@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7541C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:46:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AAD07C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:46:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A09220842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:46:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6833120842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:46:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nXOvwN/v";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="zCM04/+R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A09220842
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L4umDNTv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OmwsR34S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6833120842
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,31 +25,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Post:List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Tga+TWWj7x+tfZ+DntABgc7XxwNiDFzhyCiCMqFSxsc=; b=nXOvwN/vCuDHaf
-	ngXQBAv+0iDZcrnV2v7TBdV+Kzxqektdq0O/+p3cJlUZv8p0+y/5dIlXIk7wmzrsvq71OzsibfZKt
-	5+FUrxa+iCPM8pNNe9+KLVf/O89SBpwpDljQhx7aQpeGiIPpvtonG+8CosrDSsWjTn9GFmbDUsJc1
-	IJBJCQCpRZSXCTEw3xtT5Wp0i41LeU509mwd7cAakbdfKsZSpWU7XKN+z3f9vqI3JgZSs27BrmQqt
-	eUqdZ4jwQe7jrZau+3BX/e3dzQ4QWAQzfiVt4JXmKFm9bXnpWcBJBb17eHMp5vyJysOTmr+RPpRcf
-	COGhL9huZkcLx1TsiMrQ==;
+	List-Owner; bh=JPnDGcwH4ddEqDYDFYBY6tP9u37hWCzjfd6dHe/k7cE=; b=L4umDNTvnphsaA
+	8WKqom5BkwFdlIyePIg4DOjZfh5bU26UFLFBKd+eRCsBP5MwC6/y5+lLWnTXIVVDTOSOMLecCMgM2
+	Dnj3MWUmDu/ntk/CmAWcXYqAlcYW2ClW5+cvIUh+L1Qy8+OxGE4FVooNJPlQ9l5M7Tf0YbRwdZjrG
+	XXR2utlVW6xW3pCswpY96CTCTDtgicepV6WLECigMXVvJT2IUJg50j37+KOjehk3+U+AeWUjqkagv
+	g9OK0fK6VdYOb5JD46rS1kYLDQ5blC5cQK9ictSVjulmzBSDGhsLcjHX1S/Wkaxzv4MzjglVppXd/
+	RDgrYaqm9JXE98/O55jA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtc8T-0001mg-6z; Tue, 12 Feb 2019 17:46:21 +0000
+	id 1gtc8g-0001ys-9H; Tue, 12 Feb 2019 17:46:34 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtc8E-0001Xe-1H
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 17:46:07 +0000
+ id 1gtc8I-0001ai-3g
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 17:46:12 +0000
 Received: from localhost.localdomain (unknown [194.230.155.153])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 9FC8E222C6;
- Tue, 12 Feb 2019 17:46:02 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 49D27222C5;
+ Tue, 12 Feb 2019 17:46:06 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549993565;
- bh=FO7HAxB4PDUeZMXJICxpzdGTeJ13u79mDzeMRl3PPAU=;
+ s=default; t=1549993569;
+ bh=Nz6M9p0Hf+vB9B9GzclwdnE4pHO3RpcI7qWuiVADVvU=;
  h=From:To:Subject:Date:In-Reply-To:References:From;
- b=zCM04/+RS+LZAZYOkaTiJdc83ZxBMBWYJ1iejCyKoM03SvHnbeHV6+urBz71Mm9dt
- 8Hdies0cGqKzcMrVfECE264FL49K903HKdU6C6JUKpePFPvjba9LyWbEYoaQxBT9RT
- EU2BeiNR/rJGWEJpeFIfuO4tUHzMYTH78Gu7IrYE=
+ b=OmwsR34SU4MNjCW4gH5jzrihCsMZFwQFG5kRa8xMnLLNtV6C6TVglrXOfdBeRx1mi
+ 3eJCBZyTXa8LObk8Q6IQhEtMML2ZsSr681ua5imQH27bWRawDd3N5NbJFq/vM9gTDr
+ 9DAimU0mGLoZcfigxBIpC9/FyLXzsBJfAhO3XTNQ=
 From: Krzysztof Kozlowski <krzk@kernel.org>
 To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
  Lars-Peter Clausen <lars@metafoo.de>,
@@ -60,16 +59,15 @@ To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
  linux-iio@vger.kernel.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH 1/2] iio: adc: exynos-adc: Use proper number of channels for
- Exynos4x12
-Date: Tue, 12 Feb 2019 18:45:49 +0100
-Message-Id: <20190212174550.4383-2-krzk@kernel.org>
+Subject: [PATCH 2/2] ARM: dts: exynos: Use ADC for Exynos4x12 on Exyno4412
+Date: Tue, 12 Feb 2019 18:45:50 +0100
+Message-Id: <20190212174550.4383-3-krzk@kernel.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190212174550.4383-1-krzk@kernel.org>
 References: <20190212174550.4383-1-krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_094606_111117_688F5E76 
-X-CRM114-Status: GOOD (  13.48  )
+X-CRM114-CacheID: sfid-20190212_094610_618914_F4798F7A 
+X-CRM114-Status: GOOD (  13.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,77 +85,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Exynos4212 and Exynos4412 have only four ADC channels so using
-"samsung,exynos-adc-v1" compatible (for eight channels ADCv1) on them is
-wrong.  Add a new compatible for Exynos4x12.
+Exynos4412 should use "samsung,exynos4212-adc" compatible to report
+proper number of (four) channels.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- .../bindings/iio/adc/samsung,exynos-adc.txt     |  4 +++-
- drivers/iio/adc/exynos_adc.c                    | 17 +++++++++++++++++
- 2 files changed, 20 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos4412.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/samsung,exynos-adc.txt b/Documentation/devicetree/bindings/iio/adc/samsung,exynos-adc.txt
-index a10c1f89037d..e1fe02f3e3e9 100644
---- a/Documentation/devicetree/bindings/iio/adc/samsung,exynos-adc.txt
-+++ b/Documentation/devicetree/bindings/iio/adc/samsung,exynos-adc.txt
-@@ -11,11 +11,13 @@ New driver handles the following
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 26ad6ab3c6af..e5c041ec0756 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -274,7 +274,7 @@
+ 		};
  
- Required properties:
- - compatible:		Must be "samsung,exynos-adc-v1"
--				for exynos4412/5250 controllers.
-+				for Exynos5250 controllers.
- 			Must be "samsung,exynos-adc-v2" for
- 				future controllers.
- 			Must be "samsung,exynos3250-adc" for
- 				controllers compatible with ADC of Exynos3250.
-+			Must be "samsung,exynos4212-adc" for
-+				controllers compatible with ADC of Exynos4212 and Exynos4412.
- 			Must be "samsung,exynos7-adc" for
- 				the ADC in Exynos7 and compatibles
- 			Must be "samsung,s3c2410-adc" for
-diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-index fa2d2b5767f3..01f7c2570a1e 100644
---- a/drivers/iio/adc/exynos_adc.c
-+++ b/drivers/iio/adc/exynos_adc.c
-@@ -115,6 +115,7 @@
- #define MAX_ADC_V2_CHANNELS		10
- #define MAX_ADC_V1_CHANNELS		8
- #define MAX_EXYNOS3250_ADC_CHANNELS	2
-+#define MAX_EXYNOS4212_ADC_CHANNELS	4
- #define MAX_S5PV210_ADC_CHANNELS	10
- 
- /* Bit definitions common for ADC_V1 and ADC_V2 */
-@@ -271,6 +272,19 @@ static void exynos_adc_v1_start_conv(struct exynos_adc *info,
- 	writel(con1 | ADC_CON_EN_START, ADC_V1_CON(info->regs));
- }
- 
-+/* Exynos4212 and 4412 is like ADCv1 but with four channels only */
-+static const struct exynos_adc_data exynos4212_adc_data = {
-+	.num_channels	= MAX_EXYNOS4212_ADC_CHANNELS,
-+	.mask		= ADC_DATX_MASK,	/* 12 bit ADC resolution */
-+	.needs_adc_phy	= true,
-+	.phy_offset	= EXYNOS_ADCV1_PHY_OFFSET,
-+
-+	.init_hw	= exynos_adc_v1_init_hw,
-+	.exit_hw	= exynos_adc_v1_exit_hw,
-+	.clear_irq	= exynos_adc_v1_clear_irq,
-+	.start_conv	= exynos_adc_v1_start_conv,
-+};
-+
- static const struct exynos_adc_data exynos_adc_v1_data = {
- 	.num_channels	= MAX_ADC_V1_CHANNELS,
- 	.mask		= ADC_DATX_MASK,	/* 12 bit ADC resolution */
-@@ -492,6 +506,9 @@ static const struct of_device_id exynos_adc_match[] = {
- 	}, {
- 		.compatible = "samsung,s5pv210-adc",
- 		.data = &exynos_adc_s5pv210_data,
-+	}, {
-+		.compatible = "samsung,exynos4212-adc",
-+		.data = &exynos4212_adc_data,
- 	}, {
- 		.compatible = "samsung,exynos-adc-v1",
- 		.data = &exynos_adc_v1_data,
+ 		adc: adc@126c0000 {
+-			compatible = "samsung,exynos-adc-v1";
++			compatible = "samsung,exynos4212-adc";
+ 			reg = <0x126C0000 0x100>;
+ 			interrupt-parent = <&combiner>;
+ 			interrupts = <10 3>;
 -- 
 2.17.1
 
