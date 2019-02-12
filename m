@@ -2,62 +2,84 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B8078C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:39:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49F2AC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:40:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 893B92184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:39:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 19A712184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:40:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hmMAOJTL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 893B92184A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pzQ+iwQk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="C+sahEKz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 19A712184A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=t8RED/lFh0dQ9ipFMHABCq7IucawCJ81DNwJ0TxYrWI=; b=hmMAOJTLYW/CO9qKA4HWyZ1j+
-	2x/VxbkQmeppYV0dxK8xO/Zia7GB8Hc2yNJQkxp+EsNTvFZd8pxuHr6elGm2uOGX0giHF/x4BGCHD
-	AcOS52vRCuU4aZ+8CeEiAghzArSq65jTvZ35I2uvGO/bqiD4Cjcp8hHyf5n8EfNLdoOvTiWDx1dZn
-	YaERq6/newdDu8WOKHL19CgtY9iMkJAvQsVxNmjgMlJtiKHN814NU2eopYUcbu3CH/bThE825d+1u
-	JFKOYmkieihBFrouiFQLxsOfw1WzP0MxlOCFrCHSsexbdh2rVNiv75ku+GNmk83yulWmYz1yaHdcT
-	ikbAr4c6w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4eIm/nNnDhCk8nqtZdm4YZO+OH1fO4pennWafF7fFAU=; b=pzQ+iwQkSHqFHY
+	ncbCLk6Clu0Hj/TZegbXZIfDsDuPlqwrdFt67cA7xwAtGdaoftnKTCtuPzL6Fzs7KipVz6Y90Pf8Q
+	1wz1+ZwblvO5sCe+JgMvnfMDOr/rtAlE5EA4J8OPgv3kxL1zM270+BkRJzYtMyCLAwwEeA1a0+VP6
+	pfPrQk5txi4Vba7buBrO0Jut2Zic4Nks6YxViwtsJu/lR8sZq8BV8l7LsD4EbpFxSuESXSVAT9aZj
+	ZSJ0Me1JNxrxuvWeKerKUX9mvAJ/ObMp0WhjT2nFQz7vUwcudwcf5RH6pZO2W2rbUPWTktRHKz8mm
+	oqD3dWU5ohOki9SwzAxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtTak-0006wZ-BX; Tue, 12 Feb 2019 08:38:58 +0000
-Received: from relay8-d.mail.gandi.net ([217.70.183.201])
+	id 1gtTcB-0000Dw-QW; Tue, 12 Feb 2019 08:40:27 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtTag-0006vn-8Y
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:38:56 +0000
-X-Originating-IP: 90.88.22.177
-Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
- [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 050F91BF207;
- Tue, 12 Feb 2019 08:38:50 +0000 (UTC)
-Date: Tue, 12 Feb 2019 09:38:50 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Harald Geyer <harald@ccbib.org>
-Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
-Message-ID: <20190212083850.7genwc6ipnxtl7eo@flea>
-References: <20190211111245.GA18147@lst.de>
- <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
- <20190211153945.e34fpwkuk67l7lc6@flea>
- <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+ id 1gtTc7-0000DU-Qp
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:40:25 +0000
+Received: by mail-lf1-x142.google.com with SMTP id g2so1309837lfh.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 00:40:23 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=kapGc7eEnZJS2jJlq3PavBS0KtBWSH5wGVqr3Ma7PVk=;
+ b=C+sahEKzHhNuyY3MtTs3y8VQ7S2IAG+/hRaY3fG2nsqyB5dn7ABC3WFOi8wStHv3yP
+ Pqb3+RipqGW0NiCojzGsu/zOL8kzmgBWgF9cMKmMfkmfNWt0nBifx0dH7CMcxf7xlico
+ sTy5S+AaQQw0gAmwC9lwp9N29VPzzGGTpNgbkXvVoAewBMpcYbjsTYl3XlwZZoPCDdPg
+ L8QhyC0RKUkfyvs/u2CR9HhV5hCMkyAe86BUAj2zW4nYYOQUniI0kkO+nCzLgsMSj7E5
+ 3LEdyHf1rmtv5U2O9tCjhl3ekcEXHYj0r9etFfxK1baQfOEx7ukvTSmxASzu40aDxXYN
+ DMNw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=kapGc7eEnZJS2jJlq3PavBS0KtBWSH5wGVqr3Ma7PVk=;
+ b=s+2ygDO4gCQ9a4INQQJYeEZETnfm4P+ZIJhq8kRCq3gUrVZatZ1fDkeRI04JF+jk5i
+ 4qVHPPWDo5VdvgezRAkw6gqe9Vcpi2FRhHr1KO7UM+MkOkT0EOMzVEgV3vM3yUpREsqk
+ f5ufmGX3TWI64ub0plZScmt60Vo8SqKjR0JJIJqa2x9ErNodhhjAPOs5heRXZSx48Yy8
+ yFyjR6BAKboF/avnlluQsZC8tI+Dsc9V54HWkMyCZcMv0aEfk0IYXpBvuoTt531MHvbm
+ SxsIShK/PeI9AKDb1m6Nz3PJ8oojv0aDfDugonMMbxARL3B4J6hu0RbCfwIznxPsyjTg
+ zIbA==
+X-Gm-Message-State: AHQUAuaEFEgAw5wMYsU1QqbsNJ5bHSqYpBm5SD8QZXK4bkdvqfIEn59W
+ o1WISBB1sMxPn736ce8sjRIrAcqTbPstjRbvFq3phQ==
+X-Google-Smtp-Source: AHgI3IZ8z4QC8e7jHotvOMuIrTXc2Rlv1WBYvpBmt3BX2+0iUCQ0UEorBo18AIH3L+tnGeYhYmjSxBCLqxlYBJLmmac=
+X-Received: by 2002:ac2:42c5:: with SMTP id n5mr1603960lfl.115.1549960821979; 
+ Tue, 12 Feb 2019 00:40:21 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
-User-Agent: NeoMutt/20180716
+References: <cover.1548052878.git.baolin.wang@linaro.org>
+ <CAK8P3a3UROFLTtEcNXKtMUN283UQ6auQUOXCR=6e3BdLu5K8Nw@mail.gmail.com>
+ <CAMz4kuLotnNom9kx2EmdfVEb+gvWfEbxoh6+hiqk87EjmtYJwA@mail.gmail.com>
+ <20190201130519.GH20797@sirena.org.uk>
+In-Reply-To: <20190201130519.GH20797@sirena.org.uk>
+From: Baolin Wang <baolin.wang@linaro.org>
+Date: Tue, 12 Feb 2019 16:40:10 +0800
+Message-ID: <CAMz4kuJdPts31Ak-H=VAivvoqqPtxO5M1RdqrNPwTLT5d1h_7w@mail.gmail.com>
+Subject: Re: [PATCH 0/4] Add new device nodes for Spreadtrum SC9860 platform
+To: Mark Brown <broonie@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_003854_447865_47B22E69 
-X-CRM114-Status: GOOD (  14.43  )
+X-CRM114-CacheID: sfid-20190212_004023_995022_A00CE499 
+X-CRM114-Status: GOOD (  14.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,86 +91,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- info@olimex.com, Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7772432879733703169=="
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ arm-soc <arm@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
+ Lyra Zhang <zhang.lyra@gmail.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Orson Zhai <orsonzhai@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Mark,
 
---===============7772432879733703169==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="mbfotkrj5qb4aubt"
-Content-Disposition: inline
+Sorry for late reply.
 
-
---mbfotkrj5qb4aubt
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Feb 11, 2019 at 08:32:35PM +0100, Harald Geyer wrote:
-> > We want to model this properly. I guess using a pinctrl driver
-> > controlled through GPIO (similar to what regulator-gpio is) would be a
-> > good first step.
->=20
-> I considered this too, but didn't like it:
->=20
-> 1) Seems like a bit of overkill.
+On Fri, 1 Feb 2019 at 21:05, Mark Brown <broonie@kernel.org> wrote:
 >
-> 2) The HW at hand is a rather different kind of multiplexer than
-> what pinctrl assumes. We don't want two mutually exclusive devices,
-> (Ie don't make the kernel unbind /dev/console for the sake of audio.)
-> but we want switch the jack between two devices, that might both be
-> active at the same time. This looks more like the channel multiplexers
-> used with many ADCs and such. I guess, I could start a new subsystem
-> around this. Seems like even more overkill.
+> On Fri, Feb 01, 2019 at 08:05:30PM +0800, Baolin Wang wrote:
+>
+> > On Spreadtrum platform, we use one mfd driver [1] to populate the
+> > SC27XX series PMICs including SC2731, SC2721, SC2720 and SC2730. So we
+> > use sc27xx to be compatible with different PMICs' devices, otherwise
+> > it will be difficult to define the mfd cell arrays in mfd driver. Do
+> > you have any good suggestion? Thanks.
+>
+> You can just list all the individual device names in the of_match_table
+> for the MFD and then it can bind to any of them.  You can always map
+> them onto the same behaviour in the MFD driver if they are identical
+> from a software point of view.
 
-I'm not quite sure about how that's different from what pinctrl
-assumes. pinctrl assumes to handle devices that have multiple signals
-as input, and one as output. Isn't that exactly what you have?
+If I understood correctly, as you suggested, we should add new
+mfd_cell groups to list all different PMICs' device names. Something
+like:
 
-And pinctrl can be used dynamically as well if you need to
+static const struct mfd_cell sprd_pmic_sc2731_devs[] = {
+{
+.name = "sc27xx-wdt",
+.of_compatible = "sprd,sc2731-wdt",
+}, {
+.name = "sc27xx-rtc",
+.of_compatible = "sprd,sc2731-rtc",
+}, {
+.name = "sc27xx-charger",
+.of_compatible = "sprd,sc2731-charger",
+},  {
+.name = "sc27xx-fast-chg",
+.of_compatible = "sprd,sc2731-fast-chg",
+}, {
+.name = "sc27xx-typec",
+.of_compatible = "sprd,sc2731-typec",
+}, {
+.name = "sc27xx-eic",
+.of_compatible = "sprd,sc2731-eic",
+},
 
-> Instead I just got the original patch working, by implementing
-> "output-high" DT property in sunxi-pinctrl. I'll send a patch for
-> review soon.
+.......
 
-What do you want to do with output-high exactly?
+};
 
-Maxime
+static const struct mfd_cell sprd_pmic_sc2730_devs[] = {
+{
+.name = "sc27xx-wdt",
+.of_compatible = "sprd,sc2730-wdt",
+}, {
+.name = "sc27xx-rtc",
+.of_compatible = "sprd,sc2730-rtc",
+}, {
+.name = "sc27xx-charger",
+.of_compatible = "sprd,sc2730-charger",
+},  {
+.name = "sc27xx-fast-chg",
+.of_compatible = "sprd,sc2730-fast-chg",
+}, {
+.name = "sc27xx-typec",
+.of_compatible = "sprd,sc2730-typec",
+}, {
+.name = "sc27xx-eic",
+.of_compatible = "sprd,sc2730-eic",
+},
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+.......
 
---mbfotkrj5qb4aubt
-Content-Type: application/pgp-signature; name="signature.asc"
+};
 
------BEGIN PGP SIGNATURE-----
+......
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGKGGgAKCRDj7w1vZxhR
-xYuZAQCp23Sdst8xXZYRMCqrva1rMoo7KVAz/EnclmklBSRcBwEAlMhswxQCB6Dp
-RricCHumMDXZn3wRD/p4F0DLvdczYA4=
-=+Dq1
------END PGP SIGNATURE-----
+But from my point, they are just some meaningless duplication, and
+will waste lots of code there.
 
---mbfotkrj5qb4aubt--
-
-
---===============7772432879733703169==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+-- 
+Baolin Wang
+Best Regards
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============7772432879733703169==--
-
