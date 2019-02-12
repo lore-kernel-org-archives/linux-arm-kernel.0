@@ -2,61 +2,96 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C50CBC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:45:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C47AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:46:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94F3D21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:45:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA25421773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:46:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SRKqB8F7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94F3D21773
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jOzPuC9f";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="JGDUCiQb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA25421773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
+	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=66W5Z2EQmcdu0R5PYB1u5n8gd2SsW17VFhw8KyssYHI=; b=SRKqB8F76hnr9MgNvxS3xbe74
-	wVj14OE/qoAk7ofp2J26mfVnxqLS1mka4PU3jH/haXTa9MPpiIzgJLbex1EQtmjk8vfTmYg6AgYvB
-	KeLGa3tq8M8yzzDtkM6POw3gTx7pcy8XY5jo8w/7pdRIlTfl8f/bXagvw4/s7lxU/m949fW6UtsJ0
-	m+xvXcdZO2CLyRgXSHBjwHGnAbJDZPcOffBBop0ZHkSd/DXB6x38qPb7inbMPinZIl6P32BVCn/wn
-	zAj8Ku6jUpnXkeS1Dx0K+yslnqQNVs4q6s3FiXAlZqYUEfTf3i//BI5CNfY32Tg3Uzx7GClA7j72j
-	Cekm3m1HA==;
+	 bh=TRH6dHOxRFiBNA/3ABgfmfM2zn4HwW6TLa2ot/QQvJk=; b=jOzPuC9f/As5e9IBlzelKTjg4
+	IPhgM8itiM2BzSKsNVMNpUodP5vI3BL9bGoR0gKul2pEHQhqanadkFUrHduVH8LPCBJLZMaaiCMi7
+	w3u9Qa2BvP7rAjxmbIOFk5gTufksJHxSXzMqrp6FCOGMvgNoycRrrJmgJeSpnMUH9R1mB1UtRsmS0
+	pAo8EXpfLldmbuudaV195mQkZUNAIrPzVgXaz/czoAG2u/PRgtJveWB37VZz1K+o34KxMCrSEijUI
+	F/ZhJvYCev4jGlKwAJr3/xBWqibzJ64UgY94S/udUsRntbmhwf0zeJKjbMCM9Rs3lOJFJqtB2vv2T
+	uldetY+eQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtaFr-000098-JT; Tue, 12 Feb 2019 15:45:51 +0000
-Received: from relay5-d.mail.gandi.net ([217.70.183.197])
+	id 1gtaGM-0000Tg-2Q; Tue, 12 Feb 2019 15:46:22 +0000
+Received: from aserp2130.oracle.com ([141.146.126.79])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtaFn-00008i-F6
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:45:49 +0000
-X-Originating-IP: 185.94.189.187
-Received: from localhost (unknown [185.94.189.187])
- (Authenticated sender: maxime.ripard@bootlin.com)
- by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 15C301C0018;
- Tue, 12 Feb 2019 15:45:32 +0000 (UTC)
-Date: Tue, 12 Feb 2019 16:45:32 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH v3 2/8] drm/sun4i: dsi: Change the start delay calculation
-Message-ID: <20190212154532.uwntofq7hkm74xjv@flea>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <6e5f72e68f47ca0223877464bf12f0c3f3978de8.1549896081.git-series.maxime.ripard@bootlin.com>
- <0f3247c920d1f5ce67cc7e024125c3a4d3ca0c81.camel@bootlin.com>
+ id 1gtaGI-0000TI-N2
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:46:20 +0000
+Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
+ by aserp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1CFcc8d089975;
+ Tue, 12 Feb 2019 15:45:53 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=subject : to : cc :
+ references : from : message-id : date : mime-version : in-reply-to :
+ content-type; s=corp-2018-07-02;
+ bh=eMhNDOH++cdlbrqr2EGPEiewoTfXsUm8w7p7ZcMdX40=;
+ b=JGDUCiQb/xJpqX0PjPgd7bAHaBgqPfkR/GezmtFYiDvY/U9Imbx/6mBdZnYHsOnRVJgy
+ pV+jWhyrwNmBshdjBKFzVZt8M4ffSvq4w0rTQcoHbzfU2UrEYjVuAm8HVVHfXBESt46R
+ sCSX0boiqaZeVJ5xg/foScJYudYByFbKxY7iWWlQewZj9/4lpC6Lg0CdpLT9JGDZgIu8
+ zh7hlEDSlk/TmkWxdW/D7QWVmUB/REMoaW2BgoE3sH2Ne/VhhA2aZlWJ5pDUWkhA/gMj
+ pfSggcLPK2Cw/tcLNAnn7ctrMCZRpmidKEuPmEDU3nx0N/lu61Ol7QmBtAolcF+6d3jS fA== 
+Received: from userv0021.oracle.com (userv0021.oracle.com [156.151.31.71])
+ by aserp2130.oracle.com with ESMTP id 2qhre5cpvn-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 12 Feb 2019 15:45:53 +0000
+Received: from userv0121.oracle.com (userv0121.oracle.com [156.151.31.72])
+ by userv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1CFjlfn026656
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 12 Feb 2019 15:45:47 GMT
+Received: from abhmp0019.oracle.com (abhmp0019.oracle.com [141.146.116.25])
+ by userv0121.oracle.com (8.14.4/8.13.8) with ESMTP id x1CFjiHA008994;
+ Tue, 12 Feb 2019 15:45:45 GMT
+Received: from [192.168.1.16] (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Tue, 12 Feb 2019 07:45:44 -0800
+Subject: Re: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
+To: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+References: <cover.1547153058.git.khalid.aziz@oracle.com>
+ <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+ <20190123142047.GB19289@Konrads-MacBook-Pro.local>
+From: Khalid Aziz <khalid.aziz@oracle.com>
+Organization: Oracle Corp
+Message-ID: <0ea68b21-ac03-e9d1-3285-14e6084e10fa@oracle.com>
+Date: Tue, 12 Feb 2019 08:45:41 -0700
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <0f3247c920d1f5ce67cc7e024125c3a4d3ca0c81.camel@bootlin.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <20190123142047.GB19289@Konrads-MacBook-Pro.local>
+Content-Type: multipart/mixed; boundary="------------CE9BD2F746D7F2667607891B"
+Content-Language: en-US
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9165
+ signatures=668683
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
+ priorityscore=1501 malwarescore=0
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1011
+ lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=999 adultscore=0
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
+ definitions=main-1902120111
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_074547_801549_42129790 
-X-CRM114-Status: GOOD (  25.56  )
+X-CRM114-CacheID: sfid-20190212_074618_887657_8FFD41CA 
+X-CRM114-Status: GOOD (  22.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,112 +103,167 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7908516399185536415=="
+Cc: Tycho Andersen <tycho@docker.com>, kernel-hardening@lists.openwall.com,
+ linux-mm@kvack.org, deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
+ joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, tycho@tycho.ws,
+ ak@linux.intel.com, hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de,
+ pradeep.vincent@oracle.com, jcm@redhat.com, liran.alon@oracle.com,
+ tglx@linutronix.de, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, juergh@gmail.com,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
+ dwmw@amazon.co.uk, keescook@google.com, torvalds@linux-foundation.org,
+ kirill.shutemov@linux.intel.com
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============7908516399185536415==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="4uzrhcaamb2hejep"
-Content-Disposition: inline
-
-
---4uzrhcaamb2hejep
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+This is a multi-part message in MIME format.
+--------------CE9BD2F746D7F2667607891B
+Content-Type: text/plain; charset=utf-8
 Content-Transfer-Encoding: quoted-printable
 
-On Tue, Feb 12, 2019 at 04:28:13PM +0100, Paul Kocialkowski wrote:
-> Hi,
+On 1/23/19 7:20 AM, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jan 10, 2019 at 02:09:37PM -0700, Khalid Aziz wrote:
+>> From: Juerg Haefliger <juerg.haefliger@canonical.com>
+>>
+>> Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and=
+
+>> provide a hook for updating a single kernel page table entry (which is=
+
+>> required by the generic XPFO code).
+>>
+>> v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+>>
+>> CC: linux-arm-kernel@lists.infradead.org
+>> Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+>> Signed-off-by: Tycho Andersen <tycho@docker.com>
+>> Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+>> ---
+>>  arch/arm64/Kconfig     |  1 +
+>>  arch/arm64/mm/Makefile |  2 ++
+>>  arch/arm64/mm/xpfo.c   | 58 +++++++++++++++++++++++++++++++++++++++++=
++
+>>  3 files changed, 61 insertions(+)
+>>  create mode 100644 arch/arm64/mm/xpfo.c
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index ea2ab0330e3a..f0a9c0007d23 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -171,6 +171,7 @@ config ARM64
+>>  	select SWIOTLB
+>>  	select SYSCTL_EXCEPTION_TRACE
+>>  	select THREAD_INFO_IN_TASK
+>> +	select ARCH_SUPPORTS_XPFO
+>>  	help
+>>  	  ARM 64-bit (AArch64) Linux support.
+>> =20
+>> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+>> index 849c1df3d214..cca3808d9776 100644
+>> --- a/arch/arm64/mm/Makefile
+>> +++ b/arch/arm64/mm/Makefile
+>> @@ -12,3 +12,5 @@ KASAN_SANITIZE_physaddr.o	+=3D n
+>> =20
+>>  obj-$(CONFIG_KASAN)		+=3D kasan_init.o
+>>  KASAN_SANITIZE_kasan_init.o	:=3D n
+>> +
+>> +obj-$(CONFIG_XPFO)		+=3D xpfo.o
+>> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
+>> new file mode 100644
+>> index 000000000000..678e2be848eb
+>> --- /dev/null
+>> +++ b/arch/arm64/mm/xpfo.c
+>> @@ -0,0 +1,58 @@
+>> +/*
+>> + * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
+>> + * Copyright (C) 2016 Brown University. All rights reserved.
+>> + *
+>> + * Authors:
+>> + *   Juerg Haefliger <juerg.haefliger@hpe.com>
+>> + *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modi=
+fy it
+>> + * under the terms of the GNU General Public License version 2 as pub=
+lished by
+>> + * the Free Software Foundation.
+>> + */
+>> +
+>> +#include <linux/mm.h>
+>> +#include <linux/module.h>
+>> +
+>> +#include <asm/tlbflush.h>
+>> +
+>> +/*
+>> + * Lookup the page table entry for a virtual address and return a poi=
+nter to
+>> + * the entry. Based on x86 tree.
+>> + */
+>> +static pte_t *lookup_address(unsigned long addr)
 >=20
-> On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
-> > The current calculation for the video start delay in the current DSI dr=
-iver
-> > is that it is the total vertical size, minus the front porch and sync l=
-ength,
-> > plus 1. This equals to the active vertical size plus the back porch plu=
-s 1.
-> >=20
-> > That 1 is coming in the Allwinner BSP from an variable that is set to 1.
-> > However, if we look at the Allwinner BSP more closely, and especially in
-> > the "legacy" code for the display (in drivers/video/sunxi/legacy/), we =
-can
-> > see that this variable is actually computed from the porches and the sy=
-nc
-> > minus 10, clamped between 8 and 100.
+> The x86 also has level. Would it make sense to include that in here?
 >=20
-> For future reference, it look like there is a version of the BSP where
-> this is clamped between 8 and 31 in the legacy ebios code:
-> https://github.com/Icenowy/linux-kernel-lichee-a33/blob/master/drivers/vi=
-deo/sunxi/legacy/disp/de_bsp/de/ebios/de_dsi.c#L687
->=20
-> As well as in the A23 code:
-> https://github.com/Icenowy/linux-kernel-lichee-a33/blob/master/drivers/vi=
-deo/sunxi/disp/de/lowlevel_sun8iw3/de_dsi.c#L686
->=20
-> > This fixes the start delay symptom we've seen on some panels (vblank
-> > timeouts with vertical white stripes at the bottom of the panel).
-> >=20
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> >=20
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/s=
-un4i/sun6i_mipi_dsi.c
-> > index 380fc527a707..9471fa695ec7 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -357,7 +357,9 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *d=
-si,
-> >  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
-> >  					   struct drm_display_mode *mode)
-> >  {
-> > -	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> > +	u16 start =3D clamp(mode->vtotal - mode->vdisplay - 10, 8, 100);
-> > +
-> > +	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
->=20
-> Looking at the formula from the BSP, I get a different result from
-> yours.
->=20
-> From what I can see, the BSP formula is:
-> start_delay =3D vtotal - vfp + start
-> vfp =3D vtotal - y - vbp
->=20
-> With vbp counting the back porch and sync length.
 
-vbp is only the back porch.
+Possibly. ARM64 does not define page levels (as in the enum for page
+levels) at this time but that can be added easily. Adding level to
+lookup_address() for arm will make it uniform with x86 but is there any
+other rationale besides that? Do you see a future use for this
+information? The only other architecture I could see that defines
+lookup_address() is sh but it uses it for trapped io only.
 
-Maxime
+Thanks,
+Khalid
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+--------------CE9BD2F746D7F2667607891B
+Content-Type: application/pgp-keys;
+ name="pEpkey.asc"
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: attachment;
+ filename="pEpkey.asc"
 
---4uzrhcaamb2hejep
-Content-Type: application/pgp-signature; name="signature.asc"
+-----BEGIN PGP PUBLIC KEY BLOCK-----
 
------BEGIN PGP SIGNATURE-----
+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
++Wrj8Rwom6h21PXZRKnlkis7ibQfE+TxqOI7vg=3D=3D
+=3DnPqY
+-----END PGP PUBLIC KEY BLOCK-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGLqHAAKCRDj7w1vZxhR
-xUSMAQC4LTp8gqnt5iC/7ksPG7XPYmOUGIP/Qs5Mwts/qUUiBAD9EPUjVe78jXiM
-VpzeS8E66xnifs0JmaQDpSYdZDNsxwU=
-=zHqD
------END PGP SIGNATURE-----
-
---4uzrhcaamb2hejep--
-
-
---===============7908516399185536415==
+--------------CE9BD2F746D7F2667607891B
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -184,5 +274,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============7908516399185536415==--
+--------------CE9BD2F746D7F2667607891B--
 
