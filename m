@@ -2,22 +2,22 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2538BC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:43:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50074C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:43:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DCE8C20818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:43:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 12B3E20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:43:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RmF1RzAz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="SAMKq/hS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCE8C20818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="no/BVNEa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="ZzAl76Px"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 12B3E20818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1GDkA3wmEHat28l95VSws6S+K6i81K9tZ3RWy8nElWw=; b=RmF1RzAzqihIrV
-	y5q8igfORlnPulSLpcnhkZ4aU2iQnoom6bbnGtRG+FPbE6YvPMG2ovA4YmCsbSpvIQVtV0UsHR+hm
-	FSu5Vn906+HenEaZPsVNQxcYmWJ0AbwLu9ZM/n3qay3s0Yd5fLvzb9t3LZNfM7cMmzD8w0NG8jI7Y
-	n7VLas/+Mv23tMqpSaeCmuwHebVICpQRu5wDRftUIB7J3fR6jnNHxwiuzvbcUs0CiXCTrukb1lHDx
-	LCER7c4oS5Nm/sI62s3U+M07+duQVyNEJ/XTU9ylNYT7C9jUz0bNZQszW1g026KslNSJljpQD4yC+
-	GIKqWileC4ii7ZV6h53Q==;
+	List-Owner; bh=AzHMBh2nhcV6XgicsoNa1fdhE7CpCc9mdaHVTSYZODg=; b=no/BVNEa7FJ1kB
+	vQ9phyWoR6wi3tMgSA0i1mpTVbukB9/u0P+nDUFUpRWQ1G5qO6PpZ+lTDgpGhJqpcFhZtWDuWEI72
+	06vl21aM9dCqlnK8LH40kRonAOQLBtAHG6lnpXO9G8lhBn80XARpMNysWUiPugncZMHRIZULPwHpV
+	rbuS/UmHA2GuAIgvalD+0+82KnLqZ28f+T9Oc4ehRTCs73PJ3akYYnNDk85vDcz9lkgvnvK1o4Asq
+	WEcEiJttRIpiVRRnQtvjZVbjcKaCR/wb0z6fguANjDXwm2UdsXDeljcYXmt1Ar7zhWllBVkMJzRvb
+	LkIVlEGIuxXgL5MXrDsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVX7-0002ZV-UQ; Tue, 12 Feb 2019 10:43:21 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gtVXK-0002ma-Cw; Tue, 12 Feb 2019 10:43:34 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVTC-0006A4-Fp
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:34 +0000
-Received: by mail-wr1-x441.google.com with SMTP id l9so2047487wrt.13
+ id 1gtVT0-0005wN-PO
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:33 +0000
+Received: by mail-wr1-x443.google.com with SMTP id i12so2130267wrw.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 02:39:18 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:06 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=YW/+k9BvoNkqcFFu2Jlt+OYGUXl4uq4KzMp9XtY9tko=;
- b=SAMKq/hSpan8l7XX2bCvj0DZyFuvIOmDR0IzHKmx+nGiDqONLy0HUB2tZLdAcgpHQx
- NV0q7iX4BefA4GcIZlufRwSEwfkaGBGAQeCNu5EIWQVkyDbpgA7PuYqeMHbN1ELcC0/w
- w90noVSzPidcHvFeQoQLzIkdwOK0LQcnwDBK3zpkEcl9RYwx2vTtdLMy/avUv9dKR+5w
- sMJFB8rPxkPwOJHjwpEhvw5bii0AIXOmmWt5QUUHXSvdzQcq48yhkOXNFtqPUuhAkK4o
- fxQbnJo3nOAsGff59ZUHWYtq/bO/1y1S8xLAiO4hRaiJMNJUDjM4bafQwsEvmxQVV7bs
- ymOA==
+ bh=d1EQNjSyfpUGzBvEAYsI2d5nLa3DxeE3XVawtvrOQTM=;
+ b=ZzAl76PxCyFUwYAe98atSjhncUtsStLOmudKVRrDqp8x3KTiAvRyuVpZismxMqXcCV
+ BAcc5GedMkL6WVGXtirLzUBA6hOqD3DyCXIJXl8G+HqqoJ2OggqehT109WFQjBQ1JJoP
+ c35ZqMxlKAxpezq0eecr8PLMnSaRId0dfeV0SBP7SUiYhU1iNQ4fJnZVue+I9rjDKnxc
+ 8ZdGKhWQw26HBio7fkkFk6SawEK56CrvYBlEPB8ri6ZEyOm9GjRAibR4KQCfXpZ1Ipa/
+ GEx50uoCQ7EWb74fjaYU8sOIGKW/LFlzEYKRHztr1DVG0vfo8x9D5wjGnup30/t6hdHj
+ LKqQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=YW/+k9BvoNkqcFFu2Jlt+OYGUXl4uq4KzMp9XtY9tko=;
- b=QWmj65qMAjgP1lcQazef+9BxEJZInyc6NnHFZQGN+dnGwxEumzEDgJwStCUJZw2SpV
- IvD0Cdx9ndG+Pu01s7z0HjUiO8rUu8o5DFCdo68Ds8ayZP0bNGr53XPl0hGlJefuoJm5
- SIIZ41UnixKY9TnrUWK3oHz99bcdnAgKNCbpDcgEA/6ZIwO08VLIC4Mg3B1Vdh4WH688
- vWljrGAqjXzHmmSmHBLu/SuAesK6NkwtJapi8Y8bW6HGBUsjJZzil7NFz2bE3fUyXUT5
- fxicaijrCnM78rBZEG1GkK2+bJTylqHJki63bEDEeB6zRLowabLw9Gn4uYPAMz5MJJfA
- EYKQ==
-X-Gm-Message-State: AHQUAuaJrno1NP/3JFW1kNY3vfvj0ODOXRxzzOqPrSXcHqs7mbJS8L6J
- /uWe46IgMROzqb1kIbE0kZ1vCg==
-X-Google-Smtp-Source: AHgI3IYNqqBh/dJ4wlNKKUJ/oUzmhU79BVRca01lENmGXc8MjLwWEO6E5I/P6Cd++k7OOJqKUNIM6Q==
-X-Received: by 2002:adf:fb0d:: with SMTP id c13mr2509256wrr.285.1549967956961; 
- Tue, 12 Feb 2019 02:39:16 -0800 (PST)
+ bh=d1EQNjSyfpUGzBvEAYsI2d5nLa3DxeE3XVawtvrOQTM=;
+ b=SstSNfdAojgEuy9xUAfkfM5gtuBJCnK8WVmzsSJ/WVYS47F8wKu5lRAcsOYc3KtuJ+
+ 2vzczx9SRF2FOH3AhyNDBCH23HV/egxZt39Mt1Y1HNeK8MRajHkQsd0/3RNRmVQc4Jqf
+ DDFuMONHN+SlLHfP/7ayuueSyrcBFxtrBv/QOg9xjmbDOcTqid05Blc+dq09vDHri24W
+ u8xCrQoLOD7IKZrnvuQMMvIQXEMTn7c1i7OMM97iXtpRP5rI010JBX+9oHS6ns+2MCH1
+ bzPHDz2dMEejt7H0yz5B1CQQpH8m+cMEXgaXKiEAPiiG/s5G0wgvuBr9IBPD0p7V60Uw
+ c9kg==
+X-Gm-Message-State: AHQUAuaH5zxzmIei9ijMMO3YsKGes6Q/PHUv5bZWdLaHCB9qcodZB0rC
+ jcsA3+r6LaUTDK4q1G6k/nuhrQ==
+X-Google-Smtp-Source: AHgI3IY0j8aDe1M3W8H94xFw015uVaAxIBJWZ2bWvDoIJzoXXiYBsVTWlmCxN5GyEvDnfq6v+1mm5A==
+X-Received: by 2002:adf:e647:: with SMTP id b7mr2325846wrn.260.1549967944816; 
+ Tue, 12 Feb 2019 02:39:04 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
- by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.15
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.03
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 02:39:16 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:03 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 17/37] ARM: davinci: aintc: use the new config structure
-Date: Tue, 12 Feb 2019 11:38:15 +0100
-Message-Id: <20190212103835.7768-18-brgl@bgdev.pl>
+Subject: [PATCH v3 07/37] ARM: davinci: wrap HW interrupt numbers with a macro
+Date: Tue, 12 Feb 2019 11:38:05 +0100
+Message-Id: <20190212103835.7768-8-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
 References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_023918_916169_24D410CE 
-X-CRM114-Status: GOOD (  17.19  )
+X-CRM114-CacheID: sfid-20190212_023907_615809_02077AF1 
+X-CRM114-Status: GOOD (  15.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,180 +108,1310 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Modify the aintc driver to take all its configuration from the new
-config structure. Stop referencing davinci_soc_info in any way.
-Move the declaration for davinci_aintc_init() to irq-davinci-aintc.h
-and make it take the new config structure as parameter. Convert all
-users to the new version.
+Once we select SPARSE_IRQ, the interrupt numbers defined in mach/irqs.h
+will only signify the hardware interrupt offsets, not the interrupt
+numbers seen by linux. Introduce a wrapper macro that translates the
+hwirq number to virtual numbers. For now it's just a dummy. Use that
+macro when specifying the interrupts in resources for platform devices.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/dm355.c               |  2 +-
- arch/arm/mach-davinci/dm365.c               |  2 +-
- arch/arm/mach-davinci/dm644x.c              |  2 +-
- arch/arm/mach-davinci/dm646x.c              |  2 +-
- arch/arm/mach-davinci/include/mach/common.h |  2 --
- arch/arm/mach-davinci/irq.c                 | 39 +++++++++++----------
- include/linux/irqchip/irq-davinci-aintc.h   |  2 ++
- 7 files changed, 26 insertions(+), 25 deletions(-)
+ arch/arm/mach-davinci/asp.h                 |   8 +-
+ arch/arm/mach-davinci/da830.c               |  12 +-
+ arch/arm/mach-davinci/da850.c               |  28 ++--
+ arch/arm/mach-davinci/devices-da8xx.c       | 146 ++++++++++----------
+ arch/arm/mach-davinci/devices.c             |  31 +++--
+ arch/arm/mach-davinci/dm355.c               |  56 ++++----
+ arch/arm/mach-davinci/dm365.c               |  80 +++++------
+ arch/arm/mach-davinci/dm644x.c              |  46 +++---
+ arch/arm/mach-davinci/dm646x.c              |  60 ++++----
+ arch/arm/mach-davinci/include/mach/common.h |   3 +
+ arch/arm/mach-davinci/irq.c                 |   2 +-
+ arch/arm/mach-davinci/usb-da8xx.c           |   6 +-
+ arch/arm/mach-davinci/usb.c                 |   7 +-
+ 13 files changed, 246 insertions(+), 239 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index ff79c1a17fae..c7cd765114af 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -805,7 +805,7 @@ static const struct davinci_aintc_config dm355_aintc_config = {
+diff --git a/arch/arm/mach-davinci/asp.h b/arch/arm/mach-davinci/asp.h
+index 495aa6907cbc..d0ecd1d0f084 100644
+--- a/arch/arm/mach-davinci/asp.h
++++ b/arch/arm/mach-davinci/asp.h
+@@ -49,9 +49,9 @@
+ #define DAVINCI_DA830_DMA_MCASP2_AXEVT	5
  
- void __init dm355_init_irq(void)
- {
--	davinci_aintc_init();
-+	davinci_aintc_init(&dm355_aintc_config);
- }
+ /* Interrupts */
+-#define DAVINCI_ASP0_RX_INT	IRQ_MBRINT
+-#define DAVINCI_ASP0_TX_INT	IRQ_MBXINT
+-#define DAVINCI_ASP1_RX_INT	IRQ_MBRINT
+-#define DAVINCI_ASP1_TX_INT	IRQ_MBXINT
++#define DAVINCI_ASP0_RX_INT	DAVINCI_INTC_IRQ(IRQ_MBRINT)
++#define DAVINCI_ASP0_TX_INT	DAVINCI_INTC_IRQ(IRQ_MBXINT)
++#define DAVINCI_ASP1_RX_INT	DAVINCI_INTC_IRQ(IRQ_MBRINT)
++#define DAVINCI_ASP1_TX_INT	DAVINCI_INTC_IRQ(IRQ_MBXINT)
  
- static int __init dm355_init_devices(void)
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index 44dc3ca94dd3..bde3c3b94cc9 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -1064,7 +1064,7 @@ static const struct davinci_aintc_config dm365_aintc_config = {
- 
- void __init dm365_init_irq(void)
- {
--	davinci_aintc_init();
-+	davinci_aintc_init(&dm365_aintc_config);
- }
- 
- static int __init dm365_init_devices(void)
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 0b0ecac36486..6d3498058283 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -741,7 +741,7 @@ static const struct davinci_aintc_config dm644x_aintc_config = {
- 
- void __init dm644x_init_irq(void)
- {
--	davinci_aintc_init();
-+	davinci_aintc_init(&dm644x_aintc_config);
- }
- 
- void __init dm644x_init_devices(void)
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index 4e871d00e4e9..a0a8b336c1a4 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -702,7 +702,7 @@ static const struct davinci_aintc_config dm646x_aintc_config = {
- 
- void __init dm646x_init_irq(void)
- {
--	davinci_aintc_init();
-+	davinci_aintc_init(&dm646x_aintc_config);
- }
- 
- static int __init dm646x_init_devices(void)
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 8c9c011f96f6..14e0e1c40611 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -24,8 +24,6 @@
- 
- void davinci_timer_init(struct clk *clk);
- 
--extern void davinci_aintc_init(void);
--
- struct davinci_timer_instance {
- 	u32		base;
- 	u32		bottom_irq;
-diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index 509be44eda22..1b2eeddfabd1 100644
---- a/arch/arm/mach-davinci/irq.c
-+++ b/arch/arm/mach-davinci/irq.c
-@@ -8,6 +8,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/irq-davinci-aintc.h>
- #include <linux/io.h>
- #include <linux/irqdomain.h>
- 
-@@ -82,13 +83,14 @@ davinci_aintc_handle_irq(struct pt_regs *regs)
- }
- 
- /* ARM Interrupt Controller Initialization */
--void __init davinci_aintc_init(void)
-+void __init davinci_aintc_init(const struct davinci_aintc_config *config)
- {
--	unsigned i, j;
--	const u8 *davinci_def_priorities = davinci_soc_info.intc_irq_prios;
-+	unsigned int irq_off, reg_off, prio, shift;
- 	int ret, irq_base;
-+	const u8 *prios;
- 
--	davinci_aintc_base = ioremap(davinci_soc_info.intc_base, SZ_4K);
-+	davinci_aintc_base = ioremap(config->reg.start,
-+				     resource_size(&config->reg));
- 	if (WARN_ON(!davinci_aintc_base))
- 		return;
- 
-@@ -114,23 +116,21 @@ void __init davinci_aintc_init(void)
- 	davinci_aintc_writel(~0x0, DAVINCI_AINTC_IRQ_REG0);
- 	davinci_aintc_writel(~0x0, DAVINCI_AINTC_IRQ_REG1);
- 
--	for (i = DAVINCI_AINTC_IRQ_INTPRI0_REG;
--	     i <= DAVINCI_AINTC_IRQ_INTPRI7_REG; i += 4) {
--		u32		pri;
--
--		for (j = 0, pri = 0; j < 32; j += 4, davinci_def_priorities++)
--			pri |= (*davinci_def_priorities & 0x07) << j;
--		davinci_aintc_writel(pri, i);
-+	prios = config->prios;
-+	for (reg_off = DAVINCI_AINTC_IRQ_INTPRI0_REG;
-+	     reg_off <= DAVINCI_AINTC_IRQ_INTPRI7_REG; reg_off += 4) {
-+		for (shift = 0, prio = 0; shift < 32; shift += 4, prios++)
-+			prio |= (*prios & 0x07) << shift;
-+		davinci_aintc_writel(prio, reg_off);
- 	}
- 
--	irq_base = irq_alloc_descs(-1, 0, davinci_soc_info.intc_irq_num, 0);
-+	irq_base = irq_alloc_descs(-1, 0, config->num_irqs, 0);
- 	if (WARN_ON(irq_base < 0))
- 		return;
- 
- 	davinci_aintc_irq_domain = irq_domain_add_legacy(NULL,
--					davinci_soc_info.intc_irq_num,
--					irq_base, 0, &irq_domain_simple_ops,
--					NULL);
-+						config->num_irqs, irq_base, 0,
-+						&irq_domain_simple_ops, NULL);
- 	if (WARN_ON(!davinci_aintc_irq_domain))
- 		return;
- 
-@@ -140,10 +140,11 @@ void __init davinci_aintc_init(void)
- 	if (WARN_ON(ret))
- 		return;
- 
--	for (i = 0, j = 0; i < davinci_soc_info.intc_irq_num;
--	     i += 32, j += 0x04)
--		davinci_aintc_setup_gc(davinci_aintc_base + j,
--				       irq_base + i, 32);
-+	for (irq_off = 0, reg_off = 0;
-+	     irq_off < config->num_irqs;
-+	     irq_off += 32, reg_off += 0x04)
-+		davinci_aintc_setup_gc(davinci_aintc_base + reg_off,
-+				       irq_base + irq_off, 32);
- 
- 	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
- 	set_handle_irq(davinci_aintc_handle_irq);
-diff --git a/include/linux/irqchip/irq-davinci-aintc.h b/include/linux/irqchip/irq-davinci-aintc.h
-index 2b2ace3c1b22..ea4e087fac98 100644
---- a/include/linux/irqchip/irq-davinci-aintc.h
-+++ b/include/linux/irqchip/irq-davinci-aintc.h
-@@ -22,4 +22,6 @@ struct davinci_aintc_config {
- 	u8 *prios;
+ #endif /* __ASM_ARCH_DAVINCI_ASP_H */
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 9e18b245266b..aa8da725a325 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -772,17 +772,17 @@ int __init da830_register_gpio(void)
+ static struct davinci_timer_instance da830_timer_instance[2] = {
+ 	{
+ 		.base		= DA8XX_TIMER64P0_BASE,
+-		.bottom_irq	= IRQ_DA8XX_TINT12_0,
+-		.top_irq	= IRQ_DA8XX_TINT34_0,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_0),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_0),
+ 		.cmp_off	= DA830_CMP12_0,
+-		.cmp_irq	= IRQ_DA830_T12CMPINT0_0,
++		.cmp_irq	= DAVINCI_INTC_IRQ(IRQ_DA830_T12CMPINT0_0),
+ 	},
+ 	{
+ 		.base		= DA8XX_TIMER64P1_BASE,
+-		.bottom_irq	= IRQ_DA8XX_TINT12_1,
+-		.top_irq	= IRQ_DA8XX_TINT34_1,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_1),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_1),
+ 		.cmp_off	= DA830_CMP12_0,
+-		.cmp_irq	= IRQ_DA830_T12CMPINT0_1,
++		.cmp_irq	= DAVINCI_INTC_IRQ(IRQ_DA830_T12CMPINT0_1),
+ 	},
  };
  
-+void davinci_aintc_init(const struct davinci_aintc_config *config);
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index e823b89e2b7a..d22b19833326 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -439,23 +439,23 @@ static struct davinci_id da850_ids[] = {
+ static struct davinci_timer_instance da850_timer_instance[4] = {
+ 	{
+ 		.base		= DA8XX_TIMER64P0_BASE,
+-		.bottom_irq	= IRQ_DA8XX_TINT12_0,
+-		.top_irq	= IRQ_DA8XX_TINT34_0,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_0),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_0),
+ 	},
+ 	{
+ 		.base		= DA8XX_TIMER64P1_BASE,
+-		.bottom_irq	= IRQ_DA8XX_TINT12_1,
+-		.top_irq	= IRQ_DA8XX_TINT34_1,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_1),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_1),
+ 	},
+ 	{
+ 		.base		= DA850_TIMER64P2_BASE,
+-		.bottom_irq	= IRQ_DA850_TINT12_2,
+-		.top_irq	= IRQ_DA850_TINT34_2,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA850_TINT12_2),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA850_TINT34_2),
+ 	},
+ 	{
+ 		.base		= DA850_TIMER64P3_BASE,
+-		.bottom_irq	= IRQ_DA850_TINT12_3,
+-		.top_irq	= IRQ_DA850_TINT34_3,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA850_TINT12_3),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA850_TINT34_3),
+ 	},
+ };
+ 
+@@ -658,8 +658,8 @@ static struct platform_device da850_vpif_dev = {
+ 
+ static struct resource da850_vpif_display_resource[] = {
+ 	{
+-		.start = IRQ_DA850_VPIFINT,
+-		.end   = IRQ_DA850_VPIFINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -677,13 +677,13 @@ static struct platform_device da850_vpif_display_dev = {
+ 
+ static struct resource da850_vpif_capture_resource[] = {
+ 	{
+-		.start = IRQ_DA850_VPIFINT,
+-		.end   = IRQ_DA850_VPIFINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start = IRQ_DA850_VPIFINT,
+-		.end   = IRQ_DA850_VPIFINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DA850_VPIFINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index cf78da5ab054..298165095d31 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -64,7 +64,7 @@ void __iomem *da8xx_syscfg1_base;
+ static struct plat_serial8250_port da8xx_serial0_pdata[] = {
+ 	{
+ 		.mapbase	= DA8XX_UART0_BASE,
+-		.irq		= IRQ_DA8XX_UARTINT0,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_DA8XX_UARTINT0),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 					UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -77,7 +77,7 @@ static struct plat_serial8250_port da8xx_serial0_pdata[] = {
+ static struct plat_serial8250_port da8xx_serial1_pdata[] = {
+ 	{
+ 		.mapbase	= DA8XX_UART1_BASE,
+-		.irq		= IRQ_DA8XX_UARTINT1,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_DA8XX_UARTINT1),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 					UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -90,7 +90,7 @@ static struct plat_serial8250_port da8xx_serial1_pdata[] = {
+ static struct plat_serial8250_port da8xx_serial2_pdata[] = {
+ 	{
+ 		.mapbase	= DA8XX_UART2_BASE,
+-		.irq		= IRQ_DA8XX_UARTINT2,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_DA8XX_UARTINT2),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 					UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -171,12 +171,12 @@ static struct resource da8xx_edma0_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_DA8XX_CCINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_CCINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_DA8XX_CCERRINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_CCERRINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -196,12 +196,12 @@ static struct resource da850_edma1_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_DA850_CCINT1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA850_CCINT1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_DA850_CCERRINT1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA850_CCERRINT1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -306,8 +306,8 @@ static struct resource da8xx_i2c_resources0[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_I2CINT0,
+-		.end	= IRQ_DA8XX_I2CINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_I2CINT0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_I2CINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -326,8 +326,8 @@ static struct resource da8xx_i2c_resources1[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_I2CINT1,
+-		.end	= IRQ_DA8XX_I2CINT1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_I2CINT1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_I2CINT1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -382,23 +382,23 @@ static struct resource da8xx_emac_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_C0_RX_THRESH_PULSE,
+-		.end	= IRQ_DA8XX_C0_RX_THRESH_PULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_RX_THRESH_PULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_RX_THRESH_PULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_C0_RX_PULSE,
+-		.end	= IRQ_DA8XX_C0_RX_PULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_RX_PULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_RX_PULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_C0_TX_PULSE,
+-		.end	= IRQ_DA8XX_C0_TX_PULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_TX_PULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_TX_PULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_C0_MISC_PULSE,
+-		.end	= IRQ_DA8XX_C0_MISC_PULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_MISC_PULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_C0_MISC_PULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -470,7 +470,7 @@ static struct resource da830_mcasp1_resources[] = {
+ 	},
+ 	{
+ 		.name	= "common",
+-		.start	= IRQ_DA8XX_MCASPINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_MCASPINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -505,7 +505,7 @@ static struct resource da830_mcasp2_resources[] = {
+ 	},
+ 	{
+ 		.name	= "common",
+-		.start	= IRQ_DA8XX_MCASPINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_MCASPINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -540,7 +540,7 @@ static struct resource da850_mcasp_resources[] = {
+ 	},
+ 	{
+ 		.name	= "common",
+-		.start	= IRQ_DA8XX_MCASPINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_MCASPINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -588,43 +588,43 @@ static struct resource da8xx_pruss_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT0,
+-		.end	= IRQ_DA8XX_EVTOUT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT1,
+-		.end	= IRQ_DA8XX_EVTOUT1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT2,
+-		.end	= IRQ_DA8XX_EVTOUT2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT3,
+-		.end	= IRQ_DA8XX_EVTOUT3,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT3),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT3),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT4,
+-		.end	= IRQ_DA8XX_EVTOUT4,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT4),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT4),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT5,
+-		.end	= IRQ_DA8XX_EVTOUT5,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT5),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT5),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT6,
+-		.end	= IRQ_DA8XX_EVTOUT6,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT6),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT6),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_EVTOUT7,
+-		.end	= IRQ_DA8XX_EVTOUT7,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT7),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_EVTOUT7),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -674,8 +674,8 @@ static struct resource da8xx_lcdc_resources[] = {
+ 		.flags  = IORESOURCE_MEM,
+ 	},
+ 	[1] = { /* interrupt */
+-		.start  = IRQ_DA8XX_LCDINT,
+-		.end    = IRQ_DA8XX_LCDINT,
++		.start  = DAVINCI_INTC_IRQ(IRQ_DA8XX_LCDINT),
++		.end    = DAVINCI_INTC_IRQ(IRQ_DA8XX_LCDINT),
+ 		.flags  = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -700,48 +700,48 @@ static struct resource da8xx_gpio_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{ /* interrupt */
+-		.start	= IRQ_DA8XX_GPIO0,
+-		.end	= IRQ_DA8XX_GPIO0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO1,
+-		.end	= IRQ_DA8XX_GPIO1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO2,
+-		.end	= IRQ_DA8XX_GPIO2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO3,
+-		.end	= IRQ_DA8XX_GPIO3,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO3),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO3),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO4,
+-		.end	= IRQ_DA8XX_GPIO4,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO4),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO4),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO5,
+-		.end	= IRQ_DA8XX_GPIO5,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO5),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO5),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO6,
+-		.end	= IRQ_DA8XX_GPIO6,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO6),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO6),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO7,
+-		.end	= IRQ_DA8XX_GPIO7,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO7),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO7),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DA8XX_GPIO8,
+-		.end	= IRQ_DA8XX_GPIO8,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO8),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_GPIO8),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -766,8 +766,8 @@ static struct resource da8xx_mmcsd0_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{		/* interrupt */
+-		.start	= IRQ_DA8XX_MMCSDINT0,
+-		.end	= IRQ_DA8XX_MMCSDINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_MMCSDINT0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_MMCSDINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -793,8 +793,8 @@ static struct resource da850_mmcsd1_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{		/* interrupt */
+-		.start	= IRQ_DA850_MMCSDINT0_1,
+-		.end	= IRQ_DA850_MMCSDINT0_1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA850_MMCSDINT0_1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA850_MMCSDINT0_1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -845,8 +845,8 @@ static struct resource da8xx_rproc_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	{ /* dsp irq */
+-		.start		= IRQ_DA8XX_CHIPINT0,
+-		.end		= IRQ_DA8XX_CHIPINT0,
++		.start		= DAVINCI_INTC_IRQ(IRQ_DA8XX_CHIPINT0),
++		.end		= DAVINCI_INTC_IRQ(IRQ_DA8XX_CHIPINT0),
+ 		.flags		= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -936,13 +936,13 @@ static struct resource da8xx_rtc_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	{ /* timer irq */
+-		.start		= IRQ_DA8XX_RTC,
+-		.end		= IRQ_DA8XX_RTC,
++		.start		= DAVINCI_INTC_IRQ(IRQ_DA8XX_RTC),
++		.end		= DAVINCI_INTC_IRQ(IRQ_DA8XX_RTC),
+ 		.flags		= IORESOURCE_IRQ,
+ 	},
+ 	{ /* alarm irq */
+-		.start		= IRQ_DA8XX_RTC,
+-		.end		= IRQ_DA8XX_RTC,
++		.start		= DAVINCI_INTC_IRQ(IRQ_DA8XX_RTC),
++		.end		= DAVINCI_INTC_IRQ(IRQ_DA8XX_RTC),
+ 		.flags		= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -1009,8 +1009,8 @@ static struct resource da8xx_spi0_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= IRQ_DA8XX_SPINT0,
+-		.end	= IRQ_DA8XX_SPINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_SPINT0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_SPINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -1022,8 +1022,8 @@ static struct resource da8xx_spi1_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= IRQ_DA8XX_SPINT1,
+-		.end	= IRQ_DA8XX_SPINT1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_SPINT1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_SPINT1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -1103,7 +1103,7 @@ static struct resource da850_sata_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DA850_SATAINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA850_SATAINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
+index e8dbbb7479ab..722c463f9b18 100644
+--- a/arch/arm/mach-davinci/devices.c
++++ b/arch/arm/mach-davinci/devices.c
+@@ -56,7 +56,7 @@ static struct resource i2c_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start		= IRQ_I2C,
++		.start		= DAVINCI_INTC_IRQ(IRQ_I2C),
+ 		.flags		= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -84,8 +84,8 @@ static struct resource ide_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start		= IRQ_IDE,
+-		.end		= IRQ_IDE,
++		.start		= DAVINCI_INTC_IRQ(IRQ_IDE),
++		.end		= DAVINCI_INTC_IRQ(IRQ_IDE),
+ 		.flags		= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -133,11 +133,11 @@ static struct resource mmcsd0_resources[] = {
+ 	},
+ 	/* IRQs:  MMC/SD, then SDIO */
+ 	{
+-		.start = IRQ_MMCINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_MMCINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	}, {
+ 		/* different on dm355 */
+-		.start = IRQ_SDIOINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_SDIOINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -163,10 +163,10 @@ static struct resource mmcsd1_resources[] = {
+ 	},
+ 	/* IRQs:  MMC/SD, then SDIO */
+ 	{
+-		.start = IRQ_DM355_MMCINT1,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM355_MMCINT1),
+ 		.flags = IORESOURCE_IRQ,
+ 	}, {
+-		.start = IRQ_DM355_SDIOINT1,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM355_SDIOINT1),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -219,7 +219,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ 			mmcsd1_resources[0].start = DM365_MMCSD1_BASE;
+ 			mmcsd1_resources[0].end = DM365_MMCSD1_BASE +
+ 							SZ_4K - 1;
+-			mmcsd1_resources[2].start = IRQ_DM365_SDIOINT1;
++			mmcsd1_resources[2].start = DAVINCI_INTC_IRQ(
++							IRQ_DM365_SDIOINT1);
+ 			davinci_mmcsd1_device.name = "da830-mmc";
+ 		} else
+ 			break;
+@@ -230,7 +231,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ 		if (cpu_is_davinci_dm355()) {
+ 			mmcsd0_resources[0].start = DM355_MMCSD0_BASE;
+ 			mmcsd0_resources[0].end = DM355_MMCSD0_BASE + SZ_4K - 1;
+-			mmcsd0_resources[2].start = IRQ_DM355_SDIOINT0;
++			mmcsd0_resources[2].start = DAVINCI_INTC_IRQ(
++							IRQ_DM355_SDIOINT0);
+ 
+ 			/* expose all 6 MMC0 signals:  CLK, CMD, DATA[0..3] */
+ 			davinci_cfg_reg(DM355_MMCSD0);
+@@ -241,7 +243,8 @@ void __init davinci_setup_mmc(int module, struct davinci_mmc_config *config)
+ 			mmcsd0_resources[0].start = DM365_MMCSD0_BASE;
+ 			mmcsd0_resources[0].end = DM365_MMCSD0_BASE +
+ 							SZ_4K - 1;
+-			mmcsd0_resources[2].start = IRQ_DM365_SDIOINT0;
++			mmcsd0_resources[2].start = DAVINCI_INTC_IRQ(
++							IRQ_DM365_SDIOINT0);
+ 			davinci_mmcsd0_device.name = "da830-mmc";
+ 		} else if (cpu_is_davinci_dm644x()) {
+ 			/* REVISIT: should this be in board-init code? */
+@@ -313,13 +316,13 @@ int davinci_gpio_register(struct resource *res, int size, void *pdata)
+ struct davinci_timer_instance davinci_timer_instance[2] = {
+ 	{
+ 		.base		= DAVINCI_TIMER0_BASE,
+-		.bottom_irq	= IRQ_TINT0_TINT12,
+-		.top_irq	= IRQ_TINT0_TINT34,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_TINT0_TINT12),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_TINT0_TINT34),
+ 	},
+ 	{
+ 		.base		= DAVINCI_TIMER1_BASE,
+-		.bottom_irq	= IRQ_TINT1_TINT12,
+-		.top_irq	= IRQ_TINT1_TINT34,
++		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_TINT1_TINT12),
++		.top_irq	= DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34),
+ 	},
+ };
+ 
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 03ce5df28d87..cb725244fa13 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -53,7 +53,7 @@ static struct resource dm355_spi0_resources[] = {
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start = IRQ_DM355_SPINT0_0,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM355_SPINT0_0),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -273,12 +273,12 @@ static struct resource edma_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_CCINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_CCERRINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCERRINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* not using (or muxing) TC*_ERR */
+@@ -358,13 +358,13 @@ static struct platform_device dm355_vpss_device = {
+ 
+ static struct resource vpfe_resources[] = {
+ 	{
+-		.start          = IRQ_VDINT0,
+-		.end            = IRQ_VDINT0,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT0),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT0),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start          = IRQ_VDINT1,
+-		.end            = IRQ_VDINT1,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT1),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT1),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -422,8 +422,8 @@ static struct platform_device dm355_osd_dev = {
+ 
+ static struct resource dm355_venc_resources[] = {
+ 	{
+-		.start	= IRQ_VENCINT,
+-		.end	= IRQ_VENCINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* venc registers io space */
+@@ -442,8 +442,8 @@ static struct resource dm355_venc_resources[] = {
+ 
+ static struct resource dm355_v4l2_disp_resources[] = {
+ 	{
+-		.start	= IRQ_VENCINT,
+-		.end	= IRQ_VENCINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* venc registers io space */
+@@ -547,38 +547,38 @@ static struct resource dm355_gpio_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{	/* interrupt */
+-		.start	= IRQ_DM355_GPIOBNK0,
+-		.end	= IRQ_DM355_GPIOBNK0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK1,
+-		.end	= IRQ_DM355_GPIOBNK1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK2,
+-		.end	= IRQ_DM355_GPIOBNK2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK3,
+-		.end	= IRQ_DM355_GPIOBNK3,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK3),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK3),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK4,
+-		.end	= IRQ_DM355_GPIOBNK4,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK4),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK4),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK5,
+-		.end	= IRQ_DM355_GPIOBNK5,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK5),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK5),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM355_GPIOBNK6,
+-		.end	= IRQ_DM355_GPIOBNK6,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK6),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM355_GPIOBNK6),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -632,7 +632,7 @@ static struct davinci_timer_info dm355_timer_info = {
+ static struct plat_serial8250_port dm355_serial0_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART0_BASE,
+-		.irq		= IRQ_UARTINT0,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT0),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -645,7 +645,7 @@ static struct plat_serial8250_port dm355_serial0_platform_data[] = {
+ static struct plat_serial8250_port dm355_serial1_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART1_BASE,
+-		.irq		= IRQ_UARTINT1,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT1),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -658,7 +658,7 @@ static struct plat_serial8250_port dm355_serial1_platform_data[] = {
+ static struct plat_serial8250_port dm355_serial2_platform_data[] = {
+ 	{
+ 		.mapbase	= DM355_UART2_BASE,
+-		.irq		= IRQ_DM355_UARTINT2,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_DM355_UARTINT2),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 3e034f0478d2..ae1b53ea956a 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -224,7 +224,7 @@ static struct resource dm365_spi0_resources[] = {
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start = IRQ_DM365_SPIINT0_0,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM365_SPIINT0_0),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -266,43 +266,43 @@ static struct resource dm365_gpio_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{	/* interrupt */
+-		.start	= IRQ_DM365_GPIO0,
+-		.end	= IRQ_DM365_GPIO0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO1,
+-		.end	= IRQ_DM365_GPIO1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO2,
+-		.end	= IRQ_DM365_GPIO2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO3,
+-		.end	= IRQ_DM365_GPIO3,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO3),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO3),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO4,
+-		.end	= IRQ_DM365_GPIO4,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO4),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO4),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO5,
+-		.end	= IRQ_DM365_GPIO5,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO5),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO5),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO6,
+-		.end	= IRQ_DM365_GPIO6,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO6),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO6),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_GPIO7,
+-		.end	= IRQ_DM365_GPIO7,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO7),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_GPIO7),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -336,23 +336,23 @@ static struct resource dm365_emac_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_EMAC_RXTHRESH,
+-		.end	= IRQ_DM365_EMAC_RXTHRESH,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_RXTHRESH),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_RXTHRESH),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_EMAC_RXPULSE,
+-		.end	= IRQ_DM365_EMAC_RXPULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_RXPULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_RXPULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_EMAC_TXPULSE,
+-		.end	= IRQ_DM365_EMAC_TXPULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_TXPULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_TXPULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM365_EMAC_MISCPULSE,
+-		.end	= IRQ_DM365_EMAC_MISCPULSE,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_MISCPULSE),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM365_EMAC_MISCPULSE),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -518,12 +518,12 @@ static struct resource edma_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_CCINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_CCERRINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCERRINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* not using TC*_ERR */
+@@ -597,7 +597,7 @@ static struct resource dm365_rtc_resources[] = {
+ 		.flags = IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start = IRQ_DM365_RTCINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM365_RTCINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -627,8 +627,8 @@ static struct resource dm365_ks_resources[] = {
+ 	},
+ 	{
+ 		/* interrupt */
+-		.start = IRQ_DM365_KEYINT,
+-		.end = IRQ_DM365_KEYINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM365_KEYINT),
++		.end = DAVINCI_INTC_IRQ(IRQ_DM365_KEYINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -669,7 +669,7 @@ static struct davinci_timer_info dm365_timer_info = {
+ static struct plat_serial8250_port dm365_serial0_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART0_BASE,
+-		.irq		= IRQ_UARTINT0,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT0),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -682,7 +682,7 @@ static struct plat_serial8250_port dm365_serial0_platform_data[] = {
+ static struct plat_serial8250_port dm365_serial1_platform_data[] = {
+ 	{
+ 		.mapbase	= DM365_UART1_BASE,
+-		.irq		= IRQ_UARTINT1,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT1),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -821,13 +821,13 @@ static struct platform_device dm365_vpss_device = {
+ 
+ static struct resource vpfe_resources[] = {
+ 	{
+-		.start          = IRQ_VDINT0,
+-		.end            = IRQ_VDINT0,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT0),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT0),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start          = IRQ_VDINT1,
+-		.end            = IRQ_VDINT1,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT1),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT1),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -908,8 +908,8 @@ static struct platform_device dm365_osd_dev = {
+ 
+ static struct resource dm365_venc_resources[] = {
+ 	{
+-		.start = IRQ_VENCINT,
+-		.end   = IRQ_VENCINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_VENCINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_VENCINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ 	/* venc registers io space */
+@@ -928,8 +928,8 @@ static struct resource dm365_venc_resources[] = {
+ 
+ static struct resource dm365_v4l2_disp_resources[] = {
+ 	{
+-		.start = IRQ_VENCINT,
+-		.end   = IRQ_VENCINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_VENCINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_VENCINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ 	/* venc registers io space */
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 66bab4782c62..5ccb49196a71 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -59,8 +59,8 @@ static struct resource dm644x_emac_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start = IRQ_EMACINT,
+-		.end   = IRQ_EMACINT,
++		.start = DAVINCI_INTC_IRQ(IRQ_EMACINT),
++		.end   = DAVINCI_INTC_IRQ(IRQ_EMACINT),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -260,12 +260,12 @@ static struct resource edma_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_CCINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_CCERRINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCERRINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* not using TC*_ERR */
+@@ -330,13 +330,13 @@ static struct platform_device dm644x_vpss_device = {
+ 
+ static struct resource dm644x_vpfe_resources[] = {
+ 	{
+-		.start          = IRQ_VDINT0,
+-		.end            = IRQ_VDINT0,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT0),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT0),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start          = IRQ_VDINT1,
+-		.end            = IRQ_VDINT1,
++		.start          = DAVINCI_INTC_IRQ(IRQ_VDINT1),
++		.end            = DAVINCI_INTC_IRQ(IRQ_VDINT1),
+ 		.flags          = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -442,8 +442,8 @@ static int dm644x_venc_setup_clock(enum vpbe_enc_timings_type type,
+ 
+ static struct resource dm644x_v4l2_disp_resources[] = {
+ 	{
+-		.start	= IRQ_VENCINT,
+-		.end	= IRQ_VENCINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_VENCINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -491,28 +491,28 @@ static struct resource dm644_gpio_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{	/* interrupt */
+-		.start	= IRQ_GPIOBNK0,
+-		.end	= IRQ_GPIOBNK0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_GPIOBNK1,
+-		.end	= IRQ_GPIOBNK1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_GPIOBNK2,
+-		.end	= IRQ_GPIOBNK2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_GPIOBNK3,
+-		.end	= IRQ_GPIOBNK3,
++		.start	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK3),
++		.end	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK3),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_GPIOBNK4,
+-		.end	= IRQ_GPIOBNK4,
++		.start	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK4),
++		.end	= DAVINCI_INTC_IRQ(IRQ_GPIOBNK4),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -573,7 +573,7 @@ static struct davinci_timer_info dm644x_timer_info = {
+ static struct plat_serial8250_port dm644x_serial0_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART0_BASE,
+-		.irq		= IRQ_UARTINT0,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT0),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -586,7 +586,7 @@ static struct plat_serial8250_port dm644x_serial0_platform_data[] = {
+ static struct plat_serial8250_port dm644x_serial1_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART1_BASE,
+-		.irq		= IRQ_UARTINT1,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT1),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+@@ -599,7 +599,7 @@ static struct plat_serial8250_port dm644x_serial1_platform_data[] = {
+ static struct plat_serial8250_port dm644x_serial2_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART2_BASE,
+-		.irq		= IRQ_UARTINT2,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT2),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM,
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 45efa715a2c1..2b55625e8fb5 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -62,23 +62,23 @@ static struct resource dm646x_emac_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_EMACRXTHINT,
+-		.end	= IRQ_DM646X_EMACRXTHINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACRXTHINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACRXTHINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_EMACRXINT,
+-		.end	= IRQ_DM646X_EMACRXINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACRXINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACRXINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_EMACTXINT,
+-		.end	= IRQ_DM646X_EMACTXINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACTXINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACTXINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_EMACMISCINT,
+-		.end	= IRQ_DM646X_EMACMISCINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACMISCINT),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_EMACMISCINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -273,12 +273,12 @@ static struct resource edma_resources[] = {
+ 	},
+ 	{
+ 		.name	= "edma3_ccint",
+-		.start	= IRQ_CCINT0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCINT0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "edma3_ccerrint",
+-		.start	= IRQ_CCERRINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_CCERRINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	/* not using TC*_ERR */
+@@ -315,12 +315,12 @@ static struct resource dm646x_mcasp0_resources[] = {
+ 	},
+ 	{
+ 		.name	= "tx",
+-		.start	= IRQ_DM646X_MCASP0TXINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_MCASP0TXINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+ 		.name	= "rx",
+-		.start	= IRQ_DM646X_MCASP0RXINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_MCASP0RXINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -341,7 +341,7 @@ static struct resource dm646x_mcasp1_resources[] = {
+ 	},
+ 	{
+ 		.name	= "tx",
+-		.start	= IRQ_DM646X_MCASP1TXINT,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_MCASP1TXINT),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -388,13 +388,13 @@ static struct platform_device vpif_dev = {
+ 
+ static struct resource vpif_display_resource[] = {
+ 	{
+-		.start = IRQ_DM646X_VP_VERTINT2,
+-		.end   = IRQ_DM646X_VP_VERTINT2,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT2),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT2),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start = IRQ_DM646X_VP_VERTINT3,
+-		.end   = IRQ_DM646X_VP_VERTINT3,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT3),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT3),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -412,13 +412,13 @@ static struct platform_device vpif_display_dev = {
+ 
+ static struct resource vpif_capture_resource[] = {
+ 	{
+-		.start = IRQ_DM646X_VP_VERTINT0,
+-		.end   = IRQ_DM646X_VP_VERTINT0,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT0),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT0),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start = IRQ_DM646X_VP_VERTINT1,
+-		.end   = IRQ_DM646X_VP_VERTINT1,
++		.start = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT1),
++		.end   = DAVINCI_INTC_IRQ(IRQ_DM646X_VP_VERTINT1),
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -441,18 +441,18 @@ static struct resource dm646x_gpio_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	{	/* interrupt */
+-		.start	= IRQ_DM646X_GPIOBNK0,
+-		.end	= IRQ_DM646X_GPIOBNK0,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK0),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK0),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_GPIOBNK1,
+-		.end	= IRQ_DM646X_GPIOBNK1,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK1),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK1),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ 	{
+-		.start	= IRQ_DM646X_GPIOBNK2,
+-		.end	= IRQ_DM646X_GPIOBNK2,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK2),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DM646X_GPIOBNK2),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+@@ -513,7 +513,7 @@ static struct davinci_timer_info dm646x_timer_info = {
+ static struct plat_serial8250_port dm646x_serial0_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART0_BASE,
+-		.irq		= IRQ_UARTINT0,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT0),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM32,
+@@ -526,7 +526,7 @@ static struct plat_serial8250_port dm646x_serial0_platform_data[] = {
+ static struct plat_serial8250_port dm646x_serial1_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART1_BASE,
+-		.irq		= IRQ_UARTINT1,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_UARTINT1),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM32,
+@@ -539,7 +539,7 @@ static struct plat_serial8250_port dm646x_serial1_platform_data[] = {
+ static struct plat_serial8250_port dm646x_serial2_platform_data[] = {
+ 	{
+ 		.mapbase	= DAVINCI_UART2_BASE,
+-		.irq		= IRQ_DM646X_UARTINT2,
++		.irq		= DAVINCI_INTC_IRQ(IRQ_DM646X_UARTINT2),
+ 		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+ 				  UPF_IOREMAP,
+ 		.iotype		= UPIO_MEM32,
+diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+index 3d45b73b9a64..d840023eaaac 100644
+--- a/arch/arm/mach-davinci/include/mach/common.h
++++ b/arch/arm/mach-davinci/include/mach/common.h
+@@ -17,6 +17,9 @@
+ #include <linux/types.h>
+ #include <linux/reboot.h>
+ 
++#define DAVINCI_INTC_START		0
++#define DAVINCI_INTC_IRQ(_irqnum)	(DAVINCI_INTC_START + (_irqnum))
 +
- #endif /* _LINUX_IRQ_DAVINCI_AINTC_ */
+ void davinci_timer_init(struct clk *clk);
+ 
+ extern void davinci_irq_init(void);
+diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+index b27b90dc269c..80bf99c8fa55 100644
+--- a/arch/arm/mach-davinci/irq.c
++++ b/arch/arm/mach-davinci/irq.c
+@@ -154,6 +154,6 @@ void __init davinci_irq_init(void)
+ 	for (i = 0, j = 0; i < davinci_soc_info.intc_irq_num; i += 32, j += 0x04)
+ 		davinci_irq_setup_gc(davinci_intc_base + j, irq_base + i, 32);
+ 
+-	irq_set_handler(IRQ_TINT1_TINT34, handle_level_irq);
++	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
+ 	set_handle_irq(davinci_handle_irq);
+ }
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index c17ce66a3d95..2de5a04ffc24 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -70,7 +70,7 @@ static struct resource da8xx_usb20_resources[] = {
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start		= IRQ_DA8XX_USB_INT,
++		.start		= DAVINCI_INTC_IRQ(IRQ_DA8XX_USB_INT),
+ 		.flags		= IORESOURCE_IRQ,
+ 		.name		= "mc",
+ 	},
+@@ -105,8 +105,8 @@ static struct resource da8xx_usb11_resources[] = {
+ 		.flags	= IORESOURCE_MEM,
+ 	},
+ 	[1] = {
+-		.start	= IRQ_DA8XX_IRQN,
+-		.end	= IRQ_DA8XX_IRQN,
++		.start	= DAVINCI_INTC_IRQ(IRQ_DA8XX_IRQN),
++		.end	= DAVINCI_INTC_IRQ(IRQ_DA8XX_IRQN),
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
+ };
+diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+index 31ed7aa47227..9d4a58a3113a 100644
+--- a/arch/arm/mach-davinci/usb.c
++++ b/arch/arm/mach-davinci/usb.c
+@@ -38,7 +38,7 @@ static struct resource usb_resources[] = {
+ 		.flags          = IORESOURCE_MEM,
+ 	},
+ 	{
+-		.start          = IRQ_USBINT,
++		.start          = DAVINCI_INTC_IRQ(IRQ_USBINT),
+ 		.flags          = IORESOURCE_IRQ,
+ 		.name		= "mc"
+ 	},
+@@ -70,8 +70,9 @@ void __init davinci_setup_usb(unsigned mA, unsigned potpgt_ms)
+ 
+ 	if (cpu_is_davinci_dm646x()) {
+ 		/* Override the defaults as DM6467 uses different IRQs. */
+-		usb_dev.resource[1].start = IRQ_DM646X_USBINT;
+-		usb_dev.resource[2].start = IRQ_DM646X_USBDMAINT;
++		usb_dev.resource[1].start = DAVINCI_INTC_IRQ(IRQ_DM646X_USBINT);
++		usb_dev.resource[2].start = DAVINCI_INTC_IRQ(
++							IRQ_DM646X_USBDMAINT);
+ 	} else	/* other devices don't have dedicated CPPI IRQ */
+ 		usb_dev.num_resources = 2;
+ 
 -- 
 2.20.1
 
