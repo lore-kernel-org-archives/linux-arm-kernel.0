@@ -2,89 +2,91 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86D08C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:14:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D851C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:14:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 589B52075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:14:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B5C02075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:14:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kWG46bqy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Ww4lETpw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 589B52075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sDYZ1dBH";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="mrPl2XTA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B5C02075C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=jwByc9yc7LP1H0CFzruSJc8bSM2Tzv/dIjX6oN4xKng=; b=kWG46bqyIXrzQi
-	GpxE+u5aXPYPpYZtJshjGr+pdWH4hzwh3AgpxTHvJqR8zVYcqMrJAYWphHhW3ranCci8TGnytc33K
-	eoz5QM6lhlncETaISALWSC51Md9FKvJiILaZQjbLyGcbub9SXAi+DaenFSvEXakIR1L5k7Dnv+iE6
-	IVx9RwsHardmDTNx4KsFhDAIo0MsYnB9Uq0bSnIrrSTRSfHnrzdWkGg3CBaoogzFtDpyj4ZBhRbqv
-	7E9LCGH0wueAC0lakx22TZolcbhfddni0Yf6+1WkCv6R0n1QxDEgezLA9offMYnhiRP8JJmY/ryuT
-	dnAAKF6OtGNZD0wIKR5g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Vp9n21TVyxiGi5YBRyn15MLp9sFO++yvDbVbUnbV684=; b=sDYZ1dBHCJhXOj
+	ycLe6am9eSVadEa4wA3TOLhOg6Ef35Gdowdy7pT0QV2Thjqg6yLs9WVp4gyBU8mkw4/6IfrnVVARC
+	DwvwhWmuVPbQSQmz2/aaFveVgv1g4yXwcHSnZDU7DVFrxf+0CMXI+s9lTHyMl+hUHH6nNoBIRvH+J
+	tX8z+sPoBDNqAbkXIrHHyGwhcdvJXj0zVOYgZrv+4P536Sl1J0z2QolRTowus6dLK4ag9/H1TZrzI
+	yyI6AVyEK4X9O7zrgYM11Qf9IXwFWCTn1Krm3/jcjjshnT5S+lF1AfxEjCXsnY0I8RPAwQ1YbMAzY
+	vzsbWgkuej8KjnLc2ixA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtZlQ-0006Uf-BM; Tue, 12 Feb 2019 15:14:24 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gtZlj-0006oV-6x; Tue, 12 Feb 2019 15:14:43 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtZlK-0006Qv-Cz
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:14:21 +0000
-Received: by mail-wm1-x342.google.com with SMTP id q21so3388490wmc.5
+ id 1gtZlK-0006R1-Uc
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:14:23 +0000
+Received: by mail-wr1-x442.google.com with SMTP id t18so3101358wrx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 07:14:17 -0800 (PST)
+ Tue, 12 Feb 2019 07:14:18 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=UckL5F5wh14/YUh0EVruXB5oWRHagYvkkrGnqq3zUiE=;
- b=Ww4lETpwizQsUdnAm2qIdHMhCP85ZOydMyiTTX6qQKV73ZRx6kagGSPv6iuZr3FAFD
- 9ALBszVPoHHnbjOfrsfley8xk0ZNvw4a8KeSW4XPaZtW6JUD5Ay4i4dsZK7ZRC7Xa/p5
- RzJ+kDsIxhcvgT93T8ARnToZElGPd5lrlSMQDHyPFO03BKaLlKp77EDi0oMe/Qi7Q13+
- 1vtDtuhN1E9skOfkhu3JSGg92yTg0twl2yZD1kCg5Vr72q40gGtKckNCgKt+ouw6JVUA
- Ans54ZtJEliafc4+KKK0+GA8+AQo0kq+gDnWUzWoyZZIyfPv1lt6ZkcsXiq6QhA5tq8Y
- p8xw==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=lEfvGeOk1usEAZ8llxjKkiOzQN+ahvtkYpFJPi6soxQ=;
+ b=mrPl2XTA02ZrZOTTKOV6YbwerRpbdV9CMe3BnIq9Qfgh0nKxk5t98JZb1RtPnsYCbx
+ ohG+Nv9qn+h1EYsa65ywzS6VFgoAN/ngyjBg1sB2fgIGfT8oYzm+GebourW72INdf5FJ
+ oz4nk78cufgfWoZhy/mtB06VdJcg1n6ArWqQ+36geNiP3oaKcrEdT0Di13cFTH1UkC7m
+ xviVkV/6Qj+37fy6ivzkYUWtD1aXC4ib3w49aWohJ3cj4pmwEW3yBKXX2igS1bmjjg2q
+ 4+lxqoT+8zT+rii/ST8SGKlurSxrY2PmIz7JhKUAf4oR8gBKrYW7aqY32G+jIMcV+guK
+ YRig==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=UckL5F5wh14/YUh0EVruXB5oWRHagYvkkrGnqq3zUiE=;
- b=Ej/FTERGIdLsYRu9z3s/lPnetCDPCjRGDkgaAX9KTTyPnbz4T8lc6iroq/VKg/WcTN
- gGUbyEfC3uQ/HcNZQDVhyhs6Kowm1T85uhx/WkFI8R1B1JDC1gHpfpgFm83u7hd2jXkd
- qDgUmnst8LDCwj4fcTSeT3MUJYaETcMvHs9dX4FW50TM5wY7xkgMlrWSH0DNTOZKARC2
- ZXSYeffr68Bi6cxYdHeXPyDVP/Qbu6eE80WXg6ZYZr7xGyUKEcd1xWfSy5PxdegjwJM5
- XA1OWZFppsFljN8vqB1U35eNOS5qIYlFrV25G5Lv631ZGSNQdSnxQoaSX47m5F4rOIk6
- LN0Q==
-X-Gm-Message-State: AHQUAuboBWZXKQZNY+inQOCewcMwaObm8iv8ys/Xi5znM6oGT0FQAv0Y
- C1yHO3dYotCO6pyO6WALdlM/ag==
-X-Google-Smtp-Source: AHgI3IbE/WnTSfsIWA2e4zZ/8ElQpqHC/9f0glSu8Ltf7WCBwxI7RcaVE8d6ILzTCgdgNRAh69VmAA==
-X-Received: by 2002:a1c:b70b:: with SMTP id h11mr3421759wmf.72.1549984455689; 
- Tue, 12 Feb 2019 07:14:15 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=lEfvGeOk1usEAZ8llxjKkiOzQN+ahvtkYpFJPi6soxQ=;
+ b=cADOtSA4LVW6auX3WOZ21qhPfTBMfi/ax9qpIWiimo1/CVwqalmrWZN28tScTjjqNQ
+ G/Vych3ei0sqQPQUVs8kjUsG23O3c1Vg3T4aEp1asqIFwuBGD3dmar8dk7Q+z4PWh3EC
+ QQiL/x9jPx4KocGy0QNUhhFoMNi6Tx52IwTY3ff1H/HGhABSXlhO67YzP/QdJjXJXU7u
+ q/+FAXiosk23TfWyz5jEdrGbutw5kEG+Bo7tnYAU2qDSl+YWPkpGcEB3PBFquDe4VEI/
+ QeNwEDWQ4D99hHsylgBtyUObR4WgBFgmBDMgV+UUmXY8X+YX/n0vfjX7YMr4dUNtv/TC
+ Bq+w==
+X-Gm-Message-State: AHQUAuaW9fAE+H27Zh9XhDB7WL4ytd74Xq5ezrBc9JT0E0qSzlb9nRyu
+ AffllZJrgEx+arJoadzkkldt4w==
+X-Google-Smtp-Source: AHgI3IYxKnd8AIHCEYlPT+DtsN2774Su5ayDJJB6gxk5G6/KEOGgxjSfhqycSOtgD5LnRxuJc++F6g==
+X-Received: by 2002:adf:9123:: with SMTP id j32mr3464508wrj.122.1549984457297; 
+ Tue, 12 Feb 2019 07:14:17 -0800 (PST)
 Received: from bender.baylibre.local
  (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id c1sm1589515wmb.14.2019.02.12.07.14.14
+ by smtp.gmail.com with ESMTPSA id c1sm1589515wmb.14.2019.02.12.07.14.15
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Tue, 12 Feb 2019 07:14:14 -0800 (PST)
+ Tue, 12 Feb 2019 07:14:16 -0800 (PST)
 From: Neil Armstrong <narmstrong@baylibre.com>
 To: gregkh@linuxfoundation.org, hminas@synopsys.com, balbi@kernel.org,
- kishon@ti.com
-Subject: [PATCH 0/8] arm64: meson: Add support for USB on Amlogic G12A
-Date: Tue, 12 Feb 2019 16:14:05 +0100
-Message-Id: <20190212151413.24632-1-narmstrong@baylibre.com>
+ kishon@ti.com, devicetree@vger.kernel.org
+Subject: [PATCH 1/8] dt-bindings: phy: Add Amlogic G12A USB2 PHY Bindings
+Date: Tue, 12 Feb 2019 16:14:06 +0100
+Message-Id: <20190212151413.24632-2-narmstrong@baylibre.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190212151413.24632-1-narmstrong@baylibre.com>
+References: <20190212151413.24632-1-narmstrong@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_071418_496448_78F9E5CA 
-X-CRM114-Status: GOOD (  14.24  )
+X-CRM114-CacheID: sfid-20190212_071418_989007_32B8E473 
+X-CRM114-Status: GOOD (  12.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,68 +106,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patchset adds support for USB on Amlogic G12A SoCs.
+Add the Amlogic G12A Family USB2 OTG PHY Bindings
 
-This patchset is composed with :
-- bindings of the PHYs
-- bindings of the USB Control Glue
-- PHY Drivers
-- USB Control Glue driver
-
-Device Tree nodes will be added in a separate patchset.
-
-The Amlogic G12A USB Complex is composed of :
-- 2 USB Controllers :
- * DWC3 for USB2 and USB3 Host functionality
- * DWC2 for USB2 Peripheral functionality
-- 2 USB2 OTG PHYs, only a single one will be routed to either DWC2 to DWC3
-- 1 USB3 PHY shared with PCIE funcionnality
-- A Glue to control PHY routing, setup and OTG detection
-
-The Glue configures the UTMI 8bit interfaces for the USB2 PHYs, including
-routing of the OTG PHY between the DWC3 and DWC2 controllers, and
-setups the on-chip OTG mode selection for this PHY.
-
-The PHYs are children of the Glue node since the Glue controls the interface
-with the PHY, not the DWC3 controller.
-
-The PHY interconnect is handled into ports subnodes, which eases describing
-which PHY is enabled (like the USB3 shared PHY) and futures layouts on
-derivatives of the G12A Family.
-
-This drivers supports the on-probe setup of the OTG mode, and manually
-via a debugfs interface. The IRQ mode change detect is yet to be added
-in a future patchset, mainly due to lack of hardware to validate on.
-
-Neil Armstrong (8):
-  dt-bindings: phy: Add Amlogic G12A USB2 PHY Bindings
-  dt-bindings: phy: Add Amlogic G12A USB3+PCIE Combo PHY Bindings
-  dt-bindings: usb: dwc2: Add Amlogic G12A DWC2 Compatible
-  dt-bindings: usb: dwc3: Add Amlogic G12A DWC3 Glue Bindings
-  phy: amlogic: add Amlogic G12A USB2 PHY Driver
-  phy: amlogic: Add Amlogic G12A USB3 + PCIE Combo PHY Driver
-  usb: dwc2: Add Amlogic G12A DWC2 Params
-  usb: dwc3: Add Amlogic G12A DWC3 glue
-
- .../bindings/phy/meson-g12a-usb2-phy.txt      |  22 +
- .../bindings/phy/meson-g12a-usb3-pcie-phy.txt |  25 +
- .../devicetree/bindings/usb/amlogic,dwc3.txt  | 109 +++
- .../devicetree/bindings/usb/dwc2.txt          |   1 +
- drivers/phy/amlogic/Kconfig                   |  24 +
- drivers/phy/amlogic/Makefile                  |   2 +
- drivers/phy/amlogic/phy-meson-g12a-usb2.c     | 191 +++++
- .../phy/amlogic/phy-meson-g12a-usb3-pcie.c    | 414 +++++++++++
- drivers/usb/dwc2/params.c                     |  12 +
- drivers/usb/dwc3/Kconfig                      |   9 +
- drivers/usb/dwc3/Makefile                     |   1 +
- drivers/usb/dwc3/dwc3-meson-g12a.c            | 650 ++++++++++++++++++
- 12 files changed, 1460 insertions(+)
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../bindings/phy/meson-g12a-usb2-phy.txt      | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/meson-g12a-usb2-phy.txt
- create mode 100644 Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
- create mode 100644 drivers/phy/amlogic/phy-meson-g12a-usb2.c
- create mode 100644 drivers/phy/amlogic/phy-meson-g12a-usb3-pcie.c
- create mode 100644 drivers/usb/dwc3/dwc3-meson-g12a.c
 
+diff --git a/Documentation/devicetree/bindings/phy/meson-g12a-usb2-phy.txt b/Documentation/devicetree/bindings/phy/meson-g12a-usb2-phy.txt
+new file mode 100644
+index 000000000000..a6ebc3dea159
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/meson-g12a-usb2-phy.txt
+@@ -0,0 +1,22 @@
++* Amlogic G12A USB2 PHY binding
++
++Required properties:
++- compatible:	Should be "amlogic,meson-g12a-usb2-phy"
++- reg:		The base address and length of the registers
++- #phys-cells:	must be 0 (see phy-bindings.txt in this directory)
++- clocks:	a phandle to the clock of this PHY
++- clock-names:	must be "xtal"
++- resets:	a phandle to the reset line of this PHY
++- reset-names:	must be "phy"
++- phy-supply:	see phy-bindings.txt in this directory
++
++Example:
++	usb2_phy0: phy@36000 {
++		compatible = "amlogic,g12a-usb2-phy";
++		reg = <0x0 0x36000 0x0 0x2000>;
++		clocks = <&xtal>;
++		clock-names = "xtal";
++		resets = <&reset RESET_USB_PHY21>;
++		reset-names = "phy";
++		#phy-cells = <0>;
++	};
 -- 
 2.20.1
 
