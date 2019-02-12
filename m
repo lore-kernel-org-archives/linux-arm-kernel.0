@@ -2,82 +2,67 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F343AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:05:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DC96C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:45:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BBD4F222C7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:05:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6BF332084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 23:45:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eswIPm8u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BBD4F222C7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ab.jp.nec.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ff0CGhtP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BF332084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zte.com.cn
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1dQS6kYvALIyCDuty8IygeiTrWS7RKy+cNm3YuHqnD8=; b=eswIPm8u6Wduz2
-	oNGTH9JlzuQlO1GgMha/bu8qawg74nLUkXypFWA6PLFGtiv478r2rJckiWJXtjEOURd4yHenNZ94M
-	eGJ0Rzyja8lVzJQPtDkw5C7LrOWjymujPRycqnUEFq9qU0LNaPnhIEBPfXf+1rK9I6cmQpCtMrwYO
-	YXYCCcyDvwQluuvxPI7qncYEyjR0ujhzBXQomjFfyjuMSD6354L5esl0RILc+D+wCXg22O+jMGqdX
-	g9W7/ICwoIOYxlHcp238A9qto6Pt+pHLAlKDTx9tYmst8qTdjrxo78JRslHPkjm2JsLwUuthxw92x
-	K8abnMOIW7eMRUOHYTWg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=hLY/iHcm7GrqQV4WEllO9NQZpTQdaUUS0e0H6jAmnFA=; b=Ff0
+	CGhtPMrQhhIcZb5tS4Zr9i2eWZ6zw6n0GzJN+o4lgIeR+D9sBJd/SoCd5TL3/ZqqNRaZeMxQWrpiL
+	4G6f9HwE5zd0Ow4wUkuKsECAmXJimcuive/jYu30zimk6w9WsjYu7+WpxMk1xDKOyWIr7JfO8LclM
+	X4G2XW4pGkE2dHTVVbxtybQFoU+lloI1FnSmu3h0uUyhdAgWTqeDcMrCvXo9jUqIOukFPIxPBNsRc
+	Y5dZVVoCeH0aKYECxBPsPi+oV+lTwjjJYnqHENStu9M98bFNMbBJb4aHOpDiT+ybSTkgnkAyGbiNy
+	B9DYhnoMJ3aDjRBd1Ie0zKFdApyD6Dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gth77-0003qX-Nf; Tue, 12 Feb 2019 23:05:17 +0000
-Received: from tyo162.gate.nec.co.jp ([114.179.232.162])
+	id 1gthkS-00048w-G8; Tue, 12 Feb 2019 23:45:56 +0000
+Received: from out1.zte.com.cn ([202.103.147.172] helo=mxct.zte.com.cn)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gth74-0003k4-7R; Tue, 12 Feb 2019 23:05:16 +0000
-Received: from mailgate01.nec.co.jp ([114.179.233.122])
- by tyo162.gate.nec.co.jp (8.15.1/8.15.1) with ESMTPS id x1CN4rMO001098
- (version=TLSv1.2 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO);
- Wed, 13 Feb 2019 08:04:53 +0900
-Received: from mailsv01.nec.co.jp (mailgate-v.nec.co.jp [10.204.236.94])
- by mailgate01.nec.co.jp (8.15.1/8.15.1) with ESMTP id x1CN4rYH004424;
- Wed, 13 Feb 2019 08:04:53 +0900
-Received: from mail01b.kamome.nec.co.jp (mail01b.kamome.nec.co.jp [10.25.43.2])
- by mailsv01.nec.co.jp (8.15.1/8.15.1) with ESMTP id x1CN47JL023191;
- Wed, 13 Feb 2019 08:04:53 +0900
-Received: from bpxc99gp.gisp.nec.co.jp ([10.38.151.135] [10.38.151.135]) by
- mail03.kamome.nec.co.jp with ESMTP id BT-MMP-2334655;
- Wed, 13 Feb 2019 08:03:14 +0900
-Received: from BPXM09GP.gisp.nec.co.jp ([10.38.151.201]) by
- BPXC07GP.gisp.nec.co.jp ([10.38.151.135]) with mapi id 14.03.0319.002; Wed,
- 13 Feb 2019 08:03:13 +0900
-From: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
-To: Bhupesh Sharma <bhsharma@redhat.com>, Dave Young <dyoung@redhat.com>
-Subject: RE: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-Thread-Topic: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-Thread-Index: AQHUuQb/BT+pA4VdFkyjzG4/innmbKXP0wNAgAzVznSAAC8oAA==
-Date: Tue, 12 Feb 2019 23:03:13 +0000
-Message-ID: <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
- <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
- <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
- <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
-In-Reply-To: <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
-Accept-Language: ja-JP, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [143.101.133.73]
-MIME-Version: 1.0
-X-TM-AS-MML: disable
+ id 1gthkN-000478-Tl; Tue, 12 Feb 2019 23:45:54 +0000
+Received: from mse01.zte.com.cn (unknown [10.30.3.20])
+ by Forcepoint Email with ESMTPS id 8E590E239FC4DE14821F;
+ Wed, 13 Feb 2019 07:45:41 +0800 (CST)
+Received: from notes_smtp.zte.com.cn ([10.30.1.239])
+ by mse01.zte.com.cn with ESMTP id x1CNjZ1E001782;
+ Wed, 13 Feb 2019 07:45:36 +0800 (GMT-8)
+ (envelope-from wen.yang99@zte.com.cn)
+Received: from fox-host8.localdomain ([10.74.120.8])
+ by szsmtp06.zte.com.cn (Lotus Domino Release 8.5.3FP6)
+ with ESMTP id 2019021307455443-25782367 ;
+ Wed, 13 Feb 2019 07:45:54 +0800 
+From: Wen Yang <wen.yang99@zte.com.cn>
+To: narmstrong@baylibre.com
+Subject: [PATCH v2 1/4] media: platform: meson-ao-cec: fix possible object
+ reference leak
+Date: Wed, 13 Feb 2019 07:44:35 +0800
+Message-Id: <1550015075-41548-1-git-send-email-wen.yang99@zte.com.cn>
+X-Mailer: git-send-email 1.8.3.1
+X-MIMETrack: Itemize by SMTP Server on SZSMTP06/server/zte_ltd(Release
+ 8.5.3FP6|November 21, 2013) at 2019-02-13 07:45:54,
+ Serialize by Router on notes_smtp/zte_ltd(Release 9.0.1FP7|August  17, 2016) at
+ 2019-02-13 07:45:28, Serialize complete at 2019-02-13 07:45:28
+X-MAIL: mse01.zte.com.cn x1CNjZ1E001782
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_150514_496608_BB620DDA 
-X-CRM114-Status: GOOD (  11.68  )
+X-CRM114-CacheID: sfid-20190212_154552_123510_46D98117 
+X-CRM114-Status: GOOD (  11.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,64 +74,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>, Borislav Petkov <bp@alien8.de>,
- "anderson@redhat.com" <anderson@redhat.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: wang.yi59@zte.com.cn, khilman@baylibre.com, linux-kernel@vger.kernel.org,
+ "Hans Verkuil \(hansverk\)" <hansverk@cisco.com>,
+ linux-media@lists.freedesktop.org, xue.zhihong@zte.com.cn,
+ Wen Yang <yellowriver2010@hotmail.com>, linux-amlogic@lists.infradead.org,
+ mchehab@kernel.org, Wen Yang <wen.yang99@zte.com.cn>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+The call to of_parse_phandle() returns a node pointer with refcount
+incremented thus it must be explicitly decremented here after the last
+usage.
+The of_find_device_by_node() takes a reference to the underlying device
+structure, we also should release that reference.
 
-On 2/12/2019 2:59 PM, Bhupesh Sharma wrote:
-> BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
-> (which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
-> mentioned that the changes look necessary.
-> 
-> [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
+Hans Verkuil says:
+The cec driver should never take a reference of the hdmi device.
+It never accesses the HDMI device, it only needs the HDMI device pointer as
+a key in the notifier list.
+The real problem is that several CEC drivers take a reference of the HDMI
+device and never release it. So those drivers need to be fixed.
 
-> > > The increased 'PTRS_PER_PGD' value for such cases needs to be then
-> > > calculated as is done by the underlying kernel (see
-> > > 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
-> > >
-> > > #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
+This patch fixes those two issues.
 
-Yes, this is the reason why makedumpfile needs the MAX_USER_VA_BITS.
-It is used for pgd_index() also in makedumpfile to walk page tables.
+Fixes: 7ec2c0f72cb1 ("media: platform: Add Amlogic Meson AO CEC Controller driver")
+Suggested-by: Hans Verkuil (hansverk) <hansverk@cisco.com>
+Signed-off-by: Wen Yang <wen.yang99@zte.com.cn>
+Cc: Hans Verkuil (hansverk) <hansverk@cisco.com>
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Wen Yang <yellowriver2010@hotmail.com>
+Cc: linux-media@lists.freedesktop.org
+Cc: linux-amlogic@lists.infradead.org
+Cc: linux-media@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
+---
+v2->v1: 
+- move of_node_put() to just after the 'hdmi_dev = of_find_device_by_node(np)'.
+- put_device() can be done before the cec = devm_kzalloc line.
 
-/* to find an entry in a page-table-directory */
-#define pgd_index(addr)         (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+ drivers/media/platform/meson/ao-cec.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks,
-Kazu
+diff --git a/drivers/media/platform/meson/ao-cec.c b/drivers/media/platform/meson/ao-cec.c
+index cd4be38..f757ece 100644
+--- a/drivers/media/platform/meson/ao-cec.c
++++ b/drivers/media/platform/meson/ao-cec.c
+@@ -613,9 +613,11 @@ static int meson_ao_cec_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	hdmi_dev = of_find_device_by_node(np);
++	of_node_put(np);
+ 	if (hdmi_dev == NULL)
+ 		return -EPROBE_DEFER;
+ 
++	put_device(&hdmi_dev->dev);
+ 	ao_cec = devm_kzalloc(&pdev->dev, sizeof(*ao_cec), GFP_KERNEL);
+ 	if (!ao_cec)
+ 		return -ENOMEM;
+-- 
+2.9.5
 
-> > >
-> > > Also, note that 'arch/arm64/include/asm/memory.h' defines 'MAX_USER_VA_BITS'
-> > > as 'VA_BITS' in case 'CONFIG_ARM64_USER_VA_BITS_52' is set to 'n':
-> > >
-> > > #ifdef CONFIG_ARM64_USER_VA_BITS_52
-> > > #define MAX_USER_VA_BITS      52
-> > > #else
-> > > #define MAX_USER_VA_BITS      VA_BITS
-> > > #endif
-> > >
-> > > So, makedumpfile will need this symbol exported in vmcore to make the above
-> > > determination.
-> > >
-> > > [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022425.html
-> > >
-> > > Thanks,
-> > > Bhupesh
-> >
-> > Thanks
-> > Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
