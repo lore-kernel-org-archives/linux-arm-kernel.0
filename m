@@ -2,58 +2,66 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54355C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 96F47C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 24BD8214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 660C5214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZuZ/2rwk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24BD8214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CzGQQ4tG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 660C5214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Uqdk5r0a5Bn4b81BpdtJ512QPOPazL3KOM18MH3XBSs=; b=ZuZ/2rwkMAvaz7
-	jlqlfqPca7K6rRXqKX+nu+OnuevWnrO2QwoAIo46xscNQ/8ud6oJXziL2nYuaJusyOBb96cSQPFlU
-	IyaQ4O77ENS6jObOTUCb9ngWRM1r3DZA2R8KJ6XNuAUx1rlNBRkxLaGnm2lKPA2vJWk8gKDRqeUCa
-	KbK35qjfhgdxuovbFgXwcRkNAr7dTCi85uImEr4dnoPqpgvT1JUhK92kyN1U18VbuFAwd+1joeF35
-	+ibsVHGg1LlvLZgTVT759NqBBv00fAXEXN240TEljXzN0rzYsKAunOY20kTVlhifTFPxtxxz2Tb3y
-	W3rTdZQSQEHkfeu1Bkyg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=RgyFpARJ35LIe8Zp2BnEeUbUcu/BJkoCEI2okxbm5Cc=; b=CzGQQ4tGwm4SiYm7TJ8u3FAcz
+	WTt15vqKSaFlwNatioiSPY+6N9BrCzugxi1F7TDb0hQU5qep1PBCDRiGXfyHr9dp7WWaBvRyJQpws
+	QYbypyYtJn21i0//ipWnfKpN9zTr1ikusz9HgS0R1DlBM5niS6fW1XJ1Yr0DxRoXNxlDOjfCwrdW2
+	rQlCNo7tNOaf+eybSgo+/M7hDJVRxdzRiunKDj+hwgbtmq6XD100BeXREVRM5NXlUZk+YZZMtdult
+	xYtV1FGrS/6OSkV6YtvogGP8l8orEflyeLjwy9gWthYHjjvpoADZTZ+44BkVbPWlTdRQPuX7WaGOc
+	6tDiE8qxg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVdX-0008BY-49; Tue, 12 Feb 2019 10:49:59 +0000
-Received: from gloria.sntech.de ([185.11.138.130])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVdU-0008B4-Mk; Tue, 12 Feb 2019 10:49:58 +0000
-Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
- helo=diego.localnet)
- by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
- (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gtVdP-00014V-Tf; Tue, 12 Feb 2019 11:49:51 +0100
-From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
-To: Yizhuo <yzhai003@ucr.edu>
-Subject: Re: [PATCH] phy: rockchip-typec: Variable "val" of function
- rockchip_usb3_phy_power_on() could be uninitialized
-Date: Tue, 12 Feb 2019 11:49:51 +0100
-Message-ID: <3410531.oxWKaip9ZE@diego>
-In-Reply-To: <20190206021810.21596-1-yzhai003@ucr.edu>
-References: <20190206021810.21596-1-yzhai003@ucr.edu>
+	id 1gtVdx-0001NU-Ud; Tue, 12 Feb 2019 10:50:25 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtVdZ-0008BZ-4e; Tue, 12 Feb 2019 10:50:05 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 73695A78;
+ Tue, 12 Feb 2019 02:49:58 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C76463F557;
+ Tue, 12 Feb 2019 02:49:56 -0800 (PST)
+Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
+ 'MAX_PHYSMEM_BITS' to vmcoreinfo
+To: Bhupesh Sharma <bhsharma@redhat.com>, James Morse <james.morse@arm.com>
+References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
+ <239cdca4-1c7d-f236-f4a9-a0a3fe98f966@arm.com>
+ <86c0dd9f-a55b-8ce8-69ca-893f63087d1a@redhat.com>
+ <a646e38d-9351-e187-1571-c49d3558b164@redhat.com>
+ <2d14484d-743e-080a-daf6-a07b0a659c3d@arm.com>
+ <f4905b1c-c3f0-f5a1-193e-2997a0047b9c@redhat.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <5256fbd8-6e96-0de7-c538-acbec6387c41@arm.com>
+Date: Tue, 12 Feb 2019 10:49:55 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <f4905b1c-c3f0-f5a1-193e-2997a0047b9c@redhat.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_024956_889207_7F4BD6ED 
-X-CRM114-Status: GOOD (  15.40  )
+X-CRM114-CacheID: sfid-20190212_025001_368754_66FF49F2 
+X-CRM114-Status: GOOD (  20.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,51 +73,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: csong@cs.ucr.edu, zhiyunq@cs.ucr.edu, linux-kernel@vger.kernel.org,
- Kishon Vijay Abraham I <kishon@ti.com>, linux-rockchip@lists.infradead.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, ard.biesheuvel@linaro.org,
+ catalin.marinas@arm.com, kexec@lists.infradead.org,
+ Will Deacon <will.deacon@arm.com>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>, bhupesh.linux@gmail.com,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Mittwoch, 6. Februar 2019, 03:18:10 CET schrieb Yizhuo:
-> In function rockchip_usb3_phy_power_on(), local variable
-> "val" could be uninitialized if function regmap_read()
-> returns -EINVAL. However, this value is directly used in
-> later context. This is potentially unsafe.
-
-While highly unlikely case (GRF-registers are mmio-based),
-it's still nicer to go the clean way, so
-
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-> Signed-off-by: Yizhuo <yzhai003@ucr.edu>
-> ---
->  drivers/phy/rockchip/phy-rockchip-typec.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+On 12/02/2019 04:55, Bhupesh Sharma wrote:
+> Hi Robin,
 > 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
-> b/drivers/phy/rockchip/phy-rockchip-typec.c index
-> a958c9bced01..b1e24418cb2d 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
-> @@ -716,7 +716,10 @@ static int rockchip_usb3_phy_power_on(struct phy *phy)
+> On 02/04/2019 09:01 PM, Robin Murphy wrote:
+>> On 04/02/2019 14:35, Bhupesh Sharma wrote:
+>> [...]
+>>>> Also hardcoding the PTE calculation to use the high address bit mask 
+>>>> always will break the backward compatibility with older kernels 
+>>>> (which don't support 52-bit address space extensions).
+>>
+>> No it won't. There's no difference between an old kernel, a new kernel 
+>> on a CPU without ARMv8.2-LPA, or a new kernel on a CPU with 
+>> ARMv8.2-LPA in a system which happens to have less than 49 bits of 
+>> physical memory map - in all those cases the relevant bits are either 
+>> RES0 or just actually 0 in the PTE, so replacing 4 bits of zeros with 
+>> 4 bits of other zeros in the final physical address has no effect 
+>> whatsoever other than taking a couple of extra instructions to perform.
 > 
->  	/* wait TCPHY for pipe ready */
->  	for (timeout = 0; timeout < 100; timeout++) {
-> -		regmap_read(tcphy->grf_regs, reg->offset, &val);
-> +		ret = regmap_read(tcphy->grf_regs, reg->offset, &val);
-> +		if (ret)
-> +			goto unlock_ret;
-> +
->  		if (!(val & BIT(reg->enable_bit))) {
->  			tcphy->mode |= new_mode & (MODE_DFP_USB | MODE_UFP_USB);
->  			goto unlock_ret;
+> Right, but lets think this from a distribution user p-o-v. Why would a 
+> user with newer kernel and CPU which doesn't support ARMv8.2 LPA want to 
+> update a user-space utility? Well unless something is broken in the 
+> user-space. Requesting an upgrade is easier in this case, as the 
+> user-space components like crash-utility/kexec-tools (or for that matter 
+> any user-space tool which requires a page-table walk to determine 
+> vaddr/paddr values) are indeed broken with this combination.
 
+Huh? Nothing gets broken unless we go out of our way to break it. The 
+point I'm making is that the format of vmcoreinfo *does not* need to 
+change in order for the userspace tool to support LPA. There is no 
+compatibility issue either way. If a user's machine doesn't support or 
+make use of LPA, then yeah, they should absolutely not have to upgrade 
+their tools for the sake of LPA regardless of what kernel they use.
 
+> On the other hand, if a user a having a old kernel, CPU which doesn't 
+> support LPA, but if we still want them to upgrade to a newer version of 
+> user-space utility (with a upgrade fix note reading something like: "Add 
+> 52-bit PA support"), surely that would not be an ideal case requiring an 
+> upgrade as his underlying environment doesn't support the same.
 
+I don't get why we would "still want them to upgrade" if there's no 
+technical reason for them to do so. That sounds like the kind of crap 
+that proprietary OS vendors pull :/
 
+> That's what I meant when I said that we need to take care of the 
+> backward compatibility also when we propose new code changes to 
+> user-space packages.
+
+And what I meant is that you can trivially update the userspace tools to 
+support LPA entirely transparently, without requiring kernel changes or 
+creating any compatibility issues in any direction.
+
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
