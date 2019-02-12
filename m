@@ -2,91 +2,133 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-6.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1325EC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 01:51:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F49FC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:02:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D723B2080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 01:51:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E055214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:02:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nXSlCTxS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Q2NCdLTe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D723B2080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IJfbHMK7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=wavesemi.onmicrosoft.com header.i=@wavesemi.onmicrosoft.com header.b="Khae+qna"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E055214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iKgMjJpGhj3vU1a3KVN0nFhrf2XU4gHvBm3lDz5a3n4=; b=nXSlCTxSfDpMqe
-	xnzDqWR910T9Ceh/0sRI07nh7f8Q13hnxLLYcN5ruQXkk0IjqWkjXCBcThn49yiqIQVtXMEhydXdf
-	yFGuoDteYG9vZvjZH2bGlDIkHCALHStNr0khucNxK7jfm7FphPySzizBAFDLsnKLbubQYwokUl7CO
-	Nvqca1VeD5RR/O8jMpaUtgfAECl3V3asqCAdUmYWYIsVY7KhU2DTVuwx8mJasLEpjvLu4fTffinFy
-	NU03Dz4mRG6Z0iPwNnYQ8VZn1S0DVqRujhZqkPuOZhDurl6gz4ecyGwnwNaXRbh8h2dlp1fOFh+xS
-	U1h/y+iRJ02nys8NskPA==;
+	List-Owner; bh=WqHSC+wm9jtz49yQ2Vx2Yzj6wW8+gfgFVk8J4TJbBd4=; b=IJfbHMK7zY4jmy
+	R2bj4IuSogxjLdk+9hXHVjnkjEJFQ1PrPZd9VJEZuos1CbLAefGtBdaae/6qHdh/sdEiJevrZ64JO
+	JkEVUjcs/SaJod1ktc1sbG5jpAVowrsftLL45DscGKwvtbVkgB4UAdKy4yp7+liJyQ4aKFxa61TrB
+	Y20mWkHf1RUNJWJQHYYeC5P7L4ZN/QN79dFwM0HC7ZNrWwS4Upa/COG/EsnIU1lpXIxSsYeXlg3Oc
+	Q28RmVcmlw6JdWPGwTEYChDOjuqie79I5vSDGGUiMAmIksgtPGO25Z+OE1Iot5RyVOKwp6iUsjbyH
+	lZ5GBXUZGU7opsujJkfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtNEk-00015j-NY; Tue, 12 Feb 2019 01:51:50 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1gtNPV-0004ef-DW; Tue, 12 Feb 2019 02:02:57 +0000
+Received: from mail-eopbgr740123.outbound.protection.outlook.com
+ ([40.107.74.123] helo=NAM01-BN3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtNEM-0000gO-CP
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 01:51:29 +0000
-Received: by mail-pf1-x443.google.com with SMTP id f132so468425pfa.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 17:51:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=sMMxpgSAniB8LFv+M0YvWiyKlN5hrWVQrVJB4z8L3aY=;
- b=Q2NCdLTe3L02gUvsERVySCKHaosfpploZ7PksExlTb+pRbqf4g+/w2laNGEF9s3n7D
- BvjDsXKQ1OFHZxurw1RKwZgs5DSysAgHmZweQDOXKH2/UQHJ9GqvpAB72R9krft3vAjY
- qIQazMqb4HojIG9l41zCkgr0+GDKI7/S7ZQjB8ghQOQhArPiu5KYyy3+SM8M9nJm0pbF
- UKigOQyO6c3HcN5ABEj9YlNZjAEj0ZpaMH/xL+Fh+zpkjM0OnH93929okw6KwBhOphdN
- JTEwPuV9p7X6LdPzD719lkpRmGreckTQ0huJhT2+fHfJD4TUX0fcWvXhNLDemxkLj7Qz
- /a6A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=sMMxpgSAniB8LFv+M0YvWiyKlN5hrWVQrVJB4z8L3aY=;
- b=bj7Ma4p1VUIUmBnnMa/nyD5PwZLy5iee2Jl8LbfaR4hhY9ROHz2l9SQf2lDIcjYeyz
- 0aStOETjKkH1zYsZflbYRvzN8SadUlL0c8nzcqS+xbNzil5b91+c+UrVuiXt2CKxI4Ey
- obgMjXlWPZaVX6MaVcRKfk9QtcvuLYxZNIq30bkfAKBVBehfNXdT9iObPMUb8xMCkkXK
- Tr6h5XV/XSsVIPNUFk+UaKY+YO78fKVDSSZ7yHTYDA7qMiJ6lfaI2LEre1i8rtfVBbXw
- ivt3azzcvUV3Ama5wCbMHmPuO2FRWk/8cPSqks+8oGtJTF+Sk4ftl0ET0/94eE2tQ37w
- 72+A==
-X-Gm-Message-State: AHQUAubUxeyd3yyORorKy8UXOgE2hGn8RJeyfsCLpMh8Z5cRFMP4din0
- 8rLN3pkTOaTEUu91rQc/5y8=
-X-Google-Smtp-Source: AHgI3IZuyGNGaY3+wbNd56v+9F6Z4rVnNcBqyshgVkthaFjRMDAQfmZ2q/nKFILjhcMsn3X28rVzdg==
-X-Received: by 2002:aa7:85cc:: with SMTP id z12mr1418728pfn.196.1549936285714; 
- Mon, 11 Feb 2019 17:51:25 -0800 (PST)
-Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
- [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id h64sm17146941pfc.142.2019.02.11.17.51.24
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 11 Feb 2019 17:51:25 -0800 (PST)
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH 2/2] PCI: imx6: Add code to request/control "pcie_aux" clock
- for i.MX8MQ
-Date: Mon, 11 Feb 2019 17:51:08 -0800
-Message-Id: <20190212015108.16952-3-andrew.smirnov@gmail.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190212015108.16952-1-andrew.smirnov@gmail.com>
-References: <20190212015108.16952-1-andrew.smirnov@gmail.com>
+ id 1gtNPR-0004e3-LL; Tue, 12 Feb 2019 02:02:55 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=wavesemi.onmicrosoft.com; s=selector1-wavecomp-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=ko3u7AbITI3PXQfMPviTKYv28S80u3ZNuvzbqnXFfw0=;
+ b=Khae+qnaUo8lC0WpjR6TuQviCo8MBeneU5ey2OLYol2VNU1nmJCS+onfGN8X4vDbDGy3Xurvl8jACYLPEOJnqA7wmBH9K8Npi4g4pMRkV4yWijkYulnHyss6pkfOGAaZ0DXbtG/ONw3Bijq0z66rvUrZsyQzaHMjFi2WXEMB6uQ=
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com (10.174.162.17) by
+ MWHPR2201MB1328.namprd22.prod.outlook.com (10.174.162.143) with Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.22; Tue, 12 Feb 2019 02:02:48 +0000
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::7d5e:f3b0:4a5:4636]) by MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::7d5e:f3b0:4a5:4636%9]) with mapi id 15.20.1601.023; Tue, 12 Feb 2019
+ 02:02:48 +0000
+From: Paul Burton <paul.burton@mips.com>
+To: Christoph Hellwig <hch@lst.de>
+Subject: Re: [PATCH 1/2] dma-mapping: add a kconfig symbol for
+ arch_setup_dma_ops availability
+Thread-Topic: [PATCH 1/2] dma-mapping: add a kconfig symbol for
+ arch_setup_dma_ops availability
+Thread-Index: AQHUvGGrfD9q1BPhjUaX7rLQQjZd+aXbdVQA
+Date: Tue, 12 Feb 2019 02:02:48 +0000
+Message-ID: <20190212020246.pnxg2tlwejvu45ze@pburton-laptop>
+References: <20190204081420.15083-1-hch@lst.de>
+ <20190204081420.15083-2-hch@lst.de>
+In-Reply-To: <20190204081420.15083-2-hch@lst.de>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BYAPR04CA0024.namprd04.prod.outlook.com
+ (2603:10b6:a03:40::37) To MWHPR2201MB1277.namprd22.prod.outlook.com
+ (2603:10b6:301:24::17)
+user-agent: NeoMutt/20180716
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pburton@wavecomp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [67.207.99.198]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 908efb06-c86a-4692-a691-08d6908e2fa2
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR2201MB1328; 
+x-ms-traffictypediagnostic: MWHPR2201MB1328:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; MWHPR2201MB1328;
+ 23:D4hhrUvzN1PFKdjkHNADyi5AJa8E1FXG809i/8v?=
+ =?us-ascii?Q?WR8mhml2/ghGwWXIgqj7HaABu8hlyEEDwbxr57YIPM8k+e65aPmhp4Gw512o?=
+ =?us-ascii?Q?UPP4lnyUerVh78qFRkKCvHVRTuhrN/O0COay+0umrZOiKuuy6qPGt+8/NYFo?=
+ =?us-ascii?Q?LQrAfcJNMfUEfcvsrfjzFEu8UQ/G89AH9QivUCAFQ3f14uvy3C22C4FfNpHj?=
+ =?us-ascii?Q?HkH06B4PavAvr4JJ2zCaf1idkzJj82pr47s+vBy6fIiBKjC0O2mJj5oog3FN?=
+ =?us-ascii?Q?ITpLbgbcnmsmFIZGlKmQNuMoYggYqJbG7GDeuU+DMKPI5992ExvSFtjFcKGS?=
+ =?us-ascii?Q?iFVJS+Yjx8/8TiYwvij3WDKCUdaxea5o153dKG+SbIGplKZKp5Fo8Jx6n8eh?=
+ =?us-ascii?Q?DZbv7s8UUjgpqvGb2ED4YI5HxaELPhuc5LymlPLoOFrcOehF1amnjcX91SC4?=
+ =?us-ascii?Q?Ng41Mc3qHDa3cOEFkhHK75qomecRnsuhkv2xXB+IgCWPvQXzk8/MlQ3sk0Wb?=
+ =?us-ascii?Q?Rx0nSQUlKvuodqHlobkKIXjntgvEXlm4EFNSAsTYrXYAOGnsS0kN9D33T4Ic?=
+ =?us-ascii?Q?MEgEVRH77AJbofNdDyvcnzRc0/1A4DL49/QGVpDoPWsOEZpjBG2NacYyoteb?=
+ =?us-ascii?Q?Jz1U2qk0z50TcWq5X7AEfEYQG2FiCut8ZqpF6V68kXlsW60N1+6yFUBTyfCU?=
+ =?us-ascii?Q?qeElj6nAKyV4QcrOHJ2DLNWXm/Z4OiOJWnolUF2K+KNh8xOO8mVBlXwTjc5s?=
+ =?us-ascii?Q?CvwsJuug4sHMvImmwOK2v8dfkq0N2+W7w0c/c2rIHvWOJh6+WM/CCi1jAevW?=
+ =?us-ascii?Q?LFw4vLmr43Q6LnhkUoKjaWP0RWkSCLxFrFFWgg5ttE2h1cQogSXQrNR0jFow?=
+ =?us-ascii?Q?wyglBZJmX7duyHkvXGB2x5J74yrGIRZlqaBpXLseY8DzSLSudntS786VvJWB?=
+ =?us-ascii?Q?8kMjrVXAVwAdRLSW/Xi0U0UX/akjcm+IBHA77zIPGV9F50PjrTZRf0lK7jjO?=
+ =?us-ascii?Q?JNN+mnFaNpWnlucD90ETRFcfo6Hpvq8aqETYIQDwPyhP8gcML5sKB7N9sDrD?=
+ =?us-ascii?Q?c3HILyQ6q7BUvbemTvCTb8iNAbzHu895v2hlUBgDeVQjXCE6OStoT8Q7WySQ?=
+ =?us-ascii?Q?vCceQiSkEI/rQj/rIv50HucNdGaBhCFEQoGEydWIYMt4O1vAjzRb8ah+qMvV?=
+ =?us-ascii?Q?w88/3cffxHIrLhkdq84wJCjKff+z4lgHxpyQ3iaICleQXRnnWSd6DKcVGyyw?=
+ =?us-ascii?Q?vSMjrk9PsBiBVqs/qH8MeESNlLaR6hd8+IitEQKvXeSRMF1RWLERku7YPw5S?=
+ =?us-ascii?Q?qMwEnAZ3dcrnq7mAjeDkp6Xo=3D?=
+x-microsoft-antispam-prvs: <MWHPR2201MB13281C706CB3B6CD9ABE6348C1650@MWHPR2201MB1328.namprd22.prod.outlook.com>
+x-forefront-prvs: 0946DC87A1
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(7916004)(396003)(376002)(346002)(39840400004)(366004)(136003)(199004)(189003)(81166006)(52116002)(4326008)(76176011)(6246003)(6116002)(14454004)(3846002)(99286004)(33716001)(33896004)(8936002)(8676002)(305945005)(106356001)(7416002)(105586002)(7736002)(81156014)(25786009)(478600001)(58126008)(54906003)(476003)(316002)(26005)(68736007)(446003)(6436002)(11346002)(6916009)(186003)(4744005)(66066001)(2906002)(6506007)(53936002)(386003)(6486002)(71190400001)(44832011)(486006)(9686003)(6512007)(71200400001)(1076003)(97736004)(42882007)(256004)(229853002)(102836004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR2201MB1328;
+ H:MWHPR2201MB1277.namprd22.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: wavecomp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 3J3jOrF5ZV0/e+aCiAn7AjK4hZ6DJsAjQaKbDClrx6HMjCxjmsFt55kUYIpGr9K3NDg5pM0S51kEH6AOIxDoG6CBZujGtGOa9YLXSWGhtRFURZ9cEW8hAF7WNRQgjPj6tiFw8cjOm3f7W5Bi64vGnnDYEQvbbwbI9MiSXnIALRSognH57wB+cd0i4w/4fE7wVZcv67uREW18Cj3oSYwzoS/jFpIaZRaFVp0CrYIOAC1C+qByK8BUjUBbkT88n5vtMz9z74vVgELuJLmxtp/WxagSZ//eaE/f03Sp/quZ8ZHGgvCsnlE4ib8LAzp7K0oOVPtHBXzWrJmaBJEEKIRRgP/ed99n18PNtahTL4dUCeGzImG8Gs/VntQlmbxWmwm0d2IWaQ0YCWrIEAWfDSJdAdox4U2aTTjYttb/yvPcmJY=
+Content-ID: <C4D58356C472DE43A87A2CDF3A97D97A@namprd22.prod.outlook.com>
 MIME-Version: 1.0
+X-OriginatorOrg: mips.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 908efb06-c86a-4692-a691-08d6908e2fa2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Feb 2019 02:02:47.7877 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 463607d3-1db3-40a0-8a29-970c56230104
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR2201MB1328
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_175126_562196_00823B79 
-X-CRM114-Status: GOOD (  13.77  )
+X-CRM114-CacheID: sfid-20190211_180253_762245_15378D97 
+X-CRM114-Status: GOOD (  10.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,90 +140,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- Richard Zhu <hongxing.zhu@nxp.com>, linux-arm-kernel@lists.infradead.org,
- devicetree@vger.kernel.org, Andrey Smirnov <andrew.smirnov@gmail.com>,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
- Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
- Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Cc: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Vineet Gupta <vgupta@synopsys.com>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>,
+ "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
+ "iommu@lists.linux-foundation.org" <iommu@lists.linux-foundation.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ "linux-snps-arc@lists.infradead.org" <linux-snps-arc@lists.infradead.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PCIe IP block has additional clock, "pcie_aux", that needs to be
-controlled by the driver. Add code to support that.
+Hi Christoph,
 
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Chris Healy <cphealy@gmail.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: linux-imx@nxp.com
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-kernel@vger.kernel.org
-Cc: linux-pci@vger.kernel.org
-Cc: Rob Herring <robh@kernel.org>
-Cc: devicetree@vger.kernel.org
----
- drivers/pci/controller/dwc/pci-imx6.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Mon, Feb 04, 2019 at 09:14:19AM +0100, Christoph Hellwig wrote:
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/arc/Kconfig                     |  1 +
+>  arch/arc/include/asm/Kbuild          |  1 +
+>  arch/arc/include/asm/dma-mapping.h   | 13 -------------
+>  arch/arm/Kconfig                     |  1 +
+>  arch/arm/include/asm/dma-mapping.h   |  4 ----
+>  arch/arm64/Kconfig                   |  1 +
+>  arch/arm64/include/asm/dma-mapping.h |  4 ----
+>  arch/mips/Kconfig                    |  1 +
+>  arch/mips/include/asm/dma-mapping.h  | 10 ----------
+>  arch/mips/mm/dma-noncoherent.c       |  8 ++++++++
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 7cdf8f9ab244..1a7031782846 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -65,6 +65,7 @@ struct imx6_pcie {
- 	struct clk		*pcie_phy;
- 	struct clk		*pcie_inbound_axi;
- 	struct clk		*pcie;
-+	struct clk		*pcie_aux;
- 	struct regmap		*iomuxc_gpr;
- 	u32			controller_id;
- 	struct reset_control	*pciephy_reset;
-@@ -421,6 +422,12 @@ static int imx6_pcie_enable_ref_clk(struct imx6_pcie *imx6_pcie)
- 	case IMX7D:
- 		break;
- 	case IMX8MQ:
-+		ret = clk_prepare_enable(imx6_pcie->pcie_aux);
-+		if (ret) {
-+			dev_err(dev, "unable to enable pcie_aux clock\n");
-+			break;
-+		}
-+
- 		offset = imx6_pcie_grp_offset(imx6_pcie);
- 		/*
- 		 * Set the over ride low and enabled
-@@ -904,6 +911,9 @@ static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
- 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
- 				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
- 		break;
-+	case IMX8MQ:
-+		clk_disable_unprepare(imx6_pcie->pcie_aux);
-+		break;
- 	default:
- 		break;
- 	}
-@@ -1049,6 +1059,12 @@ static int imx6_pcie_probe(struct platform_device *pdev)
- 			dev_err(dev, "Failed to get PCIE APPS reset control\n");
- 			return PTR_ERR(imx6_pcie->apps_reset);
- 		}
-+
-+		imx6_pcie->pcie_aux = devm_clk_get(dev, "pcie_aux");
-+		if (IS_ERR(imx6_pcie->pcie_aux)) {
-+			dev_err(dev, "pcie_aux clock source missing or invalid\n");
-+			return PTR_ERR(imx6_pcie->pcie_aux);
-+		}
- 		break;
- 	default:
- 		break;
--- 
-2.20.1
+Acked-by: Paul Burton <paul.burton@mips.com> # MIPS
 
+Thanks,
+    Paul
 
 _______________________________________________
 linux-arm-kernel mailing list
