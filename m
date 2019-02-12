@@ -4,84 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D780C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3499C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6C66222C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A5CE52084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:02:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UTbfUNUZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6C66222C4
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g/RMEvZt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5CE52084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RAwp8YVFQ/qjs/5g84QildFlg4ak3SW4vC0Ti2m77MU=; b=UTbfUNUZ74bdtr
-	GBy37rdre8Iaep4k0YCcnorn4V3qr2YrRePa60KBXVUxIxV8ouYaWOGpmNQX59XfzHEU9Nl+AoxNF
-	f7AfKomnqmdQ69O8znVf+sxpDRUB8YLltwEGxaiO0ruOMv70IdFyaTYUUK9L11uLmi5e4RW0zf+7J
-	kYA8yjwqbiieHvZrgW6INOIE/jXDq512MjyCgQRgXuYNPEfuPIMwY2Uf2pqOmu+w3z9+eAvkQBVYZ
-	vXJ+Ha67hBVavLG0/URH1aXU0xuz0Nqxfh4S/37+jeZP1ubeZ4oIpqDsLgE8kM6jKdkaWl8NBsACz
-	M8iR+bOra6A/SpTAiVog==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=xZ7OitOV/GCNzVi3kkehjA2TAGtYu/TkPb9GOsm+36Q=; b=g/RMEvZtFsHrz8tf3IxKJdNBh
+	ZgC4AyxRwDc++UWQ65ebiJAXuOFFy28nbcjWZDP7D6KtVzouAsVk2U5gxVMc8c0CHYfu/4itlWIzr
+	B1tOOoolBIYGkkYrn7Syy3I6SRt/I63oDdc+rr7XD0HGb9HzXbieyg/R2iZ5eOn0bO7C6fLVU5WXw
+	hGbViw60nnHmrLyI5rAJQI9HXkeG0wui752d5MHXDtRQp35DSd53ILkZXE7EUR3+KuDEZ+La29d/b
+	Sw4Fsb4gxq6akMaT3OxTB+bBOcV2c53fYOq7TRLhKNQWeI0CdV1j0u4J6saHIschTPmXBrUgKVu+F
+	J/5i2XVAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtcNq-0002gk-UL; Tue, 12 Feb 2019 18:02:14 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtcNn-0002f1-Aj
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:02:13 +0000
-Received: by mail-qt1-f194.google.com with SMTP id n32so3973795qte.11
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 10:02:08 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=dPBQqfYVPgXd1rOFZeov+mi9Da5uKK6iTGqh8Moxmo0=;
- b=rAdK8SKk4ql7PbFpD4MhsvsfMTfhH/1yWYglhQvpAPBXLQuu1hLodNW01pFYHOzHTM
- Z4RCfJZ1eRz72D7RSYPVnl8oQP21CkkI+tzgq9OQm+eII0cxdyII3wKaZ5J6qh0+GQ0h
- QY/Iu9UVip7RZ5HYh2uXn8cWTvTiWb/hbm6JQ92HYzYUA4E/x8Uo6Xa1lZPKjGUtHbTI
- Sv5qs/bPDxpKiEtQD/zp/kdlS5IM7DmiDyjOrfNbLGACd5qlKqrvR0zPldNtfzFkFvym
- 6HHV8tVu5Be9Oo5tDEAdD5kxgGEUHFcxsNT+ZOy0iDEKmgR+VEsqc1VHe2+2ckusqbYG
- 9L7w==
-X-Gm-Message-State: AHQUAuYkxCjKwgohjGHaV9ql8qvy/jjAcVD7Nw+SLslkJc0104VuXj6E
- ffWjbTEd5761RWX5YQUhONrFYQRULVU=
-X-Google-Smtp-Source: AHgI3Ibu7GDBMuCi6cAm3O0fqn8mynn1Dp7Kypxz0ZIX2aeCW5Eg4hoVX+FfumZ7wje+H9u1KwtIKQ==
-X-Received: by 2002:ac8:3437:: with SMTP id u52mr3898893qtb.185.1549994527026; 
- Tue, 12 Feb 2019 10:02:07 -0800 (PST)
-Received: from mail-qt1-f173.google.com (mail-qt1-f173.google.com.
- [209.85.160.173])
- by smtp.gmail.com with ESMTPSA id f5sm14769896qkd.0.2019.02.12.10.02.06
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 10:02:06 -0800 (PST)
-Received: by mail-qt1-f173.google.com with SMTP id r9so4031396qtt.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 10:02:06 -0800 (PST)
-X-Received: by 2002:a0c:ecc5:: with SMTP id o5mr3747109qvq.106.1549994525892; 
- Tue, 12 Feb 2019 10:02:05 -0800 (PST)
+	id 1gtcOL-00034n-0r; Tue, 12 Feb 2019 18:02:45 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtcO8-00030F-3O
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:02:42 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6F0BBA78;
+ Tue, 12 Feb 2019 10:02:31 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 2EEFF3F774;
+ Tue, 12 Feb 2019 10:02:29 -0800 (PST)
+Subject: Re: [PATCH v3 3/7] of: address: Add parent pointer to the
+ __of_translate_address args
+To: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh+dt@kernel.org>,
+ Frank Rowand <frowand.list@gmail.com>, Chen-Yu Tsai <wens@csie.org>
+References: <cover.f2e5fbb4d21384168973fa32377a33d627768146.1549897336.git-series.maxime.ripard@bootlin.com>
+ <57fa05909120919f33590fed11bd4041467a09f5.1549897336.git-series.maxime.ripard@bootlin.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <fbac5719-5d76-e7f4-5e5e-2d5167783106@arm.com>
+Date: Tue, 12 Feb 2019 18:02:27 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190206150520.9683-1-pankaj.bansal@nxp.com>
- <20190211030010.GI22487@dragon>
- <AM6PR04MB5863A68D22DD06F81743AC8B8F640@AM6PR04MB5863.eurprd04.prod.outlook.com>
- <AM5PR0401MB24818DB35D5DEF95DA710038F1650@AM5PR0401MB2481.eurprd04.prod.outlook.com>
-In-Reply-To: <AM5PR0401MB24818DB35D5DEF95DA710038F1650@AM5PR0401MB2481.eurprd04.prod.outlook.com>
-From: Li Yang <leoyang.li@nxp.com>
-Date: Tue, 12 Feb 2019 12:01:53 -0600
-X-Gmail-Original-Message-ID: <CADRPPNTEE7beTyR-3ezSBuaNm-9vMAiUVKWYUkr_gd8nswMSYg@mail.gmail.com>
-Message-ID: <CADRPPNTEE7beTyR-3ezSBuaNm-9vMAiUVKWYUkr_gd8nswMSYg@mail.gmail.com>
-Subject: Re: [PATCH v3] arm64: dts: lx2160aqds: Add mdio mux nodes
-To: Pankaj Bansal <pankaj.bansal@nxp.com>, Rob Herring <robh+dt@kernel.org>
+In-Reply-To: <57fa05909120919f33590fed11bd4041467a09f5.1549897336.git-series.maxime.ripard@bootlin.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_100211_377914_D0DA6C01 
-X-CRM114-Status: GOOD (  29.74  )
+X-CRM114-CacheID: sfid-20190212_100232_523453_DE3ADBF9 
+X-CRM114-Status: GOOD (  27.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,274 +73,147 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
- Shawn Guo <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "netdev@vger.kernel.org" <netdev@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: devicetree@vger.kernel.org, Yong Deng <yong.deng@magewell.com>,
+ Arnd Bergmann <arnd@arndb.de>, dri-devel@lists.freedesktop.org,
+ Dave Martin <dave.martin@arm.com>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Georgi Djakov <georgi.djakov@linaro.org>, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 9:28 PM Pankaj Bansal <pankaj.bansal@nxp.com> wrote:
->
->
->
-> > -----Original Message-----
-> > From: Leo Li
-> > Sent: Tuesday, 12 February, 2019 02:14 AM
-> > To: Shawn Guo <shawnguo@kernel.org>; Pankaj Bansal
-> > <pankaj.bansal@nxp.com>
-> > Cc: Andrew Lunn <andrew@lunn.ch>; Florian Fainelli <f.fainelli@gmail.com>;
-> > netdev@vger.kernel.org; linux-arm-kernel@lists.infradead.org
-> > Subject: RE: [PATCH v3] arm64: dts: lx2160aqds: Add mdio mux nodes
-> >
-> >
-> >
-> > > -----Original Message-----
-> > > From: Shawn Guo <shawnguo@kernel.org>
-> > > Sent: Sunday, February 10, 2019 9:00 PM
-> > > To: Pankaj Bansal <pankaj.bansal@nxp.com>
-> > > Cc: Leo Li <leoyang.li@nxp.com>; Andrew Lunn <andrew@lunn.ch>; Florian
-> > > Fainelli <f.fainelli@gmail.com>; netdev@vger.kernel.org; linux-arm-
-> > > kernel@lists.infradead.org
-> > > Subject: Re: [PATCH v3] arm64: dts: lx2160aqds: Add mdio mux nodes
-> > >
-> > > On Wed, Feb 06, 2019 at 09:40:33AM +0000, Pankaj Bansal wrote:
-> > > > The two external MDIO buses used to communicate with phy devices
-> > > > that are external to SOC are muxed in LX2160AQDS board.
-> > > >
-> > > > These buses can be routed to any one of the eight IO slots on
-> > > > LX2160AQDS board depending on value in fpga register 0x54.
-> > > >
-> > > > Additionally the external MDIO1 is used to communicate to the
-> > > > onboard RGMII phy devices.
-> > > >
-> > > > The mdio1 is controlled by bits 4-7 of fpga register and mdio2 is
-> > > > controlled by bits 0-3 of fpga register.
-> > > >
-> > > > Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
-> > > > ---
-> > > >
-> > > > Notes:
-> > > >     V3:
-> > > >     - Add status = disabled in soc file and status = okay in board file
-> > > >       for external MDIO nodes
-> > > >     - Add interrupts property in external mdio nodes in soc file
-> > > >     V2:
-> > > >     - removed unnecassary TODO statements
-> > > >     - removed device_type from mdio nodes
-> > > >     - change the case of hex number to lowercase
-> > > >     - removed board specific comments from soc file
-> > > >
-> > > >  .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 123 +++++++++++++++++
-> > > >  .../boot/dts/freescale/fsl-lx2160a.dtsi      |  22 +++
-> > > >  2 files changed, 145 insertions(+)
-> > > >
-> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> > > > b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> > > > index 99a22abbe725..079264b391a2 100644
-> > > > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-> > > > @@ -35,6 +35,14 @@
-> > > >   status = "okay";
-> > > >  };
-> > > >
-> > > > +&emdio1 {
-> > > > + status = "okay";
-> > > > +};
-> > > > +
-> > > > +&emdio2 {
-> > > > + status = "okay";
-> > > > +};
-> > > > +
-> > > >  &esdhc0 {
-> > > >   status = "okay";
-> > > >  };
-> > > > @@ -46,6 +54,121 @@
-> > > >  &i2c0 {
-> > > >   status = "okay";
-> > > >
-> > > > + fpga@66 {
-> > > > +         compatible = "fsl,lx2160aqds-fpga", "fsl,fpga-qixis-i2c";
-> > > > +         reg = <0x66>;
-> > > > +         #address-cells = <1>;
-> > > > +         #size-cells = <0>;
-> > > > +
-> > > > +         mdio-mux-1@54 {
-> > > > +                 mdio-parent-bus = <&emdio1>;
-> > > > +                 reg = <0x54>;            /* BRDCFG4 */
-> > > > +                 mux-mask = <0xf8>;      /* EMI1_MDIO */
-> > > > +                 #address-cells=<1>;
-> > > > +                 #size-cells = <0>;
-> > > > +
-> > > > +                 mdio@0 {
-> > > > +                         reg = <0x00>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > >
-> > > Please have a newline between nodes.  It doesn't deserve a respin
-> > > though.  I can fix them up when applying if Leo is fine with this version.
-> >
-> > I think there should be a compatible string defined for the binding of parent
-> > node mdio-mux, probably "mdio-mux-regmap", and be used here in the device
-> > tree.
->
-> I have two concerns :
-> 1. The regmap is linux s/w construct, while device tree is h/w representation and is s/w agnostic. can we use regmap in device tree?
+On 11/02/2019 15:02, Maxime Ripard wrote:
+> The __of_translate_address function is used to translate the device tree
+> addresses to physical addresses using the various ranges property to create
+> the offset.
+> 
+> However, it's shared between the CPU addresses (based on the ranges
+> property) and the DMA addresses (based on dma-ranges). Since we're going to
+> add support for a DMA parent node that is not the DT parent node, we need
+> to change the logic a bit to have an optional parent node that we should
+> use.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>   drivers/of/address.c | 21 ++++++++++++---------
+>   1 file changed, 12 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/of/address.c b/drivers/of/address.c
+> index 2270373b30ab..4c5dc21c71ca 100644
+> --- a/drivers/of/address.c
+> +++ b/drivers/of/address.c
+> @@ -569,10 +569,10 @@ static int of_translate_one(struct device_node *parent, struct of_bus *bus,
+>    * relative to that node.
+>    */
+>   static u64 __of_translate_address(struct device_node *dev,
+> +				  struct device_node *parent,
+>   				  const __be32 *in_addr, const char *rprop,
+>   				  struct device_node **host)
+>   {
+> -	struct device_node *parent = NULL;
+>   	struct of_bus *bus, *pbus;
+>   	__be32 addr[OF_MAX_ADDR_CELLS];
+>   	int na, ns, pna, pns;
+> @@ -583,11 +583,14 @@ static u64 __of_translate_address(struct device_node *dev,
+>   	/* Increase refcount at current level */
+>   	of_node_get(dev);
+>   
+> -	*host = NULL;
+> -	/* Get parent & match bus type */
+> -	parent = of_get_parent(dev);
+> -	if (parent == NULL)
+> -		goto bail;
+> +	if (!parent) {
 
-Well, if we want to avoid using the regmap name, we probably can try
-"mdio-mux-reg" or "mdio-mux-syscon"?  With further search I also found
-a more generic mux binding at Documentation/devicetree/bindings/mux/,
-would be even better if we can use that to describe the mux.
+I would have suggested having the callers make the of_get_parent() call 
+themselves, but having pulled up the code for a look at the whole 
+function, there's a bigger issue at play. The parent traversal happens 
+within the main translation loop as well, and topologies could quite 
+feasibly exist where that makes a difference, e.g.:
 
-> 2. By convention the device tree compatible binding is defined as "<manufacturer>,<model>" e.g. "fsl,mpc8349-uart". The mdio-mux node and it's sub nodes are a generic representation of mdio mux and it is not dependent on a particular manufacturer device. How to define the compatible in this case?
+	icc {
+		#interconnect-cells = <0>;
+		dma-ranges = <...>;
+	};
 
-The manufacturer prefix is for vendor specific bindings.  If the
-binding a suppose to be generic, we don't need the vendor prefix.
+	subsystem {
+		interconnects = <&icc>;
+		interconnect-names = "dma";
 
->
-> >
-> > >
-> > > Shawn
-> > >
-> > > > +                 mdio@40 {
-> > > > +                         reg = <0x40>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@c0 {
-> > > > +                         reg = <0xc0>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@c8 {
-> > > > +                         reg = <0xc8>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@d0 {
-> > > > +                         reg = <0xd0>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@d8 {
-> > > > +                         reg = <0xd8>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@e0 {
-> > > > +                         reg = <0xe0>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@e8 {
-> > > > +                         reg = <0xe8>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@f0 {
-> > > > +                         reg = <0xf0>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@f8 {
-> > > > +                         reg = <0xf8>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +         };
-> > > > +
-> > > > +         mdio-mux-2@54 {
-> > > > +                 mdio-parent-bus = <&emdio2>;
-> > > > +                 reg = <0x54>;            /* BRDCFG4 */
-> > > > +                 mux-mask = <0x07>;      /* EMI2_MDIO */
-> > > > +                 #address-cells=<1>;
-> > > > +                 #size-cells = <0>;
-> > > > +
-> > > > +                 mdio@0 {
-> > > > +                         reg = <0x00>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@1 {
-> > > > +                         reg = <0x01>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@2 {
-> > > > +                         reg = <0x02>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@3 {
-> > > > +                         reg = <0x03>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@4 {
-> > > > +                         reg = <0x04>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@5 {
-> > > > +                         reg = <0x05>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@6 {
-> > > > +                         reg = <0x06>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +                 mdio@7 {
-> > > > +                         reg = <0x07>;
-> > > > +                         #address-cells = <1>;
-> > > > +                         #size-cells = <0>;
-> > > > +                 };
-> > > > +         };
-> > > > + };
-> > > > +
-> > > >   i2c-mux@77 {
-> > > >           compatible = "nxp,pca9547";
-> > > >           reg = <0x77>;
-> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > > > b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > > > index a79f5c1ea56d..7def5252ac1a 100644
-> > > > --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-> > > > @@ -762,5 +762,27 @@
-> > > >                                <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
-> > > >                   dma-coherent;
-> > > >           };
-> > > > +
-> > > > +         /* WRIOP0: 0x8b8_0000, E-MDIO1: 0x1_6000 */
-> > > > +         emdio1: mdio@8b96000 {
-> > > > +                 compatible = "fsl,fman-memac-mdio";
-> > > > +                 reg = <0x0 0x8b96000 0x0 0x1000>;
-> > > > +                 interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
-> > > > +                 #address-cells = <1>;
-> > > > +                 #size-cells = <0>;
-> > > > +                 little-endian;  /* force the driver in LE mode */
-> > > > +                 status = "disabled";
-> > > > +         };
-> > > > +
-> > > > +         /* WRIOP0: 0x8b8_0000, E-MDIO2: 0x1_7000 */
-> > > > +         emdio2: mdio@8b97000 {
-> > > > +                 compatible = "fsl,fman-memac-mdio";
-> > > > +                 reg = <0x0 0x8b97000 0x0 0x1000>;
-> > > > +                 interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
-> > > > +                 #address-cells = <1>;
-> > > > +                 #size-cells = <0>;
-> > > > +                 little-endian;  /* force the driver in LE mode */
-> > > > +                 status = "disabled";
-> > > > +         };
-> > > >   };
-> > > >  };
-> > > > --
-> > > > 2.17.1
-> > > >
+		intermediate-bus {
+			dma-ranges;
+
+			device {
+				...
+			};
+		};
+	};
+
+or:
+
+	icc2 {
+		#interconnect-cells = <0>;
+		dma-ranges = <...>;
+	};
+
+	icc1 {
+		#interconnect-cells = <0>;
+		dma-ranges = <...>;
+		interconnects = <&icc2>;
+		interconnect-names = "dma";
+	};
+
+	device {
+		interconnects = <&icc1>;
+		interconnect-names = "dma";
+		...
+	};
+
+So I guess the answer is to switch this over to using a callback and 
+have the callers pass of_get_parent/of_get_dma_parent in as appropriate.
+
+Robin.
+
+> +		*host = NULL;
+> +		/* Get parent & match bus type */
+> +		parent = of_get_parent(dev);
+> +		if (parent == NULL)
+> +			goto bail;
+> +	}
+> +
+>   	bus = of_match_bus(parent);
+>   
+>   	/* Count address cells & copy address locally */
+> @@ -665,7 +668,7 @@ u64 of_translate_address(struct device_node *dev, const __be32 *in_addr)
+>   	struct device_node *host;
+>   	u64 ret;
+>   
+> -	ret = __of_translate_address(dev, in_addr, "ranges", &host);
+> +	ret = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+>   	if (host) {
+>   		of_node_put(host);
+>   		return OF_BAD_ADDR;
+> @@ -680,7 +683,7 @@ u64 of_translate_dma_address(struct device_node *dev, const __be32 *in_addr)
+>   	struct device_node *host;
+>   	u64 ret;
+>   
+> -	ret = __of_translate_address(dev, in_addr, "dma-ranges", &host);
+> +	ret = __of_translate_address(dev, NULL, in_addr, "dma-ranges", &host);
+>   
+>   	if (host) {
+>   		of_node_put(host);
+> @@ -736,7 +739,7 @@ static u64 of_translate_ioport(struct device_node *dev, const __be32 *in_addr,
+>   	unsigned long port;
+>   	struct device_node *host;
+>   
+> -	taddr = __of_translate_address(dev, in_addr, "ranges", &host);
+> +	taddr = __of_translate_address(dev, NULL, in_addr, "ranges", &host);
+>   	if (host) {
+>   		/* host-specific port access */
+>   		port = logic_pio_trans_hwaddr(&host->fwnode, taddr, size);
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
