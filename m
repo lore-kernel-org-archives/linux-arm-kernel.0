@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0C5E8C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:29:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A64C8C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:29:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D19342070C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:29:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41AE92070C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:29:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fPF4ib10"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D19342070C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MaoI9dgf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41AE92070C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XKCtz8uUERmhmFRekXR4PXm1Hc3GLCI9za5x4sRTNSA=; b=fPF4ib10U17oP2
-	6HnDutS5iWb2Pk/DKJis88X8mam6AlIbqD+xbmyB6P2CqBUww96lS8eihnjj0DWRRIO+l6MwXtTI6
-	ofEQwX4l0vJ5WQGf69vIFjkT4Wfk3VBoFUVKyPNRUfH/0dtxEBNln/f5ipCNSHZ6tl+PGtAr5TKCb
-	PkI66m3lRPLSJMcUK7zJ0Zbmp9X2PDgCJC2JNe2ftMhPcL19qxcMqyXv8i2yuKDbYXQAiIJCwlPt+
-	c2ArEGDLCCIlLrvTbgcmm7UDlVsHQAwo+4AxHdUNSSzsvV90MBuGow+Hax4rxB4DVO7E4glblwEq8
-	n/0o7NXCmrWGGdQ8xnCg==;
+	List-Owner; bh=2LDfREH2O+ncRJ/RjpT3OvJhL4Gqi8z2n1l/85C4yqI=; b=MaoI9dgf/sfVWv
+	ewmVxMlXYArHgEQW3s31MikdesoAsRxc6rryiRJHsH/NtfDghwko9L210ksfkYdHO61kHCkONiyqx
+	Rq9ynfubN8F4UCua3SBKtVvVPacQQXFyk3JLtD1srE+Fo7CNZ5eX8cx5u0ZZmmD6urnC4qvHAClLh
+	PIxEPdj/BHqL49k053Oi1oDMekE+mvkekxf7PBfgZlOB+a/mGLHASfYRtsEZLF32PChqkcE2Ir3Vz
+	T6+x3QtweWW2c3IyK3734ynvxdA73jHQRyGwXTBhk6XzCBq7TZ8G7POuG+4V3/+85XVQ4A35nnvqD
+	8oaZ+3pAZA349lh9eExg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSVC-00065O-2P; Tue, 12 Feb 2019 07:29:10 +0000
+	id 1gtSVP-0006O0-KU; Tue, 12 Feb 2019 07:29:23 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSSE-0002ty-4k; Tue, 12 Feb 2019 07:26:06 +0000
+ id 1gtSSG-0002vw-RH; Tue, 12 Feb 2019 07:26:09 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [PATCH 13/14] mmc: core: don't use block layer bounce buffers
-Date: Tue, 12 Feb 2019 08:25:27 +0100
-Message-Id: <20190212072528.13167-14-hch@lst.de>
+Subject: [PATCH 14/14] dma-mapping: remove dma_max_pfn
+Date: Tue, 12 Feb 2019 08:25:28 +0100
+Message-Id: <20190212072528.13167-15-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212072528.13167-1-hch@lst.de>
 References: <20190212072528.13167-1-hch@lst.de>
@@ -68,36 +68,52 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-All MMC and SD host drivers are highmem safe now, and bounce buffering
-for addressing limitations is handled in the DMA layer now.
+These days the DMA mapping code must bounce buffer for any not supported
+address, and if they driver needs to optimize for natively supported
+ranged it should use dma_get_required_mask.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mmc/core/queue.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/include/asm/dma-mapping.h | 7 -------
+ include/linux/dma-mapping.h        | 7 -------
+ 2 files changed, 14 deletions(-)
 
-diff --git a/drivers/mmc/core/queue.c b/drivers/mmc/core/queue.c
-index 71cd2411329e..1c92a2a4d641 100644
---- a/drivers/mmc/core/queue.c
-+++ b/drivers/mmc/core/queue.c
-@@ -354,17 +354,12 @@ static const struct blk_mq_ops mmc_mq_ops = {
- static void mmc_setup_queue(struct mmc_queue *mq, struct mmc_card *card)
- {
- 	struct mmc_host *host = card->host;
--	u64 limit = BLK_BOUNCE_HIGH;
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 31d3b96f0f4b..496b36b9a7ff 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -89,13 +89,6 @@ static inline dma_addr_t virt_to_dma(struct device *dev, void *addr)
+ }
+ #endif
+ 
+-/* The ARM override for dma_max_pfn() */
+-static inline unsigned long dma_max_pfn(struct device *dev)
+-{
+-	return dma_to_pfn(dev, *dev->dma_mask);
+-}
+-#define dma_max_pfn(dev) dma_max_pfn(dev)
 -
--	if (mmc_dev(host)->dma_mask && *mmc_dev(host)->dma_mask)
--		limit = (u64)dma_max_pfn(mmc_dev(host)) << PAGE_SHIFT;
+ #define arch_setup_dma_ops arch_setup_dma_ops
+ extern void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 			       const struct iommu_ops *iommu, bool coherent);
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index f6ded992c183..c6dbc287e466 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -710,13 +710,6 @@ static inline int dma_set_seg_boundary(struct device *dev, unsigned long mask)
+ 	return -EIO;
+ }
  
- 	blk_queue_flag_set(QUEUE_FLAG_NONROT, mq->queue);
- 	blk_queue_flag_clear(QUEUE_FLAG_ADD_RANDOM, mq->queue);
- 	if (mmc_can_erase(card))
- 		mmc_queue_setup_discard(mq->queue, card);
- 
--	blk_queue_bounce_limit(mq->queue, limit);
- 	blk_queue_max_hw_sectors(mq->queue,
- 		min(host->max_blk_count, host->max_req_size / 512));
- 	blk_queue_max_segments(mq->queue, host->max_segs);
+-#ifndef dma_max_pfn
+-static inline unsigned long dma_max_pfn(struct device *dev)
+-{
+-	return (*dev->dma_mask >> PAGE_SHIFT) + dev->dma_pfn_offset;
+-}
+-#endif
+-
+ static inline int dma_get_cache_alignment(void)
+ {
+ #ifdef ARCH_DMA_MINALIGN
 -- 
 2.20.1
 
