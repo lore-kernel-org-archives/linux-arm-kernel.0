@@ -2,62 +2,79 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BBE6DC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:00:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3ECF1C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:07:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84788217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:00:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0734F20700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 17:07:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTPBZNT0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84788217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A/+KMgWL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="CrvdDpAx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0734F20700
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=snWHCOO80kdZi8LAP/OFJoEBLYEdCSXu8GWwZFZwpvI=; b=uTPBZNT0oWx8Nj
-	epqCg2mNpkd0nb6CChCehbNU3QH60VwAbrmvkkUBUJ5jKjhYxLlrVxfyyeA+4s+Agy+/qqQmbXHaF
-	ZdJ8HAkDAT/epbzJgltdaRnAWMafOgJS8IsGH7Q0M2JYLdeCZ2r+Fw3A4OXDUlAr+Ewz9OEk3vCvl
-	G947JQXld950rSuLTeOAxbhdMiocpTMJEyxZ6u0Da67eR9FcubH61qAvB9/zguNAMVA9WfJlib1uV
-	SyIcj9qAV/aWWoswi/v+dzKlV0oCD0dOhKyEmtPKVhjV5zcbxvU5/Ey05xZviPYQ8Qlf5+ixsv6lZ
-	KJATQ6q88v6rmZY+8iDg==;
+	List-Owner; bh=IeujGU9qkGfq8fprL8GXjitxLx0ZgnbouT01pODjWqc=; b=A/+KMgWLLVdHOx
+	r/uldQpWgL3k0vG/T6Hvh071HtMHwmuoPevYKjvEFtBshZAnN7nk0SAvcRFIDnjzbmUUyzIuQ94ik
+	bKYgK4B+Wk+01H1FvKfSgRMEOKz7hueKFbBso8yOFJef14fJDZ63Hp8rHZhj5LakZZv8IOpYWZuVj
+	21DnhiUBg7lMIDFs7YGGuoJLv2niyNGANKHXqWxwVZ9Ll2UA8VeYVRdplbL8p1NpYm2MoUytdVJqY
+	WiW41QiZaj3Y0Q5m8Hb3mDQ3ff9DKqS0LNpZU9s3LEFkt4k5oOdGACvQQmMyiJ7Cybrf6Cmlhwxzx
+	WnGM7Eb2bZpGK1sx1aQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtbQC-0003bA-H7; Tue, 12 Feb 2019 17:00:36 +0000
-Received: from smtp.nue.novell.com ([195.135.221.5])
+	id 1gtbX6-0005hx-Rg; Tue, 12 Feb 2019 17:07:44 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtbQ3-0003Zy-Aj
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 17:00:31 +0000
-Received: from emea4-mta.ukb.novell.com ([10.120.13.87])
- by smtp.nue.novell.com with ESMTP (TLS encrypted);
- Tue, 12 Feb 2019 18:00:23 +0100
-Received: from suse.de (nwb-a10-snat.microfocus.com [10.120.13.201])
- by emea4-mta.ukb.novell.com with ESMTP (TLS encrypted);
- Tue, 12 Feb 2019 17:00:10 +0000
-Date: Tue, 12 Feb 2019 20:00:59 +0100
-From: Mian Yousaf Kaukab <ykaukab@suse.de>
-To: Peng Ma <peng.ma@nxp.com>
-Subject: Re: [v5 2/2] arm64: dts: lx2160a: add sata node support
-Message-ID: <20190212190059.GA9272@suse.de>
-References: <20190125081013.21663-1-peng.ma@nxp.com>
- <20190125081013.21663-2-peng.ma@nxp.com>
+ id 1gtbX3-0005hZ-PC
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 17:07:43 +0000
+Received: from mail-ed1-f43.google.com (mail-ed1-f43.google.com
+ [209.85.208.43])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 839DE217D9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 17:07:39 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1549991259;
+ bh=MeHHuPu0Pdq3s5h/Max33zQatHui0w5NnFPlRdmJvjg=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=CrvdDpAxKtvjcZ8SOHhIFk/vPkNSnQfJ6UX4p3e/U7lbr6MfDWwqF3mNgZZkRPHKu
+ mu3lZhgwybhPPTjmeEiay+kEpjEL/NJheamn/S8XH52/66hJjyiB0m+YMrt82KT/BF
+ MrI/K9vzM81soqoUHEZqss8X3zclg+1aLdObkhAo=
+Received: by mail-ed1-f43.google.com with SMTP id h58so2838031edb.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 09:07:39 -0800 (PST)
+X-Gm-Message-State: AHQUAuZ+4t+8q3bRIThTko9ViLG2Rkj1+OqlepQLrU12Dt1YifBdduq9
+ 5EkF0qBpjE3I0mvo+WkANX6qQY2/tc5z6syXrag=
+X-Google-Smtp-Source: AHgI3IYqn69oQbKy3U6QIxj4nGb7YIBe/HEIXeOgvT9NZ/n7BRrrSAv19XXFH4OzqVWX+meaVfNi0ZFjDqiteW2+8AA=
+X-Received: by 2002:a17:906:49a:: with SMTP id
+ f26mr3514106eja.15.1549991257931; 
+ Tue, 12 Feb 2019 09:07:37 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190125081013.21663-2-peng.ma@nxp.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190211161754.23902-1-nava.manne@xilinx.com>
+ <CAAtXAHfXaerVYzfdnA_09rK5AgLVJAiRcE2KEqosfrMZBuO3xQ@mail.gmail.com>
+In-Reply-To: <CAAtXAHfXaerVYzfdnA_09rK5AgLVJAiRcE2KEqosfrMZBuO3xQ@mail.gmail.com>
+From: Alan Tull <atull@kernel.org>
+Date: Tue, 12 Feb 2019 11:07:01 -0600
+X-Gmail-Original-Message-ID: <CANk1AXTSE+JXn1rinhdxeuOHgFZKga6SvGvTcNwN1knSNxwjjQ@mail.gmail.com>
+Message-ID: <CANk1AXTSE+JXn1rinhdxeuOHgFZKga6SvGvTcNwN1knSNxwjjQ@mail.gmail.com>
+Subject: Re: [PATCH v3 3/3] fpga manager: Adding FPGA Manager support for
+ Xilinx zynqmp
+To: Moritz Fischer <moritz.fischer@ettus.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_090027_686479_92B84F99 
-X-CRM114-Status: GOOD (  13.44  )
+X-CRM114-CacheID: sfid-20190212_090741_837328_0256E8BF 
+X-CRM114-Status: GOOD (  13.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,78 +86,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: axboe@kernel.dk, mark.rutland@arm.com, andy.tang@nxp.com,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org, leoyang.li@nxp.com,
- linux-ide@vger.kernel.org, robh+dt@kernel.org, shawnguo@kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Devicetree List <devicetree@vger.kernel.org>,
+ Nava kishore Manne <nava.manne@xilinx.com>, linux-fpga@vger.kernel.org,
+ Michal Simek <michal.simek@xilinx.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Jolly Shah <jollys@xilinx.com>, Rajan Vaja <rajanv@xilinx.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ kishore m <chinnikishore369@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gRnJpLCBKYW4gMjUsIDIwMTkgYXQgMDg6MTA6MTNBTSArMDAwMCwgUGVuZyBNYSB3cm90ZToK
-PiBBZGQgU0FUQSBkZXZpY2Ugbm9kZXMgZm9yIGZzbC1seDIxNjBhIGFuZCBlbmFibGUgc3VwcG9y
-dAo+IGZvciBRRFMgYW5kIFJEQiBib2FyZHMuCj4gCj4gU2lnbmVkLW9mZi1ieTogUGVuZyBNYSA8
-cGVuZy5tYUBueHAuY29tPgo+IC0tLQo+IGNoYW5nZWQgZm9yIFY1Ogo+IAktIG5vIGNoYW5nZQo+
-IAo+ICBhcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9mc2wtbHgyMTYwYS1xZHMuZHRzIHwg
-ICAxNiArKysrKysrCj4gIGFyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2ZzbC1seDIxNjBh
-LXJkYi5kdHMgfCAgIDE2ICsrKysrKysKPiAgYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUv
-ZnNsLWx4MjE2MGEuZHRzaSAgICB8ICAgNDQgKysrKysrKysrKysrKysrKysrKysrCj4gIDMgZmls
-ZXMgY2hhbmdlZCwgNzYgaW5zZXJ0aW9ucygrKSwgMCBkZWxldGlvbnMoLSkKPiAKPiBkaWZmIC0t
-Z2l0IGEvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUvZnNsLWx4MjE2MGEtcWRzLmR0cyBi
-L2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2ZzbC1seDIxNjBhLXFkcy5kdHMKPiBpbmRl
-eCA5OWEyMmFiLi4xYTVhY2Y2IDEwMDY0NAo+IC0tLSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJl
-ZXNjYWxlL2ZzbC1seDIxNjBhLXFkcy5kdHMKPiArKysgYi9hcmNoL2FybTY0L2Jvb3QvZHRzL2Zy
-ZWVzY2FsZS9mc2wtbHgyMTYwYS1xZHMuZHRzCj4gQEAgLTk1LDYgKzk1LDIyIEBACj4gIAl9Owo+
-ICB9Owo+ICAKPiArJnNhdGEwIHsKPiArCXN0YXR1cyA9ICJva2F5IjsKPiArfTsKPiArCj4gKyZz
-YXRhMSB7Cj4gKwlzdGF0dXMgPSAib2theSI7Cj4gK307Cj4gKwo+ICsmc2F0YTIgewo+ICsJc3Rh
-dHVzID0gIm9rYXkiOwo+ICt9Owo+ICsKPiArJnNhdGEzIHsKPiArCXN0YXR1cyA9ICJva2F5IjsK
-PiArfTsKPiArCj4gICZ1YXJ0MCB7Cj4gIAlzdGF0dXMgPSAib2theSI7Cj4gIH07Cj4gZGlmZiAt
-LWdpdCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2ZzbC1seDIxNjBhLXJkYi5kdHMg
-Yi9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9mc2wtbHgyMTYwYS1yZGIuZHRzCj4gaW5k
-ZXggNjQ4MWU1Zi4uNWI2Nzk5ZSAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybTY0L2Jvb3QvZHRzL2Zy
-ZWVzY2FsZS9mc2wtbHgyMTYwYS1yZGIuZHRzCj4gKysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9m
-cmVlc2NhbGUvZnNsLWx4MjE2MGEtcmRiLmR0cwo+IEBAIC0xMDIsNiArMTAyLDIyIEBACj4gIAl9
-Owo+ICB9Owo+ICAKPiArJnNhdGEwIHsKPiArCXN0YXR1cyA9ICJva2F5IjsKPiArfTsKPiArCj4g
-KyZzYXRhMSB7Cj4gKwlzdGF0dXMgPSAib2theSI7Cj4gK307Cj4gKwo+ICsmc2F0YTIgewo+ICsJ
-c3RhdHVzID0gIm9rYXkiOwo+ICt9Owo+ICsKPiArJnNhdGEzIHsKPiArCXN0YXR1cyA9ICJva2F5
-IjsKPiArfTsKPiArCj4gICZ1YXJ0MCB7Cj4gIAlzdGF0dXMgPSAib2theSI7Cj4gIH07Cj4gZGlm
-ZiAtLWdpdCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2ZzbC1seDIxNjBhLmR0c2kg
-Yi9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9mc2wtbHgyMTYwYS5kdHNpCj4gaW5kZXgg
-YTc5ZjVjMS4uNTkyMDM0YiAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVz
-Y2FsZS9mc2wtbHgyMTYwYS5kdHNpCj4gKysrIGIvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2Nh
-bGUvZnNsLWx4MjE2MGEuZHRzaQo+IEBAIC02NzEsNiArNjcxLDUwIEBACj4gIAkJCXN0YXR1cyA9
-ICJkaXNhYmxlZCI7Cj4gIAkJfTsKPiAgCj4gKwkJc2F0YTA6IHNhdGFAMzIwMDAwMCB7Cj4gKwkJ
-CWNvbXBhdGlibGUgPSAiZnNsLGx4MjE2MGEtYWhjaSI7Cj4gKwkJCXJlZyA9IDwweDAgMHgzMjAw
-MDAwIDB4MCAweDEwMDAwPiwKPiArCQkJICAgICAgPDB4NyAweDEwMDUyMCAweDAgMHg0PjsKPiAr
-CQkJcmVnLW5hbWVzID0gImFoY2kiLCAic2F0YS1lY2MiOwo+ICsJCQlpbnRlcnJ1cHRzID0gPEdJ
-Q19TUEkgMTMzIElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+ICsJCQljbG9ja3MgPSA8JmNsb2NrZ2Vu
-IDQgMz47Cj4gKwkJCWRtYS1jb2hlcmVudDsKPiArCQkJc3RhdHVzID0gImRpc2FibGVkIjsKPiAr
-CQl9Owo+ICsKPiArCQlzYXRhMTogc2F0YUAzMjEwMDAwIHsKPiArCQkJY29tcGF0aWJsZSA9ICJm
-c2wsbHgyMTYwYS1haGNpIjsKPiArCQkJcmVnID0gPDB4MCAweDMyMTAwMDAgMHgwIDB4MTAwMDA+
-LAo+ICsJCQkgICAgICA8MHg3IDB4MTAwNTIwIDB4MCAweDQ+Owo+ICsJCQlyZWctbmFtZXMgPSAi
-YWhjaSIsICJzYXRhLWVjYyI7Cj4gKwkJCWludGVycnVwdHMgPSA8R0lDX1NQSSAxMzYgSVJRX1RZ
-UEVfTEVWRUxfSElHSD47Cj4gKwkJCWNsb2NrcyA9IDwmY2xvY2tnZW4gNCAzPjsKPiArCQkJZG1h
-LWNvaGVyZW50Owo+ICsJCQlzdGF0dXMgPSAiZGlzYWJsZWQiOwo+ICsJCX07Cj4gKwo+ICsJCXNh
-dGEyOiBzYXRhQDMyMjAwMDAgewo+ICsJCQljb21wYXRpYmxlID0gImZzbCxseDIxNjBhLWFoY2ki
-Owo+ICsJCQlyZWcgPSA8MHgwIDB4MzIyMDAwMCAweDAgMHgxMDAwMD4sCj4gKwkJCSAgICAgIDww
-eDcgMHgxMDA1MjAgMHgwIDB4ND47Cj4gKwkJCXJlZy1uYW1lcyA9ICJhaGNpIiwgInNhdGEtZWNj
-IjsKPiArCQkJaW50ZXJydXB0cyA9IDxHSUNfU1BJIDk3IElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+
-ICsJCQljbG9ja3MgPSA8JmNsb2NrZ2VuIDQgMz47Cj4gKwkJCWRtYS1jb2hlcmVudDsKPiArCQkJ
-c3RhdHVzID0gImRpc2FibGVkIjsKPiArCQl9Owo+ICsKPiArCQlzYXRhMzogc2F0YUAzMjMwMDAw
-IHsKPiArCQkJY29tcGF0aWJsZSA9ICJmc2wsbHgyMTYwYS1haGNpIjsKPiArCQkJcmVnID0gPDB4
-MCAweDMyMzAwMDAgMHgwIDB4MTAwMDA+LAo+ICsJCQkgICAgICA8MHg3IDB4MTAwNTIwIDB4MCAw
-eDQ+OwpZb3UgYXJlIHVzaW5nIHNhbWUgcmVnIHZhbHVlcyBmb3Igc2F0YS1lY2MgaW4gYWxsIHNh
-dGEgaW5zdGFuY2VzLiBEb2VzIHRoaXMKYWN0dWFsbHkgd29yaz8gTm8gZXJyb3JzIHdoZW4gdGhl
-IGFoY2lfcW9yaXEgZHJpdmVyIGRvIGlvcmVtYXAgb24gaXQgd2hpbGUKcHJvYmluZyBzZWNvbmQg
-aW5zdGFuY2UgYW5kIG9ud2FyZD8KCmZzbC1sczIwOHhhLmR0c2kgaXMgdGhlIG9ubHkgb3RoZXIg
-ZmlsZSBoZXJlIHdpdGggbXVsdGlwbGUgc2F0YSBpbnN0YW5jZXMgYW5kCml0IGRvZXNu4oCZdCBj
-YXJlIGFib3V0IHNhdGEtZWNjLgoKPiArCQkJcmVnLW5hbWVzID0gImFoY2kiLCAic2F0YS1lY2Mi
-Owo+ICsJCQlpbnRlcnJ1cHRzID0gPEdJQ19TUEkgMTAwIElSUV9UWVBFX0xFVkVMX0hJR0g+Owo+
-ICsJCQljbG9ja3MgPSA8JmNsb2NrZ2VuIDQgMz47Cj4gKwkJCWRtYS1jb2hlcmVudDsKPiArCQkJ
-c3RhdHVzID0gImRpc2FibGVkIjsKPiArCQl9Owo+ICsKPiAgCQlzbW11OiBpb21tdUA1MDAwMDAw
-IHsKPiAgCQkJY29tcGF0aWJsZSA9ICJhcm0sbW11LTUwMCI7Cj4gIAkJCXJlZyA9IDwwIDB4NTAw
-MDAwMCAwIDB4ODAwMDAwPjsKCkJSLApZb3VzYWYKCl9fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4
-LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9y
-Zy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Tue, Feb 12, 2019 at 5:06 AM Moritz Fischer <moritz.fischer@ettus.com> wrote:
+
+Hi Nava,
+
+> > +       mgr = fpga_mgr_create(dev, "Xilinx ZynqMP FPGA Manager",
+> > +                             &zynqmp_fpga_ops, priv);
+
+Please use the new devm_fpga_mgr_create()
+
+> > +       if (!mgr)
+> > +               return -ENOMEM;
+> > +
+> > +       platform_set_drvdata(pdev, mgr);
+> > +
+> > +       err = fpga_mgr_register(mgr);
+> vs here.
+> > +       if (err) {
+> > +               dev_err(dev, "unable to register FPGA manager");
+> > +               fpga_mgr_free(mgr);
+
+With devm_fpga_mgr_create(), this fpga_mgr_free() can go away.
+
+> > +               return err;
+> > +       }
+> > +
+> > +       return 0;
+
+Thanks,
+Alan
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
