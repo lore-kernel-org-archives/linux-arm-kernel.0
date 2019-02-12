@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12A85C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:42:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C43AEC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:42:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D26FD20818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:42:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89FC620818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:42:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MLUgAQdU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="iFcnWZbI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D26FD20818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ac4X09Fa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="lrcoyWbU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89FC620818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zauewHMFxUoySf1sxzgNdqYFQ8XSFFaG662OypoduRw=; b=MLUgAQdUtbAf9L
-	eyhtPksFE4YFccdbstB2V8jkftId/ugND9K54QpiWC+XgWIXC6BoJ4i1rCXlgsfOQzPZc8HnMVc2O
-	cl7L3wji+TbAUQkVpui/KZ2o2DxFpUHK8wdX3lvwe2ib5IJniC+qdg49dG1ajgEJ0MuYrXyTujfUk
-	YNFeKgbgZUY3UtOIQ+8UP0Xp6pt33NYkMGTK7WWpiGZb2sCt/pWfzyuPGXx3BiXJI89Z7JTFVbZ3Z
-	+CrW6zR+PW9kICyWwrg3rjabRC5wVWjN1rFWYPKNLUwqzZiovXBx6G2rcSEss8fGdTyTNwSBY4vR/
-	x3Na2EZB1YPEknA5+ppA==;
+	List-Owner; bh=c0plHwRJifhltmv6wdim9fQx91t31OXu+eFILJFtFn0=; b=Ac4X09Fa0qUzlW
+	j1U6S5MdNfV+WxwFw44uxV2G6e2CwrW7i1NYMlEXJhJWxhAGEFwwF+5ge22s734Xfyjw74YlUMiye
+	ahFRxCAFS4ykY+xQsDrOSPJLDaB7QOcyPR2aOP5RsJBCbty6Lv63R6KdB3Qq6NRGHKO60ok3WmQNO
+	t0+6N0lcsmzj7TS5OLIQ0lLZzac6vwd4f7eH4fnQWjHgYUFbBVCSwY7Kq6XpuQ6M3E5s3DX0v760X
+	g/3oNy4jssOcFsVVz++v0n1YR5Hqg1QOtur+18ug9dz8pR1ep9nIXMV01z2lFu5oOGja5m4/0Wmvr
+	+k4+XfiGG1a7Tny6jzkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVWQ-0001vA-22; Tue, 12 Feb 2019 10:42:38 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gtVWc-00025H-L1; Tue, 12 Feb 2019 10:42:50 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVTP-0006PF-RM
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:40:08 +0000
-Received: by mail-wm1-x342.google.com with SMTP id h22so1022116wmb.0
+ id 1gtVT5-000617-2B
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:28 +0000
+Received: by mail-wm1-x341.google.com with SMTP id x7so2356622wmj.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 02:39:31 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=Es/cEXbYyznp8EfSwmv6V/WrOaOvER1k/aQsIXQBUy8=;
- b=iFcnWZbIQmKg7hny1fb0496nhM77wmTcjHjeVjGgsUELOvnkoOkElDnhTTcaFBEhLZ
- F3yV18ld0jKzrxvJbBY7lFSt0yTj2KJvg9kZqH3DcPu0oFWqSnLn6OT830HKWG5MRQkm
- xABfYY2UnNF95CjUqyH8s4uLFGD46Gn0fm3x7J9BGj/9uKAW6W7aAEYrw44CmZYUQs9g
- UTXup/cY4lSIynrO/Wdnrfwl4UeHbcPa4lPq7krmnMRHOCMTYFMG+F3a6hAqqCGvmWPV
- wb73CD1WuikYqWQkhMCERsLAB+/ZTJsauLVabjZvm0hSI/kHcYq2+5i+Dffs/xjSK/mW
- bEeA==
+ bh=u9dKzUN0x8BEK+hLj1N43VcW29DmtNXABd9m5s3FHFI=;
+ b=lrcoyWbUfspOgRk0gIOFEG3DFdFOlnVC0/ufY/BrMKyxFX+CEdvxqkvLKyU7I6ZNVG
+ AnFaQU0T062yTxG1MkjDcICeT1A+zETa2eWxoi4JhJR1/LOwyxZew9nhhkw1HkVZiLNR
+ 1Mf0IFvKe1opVZVqrA0WTDv5wsnwf61PVaA/OHB1yX+5BzmRx5WSPdwlleZqXJzDQ+uK
+ RHfHZ3kCb+n1nsYBd47P1ThCMOYgy7/46prE0tj/SPjpFEE6uCadAGKbi0sLWh6o6DuA
+ wQZl0bQOE5R6JkelTFKuF0Z1+0M+Sl6ioUi2bPWghUMQCljjOp9PBnbnYYXXapcBs28E
+ XIAQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=Es/cEXbYyznp8EfSwmv6V/WrOaOvER1k/aQsIXQBUy8=;
- b=MIySrz7eZd1+rys4fe9+Lbg21bwa7MVooNSIcVzOVvjveKFQQyGMzJoHJYE9UNKLIF
- Ny5lm4UtmtkbnkDqSefPFFAbfamb4r+dnJPK2XxD1MQph4RN6TLY2DlMb8MQrhDFgOm9
- 8ATk6tEv49YeDs8IwdIZ7odtfGD/UbkgU2yBVTwKNr9h8ZA73d0k4JbkTYAqRMjIadL4
- tbbFDJkkBz/mMQVQmv/BFzNwVSxDLenL5/Ww3NvnPWNfKBFcR9bT9E+ZSf6+K/D2ogKB
- NU7ReQNNWpg57+8jdWlb3pgxaXJyhkgyw1S7YGC6jQQYhDuCz2+CQa3hqtVwfK1Ulv9O
- iqBQ==
-X-Gm-Message-State: AHQUAuY3sNkeRBPopILmhpA87pI5RvM3DGthC7QgRAYc6IKzAerRC5Uf
- mH4woN6K94LX8/JJ0La9j9Zd6Q==
-X-Google-Smtp-Source: AHgI3IasTvgujVORfbAnj/Em45f95cZ6OMYccFOI/4G7aXw+iXAIeuhuN7n6fIUagaDrAo58/BJlIQ==
-X-Received: by 2002:a1c:7011:: with SMTP id l17mr2457497wmc.8.1549967970354;
- Tue, 12 Feb 2019 02:39:30 -0800 (PST)
+ bh=u9dKzUN0x8BEK+hLj1N43VcW29DmtNXABd9m5s3FHFI=;
+ b=jwgLj08ESfdNqqmFaKyZbFRwkSHAjoku9otAi/CCUxK7fw/BVSVBAGAv48hiekTsNH
+ cOQPKsN7wfnGOc1WGgKBEwhzjA9GhSiQpGTGdHfRcQw3+thRg8IdgLtS57+ezSxxFG5N
+ Sc+grLlRo0BLaOQ7KZ2NuHfjhtDoo+uIA2usMJnJxgQGgZLN6gFAmDrEcS7kH4re06YN
+ 4BZ+YnFQ5CYkUDgRhqWAFIiDKQfPWomkR8E9xlVxlLbngpKT6lNy2ydotyf7ayK2OuWU
+ 7W5JeV4ocY2T/9Cz4MQNrMQtfyiNuQPM8xGlbr+g0RAXPLwrKI5uK9KTXvionIV8Ql2W
+ bMMQ==
+X-Gm-Message-State: AHQUAuYbSm8xX6HEyxAI0dp6p/aT9/aCTbKwbM8WdBOoWGhxhMXsIiKk
+ ZM0r4x+ecXSb0qmSpQTHCqn3AA==
+X-Google-Smtp-Source: AHgI3IasBPGm/a0Y7xgdk3eXaiYalPeAF7QqcHQOFzFeOV2wox9slcAZx2hxUqFGTtdKb5/pSzIhjA==
+X-Received: by 2002:a7b:c205:: with SMTP id x5mr2432047wmi.3.1549967949629;
+ Tue, 12 Feb 2019 02:39:09 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
- by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.29
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.08
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 02:39:29 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:09 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 29/37] ARM: davinci: cp-intc: use the new-style config
- structure
-Date: Tue, 12 Feb 2019 11:38:27 +0100
-Message-Id: <20190212103835.7768-30-brgl@bgdev.pl>
+Subject: [PATCH v3 11/37] ARM: davinci: aintc: wrap davinci_irq_init() with a
+ helper
+Date: Tue, 12 Feb 2019 11:38:09 +0100
+Message-Id: <20190212103835.7768-12-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
 References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_023932_078558_88D6CC5D 
-X-CRM114-Status: GOOD (  23.54  )
+X-CRM114-CacheID: sfid-20190212_023911_872175_887B7599 
+X-CRM114-Status: GOOD (  14.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,234 +109,230 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Modify the cp-intc driver to take all its configuration from the new
-config structure. Stop referencing davinci_soc_info in any way.
-Move the declaration for davinci_cp_intc_init() to
-irq-davinci-cp-intc.h and make it take the new config structure as
-parameter. Convert all users to the new version.
+We're going to extend the davinci_irq_init() function with a config
+structure so we can drop the intc-related fields from davinci_soc_info.
 
-Also: since the two da8xx SoCs default all irq priorities to 7, just
-drop the priority configuration at all and hardcode the channels to 7.
-
-It will simplify the driver code and make our lives easier when it
-comes to device-tree support.
+Once we do it, we won't be able to use this routine directly as the
+init_irq callback. Wrap the calls in additional helpers that don't
+take parameters and can be assigned to init_irq.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/cp_intc.c             | 99 ++++++++++-----------
- arch/arm/mach-davinci/da830.c               |  2 +-
- arch/arm/mach-davinci/da850.c               |  2 +-
- arch/arm/mach-davinci/include/mach/common.h |  1 -
- include/linux/irqchip/irq-davinci-cp-intc.h |  2 +
- 5 files changed, 50 insertions(+), 56 deletions(-)
+ arch/arm/mach-davinci/board-dm355-evm.c     | 2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c | 2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c     | 2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c    | 2 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c    | 4 ++--
+ arch/arm/mach-davinci/board-neuros-osd2.c   | 2 +-
+ arch/arm/mach-davinci/board-sffsdr.c        | 2 +-
+ arch/arm/mach-davinci/davinci.h             | 4 ++++
+ arch/arm/mach-davinci/dm355.c               | 5 +++++
+ arch/arm/mach-davinci/dm365.c               | 5 +++++
+ arch/arm/mach-davinci/dm644x.c              | 5 +++++
+ arch/arm/mach-davinci/dm646x.c              | 5 +++++
+ 12 files changed, 32 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index dcd43b067a6a..f56a4275083f 100644
---- a/arch/arm/mach-davinci/cp_intc.c
-+++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -13,6 +13,7 @@
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/irqchip.h>
-+#include <linux/irqchip/irq-davinci-cp-intc.h>
- #include <linux/irqdomain.h>
- #include <linux/io.h>
- #include <linux/of.h>
-@@ -20,7 +21,6 @@
- #include <linux/of_irq.h>
+diff --git a/arch/arm/mach-davinci/board-dm355-evm.c b/arch/arm/mach-davinci/board-dm355-evm.c
+index f7fa960c23e3..64d81fc86f14 100644
+--- a/arch/arm/mach-davinci/board-dm355-evm.c
++++ b/arch/arm/mach-davinci/board-dm355-evm.c
+@@ -438,7 +438,7 @@ static __init void dm355_evm_init(void)
+ MACHINE_START(DAVINCI_DM355_EVM, "DaVinci DM355 EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = dm355_evm_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm355_init_irq,
+ 	.init_time	= dm355_init_time,
+ 	.init_machine = dm355_evm_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-dm355-leopard.c b/arch/arm/mach-davinci/board-dm355-leopard.c
+index 0fdf1d03eb11..b9e9950dd300 100644
+--- a/arch/arm/mach-davinci/board-dm355-leopard.c
++++ b/arch/arm/mach-davinci/board-dm355-leopard.c
+@@ -273,7 +273,7 @@ static __init void dm355_leopard_init(void)
+ MACHINE_START(DM355_LEOPARD, "DaVinci DM355 leopard")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = dm355_leopard_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm355_init_irq,
+ 	.init_time	= dm355_init_time,
+ 	.init_machine = dm355_leopard_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index e3b0b701e395..8a53e4c7944d 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -834,7 +834,7 @@ static __init void dm365_evm_init(void)
+ MACHINE_START(DAVINCI_DM365_EVM, "DaVinci DM365 EVM")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= dm365_evm_map_io,
+-	.init_irq	= davinci_irq_init,
++	.init_irq	= dm365_init_irq,
+ 	.init_time	= dm365_init_time,
+ 	.init_machine	= dm365_evm_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index a6bc48c9ecd9..e7a6e2d1fcd9 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -891,7 +891,7 @@ MACHINE_START(DAVINCI_EVM, "DaVinci DM644x EVM")
+ 	/* Maintainer: MontaVista Software <source@mvista.com> */
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = davinci_evm_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm644x_init_irq,
+ 	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_evm_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
+index 26c123f35350..21d92d3c10ec 100644
+--- a/arch/arm/mach-davinci/board-dm646x-evm.c
++++ b/arch/arm/mach-davinci/board-dm646x-evm.c
+@@ -864,7 +864,7 @@ static __init void evm_init(void)
+ MACHINE_START(DAVINCI_DM6467_EVM, "DaVinci DM646x EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io       = davinci_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm646x_init_irq,
+ 	.init_time	= dm646x_evm_init_time,
+ 	.init_machine = evm_init,
+ 	.init_late	= davinci_init_late,
+@@ -874,7 +874,7 @@ MACHINE_END
+ MACHINE_START(DAVINCI_DM6467TEVM, "DaVinci DM6467T EVM")
+ 	.atag_offset  = 0x100,
+ 	.map_io       = davinci_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm646x_init_irq,
+ 	.init_time	= dm6467t_evm_init_time,
+ 	.init_machine = evm_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-neuros-osd2.c b/arch/arm/mach-davinci/board-neuros-osd2.c
+index efdaa27241c5..ce99f782811a 100644
+--- a/arch/arm/mach-davinci/board-neuros-osd2.c
++++ b/arch/arm/mach-davinci/board-neuros-osd2.c
+@@ -231,7 +231,7 @@ MACHINE_START(NEUROS_OSD2, "Neuros OSD2")
+ 	/* Maintainer: Neuros Technologies <neuros@groups.google.com> */
+ 	.atag_offset	= 0x100,
+ 	.map_io		 = davinci_ntosd2_map_io,
+-	.init_irq	= davinci_irq_init,
++	.init_irq	= dm644x_init_irq,
+ 	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_ntosd2_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/board-sffsdr.c b/arch/arm/mach-davinci/board-sffsdr.c
+index 792bb84d5011..91f594f96189 100644
+--- a/arch/arm/mach-davinci/board-sffsdr.c
++++ b/arch/arm/mach-davinci/board-sffsdr.c
+@@ -153,7 +153,7 @@ static __init void davinci_sffsdr_init(void)
+ MACHINE_START(SFFSDR, "Lyrtech SFFSDR")
+ 	.atag_offset  = 0x100,
+ 	.map_io	      = davinci_sffsdr_map_io,
+-	.init_irq     = davinci_irq_init,
++	.init_irq     = dm644x_init_irq,
+ 	.init_time	= dm644x_init_time,
+ 	.init_machine = davinci_sffsdr_init,
+ 	.init_late	= davinci_init_late,
+diff --git a/arch/arm/mach-davinci/davinci.h b/arch/arm/mach-davinci/davinci.h
+index db4c95ef4d5c..56c1835c42e5 100644
+--- a/arch/arm/mach-davinci/davinci.h
++++ b/arch/arm/mach-davinci/davinci.h
+@@ -88,6 +88,7 @@ int davinci_init_wdt(void);
+ /* DM355 function declarations */
+ void dm355_init(void);
+ void dm355_init_time(void);
++void dm355_init_irq(void);
+ void dm355_register_clocks(void);
+ void dm355_init_spi0(unsigned chipselect_mask,
+ 		const struct spi_board_info *info, unsigned len);
+@@ -97,6 +98,7 @@ int dm355_gpio_register(void);
  
- #include <asm/exception.h>
--#include <mach/common.h>
+ /* DM365 function declarations */
+ void dm365_init(void);
++void dm365_init_irq(void);
+ void dm365_init_time(void);
+ void dm365_register_clocks(void);
+ void dm365_init_asp(void);
+@@ -110,6 +112,7 @@ int dm365_gpio_register(void);
  
- #define DAVINCI_CP_INTC_CTRL			0x04
- #define DAVINCI_CP_INTC_HOST_CTRL		0x0c
-@@ -158,22 +158,15 @@ static const struct irq_domain_ops davinci_cp_intc_irq_domain_ops = {
- 	.xlate = irq_domain_xlate_onetwocell,
- };
+ /* DM644x function declarations */
+ void dm644x_init(void);
++void dm644x_init_irq(void);
+ void dm644x_init_devices(void);
+ void dm644x_init_time(void);
+ void dm644x_register_clocks(void);
+@@ -119,6 +122,7 @@ int dm644x_gpio_register(void);
  
--static int __init davinci_cp_intc_of_init(struct device_node *node,
--					  struct device_node *parent)
-+static int __init
-+davinci_cp_intc_do_init(const struct davinci_cp_intc_config *config,
-+			struct device_node *node)
- {
--	u32 num_irq		= davinci_soc_info.intc_irq_num;
--	u8 *irq_prio		= davinci_soc_info.intc_irq_prios;
--	unsigned num_reg	= BITS_TO_LONGS(num_irq);
--	int i, irq_base;
--
--	if (node) {
--		davinci_cp_intc_base = of_iomap(node, 0);
--		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
--			pr_warn("unable to get intc-size, default to %d\n",
--				num_irq);
--	} else {
--		davinci_cp_intc_base = ioremap(davinci_soc_info.intc_base, SZ_8K);
--	}
-+	unsigned int num_regs = BITS_TO_LONGS(config->num_irqs);
-+	int offset, irq_base;
-+
-+	davinci_cp_intc_base = ioremap(config->reg.start,
-+				       resource_size(&config->reg));
- 	if (WARN_ON(!davinci_cp_intc_base))
- 		return -EINVAL;
- 
-@@ -183,51 +176,29 @@ static int __init davinci_cp_intc_of_init(struct device_node *node,
- 	davinci_cp_intc_write(0, DAVINCI_CP_INTC_HOST_ENABLE(0));
- 
- 	/* Disable system interrupts */
--	for (i = 0; i < num_reg; i++)
--		davinci_cp_intc_write(~0, DAVINCI_CP_INTC_SYS_ENABLE_CLR(i));
-+	for (offset = 0; offset < num_regs; offset++)
-+		davinci_cp_intc_write(~0,
-+			DAVINCI_CP_INTC_SYS_ENABLE_CLR(offset));
- 
- 	/* Set to normal mode, no nesting, no priority hold */
- 	davinci_cp_intc_write(0, DAVINCI_CP_INTC_CTRL);
- 	davinci_cp_intc_write(0, DAVINCI_CP_INTC_HOST_CTRL);
- 
- 	/* Clear system interrupt status */
--	for (i = 0; i < num_reg; i++)
--		davinci_cp_intc_write(~0, DAVINCI_CP_INTC_SYS_STAT_CLR(i));
-+	for (offset = 0; offset < num_regs; offset++)
-+		davinci_cp_intc_write(~0,
-+			DAVINCI_CP_INTC_SYS_STAT_CLR(offset));
- 
- 	/* Enable nIRQ (what about nFIQ?) */
- 	davinci_cp_intc_write(1, DAVINCI_CP_INTC_HOST_ENABLE_IDX_SET);
- 
--	/*
--	 * Priority is determined by host channel: lower channel number has
--	 * higher priority i.e. channel 0 has highest priority and channel 31
--	 * had the lowest priority.
--	 */
--	num_reg = (num_irq + 3) >> 2;	/* 4 channels per register */
--	if (irq_prio) {
--		unsigned j, k;
--		u32 val;
--
--		for (k = i = 0; i < num_reg; i++) {
--			for (val = j = 0; j < 4; j++, k++) {
--				val >>= 8;
--				if (k < num_irq)
--					val |= irq_prio[k] << 24;
--			}
--
--			davinci_cp_intc_write(val, DAVINCI_CP_INTC_CHAN_MAP(i));
--		}
--	} else	{
--		/*
--		 * Default everything to channel 15 if priority not specified.
--		 * Note that channel 0-1 are mapped to nFIQ and channels 2-31
--		 * are mapped to nIRQ.
--		 */
--		for (i = 0; i < num_reg; i++)
--			davinci_cp_intc_write(0x0f0f0f0f,
--					      DAVINCI_CP_INTC_CHAN_MAP(i));
--	}
-+	/* Default all priorities to channel 7. */
-+	num_regs = (config->num_irqs + 3) >> 2;	/* 4 channels per register */
-+	for (offset = 0; offset < num_regs; offset++)
-+		davinci_cp_intc_write(0x07070707,
-+			DAVINCI_CP_INTC_CHAN_MAP(offset));
- 
--	irq_base = irq_alloc_descs(-1, 0, num_irq, 0);
-+	irq_base = irq_alloc_descs(-1, 0, config->num_irqs, 0);
- 	if (irq_base < 0) {
- 		pr_warn("Couldn't allocate IRQ numbers\n");
- 		irq_base = 0;
-@@ -235,7 +206,7 @@ static int __init davinci_cp_intc_of_init(struct device_node *node,
- 
- 	/* create a legacy host */
- 	davinci_cp_intc_irq_domain = irq_domain_add_legacy(
--					node, num_irq, irq_base, 0,
-+					node, config->num_irqs, irq_base, 0,
- 					&davinci_cp_intc_irq_domain_ops, NULL);
- 
- 	if (!davinci_cp_intc_irq_domain) {
-@@ -251,9 +222,31 @@ static int __init davinci_cp_intc_of_init(struct device_node *node,
+ /* DM646x function declarations */
+ void dm646x_init(void);
++void dm646x_init_irq(void);
+ void dm646x_init_time(unsigned long ref_clk_rate, unsigned long aux_clkin_rate);
+ void dm646x_register_clocks(void);
+ void dm646x_init_mcasp0(struct snd_platform_data *pdata);
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index b27ea4fc1d51..6c65699cb074 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -792,6 +792,11 @@ int __init dm355_init_video(struct vpfe_config *vpfe_cfg,
  	return 0;
  }
  
--void __init davinci_cp_intc_init(void)
-+int __init davinci_cp_intc_init(const struct davinci_cp_intc_config *config)
- {
--	davinci_cp_intc_of_init(NULL, NULL);
-+	return davinci_cp_intc_do_init(config, NULL);
- }
- 
-+static int __init davinci_cp_intc_of_init(struct device_node *node,
-+					  struct device_node *parent)
++void __init dm355_init_irq(void)
 +{
-+	struct davinci_cp_intc_config config = { };
-+	int ret;
-+
-+	ret = of_address_to_resource(node, 0, &config.reg);
-+	if (ret) {
-+		pr_err("%s: unable to get the register range from device-tree\n",
-+		       __func__);
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(node, "ti,intc-size", &config.num_irqs);
-+	if (ret) {
-+		pr_err("%s: unable to read the 'ti,intc-size' property\n",
-+		       __func__);
-+		return ret;
-+	}
-+
-+	return davinci_cp_intc_do_init(&config, node);
++	davinci_irq_init();
 +}
- IRQCHIP_DECLARE(cp_intc, "ti,cp-intc", davinci_cp_intc_of_init);
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 0eb48ed2d423..7ce0b5f1200d 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -833,7 +833,7 @@ static const struct davinci_cp_intc_config da830_cp_intc_config = {
- 
- void __init da830_init_irq(void)
- {
--	davinci_cp_intc_init();
-+	davinci_cp_intc_init(&da830_cp_intc_config);
- }
- 
- void __init da830_init_time(void)
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index fe274ab63fc8..62a00fa94696 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -771,7 +771,7 @@ static const struct davinci_cp_intc_config da850_cp_intc_config = {
- 
- void __init da850_init_irq(void)
- {
--	davinci_cp_intc_init();
-+	davinci_cp_intc_init(&da850_cp_intc_config);
- }
- 
- void __init da850_init_time(void)
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 7ad79171b4b5..14e0e1c40611 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -22,7 +22,6 @@
- #define DAVINCI_INTC_START		NR_IRQS
- #define DAVINCI_INTC_IRQ(_irqnum)	(DAVINCI_INTC_START + (_irqnum))
- 
--void davinci_cp_intc_init(void);
- void davinci_timer_init(struct clk *clk);
- 
- struct davinci_timer_instance {
-diff --git a/include/linux/irqchip/irq-davinci-cp-intc.h b/include/linux/irqchip/irq-davinci-cp-intc.h
-index 2270a6167b98..8d71ed5b5a61 100644
---- a/include/linux/irqchip/irq-davinci-cp-intc.h
-+++ b/include/linux/irqchip/irq-davinci-cp-intc.h
-@@ -20,4 +20,6 @@ struct davinci_cp_intc_config {
- 	unsigned int num_irqs;
- };
- 
-+int davinci_cp_intc_init(const struct davinci_cp_intc_config *config);
 +
- #endif /* _LINUX_IRQ_DAVINCI_CP_INTC_ */
+ static int __init dm355_init_devices(void)
+ {
+ 	struct platform_device *edma_pdev;
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index d9c6ab9215a6..e1c223c6031f 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -1051,6 +1051,11 @@ int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
+ 	return 0;
+ }
+ 
++void __init dm365_init_irq(void)
++{
++	davinci_irq_init();
++}
++
+ static int __init dm365_init_devices(void)
+ {
+ 	struct platform_device *edma_pdev;
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index b2748c82b747..2b18c134ee15 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -728,6 +728,11 @@ int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
+ 	return 0;
+ }
+ 
++void __init dm644x_init_irq(void)
++{
++	davinci_irq_init();
++}
++
+ void __init dm644x_init_devices(void)
+ {
+ 	struct platform_device *edma_pdev;
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index cf210741dfe5..75a9f80317ca 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -689,6 +689,11 @@ void __init dm646x_register_clocks(void)
+ 	platform_device_register(&dm646x_pll2_device);
+ }
+ 
++void __init dm646x_init_irq(void)
++{
++	davinci_irq_init();
++}
++
+ static int __init dm646x_init_devices(void)
+ {
+ 	int ret = 0;
 -- 
 2.20.1
 
