@@ -2,61 +2,89 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78AC4C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:28:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CC69C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:28:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C3602084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:28:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B0872084E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:28:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WnIhbfpe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C3602084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NFm8ZVcz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B0872084E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1KvC3nxXwHsJ3lIFYHQbJicyHF9GRK42AFVT/FKXaEA=; b=WnIhbfpec9qQjw
-	jmX8NYJDnT2rZqv3Qt8DEoPZhKWW4P1RhEBwBymcTxcjApAMAeQcrLM+DrogY/QzUmgGXxxzu+IqE
-	Hcut97I7eKgAsAZ3NUrj/63BQVKQn3eevRsuJdjGYLHUMCqv23vHyyJCkkC/RBXKpu4nwWQAQ0UnR
-	lPsqLRU+M8hkgiIlXr/kGt+38nb/I34hrJDuJhPAth1f7g9k0zRvGQFYeuigrB6KWVJHDdYQiFxzj
-	NSZK2L+ED/pvNyEManpqfSb7ibPi1w9rhxpyiJqkEV4RTBwziwN5DBboA0Wac0GtWk6k9+pZnzfUV
-	/lsLiSQ3ZjjGzJF/S9Aw==;
+	List-Owner; bh=GBjDwBaTNUlOzBcoVaEyosnDF1iGmaeP1IIO+XRetPQ=; b=NFm8ZVczFkNk5d
+	aN5ad97DII9xLdjaestLBQJrs6fpzfk/tiXLDJA1G1LOPI9cSvTvSjcRKnFXIpqpKB64FG1RrwJhl
+	sX0tk/qR4sQPb9kf54+EH0cD1McsrcVjy9AnytQFGoFsHm1zlFim4DgY+u7SeJy5rZ+6l9ai3XOuP
+	7ZHq7Tse7rqnp8J2DofcI43jHRDnqQ/BopIOQcjuMYJgKA74c3NxNQ04ExBLokGSpjEpLBA5jVsdk
+	9Jdt/b7wwN2S7twGQW0itEI76h7E7kiH1z3Gaez/opX96JKWH9OgMaf+6zAl1vI0DLX1IyWXJ9Smb
+	rqVH9eeqAiByDg07qJbQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtZzB-0006Wg-Hl; Tue, 12 Feb 2019 15:28:37 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gtZzM-0006gR-Ku; Tue, 12 Feb 2019 15:28:48 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtZyx-0006H6-Ig
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:28:30 +0000
-Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id ED302200018;
- Tue, 12 Feb 2019 15:28:13 +0000 (UTC)
-Message-ID: <0f3247c920d1f5ce67cc7e024125c3a4d3ca0c81.camel@bootlin.com>
-Subject: Re: [PATCH v3 2/8] drm/sun4i: dsi: Change the start delay calculation
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
- <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
-Date: Tue, 12 Feb 2019 16:28:13 +0100
-In-Reply-To: <6e5f72e68f47ca0223877464bf12f0c3f3978de8.1549896081.git-series.maxime.ripard@bootlin.com>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <6e5f72e68f47ca0223877464bf12f0c3f3978de8.1549896081.git-series.maxime.ripard@bootlin.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.5 
+ id 1gtZz3-0006Pt-GA
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:28:33 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1CFGUqq031812; Tue, 12 Feb 2019 16:28:25 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2qjfy65khf-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Tue, 12 Feb 2019 16:28:25 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id C6C0F38;
+ Tue, 12 Feb 2019 15:28:23 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag3node3.st.com [10.75.127.9])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 4DF4A5470;
+ Tue, 12 Feb 2019 15:28:23 +0000 (GMT)
+Received: from SFHDAG4NODE2.st.com (10.75.127.11) by SFHDAG3NODE3.st.com
+ (10.75.127.9) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Tue, 12 Feb
+ 2019 16:28:22 +0100
+Received: from SFHDAG4NODE2.st.com ([fe80::4457:45af:aece:883f]) by
+ SFHDAG4NODE2.st.com ([fe80::4457:45af:aece:883f%20]) with mapi id
+ 15.00.1347.000; Tue, 12 Feb 2019 16:28:22 +0100
+From: Gabriel FERNANDEZ <gabriel.fernandez@st.com>
+To: Michael Turquette <mturquette@baylibre.com>, Stephen Boyd
+ <sboyd@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>, "Alexandre
+ TORGUE" <alexandre.torgue@st.com>
+Subject: Re: [PATCH] Input: st-keyscan - fix potential zalloc NULL dereference
+Thread-Topic: [PATCH] Input: st-keyscan - fix potential zalloc NULL dereference
+Thread-Index: AQHUwucSbnUyh3E18kKgOKwxl5Aux6XcOJsA
+Date: Tue, 12 Feb 2019 15:28:22 +0000
+Message-ID: <e0967983-cab2-3c18-6c8a-a0333dc087ff@st.com>
+References: <20190212152429.1936-1-gabriel.fernandez@st.com>
+In-Reply-To: <20190212152429.1936-1-gabriel.fernandez@st.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.75.127.51]
+Content-ID: <07234B400B9A124689DEB41218527AA9@st.com>
 MIME-Version: 1.0
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-12_08:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_072824_300111_ABE54302 
-X-CRM114-Status: GOOD (  21.66  )
+X-CRM114-CacheID: sfid-20190212_072830_059388_DE873D08 
+X-CRM114-Status: GOOD (  14.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,87 +96,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel@lists.freedesktop.org,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
+Cc: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-stm32@st-md-mailman.stormreply.com"
+ <linux-stm32@st-md-mailman.stormreply.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Sorry ignore this patch (bad mailing list)
 
-On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
-> The current calculation for the video start delay in the current DSI driver
-> is that it is the total vertical size, minus the front porch and sync length,
-> plus 1. This equals to the active vertical size plus the back porch plus 1.
-> 
-> That 1 is coming in the Allwinner BSP from an variable that is set to 1.
-> However, if we look at the Allwinner BSP more closely, and especially in
-> the "legacy" code for the display (in drivers/video/sunxi/legacy/), we can
-> see that this variable is actually computed from the porches and the sync
-> minus 10, clamped between 8 and 100.
+Best Regard
 
-For future reference, it look like there is a version of the BSP where
-this is clamped between 8 and 31 in the legacy ebios code:
-https://github.com/Icenowy/linux-kernel-lichee-a33/blob/master/drivers/video/sunxi/legacy/disp/de_bsp/de/ebios/de_dsi.c#L687
+Gabriel
 
-As well as in the A23 code:
-https://github.com/Icenowy/linux-kernel-lichee-a33/blob/master/drivers/video/sunxi/disp/de/lowlevel_sun8iw3/de_dsi.c#L686
-
-> This fixes the start delay symptom we've seen on some panels (vblank
-> timeouts with vertical white stripes at the bottom of the panel).
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On 2/12/19 4:24 PM, gabriel.fernandez@st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+>
+> This patch fixes the following static checker warning:
+>
+> drivers/input/keyboard/st-keyscan.c:156 keyscan_probe()
+> error: potential zalloc NULL dereference: 'keypad_data->input_dev'
+>
+> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 380fc527a707..9471fa695ec7 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -357,7 +357,9 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
->  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
->  					   struct drm_display_mode *mode)
->  {
-> -	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> +	u16 start = clamp(mode->vtotal - mode->vdisplay - 10, 8, 100);
+>   drivers/input/keyboard/st-keyscan.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/input/keyboard/st-keyscan.c b/drivers/input/keyboard/st-keyscan.c
+> index babcfb165e4f..3b85631fde91 100644
+> --- a/drivers/input/keyboard/st-keyscan.c
+> +++ b/drivers/input/keyboard/st-keyscan.c
+> @@ -153,6 +153,8 @@ static int keyscan_probe(struct platform_device *pdev)
+>   
+>   	input_dev->id.bustype = BUS_HOST;
+>   
+> +	keypad_data->input_dev = input_dev;
 > +
-> +	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
-
-Looking at the formula from the BSP, I get a different result from
-yours.
-
-From what I can see, the BSP formula is:
-start_delay = vtotal - vfp + start
-vfp = vtotal - y - vbp
-
-With vbp counting the back porch and sync length.
-So the final value can be simplified:
-start_delay = vbp + y + start
-
-Translated to DRM:
-start_delay = vtotal - vsync_start + vdisplay + start
-
-Which differs from your formula by the sync length.
-
-Does this also work out for your hardware? I guess it's best to stick
-close to the BSP if we can.
-
-Cheers,
-
-Paul
-
->  }
->  
->  static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
--- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
-
-
+>   	error = keypad_matrix_key_parse_dt(keypad_data);
+>   	if (error)
+>   		return error;
+> @@ -168,8 +170,6 @@ static int keyscan_probe(struct platform_device *pdev)
+>   
+>   	input_set_drvdata(input_dev, keypad_data);
+>   
+> -	keypad_data->input_dev = input_dev;
+> -
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	keypad_data->base = devm_ioremap_resource(&pdev->dev, res);
+>   	if (IS_ERR(keypad_data->base))
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
