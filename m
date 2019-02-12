@@ -2,60 +2,79 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E4FBC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:23:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7F3FC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:33:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57E1C21B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:23:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8925E21B1C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:33:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZAPBGSyh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57E1C21B18
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dV4JLwYM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="GdPRy1dn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8925E21B1C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=L9gtnmUU7DHLMpR4Otc04EOtnoiIfKLQfOR1w4cqdTs=; b=ZAPBGSyh/qhHcad03ZUV0IQCx
-	KQLd/7zyO1oCJRX06bsphVIMxTK7PHgBA17aLRvxKBO6wM8iyeP7szmOmQeKoIesT2AeRFrqYSSDq
-	lo1r5eNfeNTzfADM95P/ScMxoJKNvz/mrJ8DrHjeoMYpreYVurLifZQRzOEhmd8fhpvzm5FGU0vHc
-	I3cjXny9JrowxLyLIYMgguohzTlPlZXbI+RAEyWcnJqQmLE27ou+KS35bqBDae7rVMCwDZckVTDLA
-	6AdaQgnE6wzC5iSCEn8FDCjnI6UTdm8ty/Qk1NXHG4bJefPzc24CBAwljeV3+iJ6TvfCisqf47ose
-	Nf8g9QvWA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=QKvuJyi+xFNf1rrnp99hvgBQamfZlya26jmXyswBfEI=; b=dV4JLwYMqBuqHS
+	L3lqtOjauHUAX5epJL4h+PSX8TuREV5Gl7BtQePKvz/ycCkTvdMbk1RIubS9Z2bspiJnuDbW658l1
+	CZXwdtMRqFY+oBoeH/B9p/1DwHVKvCR34qDumhBukJUs5Vfa9ZC3AxRJBJZrDLA5aD7LSBVDT1HXb
+	Bh4+JX7tlWhwtK6BZoq1gM0i4c/Mbeex/789N8pYUvrcawqci641bKbQ9PGBnVpX+HaV4IrmeAIiS
+	9e0qSDfwmetESiwi1GdbPMXlbF9iBqKJbqdj8OJQujb9EGGz/Yf3s639CNMsXca2OES78LnNDUYs/
+	HHdm/806TO4oKwd/d8Zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVEA-0000u5-N6; Tue, 12 Feb 2019 10:23:46 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gtVN6-00045x-73; Tue, 12 Feb 2019 10:33:00 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVE5-0000qg-D2
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:23:44 +0000
-Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
- [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id 40364200004;
- Tue, 12 Feb 2019 10:23:25 +0000 (UTC)
-Date: Tue, 12 Feb 2019 11:23:24 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Ezequiel Garcia <ezequiel@collabora.com>
-Subject: Re: [PATCH v3 1/2] media: uapi: Add H264 low-level decoder API
- compound controls.
-Message-ID: <20190212102324.3tdurso54fumlkwr@flea>
-References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
- <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
- <209bafb880bd9410f875f5e6f16923e38ec76df4.camel@collabora.com>
+ id 1gtVN3-00045X-Ax
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:32:59 +0000
+Received: by mail-it1-x144.google.com with SMTP id c9so6308765itj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 02:32:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=uVfVPkHESSQI0nz5hCRCWBliPzgZit92UhHa85UMyqE=;
+ b=GdPRy1dn5Yk0gwngvgj+ifyeHwTYgK7XOCZ1Klr8pbU0wEDxhDqIQlnJCwJfLAIoB2
+ JuzyKq7sFERz2Gnv4yZTJsOv/FVhlZbSIsMVx3zUhyKUxONOotehhqVCJvhIf7ui5A3r
+ h841Jjg05OtlQ/hh+QtAdS9t2bbK1pAqc++I4=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=uVfVPkHESSQI0nz5hCRCWBliPzgZit92UhHa85UMyqE=;
+ b=XY05qXF15SBGIy2ss1nMuPIjFcozAvNxDhGAeTLoNNHwRPYv+dNsJzai6eOb98agAo
+ P91skRhmi0E9YuoZRvLfpkTQM3eP1+zZAlYIgYOPAbEj47KVYzRRHpvW1D+HSz+W/eDw
+ UmqNUQTvoXAquWUOXG8Yvg3RvnaxWhCDPuyJRI5qRk8cWIC+PATCWDV8aV2O7EI1jVPR
+ e2YljQzPma83V6SRR+s7yqvOauWOa6WcHwXgoeDTNg3mlBwu/yCy0+jNZlRAP/7BFqGA
+ 8g/+mAIO7kmicjSZdJaWRPkSICXhNljwaURj4NoE6okKYNU7PPiUPBbgmn6hD21qdnIH
+ aiug==
+X-Gm-Message-State: AHQUAuZQf2EqK7LmGu/Y7k/BULKA6Z3qRi2kFKYHb0+2LwQMpddrG33z
+ yoTxk96awFyyowHK34N22x4KHc+wUJvVniqp0kyT6g==
+X-Google-Smtp-Source: AHgI3IY7btmgO3Ss6HDhFPKST0OebfjcPqaYLH6lNDDxho84XscuW1Iy/DRWiKrc+tByoVcyEsO8mm57c2Oun+Aiwg8=
+X-Received: by 2002:a5d:97c8:: with SMTP id k8mr1719199ios.267.1549967575730; 
+ Tue, 12 Feb 2019 02:32:55 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <209bafb880bd9410f875f5e6f16923e38ec76df4.camel@collabora.com>
-User-Agent: NeoMutt/20180716
+References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+In-Reply-To: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Tue, 12 Feb 2019 16:02:43 +0530
+Message-ID: <CAMty3ZC39YFaNtPWoNq-fV5tpnJ_0_0WSG728kUXw4ZZp-Csew@mail.gmail.com>
+Subject: Re: [PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_022341_797701_07512EA6 
-X-CRM114-Status: GOOD (  14.36  )
+X-CRM114-CacheID: sfid-20190212_023257_538881_7318DC52 
+X-CRM114-Status: GOOD (  19.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,100 +86,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
- jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, jernej.skrabec@gmail.com, tfiga@chromium.org,
+Cc: bbrezillon@kernel.org,
+ Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
  Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, hans.verkuil@cisco.com,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- sakari.ailus@linux.intel.com, Guenter Roeck <groeck@chromium.org>,
- nicolas.dufresne@collabora.com, posciak@chromium.org,
- linux-media@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============9107126840707526878=="
+ Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Jagan Teki <jagan@openedev.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Maxime,
 
---===============9107126840707526878==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="drrdy3tibi4hg6l4"
-Content-Disposition: inline
+On Mon, Feb 11, 2019 at 8:12 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Hi,
+>
+> Here is a series implementing the burst mode support for DSI.
+>
+> It's been tested on an A33 board with the panel supported on the last
+> patch, which should remove all quirks due to a different SoC from the
+> equation.
+>
+> Let me know what you think,
 
+I have similar burst changes[1] (from 01/23 to 09/23) which are now
+v7, since these were generic changes and been in ML since from last 6
+months. request you to pick or work on top.
 
---drrdy3tibi4hg6l4
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+> Maxime
+>
+> Changes from v3:
+>   - Fixed error in Ronbo panel error path
+>
+> Changes from v2:
+>   - Change the start delay calculation according to the legacy driver in
+>     Allwinner's BSP
+>   - Fixed the edge calculation to add the same parentheses around the
+>     factors
+>   - Added a bunch of fixes to timings
+>   - Added a patch to make hblk computation more accurate, and added a
+>     comment
+>   - Renamed the panel to Ronbo and fixed a bunch of things
+>   - Added the Reviewed-By
+>
+> Konstantin Sudakov (2):
+>   drm/sun4i: dsi: Add burst support
+>   drm/panel: Add Ronbo RB070D30 panel
+>
+> Maxime Ripard (6):
+>   drm/sun4i: dsi: Restrict DSI tcon clock divider
+>   drm/sun4i: dsi: Change the start delay calculation
+>   drm/sun4i: dsi: Enforce boundaries on the start delay
+>   drm/sun4i: dsi: Fix front vs back porch calculation
 
-On Mon, Feb 11, 2019 at 02:12:25PM -0300, Ezequiel Garcia wrote:
-> On Mon, 2019-02-11 at 15:39 +0100, Maxime Ripard wrote:
-> >=20
-> > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videod=
-ev2.h
-> > index d6eed479c3a6..6fc955926bdb 100644
-> > --- a/include/uapi/linux/videodev2.h
-> > +++ b/include/uapi/linux/videodev2.h
-> > @@ -645,6 +645,7 @@ struct v4l2_pix_format {
-> >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H264 =
-with start codes */
-> >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H26=
-4 without start codes */
-> >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H264 =
-MVC */
-> > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H26=
-4 parsed slices */
->=20
-> Nicolas and I have discussed the pixel format, and came up with
-> the following proposal.
->=20
-> Given this format represents H264 parsed slices, without any start code,
-> perhpaps we name it as:
->=20
-> V4L2_PIX_FMT_H264_SLICE_RAW
->=20
-> Then, we'd also add:
->=20
-> V4L2_PIX_FMT_H264_SLICE_ANNEX_B
->=20
-> To represent H264 parsed slices with annex B (3- or 4-byte) start code.
-> This one is what the Rockchip VPU driver would expose.
->=20
-> Ideas?
+Same patches are been for a while in ML[2], hope you can consider to pick.
 
-I think we discussed that idea already, and I'm all for it.
+>   drm/sun4i: dsi: Fix DRQ calculation
+>   drm/sun4i: dsi: Rework a bit the hblk calculation
+>
+>  drivers/gpu/drm/panel/Kconfig                |   9 +-
+>  drivers/gpu/drm/panel/Makefile               |   1 +-
+>  drivers/gpu/drm/panel/panel-ronbo-rb070d30.c | 262 ++++++++++++++++++++-
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c           |   4 +-
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c       | 183 ++++++++++----
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h       |   2 +-
+>  6 files changed, 419 insertions(+), 42 deletions(-)
+>  create mode 100644 drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
 
-Maxime
+[2] https://patchwork.kernel.org/patch/10793123/
+     https://patchwork.kernel.org/patch/10793125/
+     https://patchwork.kernel.org/patch/10680309/
+[1] https://patchwork.kernel.org/cover/10792981/
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---drrdy3tibi4hg6l4
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGKenAAKCRDj7w1vZxhR
-xW+MAP9jbBHZlCQuCB5NsMT18YGAkvbt2059lhnKbRNmfwEwqwD/SafCidHKsDSl
-2sdRRj1tVdOCB3oTJRS3WNE83XwAKgM=
-=cJo3
------END PGP SIGNATURE-----
-
---drrdy3tibi4hg6l4--
-
-
---===============9107126840707526878==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Jagan.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============9107126840707526878==--
-
