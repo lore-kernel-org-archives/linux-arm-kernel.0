@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAC8EC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:26:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F343C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:26:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A47902186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:26:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D32F82186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:26:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RjHv1DVw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A47902186A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g7KEwFLk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D32F82186A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YX1Rgr+q6tXNOZr+FyE6I7mhULmcXtz4ms/X+etCru4=; b=RjHv1DVw7eypdF
-	u855HWEmvm4N0ok5kDqPD6RRQ478CdfxfhV9Mx9bVP13Rgm1AvV+5xrWLPGLj+BI8bwLH3bhYyRGX
-	NQ36HyRhUhXYpQSIqtIFzM6EBODPLfS4Msj49pcFSIfLnQIsCCXFL67PVGPV/37mvAjy9UatqzgtF
-	smvmcQCN+Uwc8PHi5AnXNsG1eslUm81Ptl3cRP/CTwWtBNorC8v3CJ1CHCbVL5mD0bmu2WaHzRo3g
-	3roBJXgwzyelrRcvazWinXTh9zoe0jdwo0TXkL46NIOIJGQT6G3rTst9C/2HyVYt4dJ6+3raVmfqW
-	KUc1eUEatHierQz3BEZg==;
+	List-Owner; bh=hi3vs9aSZbbYVpTVI1sCgZU5wVUh/fE9Gyi7CT3BisY=; b=g7KEwFLkjXlzkM
+	QTQ2Mc3XYva7HizgLL58zWlI5JcuI4j+OFNk9jZdg+EcUwINZ1VemlrekiRln+8kq6ky+dZHdly31
+	+KzAd+P7nBVM5gHRgrsx+0DSWQCFzKM4xC70BD8JaJUEjgvEpGiGq+REHFMDd6WorD25czcawY1IV
+	Qn5bkEySuk4TuzK+GxGcVRRnARwo/bT3ZjkAIQBteF+C7QUKSb6fCFWVFmo9NZLDoeCsgdyIE6vNQ
+	hutE3G749dfnXkIAx6DF7aqwDdqf5SW+o4cqwSv94KRfNSzqQpccMyFcx57KLF3OfSFWov0FA5klC
+	4dF8V9BfHbmyPQxWAfWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSSV-0003Ak-7P; Tue, 12 Feb 2019 07:26:23 +0000
+	id 1gtSSi-0003Rl-K3; Tue, 12 Feb 2019 07:26:36 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSRp-0002RZ-8Y; Tue, 12 Feb 2019 07:25:41 +0000
+ id 1gtSRr-0002US-VE; Tue, 12 Feb 2019 07:25:44 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: [PATCH 04/14] mmc: davinci: handle highmem pages
-Date: Tue, 12 Feb 2019 08:25:18 +0100
-Message-Id: <20190212072528.13167-5-hch@lst.de>
+Subject: [PATCH 05/14] mmc: moxart: handle highmem pages
+Date: Tue, 12 Feb 2019 08:25:19 +0100
+Message-Id: <20190212072528.13167-6-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212072528.13167-1-hch@lst.de>
 References: <20190212072528.13167-1-hch@lst.de>
@@ -69,91 +69,74 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 Instead of setting up a kernel pointer to track the current PIO address,
-track the offset in the current page, and do an atomic kmap for the page
-while doing the actual PIO operations.
+track the offset in the current page, and do a kmap for the page while
+doing the actual PIO operations.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/mmc/host/davinci_mmc.c | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/mmc/host/moxart-mmc.c | 20 ++++++++++++--------
+ 1 file changed, 12 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/mmc/host/davinci_mmc.c b/drivers/mmc/host/davinci_mmc.c
-index 9e68c3645e22..6a16d7a1d5bc 100644
---- a/drivers/mmc/host/davinci_mmc.c
-+++ b/drivers/mmc/host/davinci_mmc.c
-@@ -194,11 +194,12 @@ struct mmc_davinci_host {
- #define DAVINCI_MMC_DATADIR_WRITE	2
- 	unsigned char data_dir;
+diff --git a/drivers/mmc/host/moxart-mmc.c b/drivers/mmc/host/moxart-mmc.c
+index a0670e9cd012..116964e6506d 100644
+--- a/drivers/mmc/host/moxart-mmc.c
++++ b/drivers/mmc/host/moxart-mmc.c
+@@ -311,7 +311,7 @@ static void moxart_transfer_pio(struct moxart_host *host)
+ 	if (host->data_len == data->bytes_xfered)
+ 		return;
  
--	/* buffer is used during PIO of one scatterlist segment, and
--	 * is updated along with buffer_bytes_left.  bytes_left applies
--	 * to all N blocks of the PIO transfer.
-+	/*
-+	 * buffer_offset is used during PIO of one scatterlist segment, and is
-+	 * updated along with buffer_bytes_left.  bytes_left applies to all N
-+	 * blocks of the PIO transfer.
- 	 */
--	u8 *buffer;
-+	u32 buffer_offset;
- 	u32 buffer_bytes_left;
- 	u32 bytes_left;
+-	sgp = sg_virt(host->cur_sg);
++	sgp = kmap(sg_page(host->cur_sg)) + host->cur_sg->offset;
+ 	remain = host->data_remain;
  
-@@ -229,8 +230,8 @@ static irqreturn_t mmc_davinci_irq(int irq, void *dev_id);
- /* PIO only */
- static void mmc_davinci_sg_to_buf(struct mmc_davinci_host *host)
- {
-+	host->buffer_offset = host->sg->offset;
- 	host->buffer_bytes_left = sg_dma_len(host->sg);
--	host->buffer = sg_virt(host->sg);
- 	if (host->buffer_bytes_left > host->bytes_left)
- 		host->buffer_bytes_left = host->bytes_left;
- }
-@@ -238,7 +239,7 @@ static void mmc_davinci_sg_to_buf(struct mmc_davinci_host *host)
- static void davinci_fifo_data_trans(struct mmc_davinci_host *host,
- 					unsigned int n)
- {
--	u8 *p;
-+	u8 *p, *base;
- 	unsigned int i;
+ 	if (data->flags & MMC_DATA_WRITE) {
+@@ -319,8 +319,7 @@ static void moxart_transfer_pio(struct moxart_host *host)
+ 			if (moxart_wait_for_status(host, FIFO_URUN, &status)
+ 			     == -ETIMEDOUT) {
+ 				data->error = -ETIMEDOUT;
+-				complete(&host->pio_complete);
+-				return;
++				goto done;
+ 			}
+ 			for (len = 0; len < remain && len < host->fifo_width;) {
+ 				iowrite32(*sgp, host->base + REG_DATA_WINDOW);
+@@ -335,8 +334,7 @@ static void moxart_transfer_pio(struct moxart_host *host)
+ 			if (moxart_wait_for_status(host, FIFO_ORUN, &status)
+ 			    == -ETIMEDOUT) {
+ 				data->error = -ETIMEDOUT;
+-				complete(&host->pio_complete);
+-				return;
++				goto done;
+ 			}
+ 			for (len = 0; len < remain && len < host->fifo_width;) {
+ 				/* SCR data must be read in big endian. */
+@@ -356,10 +354,15 @@ static void moxart_transfer_pio(struct moxart_host *host)
+ 	data->bytes_xfered += host->data_remain - remain;
+ 	host->data_remain = remain;
  
- 	if (host->buffer_bytes_left == 0) {
-@@ -246,7 +247,8 @@ static void davinci_fifo_data_trans(struct mmc_davinci_host *host,
- 		mmc_davinci_sg_to_buf(host);
- 	}
- 
--	p = host->buffer;
-+	base = sg_kmap_atomic(host->sg);
-+	p = base + host->buffer_offset;
- 	if (n > host->buffer_bytes_left)
- 		n = host->buffer_bytes_left;
- 	host->buffer_bytes_left -= n;
-@@ -275,7 +277,8 @@ static void davinci_fifo_data_trans(struct mmc_davinci_host *host,
- 			p = p + (n & 3);
- 		}
- 	}
--	host->buffer = p;
-+	host->buffer_offset = p - base;
-+	sg_kunmap_atomic(host->sg, base);
+-	if (host->data_len != data->bytes_xfered)
++	if (host->data_len != data->bytes_xfered) {
++		kunmap(sg_page(host->cur_sg));
+ 		moxart_next_sg(host);
+-	else
+-		complete(&host->pio_complete);
++		return;
++	}
++
++done:
++	kunmap(sg_page(host->cur_sg));
++	complete(&host->pio_complete);
  }
  
- static void mmc_davinci_start_command(struct mmc_davinci_host *host,
-@@ -572,7 +575,7 @@ mmc_davinci_prepare_data(struct mmc_davinci_host *host, struct mmc_request *req)
- 			host->base + DAVINCI_MMCFIFOCTL);
- 	}
+ static void moxart_prepare_data(struct moxart_host *host)
+@@ -614,6 +617,7 @@ static int moxart_probe(struct platform_device *pdev)
+ 	spin_lock_init(&host->lock);
  
--	host->buffer = NULL;
-+	host->buffer_offset = 0;
- 	host->bytes_left = data->blocks * data->blksz;
- 
- 	/* For now we try to use DMA whenever we won't need partial FIFO
-@@ -1291,6 +1294,7 @@ static int davinci_mmcsd_probe(struct platform_device *pdev)
- 
- 	mmc->ops = &mmc_davinci_ops;
- 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+ 	mmc->ops = &moxart_ops;
 +	mmc->need_kmap = 1;
- 
- 	/* With no iommu coalescing pages, each phys_seg is a hw_seg.
- 	 * Each hw_seg uses one EDMA parameter RAM slot, always one
+ 	mmc->f_max = DIV_ROUND_CLOSEST(host->sysclk, 2);
+ 	mmc->f_min = DIV_ROUND_CLOSEST(host->sysclk, CLK_DIV_MASK * 2);
+ 	mmc->ocr_avail = 0xffff00;	/* Support 2.0v - 3.6v power. */
 -- 
 2.20.1
 
