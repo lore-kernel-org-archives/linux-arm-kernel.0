@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9392AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 14:03:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44645C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 14:03:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6299A20823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 14:03:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1416820823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 14:03:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="llvWDyyU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="xwTOHJme"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6299A20823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZvhRnfNe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="DDKaRtFg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1416820823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eQl1yemA8XoEZnwoVZiuHw1A+8JD0GFhXGys8cAbd6Q=; b=llvWDyyUhF9ckW
-	2arqOnYnYTERHpv7PenI6QfGs4vWKhcWDq1mmM/Q8Q9cqis0XSS9tFyx1JblP5qFh7l7xuZDU8pLN
-	F2B3QJX0QULQXOeYaT8U32UH8GH0JE9E7IdR6sdy41a66YVFAAyoTo1dTg3kpa/gCnzBIEEoNUhoo
-	sTLlCF/SDV8maHBExBl0nfEsP6/VtvNWvdMECpFJvwcDeE+qWIB2DklkKvuCALhySkVkibQKsmVPf
-	tLHFBqCRUSYW8RM8MnQSxu7cLSVvbhrNUQXKxuXeJGdJahlt4xx+QKnn6ZxAUGVOLjivo0T+Mz6of
-	45Beay8M3mXeCZgbTnMg==;
+	List-Owner; bh=Cd7aD7pcoHGKVcXvYvul3L081RgnKvmYOnV7bK5VdzU=; b=ZvhRnfNeGknM2T
+	sjcaQW2zIMyZXWfRlG9N36Qgk03ascyIaKemKliRxCC9qYTLD8TiQwKpuI0ssbnvBwhxcfhGyx9ju
+	JRYD1DPGVe10uLx8Hejy44TBNJa/IRnTviWFaTWZDnfp4g5csa8gIvPrE3DB2IgoDo45nwQk9TsuE
+	rZJkQ7kOtini47UpTsRoP0IsDVzGlppGF7TKLwVvwRMu2OR+ZtN3p9EesLZsN8bm1JLTqHw87gu+T
+	7CT+5TXuLtC9ow21havKAE9YWNjxSF6AnJjphHAN8vYyQl7TDWYONYcKxcH39e/pS21/D+vmE5nxo
+	RfhzUjOMf2xFvI2i9Fig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtYel-0003w0-Ti; Tue, 12 Feb 2019 14:03:27 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gtYex-00046g-S8; Tue, 12 Feb 2019 14:03:39 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtYeP-0003ZB-T9
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 14:03:07 +0000
-Received: by mail-wr1-x441.google.com with SMTP id x10so2784947wrs.8
+ id 1gtYeP-0003Ym-CA
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 14:03:11 +0000
+Received: by mail-wm1-x343.google.com with SMTP id b11so3089360wmj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 06:03:05 -0800 (PST)
+ Tue, 12 Feb 2019 06:03:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=jN5KUzfKX2ndr6TNL6ZWjgGyp82IoCOhgEMTMPUGQYI=;
- b=xwTOHJmeN1oYM8JlE57RDbdCpUcSAWOeO9lHTdXDTKiVHQiIa+5MBD5cuOrtV+0BHf
- mMQbWeeGTZpryJnbTRQvgb8Dd0l4MIxbnkR/BtWzOsXqqPf9ZYD8dVToUAz04ksTJnwr
- HlwbJRaQTmmZHasPLGYwDUVxMsFJ2HNQqTJKc38+zJmF+q+5dWh0IEvOo9/ilMYqiHRh
- abPQ79/KOJz3yNucAqOb59c76LpLe5kMbO6nBh6TsVbXKHXlgrNr1fqwyhhAMiRkpGM4
- Mp5tPJ/Ow2L5EcksZWxkKAtCSO4qN6OCeGdkck59td7MhioNMYzAN71KbGTfY7XKgMa7
- GBXw==
+ bh=dulm1bU9WtsfyglzYBfpic3H5/a+/roIjKv2vYQ8/qg=;
+ b=DDKaRtFgKO7VzFN3HDS4BSseE07cHdEL2YnMBj5rNfi4sdbaVkIJHhlvDCSgVwbNgc
+ wcTWHqrO4lr5n1X2fyNzKUlAyr94HWE1W4vyjSIlMWbgs6O0YqrUBsXo4X0R42s8W9+A
+ 3+4PA7KeXrPYmDkwPdLwp9KEltX4bvhCs9rf5nWy9x1Q24o9NM0DR3/6M7Pmw45c97Wt
+ M2wrfLuZy4gAqor7FHhhDO9sKcuU8ywd8BMXZtwGSXWPWAr5b6kcStJPlpuoqwvgAoi3
+ PZY76QWsSBEVeqzXnvkiHgjwmKSSLuBdR55cJf0DqQofKrr0G+b7MwjgnLnwZX9BZI1r
+ IWqw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=jN5KUzfKX2ndr6TNL6ZWjgGyp82IoCOhgEMTMPUGQYI=;
- b=nejn+CUq9TccEOdEWC1zpaFfBsPG79wu5oHIHIzV9B3AlhaZ7MbmOXOeltgD0UJ5Tb
- MK320U+RVBjGd0orIUt9NOe8PYkehMj0LdLm81mIvoUfoPZU6JSfXUovqx+EpNPt6tPY
- K88AINzEUks6IopuswUJU/wAxZQAFvoRxXLXcOxM4dBfAiY61VnNeElTMaZjTsVSAEbx
- +9ZpXFOVfrwE65/7+52xcUEXf1MPGTOF6xFvH8i5zjHcbkn+RqeeDY+bVZ5Aj3vrMmxK
- HsQs329RmZgiTDdna/kI/63TpA3CdGvpi49AU2Jtaahl/Wo04NRuUvja2kXX7/79Umcm
- 7skg==
-X-Gm-Message-State: AHQUAuZy0fAx79k1YUdxQ2324BtSYjX4jEEze6D11tc2CQiB+6rHKxkI
- U0ydBWL/5MkGa76Io/SMGFEnDg==
-X-Google-Smtp-Source: AHgI3IZX1WfsdFtWbVrcdrN2oLFP3xvftMrl/I8QnMfuGABwxEYTBvnxag+iyshx+3R1mAnqm4jStA==
-X-Received: by 2002:adf:9083:: with SMTP id i3mr3030823wri.124.1549980184261; 
- Tue, 12 Feb 2019 06:03:04 -0800 (PST)
+ bh=dulm1bU9WtsfyglzYBfpic3H5/a+/roIjKv2vYQ8/qg=;
+ b=TsUvyTCUDpJ4jCx1WUFQs0WQo49GiX5M7laE8eJQC9yag3VvRN9ovYcyq3/69p5cO9
+ RSXJmxvqQzK0yd1uu0xRdbVmjwSdW8W8qT2pfb+ypvT+OjxrBZ/K2yOIf69bsGynUWhZ
+ bXL0ee/6GuQ7Im5xylv+j89NOVxY7YDXndVW/y6zX+9gyOCgzmfkCzyvKhQRzAm4cVVK
+ t63E/3ATH+++axV6OLLKfcJvgMmFucEUVIMgrhUBuZwAmYOaqq5XdNO03fWZT5rEc14p
+ Z/SF7AtweZPIEDoOYvUVDspMDn/OSt/EUL4GgGx/2fgAGwZig8BqPXMa4vmE5p069DJn
+ SuLA==
+X-Gm-Message-State: AHQUAuZR+zXcjdPfKczk1gxSf0MH1y7BlYSETCZnZl05vWd0vkRSzGBK
+ uyvLlC0U4bmoiqRI9LLVP/7VYA==
+X-Google-Smtp-Source: AHgI3IYMiZchpHwXlRRXUxNBcje3WNreoRMlf+KDfkg3zQC6oxYJP3FScpJukr1yLGZK+OO4ykSc/Q==
+X-Received: by 2002:a1c:eb18:: with SMTP id j24mr2886191wmh.119.1549980183432; 
+ Tue, 12 Feb 2019 06:03:03 -0800 (PST)
 Received: from bender.baylibre.local
  (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id g10sm23435678wrq.81.2019.02.12.06.03.03
+ by smtp.gmail.com with ESMTPSA id g10sm23435678wrq.81.2019.02.12.06.03.02
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Tue, 12 Feb 2019 06:03:03 -0800 (PST)
+ Tue, 12 Feb 2019 06:03:02 -0800 (PST)
 From: Neil Armstrong <narmstrong@baylibre.com>
 To: khilman@baylibre.com
-Subject: [PATCH 2/2] arm64: dts: Add SEI Robotics SEI510 Board
-Date: Tue, 12 Feb 2019 15:02:59 +0100
-Message-Id: <20190212140259.9537-3-narmstrong@baylibre.com>
+Subject: [PATCH 1/2] vendor-prefixes: Add prefix for Shenzhen SEI Robotics Co., Ltd
+Date: Tue, 12 Feb 2019 15:02:58 +0100
+Message-Id: <20190212140259.9537-2-narmstrong@baylibre.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212140259.9537-1-narmstrong@baylibre.com>
 References: <20190212140259.9537-1-narmstrong@baylibre.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_060305_937161_522F7660 
-X-CRM114-Status: GOOD (  15.30  )
+X-CRM114-CacheID: sfid-20190212_060305_432363_DBDD65E7 
+X-CRM114-Status: GOOD (  10.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,96 +105,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The SEI Robotics SEI510 Board is based on the Amlogic G12A S905X2
-and has the following features :
-- Amlogic G12A S905X2 SoC
-- 10/100 Ethernet
-- USB2 + USB3 ports
-- Micro SDCard Port
-- Audio + CVBS AV Jack port
-- HDMI 2.1 + CEC Port
-- ADC Touch Button
-- Far-Field Microphone Array + Mono HP
-- IR Sensor
-- IR Emmiter LED Array
-- RGB Led
+Add vendor prefix for the Shenzhen SEI Robotics Co., Ltd, a chinese ODM
+specialized in Android TV HDMI Stick, OTT Box, Hybrid STB,
+Smart Home Gateway & more.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../devicetree/bindings/arm/amlogic.txt       |  1 +
- arch/arm64/boot/dts/amlogic/Makefile          |  1 +
- .../boot/dts/amlogic/meson-g12a-sei510.dts    | 38 +++++++++++++++++++
- 3 files changed, 40 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-g12a-sei510.dts
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
-index 7f40cb5f490b..061f7b98a07f 100644
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic.txt
-@@ -110,6 +110,7 @@ Board compatible values (alphabetically, grouped by SoC):
- 
-   - "amlogic,u200" (Meson g12a s905d2)
-   - "amediatech,x96-max" (Meson g12a s905x2)
-+  - "seirobotics,sei510" (Meson g12a s905x2)
- 
- Amlogic Meson Firmware registers Interface
- ------------------------------------------
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 0821fed4c074..2709f7ede908 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_MESON) += meson-axg-s400.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-g12a-u200.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-g12a-sei510.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-g12a-x96-max.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nanopi-k2.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-nexbox-a95x.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-g12a-sei510.dts b/arch/arm64/boot/dts/amlogic/meson-g12a-sei510.dts
-new file mode 100644
-index 000000000000..6a7c3241862a
---- /dev/null
-+++ b/arch/arm64/boot/dts/amlogic/meson-g12a-sei510.dts
-@@ -0,0 +1,38 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2019 BayLibre SAS. All rights reserved.
-+ */
-+
-+/dts-v1/;
-+
-+#include "meson-g12a.dtsi"
-+
-+/ {
-+	compatible = "seirobotics,sei510", "amlogic,g12a";
-+	model = "SEI Robotics SEI510";
-+
-+	aliases {
-+		serial0 = &uart_AO;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory@0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x40000000>;
-+	};
-+
-+	reserved-memory {
-+		/* TEE Reserved Memory */
-+		bl32_reserved: bl32@5000000 {
-+			reg = <0x0 0x05300000 0x0 0x2000000>;
-+			no-map;
-+		};
-+	};
-+};
-+
-+&uart_AO {
-+	status = "okay";
-+};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 4615d4b9d11e..921ad8f88ed3 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -343,6 +343,7 @@ sandisk	Sandisk Corporation
+ sbs	Smart Battery System
+ schindler	Schindler
+ seagate	Seagate Technology PLC
++seirobotics	Shenzhen SEI Robotics Co., Ltd
+ semtech	Semtech Corporation
+ sensirion	Sensirion AG
+ sff	Small Form Factor Committee
 -- 
 2.20.1
 
