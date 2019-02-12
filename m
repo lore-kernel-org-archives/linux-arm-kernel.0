@@ -2,62 +2,75 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A82AAC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:18:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9809AC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:19:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7396D2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:18:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 311C32081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:19:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bYLy80Ww"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7396D2081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U9lBzGur";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="QdssbfCL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 311C32081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EKtjNoGMTK1Istk/vEBDdVl93R2/nlimr5chg4iVRgo=; b=bYLy80Ww1Sai3H
-	VXGany1CRrrvmak5r6g/H2d9dTL7DrNqV22hWB/D5ysSSXHBA7VeSlgx1joCYkiLydLtQ9QgtpeTj
-	/noZONpBKq3w/skoEPxNMhWSdaRLr56MCkZrNgAcGql17tLzFrzfuukvwURlcNFd3nqcu4SCI4Rhp
-	GmHbB8SV8Yla5COkSdTy4U/NrcENhVL6hCq1DEEIyNW/m5cgvAfjfYhLOqRn+joDP2ASdPQj57vYm
-	xudK3E/CYIofOV6vIr8UEYrVmS8cx+bGLmq8wAEAX2VRGGr6nc/GFPGtka6bfGkhII3ZGLIvcN0zY
-	hexlU9mg4aP1UzEOuiJg==;
+	List-Owner; bh=SnTYGT6ZiAUV9GYHLBe0fLjEb0+CQr1N2M6Lfi6FiWs=; b=U9lBzGurI/cwP2
+	ETMXuHOxeeO9eD3Y90KqGVweujtBX5Kj0I7K0NJq/e7E3KdCh5WJr927ysqDbSWLa/UGrQD+dC9eQ
+	IRbzVqOP3IBHVd+NUzpAiZ+8YChzYK55V73qSx86ECwmNW4up103J9y7nZH4S1VGv72gaX9IVLGVe
+	Ksmv6OFbAV1LnQC2vbXysYlOQqWE8oyiAf4uovyPt//OK7tZRtnJ7gRMzeVR/D/t+8AX2MDgjpywz
+	0FD2cXmQqTILbPjf9BzazEx8o7pg21ooUIQmm6zgkF+9aDhckHdEskObn6nF5ky4VBHpXapzrVGLy
+	RuvGi61aRW1WX9YLnJXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtfRS-0006sr-9F; Tue, 12 Feb 2019 21:18:10 +0000
-Received: from bhuna.collabora.co.uk ([46.235.227.227])
+	id 1gtfSN-0007Qi-Hv; Tue, 12 Feb 2019 21:19:07 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtfRP-0006sM-9I
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 21:18:08 +0000
-Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: ezequiel) with ESMTPSA id 20B0327FB65
-Message-ID: <fb7e6bf4474583535961712bac5248b43dd47af0.camel@collabora.com>
-Subject: Re: [PATCH v3 1/2] media: uapi: Add H264 low-level decoder API
- compound controls.
-From: Ezequiel Garcia <ezequiel@collabora.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Hans Verkuil
- <hverkuil@xs4all.nl>
-Date: Tue, 12 Feb 2019 18:17:52 -0300
-In-Reply-To: <20190212130548.tytlxmbu4q6qgzzq@flea>
-References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
- <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
- <716ae1ff-8e62-c723-5b5a-0b018cf6af6a@xs4all.nl>
- <db7a762a-8bc3-0391-036b-1fda2e445023@xs4all.nl>
- <20190212130548.tytlxmbu4q6qgzzq@flea>
-Organization: Collabora
-User-Agent: Evolution 3.30.5-1 
+ id 1gtfSG-0007LO-U2; Tue, 12 Feb 2019 21:19:03 +0000
+Received: from mail-qk1-f177.google.com (mail-qk1-f177.google.com
+ [209.85.222.177])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 245582075C;
+ Tue, 12 Feb 2019 21:19:00 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550006340;
+ bh=b8USUSrg3lJKX89ykkFcbjrdlAPDyKVL3G6hd2eIKTM=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=QdssbfCLQx+1NjM8RrOrm7erZtinwVjJSa4a+r6GZrAp0tadbkmNAFQKP8lDSnx2t
+ /fk514a292jF6WGM0psVno9umMFG/65mLK8EARg2npiOQmvQdMy1Q8UhhgODYecGFV
+ vxO9Ieagwq/6/nV2T08oKRAQ1CVyeaZ5HjX38sIw=
+Received: by mail-qk1-f177.google.com with SMTP id w204so110405qka.2;
+ Tue, 12 Feb 2019 13:19:00 -0800 (PST)
+X-Gm-Message-State: AHQUAuapfLCbCr7tOV8lV8bhS7tXmb0z1/Zp6TA8XWB46f4YuxDOPFo4
+ C3IwYvG+pKW8uAVSAw9mKc2R3kZx4nk3hkJSTw==
+X-Google-Smtp-Source: AHgI3IbGBC5HehArOZY6ed9XOuq2/9Lb4TpJX6nU6mD811cwtyzYbz48P+dF9MwrYsEa7CmR2h8pY4pkQsvgQAsxg2c=
+X-Received: by 2002:a37:5686:: with SMTP id k128mr3941140qkb.29.1550006339312; 
+ Tue, 12 Feb 2019 13:18:59 -0800 (PST)
 MIME-Version: 1.0
+References: <1548693481-1162-1-git-send-email-lollivier@baylibre.com>
+ <1548693481-1162-3-git-send-email-lollivier@baylibre.com>
+ <20190130155016.GA26536@bogus> <20190211092251.GV4686@localhost>
+In-Reply-To: <20190211092251.GV4686@localhost>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 12 Feb 2019 15:18:46 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJPhuDDsEMvpVizewTuehOZTc84d+8Hq7o8C+O4UrBjYw@mail.gmail.com>
+Message-ID: <CAL_JsqJPhuDDsEMvpVizewTuehOZTc84d+8Hq7o8C+O4UrBjYw@mail.gmail.com>
+Subject: Re: [PATCH v3 2/4] dt-bindings: gnss: add mediatek binding
+To: Johan Hovold <johan@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_131807_454117_C758C89F 
-X-CRM114-Status: GOOD (  15.32  )
+X-CRM114-CacheID: sfid-20190212_131901_276152_6A068F02 
+X-CRM114-Status: GOOD (  23.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,52 +82,100 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
- jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, jernej.skrabec@gmail.com, tfiga@chromium.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, hans.verkuil@cisco.com,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- sakari.ailus@linux.intel.com, Guenter Roeck <groeck@chromium.org>,
- nicolas.dufresne@collabora.com, posciak@chromium.org,
- linux-media@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ linux-amlogic@lists.infradead.org,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-02-12 at 14:05 +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> On Mon, Feb 11, 2019 at 04:21:47PM +0100, Hans Verkuil wrote:
-> > > I think the API should be designed with 4k video in mind. So if some of
-> > > these constants would be too small when dealing with 4k (even if the
-> > > current HW doesn't support this yet), then these constants would have to
-> > > be increased.
-> > > 
-> > > And yes, I know 8k video is starting to appear, but I think it is OK
-> > > that additional control(s) would be needed to support 8k.
-> > 
-> > Hmm, 4k (and up) is much more likely to use HEVC. So perhaps designing this
-> > for 4k is overkill.
-> > 
-> > Does anyone know if H.264 is used for 4k video at all? If not (or if very
-> > rare), then just ignore this.
-> 
-> I don't know the state of it right now, but until quite recently
-> youtube at least was encoding their 4k videos in both VP9 and
-> H264. They might have moved to h265 since, but considering 4k doesn't
-> seem unreasonable.
-> 
+On Mon, Feb 11, 2019 at 3:23 AM Johan Hovold <johan@kernel.org> wrote:
+>
+> On Wed, Jan 30, 2019 at 09:50:16AM -0600, Rob Herring wrote:
+> > On Mon, Jan 28, 2019 at 05:37:59PM +0100, Loys Ollivier wrote:
+> > > Add binding for Mediatek-based GNSS receivers.
+> > >
+> > > Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> > > ---
+> > >
+> > > v3:
+> > > Removed the I2C and SPI interfaces references.
+> > > Removed the "mediatek,mt3339" compatible line.
+> > > Added the optional propertied (reset, fix)
+> > > Added the pin names for the optional properties.
+> > >
+> > > v2:
+> > > Renamed bindings from Globaltop/gtop to Mediatek/mtk.
+> > > Moved current-speed as an optional propertie.
+> > > Removed the status line in the example.
+> > > Added "mediatek,mt3339" compatible.
+> > >
+> > >  .../devicetree/bindings/gnss/mediatek.txt          | 37 ++++++++++++++++++++++
+> > >  1 file changed, 37 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> > > new file mode 100644
+> > > index 000000000000..00650d81c5c8
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> > > @@ -0,0 +1,37 @@
+> > > +Mediatek-based GNSS Receiver DT binding
+> > > +
+> > > +Mediatek chipsets are used in GNSS-receiver modules produced by several
+> > > +vendors and can use an UART interface.
+>
+> s/an/a/
+>
+> > > +
+> > > +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
+> > > +properties.
+> > > +
+> > > +Required properties:
+> > > +
+> > > +- compatible       : Must be
+> > > +
+> > > +                   "globaltop,pa6h"
+> > > +
+> > > +- vcc-supply       : Main voltage regulator (pin name: VCC)
+> > > +
+> > > +Optional properties:
+> > > +
+> > > +- gtop,reset-gpios : GPIO used to reset the device
+> > > +                     (pin name: RESET, NRESET)
+> >
+> > reset-gpios is the standard name.
+> >
+> > > +- gtop,fix-gpios   : GPIO used to determine device position fix state
+> > > +                     (pin name: FIX, 3D_FIX)
+>
+> I'm thinking we might need a standard name for fix-gpios as well. This
+> isn't a feature that is globaltop (or mediatek) specific, and other
+> manufacturers provide similar functionality through pins named UI_FIX,
+> or even LCKIND (lock indicator).
+>
+> The pin is typically used to drive an indicator LED AFAIU, but the
+> characteristics of the signal varies from device to device (fw to fw),
+> for example, pulse when no lock and low otherwise, or pulse when a 2d or
+> 3d-fix is acquired, etc.
+>
+> I'm not sure how useful the pulsing would be for software, but someone
+> might find a use for it in some form.
+>
+> Rob, is this something we want to keep in the binding, and if so, how
+> about using a generic name such as "gnss-fix-gpios"?
 
-Just asked the multimedia team here, and they say that 4k videos are in
-fact widely used for both H264 and VP9 because of the HEVC licensing issues,
-and because gains in compressions are not so impressive.
+Sure. As long as details like being a pulse and when the pulse occurs
+are implied by compatible string. So we don't get an endless addition
+of properties to describe those.
 
-Regards,
-Ezequiel
-
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
