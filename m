@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8B0CC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:49:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 78353C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:50:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B802D206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:49:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 47074206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:50:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JBZdXSsh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qI/X/laN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B802D206BA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZkuMolEK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="QnKvLLxj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 47074206BA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,45 +26,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gE1x8MFQ7iUTQRBaklSwuVg8S7M9ibD/mUOKwXOo+wY=; b=JBZdXSsheLtZ+Z
-	PUKkhu9wuZYGXg3Evmoo1yGRyMv7CVjG7bm1U7CExM8NFEzNjL5IzjdEFuOSfWkcv5Bw8URlUqQvE
-	s2H9r79Oyo7FdRwtYkFsO7/n8okFkVf8d/DopYKaOb1b/MQ5/Y1yIUoovjrproVMPcfdLHATdTVvc
-	tmYnEiJPhfJpTwosd9EtUIdz79Ci5NdQxZKzbMOkhPSbeKZtcz8+tUNL38KVQV7ilCOOeCfPho2O9
-	lxMy7oKJgpOC7T+TTEKp+hvXoPlQ0dd4tuM7Ni8Roa/BwVCIQcr3X6yzochYPI6McFtHhZqzujqcl
-	yDK8XsPyMaT20nnhuSnw==;
+	List-Owner; bh=6kw7C2sUnooy7OSWpCd8E/DxY+u/GPQrYJGtA1/vECU=; b=ZkuMolEKyASL9v
+	O5RaUAvQomTESPpBdv+rwWqM6T0lPV4004eMYdfbG3lmTCpwFDBIKRTfhZAY9EnOV9mIjsHOEFh7E
+	e2HnT9PV5TSzZc23WTq/2Gu4yUDJgkXCWXUX+yhOxQ4UNJbzdFCLJCxWZrLXSTaQokVcS5XKKl8Mp
+	1Swwjag2NnH1YBD6afSmT90eeUKJXHfOMXY+P4izI2rXqV4WAdj3Mt6djpfSBof8e7bdIYaJGtoWb
+	k4tMALVqSHl4ANrrWwWQj3kfbzhIKRFgS4o2rUEaxQmSHrpQQVLaOrN+FFMYi5gkjm2L3yO6ycVF5
+	1zv7ZWSHiy0xCQj7C6LA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSp8-0000E0-2Q; Tue, 12 Feb 2019 07:49:46 +0000
+	id 1gtSpn-0001qU-Ak; Tue, 12 Feb 2019 07:50:27 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSp5-0000DN-7p; Tue, 12 Feb 2019 07:49:44 +0000
+ id 1gtSpk-0001q4-Lk; Tue, 12 Feb 2019 07:50:26 +0000
 Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 55D11206BA;
- Tue, 12 Feb 2019 07:49:42 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id B3154206BA;
+ Tue, 12 Feb 2019 07:50:23 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549957783;
- bh=HyKNorq6TjpgFi5QyJEgeekX7eUrN1l+FnH+qgHHhnk=;
+ s=default; t=1549957824;
+ bh=doEoHEEJFxpJh5s2UkkMEtSv47p1Dos+NTCDCKD20ZA=;
  h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=qI/X/laNeqldkcPAOZlQYINzbJrGBYV1Lva9nJVKuZc1OZUp9C712/P2XUkscFuV4
- /QC9V+EvrtPWV67hzW+fgwrUtOraz1epXoze+I8b4zQBq/Ci0xGYLTzpdbLklie66/
- FpwqP1/4yV8HumJSWqRhgRzj0vaZRFIK8mNAvAHo=
-Date: Tue, 12 Feb 2019 08:49:40 +0100
+ b=QnKvLLxjCK2y717cXiFoL8W4t2PIRDjVHo4lvhFpFEO2Cuy6QpxsczeDi5u62YM4/
+ BpZrBe/E/XkbnZiKwZmYBsDZQ75wZBJJOSIcHRq100Nkp/vGAm6Np1h6YnM3mTQnj8
+ OA5V2KBCgNP3BdgpaF/2ci+Cpj52rFJT7k4WW2hA=
+Date: Tue, 12 Feb 2019 08:50:20 +0100
 From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 To: Christoph Hellwig <hch@lst.de>
-Subject: Re: [PATCH 06/12] dma-mapping: improve selection of
- dma_declare_coherent availability
-Message-ID: <20190212074940.GB5924@kroah.com>
+Subject: Re: [PATCH 09/12] dma-mapping: remove the DMA_MEMORY_EXCLUSIVE flag
+Message-ID: <20190212075020.GC5924@kroah.com>
 References: <20190211133554.30055-1-hch@lst.de>
- <20190211133554.30055-7-hch@lst.de>
+ <20190211133554.30055-10-hch@lst.de>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190211133554.30055-7-hch@lst.de>
+In-Reply-To: <20190211133554.30055-10-hch@lst.de>
 User-Agent: Mutt/1.11.3 (2019-02-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_234943_299020_517CBE54 
-X-CRM114-Status: UNSURE (   8.87  )
+X-CRM114-CacheID: sfid-20190211_235024_795150_7862A492 
+X-CRM114-Status: UNSURE (   9.89  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,13 +87,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 02:35:48PM +0100, Christoph Hellwig wrote:
-> This API is primarily used through DT entries, but two architectures
-> and two drivers call it directly.  So instead of selecting the config
-> symbol for random architectures pull it in implicitly for the actual
-> users.  Also rename the Kconfig option to describe the feature better.
+On Mon, Feb 11, 2019 at 02:35:51PM +0100, Christoph Hellwig wrote:
+> All users of dma_declare_coherent want their allocations to be
+> exclusive, so default to exclusive allocations.
 > 
 > Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  Documentation/DMA-API.txt                     |  9 +------
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c   | 12 +++------
+>  arch/arm/mach-imx/mach-mx31moboard.c          |  3 +--
+>  arch/sh/boards/mach-ap325rxa/setup.c          |  5 ++--
+>  arch/sh/boards/mach-ecovec24/setup.c          |  6 ++---
+>  arch/sh/boards/mach-kfr2r09/setup.c           |  5 ++--
+>  arch/sh/boards/mach-migor/setup.c             |  5 ++--
+>  arch/sh/boards/mach-se/7724/setup.c           |  6 ++---
+>  arch/sh/drivers/pci/fixups-dreamcast.c        |  3 +--
+>  .../soc_camera/sh_mobile_ceu_camera.c         |  3 +--
+>  drivers/usb/host/ohci-sm501.c                 |  3 +--
+>  drivers/usb/host/ohci-tmio.c                  |  2 +-
+>  include/linux/dma-mapping.h                   |  7 ++----
+>  kernel/dma/coherent.c                         | 25 ++++++-------------
+>  14 files changed, 29 insertions(+), 65 deletions(-)
 
 Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
