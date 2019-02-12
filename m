@@ -4,73 +4,58 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A6963C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:31:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB6B8C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:33:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68B672084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:31:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C8EF217FA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 15:33:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lrGp84bE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68B672084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IPWu5r64"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C8EF217FA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=glider.be
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=vG92341GmW4XCASFQF4KOyEUrZHhjRrcAV9TxYGIFBY=; b=lrGp84bEdT7lKH
-	UQ+oT4vpM9Ep3Fp9X4Bjoa+lIbshamGOGepAaqPlP+lZXIoh3NVn2CV4tLJBKhQUgCXGcRPlmRVym
-	REj/aG1Ot4f00IEm9LrS0NPr3i+yAC6sicdKp2oFNnLZOWkZLx3aX/CF8QbSB82YADYkUVEAn3/tI
-	Ab/3veRn0HquVk0hIX1vP5dKYxAvZ9ayxRQ2SU+q6DRhSPI9mUULiT+csODFhG7OstRFa4JIdX5iy
-	bZ4CwuobqbxCIYMpnNbh1I9yR8ZecTFN41lnQGxifEOHHvaZcBAY/auhNAN6iHiA/X6jDXnkWgWKi
-	fplZgrpLL8IgNJqL+Rpw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=HzTTIICGEw6ir9VgfdHBcBs+3fCo1iCOn0cnMhGhc98=; b=IPW
+	u5r643rVky+kUKa+jlpV5Ngt3HdcF07WrDjR+tWK3Wa5F+kvph806TtLsc7WJBfomE1Gfugj/v6KU
+	B5F0S2uhthN+FDbqRH68V1rh/8wZjQp/BvODbzLytuu/pDA1nWqrQunOYrMTpVhDGw9s9FPo/RvEq
+	nUGxQwPp+d0mn4W2LNIpBI5lMMuOY1e0HGceilcGpmVaN31qSwlNjJbrWTPSPbp3SLGeF4Hen/1wc
+	nYHZO0ORX1UdcBopEeIoHBTWkqThr7p7wLVlJCmG8uWMoKU2DXGigGp79Ad8aqe5Hmi5Ci7TweKgB
+	hTQadSbYhGrChU5pZ/ELpR/0qosrQlA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gta21-0000dF-NB; Tue, 12 Feb 2019 15:31:33 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gta3d-0001QS-2r; Tue, 12 Feb 2019 15:33:13 +0000
+Received: from albert.telenet-ops.be ([2a02:1800:110:4::f00:1a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gta1x-0000co-RJ
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:31:31 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1CFH0Yu019267; Tue, 12 Feb 2019 16:31:27 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qhurj1344-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 12 Feb 2019 16:31:27 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 825FF3A;
- Tue, 12 Feb 2019 15:31:26 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag4node2.st.com [10.75.127.11])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 611305494;
- Tue, 12 Feb 2019 15:31:26 +0000 (GMT)
-Received: from localhost (10.75.127.45) by SFHDAG4NODE2.st.com (10.75.127.11)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Tue, 12 Feb 2019 16:31:25 +0100
-From: <gabriel.fernandez@st.com>
-To: Dmitry Torokhov <dmitry.torokhov@gmail.com>, Gabriel Fernandez
- <gabriel.fernandez@st.com>
-Subject: [PATCH v1] Input: st-keyscan - fix potential zalloc NULL dereference
-Date: Tue, 12 Feb 2019 16:30:55 +0100
-Message-ID: <20190212153055.3925-1-gabriel.fernandez@st.com>
-X-Mailer: git-send-email 2.17.0
-MIME-Version: 1.0
-X-Originating-IP: [10.75.127.45]
-X-ClientProxiedBy: SFHDAG3NODE3.st.com (10.75.127.9) To SFHDAG4NODE2.st.com
- (10.75.127.11)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-12_08:, , signatures=0
+ id 1gta3Y-0001Pl-Kn
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 15:33:10 +0000
+Received: from ramsan ([84.194.111.163]) by albert.telenet-ops.be with bizsmtp
+ id brZ21z00A3XaVaC06rZ2S2; Tue, 12 Feb 2019 16:33:02 +0100
+Received: from rox.of.borg ([192.168.97.57]) by ramsan with esmtp (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1gta3P-0005xD-Vp; Tue, 12 Feb 2019 16:32:59 +0100
+Received: from geert by rox.of.borg with local (Exim 4.90_1)
+ (envelope-from <geert@linux-m68k.org>)
+ id 1gta3P-0003Hz-T9; Tue, 12 Feb 2019 16:32:59 +0100
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+To: Simon Horman <horms@verge.net.au>, Magnus Damm <magnus.damm@gmail.com>,
+ Marek Vasut <marek.vasut+renesas@gmail.com>
+Subject: [PATCH/RFC] arm64: dts: renesas: r8a77990: Add Ebisu-4D board support
+Date: Tue, 12 Feb 2019 16:32:59 +0100
+Message-Id: <20190212153259.12601-1-geert+renesas@glider.be>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_073130_171884_909E1EC2 
-X-CRM114-Status: UNSURE (   9.61  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190212_073308_840354_DC0CA64E 
+X-CRM114-Status: GOOD (  14.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,53 +67,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nate Drude <nate.drude@ohmlinxelectronics.com>,
- linux-kernel@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- giuseppe.condorelli@st.com, linux-input@vger.kernel.org,
- Dan Carpenter <dan.carpenter@oracle.com>, linux-clk@vger.kernel.org,
+Cc: linux-renesas-soc@vger.kernel.org,
+ Takeshi Kihara <takeshi.kihara.df@renesas.com>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Gabriel Fernandez <gabriel.fernandez@st.com>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch fixes the following static checker warning:
+Add initial support for the Renesas Ebisu-4D development board.
 
-drivers/input/keyboard/st-keyscan.c:156 keyscan_probe()
-error: potential zalloc NULL dereference: 'keypad_data->input_dev'
+The Ebisu-4D board is very similar to the Ebisu board, but the memory
+configuration is different.
 
-Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+  - The memory map of Ebisu-4D board is as follows:
+      Bank0: 2 GiB RAM : 0x000048000000 -> 0x000bfffffff
+
+  - The memory map of Ebisu board is as follows:
+      Bank0: 1 GiB RAM : 0x000048000000 -> 0x0007fffffff
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/input/keyboard/st-keyscan.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Do we need this patch?
 
-diff --git a/drivers/input/keyboard/st-keyscan.c b/drivers/input/keyboard/st-keyscan.c
-index babcfb165e4f..3b85631fde91 100644
---- a/drivers/input/keyboard/st-keyscan.c
-+++ b/drivers/input/keyboard/st-keyscan.c
-@@ -153,6 +153,8 @@ static int keyscan_probe(struct platform_device *pdev)
+ATF v2.0-763-ga45ccf135e48 sees the full 2 GiB, but U-Boot
+2019.01-00523-ge5fd39c88648 still sees only 896 MiB of RAM, and this
+patch is needed to let Linux use the additional 1 GiB of RAM.
+
+If U-Boot could see all RAM, it could update:
+  1. the reg property in the memory node, and
+  2. the dma-ranges property in the pcie node[*],
+depending on the board, and we won't need separate DTSes for Ebisu and
+Ebisu-4D.
+
+[*] Looks like fdt_pci_dma_ranges() is called on Freescale platforms
+    only?
+---
+ arch/arm64/boot/dts/renesas/Makefile          |  1 +
+ .../boot/dts/renesas/r8a77990-ebisu-4d.dts    | 25 +++++++++++++++++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a77990-ebisu-4d.dts
+
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index 36c0429f62c7b7f7..b6630ffd0cbb255c 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -14,6 +14,7 @@ dtb-$(CONFIG_ARCH_R8A77965) += r8a77965-m3nulcb-kf.dtb
+ dtb-$(CONFIG_ARCH_R8A77970) += r8a77970-eagle.dtb r8a77970-v3msk.dtb
+ dtb-$(CONFIG_ARCH_R8A77980) += r8a77980-condor.dtb r8a77980-v3hsk.dtb
+ dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu.dtb
++dtb-$(CONFIG_ARCH_R8A77990) += r8a77990-ebisu-4d.dtb
+ dtb-$(CONFIG_ARCH_R8A77995) += r8a77995-draak.dtb
  
- 	input_dev->id.bustype = BUS_HOST;
- 
-+	keypad_data->input_dev = input_dev;
+ # SoCs lacking upstream board support
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu-4d.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu-4d.dts
+new file mode 100644
+index 0000000000000000..9f5bc7a7734f5fb8
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu-4d.dts
+@@ -0,0 +1,25 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Device Tree Source for the Ebisu-4D board
++ *
++ * Copyright (C) 2018 Renesas Electronics Corp.
++ */
 +
- 	error = keypad_matrix_key_parse_dt(keypad_data);
- 	if (error)
- 		return error;
-@@ -168,8 +170,6 @@ static int keyscan_probe(struct platform_device *pdev)
- 
- 	input_set_drvdata(input_dev, keypad_data);
- 
--	keypad_data->input_dev = input_dev;
--
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	keypad_data->base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(keypad_data->base))
++/dts-v1/;
++#include "r8a77990-ebisu.dts"
++
++/ {
++	model = "Renesas Ebisu-4D board based on r8a77990";
++	compatible = "renesas,ebisu", "renesas,r8a77990";
++
++	memory@48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x78000000>;
++	};
++};
++
++&pciec0 {
++	/* Map all possible DDR as inbound ranges */
++	dma-ranges = <0x42000000 0 0x40000000 0 0x40000000 0 0x80000000>;
++};
 -- 
-2.17.0
+2.17.1
 
 
 _______________________________________________
