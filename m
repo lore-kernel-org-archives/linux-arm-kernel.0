@@ -2,84 +2,85 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E76F0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:32:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C78DC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:33:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B31002082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:32:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DEA0B2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:33:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VZ1S/tZr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="TR0xj5P7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B31002082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DxgZMr9v";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="GUTAM4/9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEA0B2082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Dh8sk91qF5RiEzQZtf0CUme94+sk3nFRhFvWfUGQJZo=; b=VZ1S/tZrW+Qg67
-	RZnkPxy6/thTsYmJPm5IZ9QkYl7HnZZHFo+1vKmqze+Vr2lNiFBpFcQIX8kxaoJQREO9/ckol79OE
-	P5sap+K2Tq3OxeBST+G5A7qyfRZMVtNWg2bx4Un2Ljjd+0c19CAiYPAiJkzANF2XCflQUSuGVu9Up
-	4TnERPRmJrR2NK7ECJSFg1VwYhNhg6JHAqXAj8pds37Nto2SpnERGchmPbzc3vOQHchku+aOQhxtE
-	X+w1H0E+hu55aAqWCx6fbJ/TOrrFOTXn3/FCtJ53CKlT+bkdc/GevQ3MDag+QQIpNpUVheiHHgF0T
-	CMFeO26E0PTXDhcrdYxg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ycDySgou0g8qmzLTvNqqtWwsgolK5HqTHOk5OlMM1DQ=; b=DxgZMr9vHLSj0g
+	rHA6vtSkwrBTXtVryFlPZ4rqBM6c5QMDO+dmixxI5BqpLjacn0E9gZ76ZkOiPjxeY0Xc1Tg3gg9sB
+	IGXnURRWustYlIDJwIVqiNHxJrWSY+g31ocBqANHIndVKa9CigVwnHpO5dj39Fyq90veDTFdDuoJA
+	j/jX+mi25TCC8rKxfnV9P5GsBELcDjtzY2Mjxqb/xoVz8uLPIXtWKBRt/HKYoAl5GKDYNShXIIa6q
+	kJ782neErtK3c51G+5+Q4aWf1P80YcQP9PHcIggUwICdVwoBzhviU9GaG2roywdDtOyUD64zGp8Ow
+	DKyvlY2+5HsZ4L7yl6qA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtTUE-0003Zd-EO; Tue, 12 Feb 2019 08:32:14 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+	id 1gtTVE-0003sC-Ai; Tue, 12 Feb 2019 08:33:16 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtTU7-0003Uo-FL
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:32:11 +0000
-Received: by mail-ot1-x342.google.com with SMTP id b3so3064282otp.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 00:32:06 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=r/MtKpa4761DXWQUhuz6Dd1LL8SOhaerQOxx15a6k3g=;
- b=TR0xj5P7yc2Csi1UPes3wPhR18oWs/tTD5xusancZlJtjcak9JrNv0A9kUXWXchV1m
- 3o8i1HU5HLMd5QLkEF5kkQkS6CfLROEFBDp+7dCJutSOZsPPgR/aaXfLm/fn4vhClJXQ
- huUfRBaGKUZWKpgYbgJG0YvuxGroDDBZraRNO62iqepOt47Dx0fY7A5GJps/rK+5fwds
- 0SGkuTXTMgOHkzTHEziOVy6H8LOL0u9yP8wwKxDrBkIgtCX2gT93T3/4MgRpMQow/kpe
- FjLYoyr3UPwws/C6NUz7Bv3jgicNjqHfSdQPS/oNm+tkrMwaHIFcqS+NAaajooPpEfdm
- AJ9g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=r/MtKpa4761DXWQUhuz6Dd1LL8SOhaerQOxx15a6k3g=;
- b=VRdQEyrRIaXIprEZnCe4fZ0G0SBOBFefudiwh0pKTsSsI8lB7xfFzKBuND0EBvbRX4
- 2r72v3RxgCTjPTC/x2qV03nevUN+nuGmjMjyyLeVVzmRS5CSoP5tod/qx5qQWEhNYXMd
- mY5/mpENquE/2Nu+2eHSdbPgCIl97uXAWfBFzJ7jHYTedYBavOx1oi7dQCiYrl6qy+Gt
- nnes/xq3w9QCLEQuhEvbY9Q9SWqoO2vYO/OTf24guhlSha2KhguE0v+MlhdSe1FXAnuc
- ZLxIF73wN6cFEyLjLkVfjIqBuFaS6tuHyQOSbmqI91xeCDq0koo1FiL5vkzU3TYveT9C
- 0NKQ==
-X-Gm-Message-State: AHQUAubgPT4ogLmz2kFtYaiDXCdpr1fGz2jYeaFiENTc810kPj+reahI
- VUtg6u8a/aypkmAgldmtr3w+GeO5vRwn7v5SiolKGg==
-X-Google-Smtp-Source: AHgI3Ia+dhS3kqkHVI512MvgSHV+MHbl80BetH5wNP878OMvJJ7YK/nA58fNKqSAcWSETd7fKODREoVbgxQP2Tg+cEE=
-X-Received: by 2002:a9d:6191:: with SMTP id g17mr2680441otk.56.1549960326066; 
- Tue, 12 Feb 2019 00:32:06 -0800 (PST)
-MIME-Version: 1.0
+ id 1gtTVB-0003rs-IK
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:33:14 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C8W4cN032279;
+ Tue, 12 Feb 2019 02:32:04 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549960324;
+ bh=Axvh0Rq6fFXHZYgk8AwVcglhNQjlBrZKQRI16zrgGF8=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=GUTAM4/9Q70LYSEFNj8H/lNYHj3TS0jy6uYkGo4c8jPXvLgjXjwp6XSi4snvc5wOv
+ wC/4U+tB27UirlhfvKDVhuhoKSPXN07Kj6EUVhgns86nxSdwGjiozCneClc3ubrzrA
+ bnCbmbP5KAJVIR+bG1ig6bEj/j1bGHvq6gF1RqQE=
+Received: from DLEE115.ent.ti.com (dlee115.ent.ti.com [157.170.170.26])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C8W41P006214
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 12 Feb 2019 02:32:04 -0600
+Received: from DLEE101.ent.ti.com (157.170.170.31) by DLEE115.ent.ti.com
+ (157.170.170.26) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
+ Feb 2019 02:32:03 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE101.ent.ti.com
+ (157.170.170.31) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 12 Feb 2019 02:32:03 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C8VxVN028341;
+ Tue, 12 Feb 2019 02:32:00 -0600
+Subject: Re: [RESEND PATCH v2 08/33] ARM: davinci: make irqs.h a local header
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
 References: <20190211122606.8662-1-brgl@bgdev.pl>
- <a333fac0-955e-d04a-6076-42a5b6edda34@ti.com>
-In-Reply-To: <a333fac0-955e-d04a-6076-42a5b6edda34@ti.com>
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Date: Tue, 12 Feb 2019 09:31:55 +0100
-Message-ID: <CAMpxmJWZoPkM7LW8HvVi2SRP5097f9YTnbEZMAXpbM69JHG8fg@mail.gmail.com>
-Subject: Re: [RESEND PATCH v2 00/33] ARM: davinci: modernize the irq support
-To: Sekhar Nori <nsekhar@ti.com>
+ <20190211122606.8662-9-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <5bd7552d-a6fc-9701-beb2-5e76a295d635@ti.com>
+Date: Tue, 12 Feb 2019 14:01:59 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190211122606.8662-9-brgl@bgdev.pl>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_003207_536687_065C7DC1 
-X-CRM114-Status: GOOD (  14.45  )
+X-CRM114-CacheID: sfid-20190212_003313_641990_AC9857F6 
+X-CRM114-Status: GOOD (  13.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,36 +92,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Lechner <david@lechnology.com>, Kevin Hilman <khilman@kernel.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Bartosz Golaszewski <brgl@bgdev.pl>,
- LKML <linux-kernel@vger.kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- arm-soc <linux-arm-kernel@lists.infradead.org>,
- Jason Cooper <jason@lakedaemon.net>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-d3QuLCAxMiBsdXQgMjAxOSBvIDA5OjI0IFNla2hhciBOb3JpIDxuc2VraGFyQHRpLmNvbT4gbmFw
-aXNhxYIoYSk6Cj4KPiBPbiAxMS8wMi8xOSA1OjU1IFBNLCBCYXJ0b3N6IEdvbGFzemV3c2tpIHdy
-b3RlOgo+ID4gRnJvbTogQmFydG9zeiBHb2xhc3pld3NraSA8YmdvbGFzemV3c2tpQGJheWxpYnJl
-LmNvbT4KPiA+Cj4gPiBOT1RFOiByZXNlbmRpbmcgZHVlIHRvIG1pc3NpbmcgaXJxY2hpcCBtYWlu
-dGFpbmVycyBpbiBDYwo+ID4KPiA+IFRoaXMgc2VyaWVzIHBvcnRzIHRoZSBkYXZpbmNpIHBsYXRm
-b3JtIHRvIHVzaW5nIFNQQVJTRV9JUlEsIGNsZWFucyB1cAo+ID4gdGhlIGlycWNoaXAgZHJpdmVy
-cyBhbmQgbW92ZXMgdGhlbSBvdmVyIHRvIGRyaXZlcnMvaXJxY2hpcC4KPiA+Cj4gPiBUaGUgc2Vy
-aWVzIGNhbiBiZSBsb2dpY2FsbHkgc3BsaXQgaW50byBmb3VyIHBhcnRzLiBUaGUgZmlyc3QgKDEt
-OCkgYWltcwo+ID4gYXQgaW50cm9kdWNpbmcgc3VwcG9ydCBmb3IgU1BBUlNFX0lSUS4gSXQgY29u
-dGFpbnMgYSBjb3VwbGUgY2hhbmdlcwo+ID4gcmVxdWlyZWQgZm9yIHRoYXQgZnVuY3Rpb25hbGl0
-eSBhbmQgdGhlIGZpbmFsIHBhdGNoIGFjdHVhbGx5IHNlbGVjdGluZwo+ID4gaXQuCj4gPgo+ID4g
-U2Vjb25kIHBhcnQgKDktMTkpIG1ha2VzIHRoZSBhaW50YyBkcml2ZXIgc3VpdGFibGUgZm9yIGRy
-aXZlcnMvaXJxY2hpcAo+ID4gYW5kIGV2ZW50dWFsbHkgbW92ZXMgaXQgb3ZlciB0aGVyZS4KPiA+
-Cj4gPiBQYXJ0IDMgKDIwLTMyKSBkb2VzIHRoZSBzYW1lIGZvciB0aGUgY3AtaW50YyBkcml2ZXIu
-Cj4gPgo+ID4gTGFzdCBwYXRjaCByZW1vdmVzIHVubmVjZXNzYXJ5IGNvZGUuCj4gPgo+ID4gVGhl
-IHNlcmllcyBoYXMgYmVlbiB0ZXN0ZWQgb24gZGE4NTAtbGNkayAoZm9yIGNwLWludGMpIGFuZAo+
-ID4gZG0zNjUtZXZtIChmb3IgYWludGMpLgo+Cj4gVGhlcmUgaXMgYnVpbGQgYnJlYWthZ2UgaW4g
-ZHJpdmVycy9pbnB1dC9rZXlib2FyZC9kYXZpbmNpX2tleXNjYW4uYwo+IGFmdGVyIHRoaXMgc2Vy
-aWVzIGR1ZSB0byA8bWFjaC9pcnFzLmg+IHJlbW92YWwuCj4KPiBUaGFua3MsCj4gU2VraGFyCgpU
-aGFua3MsIEknbGwgZml4IHRoYXQuCgpCYXJ0CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1h
-cm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcv
-bWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On 11/02/19 5:55 PM, Bartosz Golaszewski wrote:
+> diff --git a/arch/arm/mach-davinci/usb.c b/arch/arm/mach-davinci/usb.c
+> index 9d4a58a3113a..cde72ba35dc3 100644
+> --- a/arch/arm/mach-davinci/usb.c
+> +++ b/arch/arm/mach-davinci/usb.c
+> @@ -5,13 +5,14 @@
+>  #include <linux/init.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/dma-mapping.h>
+> -
+> +#include <linux/platform_data/usb-davinci.h>
+>  #include <linux/usb/musb.h>
+>  
+>  #include <mach/common.h>
+> -#include <mach/irqs.h>
+>  #include <mach/cputype.h>
+> -#include <linux/platform_data/usb-davinci.h>
+> +
+> +
+
+Drop one extra empty line here.
+
+> +#include "irqs.h"
+
+Thanks,
+Sekhar
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
