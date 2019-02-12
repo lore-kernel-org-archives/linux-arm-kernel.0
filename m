@@ -2,69 +2,52 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-13.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25EDCC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:03:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBFC4C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:04:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EBC8F2084E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:03:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C1DDC2229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 18:04:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cRhbvZlo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBC8F2084E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EygN4b7y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C1DDC2229F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bjm3MoZShZlEyUEij9LBuhuoChinK7Mc+iF7NCzmLD0=; b=cRhbvZlo4lG2IB
-	2xZxbiZZy65kk47eykEAh6AXlJEZhshEGR7zDJwZ7ogCv1CwMdF24O+eXJ+xuYelFm7HDYUu7aWIW
-	t1SFNbQqdxhWlCgFe6yNFh88ifnUa8E1ZNBoDcY48mJhaJKTY91/bdyjncTpnb1fNaLiV29S1Abk4
-	rG7BfSPaEkCrAaIVnthJJrQ9K9TQNdNNSBTyb5IeV5EVfUP40UiPkSGrDqRcKXNvH2lgVx1wx0UE7
-	yWKsaV7fhFVdBm4flTT67NTOfAHe7k4P9cRfz2f3ywym/6Uis0i0ILl0MvBw6K8Q56rqrrSGprRha
-	KaLP3CLedv/vS02/fgRg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=2LBvA3Ya2v/6ilOnBHwPcUMMnFvjNa4qaJjBICex4j8=; b=EygN4b7y5iKcDE
+	UlTNdF3kb99q++QnHQ8vRIoGKR+0U5WRwuKMXxSjdWClfrlSf+VFOzuEgg5wGym5ETG515xOzdtA4
+	6IyPmtjXVfDZe9IBSAmVupu7Og2zpa9Ivhn570HS4W1Nkl2Cxy/Gn5LqWleA8JlVwqcP1WEt8blX/
+	58nXByMKF5yxV8y3ZXnZUsLSB3Zd5srrOPGsJELsiwwKD8UJ+eVTbz7XZPodIHIKMGJ9GKOsTFDFD
+	IZdS/dBNWOiwwltesaymmsRveTXfQpxugD/kXsXhtZoAkDJZYnORbM/UuSZUWsxX/Q0P7U7eGo3kC
+	0PyoDyiVPWp5f7Kn3XBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtcOd-0003Jd-8V; Tue, 12 Feb 2019 18:03:03 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtcO9-00030d-Rh
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 18:02:46 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 70F181596;
- Tue, 12 Feb 2019 10:02:31 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.78])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- BDEF33F675; Tue, 12 Feb 2019 10:02:26 -0800 (PST)
-Date: Tue, 12 Feb 2019 18:02:24 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Evgenii Stepanov <eugenis@google.com>
-Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
-Message-ID: <20190212180223.GD199333@arrakis.emea.arm.com>
-References: <cover.1544445454.git.andreyknvl@google.com>
- <20181210143044.12714-1-vincenzo.frascino@arm.com>
- <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
- <20181212150230.GH65138@arrakis.emea.arm.com>
- <CAAeHK+zxYJDJ7DJuDAOuOMgGvckFwMAoVUTDJzb6MX3WsXhRTQ@mail.gmail.com>
- <20181218175938.GD20197@arrakis.emea.arm.com>
- <20181219125249.GB22067@e103592.cambridge.arm.com>
- <9bbacb1b-6237-f0bb-9bec-b4cf8d42bfc5@arm.com>
- <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
+	id 1gtcPs-00044p-Bo; Tue, 12 Feb 2019 18:04:20 +0000
+Received: from [190.15.121.82] (helo=quaco.ghostprotocols.net)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtcPl-000441-OZ; Tue, 12 Feb 2019 18:04:15 +0000
+Received: by quaco.ghostprotocols.net (Postfix, from userid 1000)
+ id 42F0A410D5; Tue, 12 Feb 2019 15:04:08 -0300 (-03)
+Date: Tue, 12 Feb 2019 15:04:08 -0300
+From: Arnaldo Carvalho de Melo <acme@kernel.org>
+To: Mathieu Poirier <mathieu.poirier@linaro.org>
+Subject: HEADS UP: disable building with opencsd by default
+Message-ID: <20190212180408.GL3269@kernel.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
+X-Url: http://acmel.wordpress.com
 User-Agent: Mutt/1.10.1 (2018-07-13)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_100240_271591_86E003B1 
-X-CRM114-Status: GOOD (  47.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,208 +59,186 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>,
- "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
- Will Deacon <will.deacon@arm.com>, Kostya Serebryany <kcc@google.com>,
- "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
- Chintan Pandya <cpandya@codeaurora.org>,
- Vincenzo Frascino <vincenzo.frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
- Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
- Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- Dave Martin <Dave.Martin@arm.com>, Kees Cook <keescook@chromium.org>,
- Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Andrey Konovalov <andreyknvl@google.com>,
- Kevin Brodsky <kevin.brodsky@arm.com>,
- Alexander Viro <viro@zeniv.linux.org.uk>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Linux Memory Management List <linux-mm@kvack.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- LKML <linux-kernel@vger.kernel.org>,
- Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
- Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: Kim Phillips <kim.phillips@arm.com>, Jiri Olsa <jolsa@kernel.org>,
+ Suzuki Poulouse <suzuki.poulose@arm.com>,
+ Peter Zijlstra <peterz@infradead.org>, Mike Leach <mike.leach@arm.com>,
+ Namhyung Kim <namhyung@kernel.org>, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 12:32:55PM -0800, Evgenii Stepanov wrote:
-> On Mon, Feb 11, 2019 at 9:28 AM Kevin Brodsky <kevin.brodsky@arm.com> wrote:
-> > On 19/12/2018 12:52, Dave Martin wrote:
-> > > Really, the kernel should do the expected thing with all "non-weird"
-> > > memory.
-> > >
-> > > In lieu of a proper definition of "non-weird", I think we should have
-> > > some lists of things that are explicitly included, and also excluded:
-> > >
-> > > OK:
-> > >       kernel-allocated process stack
-> > >       brk area
-> > >       MAP_ANONYMOUS | MAP_PRIVATE
-> > >       MAP_PRIVATE mappings of /dev/zero
-> > >
-> > > Not OK:
-> > >       MAP_SHARED
-> > >       mmaps of non-memory-like devices
-> > >       mmaps of anything that is not a regular file
-> > >       the VDSO
-> > >       ...
-> > >
-> > > In general, userspace can tag memory that it "owns", and we do not assume
-> > > a transfer of ownership except in the "OK" list above.  Otherwise, it's
-> > > the kernel's memory, or the owner is simply not well defined.
-> >
-> > Agreed on the general idea: a process should be able to pass tagged pointers at the
-> > syscall interface, as long as they point to memory privately owned by the process. I
-> > think it would be possible to simplify the definition of "non-weird" memory by using
-> > only this "OK" list:
-> > - mmap() done by the process itself, where either:
-> >    * flags = MAP_PRIVATE | MAP_ANONYMOUS
-> >    * flags = MAP_PRIVATE and fd refers to a regular file or a well-defined list of
-> > device files (like /dev/zero)
-> > - brk() done by the process itself
-> > - Any memory mapped by the kernel in the new process's address space during execve(),
-> > with the same restrictions as above ([vdso]/[vvar] are therefore excluded)
+Please see the rationale on the cset, this test-all.c thing was done by
+Ingo long ago to speed up the build of the tools by checking first if
+the common set of libraries is present, and because this isn't being
+properly checked I left several cases pass, like opencsd, libaio and
+libcrypto, that I'm working as well and have fixes in my perf/core
+branch.
 
-Sounds reasonable.
+- Arnaldo
 
-> > >   * Userspace should set tags at the point of allocation only.
-> >
-> > Yes, tags are only supposed to be set at the point of either allocation or
-> > deallocation/reallocation. However, allocators can in principle be nested, so an
-> > allocator could  take a region allocated by malloc() as input and subdivide it
-> > (changing tags in the process). That said, this suballocator must not free() that
-> > region until all the suballocations themselves have been freed (thereby restoring the
-> > tags initially set by malloc()).
-> >
-> > >   * If you don't know how an object was allocated, you cannot modify the
-> > >     tag, period.
-> >
-> > Agreed, allocators that tag memory can only operate on memory with a well-defined
-> > provenance (for instance anonymous mmap() or malloc()).
-> >
-> > >   * A single C object should be accessed using a single, fixed pointer tag
-> > >     throughout its entire lifetime.
-> >
-> > Agreed. Allocators themselves may need to be excluded though, depending on how they
-> > represent their managed memory.
-> >
-> > >   * Tags can be changed only when there are no outstanding pointers to
-> > >     the affected object or region that may be used to access the object
-> > >     or region (i.e., if the object were allocated from the C heap and
-> > >     is it safe to realloc() it, then it is safe to change the tag; for
-> > >     other types of allocation, analogous arguments can be applied).
-> >
-> > Tags can only be changed at the point of deallocation/reallocation. Pointers to the
-> > object become invalid and cannot be used after it has been deallocated; memory
-> > tagging allows to catch such invalid usage.
+commit b7213083e3f3d69fffb5229034b3ac3ca9d41038
+Author: Arnaldo Carvalho de Melo <acme@redhat.com>
+Date:   Tue Feb 12 14:37:15 2019 -0300
 
-All the above sound well but that's mostly a guideline on what a C
-library can do. It doesn't help much with defining the kernel ABI.
-Anyway, it's good to clarify the use-cases.
+    perf coresight: Do not test for libopencsd by default
+    
+    Since it is not yet that generally available, avoid testing for the
+    presence of libcoresight in the fast path test-all.bin feature test.
+    
+      # dnf search opencsd
+      No matches found.
+      # dnf search OpenCSD
+      No matches found.
+      # cat /etc/fedora-release
+      Fedora release 29 (Twenty Nine)
+      #
+    
+    I.e. right now, in my system test-all.bin is failing all the time since
+    Fedora29 doesn't have libopencsd available:
+    
+      $ cat /tmp/build/perf/feature/test-all.make.output
+      In file included from test-all.c:174:
+      test-libopencsd.c:2:10: fatal error: opencsd/c_api/opencsd_c_api.h: No such file or directory
+       #include <opencsd/c_api/opencsd_c_api.h>
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      compilation terminated.
+    
+    See:
+    
+      6ab2b762befd ("perf build: Disable libbabeltrace check by default")
+    
+    For the rationale, as soon as libopencsd becomes more generally packaged
+    and available, we do the same thing we did with babeltrace, enabling it
+    by default, as done in:
+    
+      24787afbcd01 ("perf tools: Enable LIBBABELTRACE by default")
+    
+    For now, to explicitely ask for opencsd, make sure you have it installed
+    and use:
+    
+       make -C tools/perf CORESIGHT=1
+    
+    The feature test output will be there as an empty file:
+    
+      $ ls -la /tmp/build/perf/feature/test-libopencsd.make.output
+    
+    Because the binary used for the feature check was successfully built:
+    
+      $ ls -la /tmp/build/perf/feature/test-libopencsd.bin
+      -rwxrwxr-x. 1 acme acme 18336 Feb 12 14:49 /tmp/build/perf/feature/test-libopencsd.bin
+      $ ldd /tmp/build/perf/feature/test-libopencsd.bin
+            linux-vdso.so.1 (0x00007fffe18cc000)
+            libopencsd_c_api.so.0 => /lib64/libopencsd_c_api.so.0 (0x00007fb8e67f6000)
+            libopencsd.so.0 => /lib64/libopencsd.so.0 (0x00007fb8e676f000)
+            libc.so.6 => /lib64/libc.so.6 (0x00007fb8e65a9000)
+            libstdc++.so.6 => /lib64/libstdc++.so.6 (0x00007fb8e6411000)
+            libm.so.6 => /lib64/libm.so.6 (0x00007fb8e628d000)
+            libgcc_s.so.1 => /lib64/libgcc_s.so.1 (0x00007fb8e6272000)
+            /lib64/ld-linux-x86-64.so.2 (0x00007fb8e6828000)
+      $
+    
+    And the resulting perf binary will be linked with it:
+    
+      -rw-rw-r--. 1 acme acme 0 Feb 12 14:49 /tmp/build/perf/feature/test-libopencsd.make.output
+      $ ldd ~/bin/perf | grep opencsd
+            libopencsd_c_api.so.0 => /lib64/libopencsd_c_api.so.0 (0x00007fd43097f000)
+            libopencsd.so.0 => /lib64/libopencsd.so.0 (0x00007fd4308f8000)
+      $
+    
+    To make sure this gets built before pushing things upstream I have a
+    ubuntu:19.04-x-arm64 container that has:
+    
+      [root@quaco x-arm64]# grep CORESIGHT Dockerfile
+      ENV EXTRA_MAKE_ARGS=CORESIGHT=1
+      [root@quaco x-arm64]#
+    
+    So that I always build with libopencsd before pushing things upstream.
+    
+    Cc: Adrian Hunter <adrian.hunter@intel.com>
+    Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+    Cc: Jiri Olsa <jolsa@kernel.org>
+    Cc: Kim Phillips <kim.phillips@arm.com>
+    Cc: linux-arm-kernel@lists.infradead.org
+    Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+    Cc: Mike Leach <mike.leach@arm.com>
+    Cc: Namhyung Kim <namhyung@kernel.org>
+    Cc: Peter Zijlstra <peterz@infradead.org>
+    Cc: Suzuki Poulouse <suzuki.poulose@arm.com>
+    Link: https://lkml.kernel.org/n/tip-20vyy39jw9jgrijesi30fgox@git.kernel.org
+    Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 
-> > >   * When the kernel dereferences a pointer on userspace's behalf, it
-> > >     shall behave equivalently to userspace dereferencing the same pointer,
-> > >     including use of the same tag (where passed by userspace).
-> > >
-> > >   * Where the pointer tag affects pointer dereference behaviour (i.e.,
-> > >     with hardware memory colouring) the kernel makes no guarantee to
-> > >     honour pointer tags correctly for every location a buffer based on a
-> > >     pointer passed by userspace to the kernel.
-> > >
-> > >     (This means for example that for a read(fd, buf, size), we can check
-> > >     the tag for a single arbitrary location in *(char (*)[size])buf
-> > >     before passing the buffer to get_user_pages().  Hopefully this could
-> > >     be done in get_user_pages() itself rather than hunting call sites.
-> > >     For userspace, it means that you're on your own if you ask the
-> > >     kernel to operate on a buffer than spans multiple, independently-
-> > >     allocated objects, or a deliberately striped single object.)
-> >
-> > I think both points are reasonable. It is very valuable for the kernel to access
-> > userspace memory using the user-provided tag, because it enables kernel accesses to
-> > be checked in the same way as user accesses, allowing to detect bugs that are
-> > potentially hard to find. For instance, if a pointer to an object is passed to the
-> > kernel after it has been deallocated, this is invalid and should be detected.
-> > However, you are absolutely right that the kernel cannot *guarantee* that such a
-> > check is carried out for the entire memory range (or in fact at all); it should be a
-> > best-effort approach.
-> 
-> It would also be valuable to narrow down the set of "relaxed" (i.e.
-> not tag-checking) syscalls as reasonably possible. We would want to
-> provide tag-checking userspace wrappers for any important calls that
-> are not checked in the kernel. Is it correct to assume that anything
-> that goes through copy_from_user  / copy_to_user is checked?
-
-I lost track of the context of this thread but if it's just about
-relaxing the ABI for hwasan, the kernel has no idea of the compiler
-generated structures in user space, so nothing is checked.
-
-If we talk about tags in the context of MTE, than yes, with the current
-proposal the tag would be checked by copy_*_user() functions.
-
-> > >   * The kernel shall not extend the lifetime of user pointers in ways
-> > >     that are not clear from the specification of the syscall or
-> > >     interface to which the pointer is passed (and in any case shall not
-> > >     extend pointer lifetimes without good reason).
-> > >
-> > >     So no clever transparent caching between syscalls, unless it _really_
-> > >     is transparent in the presence of tags.
-> >
-> > Do you have any particular case in mind? If such caching is really valuable, it is
-> > always possible to access the object while ignoring the tag. For sure, the
-> > user-provided tag can only be used during the syscall handling itself, not
-> > asynchronously later on, unless otherwise specified.
-> 
-> For aio* operations it would be nice if the tag was checked at the
-> time of the actual userspace read/write, either instead of or in
-> addition to at the time of the system call.
-
-With aio* (and synchronous iovec-based syscalls), the kernel may access
-the memory while the corresponding user process is scheduled out. Given
-that such access is not done in the context of the user process (and
-using the user VA like copy_*_user), the kernel cannot handle potential
-tag faults. Moreover, the transfer may be done by DMA and the device
-does not understand tags.
-
-I'd like to keep tags as a property of the pointer in a specific virtual
-address space. The moment you convert it to a different address space
-(e.g. kernel linear map, physical address), the tag property is stripped
-and I don't think we should re-build it (and have it checked).
-
-> > >   * For purposes other than dereference, the kernel shall accept any
-> > >     legitimately tagged pointer (according to the above rules) as
-> > >     identifying the associated memory location.
-> > >
-> > >     So, mprotect(some_page_aligned_object, ...); is valid irrespective
-> > >     of where page_aligned_object() came from.  There is no implicit
-> > >     derefence by the kernel here, hence no tag check.
-> > >
-> > >     The kernel does not guarantee to work correctly if the wrong tag
-> > >     is used, but there is not always a well-defined "right" tag, so
-> > >     we can't really guarantee to check it.  So a pointer derived by
-> > >     any reasonable means by userspace has to be treated as equally
-> > >     valid.
-> >
-> > This is a disputed point :) In my opinion, this is the the most reasonable approach.
-> 
-> Yes, it would be nice if the kernel explicitly promised, ex.
-> mprotect() over a range of differently tagged pages to be allowed
-> (i.e. address tag should be unchecked).
-
-I don't think mprotect() over differently tagged pages was ever a
-problem. I originally asked that mprotect() and friends do not accept
-tagged pointers since these functions deal with memory ranges rather
-than dereferencing such pointer (the reason being minimal kernel
-changes). However, given how complicated it is to specify an ABI, I came
-to the conclusion that a pointer passed to such function should be
-allowed to have non-zero top byte. It would be the kernel's
-responsibility to strip it out as appropriate.
-
--- 
-Catalin
+diff --git a/tools/build/Makefile.feature b/tools/build/Makefile.feature
+index 5467c6bf9ceb..bb9dca65eb5f 100644
+--- a/tools/build/Makefile.feature
++++ b/tools/build/Makefile.feature
+@@ -70,7 +70,6 @@ FEATURE_TESTS_BASIC :=                  \
+         sched_getcpu			\
+         sdt				\
+         setns				\
+-        libopencsd			\
+         libaio
+ 
+ # FEATURE_TESTS_BASIC + FEATURE_TESTS_EXTRA is the complete list
+@@ -84,6 +83,7 @@ FEATURE_TESTS_EXTRA :=                  \
+          libbabeltrace                  \
+          libbfd-liberty                 \
+          libbfd-liberty-z               \
++         libopencsd                     \
+          libunwind-debug-frame          \
+          libunwind-debug-frame-arm      \
+          libunwind-debug-frame-aarch64  \
+diff --git a/tools/build/feature/test-all.c b/tools/build/feature/test-all.c
+index 20cdaa4fc112..74329957553a 100644
+--- a/tools/build/feature/test-all.c
++++ b/tools/build/feature/test-all.c
+@@ -170,10 +170,6 @@
+ # include "test-setns.c"
+ #undef main
+ 
+-#define main main_test_libopencsd
+-# include "test-libopencsd.c"
+-#undef main
+-
+ #define main main_test_libaio
+ # include "test-libaio.c"
+ #undef main
+@@ -217,7 +213,6 @@ int main(int argc, char *argv[])
+ 	main_test_sched_getcpu();
+ 	main_test_sdt();
+ 	main_test_setns();
+-	main_test_libopencsd();
+ 	main_test_libaio();
+ 
+ 	return 0;
+diff --git a/tools/perf/Makefile.config b/tools/perf/Makefile.config
+index b441c88cafa1..e3bf29f942a8 100644
+--- a/tools/perf/Makefile.config
++++ b/tools/perf/Makefile.config
+@@ -386,7 +386,8 @@ ifeq ($(feature-setns), 1)
+   $(call detected,CONFIG_SETNS)
+ endif
+ 
+-ifndef NO_CORESIGHT
++ifdef CORESIGHT
++  $(call feature_check,libopencsd)
+   ifeq ($(feature-libopencsd), 1)
+     CFLAGS += -DHAVE_CSTRACE_SUPPORT $(LIBOPENCSD_CFLAGS)
+     LDFLAGS += $(LIBOPENCSD_LDFLAGS)
+diff --git a/tools/perf/Makefile.perf b/tools/perf/Makefile.perf
+index 09df1c8a4ec9..c2ccc54618d1 100644
+--- a/tools/perf/Makefile.perf
++++ b/tools/perf/Makefile.perf
+@@ -102,7 +102,7 @@ include ../scripts/utilities.mak
+ # When selected, pass LLVM_CONFIG=/path/to/llvm-config to `make' if
+ # llvm-config is not in $PATH.
+ #
+-# Define NO_CORESIGHT if you do not want support for CoreSight trace decoding.
++# Define CORESIGHT if you DO WANT support for CoreSight trace decoding.
+ #
+ # Define NO_AIO if you do not want support of Posix AIO based trace
+ # streaming for record mode. Currently Posix AIO trace streaming is
 
 _______________________________________________
 linux-arm-kernel mailing list
