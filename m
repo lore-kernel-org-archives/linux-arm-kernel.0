@@ -2,76 +2,82 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.7 required=3.0 tests=DKIM_ADSP_ALL,DKIM_INVALID,
-	DKIM_SIGNED,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DBACC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:46:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3A6DC282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:46:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AC9120821
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:46:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B49620821
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:46:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mK3w1GZP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=plaes.org header.i=@plaes.org header.b="Y66Oa5RF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AC9120821
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=plaes.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZxGI6t/x";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="UteXABVN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B49620821
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Wzxo4zAclQfmHWYgL9JuuzvdY4QFPaV7yruBe/b1qOI=; b=mK3w1GZPn35C1W
-	7xR/iBYsM3qdXgzCT10WdBzTwiygRrjgqjJi30GeVYSqEjyrl5HOdtN2LDxibFy0Ah4l5mE8Bn6GM
-	INqUvaXLp2dCt+s4673TiUR1DVAtjde73c5g1nz95tLn6s/ct7udN0Ke4VcdFPWYdyu1XsCi5PY0D
-	DtOe40LHGJElHTpRAvseYoxMF4g23bKpt/SbfqxLsOfkOM9mgMiQkCSVfuqZqfhrA5Aa5m6UQIglx
-	CZu6tzLGjWJMYbbRuELib6wPe1TsNc1tQk7ii+NhrtsnCn2BHOFCO5CuLJo8D2JH0TZtZ1yZ59x20
-	2/tuBrOM5LVdjsdZulng==;
+	List-Owner; bh=GcXdDeHRhIfw0O50lJ3119E19lNgQtlxk5uDU6vaNyo=; b=ZxGI6t/xUDw8H7
+	sQcJbKmVW3OjeGAtqsD+3cFcnYhAzOwrPLGIrPS+YF3XXC7vYBob3prSjkjDok3kUhRWL0YMBpqXH
+	nj9Vd8d3vAJX0pWuhT2HC/5qkJSyAN82I4r0ezsK8d5mwhuhMhvzedS2Pt3CYG9T6I5c+Vu6Etnhd
+	SGEWQjyvq7jgHPYBGr1UIOaPCRZUMc1sUZiH4WoZJ/o4+jH3CdrMcyuWnVVTiTb4pQUITu1DZKiM4
+	QEQXLqb4qfbRemrtMb3SgOZ3BcTKloFzfYYb9HINtcifymHnJmsPK4i6cSEoykSkDjwjWYzyQMIkq
+	2dFv8j6HJ3FyyrlXkOVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtUdV-00043W-JM; Tue, 12 Feb 2019 09:45:53 +0000
-Received: from plaes.org ([188.166.43.21])
+	id 1gtUdx-0004Qr-Eg; Tue, 12 Feb 2019 09:46:21 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtUdR-00042t-G2
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 09:45:51 +0000
-Received: from plaes.org (localhost [127.0.0.1])
- by plaes.org (Postfix) with ESMTPSA id 663D64022E;
- Tue, 12 Feb 2019 09:45:47 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=plaes.org; s=mail;
- t=1549964747; bh=W25nCZmEIHwGCTrzOhdBgd7ZEShM1fhel195A9NUUJ8=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=Y66Oa5RFVOQQLEpwHktWNOQofRWVwvVlE4yIXl0jLqHj+CrSy6KH+C36goAXDu3+H
- 3hDCzZbdv1x+SzKdULFgOOcO+7j8Kd3O+NB1369dHVx4E5Nhd5af1ON2g9hTKCmi0N
- 5Cxc5sWq5pxAoEWdtFIINuXTzTYSH1fWVaFevRV9IgGCPyPoCXnWaDV1XzsrgUn8K3
- ngBcxdfJnvh0CKSh7P2rSlnae0PYccxX/C9h5KDfbuV3GqYi283omzQECukJLIyGpf
- oeQ+0pnI5n8pS39PuSNUsDvh0Xxhlqax4PFnR1Inl0ldeOaFfiAOtRUq4+CXfS4xK2
- qgSmS4YawBs3g==
-Date: Tue, 12 Feb 2019 09:45:46 +0000
-From: Priit Laes <plaes@plaes.org>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [RFC PATCH] clk: sunxi-ng: sun4i: Use CLK_SET_RATE_PARENT for
- mmc2 clock
-Message-ID: <20190212094546.n2w7pffytzdgpx3e@plaes.org>
-References: <20190202155209.31617-1-plaes@plaes.org>
- <20190205094529.t7je4ozzu2b4ornc@flea>
- <CAGb2v673ntXn7MTRhU1uecO9q8_i79e+Ovio=tucd6qFf5L84Q@mail.gmail.com>
- <20190206092000.f46nsn4fw2n4crub@flea>
- <20190206100309.dhkm2l73qzkwgjzg@plaes.org>
- <20190206155227.wbkzvsdgykir4wn5@flea>
- <20190211143552.2uqx6yy53dyv5lbl@plaes.org>
- <20190211153402.s5qij5idvhbtsw2y@flea>
+ id 1gtUdr-0004OY-D7
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 09:46:18 +0000
+Received: by mail-it1-x144.google.com with SMTP id z7so5733359iti.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 01:46:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=05CniVm9PLCTpTi84DDJvIByzSMkdbNsdq0wM1zg6bs=;
+ b=UteXABVNaGCBS/tHUabW/5SZKWfm+IpAFT5pyBZRq/ZiRG4z17DBZB03wEQzqc5pfy
+ bVm76uuUEU84rxjjoAfzt1woJOILw6K2LXLUT+aemcTu1cFeGVAFrxFqfnPkoG9MzXPg
+ +5d4yT8e/rI3UK4IbBIFIm5+2UOvfOdaoT5ls=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=05CniVm9PLCTpTi84DDJvIByzSMkdbNsdq0wM1zg6bs=;
+ b=GK9Jf/L/Da+a6w6vu2DlStdZFjzp138PTE5HO9UqxJMQO0KEDvUTdzGfA2V+AfpOjj
+ LSEn+x7XXOaMEbp6aplOgt4040hX86Caw/+dQ5u8l90kcqpHKbtuRmGUrSXn8TDhuY3t
+ 2rJdEYiEWXV7Xiq5pKYOpdAiPxxshhT9FZev1Q+oy9mZ3+MJj3GormwGJUoEIZ25XPLe
+ q1FdDkClyOUs9HODbQV8hrNW6DG4CjxPFdUy9cneptbw19dATQv+8ubFTrzbBFQ5lY9X
+ qS/XDpmPg1IheGFQ2bPc2S1HnQzUlA9WlL4WDwMSV2Jv3dFhXbez5TNdVYmQB/vUGZA0
+ Jk4g==
+X-Gm-Message-State: AHQUAuZq5hrHUW3Ula/E3nwRnwmnf+i4yMtIWaunv+QYPHb9cgE2BoTD
+ KmGnQ5LVB37QaFABmODzN0tAHZZyxGzt0eoTBt8fYA==
+X-Google-Smtp-Source: AHgI3Ib86k93mfKNJvQH3NjDKtEduAkqTTLeuPW1AiUV7u0STgkVVNdjzLiATWXLCSJoswBvz/LQ91xYDDU8/ZfhBiE=
+X-Received: by 2002:a24:385:: with SMTP id e127mr1350371ite.32.1549964774244; 
+ Tue, 12 Feb 2019 01:46:14 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190211153402.s5qij5idvhbtsw2y@flea>
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <20190201154232.10505-1-jagan@amarulasolutions.com>
+In-Reply-To: <20190201154232.10505-1-jagan@amarulasolutions.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Tue, 12 Feb 2019 15:16:02 +0530
+Message-ID: <CAMty3ZBspvP=qZEK9vaowVq4f5W3Qx2qHkwcuAnCOOjV29=Y_Q@mail.gmail.com>
+Subject: Re: [PATCH v7 00/23] drm/sun4i: Allwinner A64 MIPI-DSI support
+To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
+ Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>, 
+ Michael Turquette <mturquette@baylibre.com>, Rob Herring <robh+dt@kernel.org>, 
+ Mark Rutland <mark.rutland@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_014549_893161_457FF9B5 
-X-CRM114-Status: GOOD (  22.01  )
+X-CRM114-CacheID: sfid-20190212_014615_636860_C531B028 
+X-CRM114-Status: GOOD (  13.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,125 +89,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jernej Skrabec <jernej.skrabec@siol.net>, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- linux-clk <linux-clk@vger.kernel.org>,
+Cc: devicetree <devicetree@vger.kernel.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 04:34:02PM +0100, Maxime Ripard wrote:
-> On Mon, Feb 11, 2019 at 02:35:52PM +0000, Priit Laes wrote:
-> > On Wed, Feb 06, 2019 at 04:52:27PM +0100, Maxime Ripard wrote:
-> > > Hi,
-> > > 
-> > > On Wed, Feb 06, 2019 at 10:03:09AM +0000, Priit Laes wrote:
-> > > > > > I'm concerned for other users of the PLL-PERIPH clock. AFAIK
-> > > > > > all of them, except the HRTIMER, expect the clock rate to stay
-> > > > > > the same and not change underneath them. And SATA expects it to
-> > > > > > be at 600 MHz, as the datasheet says. And while it may not directly
-> > > > > > apply to the LIME2, eMMC on newer SoCs / boards run at the slightly
-> > > > > > reduced rate of 50 MHz just fine.
-> > > > > > 
-> > > > > > In the commit in question, clocks without CLK_SET_RATE_PARENT
-> > > > > > should be using the old code (now in the if conditional block),
-> > > > > > i.e. the behavior should not have changed.
-> > > > > > 
-> > > > > > I don't think this actually "fixes" whatever bug was introduced,
-> > > > > > but only papers over the issue, and possible introduces further
-> > > > > > issues for other users.
-> > > > > 
-> > > > > You're right, I've overlooked that it was pll-periph being
-> > > > > affected. I've dropped it for now.
-> > > > 
-> > > > Any ideas what could be done. I currently have no time to debug it,
-> > > > but it affects existing systems.
-> > > 
-> > > I can't find what would change with that commit either if the flag
-> > > isn't set, so looking at the register state before and after that
-> > > commit would help I guess?
-> > 
-> > Register dump without the patch:
-> > 
-> > $ busybox devmem 0x01c20090
-> > 0x0250030E
-> > 
-> > pll-ddr-base     2 2 0   768000000          0     0  50000
-> >    pll-ddr-other 1 1 0   768000000          0     0  50000
-> >       mmc2       3 3 0    51200000          0     0  50000
-> > 
-> > Register dump with patch applied, booted from mmc0 and after mounting emmc:
-> > 
-> > $ busybox devmem 0x01c20090
-> > 0x8140020B
-> > 
-> > pll-periph-base  3 3 0  1200000000          0     0  50000
-> >    pll-periph    6 6 0   600000000          0     0  50000
-> >       mmc2       3 3 0    50000000          0     0  50000
-> 
-> I meant the whole Clock controller, ideally a diff between the two
-> states would be great.
+On Fri, Feb 1, 2019 at 9:12 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> Here is next version changes for Allwinner A64 MIPI-DSI support
+>
+> This series grouped the changes like previous version[1] with different
+> sets to support three different panels types that can fit into the DSI
+> controller.
+>
+> set:1, for 4-lane, burst mode support
+> - patch 0001: 0009, DSI controller changes that support burst mode.
+>
+> set:2, for A64 DSI support
+> - patch 0010: tcon dclk divider computation based on A64 BSP.
+> - patch 0011: 0017, Allwinner A64 DSI controller changes.
+>
+> set:3, enable 4-lane burst mode panel:
+> - patch 0018: Overlay patch that enable Feiyang FY07024DI26A30-D
+>   burst mode panel on Pine64-LTS
+>
+> set:4, enable 4-lane video mode panel:
+> - patch 0019: msg type MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM support
+> - patch 0020: Overlay patch that enable Bananapi S070WV20-CT16 ICN6211
+>   panel on Bananapi M64
+>
+> set:5, enable 2-lane video mode panel:
+> - patch 0021, 0022: DSI hfp and hbp timings fixes
+> - patch 0023: Enable Techstar TS8550B panel on Amarula A64-Relic
+>
+> Changes for v7:
+> - moved vcc-dsi binding to required filed.
+> - drop quotes on fallback dphy bindings.
+> - drop min_rate clock pll-mipi patches.
+> - introduce dclk divider computation as like A64 BSP.
+> - add A64 DSI quark patches.
+> - fixed A64 DSI pipeline.
+> - add proper commit messages.
+> - collect Merlijn Wajer Tested-by credits.
+> Changes for v6:
+> - dropped unneeded changes, patches
+> - fixed all burst mode patches as per previous version comments
+> - rebase on master
+> - update proper commit message
+> - dropped unneeded comments
+> - order the patches that make review easy
+> Changes for v5:
+> - collect Rob, Acked-by
+> - droped "Fix VBP size calculation" patch
+> - updated vblk timing calculation.
+> - droped techstar, bananapi dsi panel drivers which may require
+>   bridge or other setup. it's under discussion.
+> Changes for v4:
+> - droppoed untested CCU_FEATURE_FIXED_POSTDIV check code in
+>   nkm min, max rate patches
+> - create two patches for "Add Allwinner A64 MIPI DSI support"
+>   one for has_mod_clk quirk and other one for A64 support
+> - use existing driver code construct for hblk computation
+> - dropped "Increase hfp packet overhead" patch [2], though BSP added
+>   this but we have no issues as of now.
+>   (no issues on panel side w/o this change)
+> - create separate function for vblk computation
+> - enable vcc-dsi regulator in dsi_runtime_resume
+> - collect Rob, Acked-by
+> - update MAINTAINERS file for panel drivers
+> - cleanup commit messages
+> - fixed checkpatch warnings/errors
+>
+> [1] https://patchwork.kernel.org/cover/10779893/
+>
+> Any inputs?
+> Jagan.
+>
+> Jagan Teki (23):
+>   drm/sun4i: sun6i_mipi_dsi: Compute burst mode loop N1 instruction
+>     delay
+>   drm/sun4i: sun6i_mipi_dsi: Support instruction loop selection
+>   drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
+>   drm/sun4i: sun6i_mipi_dsi: Simplify drq to support all modes
+>   drm/sun4i: tcon: Export get tcon0 routine
+>   drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during dsi_bind
+>   drm/sun4i: sun6i_mipi_dsi: Setup burst mode
+>   drm/sun4i: sun6i_mipi_dsi: Enable trail_inv and trail_fill controls
+>   drm/sun4i: sun6i_mipi_dsi: Enable HBP, HSA_HSE for burst mode
 
-I have uploaded the raw files here:
-https://gist.github.com/plaes/3465386d8aa55fa70fd3997310719828
-
-The test scenario is following:
-
-1) Boot via FEL (u-boot + zImage + boot.scr) and load root fs from
-sd-card / mmc0
-
-2) ssh into machine and dump register space
-
-- no-patch-before-mount.dump
-- no-patch-post-mount.dump
-
-3) Attempt to mount emmc / mmc2 and dump ccu register space
-- with-patch-before-mount.dump
-- with-patch-post-mount.dump
-
-
-Firstly, I noticed that first 0x200 bits are mirrored:
-0x1c20000 = 0x1c20200
-0x1c20004 = 0x1c20204
-...
-01xc201fc = 0x1c203fc
-
-And here come the diffs:
-
-a) Diff before mount vs patch / reverted patch:
-
-mmc2:
-  -0x1c20090: 0x0250030E
-  +0x1c20090: 0x0140020B
-unk1: (mirrored ahb?, this one's flaky due to mmc runtime suspend)
-  -0x1c20260: 0x1200C17F
-  +0x1c20260: 0x1200C07F
-unk2: (mirrored mmc2?)
-  -0x1c20290: 0x0250030E
-  +0x1c20290: 0x0140020B
-
-b) Diff post-mount vs patch / reverted patch:
-
-ahb (this one's flaky, possibly due to runtime suspend for mmc):
-  -0x1c20060: 0x1200C07F or 0x1200C17F
-  +0x1c20060: 0x1200C47F
-mmc2:
-  -0x1c20090: 0x0250030E
-  +0x1c20090: 0x8140020B
-unk1:
-  -0x1c20260: 0x1200C07F
-  +0x1c20260: 0x1200C47F
-unk3:
-  -0x1c20288: 0x8140030B
-  +0x1c20288: 0x0140030B
-unk2: (mirrored mmc2?)
-  -0x1c20290: 0x0250030E
-  +0x1c20290: 0x8140020B
-
-
+Can you pick these burst changes which are generic to all SoCs. and
+reset will send once we decide the tcon clock.
 
 _______________________________________________
 linux-arm-kernel mailing list
