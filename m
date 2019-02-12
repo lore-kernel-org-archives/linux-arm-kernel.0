@@ -7,60 +7,64 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80256C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 12:21:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0520DC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 12:22:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48482214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 12:21:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6373214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 12:22:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pVWHAEm4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="qk71+6Dh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48482214DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="onFI88iW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="oqT+jukk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6373214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ghCW0WSVfxXOqTYEkusXE7YzcgdKElGlL4QO9I7uVI4=; b=pVWHAEm4VMX+dv
-	+jpM3OJI6czUoYRv+m9YCxrI4CX0hDNqyXdPbg9p2PulaAp2ek5M1GpsqH1gJB9STEn3CGHmgWYFa
-	reknMeqYJCrmq1/KmHv7IjsYMJCY7sqEw7sni8pBMAIfywHEuAm+uRdYG54Y/44J3fAr/CGh+XINM
-	BsJrJsJXMZuPHEFhcpiJpOWJ2TubBiDChN1ua5p70kkSeYM1xnOJW62jYBAi07Bq8zGhKv2iXu9Kp
-	mzU3e+QHw5pMUuLLp8ZduHU7biD/uRrrd1JOM9FoSLefgHpqSHhN+FGPuISjJ8/9j3Ggc1HRNeUmg
-	X/xFRDM0i4Ekw/A8YOAw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UXHtD/cnzLP9eyLqRtdp+8excEaDP/cRDeumpztpdE4=; b=onFI88iWUSZejN
+	bqerTqcNzbyWE821crXssGh84LlNE9IYjo/lFr/RiqEBPcijHXB++FGPKmmdBwmZjvbQ9U1Sqd3Dd
+	dDcqNDxe5tHoW6fVjQsxjCBGZr6DumsHqG2hXMDyKE91tg7eP6rY1PaMWzQx9niPYMHXlDz0stVuQ
+	9dMTKonSK4KCS4lAgcBm/RZt6qHc96MosfOYn0EeOyDkKrpJIa7LJSr9HUfNS9wjvkYODk6TOgB3J
+	7HHHpaJhX2NXaqvHkweJtacnDNMmoKAgTNHEo12HBIpKmzPkXxDMTo3Gj6OUMIOk8cEjFCWNBdLkC
+	IniTL63Jq1X7CMpdkpMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtX4J-0001eK-QM; Tue, 12 Feb 2019 12:21:43 +0000
+	id 1gtX4X-0001rp-UW; Tue, 12 Feb 2019 12:21:57 +0000
 Received: from mail-eopbgr70048.outbound.protection.outlook.com ([40.107.7.48]
  helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtX4F-0001dP-Vq
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 12:21:41 +0000
+ id 1gtX4I-0001dP-9k
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 12:21:43 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=saytbWWmf9gZlAobpQWELPhJelyUjshDUKZpJDfwT3w=;
- b=qk71+6Dh1hWg0cWGOyF6eKD8INqTJbrwGyLHVgyYGwUsEIberyWeDvUb8guPQcQTK5Pp65ADnMv7/Vj2pU+GJZOAxYsAcoXDF2IPqvF5VhuT2Rf3uiDcI9QbIOWcBRwITIBlBzQQpeJPfPleTmwW4I+e6/wlEdx2eH24gZtqRQI=
+ bh=/04G/uCRd/Sik5Bx3CeDdhw6if0bhDHL3s8OMuMMBDs=;
+ b=oqT+jukkHf4eTTV9DZC9Gt+tzth8bwISgaYEorA+2KMhid+gaEjHMYZen14usyxh4LqvzjJb7H1uC8TR0Irx1Q7ojnoQ/l94EbEVDKvq7enyNfQrgriA3burDU9ZPhTitAde5tnUr9ALZqIVQgdCJTqsf7DLxopg+1wqdk/HYDY=
 Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
  AM0PR04MB4883.eurprd04.prod.outlook.com (20.176.215.204) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.16; Tue, 12 Feb 2019 12:21:35 +0000
+ 15.20.1622.16; Tue, 12 Feb 2019 12:21:36 +0000
 Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
  ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
  ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1601.023; Tue, 12 Feb 2019
- 12:21:35 +0000
+ 12:21:36 +0000
 From: Abel Vesa <abel.vesa@nxp.com>
 To: Anson Huang <anson.huang@nxp.com>, "Rafael J. Wysocki"
  <rjw@rjwysocki.net>, Viresh Kumar <viresh.kumar@linaro.org>, Shawn Guo
  <shawnguo@kernel.org>, Sascha Hauer <kernel@pengutronix.de>
-Subject: [PATCH 1/2] cpufreq: Add i.mx8mq support
-Thread-Topic: [PATCH 1/2] cpufreq: Add i.mx8mq support
-Thread-Index: AQHUws1/vGuK9i/NUECj4GLPl6ZtMg==
-Date: Tue, 12 Feb 2019 12:21:35 +0000
-Message-ID: <1549974071-8284-1-git-send-email-abel.vesa@nxp.com>
+Subject: [PATCH 2/2] soc: imx8: Add cpufreq registering and speed grading
+ check for i.MX8MQ
+Thread-Topic: [PATCH 2/2] soc: imx8: Add cpufreq registering and speed grading
+ check for i.MX8MQ
+Thread-Index: AQHUws1/f5iQVkEve0S0KvAhjlA+tQ==
+Date: Tue, 12 Feb 2019 12:21:36 +0000
+Message-ID: <1549974071-8284-2-git-send-email-abel.vesa@nxp.com>
+References: <1549974071-8284-1-git-send-email-abel.vesa@nxp.com>
+In-Reply-To: <1549974071-8284-1-git-send-email-abel.vesa@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -75,37 +79,37 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.7.4
 x-ms-publictraffictype: Email
 x-microsoft-exchange-diagnostics: 1; AM0PR04MB4883;
- 6:il8KI/vqUoj7505kiz/ZKFLHqfEDYD3IIklwbiV+yH5ct73Oj/+Q02aN48Te+cLrunqtCPTUqM3cQ6nltXE/cB7RTTWKUzWbKex9mnCb/THaMk/YGks6jwU1lakgGcyudMfiOAvhRcEG8jlwgPp/hyiNTFM4oVCKYun6H2Kzcg7RaneD+UG5KLXwbT7yDFdHuPOLXK5jWWx4oMR67UgcfeoN6ZMUYg17Vk+CqBoXAz3MkpCTjut8EorAuFTQZydyVGQYvL4/XyYxTr02hTh67oPNR+RYmRkQFcJpKLOK8QsQxeg7i+BJ1EzGbjS7xHezkgyaXDuTnJvgpGoJpYf6n0vgg2UpAyz+bW9JW4zfZNyqcQ8IRmQNoaqaEgw7CtAj2o1TebWLUqKTHGMYKNBPK/BNjQQRqcqvb4v5nufphIzmbZde10u+PkWB43UvcYJuEUa33bAm4Zd7jWeRhVx52Q==;
- 5:MFr/fZB1CmxIdZvz+/oHdWArr5mSWPuRSWnMPru0YPw5sqimmgt4/31JwbmStJ9F/bDskPJTemOAjcoJaDaDE3Ia8FH1o8H1Re0LUsTHQ6UfgLoXEZQXHkU9dxxluMkH99W1Ocf/sSw1qxzMj3S1EX859/rX8N83LMdY3hSKz13sf8peZb1N89ag2C60joFtDeGTaGkQgq3w0Z0wouiLcw==;
- 7:dWrawqq3s7Lp6cVub8o6uGMQqYQ9K2FesaszkGQn9wrJymjrHvjv8/Q6HfZ2d4Eae5f9lHIXnJRtsTSaG/6Ae8yuWZDAgjzT80sayni+6j0Ga8lO9+1qTnnbFriHrygu1Lm0EsanXrIwYmRWCaIqQA==
-x-ms-office365-filtering-correlation-id: 41bdbd73-1046-4246-1522-08d690e4a16e
+ 6:GM+QM6qWL2Klt1h2IbQEbYEXNCG51dqsu/KG+x1DsShrqDPsKhpQciAMIcjh2LSejVQLpZvlyKT2Ft4iRFvdxk6FDNFMtOL9YxBmRIRwKG5W16g5wboNLCal8JmvgXo95xFzAwQX/nc2g3E4bfydAOQSUatuUEIedj6RxRR4ELgGQpmkj62Ttt7NLPVnw4dywsv1afN30fI3s72zLLLD2kiyxcUatHu9zGO9kVYHQ6fYh+83qRgKgtIypDOzg5Ftva6hF1S/KiKWKIe/TCNU3uBeWreeI0CZZ0AIaLo0VV8bYb7InwsnAUfSD1rK+hEB3Rl7vr2uILlWltyFieMghrRhzze7geM60Bdqu4dU8EEFO7x0PmIVHUwaQ7ce+9o4xGz6NKvX8dGYIqp8NqEjrsdKvyhqj+1ggnSRragnlxQYVx9PheJRLaULAy5MFKAZzFOmIlvru6Q4R04VUhkQSw==;
+ 5:LC+KNPyBK8M5eMKAq/38i9LfrwTmPCw/Uy5X1YABJH3QcYoNjuqoJPFBHOuDOuivL0pqJOrzevu/yL+3nRUaD2ltVzm2LvaBpmctPsOQWThyipairLPV8AuyW0WCrvc2/19kF/ZfDg+FJYbtRP8j/qi3sj33JpUcx4+LwpGgh4B/uFFIhPjszL0hbXe2v0W8lSVWMBmoaB//l037IZIubA==;
+ 7:5ZDM9hsGUdlAYh1sQYlGAK5feYw5MsTXnFFUy+3HWFJp2ogiknAaHCQ0jbNSDzDmJh1ObpK1JLIpwbkvmniu54WeFcNNhxfcd0NTt6HUHireB4+dOlhg+te/AyhQvrxl97Hzp6qvF+1PdehNWo241w==
+x-ms-office365-filtering-correlation-id: be0e3c6a-c60c-410a-43db-08d690e4a203
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM0PR04MB4883; 
 x-ms-traffictypediagnostic: AM0PR04MB4883:
-x-microsoft-antispam-prvs: <AM0PR04MB48834408E8F8FD9C00A235D6F6650@AM0PR04MB4883.eurprd04.prod.outlook.com>
+x-microsoft-antispam-prvs: <AM0PR04MB4883842C8B6C340DC1D8E93EF6650@AM0PR04MB4883.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0946DC87A1
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(136003)(39860400002)(376002)(366004)(346002)(199004)(189003)(8936002)(6116002)(8676002)(50226002)(68736007)(3846002)(54906003)(81156014)(110136005)(316002)(36756003)(81166006)(99286004)(52116002)(478600001)(66066001)(44832011)(486006)(2616005)(476003)(71200400001)(71190400001)(25786009)(97736004)(14454004)(4326008)(14444005)(6512007)(106356001)(6436002)(6486002)(7736002)(86362001)(305945005)(26005)(186003)(53936002)(386003)(6506007)(102836004)(105586002)(2906002)(256004);
+ SFS:(10009020)(396003)(136003)(39860400002)(376002)(366004)(346002)(199004)(189003)(8936002)(6116002)(8676002)(50226002)(68736007)(3846002)(54906003)(81156014)(110136005)(316002)(36756003)(81166006)(99286004)(52116002)(76176011)(478600001)(66066001)(44832011)(486006)(11346002)(446003)(2616005)(476003)(71200400001)(71190400001)(25786009)(97736004)(14454004)(4326008)(6512007)(106356001)(6436002)(6486002)(7736002)(86362001)(305945005)(26005)(186003)(53936002)(386003)(6506007)(102836004)(105586002)(2906002)(256004);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4883;
  H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: qVAGAu91gF6ZrKTjtjDpy9+3LvZor0/8pCPZybrfCjG2aqhSVraFnfGCOLlvKK+EOjC0cFTriZXjdBOGeoq0g1js0+xmDOvy8FTBYQSV0hoPFHhzd27NQ/16NfK7pfWHGEEWq95sNH7BErPK5SgfM060MDzsCRc9vOOlB+imPJORQ/ujzkozkUBAI0BdhXbqWXaN493VmNc5nOc4ew6jobieRCtHg4FTTN9n9mXlSWq/4LuO0PJAq9jlCZ61kTsxjOln78WeYK1i9C46lVjqnzjHAqA1Xbu1SeUVt9NXLzY8drTU67rK0FWE4qYjYBzNMit7jNbP9UfNf5fXnBouCKgjX6PStHsQt6YvMwnq4dgBSGxYYxdPbTTG1LlWMyybUymV0H0q0Usp2SeNSNbtL3fY+G6m6DmxYENlfJ2Gja8=
+x-microsoft-antispam-message-info: OqJY0I8Uk0RVl/t/QgkBGDieMzfijPvKJw+G5hFFWj4m7EgvGGEFdnEoMc/lNbIWP7hfdJ9rTicmzQa4+/hi46/6O8VRtVcZ7we9aftdukXPJ1eGecB+GNnPyow/fa/7c/+PqKooxgLXtWZMyvXOF0zcWjZqdUJJyGeXI+E//keO4uYBf3D8Y8saRnODmGvvFEfR+QDz7E75Xiol1HsD/zsmy062wUegRis/4MRn+6ethcA59jeIUMqauopgWh9qbkuR7ueUNIQBl7iBSjgdpfxsPaqN+a1lyIfOiTLf4DoiAnGH8OQNbF+Dh6D9WrVgJ/Eol/43UGJMspE30T6qABOdYjpti5UyG+buV6kGpzyswuftZu+PLsyXyefRRLGsKaO6+g4cWNvS7eWLstqx0LslVczfsz8M7IDcTebZ9T8=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 41bdbd73-1046-4246-1522-08d690e4a16e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Feb 2019 12:21:34.8178 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: be0e3c6a-c60c-410a-43db-08d690e4a203
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Feb 2019 12:21:35.7755 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4883
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_042140_031712_7C8F07E5 
-X-CRM114-Status: GOOD (  18.86  )
+X-CRM114-CacheID: sfid-20190212_042142_340567_AA634675 
+X-CRM114-Status: GOOD (  17.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,286 +135,155 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Anson Huang <Anson.Huang@nxp.com>
 
-Add i.MX8MQ cpufreq support, current version of
-EVK board does NOT support voltage scale, but next
-version will add this support, so this driver only
-supports cpu frequency scale, voltage scale will
-be added later once new board available.
+Register cpu-freq platform driver for i.MX8.
+i.MX8MQ has different parts like consumer, industrial and auto etc.,
+different parts have different cpufreq set-points, this patch adds
+fuse check to select correct cpufreq set-points for each part. The
+default dtb has all set-points available, then kernel will check fuse
+to disable those unused set-points, definition as below:
 
-A53 CPU clock normally is from ARM_PLL, but during
-ARM_PLL relock window, it will be switched to
-SYS1_PLL_800M to avoid clock missing, and after
-arm pll relock done, it will be switched back.
+OCOTP offset 0x440, bit [7:6]
+
+'00' - Consumer 0C to 95C
+'01' - Ext. Consumer -20C to 105C
+'10' - Industrial -40C to 105C
+'11' - Automotive -40C to 125C
+
+cpu-freq set-points definition as below (datasheet Rev-E):
+
+		Normal		Over-Drive
+Consumer	1GHz@0.9V	1.5GHz@1V
+Industrial	800MHz@0.9V	1.3GHz@1V
 
 Signed-off-by: Anson Huang <anson.huang@nxp.com>
 Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 ---
- drivers/cpufreq/Kconfig.arm      |   8 ++
- drivers/cpufreq/Makefile         |   1 +
- drivers/cpufreq/imx8mq-cpufreq.c | 223 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 232 insertions(+)
- create mode 100644 drivers/cpufreq/imx8mq-cpufreq.c
+ drivers/soc/imx/Makefile   |   1 +
+ drivers/soc/imx/soc-imx8.c | 107 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
+ create mode 100644 drivers/soc/imx/soc-imx8.c
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 179a1d3..9d8001c 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -92,6 +92,14 @@ config ARM_IMX6Q_CPUFREQ
- 
- 	  If in doubt, say N.
- 
-+config ARM_IMX8MQ_CPUFREQ
-+	tristate "NXP i.MX8MQ cpufreq support"
-+	select PM_OPP
-+	help
-+	  This adds cpufreq driver support for NXP i.MX8MQ series SoCs.
-+
-+	  If in doubt, say N.
-+
- config ARM_KIRKWOOD_CPUFREQ
- 	def_bool MACH_KIRKWOOD
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 689b26c..fe5416c 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -56,6 +56,7 @@ obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
-+obj-$(CONFIG_ARM_IMX8MQ_CPUFREQ)	+= imx8mq-cpufreq.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
- obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
- obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
-diff --git a/drivers/cpufreq/imx8mq-cpufreq.c b/drivers/cpufreq/imx8mq-cpufreq.c
+diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
+index 506a6f3..d6b529e0 100644
+--- a/drivers/soc/imx/Makefile
++++ b/drivers/soc/imx/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
+ obj-$(CONFIG_IMX_GPCV2_PM_DOMAINS) += gpcv2.o
++obj-$(CONFIG_ARCH_MXC) += soc-imx8.o
+diff --git a/drivers/soc/imx/soc-imx8.c b/drivers/soc/imx/soc-imx8.c
 new file mode 100644
-index 0000000..ee24fab
+index 0000000..3896310
 --- /dev/null
-+++ b/drivers/cpufreq/imx8mq-cpufreq.c
-@@ -0,0 +1,223 @@
++++ b/drivers/soc/imx/soc-imx8.c
+@@ -0,0 +1,107 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Copyright (C) 2019 NXP
++ * Copyright 2019 NXP.
 + */
 +
-+#include <linux/clk.h>
 +#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/slab.h>
-+#include <linux/of.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
 +#include <linux/pm_opp.h>
++#include <linux/slab.h>
++#include <linux/sys_soc.h>
 +#include <linux/platform_device.h>
-+#include <linux/suspend.h>
++#include <linux/of.h>
 +
-+static struct device *cpu_dev;
-+static bool free_opp;
-+static struct cpufreq_frequency_table *freq_table;
-+static struct mutex set_cpufreq_lock;
-+static unsigned int transition_latency;
-+static unsigned int suspend_freq;
-+static struct clk *a53_clk;
-+static struct clk *arm_a53_src_clk;
-+static struct clk *arm_pll_clk;
-+static struct clk *arm_pll_out_clk;
-+static struct clk *sys1_pll_800m_clk;
++#define OCOTP_CFG3			0x440
++#define OCOTP_CFG3_MKT_SEGMENT_SHIFT	6
++#define OCOTP_CFG3_CONSUMER		0
++#define OCOTP_CFG3_EXT_CONSUMER		1
++#define OCOTP_CFG3_INDUSTRIAL		2
++#define OCOTP_CFG3_AUTO			3
 +
-+static int imx8mq_set_target(struct cpufreq_policy *policy, unsigned int index)
-+{
-+	struct dev_pm_opp *opp;
-+	unsigned long freq_hz;
-+	unsigned int old_freq, new_freq;
-+	int ret;
-+
-+	mutex_lock(&set_cpufreq_lock);
-+
-+	new_freq = freq_table[index].frequency;
-+	freq_hz = new_freq * 1000;
-+	old_freq = policy->cur;
-+
-+	rcu_read_lock();
-+	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
-+	if (IS_ERR(opp)) {
-+		rcu_read_unlock();
-+		dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
-+		mutex_unlock(&set_cpufreq_lock);
-+		return PTR_ERR(opp);
-+	}
-+	rcu_read_unlock();
-+
-+	dev_dbg(cpu_dev, "%u MHz --> %u MHz\n",
-+		old_freq / 1000, new_freq / 1000);
-+
-+	clk_set_parent(arm_a53_src_clk, sys1_pll_800m_clk);
-+	clk_set_rate(arm_pll_clk, new_freq * 1000);
-+	clk_set_parent(arm_a53_src_clk, arm_pll_out_clk);
-+
-+	/* Ensure the arm clock divider is what we expect */
-+	ret = clk_set_rate(a53_clk, new_freq * 1000);
-+	if (ret)
-+		dev_err(cpu_dev, "failed to set clock rate: %d\n", ret);
-+
-+	mutex_unlock(&set_cpufreq_lock);
-+	return ret;
-+}
-+
-+static int imx8mq_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int ret;
-+
-+	policy->clk = a53_clk;
-+	policy->cur = clk_get_rate(a53_clk) / 1000;
-+	policy->suspend_freq = suspend_freq;
-+
-+	ret = cpufreq_generic_init(policy, freq_table, transition_latency);
-+	if (ret) {
-+		dev_err(cpu_dev, "imx8mq cpufreq init failed!\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static struct cpufreq_driver imx8mq_cpufreq_driver = {
-+	.flags = CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.verify = cpufreq_generic_frequency_table_verify,
-+	.target_index = imx8mq_set_target,
-+	.get = cpufreq_generic_get,
-+	.init = imx8mq_cpufreq_init,
-+	.name = "imx8mq-cpufreq",
-+	.attr = cpufreq_generic_attr,
-+#ifdef CONFIG_PM
-+	.suspend = cpufreq_generic_suspend,
-+#endif
-+};
-+
-+static int imx8mq_cpufreq_probe(struct platform_device *pdev)
++static void __init imx8mq_opp_check_speed_grading(struct device *cpu_dev)
 +{
 +	struct device_node *np;
-+	int num, ret;
++	void __iomem *base;
++	u32 val;
 +
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu0 device\n");
-+		return -ENODEV;
++	np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-ocotp");
++	if (!np) {
++		pr_warn("failed to find ocotp node\n");
++		return;
 +	}
 +
++	base = of_iomap(np, 0);
++	if (!base) {
++		pr_warn("failed to map ocotp\n");
++		goto put_node;
++	}
++	val = readl_relaxed(base + OCOTP_CFG3);
++	val >>= OCOTP_CFG3_MKT_SEGMENT_SHIFT;
++	val &= 0x3;
++
++	switch (val) {
++	case OCOTP_CFG3_CONSUMER:
++		if (dev_pm_opp_disable(cpu_dev, 800000000))
++			pr_warn("failed to disable 800MHz OPP!\n");
++		if (dev_pm_opp_disable(cpu_dev, 1300000000))
++			pr_warn("failed to disable 1.3GHz OPP!\n");
++		break;
++	case OCOTP_CFG3_INDUSTRIAL:
++		if (dev_pm_opp_disable(cpu_dev, 1000000000))
++			pr_warn("failed to disable 1GHz OPP!\n");
++		if (dev_pm_opp_disable(cpu_dev, 1500000000))
++			pr_warn("failed to disable 1.5GHz OPP!\n");
++		break;
++	default:
++		/* consumer part for default */
++		if (dev_pm_opp_disable(cpu_dev, 800000000))
++			pr_warn("failed to disable 800MHz OPP!\n");
++		if (dev_pm_opp_disable(cpu_dev, 1300000000))
++			pr_warn("failed to disable 1.3GHz OPP!\n");
++		break;
++	}
++
++	iounmap(base);
++
++put_node:
++	of_node_put(np);
++}
++
++static void __init imx8mq_opp_init(void)
++{
++	struct device_node *np;
++	struct device *cpu_dev = get_cpu_device(0);
++
++	if (!cpu_dev) {
++		pr_warn("failed to get cpu0 device\n");
++		return;
++	}
 +	np = of_node_get(cpu_dev->of_node);
 +	if (!np) {
-+		dev_err(cpu_dev, "failed to find cpu0 node\n");
-+		return -ENOENT;
++		pr_warn("failed to find cpu0 node\n");
++		return;
 +	}
 +
-+	a53_clk = clk_get(cpu_dev, "a53");
-+	arm_a53_src_clk = clk_get(cpu_dev, "arm_a53_src");
-+	arm_pll_clk = clk_get(cpu_dev, "arm_pll");
-+	arm_pll_out_clk = clk_get(cpu_dev, "arm_pll_out");
-+	sys1_pll_800m_clk = clk_get(cpu_dev, "sys1_pll_800m");
-+	if (IS_ERR(a53_clk) || IS_ERR(arm_a53_src_clk)
-+		|| IS_ERR(arm_pll_out_clk) || IS_ERR(arm_pll_clk)
-+		|| IS_ERR(sys1_pll_800m_clk)) {
-+		dev_err(cpu_dev, "failed to get clocks\n");
-+		ret = -ENOENT;
-+		goto put_clk;
++	if (dev_pm_opp_of_add_table(cpu_dev)) {
++		pr_warn("failed to init OPP table\n");
++		goto put_node;
 +	}
 +
-+	/*
-+	 * We expect an OPP table supplied by platform.
-+	 * Just, incase the platform did not supply the OPP
-+	 * table, it will try to get it.
-+	 */
-+	num = dev_pm_opp_get_opp_count(cpu_dev);
-+	if (num < 0) {
-+		ret = dev_pm_opp_of_add_table(cpu_dev);
-+		if (ret < 0) {
-+			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
-+			goto put_clk;
-+		}
++	imx8mq_opp_check_speed_grading(cpu_dev);
 +
-+		/* Because we have added the OPPs here, we must free them */
-+		free_opp = true;
-+
-+		num = dev_pm_opp_get_opp_count(cpu_dev);
-+		if (num < 0) {
-+			ret = num;
-+			dev_err(cpu_dev, "no OPP table is found: %d\n", ret);
-+			goto out_free_opp;
-+		}
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto out_free_opp;
-+	}
-+
-+	/* use MAX freq to suspend */
-+	suspend_freq = freq_table[num - 1].frequency;
-+
-+	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-+		transition_latency = CPUFREQ_ETERNAL;
-+
-+	mutex_init(&set_cpufreq_lock);
-+
-+	ret = cpufreq_register_driver(&imx8mq_cpufreq_driver);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed register driver: %d\n", ret);
-+		goto free_freq_table;
-+	}
-+
++put_node:
 +	of_node_put(np);
-+	dev_info(cpu_dev, "registered imx8mq-cpufreq\n");
-+
-+	return 0;
-+
-+free_freq_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_free_opp:
-+	if (free_opp)
-+		dev_pm_opp_of_remove_table(cpu_dev);
-+put_clk:
-+	if (!IS_ERR(a53_clk))
-+		clk_put(a53_clk);
-+	if (!IS_ERR(arm_a53_src_clk))
-+		clk_put(arm_a53_src_clk);
-+	if (!IS_ERR(arm_pll_clk))
-+		clk_put(arm_pll_clk);
-+	if (!IS_ERR(arm_pll_out_clk))
-+		clk_put(arm_pll_out_clk);
-+	if (!IS_ERR(sys1_pll_800m_clk))
-+		clk_put(sys1_pll_800m_clk);
-+	of_node_put(np);
-+	return ret;
 +}
 +
-+static int imx8mq_cpufreq_remove(struct platform_device *pdev)
++static int __init imx8_register_cpufreq(void)
 +{
-+	cpufreq_unregister_driver(&imx8mq_cpufreq_driver);
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+	if (free_opp)
-+		dev_pm_opp_of_remove_table(cpu_dev);
-+	clk_put(a53_clk);
-+	clk_put(arm_a53_src_clk);
-+	clk_put(arm_pll_clk);
-+	clk_put(arm_pll_out_clk);
-+	clk_put(sys1_pll_800m_clk);
++	if (of_machine_is_compatible("fsl,imx8mq")) {
++		imx8mq_opp_init();
++		platform_device_register_simple("imx8mq-cpufreq", -1, NULL, 0);
++	}
 +
 +	return 0;
 +}
-+
-+static struct platform_driver imx8mq_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "imx8mq-cpufreq",
-+	},
-+	.probe		= imx8mq_cpufreq_probe,
-+	.remove		= imx8mq_cpufreq_remove,
-+};
-+module_platform_driver(imx8mq_cpufreq_platdrv);
-+
-+MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
-+MODULE_DESCRIPTION("Freescale i.MX8MQ cpufreq driver");
-+MODULE_LICENSE("GPL");
++late_initcall(imx8_register_cpufreq);
 -- 
 2.7.4
 
