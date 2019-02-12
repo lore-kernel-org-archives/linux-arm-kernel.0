@@ -2,22 +2,22 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32631C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:40:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21681C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:40:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 02F7E20449
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:40:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E65DC20449
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:40:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r+/8qAnb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="Str2ioU3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 02F7E20449
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u+aXSKwR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="fEb1R1H4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E65DC20449
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=StwZhrwo2ZHzgbwoAk+VJjC4cyi2VwczPU2nR+1pQrs=; b=r+/8qAnby2xkLH
-	/ljEEkqmYn+mI2w5wTyQBKRgqbkCYyo/xqxe7Ahb1wwR1EDpOTPuyfgg2PbQhOn9OELqY5JXbjkzU
-	RjzVh7JeqBPdQWMJnzr7fDThHaiKgPHiUR6FSt9F317cH73PSEMUKUwEyxHOZ3s6G8yhlsz9rfQ1y
-	rAynXeD7h2kIvyQnMVgnHJSw3+jdS/Bg9Vc5bQGJx0cRbNeZMIYnn4KBj6K0s+yXxj2E3zqjWq9UA
-	v7nWEF/njNVBemUTc6KwBiC3sTI+2/sWanznrEGdLAMGT466Gjbqb/JiO3kmeNpGHB/pcKoQKu5+u
-	cpkVhRl1rE4zccUOwPGw==;
+	List-Owner; bh=p9iFJuPFFICQX3LsNkplWOIhkk7aZhtU0cjfVDBte5M=; b=u+aXSKwR7zV8gz
+	t5zJvyzINanSPvmF2YiI94is0+cNS99oNvf+ByDQUReT2TIhSaQO9Of7kQtd0TVHIOnhGB8ZeHjIX
+	haF9ntLeIlaOlTKHfa2jdd4h53XXaSdPJmZiKKKkXLP3Sg9GHTRnQj4O57kGGYd+QWyoquDiernz2
+	zku4LncwflS3esc6uGbb4nDJog8uXTgOg9TXM4H9d3dU5KQuJiNdSsxQxYoenkKor45gWrefEm5sR
+	sKVhb6IdnjPvgbTi4BPfVDI2EvgJN9693AnuMNN9IxZDCyvOFM/VCzQxK/+vTBwXd4vCTFulIl4pj
+	E3Z8cpVmVzxKZ/xPsT6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVUI-0008OH-K9; Tue, 12 Feb 2019 10:40:26 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gtVUW-00009G-Kv; Tue, 12 Feb 2019 10:40:40 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVSz-0005u0-1l
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:08 +0000
-Received: by mail-wm1-x341.google.com with SMTP id d15so2358938wmb.3
+ id 1gtVSy-0005tY-1y
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:09 +0000
+Received: by mail-wm1-x342.google.com with SMTP id j125so2469498wmj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 02:39:04 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:03 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=q5BrIZFNHo3k9uJAXBkzQcisHzLVezn4k1LAhO6mPdU=;
- b=Str2ioU3Zh9gjsHXjAh2cJusyAD5gNbOVzB/6DpqGjC8/sifLVx0LYSHkpMQcXetxS
- IzPC7xOawxM+gOfGMncjGW9A5tBNz/gKFg8PBjuLm515yTuNu14WT5zRkW2Le38aRHYb
- VDeLKCE7upuKYcBxLWteauoKft6Q7DcF8gokPXCZlRutffnZTSLNCIPIt6kw7ZbQmJdE
- x7oLft2qhARq21y1G30+1o+KN0b3V7Gw9WBxSymC4AjGAxOuBLWyo3YPYeBZqbH/sut8
- FTyJjLjI4S2vHluIz7wMUQEMqcKJd2St52y3hYN16jXxxNpkwe4WJF2kMVIcMmwZlWQP
- yc3A==
+ bh=pspZEiFx1OxalovNGuxdYbLMS6GVItzFF36iRMFdcj4=;
+ b=fEb1R1H4qotruGbPCgCpsgMgWffslBWC/2/oo/gA5lc3MgnittqhfbWqB/Sro0xPLH
+ Yd9s++ieaTVLaMe38s5jUfGu6noVLmIvsKUWlBInBhGBbRiNZIvYo7fToF7Wo7GPRbXg
+ i2MHs7T5X5INOrbnnkQRsjj3D6P+mlQ8gIPKb1xhg1bDvGpzSPH7A/bk578dvyqClwKO
+ luDnslyyTTDqI8M4xZxhxAW/H7tyMCWoilPYwWt7xvwdyMUEFwxOuzg5cXD4E3Zcvh2/
+ QXsCdI6QYi+WbS2Hgq1wyglxiAovVDbSxcAZAKhEGvqES1q5sVyIgKJyjS+TaH2prPyU
+ riPg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=q5BrIZFNHo3k9uJAXBkzQcisHzLVezn4k1LAhO6mPdU=;
- b=t+lIPb9b98tP3niouijcirGOJGma6HkOPOzlu4zxv6/fwmEj8gFxe+VGgS/rAW1sly
- tj8Z9PYWI6mMkJjXUtnWQ35HoC6ENePlMH4M1u8iZ4SBP6IKaFQ3FdRAvzuOVQcY94j1
- kKFMqj2vhZITF0MtPX+r9Cq080WrFOmNYRv/Cz5AtEDzlSmKJnW8ObPtrJDnIfB8NsUu
- 6sDbZjUP/EnjgdEH+lkNGgP1y4/Ef2WDY0nrwHVShRNwaKwaxp7IVXmP9C5zRTmA3nij
- BRc/Yi5CJ0FwMayKU+tKyzZIfy6++PmLT5aIcN9tbW5oc8O9+oKCyR8n4PU7KBqiYEyc
- bGBg==
-X-Gm-Message-State: AHQUAuYkkNxBfy2z5zjE/AAakiz8XjBZFI1RB/EXVuDkvXtbAwP8XYWK
- iLmboSpy87Tsq/yswWP/VJqSug==
-X-Google-Smtp-Source: AHgI3Ibbbh/j49LejheZMR9ph96wZJUoYnBGVuhNa6CghozVfo8qNDRo/ykEXqF73l0qeHFSvMXczg==
-X-Received: by 2002:a1c:7304:: with SMTP id d4mr2237744wmb.136.1549967943292; 
- Tue, 12 Feb 2019 02:39:03 -0800 (PST)
+ bh=pspZEiFx1OxalovNGuxdYbLMS6GVItzFF36iRMFdcj4=;
+ b=WHJSNOldxyFywhG3dG09yod9nzHVfqJRYgQh60zL6hNiyEd6KHRusYkFsELfPnkC9/
+ BJV26/DUaVaXkCu9J3tlWuSC0Y/zkg2GCxiUjL1AlNB8jyHw0zoa2y2/G/QRpwrFxVgi
+ XfTALQ44i7pHU/t5h/uQ3C0yv0xHmOyhizPb3S34I7z5VM4DR6lBzZI808iGD1ZcmJV6
+ aoXsFBUhlhkSVtAlr9o26gy1UZ4xYAXx9ZapTMkAQFU/gAbWXGYj6TT2ok9SuIh6mRFL
+ bODH6H2O7alJsl7T3s7DK2HR6c3b61ejZ+XJPBQCUUIBnhtsBKM+2FgNNlPV7ELkz3cr
+ 6iQQ==
+X-Gm-Message-State: AHQUAuYfF+L0CPzNAoAv7cNVv90G7h9i+fHSATTPi7v7ULbjv9DSmGmD
+ JlmyXu8YSthsE92Ku8IGwRkTqg==
+X-Google-Smtp-Source: AHgI3IbmJnU7yNC/aluKehBT1j3F2dxsHkEdymUFfGa8bCQ8dh7dLULYX7FRFaLaF+odlMMRGPxvMQ==
+X-Received: by 2002:a7b:c44d:: with SMTP id l13mr2359498wmi.144.1549967942165; 
+ Tue, 12 Feb 2019 02:39:02 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
- by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.02
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.00
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 02:39:02 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:01 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 06/37] ARM: davinci: pull davinci_intc_base into the
- respective intc drivers
-Date: Tue, 12 Feb 2019 11:38:04 +0100
-Message-Id: <20190212103835.7768-7-brgl@bgdev.pl>
+Subject: [PATCH v3 05/37] ARM: davinci: remove davinci_intc_type
+Date: Tue, 12 Feb 2019 11:38:03 +0100
+Message-Id: <20190212103835.7768-6-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
 References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_023905_290242_02C5DA24 
-X-CRM114-Status: GOOD (  13.46  )
+X-CRM114-CacheID: sfid-20190212_023904_410028_5CC802AC 
+X-CRM114-Status: GOOD (  14.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,69 +108,168 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-davinci_intc_base is defined globally in common.c. Define separate
-local variables for the aintc and cp-intc drivers and remove the
-global one.
+We now use the generic ARM irq handler on davinci. There are no more
+users that check davinci_intc_type. Remove the variable and all its
+references.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/common.c              | 2 --
- arch/arm/mach-davinci/cp_intc.c             | 2 ++
- arch/arm/mach-davinci/include/mach/common.h | 1 -
- arch/arm/mach-davinci/irq.c                 | 1 +
- 4 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/common.c              | 1 -
+ arch/arm/mach-davinci/cp_intc.c             | 1 -
+ arch/arm/mach-davinci/da830.c               | 1 -
+ arch/arm/mach-davinci/da850.c               | 1 -
+ arch/arm/mach-davinci/dm355.c               | 1 -
+ arch/arm/mach-davinci/dm365.c               | 1 -
+ arch/arm/mach-davinci/dm644x.c              | 1 -
+ arch/arm/mach-davinci/dm646x.c              | 1 -
+ arch/arm/mach-davinci/include/mach/common.h | 2 --
+ arch/arm/mach-davinci/include/mach/irqs.h   | 3 ---
+ arch/arm/mach-davinci/irq.c                 | 1 -
+ 11 files changed, 14 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/common.c b/arch/arm/mach-davinci/common.c
-index a87e158a709b..2850ae02aaa4 100644
+index e1d0f0d841ff..a87e158a709b 100644
 --- a/arch/arm/mach-davinci/common.c
 +++ b/arch/arm/mach-davinci/common.c
-@@ -23,8 +23,6 @@
- struct davinci_soc_info davinci_soc_info;
+@@ -24,7 +24,6 @@ struct davinci_soc_info davinci_soc_info;
  EXPORT_SYMBOL(davinci_soc_info);
  
--void __iomem *davinci_intc_base;
--
+ void __iomem *davinci_intc_base;
+-int davinci_intc_type;
+ 
  void davinci_get_mac_addr(struct nvmem_device *nvmem, void *context)
  {
- 	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
 diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index 19874f5ef542..4e293cde20fb 100644
+index 4a372add8cf9..19874f5ef542 100644
 --- a/arch/arm/mach-davinci/cp_intc.c
 +++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -26,6 +26,8 @@
- #define DAVINCI_CP_INTC_PRI_INDX_MASK		GENMASK(9, 0)
- #define DAVINCI_CP_INTC_GPIR_NONE		BIT(31)
+@@ -146,7 +146,6 @@ int __init cp_intc_of_init(struct device_node *node, struct device_node *parent)
+ 	unsigned num_reg	= BITS_TO_LONGS(num_irq);
+ 	int i, irq_base;
  
-+static void __iomem *davinci_intc_base;
-+
- static inline unsigned int cp_intc_read(unsigned offset)
- {
- 	return __raw_readl(davinci_intc_base + offset);
+-	davinci_intc_type = DAVINCI_INTC_TYPE_CP_INTC;
+ 	if (node) {
+ 		davinci_intc_base = of_iomap(node, 0);
+ 		if (of_property_read_u32(node, "ti,intc-size", &num_irq))
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 2cc9fe4c3a91..9e18b245266b 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -807,7 +807,6 @@ static const struct davinci_soc_info davinci_soc_info_da830 = {
+ 	.pinmux_pins		= da830_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(da830_pins),
+ 	.intc_base		= DA8XX_CP_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_CP_INTC,
+ 	.intc_irq_prios		= da830_default_priorities,
+ 	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
+ 	.timer_info		= &da830_timer_info,
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index e7b78df2bfef..e823b89e2b7a 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -739,7 +739,6 @@ static const struct davinci_soc_info davinci_soc_info_da850 = {
+ 	.pinmux_pins		= da850_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(da850_pins),
+ 	.intc_base		= DA8XX_CP_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_CP_INTC,
+ 	.intc_irq_prios		= da850_default_priorities,
+ 	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
+ 	.timer_info		= &da850_timer_info,
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 4c6e0bef4509..03ce5df28d87 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -705,7 +705,6 @@ static const struct davinci_soc_info davinci_soc_info_dm355 = {
+ 	.pinmux_pins		= dm355_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(dm355_pins),
+ 	.intc_base		= DAVINCI_ARM_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_AINTC,
+ 	.intc_irq_prios		= dm355_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm355_timer_info,
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 01fb2b0c82de..3e034f0478d2 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -722,7 +722,6 @@ static const struct davinci_soc_info davinci_soc_info_dm365 = {
+ 	.pinmux_pins		= dm365_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(dm365_pins),
+ 	.intc_base		= DAVINCI_ARM_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_AINTC,
+ 	.intc_irq_prios		= dm365_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm365_timer_info,
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 38f92b7d413e..66bab4782c62 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -646,7 +646,6 @@ static const struct davinci_soc_info davinci_soc_info_dm644x = {
+ 	.pinmux_pins		= dm644x_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(dm644x_pins),
+ 	.intc_base		= DAVINCI_ARM_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_AINTC,
+ 	.intc_irq_prios 	= dm644x_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm644x_timer_info,
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 7dc54b2a610f..45efa715a2c1 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -586,7 +586,6 @@ static const struct davinci_soc_info davinci_soc_info_dm646x = {
+ 	.pinmux_pins		= dm646x_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(dm646x_pins),
+ 	.intc_base		= DAVINCI_ARM_INTC_BASE,
+-	.intc_type		= DAVINCI_INTC_TYPE_AINTC,
+ 	.intc_irq_prios		= dm646x_default_priorities,
+ 	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
+ 	.timer_info		= &dm646x_timer_info,
 diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 34e48de92dcc..3d45b73b9a64 100644
+index 944afd57ee38..34e48de92dcc 100644
 --- a/arch/arm/mach-davinci/include/mach/common.h
 +++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -20,7 +20,6 @@
- void davinci_timer_init(struct clk *clk);
+@@ -21,7 +21,6 @@ void davinci_timer_init(struct clk *clk);
  
  extern void davinci_irq_init(void);
--extern void __iomem *davinci_intc_base;
+ extern void __iomem *davinci_intc_base;
+-extern int davinci_intc_type;
  
  struct davinci_timer_instance {
  	u32		base;
+@@ -58,7 +57,6 @@ struct davinci_soc_info {
+ 	const struct mux_config		*pinmux_pins;
+ 	unsigned long			pinmux_pins_num;
+ 	u32				intc_base;
+-	int				intc_type;
+ 	u8				*intc_irq_prios;
+ 	unsigned long			intc_irq_num;
+ 	struct davinci_timer_info	*timer_info;
+diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
+index edb2ca62321a..03c446635301 100644
+--- a/arch/arm/mach-davinci/include/mach/irqs.h
++++ b/arch/arm/mach-davinci/include/mach/irqs.h
+@@ -30,9 +30,6 @@
+ /* Base address */
+ #define DAVINCI_ARM_INTC_BASE 0x01C48000
+ 
+-#define DAVINCI_INTC_TYPE_AINTC		0
+-#define DAVINCI_INTC_TYPE_CP_INTC	1
+-
+ /* Interrupt lines */
+ #define IRQ_VDINT0       0
+ #define IRQ_VDINT1       1
 diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index 2e3426ebfd97..b27b90dc269c 100644
+index 363ca6d76cb0..2e3426ebfd97 100644
 --- a/arch/arm/mach-davinci/irq.c
 +++ b/arch/arm/mach-davinci/irq.c
-@@ -43,6 +43,7 @@
- #define IRQ_INTPRI0_REG_OFFSET	0x0030
- #define IRQ_INTPRI7_REG_OFFSET	0x004C
+@@ -99,7 +99,6 @@ void __init davinci_irq_init(void)
+ 	const u8 *davinci_def_priorities = davinci_soc_info.intc_irq_prios;
+ 	int ret, irq_base;
  
-+static void __iomem *davinci_intc_base;
- static struct irq_domain *davinci_irq_domain;
- 
- static inline void davinci_irq_writel(unsigned long value, int offset)
+-	davinci_intc_type = DAVINCI_INTC_TYPE_AINTC;
+ 	davinci_intc_base = ioremap(davinci_soc_info.intc_base, SZ_4K);
+ 	if (WARN_ON(!davinci_intc_base))
+ 		return;
 -- 
 2.20.1
 
