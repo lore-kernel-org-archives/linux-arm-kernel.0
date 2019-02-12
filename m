@@ -2,85 +2,100 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03ED0C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:45:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03340C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:46:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B93782083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:45:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BBC36206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:46:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OB302kbA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="v+iGJ8wI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B93782083B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f4d/9yNP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="ggtW7p5n"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BBC36206BA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gjnJkSO7XD4ydoiF54thBER7w+mlMFYf2wZiViojPtY=; b=OB302kbAjdrPcp
-	jkJTvpw5eNmfQOJfhV+l7Ipf4XOjZ/lyAIyL8AJBvxoCh3RXJCjuIB1e/hVzWmy0ATUGxFf5OTfe+
-	9Rt2mcLJfv+i7zrGqcVvhUcSUulm8hdVNsA+20VgcH4Z623zAebrIX2EdM9TY5qPuNlBYaaeRPB2Z
-	kyFHlD6WQeKNgFcEaxRpkRPzRb7jK5AhrfDqoNpxZT5fEwyxF9TzawEwLjjGQG1LzfhN2+LSgtvEf
-	75yPs/xGn+Ymiijjs7XY3Dg0vtST7L290/JQKSmPkvt14TQqKobJQngr/q/3q4XPo+5u2VctvUwWd
-	lUsbb5p46POXUt4YmfpA==;
+	List-Owner; bh=7NpZPWj3PFzMYFs7qL2lcM29MFzOq6yGrGGsVsiaO8Q=; b=f4d/9yNPr0IBl4
+	HUY69cuvZeRVToJAX/9PuBSMcpxVFk7i0qps4MGYSApE0oEQf9hr76spiar3B2yUCRB8G3m+ngjDj
+	2E4oF2j3lj8SziaqaaqLCyR8Swug8ct5kn2fvU4swBkjAplBD4rvc5mvn/kawrKEIJbXLVDqexJTZ
+	TpbGHwq3jgXYoYHRJO7fCYU2sCm1CsytTOszCSEgluJ5TqfFQ37jWEfCzOyCX1fMHmasz5Dco87k4
+	HqgYpkCH0cl/N3Xik0mlmTNpxxLs6Ydre4sqQ1c6Q6vr1PB1BUAuMt3jKh7IJEdBXINNdXOJAbrHs
+	PN2X+WzHtOaEcuiIUXdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSl8-0007M8-TV; Tue, 12 Feb 2019 07:45:38 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gtSlv-0007lb-Ku; Tue, 12 Feb 2019 07:46:27 +0000
+Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSjM-0004g6-7d
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:44:25 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C7hXKU005376;
- Tue, 12 Feb 2019 01:43:33 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549957413;
- bh=t/z6qGlQVK89zXWHO0YPaiFzIhO77306BokwRa9/nDQ=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=v+iGJ8wIz9r8NlrtenbvNvVILPMGwhwalx0NYg/CdY+BUUV6kJkG9eXosMWxGaQlx
- preMprNle7m5BvzICJBUxw83MLAoGzHrq38qQFoAQ+oNGcp2WVa/b+PJ1KDYKvwoAI
- UqCrAVQ8sm1dQODmtFWLlk3cwCza1dlITa4lqXgA=
-Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C7hXI2020174
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 12 Feb 2019 01:43:33 -0600
-Received: from DLEE106.ent.ti.com (157.170.170.36) by DLEE105.ent.ti.com
- (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
- Feb 2019 01:43:32 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 12 Feb 2019 01:43:32 -0600
-Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C7gss4000385;
- Tue, 12 Feb 2019 01:43:28 -0600
-From: Lokesh Vutla <lokeshvutla@ti.com>
-To: <marc.zyngier@arm.com>, Tony Lindgren <tony@atomide.com>, Nishanth Menon
- <nm@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring
- <robh+dt@kernel.org>, <tglx@linutronix.de>, <jason@lakedaemon.net>
-Subject: [PATCH v5 08/10] irqchip: ti-sci-inta: Add support for Interrupt
- Aggregator driver
-Date: Tue, 12 Feb 2019 13:12:35 +0530
-Message-ID: <20190212074237.2875-9-lokeshvutla@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20190212074237.2875-1-lokeshvutla@ti.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
+ id 1gtSlg-0007kv-Ik
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:46:25 +0000
+Received: by mail-ed1-x542.google.com with SMTP id r15so1310633eds.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 11 Feb 2019 23:46:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
+ h=sender:date:from:to:cc:subject:message-id:mail-followup-to
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=G2cTWJIsclvFC8Z0rZLlEVppHN17qeu8Yx/Iv0dHxIQ=;
+ b=ggtW7p5nLmQ66RxJPSCmg0T6etCzZsvtVUvfFkp6WO556Vnz84asYoUDIyQD6j3qzo
+ AgjaKeM9jhQU+eQ41LbV5LrTLchVnyBkjcSSr2Fj5psDyfQ/n0CgxvvTE4+O5by+/BLD
+ NeRNoaGT1Jx5IxzLYZ8Ut6zQ84EY5ozyHIqb0=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :mail-followup-to:references:mime-version:content-disposition
+ :in-reply-to:user-agent;
+ bh=G2cTWJIsclvFC8Z0rZLlEVppHN17qeu8Yx/Iv0dHxIQ=;
+ b=X2rxJTO1UrEwI4/UELHZZ6bi5ZA9YgJ9pJL4YDBRCDzZ8dA50RtL+ADvyutw4d/ec1
+ VbuY4dYQIHt/YxYObwwjFP236OfYdG9srA12d9lGsthe+AvtJHzHM1schLXx7rxWvona
+ GHddHRBMEYLLwZ2MnaaUM7goFQFISW80Ho+cW08cLqpkYp9DV9CYoibhx0rrvmo2YcYl
+ wWTy/bACs5sxnp9/zHa1hef6qM00OHWeqZbZrw3LYQA1Z8+i/iWoYcevBBiyV6mDkeUK
+ XcoKeMLLer59V2uqpMI0oTLPIvQR3Gd91wW5DLNq9pHrzYjWCSAYRKiulQh7OCRdoQjr
+ 4gsQ==
+X-Gm-Message-State: AHQUAuZP3nARvjz16lpLUfsNG5g93fUUy2lavqnagnmgSGmqJj0SV7VI
+ 4soVqlOqhj2HHInjKaD96mlMxA==
+X-Google-Smtp-Source: AHgI3IYeHSzfPtJ0PCJdwrUkMFGJdFFgzEjnZD5MHFWg9CF/ko6871OaTnxH1dY/XjaA1gDIWJb5uw==
+X-Received: by 2002:a17:906:4cc4:: with SMTP id
+ q4mr1618011ejt.223.1549957568149; 
+ Mon, 11 Feb 2019 23:46:08 -0800 (PST)
+Received: from phenom.ffwll.local ([2a02:168:569e:0:3106:d637:d723:e855])
+ by smtp.gmail.com with ESMTPSA id i19sm3554171eds.60.2019.02.11.23.46.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 11 Feb 2019 23:46:07 -0800 (PST)
+Date: Tue, 12 Feb 2019 08:46:05 +0100
+From: Daniel Vetter <daniel@ffwll.ch>
+To: "Hean-Loong, Ong" <hean.loong.ong@intel.com>
+Subject: Re: [PATCHv13 3/3] ARM:drm ivip Intel FPGA Video and Image
+ Processing Suite
+Message-ID: <20190212074605.GW23159@phenom.ffwll.local>
+Mail-Followup-To: "Hean-Loong, Ong" <hean.loong.ong@intel.com>,
+ Rob Herring <robh+dt@kernel.org>, Dinh Nguyen <dinguyen@kernel.org>,
+ Sam Ravnborg <sam@ravnborg.org>,
+ Daniel Vetter <daniel.vetter@intel.com>,
+ Noralf =?iso-8859-1?Q?Tr=F8nnes?= <noralf@tronnes.org>,
+ Rienk de Jong <rienk.dejong@quest-innovations.com>,
+ devicetree@vger.kernel.org, chin.liang.see@intel.com,
+ linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Ong@freedesktop.org, linux-arm-kernel@lists.infradead.org
+References: <20190212023623.2646-1-hean.loong.ong@intel.com>
+ <20190212023623.2646-4-hean.loong.ong@intel.com>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Content-Disposition: inline
+In-Reply-To: <20190212023623.2646-4-hean.loong.ong@intel.com>
+X-Operating-System: Linux phenom 4.19.0-1-amd64 
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_234348_636411_DD1C8AD7 
-X-CRM114-Status: GOOD (  27.41  )
+X-CRM114-CacheID: sfid-20190211_234612_797763_3E5C28DA 
+X-CRM114-Status: GOOD (  29.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,629 +107,659 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Device Tree Mailing List <devicetree@vger.kernel.org>,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, Lokesh Vutla <lokeshvutla@ti.com>,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org,
+ Rienk de Jong <rienk.dejong@quest-innovations.com>, chin.liang.see@intel.com,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Dinh Nguyen <dinguyen@kernel.org>,
+ Noralf =?iso-8859-1?Q?Tr=F8nnes?= <noralf@tronnes.org>,
+ dri-devel@lists.freedesktop.org, Daniel Vetter <daniel.vetter@intel.com>,
+ Sam Ravnborg <sam@ravnborg.org>, linux-arm-kernel@lists.infradead.org,
+ Ong@freedesktop.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Texas Instruments' K3 generation SoCs has an IP Interrupt Aggregator
-which is an interrupt controller that does the following:
-- Converts events to interrupts that can be understood by
-  an interrupt router.
-- Allows for multiplexing of events to interrupts.
+On Tue, Feb 12, 2019 at 10:36:23AM +0800, Hean-Loong, Ong via dri-devel wrote:
+> From: Ong, Hean Loong <hean.loong.ong@intel.com>
+> 
+> Driver for Intel FPGA Video and Image Processing Suite Frame Buffer II.
+> The driver only supports the Intel Arria10 devkit and its variants.
+> This driver can be either loaded staticlly or in modules.
+> The OF device tree binding is located at:
+> Documentation/devicetree/bindings/display/altr,vip-fb2.txt
+> 
+> Signed-off-by: Ong, Hean Loong <hean.loong.ong@intel.com>
 
-Configuration of the interrupt aggregator registers can only be done by
-a system co-processor and the driver needs to send a message to this
-co processor over TISCI protocol.
+It looks like your cover letter and patch 2 didn't make it to the list
+somehow. Please check those aren't stuck on your side (list admins didn't
+see them yet).
 
-Add support for Interrupt Aggregator driver with 2 IRQ Domains:
-- INTA MSI domain that interfaces the devices using which interrupts can be
-  allocated dynamically.
-- INTA domain that is parent to the MSI domain that manages the interrupt
-  resources.
+> ---
+>  drivers/gpu/drm/Kconfig               |    2 +
+>  drivers/gpu/drm/Makefile              |    1 +
+>  drivers/gpu/drm/ivip/Kconfig          |   14 ++
+>  drivers/gpu/drm/ivip/Makefile         |    6 +
+>  drivers/gpu/drm/ivip/intel_vip_conn.c |   91 +++++++++
+>  drivers/gpu/drm/ivip/intel_vip_drv.c  |  332 +++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/ivip/intel_vip_drv.h  |   73 +++++++
+>  7 files changed, 519 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/gpu/drm/ivip/Kconfig
+>  create mode 100644 drivers/gpu/drm/ivip/Makefile
+>  create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
+>  create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.c
+>  create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
+> 
+> diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> index 4385f00..0251a9f 100644
+> --- a/drivers/gpu/drm/Kconfig
+> +++ b/drivers/gpu/drm/Kconfig
+> @@ -235,6 +235,8 @@ source "drivers/gpu/drm/nouveau/Kconfig"
+>  
+>  source "drivers/gpu/drm/i915/Kconfig"
+>  
+> +source "drivers/gpu/drm/ivip/Kconfig"
+> +
+>  config DRM_VGEM
+>  	tristate "Virtual GEM provider"
+>  	depends on DRM
+> diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> index ce8d1d3..85a5694 100644
+> --- a/drivers/gpu/drm/Makefile
+> +++ b/drivers/gpu/drm/Makefile
+> @@ -63,6 +63,7 @@ obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+>  obj-$(CONFIG_DRM_MGA)	+= mga/
+>  obj-$(CONFIG_DRM_I810)	+= i810/
+>  obj-$(CONFIG_DRM_I915)	+= i915/
+> +obj-$(CONFIG_DRM_IVIP)	+= ivip/
+>  obj-$(CONFIG_DRM_MGAG200) += mgag200/
+>  obj-$(CONFIG_DRM_V3D)  += v3d/
+>  obj-$(CONFIG_DRM_VC4)  += vc4/
+> diff --git a/drivers/gpu/drm/ivip/Kconfig b/drivers/gpu/drm/ivip/Kconfig
+> new file mode 100644
+> index 0000000..1d08b90
+> --- /dev/null
+> +++ b/drivers/gpu/drm/ivip/Kconfig
+> @@ -0,0 +1,14 @@
+> +config DRM_IVIP
+> +        tristate "Intel FGPA Video and Image Processing"
+> +        depends on DRM && OF
+> +        select DRM_GEM_CMA_HELPER
+> +        select DRM_KMS_HELPER
+> +        select DRM_KMS_FB_HELPER
+> +        select DRM_KMS_CMA_HELPER
+> +        help
+> +		  Choose this option if you have an Intel FPGA Arria 10 system
+> +		  and above with an Intel Display Port IP. This does not support
+> +		  legacy Intel FPGA Cyclone V display port. Currently only single
+> +		  frame buffer is supported. Note that ACPI and X_86 architecture
+> +		  is not supported for Arria10. If M is selected the module will be
+> +		  called ivip.
+> diff --git a/drivers/gpu/drm/ivip/Makefile b/drivers/gpu/drm/ivip/Makefile
+> new file mode 100644
+> index 0000000..8c54e11
+> --- /dev/null
+> +++ b/drivers/gpu/drm/ivip/Makefile
+> @@ -0,0 +1,6 @@
+> +#
+> +# Makefile for the drm device driver.  This driver provides support for the
+> +# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
+> +
+> +obj-$(CONFIG_DRM_IVIP) += ivip.o
+> +ivip-objs := intel_vip_drv.o intel_vip_conn.o
+> diff --git a/drivers/gpu/drm/ivip/intel_vip_conn.c b/drivers/gpu/drm/ivip/intel_vip_conn.c
+> new file mode 100644
+> index 0000000..93ce0b3
+> --- /dev/null
+> +++ b/drivers/gpu/drm/ivip/intel_vip_conn.c
+> @@ -0,0 +1,91 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2019 Intel Corporation.
+> + *
+> + * intel_vip_conn.c -- Intel Video and Image Processing(VIP)
+> + * Frame Buffer II driver
+> + *
+> + * This driver supports the Intel VIP Frame Reader component.
+> + * More info on the hardware can be found in the Intel Video
+> + * and Image Processing Suite User Guide at this address
+> + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> + *
+> + * Authors:
+> + * Walter Goossens <waltergoossens@home.nl>
+> + * Thomas Chou <thomas@wytron.com.tw>
+> + * Chris Rauer <crauer@altera.com>
+> + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> + *
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_encoder_slave.h>
+> +#include <drm/drm_plane_helper.h>
+> +
+> +static enum drm_connector_status
+> +intelvipfb_drm_connector_detect(struct drm_connector *connector, bool force)
+> +{
+> +	return connector_status_connected;
+> +}
+> +
+> +static void intelvipfb_drm_connector_destroy(struct drm_connector *connector)
+> +{
+> +	drm_connector_unregister(connector);
+> +	drm_connector_cleanup(connector);
+> +}
+> +
+> +static const struct drm_connector_funcs intelvipfb_drm_connector_funcs = {
+> +	.detect = intelvipfb_drm_connector_detect,
+> +	.reset = drm_atomic_helper_connector_reset,
+> +	.fill_modes = drm_helper_probe_single_connector_modes,
+> +	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+> +	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
+> +	.destroy = intelvipfb_drm_connector_destroy,
+> +};
+> +
+> +static int intelvipfb_drm_connector_get_modes(struct drm_connector *connector)
+> +{
+> +	struct drm_device *drm = connector->dev;
+> +	int count;
+> +
+> +	count = drm_add_modes_noedid(connector, drm->mode_config.max_width,
+> +			drm->mode_config.max_height);
+> +	drm_set_preferred_mode(connector, drm->mode_config.max_width,
+> +			drm->mode_config.max_height);
+> +	return count;
+> +}
+> +
+> +static const struct drm_connector_helper_funcs
+> +intelvipfb_drm_connector_helper_funcs = {
+> +	.get_modes = intelvipfb_drm_connector_get_modes,
+> +};
+> +
+> +struct drm_connector *
+> +intelvipfb_conn_setup(struct drm_device *drm)
+> +{
+> +	struct drm_connector *conn;
+> +	int ret;
+> +
+> +	conn = devm_kzalloc(drm->dev, sizeof(*conn), GFP_KERNEL);
+> +	if (IS_ERR(conn))
+> +		return NULL;
+> +
+> +	drm_connector_helper_add(conn, &intelvipfb_drm_connector_helper_funcs);
+> +	ret = drm_connector_init(drm, conn, &intelvipfb_drm_connector_funcs,
+> +			DRM_MODE_CONNECTOR_DisplayPort);
+> +	if (ret < 0) {
+> +		dev_err(drm->dev, "failed to initialize drm connector\n");
+> +		ret = -ENOMEM;
+> +		goto error_connector_cleanup;
+> +	}
+> +
+> +	return conn;
+> +
+> +error_connector_cleanup:
+> +	drm_connector_cleanup(conn);
+> +
+> +	return NULL;
+> +}
+> diff --git a/drivers/gpu/drm/ivip/intel_vip_drv.c b/drivers/gpu/drm/ivip/intel_vip_drv.c
+> new file mode 100644
+> index 0000000..38790b7
+> --- /dev/null
+> +++ b/drivers/gpu/drm/ivip/intel_vip_drv.c
+> @@ -0,0 +1,332 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2019 Intel Corporation.
+> + *
+> + * intel_vip_core.c -- Intel Video and Image Processing(VIP)
+> + * Frame Buffer II driver
+> + *
+> + * This driver supports the Intel VIP Frame Reader component.
+> + * More info on the hardware can be found in the Intel Video
+> + * and Image Processing Suite User Guide at this address
+> + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> + *
+> + * Authors:
+> + * Walter Goossens <waltergoossens@home.nl>
+> + * Thomas Chou <thomas@wytron.com.tw>
+> + * Chris Rauer <crauer@altera.com>
+> + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> + *
+> + */
+> +
+> +#include <drm/drm_atomic.h>
+> +#include <drm/drm_atomic_helper.h>
+> +#include <drm/drm_crtc_helper.h>
+> +#include <drm/drm_fb_helper.h>
+> +#include <drm/drm_fb_cma_helper.h>
+> +#include <drm/drm_gem_cma_helper.h>
+> +#include <drm/drm_gem_framebuffer_helper.h>
+> +#include <drm/drm_plane_helper.h>
+> +#include <drm/drm_simple_kms_helper.h>
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +
+> +#include "intel_vip_drv.h"
+> +
+> +static inline struct intelvipfb_priv *
+> +pipe_to_intelvipdrm(struct drm_simple_display_pipe *pipe)
+> +{
+> +	return container_of(pipe, struct intelvipfb_priv, pipe);
+> +}
+> +
+> +DEFINE_DRM_GEM_CMA_FOPS(drm_fops);
+> +
+> +static struct drm_driver intelvipfb_drm = {
+> +	.driver_features =
+> +			DRIVER_MODESET | DRIVER_GEM |
+> +			DRIVER_PRIME | DRIVER_ATOMIC,
+> +	.gem_free_object_unlocked = drm_gem_cma_free_object,
+> +	.gem_vm_ops = &drm_gem_cma_vm_ops,
+> +	.dumb_create = drm_gem_cma_dumb_create,
+> +	.dumb_destroy = drm_gem_dumb_destroy,
+> +	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+> +	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+> +	.gem_prime_export = drm_gem_prime_export,
+> +	.gem_prime_import = drm_gem_prime_import,
+> +	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+> +	.gem_prime_import_sg_table = drm_gem_cma_prime_import_sg_table,
+> +	.gem_prime_vmap = drm_gem_cma_prime_vmap,
+> +	.gem_prime_vunmap = drm_gem_cma_prime_vunmap,
+> +	.gem_prime_mmap = drm_gem_cma_prime_mmap,
+> +	.name = DRIVER_NAME,
+> +	.date = "20190129",
+> +	.desc = "Intel FPGA VIP SUITE",
+> +	.major = 1,
+> +	.minor = 0,
+> +	.ioctls = NULL,
+> +	.patchlevel = 0,
+> +	.fops = &drm_fops,
+> +};
+> +
+> +/*
+> + * Setting up information derived from OF Device Tree Nodes
+> + * max-width, max-height, bits per pixel, memory port width
+> + */
+> +
+> +static int intelvipfb_drm_setup(struct device *dev,
+> +					struct intelvipfb_priv *priv)
+> +{
+> +	struct drm_device *drm = priv->drm;
+> +	struct device_node *np = dev->of_node;
+> +	int mem_word_width;
+> +	int max_h, max_w;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(np, "altr,max-width", &max_w);
+> +	if (ret) {
+> +		dev_err(dev,
+> +			"Missing required parameter 'altr,max-width'");
+> +		return ret;
+> +	}
+> +
+> +	ret = of_property_read_u32(np, "altr,max-height", &max_h);
+> +	if (ret) {
+> +		dev_err(dev,
+> +			"Missing required parameter 'altr,max-height'");
+> +		return ret;
+> +	}
+> +
+> +	ret = of_property_read_u32(np, "altr,mem-port-width", &mem_word_width);
+> +	if (ret) {
+> +		dev_err(dev, "Missing required parameter 'altr,mem-port-width '");
+> +		return ret;
+> +	}
+> +
+> +	if (!(mem_word_width >= 32 && mem_word_width % 32 == 0)) {
+> +		dev_err(dev,
+> +			"mem-word-width is set to %i. must be >= 32 and multiple of 32.",
+> +			 mem_word_width);
+> +		return -ENODEV;
+> +	}
+> +
+> +	drm->mode_config.min_width = 640;
+> +	drm->mode_config.min_height = 480;
+> +	drm->mode_config.max_width = max_w;
+> +	drm->mode_config.max_height = max_h;
+> +	drm->mode_config.preferred_depth = 32;
+> +
+> +	return 0;
+> +}
+> +
+> +static int intelvipfb_of_probe(struct platform_device *pdev)
+> +{
+> +	int retval;
+> +	struct resource *reg_res;
+> +	struct intelvipfb_priv *priv;
+> +	struct device *dev = &pdev->dev;
+> +	struct drm_device *drm;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	/* setup DRM */
+> +	drm = drm_dev_alloc(&intelvipfb_drm, dev);
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
-Changes since v4:
-- Allocate the INTA output interrupts during probe.
+Just a tiny bikeshed: Recommended style nowadays is to use drm_dev_init
+an embed drm_device into your driver private structure. This means you
+can't use devm_kzalloc (but to be really strict, almost all usage of
+devm_kzalloc in drm drivers is broken, but that's an entirely different
+story). Would be great to switch over to drm_dev_init to align better with
+some of the planned work we have.
 
- MAINTAINERS                       |   1 +
- drivers/irqchip/Kconfig           |  12 +
- drivers/irqchip/Makefile          |   1 +
- drivers/irqchip/irq-ti-sci-inta.c | 531 ++++++++++++++++++++++++++++++
- 4 files changed, 545 insertions(+)
- create mode 100644 drivers/irqchip/irq-ti-sci-inta.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 970c732b7158..44a3392239d9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -15069,6 +15069,7 @@ F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-inta.txt
- F:	drivers/irqchip/irq-ti-sci-intr.c
- F:	drivers/irqchip/irq-ti-sci-common.c
- F:	drivers/irqchip/irq-ti-sci-common.h
-+F:	drivers/irqchip/irq-ti-sci-inta.c
- 
- Texas Instruments ASoC drivers
- M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index a8d9bed0254b..d16fd39408ad 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -417,6 +417,18 @@ config TI_SCI_INTR_IRQCHIP
- 	  If you wish to use interrupt router irq resources managed by the
- 	  TI System Controller, say Y here. Otherwise, say N.
- 
-+config TI_SCI_INTA_IRQCHIP
-+	bool
-+	depends on TI_SCI_PROTOCOL && ARCH_K3
-+	select IRQ_DOMAIN
-+	select IRQ_DOMAIN_HIERARCHY
-+	select K3_INTA_MSI_DOMAIN
-+	help
-+	  This enables the irqchip driver support for K3 Interrupt aggregator
-+	  over TI System Control Interface available on some new TI's SoCs.
-+	  If you wish to use interrupt aggregator irq resources managed by the
-+	  TI System Controller, say Y here. Otherwise, say N.
-+
- endmenu
- 
- config SIFIVE_PLIC
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 0499fae148a9..caf6d084e0d4 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -95,3 +95,4 @@ obj-$(CONFIG_SIFIVE_PLIC)		+= irq-sifive-plic.o
- obj-$(CONFIG_IMX_IRQSTEER)		+= irq-imx-irqsteer.o
- obj-$(CONFIG_MADERA_IRQ)		+= irq-madera.o
- obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+= irq-ti-sci-intr.o irq-ti-sci-common.o
-+obj-$(CONFIG_TI_SCI_INTA_IRQCHIP)	+= irq-ti-sci-inta.o irq-ti-sci-common.o
-diff --git a/drivers/irqchip/irq-ti-sci-inta.c b/drivers/irqchip/irq-ti-sci-inta.c
-new file mode 100644
-index 000000000000..131944fec6fe
---- /dev/null
-+++ b/drivers/irqchip/irq-ti-sci-inta.c
-@@ -0,0 +1,531 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Texas Instruments' K3 Interrupt Aggregator irqchip driver
-+ *
-+ * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
-+ *	Lokesh Vutla <lokeshvutla@ti.com>
-+ */
-+
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/msi.h>
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/module.h>
-+#include <linux/moduleparam.h>
-+#include <linux/irqdomain.h>
-+#include <linux/interrupt.h>
-+#include <linux/soc/ti/ti_sci_protocol.h>
-+#include <linux/soc/ti/k3_inta_msi.h>
-+#include <linux/irqchip/chained_irq.h>
-+#include <asm-generic/msi.h>
-+#include "irq-ti-sci-common.h"
-+
-+#define MAX_EVENTS_PER_VINT	64
-+
-+#define VINT_ENABLE_SET_OFFSET	0x0
-+#define VINT_ENABLE_CLR_OFFSET	0x8
-+#define VINT_STATUS_OFFSET	0x18
-+
-+/**
-+ * struct ti_sci_inta_event_desc - Description of an event coming to
-+ *				   Interrupt Aggregator.
-+ * @global_event:	Global event number corresponding to this event
-+ * @src_id:		TISCI device ID of the event source
-+ * @src_index:		Event source index within the device.
-+ */
-+struct ti_sci_inta_event_desc {
-+	u16 global_event;
-+	u16 src_id;
-+	u16 src_index;
-+};
-+
-+/**
-+ * struct ti_sci_inta_vint_desc - Description of a virtual interrupt coming out
-+ *				  of Interrupt Aggregator.
-+ * @domain:		Pointer to IRQ domain to which this vint belongs.
-+ * @list:		List entry for the vint list
-+ * @event_lock:		lock to guard the event map
-+ * @event_map:		Bitmap to manage the allocation of events to vint.
-+ * @events:		Array of event descriptors assigned to this vint.
-+ * @parent_virq:	Linux IRQ number that gets attached to parent
-+ * @vint_id:		TISCI vint ID
-+ */
-+struct ti_sci_inta_vint_desc {
-+	struct irq_domain *domain;
-+	struct list_head list;
-+	struct mutex event_lock;
-+	unsigned long *event_map;
-+	struct ti_sci_inta_event_desc events[MAX_EVENTS_PER_VINT];
-+	unsigned int parent_virq;
-+	u16 vint_id;
-+};
-+
-+/**
-+ * struct ti_sci_inta_irq_domain - Structure representing a TISCI based
-+ *				   Interrupt Aggregator IRQ domain.
-+ * @sci:		Pointer to TISCI handle
-+ * @vint:		TISCI resource pointer representing IA inerrupts.
-+ * @global_event:	TISCI resource pointer representing global events.
-+ * @vint_list:		List of the vints active in the system
-+ * @base:		Base address of the memory mapped IO registers
-+ * @ia_id:		TISCI device ID of this Interrupt Aggregator.
-+ */
-+struct ti_sci_inta_irq_domain {
-+	const struct ti_sci_handle *sci;
-+	struct ti_sci_resource *vint;
-+	struct ti_sci_resource *global_event;
-+	struct list_head vint_list;
-+	void __iomem *base;
-+	u16 ia_id;
-+};
-+
-+static int __get_event_index(struct ti_sci_inta_vint_desc *vint_desc,
-+			     int global_event)
-+{
-+	int event_index = -ENODEV, i;
-+
-+	for (i = 0; i < MAX_EVENTS_PER_VINT; i++) {
-+		if (vint_desc->events[i].global_event == global_event) {
-+			event_index = i;
-+			break;
-+		}
-+	}
-+
-+	return event_index;
-+}
-+
-+static void __ti_sci_inta_manage_event(struct irq_data *data, u32 offset)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct ti_sci_inta_irq_domain *inta;
-+	int global_event, event_index;
-+
-+	vint_desc = irq_data_get_irq_chip_data(data);
-+	global_event = data->hwirq;
-+	event_index = __get_event_index(vint_desc, global_event);
-+	inta = vint_desc->domain->host_data;
-+
-+	if (event_index < 0)
-+		return;
-+
-+	writeq_relaxed(BIT(event_index), inta->base +
-+		       vint_desc->vint_id * 0x1000 + offset);
-+}
-+
-+static void ti_sci_inta_mask_irq(struct irq_data *data)
-+{
-+	__ti_sci_inta_manage_event(data, VINT_ENABLE_CLR_OFFSET);
-+}
-+
-+static void ti_sci_inta_unmask_irq(struct irq_data *data)
-+{
-+	__ti_sci_inta_manage_event(data, VINT_ENABLE_SET_OFFSET);
-+}
-+
-+static int ti_sci_inta_set_affinity(struct irq_data *d,
-+				    const struct cpumask *mask_val, bool force)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc = irq_data_get_irq_chip_data(d);
-+	struct irq_chip *chip = irq_get_chip(vint_desc->parent_virq);
-+	struct irq_data *data = irq_get_irq_data(vint_desc->parent_virq);
-+
-+	if (chip && chip->irq_set_affinity)
-+		return chip->irq_set_affinity(data, mask_val, force);
-+	else
-+		return -EINVAL;
-+}
-+
-+static struct irq_chip ti_sci_inta_irq_chip = {
-+	.name			= "INTA",
-+	.irq_mask		= ti_sci_inta_mask_irq,
-+	.irq_unmask		= ti_sci_inta_unmask_irq,
-+	.irq_set_affinity	= ti_sci_inta_set_affinity,
-+};
-+
-+/**
-+ * ti_sci_free_event_irq() - Free an event from vint
-+ * @domain:	Pointer to Interrupt Aggregator IRQ domain
-+ * @vint_desc:	Virtual interrupt descriptor containing the event.
-+ * @global_event: Global event id to be freed.
-+ */
-+static void ti_sci_free_event_irq(struct irq_domain *domain,
-+				  struct ti_sci_inta_vint_desc *vint_desc,
-+				  u16 global_event)
-+{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	struct ti_sci_inta_event_desc *event_desc;
-+	int event_index = 0;
-+
-+	event_index = __get_event_index(vint_desc, global_event);
-+	event_desc = &vint_desc->events[event_index];
-+	inta->sci->ops.rm_irq_ops.free_event_map(inta->sci,
-+						 event_desc->src_id,
-+						 event_desc->src_index,
-+						 inta->ia_id,
-+						 vint_desc->vint_id,
-+						 event_desc->global_event,
-+						 event_index);
-+
-+	clear_bit(event_index, vint_desc->event_map);
-+
-+	ti_sci_release_resource(inta->global_event, event_desc->global_event);
-+}
-+
-+static void ti_sci_inta_free_vint(struct ti_sci_inta_irq_domain *inta,
-+				  struct ti_sci_inta_vint_desc *vint_desc)
-+{
-+	/* If all events are cleared, release vint */
-+	if (find_first_bit(vint_desc->event_map, MAX_EVENTS_PER_VINT) ==
-+	    MAX_EVENTS_PER_VINT)
-+		ti_sci_release_resource(inta->vint, vint_desc->vint_id);
-+}
-+
-+/**
-+ * ti_sci_inta_irq_domain_free() - Free an IRQ from the IRQ domain
-+ * @domain:	Domain to which the irqs belong
-+ * @virq:	base linux virtual IRQ to be freed.
-+ * @nr_irqs:	Number of continuous irqs to be freed
-+ */
-+static void ti_sci_inta_irq_domain_free(struct irq_domain *domain,
-+					unsigned int virq, unsigned int nr_irqs)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct irq_data *data;
-+
-+	data = irq_domain_get_irq_data(domain, virq);
-+	vint_desc = irq_data_get_irq_chip_data(data);
-+
-+	ti_sci_free_event_irq(domain, vint_desc, data->hwirq);
-+	ti_sci_inta_free_vint(domain->host_data, vint_desc);
-+	irq_domain_reset_irq_data(data);
-+}
-+
-+/**
-+ * ti_sci_allocate_event_irq() - Allocate an event to a IA vint.
-+ *
-+ * Return global_event if all went ok else appropriate error value.
-+ */
-+static
-+int ti_sci_allocate_event_irq(struct irq_domain *domain, msi_alloc_info_t *arg)
-+{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	struct ti_sci_inta_event_desc *event_desc;
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	u16 free_bit, src_id, src_index;
-+	int err;
-+
-+	src_id = HWIRQ_TO_DEVID(arg->hwirq);
-+	src_index = HWIRQ_TO_IRQID(arg->hwirq);
-+	vint_desc = arg->scratchpad[0].ptr;
-+
-+	mutex_lock(&vint_desc->event_lock);
-+	free_bit = find_first_zero_bit(vint_desc->event_map,
-+				       MAX_EVENTS_PER_VINT);
-+	if (free_bit != MAX_EVENTS_PER_VINT)
-+		set_bit(free_bit, vint_desc->event_map);
-+	mutex_unlock(&vint_desc->event_lock);
-+
-+	event_desc = &vint_desc->events[free_bit];
-+
-+	event_desc->src_id = src_id;
-+	event_desc->src_index = src_index;
-+	event_desc->global_event = ti_sci_get_free_resource(inta->global_event);
-+	if (event_desc->global_event == TI_SCI_RESOURCE_NULL) {
-+		err = -EINVAL;
-+		goto free_event;
-+	}
-+
-+	err = inta->sci->ops.rm_irq_ops.set_event_map(inta->sci,
-+						      src_id, src_index,
-+						      inta->ia_id,
-+						      vint_desc->vint_id,
-+						      event_desc->global_event,
-+						      free_bit);
-+	if (err)
-+		goto free_global_event;
-+
-+	return event_desc->global_event;
-+free_global_event:
-+	ti_sci_release_resource(inta->global_event, event_desc->global_event);
-+free_event:
-+	clear_bit(free_bit, vint_desc->event_map);
-+	return err;
-+}
-+
-+struct ti_sci_inta_vint_desc *
-+ti_sci_inta_get_vint(struct ti_sci_inta_irq_domain *inta, u16 vint)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+
-+	list_for_each_entry(vint_desc, &inta->vint_list, list)
-+		if (vint_desc->vint_id == vint)
-+			return vint_desc;
-+	return NULL;
-+}
-+
-+/**
-+ * ti_sci_inta_irq_domain_alloc() - Allocate Interrupt aggregator IRQs
-+ * @domain:	Point to the interrupt aggregator IRQ domain
-+ * @virq:	Corresponding Linux virtual IRQ number
-+ * @nr_irqs:	Continuous irqs to be allocated
-+ * @data:	Pointer to firmware specifier
-+ *
-+ * Return 0 if all went well else appropriate error value.
-+ */
-+static int ti_sci_inta_irq_domain_alloc(struct irq_domain *domain,
-+					unsigned int virq, unsigned int nr_irqs,
-+					void *data)
-+{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	msi_alloc_info_t *arg = data;
-+	int hwirq;
-+	u16 vint;
-+
-+	if (arg->desc->inta.share) {
-+		if (!arg->scratchpad[0].ptr) {
-+			vint = ti_sci_get_free_resource(inta->vint);
-+			arg->scratchpad[0].ptr = ti_sci_inta_get_vint(inta,
-+								      vint);
-+		}
-+	} else {
-+		vint = ti_sci_get_free_resource(inta->vint);
-+		arg->scratchpad[0].ptr = ti_sci_inta_get_vint(inta, vint);
-+	}
-+
-+	hwirq = ti_sci_allocate_event_irq(domain, arg);
-+	if (hwirq < 0)
-+		return hwirq;
-+
-+	irq_domain_set_info(domain, virq, hwirq, &ti_sci_inta_irq_chip,
-+			    arg->scratchpad[0].ptr, handle_simple_irq,
-+			    NULL, NULL);
-+
-+	return 0;
-+}
-+
-+static const struct irq_domain_ops ti_sci_inta_irq_domain_ops = {
-+	.alloc		= ti_sci_inta_irq_domain_alloc,
-+	.free		= ti_sci_inta_irq_domain_free,
-+};
-+
-+static struct irq_chip inta_msi_irq_chip = {
-+	.name		= "MSI-INTA",
-+};
-+
-+static void inta_msi_set_desc(msi_alloc_info_t *arg, struct msi_desc *desc)
-+{
-+	arg->desc = desc;
-+	arg->hwirq = TO_HWIRQ(desc->inta.dev_id, desc->inta.index);
-+}
-+
-+static struct msi_domain_ops inta_msi_ops = {
-+	.set_desc	= inta_msi_set_desc,
-+};
-+
-+static struct msi_domain_info inta_msi_domain_info = {
-+	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
-+	.ops	= &inta_msi_ops,
-+	.chip	= &inta_msi_irq_chip,
-+};
-+
-+static void inta_msi_irq_handler(struct irq_desc *desc)
-+{
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct ti_sci_inta_irq_domain *inta;
-+	struct irq_domain *domain;
-+	struct irq_data *irq_data;
-+	u32 hwirq, bit, virq;
-+	u64 val;
-+
-+	vint_desc = irq_desc_get_handler_data(desc);
-+	domain = vint_desc->domain;
-+	inta = domain->host_data;
-+
-+	chained_irq_enter(irq_desc_get_chip(desc), desc);
-+
-+	val = readq_relaxed(inta->base + vint_desc->vint_id * 0x1000 +
-+			    VINT_STATUS_OFFSET);
-+
-+	for (bit = 0; bit < MAX_EVENTS_PER_VINT; bit++) {
-+		if (BIT(bit) & val) {
-+			hwirq = vint_desc->events[bit].global_event;
-+			virq = irq_find_mapping(domain, hwirq);
-+			irq_data = irq_get_irq_data(virq);
-+			if (irqd_get_trigger_type(irq_data) ==
-+			    IRQF_TRIGGER_HIGH)
-+				writeq_relaxed(BIT(bit),
-+					       inta->base + vint_desc->vint_id *
-+					       0x1000 + VINT_STATUS_OFFSET);
-+
-+			if (virq)
-+				generic_handle_irq(virq);
-+		}
-+	}
-+
-+	chained_irq_exit(irq_desc_get_chip(desc), desc);
-+}
-+
-+/**
-+ * ti_sci_inta_alloc_parent_irq() - Allocate parent irq to Interrupt aggregator
-+ * @domain:	IRQ domain corresponding to Interrupt Aggregator
-+ * @virq:	Linux virtual IRQ number
-+ *
-+ * Return 0 if all went well else corresponding error value.
-+ */
-+static int ti_sci_inta_alloc_parent_irq(struct irq_domain *domain, u16 vint_id)
-+{
-+	struct ti_sci_inta_irq_domain *inta = domain->host_data;
-+	struct ti_sci_inta_vint_desc *vint_desc;
-+	struct irq_fwspec parent_fwspec;
-+	unsigned int virq;
-+
-+	vint_desc = kzalloc(sizeof(*vint_desc), GFP_KERNEL);
-+	if (!vint_desc)
-+		return -ENOMEM;
-+
-+	vint_desc->event_map = kcalloc(BITS_TO_LONGS(MAX_EVENTS_PER_VINT),
-+				       sizeof(*vint_desc->event_map),
-+				       GFP_KERNEL);
-+	if (!vint_desc->event_map) {
-+		kfree(vint_desc);
-+		return -ENOMEM;
-+	}
-+
-+	vint_desc->domain = domain;
-+	vint_desc->vint_id = vint_id;
-+	INIT_LIST_HEAD(&vint_desc->list);
-+	list_add_tail(&vint_desc->list, &inta->vint_list);
-+
-+	parent_fwspec.fwnode = domain->parent->fwnode;
-+	parent_fwspec.param_count = 4;
-+	/* Interrupt parent is Interrupt Router */
-+	parent_fwspec.param[0] = inta->ia_id;
-+	parent_fwspec.param[1] = vint_desc->vint_id;
-+	parent_fwspec.param[2] = IRQF_TRIGGER_HIGH;
-+	parent_fwspec.param[3] = 1;
-+
-+	virq = irq_create_fwspec_mapping(&parent_fwspec);
-+	if (virq <= 0) {
-+		kfree(vint_desc->event_map);
-+		kfree(vint_desc);
-+		return -ERANGE;
-+	}
-+
-+	irq_set_chained_handler_and_data(virq, inta_msi_irq_handler, vint_desc);
-+
-+	mutex_init(&vint_desc->event_lock);
-+
-+	return 0;
-+}
-+
-+static int ti_sci_inta_irq_domain_probe(struct platform_device *pdev)
-+{
-+	struct irq_domain *parent_domain, *domain, *msi_domain;
-+	struct device_node *parent_node, *node;
-+	struct ti_sci_inta_irq_domain *inta;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	int ret, set, i;
-+
-+	node = dev_of_node(dev);
-+	parent_node = of_irq_find_parent(node);
-+	if (!parent_node) {
-+		dev_err(dev, "Failed to get IRQ parent node\n");
-+		return -ENODEV;
-+	}
-+
-+	parent_domain = irq_find_host(parent_node);
-+	if (!parent_domain)
-+		return -EPROBE_DEFER;
-+
-+	inta = devm_kzalloc(dev, sizeof(*inta), GFP_KERNEL);
-+	if (!inta)
-+		return -ENOMEM;
-+
-+	inta->sci = devm_ti_sci_get_by_phandle(dev, "ti,sci");
-+	if (IS_ERR(inta->sci)) {
-+		ret = PTR_ERR(inta->sci);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(dev, "ti,sci read fail %d\n", ret);
-+		inta->sci = NULL;
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(dev->of_node, "ti,sci-dev-id",
-+				   (u32 *)&inta->ia_id);
-+	if (ret) {
-+		dev_err(dev, "missing 'ti,sci-dev-id' property\n");
-+		return -EINVAL;
-+	}
-+
-+	inta->vint = devm_ti_sci_get_of_resource(inta->sci, dev,
-+						 inta->ia_id,
-+						 "ti,sci-rm-range-vint");
-+	if (IS_ERR(inta->vint)) {
-+		dev_err(dev, "VINT resource allocation failed\n");
-+		return PTR_ERR(inta->vint);
-+	}
-+
-+	inta->global_event =
-+		devm_ti_sci_get_of_resource(inta->sci, dev,
-+					    inta->ia_id,
-+					    "ti,sci-rm-range-global-event");
-+	if (IS_ERR(inta->global_event)) {
-+		dev_err(dev, "Global event resource allocation failed\n");
-+		return PTR_ERR(inta->global_event);
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	inta->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(inta->base))
-+		return -ENODEV;
-+
-+	domain = irq_domain_add_hierarchy(parent_domain, 0, 0, dev_of_node(dev),
-+					  &ti_sci_inta_irq_domain_ops, inta);
-+	if (!domain) {
-+		dev_err(dev, "Failed to allocate IRQ domain\n");
-+		return -ENOMEM;
-+	}
-+
-+	msi_domain = inta_msi_create_irq_domain(of_node_to_fwnode(node),
-+						&inta_msi_domain_info,
-+						domain);
-+	if (!msi_domain) {
-+		irq_domain_remove(domain);
-+		dev_err(dev, "Failed to allocate msi domain\n");
-+		return -ENOMEM;
-+	}
-+
-+	INIT_LIST_HEAD(&inta->vint_list);
-+	for (set = 0; set < inta->vint->sets; set++) {
-+		for (i = 0; i < inta->vint->desc[set].num; i++) {
-+			if (ti_sci_inta_alloc_parent_irq(domain,
-+					inta->vint->desc[set].start + i))
-+				break;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ti_sci_inta_irq_domain_of_match[] = {
-+	{ .compatible = "ti,sci-inta", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, ti_sci_inta_irq_domain_of_match);
-+
-+static struct platform_driver ti_sci_inta_irq_domain_driver = {
-+	.probe = ti_sci_inta_irq_domain_probe,
-+	.driver = {
-+		.name = "ti-sci-inta",
-+		.of_match_table = ti_sci_inta_irq_domain_of_match,
-+	},
-+};
-+module_platform_driver(ti_sci_inta_irq_domain_driver);
-+
-+MODULE_AUTHOR("Lokesh Vutla <lokeshvutla@ticom>");
-+MODULE_DESCRIPTION("K3 Interrupt Aggregator driver over TI SCI protocol");
-+MODULE_LICENSE("GPL v2");
+> +	if (IS_ERR(drm))
+> +		return PTR_ERR(drm);
+> +
+> +	retval = dma_set_mask_and_coherent(drm->dev, DMA_BIT_MASK(32));
+> +	if (retval)
+> +		return -ENODEV;
+> +
+> +	priv->drm = drm;
+> +
+> +	reg_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!reg_res)
+> +		return -ENOMEM;
+> +
+> +	priv->base = devm_ioremap_resource(dev, reg_res);
+> +
+> +	if (IS_ERR(priv->base)) {
+> +		dev_err(dev, "devm_ioremap_resource failed\n");
+> +		retval = PTR_ERR(priv->base);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	intelvipfb_drm_setup(dev, priv);
+> +
+> +	dev_set_drvdata(dev, priv);
+> +
+> +	return intelvipfb_probe(dev);
+> +}
+> +
+> +static int intelvipfb_of_remove(struct platform_device *pdev)
+> +{
+> +	return intelvipfb_remove(&pdev->dev);
+> +}
+> +
+> +static void intelvipfb_enable(struct drm_simple_display_pipe *pipe,
+> +				struct drm_crtc_state *crtc_state,
+> +				struct drm_plane_state *
+> +				plane_state)
+> +{
+> +	/*
+> +	 * The frameinfo variable has to correspond to the size of the VIP Suite
+> +	 * Frame Reader register 7 which will determine the maximum size used
+> +	 * in this frameinfo
+> +	 */
+> +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> +	u32 frameinfo;
+> +	void __iomem *base = priv->base;
+> +	struct drm_plane_state *state = pipe->plane.state;
+> +	dma_addr_t addr;
+> +
+> +	addr = drm_fb_cma_get_gem_addr(state->fb, state, 0);
+> +
+> +	frameinfo =
+> +		readl(base + INTELVIPFB_FRAME_READER) & 0x00ffffff;
+> +	writel(frameinfo, base + INTELVIPFB_FRAME_INFO);
+> +	writel(addr, base + INTELVIPFB_FRAME_START);
+> +	/* Finally set the control register to 1 to start streaming */
+> +	writel(1, base + INTELVIPFB_CONTROL);
+> +}
+> +
+> +static void intelvipfb_disable(struct drm_simple_display_pipe *pipe)
+> +{
+> +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> +	void __iomem *base = priv->base;
+> +	/* set the control register to 0 to stop streaming */
+> +	writel(0, base + INTELVIPFB_CONTROL);
+> +}
+> +
+> +static const struct drm_mode_config_funcs intelvipfb_mode_config_funcs = {
+> +	.fb_create = drm_gem_fb_create,
+> +	.atomic_check = drm_atomic_helper_check,
+> +	.atomic_commit = drm_atomic_helper_commit,
+> +};
+> +
+> +static void intelvipfb_setup_mode_config(struct drm_device *drm)
+> +{
+> +	drm_mode_config_init(drm);
+> +	drm->mode_config.funcs = &intelvipfb_mode_config_funcs;
+> +}
+> +
+> +void intelvipfb_display_pipe_update(struct drm_simple_display_pipe *pipe,
+> +				    struct drm_plane_state *old_state)
+> +{
+> +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> +	struct drm_framebuffer *fb = pipe->plane.state->fb;
+> +	struct drm_crtc *crtc = &priv->pipe.crtc;
+> +
+> +	if (fb && fb != old_state->fb) {
+> +		if (priv->fb_dirty)
+> +			priv->fb_dirty(fb, NULL, 0, 0, NULL, 0);
+> +	}
+
+->fb_dirty here seems entirely unused. It's also incomplete, there's a lot
+more to implementing manual upload support than just this here (you need
+to setup framebuffers with the dirty callback, plus register the new
+damage property). Imo better if we add this when you start using it, hence
+please remove ->fb_dirty here and from the headers.
+
+> +
+> +	if (crtc->state->event) {
+> +		spin_lock_irq(&crtc->dev->event_lock);
+> +		drm_crtc_send_vblank_event(crtc, crtc->state->event);
+> +		spin_unlock_irq(&crtc->dev->event_lock);
+> +		crtc->state->event = NULL;
+> +	}
+> +}
+> +EXPORT_SYMBOL(intelvipfb_display_pipe_update);
+> +
+> +static struct drm_simple_display_pipe_funcs priv_funcs = {
+> +	.prepare_fb = drm_gem_fb_simple_display_pipe_prepare_fb,
+> +	.update = intelvipfb_display_pipe_update,
+> +	.enable = intelvipfb_enable,
+> +	.disable = intelvipfb_disable
+> +};
+> +
+> +int intelvipfb_probe(struct device *dev)
+> +{
+> +	int retval;
+> +	struct drm_device *drm;
+> +	struct intelvipfb_priv *priv = dev_get_drvdata(dev);
+> +
+> +	struct drm_connector *connector;
+> +	u32 formats[] = {DRM_FORMAT_XRGB8888};
+> +
+> +	drm = priv->drm;
+> +
+> +	intelvipfb_setup_mode_config(drm);
+
+Personally I'd inline this, it's just 2 lines.
+
+> +
+> +	connector = intelvipfb_conn_setup(drm);
+> +	if (!connector) {
+> +		dev_err(drm->dev, "Connector setup failed\n");
+> +		goto err_mode_config;
+> +	}
+> +
+> +	retval = drm_simple_display_pipe_init(drm,
+> +						&priv->pipe,
+> +						&priv_funcs,
+> +						formats,
+> +						ARRAY_SIZE(formats),
+> +						NULL, connector);
+> +
+> +	if (retval < 0) {
+> +		dev_err(drm->dev, "Cannot setup simple display pipe\n");
+> +		goto err_mode_config;
+> +	}
+> +
+> +	drm_mode_config_reset(drm);
+> +
+> +	drm_dev_register(drm, 0);
+> +
+> +	drm_fbdev_generic_setup(drm, 32);
+> +
+> +	dev_info(drm->dev, "ivip: Successfully created fb\n");
+> +
+> +	return retval;
+> +
+> +err_mode_config:
+> +
+> +	drm_mode_config_cleanup(drm);
+> +	return -ENODEV;
+> +}
+> +
+> +int intelvipfb_remove(struct device *dev)
+> +{
+> +	struct intelvipfb_priv *priv = dev_get_drvdata(dev);
+> +	struct drm_device *drm =  priv->drm;
+> +
+> +	drm_dev_unregister(drm);
+> +
+> +	drm_mode_config_cleanup(drm);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id intelvipfb_of_match[] = {
+> +	{ .compatible = "altr,vip-frame-buffer-2.0" },
+> +	{},
+> +/*
+> + * The name vip-frame-buffer-2.0 is derived from
+> + * http://www.altera.com/literature/ug/ug_vip.pdf
+> + * frame buffer IP cores section 14
+> + */
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, intelvipfb_of_match);
+> +
+> +static struct platform_driver intelvipfb_driver = {
+> +	.probe = intelvipfb_of_probe,
+> +	.remove = intelvipfb_of_remove,
+> +	.driver = {
+> +		.name = DRIVER_NAME,
+> +		.of_match_table = intelvipfb_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(intelvipfb_driver);
+> +
+> +/* Original author of Altera Frame Buffer*/
+> +MODULE_AUTHOR("Walter Goossens <waltergoossens@home.nl>");
+> +MODULE_AUTHOR("Thomas Chou <thomas@wytron.com.tw>");
+> +MODULE_AUTHOR("Chris Rauer <crauer@altera.com>");
+> +/* Author of Intel FPGA Frame Buffer II*/
+> +MODULE_AUTHOR("Ong, Hean-Loong <hean.loong.ong@intel.com>");
+> +MODULE_DESCRIPTION("Intel VIP Frame Buffer II driver");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/drivers/gpu/drm/ivip/intel_vip_drv.h b/drivers/gpu/drm/ivip/intel_vip_drv.h
+> new file mode 100644
+> index 0000000..821e74e
+> --- /dev/null
+> +++ b/drivers/gpu/drm/ivip/intel_vip_drv.h
+> @@ -0,0 +1,73 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) 2019 Intel Corporation.
+> + *
+> + * Intel Video and Image Processing(VIP) Frame Buffer II driver.
+> + * Frame Buffer II driver
+> + *
+> + * This driver supports the Intel VIP Frame Reader component.
+> + * More info on the hardware can be found in the Intel Video
+> + * and Image Processing Suite User Guide at this address
+> + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> + *
+> + * Authors:
+> + * Walter Goossens <waltergoossens@home.nl>
+> + * Thomas Chou <thomas@wytron.com.tw>
+> + * Chris Rauer <crauer@altera.com>
+> + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> + *
+> + */
+> +#ifndef _INTEL_VIP_DRV_H
+> +#define _INTEL_VIP_DRV_H
+> +
+> +#define DRIVER_NAME    "intelvipfb"
+> +#define BYTES_PER_PIXEL	 4
+> +#define CRTC_NUM	        1
+> +#define CONN_NUM	        1
+> +
+> +/* control registers */
+> +#define INTELVIPFB_CONTROL	      0
+> +#define INTELVIPFB_STATUS	       0x4
+> +#define INTELVIPFB_INTERRUPT	    0x8
+> +#define INTELVIPFB_FRAME_COUNTER	0xC
+> +#define INTELVIPFB_FRAME_DROP	   0x10
+> +#define INTELVIPFB_FRAME_INFO	   0x14
+> +#define INTELVIPFB_FRAME_START	  0x18
+> +#define INTELVIPFB_FRAME_READER	         0x1C
+> +
+> +int intelvipfb_probe(struct device *dev);
+> +int intelvipfb_remove(struct device *dev);
+> +int intelvipfb_setup_crtc(struct drm_device *drm);
+> +struct drm_connector *intelvipfb_conn_setup(struct drm_device *drm);
+> +
+> +struct intelvipfb_priv {
+> +	/**
+> +	 * @pipe: Display pipe structure
+> +	 */
+> +	struct drm_simple_display_pipe pipe;
+> +
+> +	/**
+> +	 * @drm: DRM device
+> +	 */
+> +	struct drm_device *drm;
+> +
+> +	/**
+> +	 * @dirty_lock: Serializes framebuffer flushing
+> +	 */
+> +	struct mutex dirty_lock;
+> +
+> +	/**
+> +	 * @base: Base memory for the framebuffer
+> +	 */
+> +	void    __iomem *base;
+> +
+> +	/**
+> +	 * @fb_dirty: Framebuffer dirty callback
+> +	 */
+> +	int (*fb_dirty)(struct drm_framebuffer *framebuffer,
+> +			struct drm_file *file_priv, unsigned int flags,
+> +			unsigned int color, struct drm_clip_rect *clips,
+> +			unsigned int num_clips);
+> +};
+> +
+> +#endif
+
+Very tidy driver, nice work. This looks ready (aside from the tiny nits),
+one last question: What's the plan with maintainig this? For small drivers
+I always recommend drm-misc:
+
+https://drm.pages.freedesktop.org/maintainer-tools/committer-drm-misc.html#small-drivers
+
+This would mean you'd need to familiarize yourself with the tooling and
+everything. But this also only makes sense if you expect that there will
+be more contributions from your (or your team).
+
+If you want to maintain this in drm-misc pls also add a corresponding
+MAINTAINERS entry, with you as maintainer and the drm-misc repo as git
+repo.
+
+Cheers, Daniel
 -- 
-2.19.2
-
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
 
 _______________________________________________
 linux-arm-kernel mailing list
