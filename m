@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B7917C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:21:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0278BC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:26:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8777C2190B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:21:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5C502190B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:26:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WbY6lfJy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="Byl1mggn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8777C2190B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qvsfIf3A";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="OFoUjrv+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5C502190B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,47 +26,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
 	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ixUXJ1vPTVC/ZLV5ZIjORCh5WM3kd+dKTWkpyS8YxJc=; b=WbY6lfJyp0Op53
-	vpFwD52dMP70oz6paTC0yWmBPAirQn0daygDCxn4EHv2EpC9A9Y3Ke7XgVyVZ9qIEygzm2yfqh3Cz
-	UlMp7UioPO6HZs0TQETVHli0DzlwdnxHwhQSYF0k0zHg67ltxmQJuGe8eJHDBAvOQQv98nLdV4BuZ
-	ZZA1UREPgv5CIWY/5yz0oBoK0G8k4J/qZRBrXvCd9t9KvXZJrBfA/yy0Tj2Y7ILVeZyIjcOhimF9A
-	cZuiSz3hPJ88Ow0//QIYU39J7jxexmjB25UeaI/QuNv8uL5ICZ5M/N8iqXJkOpSWaGc1Tz2R7f0V/
-	TFTQlwnkSAk1jhytDrgw==;
+	List-Owner; bh=7nVYNGhZ+DcSpVKR58d+CgoxDTujpRw77AG+B4QWB7s=; b=qvsfIf3Ag5vxtZ
+	kNsIbyVw1ZlXDjvDg5AhhBHQlIgUWGayVsj5eSgUUOv2tvs6jyNd+rWtp42FrMADPqdAUIcRlTt9A
+	OTEndZCSMwO8ubB5jwTSAw1pGDhdFmN/m7q4CYZbax767Zm1P7PVbeAuuUnlPe23fH5ZGLA7uRQVH
+	l/9Uk7bFnPTDj2dliShL9ILSYSMAU3Lf+jrHmXdkxPQ0Plru+h+eBYJ/xI1PQ40GrVua8uv+2PM8o
+	nAeGEzoDSNg/DQ8fZqA24RyoC6KLrV5I57U4z1jTjI+ou4GINolN0sc+DeCUbMSK+iiEymXedlJ5K
+	qwKiUGmk0bgyGpC9D5zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtdc2-0004JT-7p; Tue, 12 Feb 2019 19:20:58 +0000
+	id 1gtdhb-0006Gi-Qb; Tue, 12 Feb 2019 19:26:43 +0000
 Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtdbx-0004IB-Ju
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:20:56 +0000
+ id 1gtdhX-0006GB-IL
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:26:41 +0000
 Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id E1F655C04E3;
- Tue, 12 Feb 2019 20:20:46 +0100 (CET)
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id 012025C08D0;
+ Tue, 12 Feb 2019 20:26:36 +0100 (CET)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1549999246;
+ t=1549999596;
  h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
  to:to:cc:cc:mime-version:mime-version:content-type:content-type:
  content-transfer-encoding:content-transfer-encoding:
  in-reply-to:in-reply-to:references:references;
- bh=uBs9pbpeOdaWlHi3HtkAv5UGt42jbYrV0mLYcSYiSy0=;
- b=Byl1mggnAWaZwNHT4hxrEhHlKFMU0G653haA9CkpsF4TOuVJWWYSaIaLZKQfZgvh23nqQG
- jL7rV0qYyGZo3UVMulNa26iPBSHuLo7oBjtIol8BkH1C1pizT2ES6b/saIRkBJ6aA6mV6i
- et+XImtiuJUU9rf4FMGmH7mJh0/sfpI=
+ bh=vMAsB1iZFN1YlAUlS1QoRPtJAL//cY9F2EkH1ZgpbxQ=;
+ b=OFoUjrv+26oYRTa6vjpk2jFsvuaxdACurbDjQXyvlQ3O+WC+SwFgAazXGvEeNaStYK/yrL
+ 9q/W9tn0lGUDILBNx+CEP7m2fd8I+sYdgWl/AbLcYMBsEYMqJ/p16PRSDrK9PCpuYV76nS
+ YDGPDKuIrIqF8V7JSy61tTMMDjYEelA=
 MIME-Version: 1.0
-Date: Tue, 12 Feb 2019 20:20:46 +0100
+Date: Tue, 12 Feb 2019 20:26:35 +0100
 From: Stefan Agner <stefan@agner.ch>
-To: Shawn Guo <shawnguo@kernel.org>, broonie@kernel.org, s.hauer@pengutronix.de
-Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
-In-Reply-To: <20190211012305.GA21496@dragon>
-References: <20190107132226.16216-1-stefan@agner.ch>
- <20190107132226.16216-2-stefan@agner.ch>
- <1549573243.3075.72.camel@impinj.com> <20190211012305.GA21496@dragon>
-Message-ID: <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
+To: Nick Desaulniers <ndesaulniers@google.com>
+Subject: Re: [PATCH 4/5] ARM: use unified assembler in c files
+In-Reply-To: <CAKwvOdnqOkdD9fFoXmSKZNmceaXcWtdaZ2iwKej3=X-LL0DS9Q@mail.gmail.com>
+References: <cover.1549532513.git.stefan@agner.ch>
+ <fed4850fb5d8a8ca874affa05d8d116d53e25b88.1549532513.git.stefan@agner.ch>
+ <db0e6b8f034f832c7e52fe3dd47073ad@agner.ch>
+ <CAKwvOdnqOkdD9fFoXmSKZNmceaXcWtdaZ2iwKej3=X-LL0DS9Q@mail.gmail.com>
+Message-ID: <d0bab705305af664772b87d40c9c0ffd@agner.ch>
 X-Sender: stefan@agner.ch
 User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_112053_872531_20ABB5FF 
-X-CRM114-Status: GOOD (  24.50  )
+X-CRM114-CacheID: sfid-20190212_112639_899020_63D96994 
+X-CRM114-Status: GOOD (  20.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,127 +79,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, fabio.estevam@nxp.com,
- linux-arm-kernel@lists.infradead.org, Trent Piepho <tpiepho@impinj.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>,
+ Mark Rutland <mark.rutland@arm.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, julien.thierry@arm.com,
+ Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ LKML <linux-kernel@vger.kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-[adding Mark Brown]
-
-On 11.02.2019 02:23, Shawn Guo wrote:
-> On Thu, Feb 07, 2019 at 09:00:44PM +0000, Trent Piepho wrote:
->> On Mon, 2019-01-07 at 14:22 +0100, Stefan Agner wrote:
->> > Allow to use DMA for SPI by adding the appropriate DMA properites
->> > to the ecspi nodes.
+On 11.02.2019 19:17, Nick Desaulniers wrote:
+> On Sat, Feb 9, 2019 at 9:28 AM Stefan Agner <stefan@agner.ch> wrote:
+>>
+>> Thanks for the reviews so far.
+>>
+>> During some more testing I stumbled upon another issue:
+>>
+>> On 07.02.2019 10:48, Stefan Agner wrote:
+>> > Use unified assembler syntax (UAL) in inline assembler. Divided
+>> > syntax is considered depricated. This will also allow to build
+>> > the kernel using LLVM's integrated assembler.
 >> >
 >> > Signed-off-by: Stefan Agner <stefan@agner.ch>
 >> > ---
->> >  arch/arm/boot/dts/imx7s.dtsi | 8 ++++++++
->> >  1 file changed, 8 insertions(+)
+>> >  arch/arm/mm/copypage-v4mc.c | 2 +-
+>> >  arch/arm/mm/copypage-v4wb.c | 2 +-
+>> >  arch/arm/mm/copypage-v4wt.c | 2 +-
+>> >  3 files changed, 3 insertions(+), 3 deletions(-)
 >> >
->> > diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
->> > index a052198f6e96..b9330176c3af 100644
->> > --- a/arch/arm/boot/dts/imx7s.dtsi
->> > +++ b/arch/arm/boot/dts/imx7s.dtsi
->> > @@ -653,6 +653,8 @@
->> >  				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
->> >  					<&clks IMX7D_ECSPI4_ROOT_CLK>;
->> >  				clock-names = "ipg", "per";
->> > +				dmas = <&sdma 6 7 1>, <&sdma 7 7 2>;
->> > +				dma-names = "rx", "tx";
->> >  				status = "disabled";
->> >  			};
+>> > diff --git a/arch/arm/mm/copypage-v4mc.c b/arch/arm/mm/copypage-v4mc.c
+>> > index b03202cddddb..b19c7ad1a6de 100644
+>> > --- a/arch/arm/mm/copypage-v4mc.c
+>> > +++ b/arch/arm/mm/copypage-v4mc.c
+>> > @@ -56,7 +56,7 @@ static void mc_copy_user_page(void *from, void *to)
+>> >       ldmia   %0!, {r2, r3, ip, lr}           @ 4\n\
+>> >       subs    %2, %2, #1                      @ 1\n\
+>> >       stmia   %1!, {r2, r3, ip, lr}           @ 4\n\
+>> > -     ldmneia %0!, {r2, r3, ip, lr}           @ 4\n\
+>> > +     ldmiane %0!, {r2, r3, ip, lr}           @ 4\n\
+>> >       bne     1b                              @ "
+>> >       : "+&r" (from), "+&r" (to), "=&r" (tmp)
+>> >       : "2" (PAGE_SIZE / 64)
+>> > diff --git a/arch/arm/mm/copypage-v4wb.c b/arch/arm/mm/copypage-v4wb.c
+>> > index cd3e165afeed..6e3c9b69dd25 100644
+>> > --- a/arch/arm/mm/copypage-v4wb.c
+>> > +++ b/arch/arm/mm/copypage-v4wb.c
+>> > @@ -38,7 +38,7 @@ static void v4wb_copy_user_page(void *kto, const void *kfrom)
+>> >       ldmia   %1!, {r3, r4, ip, lr}           @ 4\n\
+>> >       subs    %2, %2, #1                      @ 1\n\
+>> >       stmia   %0!, {r3, r4, ip, lr}           @ 4\n\
+>> > -     ldmneia %1!, {r3, r4, ip, lr}           @ 4\n\
+>> > +     ldmiane %1!, {r3, r4, ip, lr}           @ 4\n\
+>> >       bne     1b                              @ 1\n\
+>> >       mcr     p15, 0, %1, c7, c10, 4          @ 1   drain WB"
+>> >       : "+&r" (kto), "+&r" (kfrom), "=&r" (tmp)
+>> > diff --git a/arch/arm/mm/copypage-v4wt.c b/arch/arm/mm/copypage-v4wt.c
+>> > index 8614572e1296..4a40fa1cbc2a 100644
+>> > --- a/arch/arm/mm/copypage-v4wt.c
+>> > +++ b/arch/arm/mm/copypage-v4wt.c
+>> > @@ -34,7 +34,7 @@ static void v4wt_copy_user_page(void *kto, const void *kfrom)
+>> >       ldmia   %1!, {r3, r4, ip, lr}           @ 4\n\
+>> >       subs    %2, %2, #1                      @ 1\n\
+>> >       stmia   %0!, {r3, r4, ip, lr}           @ 4\n\
+>> > -     ldmneia %1!, {r3, r4, ip, lr}           @ 4\n\
+>> > +     ldmiane %1!, {r3, r4, ip, lr}           @ 4\n\
+>> >       bne     1b                              @ 1\n\
+>> >       mcr     p15, 0, %2, c7, c7, 0           @ flush ID cache"
+>> >       : "+&r" (kto), "+&r" (kfrom), "=&r" (tmp)
 >>
->> After updating my kernel to linux-next on my IMX7d based device, I
->> found that an FPGA, which is programmed via the ECSPI interface, was no
->> longer accepting its image.
+>> When compiling with gcc, this leads to:
 >>
->> I tracked the problem to this change.  If I turn off DMA, it works.
+>> /tmp/ccrvA1wy.s: Assembler messages:
+>> /tmp/ccrvA1wy.s:180: Error: bad instruction `ldmiane r0!,{r3,r4,ip,lr}'
+>> make[1]: *** [scripts/Makefile.build:277: arch/arm/mm/copypage-v4wb.o]
+>> Error 1
+>> make: *** [Makefile:1042: arch/arm/mm] Error 2
 >>
->> There's an interesting thing that happens when DMA is used.  The SPI
->> clock changes.  Instead of cycling continuously for the entire
->> transfer, it instead clocks out 8 bits, then pauses for 4 bit times,
->> then the next byte, etc.  So it's a net of about 50% slower.  The pause
->> between bytes scales with spi frequency to always be about 4 bits.
+>> Unfortunately, the gcc option -masm-syntax-unified which allows unified
+>> syntax in inline assembly is broken (see also
+>> https://lkml.org/lkml/2019/1/7/1320).
 >>
->> Here's a trace with DMA: https://imagebin.ca/v/4WEkEnvsVSkq
->>
->> Here's what it looks like without DMA:
->> https://imagebin.ca/v/4WEkVfEqpQ12
->>
->> It seems like there are other problems with DMA too.  Here's an error
->> I'll random get every so often.
->>
->> [  142.082325] spi_master spi1: I/O Error in DMA RX
->> [  142.085678] spidev spi1.0: SPI transfer failed: -110
->> [  142.089389] spi_master spi1: failed to transfer one message from queue
->>
->> Not sure if the timeout is overly aggressive or if there is some other failure.
->>
->> Then sometimes there errors are worse:
->>
->> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
->> Modules linked in:
->> CPU: 0 PID: 1006 Comm: fpga-loader Not tainted 5.0.0-rc4-next-20190201 #1
->> Hardware name: Freescale i.MX7 Dual (Device Tree)
->> PC is at sg_last+0x4c/0x68
->> LR is at   (null)
->> pc : [<80494800>]    lr : [<00000000>]    psr: 60010013
->> sp : bf0add5c  ip : bea94598  fp : bf371218
->> r10: bf0949f0  r9 : 00000000  r8 : bf094800
->> r7 : bdc39300  r6 : bf371000  r5 : bdc39300  r4 : bf094b68
->> r3 : 00000000  r2 : 00000001  r1 : 00000001  r0 : bea94580
->> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
->> Control: 30c5387d  Table: bea94000  DAC: fffffffd
->> Process fpga-loader (pid: 1006, stack limit = 0x61bc8b73)
->> Stack: (0xbf0add5c to 0xbf0ae000)
->> dd40:                                                                8056cdb0
->> dd60: 8056c9ac 00001000 00000000 bdc39300 bf094800 bf094b68 bf371000 00000000
->> dd80: bf0949f0 8056bc00 bf094800 bdc39300 bf0adeac bf094800 bf094ad0 80569edc
->> ...
->> dfc0: 00217301 00150000 00001000 00000036 00df2010 00000003 00001000 00df1008
->> dfe0: 00022f70 7e9ebb14 000113b8 76f2a7f8 20010030 00000003 00000000 00000000
->> [<80494800>] (sg_last) from [<8056cdb0>] (spi_imx_transfer+0xd8/0x448)
->> [<8056cdb0>] (spi_imx_transfer) from [<8056bc00>] (spi_bitbang_transfer_one+0x50/0xa0)
->> [<8056bc00>] (spi_bitbang_transfer_one) from [<80569edc>] (spi_transfer_one_message+0x18c/0x3e0)
->> [<80569edc>] (spi_transfer_one_message) from [<8056a498>] (__spi_pump_messages+0x368/0x518)
->> [<8056a498>] (__spi_pump_messages) from [<8056a7ec>] (__spi_sync+0x198/0x1a0)
->> [<8056a7ec>] (__spi_sync) from [<8056a818>] (spi_sync+0x24/0x3c)
->> [<8056a818>] (spi_sync) from [<8056ae14>] (spidev_sync+0x38/0x4c)
->> [<8056ae14>] (spidev_sync) from [<8056b6f4>] (spidev_ioctl+0x660/0x704)
->> [<8056b6f4>] (spidev_ioctl) from [<80335f9c>] (do_vfs_ioctl+0xac/0x79c)
->> [<80335f9c>] (do_vfs_ioctl) from [<803366c0>] (ksys_ioctl+0x34/0x58)
->> [<803366c0>] (ksys_ioctl) from [<80201120>] (ret_fast_syscall+0x0/0x4c)
->> Exception stack(0xbf0adfa8 to 0xbf0adff0)
->> dfa0:                   00217301 00150000 00000003 40206b00 7e9ebb80 03938700
->> dfc0: 00217301 00150000 00001000 00000036 00df2010 00000003 00001000 00df1008
->> dfe0: 00022f70 7e9ebb14 000113b8 76f2a7f8
->> Code: e1510002 1afffff3 e3530000 149df004 (e7f001f2)
->> ---[ end trace 1588229fc7541669 ]---
->>
->> I think DMA on imx not be ready for prime time yet.
-
-I did only a few transfers at 10MHz on an i.MX 6ULL and i.MX 7 device
-those seemed to work. I did load the RAM firmware.
-
-The i.MX 6 device trees have DMA since quite some time, so it seems to
-work fine there? (maybe Sascha can confirm, he fixed device tree DMA
-properties in imx6qdl.dtsi a while ago).
-
-
+>> So this requires to sprinkle those inline assembly with ".syntax
+>> unified" strings, similar to how I've done it in uaccess.h.
 > 
-> I dropped both patches from my tree.
-> 
+> Not sure if this is purely a bug in GCC; Clang treats inline asm
+> statements as unique, so asm directives do not carry over from one
+> inline asm statement to another.  This has caused issues in other
+> arch's inline assembly, where we need to repeat asm directives
+> repeatedly for each inline asm statement.
+> https://bugs.llvm.org/show_bug.cgi?id=19749
 
-I think this is the wrong approach to disable DMA on those devices. The
-device tree is supposed to describe the complete hardware. If the driver
-is not ready to support DMA for that particular variant, we should add
-this information in the driver. We have compatible strings for i.MX
-6UL/i.MX 7 to disable DMA accordingly.
+I don't think that this Clang bug is related.
+
+GCC always emits a ".syntax xxx". The -masm-syntax-unified flag allows
+to select unified syntax, but it is broken in current GCC releases. I
+reported the bug and sent a fix to the GCC community, the upcoming GCC
+9, as well as 7 and 8 bugfix releases, will have it fixed.
+
+See:
+https://gcc.gnu.org/bugzilla/show_bug.cgi?id=88648
 
 --
 Stefan
