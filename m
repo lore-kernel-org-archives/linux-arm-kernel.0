@@ -2,95 +2,71 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BA6AC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:15:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7917C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:21:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06D5A21905
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:15:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8777C2190B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:21:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W6I+AFcO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="t1TVCUHx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06D5A21905
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WbY6lfJy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="Byl1mggn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8777C2190B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Q8PgJ3wYWvU5GoQBsIvMWIkgSKlHnWRNL9Q0hwYuBxI=; b=W6I+AFcOLGpGkR
-	hZy1OUFb1v+BCEOOiegIxYKkoX7MQSl6u3qXChx7mOJS2KDaMi/bnPqWIM4tAr48MxwNtVO/4tM7L
-	4J31yP0TwatAubel+BZA6Xxxt0yaN7mT7N143CY/4eZ10N5BX2g4jrPDTGbk29aY8GxJc6o7fDH6Y
-	refTth3h+PKS0gZgz246H8dC3DUAAtQS1wlZHIAoAmf1Svc/pk1Yj1oeA6pGv1i+HF1sfh9xHOoGE
-	k6/KAJ1r+x4gMg2qvPnx7LCzDwOVvDQrR+jzDkS89673rRNktvifbXhBQGt8zp6iHxy9MTmUF8kSi
-	b6US1WhVteN2WpZeZ8Dg==;
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
+	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ixUXJ1vPTVC/ZLV5ZIjORCh5WM3kd+dKTWkpyS8YxJc=; b=WbY6lfJyp0Op53
+	vpFwD52dMP70oz6paTC0yWmBPAirQn0daygDCxn4EHv2EpC9A9Y3Ke7XgVyVZ9qIEygzm2yfqh3Cz
+	UlMp7UioPO6HZs0TQETVHli0DzlwdnxHwhQSYF0k0zHg67ltxmQJuGe8eJHDBAvOQQv98nLdV4BuZ
+	ZZA1UREPgv5CIWY/5yz0oBoK0G8k4J/qZRBrXvCd9t9KvXZJrBfA/yy0Tj2Y7ILVeZyIjcOhimF9A
+	cZuiSz3hPJ88Ow0//QIYU39J7jxexmjB25UeaI/QuNv8uL5ICZ5M/N8iqXJkOpSWaGc1Tz2R7f0V/
+	TFTQlwnkSAk1jhytDrgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtdWP-0001fM-2j; Tue, 12 Feb 2019 19:15:09 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gtdc2-0004JT-7p; Tue, 12 Feb 2019 19:20:58 +0000
+Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtdWK-0001AO-Vq
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:15:07 +0000
-Received: by mail-wr1-x442.google.com with SMTP id q18so3976205wrx.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 11:15:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=Pj79uPz3GMKl1ZChwzqRlGjlNQzcr4MgHkvoWErP+W0=;
- b=t1TVCUHxt0FEbkmzEoLr1ofg3t4zk91xbPjo4QUh24sfgS2dKCsyA/BVLB1mngGv3q
- WcjF2Vm8o7+VccNyfXsEJZ9yCSgIuz1ZFQEg3cTcPVCYaWq7+CQikpT7jUzzb50a37Z3
- dnGwMmV8dTcPAxyTXdOB42mSvzkBARG3t+QAOpXGy+IvqMHVLmPMcKfUDTwFfTh/HJBO
- eXZDkLtB9YbFfGgdlkisg7pagrJFAQCe3CQlUTki6e8rwv87MU4bsM5+7Y7rhWw2lzQD
- i9vA1n3Q7dftOx4kRB3BHFnjRSg1HXAuweU8Mw+E1jLbyxR7gSeTw1/oWc0tO+JLAD4g
- dBSg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=Pj79uPz3GMKl1ZChwzqRlGjlNQzcr4MgHkvoWErP+W0=;
- b=o0G/jeyCOMvU4zigzLp/Urr4YjiZyK5ShxxE4XxBF8z0d5rdAShV3Ll49iC3oGmIwg
- qEhlL/7OzTniQszz4Yv5Au2QdOYNMusMfjjckNpLM0qO1zAqXxHHGpRWcGi96z+ic1Y9
- ewG9OTmEDT3kE4kq/6fkLrFMaXLQcn3z9O6Bq1WFV6mYPZafDeS0oHJn5Q6iwRDSRaJq
- gQla6vmkMgeops71ebdjS9BpvbLfrW4Z9BMEnxgW8xVSNqKTLMFMD+3VsXVEQxqxOpjj
- L5v5BueAbhN3JLy9jExti2tCdvmRmDgH2YmL6I0I7tWkR6ww776C15vzohe8T3ZNB7TD
- 0xug==
-X-Gm-Message-State: AHQUAuZroj72CuxSuY0AqBdKfgFrBPCDC/C79rKl64yt4Tv7j+LU37nc
- ic+aSG44bo1rbETeJbzeg6M=
-X-Google-Smtp-Source: AHgI3IafGn4ML6tAjwRwOCzcRp8aLsBfm7nyogZ1mBlheTQWMcCr6x3PdiUzMJHRs9CLcPUkasC+bg==
-X-Received: by 2002:a5d:574e:: with SMTP id q14mr3992117wrw.200.1549998902904; 
- Tue, 12 Feb 2019 11:15:02 -0800 (PST)
-Received: from ?IPv6:2003:ea:8bf1:e200:788d:bad3:281d:6cd0?
- (p200300EA8BF1E200788DBAD3281D6CD0.dip0.t-ipconnect.de.
- [2003:ea:8bf1:e200:788d:bad3:281d:6cd0])
- by smtp.googlemail.com with ESMTPSA id f17sm2009633wmh.40.2019.02.12.11.15.01
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 11:15:02 -0800 (PST)
-Subject: Re: [PATCH net-next 4/4] net: phy: Add generic support for 2.5GBaseT
- and 5GBaseT
-To: Maxime Chevallier <maxime.chevallier@bootlin.com>, davem@davemloft.net
-References: <20190211142529.22885-1-maxime.chevallier@bootlin.com>
- <20190211142529.22885-5-maxime.chevallier@bootlin.com>
-From: Heiner Kallweit <hkallweit1@gmail.com>
-Message-ID: <5f14bfd3-c9cc-79c5-bc7b-5f18397ba94e@gmail.com>
-Date: Tue, 12 Feb 2019 20:14:53 +0100
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gtdbx-0004IB-Ju
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:20:56 +0000
+Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
+ by mail.kmu-office.ch (Postfix) with ESMTPSA id E1F655C04E3;
+ Tue, 12 Feb 2019 20:20:46 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
+ t=1549999246;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:content-transfer-encoding:
+ in-reply-to:in-reply-to:references:references;
+ bh=uBs9pbpeOdaWlHi3HtkAv5UGt42jbYrV0mLYcSYiSy0=;
+ b=Byl1mggnAWaZwNHT4hxrEhHlKFMU0G653haA9CkpsF4TOuVJWWYSaIaLZKQfZgvh23nqQG
+ jL7rV0qYyGZo3UVMulNa26iPBSHuLo7oBjtIol8BkH1C1pizT2ES6b/saIRkBJ6aA6mV6i
+ et+XImtiuJUU9rf4FMGmH7mJh0/sfpI=
 MIME-Version: 1.0
-In-Reply-To: <20190211142529.22885-5-maxime.chevallier@bootlin.com>
-Content-Language: en-US
+Date: Tue, 12 Feb 2019 20:20:46 +0100
+From: Stefan Agner <stefan@agner.ch>
+To: Shawn Guo <shawnguo@kernel.org>, broonie@kernel.org, s.hauer@pengutronix.de
+Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
+In-Reply-To: <20190211012305.GA21496@dragon>
+References: <20190107132226.16216-1-stefan@agner.ch>
+ <20190107132226.16216-2-stefan@agner.ch>
+ <1549573243.3075.72.camel@impinj.com> <20190211012305.GA21496@dragon>
+Message-ID: <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
+X-Sender: stefan@agner.ch
+User-Agent: Roundcube Webmail/1.3.7
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_111505_093348_72DE4B57 
-X-CRM114-Status: GOOD (  22.63  )
+X-CRM114-CacheID: sfid-20190212_112053_872531_20ABB5FF 
+X-CRM114-Status: GOOD (  24.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,178 +78,130 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
- Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
- gregory.clement@bootlin.com, Russell King <linux@armlinux.org.uk>,
- linux-kernel@vger.kernel.org, nadavh@marvell.com, thomas.petazzoni@bootlin.com,
- miquel.raynal@bootlin.com, stefanc@marvell.com, mw@semihalf.com,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, fabio.estevam@nxp.com,
+ linux-arm-kernel@lists.infradead.org, Trent Piepho <tpiepho@impinj.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11.02.2019 15:25, Maxime Chevallier wrote:
-> The 802.3bz specification, based on previous by the NBASET alliance,
-> defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
-> cat5e, cat6 and cat7 cables.
-> 
-> These mode integrate with the already defined C45 MDIO PMA/PMD registers
-> set that added 10G support, by defining some previously reserved bits,
-> and adding a new register (2.5G/5G Extended abilities).
-> 
-> This commit adds the required definitions in include/uapi/linux/mdio.h
-> to support these modes, and detect when a link-partner advertises them.
-> 
-> It also adds support for these mode in the generic C45 PHY
-> infrastructure.
-> 
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
-> ---
->  drivers/net/phy/phy-c45.c | 37 +++++++++++++++++++++++++++++++++++++
->  include/uapi/linux/mdio.h | 16 ++++++++++++++++
->  2 files changed, 53 insertions(+)
-> 
-> diff --git a/drivers/net/phy/phy-c45.c b/drivers/net/phy/phy-c45.c
-> index 6f028de4dae1..7af5fa81daf6 100644
-> --- a/drivers/net/phy/phy-c45.c
-> +++ b/drivers/net/phy/phy-c45.c
-> @@ -47,6 +47,16 @@ int genphy_c45_pma_setup_forced(struct phy_device *phydev)
->  		/* Assume 1000base-T */
->  		ctrl2 |= MDIO_PMA_CTRL2_1000BT;
->  		break;
-> +	case SPEED_2500:
-> +		ctrl1 |= MDIO_CTRL1_SPEED2_5G;
-> +		/* Assume 2.5Gbase-T */
-> +		ctrl2 |= MDIO_PMA_CTRL2_2_5GBT;
-> +		break;
-> +	case SPEED_5000:
-> +		ctrl1 |= MDIO_CTRL1_SPEED5G;
-> +		/* Assume 5Gbase-T */
-> +		ctrl2 |= MDIO_PMA_CTRL2_5GBT;
-> +		break;
->  	case SPEED_10000:
->  		ctrl1 |= MDIO_CTRL1_SPEED10G;
->  		/* Assume 10Gbase-T */
-> @@ -194,6 +204,12 @@ int genphy_c45_read_lpa(struct phy_device *phydev)
->  	if (val < 0)
->  		return val;
->  
-> +	if (val & MDIO_AN_10GBT_STAT_LP2_5G)
-> +		linkmode_set_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-> +				 phydev->lp_advertising);
-> +	if (val & MDIO_AN_10GBT_STAT_LP5G)
-> +		linkmode_set_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-> +				 phydev->lp_advertising);
->  	if (val & MDIO_AN_10GBT_STAT_LP10G)
->  		linkmode_set_bit(ETHTOOL_LINK_MODE_10000baseT_Full_BIT,
->  				 phydev->lp_advertising);
-> @@ -224,6 +240,12 @@ int genphy_c45_read_pma(struct phy_device *phydev)
->  	case MDIO_PMA_CTRL1_SPEED1000:
->  		phydev->speed = SPEED_1000;
->  		break;
-> +	case MDIO_CTRL1_SPEED2_5G:
-> +		phydev->speed = SPEED_2500;
-> +		break;
-> +	case MDIO_CTRL1_SPEED5G:
-> +		phydev->speed = SPEED_5000;
-> +		break;
->  	case MDIO_CTRL1_SPEED10G:
->  		phydev->speed = SPEED_10000;
->  		break;
-> @@ -339,6 +361,21 @@ int genphy_c45_pma_read_abilities(struct phy_device *phydev)
->  		linkmode_mod_bit(ETHTOOL_LINK_MODE_10baseT_Half_BIT,
->  				 phydev->supported,
->  				 val & MDIO_PMA_EXTABLE_10BT);
-> +
-> +		if (val & MDIO_PMA_EXTABLE_NBT) {
-> +			val = phy_read_mmd(phydev, MDIO_MMD_PMAPMD,
-> +					   MDIO_PMA_NG_EXTABLE);
-> +			if (val < 0)
-> +				return val;
-> +
-> +			linkmode_mod_bit(ETHTOOL_LINK_MODE_2500baseT_Full_BIT,
-> +					 phydev->supported,
-> +					 val & MDIO_PMA_NG_EXTABLE_2_5GBT);
-> +
-> +			linkmode_mod_bit(ETHTOOL_LINK_MODE_5000baseT_Full_BIT,
-> +					 phydev->supported,
-> +					 val & MDIO_PMA_NG_EXTABLE_5GBT);
-> +		}
->  	}
->  
->  	return 0;
-> diff --git a/include/uapi/linux/mdio.h b/include/uapi/linux/mdio.h
-> index 0e012b168e4d..0a552061ff1c 100644
-> --- a/include/uapi/linux/mdio.h
-> +++ b/include/uapi/linux/mdio.h
-> @@ -45,6 +45,7 @@
->  #define MDIO_AN_ADVERTISE	16	/* AN advertising (base page) */
->  #define MDIO_AN_LPA		19	/* AN LP abilities (base page) */
->  #define MDIO_PCS_EEE_ABLE	20	/* EEE Capability register */
-> +#define MDIO_PMA_NG_EXTABLE	21	/* 2.5G/5G PMA/PMD extended ability */
->  #define MDIO_PCS_EEE_WK_ERR	22	/* EEE wake error counter */
->  #define MDIO_PHYXS_LNSTAT	24	/* PHY XGXS lane state */
->  #define MDIO_AN_EEE_ADV		60	/* EEE advertisement */
-> @@ -92,6 +93,10 @@
->  #define MDIO_CTRL1_SPEED10G		(MDIO_CTRL1_SPEEDSELEXT | 0x00)
->  /* 10PASS-TS/2BASE-TL */
->  #define MDIO_CTRL1_SPEED10P2B		(MDIO_CTRL1_SPEEDSELEXT | 0x04)
-> +/* 2.5 Gb/s */
-> +#define MDIO_CTRL1_SPEED2_5G		(MDIO_CTRL1_SPEEDSELEXT | 0x18)
-> +/* 5 Gb/s */
-> +#define MDIO_CTRL1_SPEED5G		(MDIO_CTRL1_SPEEDSELEXT | 0x1c)
->  
->  /* Status register 1. */
->  #define MDIO_STAT1_LPOWERABLE		0x0002	/* Low-power ability */
-> @@ -145,6 +150,8 @@
->  #define MDIO_PMA_CTRL2_1000BKX		0x000d	/* 1000BASE-KX type */
->  #define MDIO_PMA_CTRL2_100BTX		0x000e	/* 100BASE-TX type */
->  #define MDIO_PMA_CTRL2_10BT		0x000f	/* 10BASE-T type */
-> +#define MDIO_PMA_CTRL2_2_5GBT		0x0030  /* 2.5GBaseT type */
-> +#define MDIO_PMA_CTRL2_5GBT		0x0031  /* 5GBaseT type */
->  #define MDIO_PCS_CTRL2_TYPE		0x0003	/* PCS type selection */
->  #define MDIO_PCS_CTRL2_10GBR		0x0000	/* 10GBASE-R type */
->  #define MDIO_PCS_CTRL2_10GBX		0x0001	/* 10GBASE-X type */
-> @@ -198,6 +205,7 @@
->  #define MDIO_PMA_EXTABLE_1000BKX	0x0040	/* 1000BASE-KX ability */
->  #define MDIO_PMA_EXTABLE_100BTX		0x0080	/* 100BASE-TX ability */
->  #define MDIO_PMA_EXTABLE_10BT		0x0100	/* 10BASE-T ability */
-> +#define MDIO_PMA_EXTABLE_NBT		0x4000  /* 2.5/5GBASE-T ability */
->  
->  /* PHY XGXS lane state register. */
->  #define MDIO_PHYXS_LNSTAT_SYNC0		0x0001
-> @@ -234,9 +242,13 @@
->  #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
->  
->  /* AN 10GBASE-T control register. */
-> +#define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
-> +#define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
->  #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
->  
->  /* AN 10GBASE-T status register. */
-> +#define MDIO_AN_10GBT_STAT_LP2_5G	0x0020  /* LP is 2.5GBT capable */
-> +#define MDIO_AN_10GBT_STAT_LP5G		0x0040  /* LP is 5GBT capable */
->  #define MDIO_AN_10GBT_STAT_LPTRR	0x0200	/* LP training reset req. */
->  #define MDIO_AN_10GBT_STAT_LPLTABLE	0x0400	/* LP loop timing ability */
->  #define MDIO_AN_10GBT_STAT_LP10G	0x0800	/* LP is 10GBT capable */
-> @@ -265,6 +277,10 @@
->  #define MDIO_EEE_10GKX4		0x0020	/* 10G KX4 EEE cap */
->  #define MDIO_EEE_10GKR		0x0040	/* 10G KR EEE cap */
->  
-> +/* 2.5G/5G Extended abilities register. */
-> +#define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
-> +#define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
-> +
->  /* LASI RX_ALARM control/status registers. */
->  #define MDIO_PMA_LASI_RX_PHYXSLFLT	0x0001	/* PHY XS RX local fault */
->  #define MDIO_PMA_LASI_RX_PCSLFLT	0x0008	/* PCS RX local fault */
-> 
-Looks good to me.
+[adding Mark Brown]
 
-Reviewed-by: Heiner Kallweit <hkallweit1@gmail.com>
+On 11.02.2019 02:23, Shawn Guo wrote:
+> On Thu, Feb 07, 2019 at 09:00:44PM +0000, Trent Piepho wrote:
+>> On Mon, 2019-01-07 at 14:22 +0100, Stefan Agner wrote:
+>> > Allow to use DMA for SPI by adding the appropriate DMA properites
+>> > to the ecspi nodes.
+>> >
+>> > Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> > ---
+>> >  arch/arm/boot/dts/imx7s.dtsi | 8 ++++++++
+>> >  1 file changed, 8 insertions(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+>> > index a052198f6e96..b9330176c3af 100644
+>> > --- a/arch/arm/boot/dts/imx7s.dtsi
+>> > +++ b/arch/arm/boot/dts/imx7s.dtsi
+>> > @@ -653,6 +653,8 @@
+>> >  				clocks = <&clks IMX7D_ECSPI4_ROOT_CLK>,
+>> >  					<&clks IMX7D_ECSPI4_ROOT_CLK>;
+>> >  				clock-names = "ipg", "per";
+>> > +				dmas = <&sdma 6 7 1>, <&sdma 7 7 2>;
+>> > +				dma-names = "rx", "tx";
+>> >  				status = "disabled";
+>> >  			};
+>>
+>> After updating my kernel to linux-next on my IMX7d based device, I
+>> found that an FPGA, which is programmed via the ECSPI interface, was no
+>> longer accepting its image.
+>>
+>> I tracked the problem to this change.  If I turn off DMA, it works.
+>>
+>> There's an interesting thing that happens when DMA is used.  The SPI
+>> clock changes.  Instead of cycling continuously for the entire
+>> transfer, it instead clocks out 8 bits, then pauses for 4 bit times,
+>> then the next byte, etc.  So it's a net of about 50% slower.  The pause
+>> between bytes scales with spi frequency to always be about 4 bits.
+>>
+>> Here's a trace with DMA: https://imagebin.ca/v/4WEkEnvsVSkq
+>>
+>> Here's what it looks like without DMA:
+>> https://imagebin.ca/v/4WEkVfEqpQ12
+>>
+>> It seems like there are other problems with DMA too.  Here's an error
+>> I'll random get every so often.
+>>
+>> [  142.082325] spi_master spi1: I/O Error in DMA RX
+>> [  142.085678] spidev spi1.0: SPI transfer failed: -110
+>> [  142.089389] spi_master spi1: failed to transfer one message from queue
+>>
+>> Not sure if the timeout is overly aggressive or if there is some other failure.
+>>
+>> Then sometimes there errors are worse:
+>>
+>> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP ARM
+>> Modules linked in:
+>> CPU: 0 PID: 1006 Comm: fpga-loader Not tainted 5.0.0-rc4-next-20190201 #1
+>> Hardware name: Freescale i.MX7 Dual (Device Tree)
+>> PC is at sg_last+0x4c/0x68
+>> LR is at   (null)
+>> pc : [<80494800>]    lr : [<00000000>]    psr: 60010013
+>> sp : bf0add5c  ip : bea94598  fp : bf371218
+>> r10: bf0949f0  r9 : 00000000  r8 : bf094800
+>> r7 : bdc39300  r6 : bf371000  r5 : bdc39300  r4 : bf094b68
+>> r3 : 00000000  r2 : 00000001  r1 : 00000001  r0 : bea94580
+>> Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+>> Control: 30c5387d  Table: bea94000  DAC: fffffffd
+>> Process fpga-loader (pid: 1006, stack limit = 0x61bc8b73)
+>> Stack: (0xbf0add5c to 0xbf0ae000)
+>> dd40:                                                                8056cdb0
+>> dd60: 8056c9ac 00001000 00000000 bdc39300 bf094800 bf094b68 bf371000 00000000
+>> dd80: bf0949f0 8056bc00 bf094800 bdc39300 bf0adeac bf094800 bf094ad0 80569edc
+>> ...
+>> dfc0: 00217301 00150000 00001000 00000036 00df2010 00000003 00001000 00df1008
+>> dfe0: 00022f70 7e9ebb14 000113b8 76f2a7f8 20010030 00000003 00000000 00000000
+>> [<80494800>] (sg_last) from [<8056cdb0>] (spi_imx_transfer+0xd8/0x448)
+>> [<8056cdb0>] (spi_imx_transfer) from [<8056bc00>] (spi_bitbang_transfer_one+0x50/0xa0)
+>> [<8056bc00>] (spi_bitbang_transfer_one) from [<80569edc>] (spi_transfer_one_message+0x18c/0x3e0)
+>> [<80569edc>] (spi_transfer_one_message) from [<8056a498>] (__spi_pump_messages+0x368/0x518)
+>> [<8056a498>] (__spi_pump_messages) from [<8056a7ec>] (__spi_sync+0x198/0x1a0)
+>> [<8056a7ec>] (__spi_sync) from [<8056a818>] (spi_sync+0x24/0x3c)
+>> [<8056a818>] (spi_sync) from [<8056ae14>] (spidev_sync+0x38/0x4c)
+>> [<8056ae14>] (spidev_sync) from [<8056b6f4>] (spidev_ioctl+0x660/0x704)
+>> [<8056b6f4>] (spidev_ioctl) from [<80335f9c>] (do_vfs_ioctl+0xac/0x79c)
+>> [<80335f9c>] (do_vfs_ioctl) from [<803366c0>] (ksys_ioctl+0x34/0x58)
+>> [<803366c0>] (ksys_ioctl) from [<80201120>] (ret_fast_syscall+0x0/0x4c)
+>> Exception stack(0xbf0adfa8 to 0xbf0adff0)
+>> dfa0:                   00217301 00150000 00000003 40206b00 7e9ebb80 03938700
+>> dfc0: 00217301 00150000 00001000 00000036 00df2010 00000003 00001000 00df1008
+>> dfe0: 00022f70 7e9ebb14 000113b8 76f2a7f8
+>> Code: e1510002 1afffff3 e3530000 149df004 (e7f001f2)
+>> ---[ end trace 1588229fc7541669 ]---
+>>
+>> I think DMA on imx not be ready for prime time yet.
 
-Heiner
+I did only a few transfers at 10MHz on an i.MX 6ULL and i.MX 7 device
+those seemed to work. I did load the RAM firmware.
+
+The i.MX 6 device trees have DMA since quite some time, so it seems to
+work fine there? (maybe Sascha can confirm, he fixed device tree DMA
+properties in imx6qdl.dtsi a while ago).
+
+
+> 
+> I dropped both patches from my tree.
+> 
+
+I think this is the wrong approach to disable DMA on those devices. The
+device tree is supposed to describe the complete hardware. If the driver
+is not ready to support DMA for that particular variant, we should add
+this information in the driver. We have compatible strings for i.MX
+6UL/i.MX 7 to disable DMA accordingly.
+
+--
+Stefan
 
 _______________________________________________
 linux-arm-kernel mailing list
