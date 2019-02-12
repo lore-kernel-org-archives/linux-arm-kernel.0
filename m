@@ -2,69 +2,62 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1557C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:13:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A82AAC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:18:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BDE22222B1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:13:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7396D2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 21:18:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SfxyYvAo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="M6Oyvino"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDE22222B1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bYLy80Ww"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7396D2081B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sL5uabIh4jlS7Ec6dB4mQ31elRVkZlxcXumJd6+aMng=; b=SfxyYvAonQWXfe
-	iaPV16uonO9OdV3G6ac7L/xLQOmljoXT/ap/wKKpELsfVxoiIqQX/jMz6nw1PBvuVBaXPuv7EPgh4
-	oxLW+fD7vhL1GP6ppeRy4EEZ0j/udLVjwGqwYU2fs0hi6KHi4qZ7IkDi8OFjy6PSJYrSImUUbVqF+
-	ERGyqu1Np8oU52QQEp/Tn/4viXknuiBEIFsYU+4OTnCfyICsopOo3lM7U8TOMrGiuTFNd/0YLlWKV
-	GlyAu33dUMmPr09+64AgAcWYIBQTl3ug3CRbbQgFqGeeroiKOrZzlBheSeKg2jZCucbjamydy1jJ0
-	PJOWUQf2AsZr4o8nLcEQ==;
+	List-Owner; bh=EKtjNoGMTK1Istk/vEBDdVl93R2/nlimr5chg4iVRgo=; b=bYLy80Ww1Sai3H
+	VXGany1CRrrvmak5r6g/H2d9dTL7DrNqV22hWB/D5ysSSXHBA7VeSlgx1joCYkiLydLtQ9QgtpeTj
+	/noZONpBKq3w/skoEPxNMhWSdaRLr56MCkZrNgAcGql17tLzFrzfuukvwURlcNFd3nqcu4SCI4Rhp
+	GmHbB8SV8Yla5COkSdTy4U/NrcENhVL6hCq1DEEIyNW/m5cgvAfjfYhLOqRn+joDP2ASdPQj57vYm
+	xudK3E/CYIofOV6vIr8UEYrVmS8cx+bGLmq8wAEAX2VRGGr6nc/GFPGtka6bfGkhII3ZGLIvcN0zY
+	hexlU9mg4aP1UzEOuiJg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtfMw-0004vv-CR; Tue, 12 Feb 2019 21:13:30 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1gtfRS-0006sr-9F; Tue, 12 Feb 2019 21:18:10 +0000
+Received: from bhuna.collabora.co.uk ([46.235.227.227])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtfMs-0004rZ-E9
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 21:13:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=P6bPAQSDN9aNwTg20je9DY8n6icorEV+5+8z6SGXS+Y=; b=M6OyvinoenjyMKrQ+2Svs3i8hr
- q9QwX8xL1rECYfF7hI4FoM8qg4o5ZzvzbVa5RnI25TXL80Oj9OIFFn6GLIKc8rHRPoARyfnDNLpCF
- nQfk82hABwZJ6YRRRutlmd8BnLuyGaR8bUqLB8HEk0M1TnPLFVAvxmpDbh3cNEPmDVWU=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gtfMn-0007kp-Tz; Tue, 12 Feb 2019 22:13:21 +0100
-Date: Tue, 12 Feb 2019 22:13:21 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Maxime Chevallier <maxime.chevallier@bootlin.com>
-Subject: Re: [PATCH net-next 4/4] net: phy: Add generic support for 2.5GBaseT
- and 5GBaseT
-Message-ID: <20190212211321.GC27170@lunn.ch>
-References: <20190211142529.22885-1-maxime.chevallier@bootlin.com>
- <20190211142529.22885-5-maxime.chevallier@bootlin.com>
+ id 1gtfRP-0006sM-9I
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 21:18:08 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1])
+ (Authenticated sender: ezequiel) with ESMTPSA id 20B0327FB65
+Message-ID: <fb7e6bf4474583535961712bac5248b43dd47af0.camel@collabora.com>
+Subject: Re: [PATCH v3 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+From: Ezequiel Garcia <ezequiel@collabora.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Hans Verkuil
+ <hverkuil@xs4all.nl>
+Date: Tue, 12 Feb 2019 18:17:52 -0300
+In-Reply-To: <20190212130548.tytlxmbu4q6qgzzq@flea>
+References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
+ <562aefcd53a1a30d034e97f177096d70fb705f2b.1549895062.git-series.maxime.ripard@bootlin.com>
+ <716ae1ff-8e62-c723-5b5a-0b018cf6af6a@xs4all.nl>
+ <db7a762a-8bc3-0391-036b-1fda2e445023@xs4all.nl>
+ <20190212130548.tytlxmbu4q6qgzzq@flea>
+Organization: Collabora
+User-Agent: Evolution 3.30.5-1 
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190211142529.22885-5-maxime.chevallier@bootlin.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_131326_845159_D1CE5CE0 
-X-CRM114-Status: GOOD (  11.27  )
+X-CRM114-CacheID: sfid-20190212_131807_454117_C758C89F 
+X-CRM114-Status: GOOD (  15.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,38 +69,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Florian Fainelli <f.fainelli@gmail.com>,
- Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
- gregory.clement@bootlin.com, Russell King <linux@armlinux.org.uk>,
- linux-kernel@vger.kernel.org, nadavh@marvell.com, thomas.petazzoni@bootlin.com,
- miquel.raynal@bootlin.com, stefanc@marvell.com, mw@semihalf.com,
- davem@davemloft.net, linux-arm-kernel@lists.infradead.org,
- Heiner Kallweit <hkallweit1@gmail.com>
+Cc: linux-arm-kernel@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
+ jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, jernej.skrabec@gmail.com, tfiga@chromium.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, hans.verkuil@cisco.com,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ sakari.ailus@linux.intel.com, Guenter Roeck <groeck@chromium.org>,
+ nicolas.dufresne@collabora.com, posciak@chromium.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 03:25:29PM +0100, Maxime Chevallier wrote:
-> The 802.3bz specification, based on previous by the NBASET alliance,
-> defines the 2.5GBaseT and 5GBaseT link modes for ethernet traffic on
-> cat5e, cat6 and cat7 cables.
+On Tue, 2019-02-12 at 14:05 +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> These mode integrate with the already defined C45 MDIO PMA/PMD registers
-> set that added 10G support, by defining some previously reserved bits,
-> and adding a new register (2.5G/5G Extended abilities).
+> On Mon, Feb 11, 2019 at 04:21:47PM +0100, Hans Verkuil wrote:
+> > > I think the API should be designed with 4k video in mind. So if some of
+> > > these constants would be too small when dealing with 4k (even if the
+> > > current HW doesn't support this yet), then these constants would have to
+> > > be increased.
+> > > 
+> > > And yes, I know 8k video is starting to appear, but I think it is OK
+> > > that additional control(s) would be needed to support 8k.
+> > 
+> > Hmm, 4k (and up) is much more likely to use HEVC. So perhaps designing this
+> > for 4k is overkill.
+> > 
+> > Does anyone know if H.264 is used for 4k video at all? If not (or if very
+> > rare), then just ignore this.
 > 
-> This commit adds the required definitions in include/uapi/linux/mdio.h
-> to support these modes, and detect when a link-partner advertises them.
+> I don't know the state of it right now, but until quite recently
+> youtube at least was encoding their 4k videos in both VP9 and
+> H264. They might have moved to h265 since, but considering 4k doesn't
+> seem unreasonable.
 > 
-> It also adds support for these mode in the generic C45 PHY
-> infrastructure.
-> 
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Just asked the multimedia team here, and they say that 4k videos are in
+fact widely used for both H264 and VP9 because of the HEVC licensing issues,
+and because gains in compressions are not so impressive.
 
-    Andrew
+Regards,
+Ezequiel
+
 
 _______________________________________________
 linux-arm-kernel mailing list
