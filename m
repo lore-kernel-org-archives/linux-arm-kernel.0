@@ -2,98 +2,111 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89CA7C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 11:10:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AED79C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 11:11:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A4952184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 11:10:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65AC42184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 11:11:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UiCKW4su";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="zZoQn6Sk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="HzTf23ys"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A4952184A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y92ePtQf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="13zm1kX9";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="axedGr3V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65AC42184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:Subject:
-	From:To:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=3FEfB5iB7XW2gDi6g90mXEwI/ZJnqnqqbmC5yCBpwpo=; b=UiCKW4su7R92nY
-	oriDIvr9HyzaGI7t+hCmd032s3qcKwaSikiIM9eLV3Rv7Q9n6JeScZmndA6EDWEIYN5JnVAppPcYQ
-	DgFxemoG6YQ9vDvgFyiJ6D72PjqSkjFKTPXpwpUvVoiluO+wBVmfGXyPmdgEL1LNatteaWS/uqi2J
-	OBWDCAG4wX6DUEetbO4Ce6GKjP1EBZPes8PHcIBk6fSPpzxkOPRB4zbaLyC7Xlez6aSlUH6OJFeH0
-	j19mmeVA59Yn05tial/NdZUm8nGgXmu5XFNJgMVuRTao7KweiSnQx/wMG0JMp/UR+KMFPcDoNT/jr
-	ISgqxltzdQpKiELk24fg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=BKHldQ7/rDgTdiy7QzUHYmcwh/BtXmqRmI1rexZWDbU=; b=Y92ePtQforzOSI
+	hOhw7YfgBoI+a92kTBCzh7kdb22iVRID6ZafisNJz262/qL2C0Lq9q1b3tQRwhNcgYPrKBZpjAvbj
+	1Sxl2ZbwR72jBmG7H6SHur4ZvvdxIAkTE5u2wq9pIRcqUs8TVdYaS+jFYqGmOGMLQ8RlUNSbtUSil
+	eOZA5klU83ix2+gbciIC6WwP+fZ6x4OrKsIde+yDIBXa9WR4SBLsOrgJnxOgxoQ4yxrxh6YdNXCHB
+	oxdS0DtfNKQ1xMBO67XLHIGxBuOtg8o1K15+4idkV46m5p18OsMJ0sfov+e1MBMsCXrt3vmaZhVBS
+	E0YthzoxA/3buS+9pHzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVxj-0003Fd-74; Tue, 12 Feb 2019 11:10:51 +0000
+	id 1gtVxv-0003SJ-JY; Tue, 12 Feb 2019 11:11:03 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVxd-00037j-GQ
- for linux-arm-kernel@bombadil.infradead.org; Tue, 12 Feb 2019 11:10:45 +0000
+ id 1gtVxb-00037j-Rp
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 12 Feb 2019 11:10:44 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:Date:Message-ID:Subject:From:CC:To:Sender:Reply-To:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=w4PVnQwxduN+UnUe55MZMEKkhvCQ8aTHUtyy+A1Rp9g=; b=zZoQn6Sku+AbvGrrwn+DpuGT/r
- QIlPfFlcbagaWzDhib11E6dBfR7vI3YX46zMFW39PxD5qOmzaeRxlGzFz+NUJea+jxukUsgmONvfu
- Gx+xYdvvIMvXU3vyA6a8bbyJ+EypKMafUlq2OlzpEog5TyDVt2X2+nRMkMuXhdcxeORvaIiC2C05k
- xEXwkQhqeOwGbur38xcTzmIxLLw2QxnDjanjPPU/umkBRHpuSmeBZRshV+iKOtGAFU3orK+ep2FFt
- w6+a1lXtPDsFGwrygwXpB1Bfeu66legFZUA6JDlUQq1T7KtbvrvfVD5xZG4bZcm5Qd60LPT8gBXDv
- LcAgEL2Q==;
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=aq10+lp6v2F+7BT6U8iiQKTET70oYlE3URFTZA4Hifc=; b=13zm1kX9PmE+wKBXB/cv/J/GDj
+ xeldkHdcncivFMHPDdNvXmCFwMaABR5lBVvQEkbqODgp3NHYMWslA+0GWmrYC/tK8H8FCL8HHCZmp
+ EBL2W1nFdUfHlrIppyySu4tKKCTNxTuFphGnHHjVA9aGc5WLQzIgXmlv6J1FAWgLcm7lJFDDIZmPd
+ XjEEljTiVFifcH8LE9zZyABKkb02bwnFE9m4OQ0iN3MJdqlCPCzgc/etGddZ/vfftuh5GP1iuabtk
+ jluw//zyGbr5xa2z2uzNhZeUQxpqzzDyA8TjlaNwH9KbEs4gsrr2BpD2z+eh+LMrgnNegc74BZFCq
+ XDGGZY2A==;
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVUn-0002JW-1O
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:40:57 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1CAegvs072535;
- Tue, 12 Feb 2019 04:40:42 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1549968042;
- bh=w4PVnQwxduN+UnUe55MZMEKkhvCQ8aTHUtyy+A1Rp9g=;
- h=To:CC:From:Subject:Date;
- b=HzTf23ysc/tuQYjM41F76bolyy9qTPcLwpwcWZVd0vRXNBpYQelVsq9YfLcrszFsC
- mmR8V+Ury4Obj2FROwUY8ukeCmikupNLIUp1Qe+tBCBeP05wb4ZGrVH/QnI4pGcZK8
- iMhLTXFkaPSg+DbFh++ebv9frqbB0jj5z+7jAtk4=
-Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1CAegek103866
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 12 Feb 2019 04:40:42 -0600
-Received: from DFLE110.ent.ti.com (10.64.6.31) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
- Feb 2019 04:40:42 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE110.ent.ti.com
- (10.64.6.31) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 12 Feb 2019 04:40:42 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1CAedgf001966;
- Tue, 12 Feb 2019 04:40:40 -0600
-To: ARM-SoC Maintainers <arm@kernel.org>
-From: Sekhar Nori <nsekhar@ti.com>
-Subject: [GIT PULL] DaVinci SoC updates for v5.1 (part 2)
-Message-ID: <53340003-0b43-7b5c-9a24-5f2e4d8f8a3a@ti.com>
-Date: Tue, 12 Feb 2019 16:10:38 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gtVTK-0002En-Is
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:28 +0000
+Received: by mail-wr1-x443.google.com with SMTP id q1so2079408wrp.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 02:39:24 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=aq10+lp6v2F+7BT6U8iiQKTET70oYlE3URFTZA4Hifc=;
+ b=axedGr3VKUoULid2kydrcOdlkVYMhI0sCXXnEjaZMk1jOabjECRuUvCSr73GCOgPWt
+ 30otKyOx47h6zsUHEXDqeKd+Zec6uXAJgdMC3zAxTUjnlkVsdGEhFDf1UIewOU3KBTEy
+ oXFSbAAOgkEJbGDAnGgZn5nNNV2vQZoVrMx1yg/IVQNW76kuYz/Wxz+utP4gk5/hEy1h
+ +ZijJx18YfEu9hbScOtRRNuSwLARbTW9IV+a7JBUzBQ37bIl/zIEBRcGgKa3a/C3AqQI
+ /JEYHe8sv1EhdLUkDOUs+LynKKI3ftSlt1s0F6pmpdOqtNJ3zTf2YYwnKOX34ebFCQNZ
+ 7MMA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=aq10+lp6v2F+7BT6U8iiQKTET70oYlE3URFTZA4Hifc=;
+ b=Yq//nDrKQPZMvbcdOmv4y2BKOnmURto8kEbt/3ho8srJ8662SRwgwTu7zLyh46jnLA
+ 9xG+WIEa6gMxE+PtUPf98jMaVyqmtLt+TNWjLIWro8t+u+5cSoknOc2M14tXiVY2E0Oe
+ Sv+6x1a1acvRulSl8aXtljrydO9cBoVFgD4vO90MZzD2IRRNa96dXDB7dqH4QDdZdc3F
+ tN+Rn0Wf4RZqCYGwVunKtLDuWBMPzpzxIYGnV1Jy45uIN5RiYFMAlTWbIudvn+pA+BMg
+ gbLHiimZq/htPYiCuAKe/3XXU8QcUcKWPsXNADu4zHafbipNY04H6yUTTwQxbZc5uver
+ iOvA==
+X-Gm-Message-State: AHQUAuZt1/beyAeL1hKVIhQdwy0rMe/Armry7Q1HmacqYAE1etz6AmhT
+ N9uTLqu8N6Qy7nMAlgNtFFUkgQ==
+X-Google-Smtp-Source: AHgI3IY+aQ72VNrbcnyhZDLspEKHNoYxzMp3S9Dplvpq/FjDHwyKZeMXMXI/zkqx0kKu2Spbkbr47w==
+X-Received: by 2002:a05:6000:10c1:: with SMTP id
+ b1mr2179886wrx.275.1549967960258; 
+ Tue, 12 Feb 2019 02:39:20 -0800 (PST)
+Received: from localhost.localdomain
+ (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.19
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 12 Feb 2019 02:39:19 -0800 (PST)
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
+Subject: [PATCH v3 20/37] ARM: davinci: aintc: move timer-specific
+ irq_set_handler() out of irq.c
+Date: Tue, 12 Feb 2019 11:38:18 +0100
+Message-Id: <20190212103835.7768-21-brgl@bgdev.pl>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
+References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_054057_213455_FF966A47 
-X-CRM114-Status: GOOD (  10.84  )
+X-CRM114-CacheID: sfid-20190212_053926_873695_A19AF51A 
+X-CRM114-Status: GOOD (  14.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,55 +119,158 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Alan Stern <stern@rowland.harvard.edu>,
- Linux ARM Kernel List <linux-arm-kernel@lists.infradead.org>,
- Kevin Hilman <khilman@kernel.org>
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The following changes since commit e430685f496928240a328708b976c17929541011:
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-  ARM: davinci: mityomapl138: use device properties for at24 eeprom (2019-01-10 13:58:00 +0530)
+I've been unable to figure out exactly why, but it seems that the
+IRQ_TINT1_TINT34 interrupt for timer 1 needs to be handled as a
+level irq, not edge like all others.
 
-are available in the Git repository at:
+Let's move the handler setup out of the aintc driver where it's lived
+since the beginning and into the dm* SoC-specific files where it
+belongs.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v5.1/soc-part2
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/dm355.c  | 8 ++++++++
+ arch/arm/mach-davinci/dm365.c  | 8 ++++++++
+ arch/arm/mach-davinci/dm644x.c | 8 ++++++++
+ arch/arm/mach-davinci/dm646x.c | 8 ++++++++
+ arch/arm/mach-davinci/irq.c    | 3 ---
+ 5 files changed, 32 insertions(+), 3 deletions(-)
 
-for you to fetch changes up to 23fa70e40a42e8dfeac654b8cc0e5b463e54af25:
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index c7cd765114af..a732f2ea1d9a 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -15,6 +15,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/init.h>
++#include <linux/irq.h>
+ #include <linux/irqchip/irq-davinci-aintc.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+@@ -744,6 +745,13 @@ void __init dm355_init_time(void)
+ 	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+ 	dm355_psc_init(NULL, psc);
+ 
++	/*
++	 * Nobody knows why anymore, but this interrupt has been handled as
++	 * a level irq from the very beginning of davinci support in mainline
++	 * linux.
++	 */
++	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
++
+ 	clk = clk_get(NULL, "timer0");
+ 
+ 	davinci_timer_init(clk);
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index bde3c3b94cc9..79afde34cfbb 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -19,6 +19,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/init.h>
++#include <linux/irq.h>
+ #include <linux/irqchip/irq-davinci-aintc.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+@@ -785,6 +786,13 @@ void __init dm365_init_time(void)
+ 	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+ 	dm365_psc_init(NULL, psc);
+ 
++	/*
++	 * Nobody knows why anymore, but this interrupt has been handled as
++	 * a level irq from the very beginning of davinci support in mainline
++	 * linux.
++	 */
++	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
++
+ 	clk = clk_get(NULL, "timer0");
+ 
+ 	davinci_timer_init(clk);
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 6d3498058283..007d979d2d64 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -14,6 +14,7 @@
+ #include <linux/clkdev.h>
+ #include <linux/dmaengine.h>
+ #include <linux/init.h>
++#include <linux/irq.h>
+ #include <linux/irqchip/irq-davinci-aintc.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+@@ -680,6 +681,13 @@ void __init dm644x_init_time(void)
+ 	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+ 	dm644x_psc_init(NULL, psc);
+ 
++	/*
++	 * Nobody knows why anymore, but this interrupt has been handled as
++	 * a level irq from the very beginning of davinci support in mainline
++	 * linux.
++	 */
++	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
++
+ 	clk = clk_get(NULL, "timer0");
+ 
+ 	davinci_timer_init(clk);
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index a0a8b336c1a4..a643d78ad644 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -15,6 +15,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dmaengine.h>
+ #include <linux/init.h>
++#include <linux/irq.h>
+ #include <linux/irqchip/irq-davinci-aintc.h>
+ #include <linux/platform_data/edma.h>
+ #include <linux/platform_data/gpio-davinci.h>
+@@ -664,6 +665,13 @@ void __init dm646x_init_time(unsigned long ref_clk_rate,
+ 	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
+ 	dm646x_psc_init(NULL, psc);
+ 
++	/*
++	 * Nobody knows why anymore, but this interrupt has been handled as
++	 * a level irq from the very beginning of davinci support in mainline
++	 * linux.
++	 */
++	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
++
+ 	clk = clk_get(NULL, "timer0");
+ 
+ 	davinci_timer_init(clk);
+diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
+index 2b6943731af9..92b6e653d8cb 100644
+--- a/arch/arm/mach-davinci/irq.c
++++ b/arch/arm/mach-davinci/irq.c
+@@ -18,8 +18,6 @@
+ #include <asm/mach/irq.h>
+ #include <asm/exception.h>
+ 
+-#include "irqs.h"
+-
+ #define DAVINCI_AINTC_FIQ_REG0		0x00
+ #define DAVINCI_AINTC_FIQ_REG1		0x04
+ #define DAVINCI_AINTC_IRQ_REG0		0x08
+@@ -165,6 +163,5 @@ void __init davinci_aintc_init(const struct davinci_aintc_config *config)
+ 		davinci_aintc_setup_gc(davinci_aintc_base + reg_off,
+ 				       irq_base + irq_off, 32);
+ 
+-	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
+ 	set_handle_irq(davinci_aintc_handle_irq);
+ }
+-- 
+2.20.1
 
-  usb: ohci-da8xx: remove unused callbacks from platform data (2019-02-12 13:48:59 +0530)
-
-----------------------------------------------------------------
-DaVinci SoC updates for v5.1 (part 2)
-
-This pull request contains changes needed to help get rid of
-hard-coded GPIO base value passed from DaVinci platform data.
-
-The OHCI related changes also help by moving over-current support
-from board-files to OHCI driver making future DT-coversion easy.
-
-The OHCI parts are acked by its maintainer.
-
-----------------------------------------------------------------
-Bartosz Golaszewski (9):
-      ARM: davinci: da850-evm: use GPIO hogs instead of the legacy API
-      usb: ohci-da8xx: add a new line after local variables
-      usb: ohci-da8xx: add a helper pointer to &pdev->dev
-      ARM: davinci: omapl138-hawk: use gpio lookup entries for usb gpios
-      ARM: davinci: da830-evm: use gpio lookup entries for usb gpios
-      usb: ohci-da8xx: add vbus and overcurrent gpios
-      ARM: davinci: omapl138-hawk: remove legacy usb helpers
-      ARM: davinci: da830-evm: remove legacy usb helpers
-      usb: ohci-da8xx: remove unused callbacks from platform data
-
- arch/arm/mach-davinci/board-da830-evm.c     |  73 ++---------------
- arch/arm/mach-davinci/board-da850-evm.c     |  22 ++++--
- arch/arm/mach-davinci/board-omapl138-hawk.c |  81 +++----------------
- drivers/usb/host/ohci-da8xx.c               | 118 ++++++++++++++--------------
- include/linux/platform_data/usb-davinci.h   |  14 ----
- 5 files changed, 91 insertions(+), 217 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
