@@ -2,82 +2,98 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BCB21C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:34:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 30DDDC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:34:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7F5FA21B68
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:34:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC3A6222C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:34:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l12GMxOv";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="vc9pKRA4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F5FA21B68
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UKvqvevP";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="08pkvsLL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC3A6222C4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZSSypVaLO0g2Lbd9PB4Xz+lcss0DShQZweAPch4Wa+A=; b=l12GMxOv6+3xBr
-	Mt1ped9IlZyzjWSSpHGsW2cCeY6FCR1druG73yDLD/2W5pq6VhnfCqOypznsOP8kcRD0N4YB2K+Mw
-	xxW65kCOuyKtWdwub6FWjGG6KdG8redYWvQ2Fa9SzWjDq+LPsHltWwY3VthcvI8IMpcVF/NU89jxn
-	84SHcSOpyuTnkYC6A5ewz/8A1tBYKhxA4nJ1pHZxtaFR6svbDPlV2zcf17RPzKczLzoZIXH3M7A/S
-	BkqVda8+aQdaVfUir9NURVHrvUYlN6ApD8onRvDm2qbPV/B008Ab1C1aqvzaelndg8PmxntdVGKL0
-	qp262MJilCUMpQqMRVHQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
+	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=CB2sI7u00d8+iKmaGfGQVaxAkouZJdqRpD5qqrhoEWU=; b=UKvqvevPAw/kH8LcMTIHoxGTu
+	3EI/UOUIWcaJ9Q5OxJFpTgkypqtlpcE7gZjN+3JJoiTym27GHexyLglXPLRkQMOIqo8DT9rEwpJyb
+	O1yQGvdhQaeFir6L7M9o60lzUIftE8kUt7rdZ2kOe8rdrM8Q5IGHJQgOprNVoDDhKsq+N8UzCm+2K
+	RHh5dmENKb+YGKDyfMTyV7oL5HwYazsbvt0g1KLrYsbo1W/hePPtbRQpO+J+FSdQD/nLT44RbTOLq
+	/en38drfoetCFWJYErsObaa3woeeIGTN9j+o8gtPqdLTQQS/9rcnDQoxgTWGLbgZKIDzzJPw2rmzt
+	upP2Vx32g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gteks-0003Lo-7q; Tue, 12 Feb 2019 20:34:10 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gtelS-0003gl-6u; Tue, 12 Feb 2019 20:34:46 +0000
+Received: from userp2130.oracle.com ([156.151.31.86])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtekn-0003Ks-OC
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 20:34:07 +0000
-Received: by mail-it1-x143.google.com with SMTP id o131so62782itc.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 12:34:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KsP52gXpIrDlK2bHNK6azfsaCrp5vyuXdhZ92N0Vgfc=;
- b=vc9pKRA4uKiOJzb9TkfXKvyDbPoQE7sAI9osiFpfZtsTuq/UdzlKNA6eBMCmzAoXW0
- bPwPqBiuxxi8VjM8FYafqAD2JTLkwpMjIGTugcjA7+ZskGB62CD/khnIaFTUdumU5vAe
- QmJWuHxqEQZydaQpM5/Vkr3y4mrG3+42q66vzq/EGEU3dvw/ap0zMbnSXj2o1lh5Psqb
- LSslbL4zWm6u4i8pJn2E5JAEa3LYy7ojtoIEGOYyIsnZEldVRUkelB3rW6JxOvS8Jhkp
- re2bxXKkCOrEFhAWwGhJQnLDux/pyk8OADtzc9LfBYRQRv9+3ojB3KwCYwBTdmvdN4lY
- Fdaw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=KsP52gXpIrDlK2bHNK6azfsaCrp5vyuXdhZ92N0Vgfc=;
- b=JMiC8zurmM0Ex8RmKxXnanLDpJGeTU/C/oIG/XbQGu5qu9KyH/N7Pc9uZMLrWiQbxP
- KKYz0pj23ztm4xJgoC7JGz+eIbQnihbxN86MSZCc2bbsTwOsUvIOb/Xgy22Pr8K2tN5+
- 5FYdnRhzJGm+M1cpW6gP+M1X1WEckAbqGPe5qRA7py14v74cmy66KX5z328kE6NEOISY
- RpETpIjC7w4TnBPda/JZPt+VHga31m+GStYX78Oj0+jz+m+XX8Gg4TGPf6uWiu92pyQv
- JrABlRH6/WjL2P2P82JKRyoJ0RaExarblPIdaT+oWhbLENX1TrfezhZI27QhU1pISuto
- 46Cw==
-X-Gm-Message-State: AHQUAubk2zwJyZ20JrExAyWPvd6eFo8QWvUwiyg9K9wXvKIS/OB+LzQ2
- 73DKaXRIKLl/GzZMjQr7JF2rzBLi5o0mXqu9m4vj2A==
-X-Google-Smtp-Source: AHgI3IbflAdIGmgaUuPONaXGFJgvUecTLtBWQe/1V1RUjrwldhvT0b1cxWXsDF/CzcnkestXSnOibR9GNlixV9EqwJw=
-X-Received: by 2002:a05:660c:4b:: with SMTP id p11mr423122itk.71.1550003643398; 
- Tue, 12 Feb 2019 12:34:03 -0800 (PST)
+ id 1gtelO-0003fu-5g
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 20:34:43 +0000
+Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
+ by userp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1CKXeQg151654;
+ Tue, 12 Feb 2019 20:34:22 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=subject : to : cc :
+ references : from : message-id : date : mime-version : in-reply-to :
+ content-type; s=corp-2018-07-02;
+ bh=alEBznvGMT0os8XtyC5Lyg/C71RyrgZq/tVkGY4Nvvc=;
+ b=08pkvsLL8yu9g3BdPIfIurrc64y1Ln77iM1QXqaIjjvZcTQjYHnhWxMJMTLYMQ0lj1GS
+ W2DZO9ib5t4zAgcU7qjHV/bLJ3vg+qt928F6COlvWq2j7MupJSLtW4gpXkxJgtkKjzbP
+ NG4BnyZpV+LV2nFLbeBsHgPycTPKeqKmRU5UoVCWu6N/BNZo8wOF0EODerzSwwLFE5gE
+ +rJ06R0Mx0DW9UElAzckFhg5FLSRhWeJk1w3Po38cHc4dfgkZM2JmgpPKGAfFK3pz/SS
+ EuBjICWKcq1xDG0/bsNQU/6q96iciP3JYs6HXnZTlaxu0Yxg0JNMj20IoL6+8mO6fSSD aA== 
+Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
+ by userp2130.oracle.com with ESMTP id 2qhreke9t9-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 12 Feb 2019 20:34:22 +0000
+Received: from userv0122.oracle.com (userv0122.oracle.com [156.151.31.75])
+ by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1CKYLO8020346
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Tue, 12 Feb 2019 20:34:21 GMT
+Received: from abhmp0006.oracle.com (abhmp0006.oracle.com [141.146.116.12])
+ by userv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1CKYI7Q015599;
+ Tue, 12 Feb 2019 20:34:19 GMT
+Received: from [192.168.1.16] (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Tue, 12 Feb 2019 12:34:18 -0800
+Subject: Re: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
+To: Laura Abbott <labbott@redhat.com>,
+ Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+References: <cover.1547153058.git.khalid.aziz@oracle.com>
+ <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+ <20190123142410.GC19289@Konrads-MacBook-Pro.local>
+ <4dfba458-1bf6-25ff-df4c-b96a1221cd95@oracle.com>
+ <7497bd44-1fda-e073-ba7f-18a76577b64a@redhat.com>
+From: Khalid Aziz <khalid.aziz@oracle.com>
+Organization: Oracle Corp
+Message-ID: <76668db0-e87a-5294-1d71-2ab42a48425c@oracle.com>
+Date: Tue, 12 Feb 2019 13:34:15 -0700
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190212194645.32504-1-broonie@kernel.org>
-In-Reply-To: <20190212194645.32504-1-broonie@kernel.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 12 Feb 2019 20:33:57 +0000
-Message-ID: <CAKv+Gu-W2X32ZCqKsJVqSqyJ04UK2eoNCDKp=2OfsO1HhKaCuw@mail.gmail.com>
-Subject: Re: [PATCH] arm64: crypto: Disable xor-neon build when using clang
-To: Mark Brown <broonie@kernel.org>
+In-Reply-To: <7497bd44-1fda-e073-ba7f-18a76577b64a@redhat.com>
+Content-Type: multipart/mixed; boundary="------------9CCCB4AA5B3B70FD078792E2"
+Content-Language: en-US
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9165
+ signatures=668683
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
+ priorityscore=1501 malwarescore=0
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1011
+ lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=999 adultscore=0
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
+ definitions=main-1902120143
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_123405_809040_55187B10 
-X-CRM114-Status: GOOD (  26.63  )
+X-CRM114-CacheID: sfid-20190212_123442_302276_18B39E10 
+X-CRM114-Status: GOOD (  22.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,101 +105,259 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>, Jackie Liu <liuyun01@kylinos.cn>,
- Nick Desaulniers <ndesaulniers@google.com>, Will Deacon <will.deacon@arm.com>,
- Kevin Hilman <khilman@baylibre.com>,
- Nathan Chancellor <natechancellor@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Tycho Andersen <tycho@docker.com>, kernel-hardening@lists.openwall.com,
+ linux-mm@kvack.org, deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
+ joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, tycho@tycho.ws,
+ ak@linux.intel.com, hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de,
+ pradeep.vincent@oracle.com, jcm@redhat.com, liran.alon@oracle.com,
+ tglx@linutronix.de, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, juergh@gmail.com,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
+ dwmw@amazon.co.uk, keescook@google.com, torvalds@linux-foundation.org,
+ kirill.shutemov@linux.intel.com
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 12 Feb 2019 at 20:46, Mark Brown <broonie@kernel.org> wrote:
->
-> Currently clang is able to build an arm64 defconfig or allmodconfig
-> using the release branch for clang 8 apart from a series of errors in
-> xor-neon.c in the form:
->
->   arch/arm64/lib/xor-neon.c:27:28: error: incompatible pointer types assigning to 'const unsigned long *' from 'uint64_t *' (aka 'unsigned long long *') [-Werror,-Wincompatible-pointer-types]
->
-> This issue has been extensively discussed between various interested
-> parties but it is still unclear what if any the best solution is in the
-> compiler and there are concerns about just disabling the warning with a
-> pragma in the header due to the potential for masking other serious
-> issues.  Details of the discussion can be followed here:
->
->    https://github.com/ClangBuiltLinux/linux/issues/283
->
-> In order to avoid the issue and facilitate further clang work and
-> testing for the time being just disable the use of xor-neon.c if we are
-> building with clang.  Obviously this is not actually resolving the
-> problem and is not something that should be with us for the long term
-> but since it only affects clang and enables people working on that to
-> work directly with upstream it seems like a useful tradeoff.
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
-> ---
->
-> It would also be possible to achieve the same effect by using either a
-> Makefile change or a pragma to disable the warning for this specific
-> file, I can send a patch for those approaches if that's OK and
-> preferable.  Disabling the acceleration entirely seemed safer and less
-> likely to be forgotten to me.
->
-> We've got some KernelCI support for clang in the middle of getting
-> deployed:
->
->    https://staging.kernelci.org/job/next-clang/branch/master/
->
-> so being able to build and run upstream kernels directly would be
-> enormously helpful.
->
->  arch/arm64/include/asm/xor.h | 2 +-
->  arch/arm64/lib/Makefile      | 2 ++
->  2 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
-> index 856386ad076c..971b8336d2d2 100644
-> --- a/arch/arm64/include/asm/xor.h
-> +++ b/arch/arm64/include/asm/xor.h
-> @@ -14,7 +14,7 @@
->  #include <asm/hwcap.h>
->  #include <asm/neon.h>
->
-> -#ifdef CONFIG_KERNEL_MODE_NEON
-> +#if defined(CONFIG_KERNEL_MODE_NEON) && !defined(CONFIG_CC_IS_CLANG)
->
->  extern struct xor_block_template const xor_block_inner_neon;
->
-> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> index 5540a1638baf..b2a5b8d56354 100644
-> --- a/arch/arm64/lib/Makefile
-> +++ b/arch/arm64/lib/Makefile
-> @@ -6,10 +6,12 @@ lib-y         := clear_user.o delay.o copy_from_user.o                \
->                    strchr.o strrchr.o tishift.o
->
->  ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
-> +ifneq ($(CONFIG_CC_IS_CLANG), y)
->  obj-$(CONFIG_XOR_BLOCKS)       += xor-neon.o
->  CFLAGS_REMOVE_xor-neon.o       += -mgeneral-regs-only
->  CFLAGS_xor-neon.o              += -ffreestanding
->  endif
-> +endif
->
->  # Tell the compiler to treat all general purpose registers (with the
->  # exception of the IP registers, which are already handled by the caller
-> --
-> 2.20.1
->
+This is a multi-part message in MIME format.
+--------------9CCCB4AA5B3B70FD078792E2
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
 
-Can we just add the pragma to neon-instrinsics.h and be done with it?
-As long as Clang is not the dominant compiler, I don't buy the 'hiding
-real bugs' argument, especially since neon-intrinsics.h should never
-be included transitively, so it only affects source files that
-actually call NEON intrinsics.
+On 2/12/19 1:01 PM, Laura Abbott wrote:
+> On 2/12/19 7:52 AM, Khalid Aziz wrote:
+>> On 1/23/19 7:24 AM, Konrad Rzeszutek Wilk wrote:
+>>> On Thu, Jan 10, 2019 at 02:09:37PM -0700, Khalid Aziz wrote:
+>>>> From: Juerg Haefliger <juerg.haefliger@canonical.com>
+>>>>
+>>>> Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 a=
+nd
+>>>> provide a hook for updating a single kernel page table entry (which =
+is
+>>>> required by the generic XPFO code).
+>>>>
+>>>> v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+>>>>
+>>>> CC: linux-arm-kernel@lists.infradead.org
+>>>> Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+>>>> Signed-off-by: Tycho Andersen <tycho@docker.com>
+>>>> Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+>>>> ---
+>>>> =C2=A0 arch/arm64/Kconfig=C2=A0=C2=A0=C2=A0=C2=A0 |=C2=A0 1 +
+>>>> =C2=A0 arch/arm64/mm/Makefile |=C2=A0 2 ++
+>>>> =C2=A0 arch/arm64/mm/xpfo.c=C2=A0=C2=A0 | 58
+>>>> ++++++++++++++++++++++++++++++++++++++++++
+>>>> =C2=A0 3 files changed, 61 insertions(+)
+>>>> =C2=A0 create mode 100644 arch/arm64/mm/xpfo.c
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index ea2ab0330e3a..f0a9c0007d23 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -171,6 +171,7 @@ config ARM64
+>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 select SWIOTLB
+>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 select SYSCTL_EXCEPTION_TRACE
+>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 select THREAD_INFO_IN_TASK
+>>>> +=C2=A0=C2=A0=C2=A0 select ARCH_SUPPORTS_XPFO
+>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 help
+>>>> =C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 ARM 64-bit (AArch64) Linu=
+x support.
+>>>> =C2=A0 diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+>>>> index 849c1df3d214..cca3808d9776 100644
+>>>> --- a/arch/arm64/mm/Makefile
+>>>> +++ b/arch/arm64/mm/Makefile
+>>>> @@ -12,3 +12,5 @@ KASAN_SANITIZE_physaddr.o=C2=A0=C2=A0=C2=A0 +=3D n=
+
+>>>> =C2=A0 =C2=A0 obj-$(CONFIG_KASAN)=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=
+=C2=A0 +=3D kasan_init.o
+>>>> =C2=A0 KASAN_SANITIZE_kasan_init.o=C2=A0=C2=A0=C2=A0 :=3D n
+>>>> +
+>>>> +obj-$(CONFIG_XPFO)=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 +=3D x=
+pfo.o
+>>>> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
+>>>> new file mode 100644
+>>>> index 000000000000..678e2be848eb
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/mm/xpfo.c
+>>>> @@ -0,0 +1,58 @@
+>>>> +/*
+>>>> + * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
+>>>> + * Copyright (C) 2016 Brown University. All rights reserved.
+>>>> + *
+>>>> + * Authors:
+>>>> + *=C2=A0=C2=A0 Juerg Haefliger <juerg.haefliger@hpe.com>
+>>>> + *=C2=A0=C2=A0 Vasileios P. Kemerlis <vpk@cs.brown.edu>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> modify it
+>>>> + * under the terms of the GNU General Public License version 2 as
+>>>> published by
+>>>> + * the Free Software Foundation.
+>>>> + */
+>>>> +
+>>>> +#include <linux/mm.h>
+>>>> +#include <linux/module.h>
+>>>> +
+>>>> +#include <asm/tlbflush.h>
+>>>> +
+>>>> +/*
+>>>> + * Lookup the page table entry for a virtual address and return a
+>>>> pointer to
+>>>> + * the entry. Based on x86 tree.
+>>>> + */
+>>>> +static pte_t *lookup_address(unsigned long addr)
+>>>> +{
+>>>> +=C2=A0=C2=A0=C2=A0 pgd_t *pgd;
+>>>> +=C2=A0=C2=A0=C2=A0 pud_t *pud;
+>>>> +=C2=A0=C2=A0=C2=A0 pmd_t *pmd;
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 pgd =3D pgd_offset_k(addr);
+>>>> +=C2=A0=C2=A0=C2=A0 if (pgd_none(*pgd))
+>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 return NULL;
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 pud =3D pud_offset(pgd, addr);
+>>>> +=C2=A0=C2=A0=C2=A0 if (pud_none(*pud))
+>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 return NULL;
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 pmd =3D pmd_offset(pud, addr);
+>>>> +=C2=A0=C2=A0=C2=A0 if (pmd_none(*pmd))
+>>>> +=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0=C2=A0 return NULL;
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 return pte_offset_kernel(pmd, addr);
+>>>> +}
+>>>> +
+>>>> +/* Update a single kernel page table entry */
+>>>> +inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)=
+
+>>>> +{
+>>>> +=C2=A0=C2=A0=C2=A0 pte_t *pte =3D lookup_address((unsigned long)kad=
+dr);
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 set_pte(pte, pfn_pte(page_to_pfn(page), prot));
+>>>
+>>> Thought on the other hand.. what if the page is PMD? Do you really wa=
+nt
+>>> to do this?
+>>>
+>>> What if 'pte' is NULL?
+>>>> +}
+>>>> +
+>>>> +inline void xpfo_flush_kernel_tlb(struct page *page, int order)
+>>>> +{
+>>>> +=C2=A0=C2=A0=C2=A0 unsigned long kaddr =3D (unsigned long)page_addr=
+ess(page);
+>>>> +=C2=A0=C2=A0=C2=A0 unsigned long size =3D PAGE_SIZE;
+>>>> +
+>>>> +=C2=A0=C2=A0=C2=A0 flush_tlb_kernel_range(kaddr, kaddr + (1 << orde=
+r) * size);
+>>>
+>>> Ditto here. You are assuming it is PTE, but it may be PMD or such.
+>>> Or worts - the lookup_address could be NULL.
+>>>
+>>>> +}
+>>>> --=C2=A0
+>>>> 2.17.1
+>>>>
+>>
+>> Hi Konrad,
+>>
+>> This makes sense. x86 version of set_kpte() checks pte for NULL and al=
+so
+>> checks if the page is PMD. Now what you said about adding level to
+>> lookup_address() for arm makes more sense.
+>>
+>> Can someone with knowledge of arm64 mmu make recommendations here?
+>>
+>> Thanks,
+>> Khalid
+>>
+>=20
+> arm64 can't split larger pages and requires everything must be
+> mapped as pages (see [RFC PATCH v7 08/16] arm64/mm: disable
+> section/contiguous mappings if XPFO is enabled) . Any
+> situation where we would get something other than a pte
+> would be a bug.
+
+Thanks, Laura! That helps a lot. I would think checking for NULL pte in
+set_kpte() would still make sense since lookup_address() can return
+NULL. Something like:
+
+--- arch/arm64/mm/xpfo.c	2019-01-30 13:36:39.857185612 -0700
++++ arch/arm64/mm/xpfo.c.new	2019-02-12 13:26:47.471633031 -0700
+@@ -46,6 +46,11 @@
+ {
+ 	pte_t *pte =3D lookup_address((unsigned long)kaddr);
+
++	if (unlikely(!pte)) {
++		WARN(1, "xpfo: invalid address %p\n", kaddr);
++		return;
++	}
++
+ 	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
+ }
+
+--
+Khalid
+
+--------------9CCCB4AA5B3B70FD078792E2
+Content-Type: application/pgp-keys;
+ name="pEpkey.asc"
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: attachment;
+ filename="pEpkey.asc"
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
++Wrj8Rwom6h21PXZRKnlkis7ibQfE+TxqOI7vg=3D=3D
+=3DnPqY
+-----END PGP PUBLIC KEY BLOCK-----
+
+--------------9CCCB4AA5B3B70FD078792E2
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--------------9CCCB4AA5B3B70FD078792E2--
+
