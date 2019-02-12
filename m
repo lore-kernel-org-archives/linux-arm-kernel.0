@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C0AFCC282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:47:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54355C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FE5121773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:47:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 24BD8214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:50:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fhaEFObf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FE5121773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZuZ/2rwk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24BD8214DA
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NU0RhDoHKmzCIHxTy10dqrVjds9q2ph8Negj6gf/iXU=; b=fhaEFObfT0I6w1
-	EQnL6s2sNjaMmvCFS3BINbzI08IE6OGZBZWB5bE8k52J2Z+ihthd8YpRaDrPJ1SyXhKACRCFwpxPB
-	EBKNpV9BefkhME7iy6j1WLxaaW5wJWwVz6DMI513tTnZuH/2ZdWnduSSt3jYirt3G4HaxPLKHAXGx
-	baJ3Fs7gF95xHXyPpGz6sNXXoa8bSc8g2Bt/geVg0K1VlqsknQmdzUvXSExaG02bpm1fzoR55LmdP
-	7qO/cxfUomQ+DcEoHRZE5l299IyVVebN8P5BNr6yD+c+AnyW6bisQ6dvXGWADIoJN0j4FymAdmG58
-	Q5rANNpw/neIpb5P3UZw==;
+	List-Owner; bh=Uqdk5r0a5Bn4b81BpdtJ512QPOPazL3KOM18MH3XBSs=; b=ZuZ/2rwkMAvaz7
+	jlqlfqPca7K6rRXqKX+nu+OnuevWnrO2QwoAIo46xscNQ/8ud6oJXziL2nYuaJusyOBb96cSQPFlU
+	IyaQ4O77ENS6jObOTUCb9ngWRM1r3DZA2R8KJ6XNuAUx1rlNBRkxLaGnm2lKPA2vJWk8gKDRqeUCa
+	KbK35qjfhgdxuovbFgXwcRkNAr7dTCi85uImEr4dnoPqpgvT1JUhK92kyN1U18VbuFAwd+1joeF35
+	+ibsVHGg1LlvLZgTVT759NqBBv00fAXEXN240TEljXzN0rzYsKAunOY20kTVlhifTFPxtxxz2Tb3y
+	W3rTdZQSQEHkfeu1Bkyg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVbR-0007fO-1B; Tue, 12 Feb 2019 10:47:49 +0000
+	id 1gtVdX-0008BY-49; Tue, 12 Feb 2019 10:49:59 +0000
 Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVbM-0007el-9a; Tue, 12 Feb 2019 10:47:47 +0000
+ id 1gtVdU-0008B4-Mk; Tue, 12 Feb 2019 10:49:58 +0000
 Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
  helo=diego.localnet)
  by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
  (Exim 4.89) (envelope-from <heiko@sntech.de>)
- id 1gtVbA-00013l-F1; Tue, 12 Feb 2019 11:47:32 +0100
+ id 1gtVdP-00014V-Tf; Tue, 12 Feb 2019 11:49:51 +0100
 From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
 To: Yizhuo <yzhai003@ucr.edu>
-Subject: Re: [PATCH] phy: Variable "caldone" in function
- rockchip_emmc_phy_power() could be uninitialized
-Date: Tue, 12 Feb 2019 11:47:31 +0100
-Message-ID: <1884796.YtlDmFZGdE@diego>
-In-Reply-To: <20190206014733.21094-1-yzhai003@ucr.edu>
-References: <20190206014733.21094-1-yzhai003@ucr.edu>
+Subject: Re: [PATCH] phy: rockchip-typec: Variable "val" of function
+ rockchip_usb3_phy_power_on() could be uninitialized
+Date: Tue, 12 Feb 2019 11:49:51 +0100
+Message-ID: <3410531.oxWKaip9ZE@diego>
+In-Reply-To: <20190206021810.21596-1-yzhai003@ucr.edu>
+References: <20190206021810.21596-1-yzhai003@ucr.edu>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_024744_632667_8C22229B 
-X-CRM114-Status: GOOD (  17.38  )
+X-CRM114-CacheID: sfid-20190212_024956_889207_7F4BD6ED 
+X-CRM114-Status: GOOD (  15.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,60 +73,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Am Mittwoch, 6. Februar 2019, 02:47:33 CET schrieb Yizhuo:
-> In function rockchip_emmc_phy_power(), local variable "caldone"
-> could be uninitialized if function regmap_read() returns -EINVAL.
-> However, it will be used directly in the later context, which
-> is potentially unsafe.
-> 
+Am Mittwoch, 6. Februar 2019, 03:18:10 CET schrieb Yizhuo:
+> In function rockchip_usb3_phy_power_on(), local variable
+> "val" could be uninitialized if function regmap_read()
+> returns -EINVAL. However, this value is directly used in
+> later context. This is potentially unsafe.
+
+While highly unlikely case (GRF-registers are mmio-based),
+it's still nicer to go the clean way, so
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
 > Signed-off-by: Yizhuo <yzhai003@ucr.edu>
 > ---
->  drivers/phy/rockchip/phy-rockchip-emmc.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
+>  drivers/phy/rockchip/phy-rockchip-typec.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/phy/rockchip/phy-rockchip-emmc.c
-> b/drivers/phy/rockchip/phy-rockchip-emmc.c index f1b24f18e9b2..ca921ae08309
-> 100644
-> --- a/drivers/phy/rockchip/phy-rockchip-emmc.c
-> +++ b/drivers/phy/rockchip/phy-rockchip-emmc.c
-> @@ -85,11 +85,12 @@ struct rockchip_emmc_phy {
->  static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
->  {
->  	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
-> -	unsigned int caldone;
-> +	unsigned int caldone = 0;
-
-hmm, this may hide actual uninitialized uses in the future?
-With the added error handling below, there shouldn't be a case
-where caldone might be used uninitialized still?
-
-
-Heiko
-
->  	unsigned int dllrdy;
->  	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
->  	unsigned long rate;
->  	unsigned long timeout;
-> +	int err;
+> diff --git a/drivers/phy/rockchip/phy-rockchip-typec.c
+> b/drivers/phy/rockchip/phy-rockchip-typec.c index
+> a958c9bced01..b1e24418cb2d 100644
+> --- a/drivers/phy/rockchip/phy-rockchip-typec.c
+> +++ b/drivers/phy/rockchip/phy-rockchip-typec.c
+> @@ -716,7 +716,10 @@ static int rockchip_usb3_phy_power_on(struct phy *phy)
 > 
->  	/*
->  	 * Keep phyctrl_pdb and phyctrl_endll low to allow
-> @@ -164,9 +165,14 @@ static int rockchip_emmc_phy_power(struct phy *phy,
-> bool on_off) * wait 5us for calpad busy trimming
->  	 */
->  	udelay(5);
-> -	regmap_read(rk_phy->reg_base,
-> +	err = regmap_read(rk_phy->reg_base,
->  		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
->  		    &caldone);
-> +	if (err) {
-> +		pr_err("Failed to read status.\n");
-> +		return err;
-> +	}
+>  	/* wait TCPHY for pipe ready */
+>  	for (timeout = 0; timeout < 100; timeout++) {
+> -		regmap_read(tcphy->grf_regs, reg->offset, &val);
+> +		ret = regmap_read(tcphy->grf_regs, reg->offset, &val);
+> +		if (ret)
+> +			goto unlock_ret;
 > +
->  	caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
->  	if (caldone != PHYCTRL_CALDONE_DONE) {
->  		pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
+>  		if (!(val & BIT(reg->enable_bit))) {
+>  			tcphy->mode |= new_mode & (MODE_DFP_USB | MODE_UFP_USB);
+>  			goto unlock_ret;
 
 
 
