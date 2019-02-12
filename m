@@ -2,77 +2,84 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA1E3C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:59:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0ED81C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:01:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80BB9222C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:59:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1F8E222C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 20:01:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuSk6LtN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80BB9222C1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ky5APRZb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1F8E222C4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ddH1BwBMK7gI9AAyrVM71FNZWK4UkfIvnfHSqINLIRI=; b=SuSk6LtNEIJdbn
-	wWYGfmhlXNsGVa1xx0F3XrO97yQSgMDk0VvlM4k60J1yPhAEgpbNsKb9TFlKYA7JmJ3atRRMVgY9e
-	r7KfvpVXe49qvYoE1uK1ypG58PAq2jO+xnfdhFlSz6NDonQ8Er81zChlUUfh175NHD76Or5/gkqjd
-	4NG8km+Vo6o8A959da0QSqhT3LQq67/NDpxxHKa3zv/HHF2t+PXkuHOuvyjt1fQCtpu9AA1BenNpr
-	QbvNtuGQOy4XZslCvs1Dk3ljb0DJyofnSN8/vnkDGKafyJvWcv6u8yw7rsLPU8npVV7OPUoPpA1KI
-	FAVT6W2q3lORL+NNNVmA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=dHc8JUETglEf7JLlkmXp6wbW7oCj6AUGnf3+j1qSiik=; b=Ky5APRZb+XZYL/WkAoOn+h/V6
+	iktLefEj+xExveb1wuVTsQRZEW7+Wf0+y3XZ+qwpBpi+pw2CB7I4JpL3WqCLudpiu27mY7x5r+qRi
+	VG8P/y5GVNLKbB3xwsgw6eNCP8uk4UrnuKwOp4+mbnZ1hKVzy+olQNxAOD+1ZXdNZ2g0R2zxgBAV5
+	RGvy/pnwt6IffR86WGTaH2eeVqj3signZfxIKQvKnSX9zLqpG6DrLSMpNPAXPfN6KckpY36UQtobg
+	EHad2h/Htgo3a5sW2sGcLZHtyOf0vvzqC4z96TMFGEv05zg57EvMKBVmxWt/9XI1dl4302+ODGaAm
+	VWs0qTltw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gteDA-0002wO-Uo; Tue, 12 Feb 2019 19:59:20 +0000
-Received: from mail-lf1-f68.google.com ([209.85.167.68])
+	id 1gteFX-0005RL-Mz; Tue, 12 Feb 2019 20:01:47 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gteD5-0002qH-8P
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:59:18 +0000
-Received: by mail-lf1-f68.google.com with SMTP id f5so2962792lfc.13
+ id 1gteFS-0005Qx-Qh
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 20:01:45 +0000
+Received: by mail-qt1-f194.google.com with SMTP id o6so4478439qtk.6
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 11:59:14 -0800 (PST)
+ Tue, 12 Feb 2019 12:01:42 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=07JrEihgXJzN2I1jr+e09/NftVJM67wk9LLYm8Albzc=;
- b=sB29hZYxDdIFMNyy/BTp2Ui1B0OMd7anzfPm33AsOOWx1OSDax5/JGdhfmzxJTkeOF
- 6b+AYtN/ebovU6qwPO9p4d+StYwUOtK3hN0y9+qqyKNClXighywFn/pAGTk9qUwXOMVK
- Ih/uyJENjIek5uVGhTSqchhhhzSoVvmO0bHeEztolhN9J6o+T5Aqr2ctPVT9Kt+ut7Q2
- xESID8BbkZszGAc5QJYqSP9D31IlKHVPH3JMaRoWrONjcTlUMLCPCDQkGYwF6KbRf2/B
- egrk3aCXGO1Fh1AHB+IOXIEIz2UKNhW2bzKKMQpEhp5QMTtKxriW+mBkD+amLKsmQnY7
- qnfw==
-X-Gm-Message-State: AHQUAubKcoEGzQdbmGhKpYUbTuQOIEMLhRcTz4JR1DC+kLi827WM70JP
- 9s9s55Snkb4enYqd2xXdNU0cNMyuQd+mvsvfwlrXfw==
-X-Google-Smtp-Source: AHgI3IZiJEeE2DePEpsOyX6wiUYJg/8i6fuT4gT7C4jX4MycNsNwy3T0QoRfK3whLvXxy0VrIzOdHLu6jqm0JYui53U=
-X-Received: by 2002:a19:2906:: with SMTP id p6mr3461021lfp.17.1550001553136;
- Tue, 12 Feb 2019 11:59:13 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=5J3BEVMX8I3R6aDWiylH49L5Eh0Yio3E7KsL+Og9pHE=;
+ b=XTZUegNseUynSQCo12vJVOMfRN6L6nd4omLTVBdDL5gGy0mH7QjtQR0gmVznQh+wkT
+ Y0ziRDYKvXQ5EhgMLt9o2A4Yna8BdEa9bfhYUTkFUOPwQl6CyMMV+WDUgDBno2AJ6/xo
+ rTgEkkMFOhGJHlpCPc6r1gO3Vgxg795V/DOWBGa1oKlg67Ooi7RTfAqtyhU/iYAd4ANC
+ BSX/a2jo7h/PHS/MC219yxzL1oVvNd2cGAZjqzYkB9q1B3T/0Zr6GFSNZE3g4G9DGvRL
+ NoNaNUP6Q/arAijzS6ouJfuuJJC5pV99NRNZFWBurepXjEA4HKozB4+QbumQw6cLaBKp
+ UA5w==
+X-Gm-Message-State: AHQUAuZYKZYr6GFsBGXVbkdCDU45vabBPKjo8rWXSHjrLWiH4KGUNkwC
+ eMMhk6zVNmOGEXS8ToE6rkfkmQ==
+X-Google-Smtp-Source: AHgI3Ibb/fAwJBL5b9xb1ME5M4mJiSWWwndBNvOjwi+A3vbQNEu+Xmy/HhD6sB4kQ8UGZQAnBK23iQ==
+X-Received: by 2002:ac8:21ce:: with SMTP id 14mr4243520qtz.306.1550001701410; 
+ Tue, 12 Feb 2019 12:01:41 -0800 (PST)
+Received: from ?IPv6:2601:602:9800:dae6::112f? ([2601:602:9800:dae6::112f])
+ by smtp.gmail.com with ESMTPSA id t123sm14960812qkc.6.2019.02.12.12.01.37
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 12 Feb 2019 12:01:40 -0800 (PST)
+Subject: Re: [RFC PATCH v7 05/16] arm64/mm: Add support for XPFO
+To: Khalid Aziz <khalid.aziz@oracle.com>,
+ Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+References: <cover.1547153058.git.khalid.aziz@oracle.com>
+ <89f03091af87f5ab27bd6cafb032236d5bd81d65.1547153058.git.khalid.aziz@oracle.com>
+ <20190123142410.GC19289@Konrads-MacBook-Pro.local>
+ <4dfba458-1bf6-25ff-df4c-b96a1221cd95@oracle.com>
+From: Laura Abbott <labbott@redhat.com>
+Message-ID: <7497bd44-1fda-e073-ba7f-18a76577b64a@redhat.com>
+Date: Tue, 12 Feb 2019 12:01:36 -0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
- <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
- <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
-In-Reply-To: <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
-From: Bhupesh Sharma <bhsharma@redhat.com>
-Date: Wed, 13 Feb 2019 01:29:00 +0530
-Message-ID: <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-To: Dave Young <dyoung@redhat.com>
+In-Reply-To: <4dfba458-1bf6-25ff-df4c-b96a1221cd95@oracle.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_115915_320031_A04CC81E 
-X-CRM114-Status: GOOD (  34.00  )
+X-CRM114-CacheID: sfid-20190212_120142_869440_2B864C14 
+X-CRM114-Status: GOOD (  23.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,161 +91,163 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kazuhito Hagio <k-hagio@ab.jp.nec.com>,
- "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>, Borislav Petkov <bp@alien8.de>,
- "anderson@redhat.com" <anderson@redhat.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Tycho Andersen <tycho@docker.com>, kernel-hardening@lists.openwall.com,
+ linux-mm@kvack.org, deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
+ joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, tycho@tycho.ws,
+ ak@linux.intel.com, hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de,
+ pradeep.vincent@oracle.com, jcm@redhat.com, liran.alon@oracle.com,
+ tglx@linutronix.de, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, juergh@gmail.com,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
+ dwmw@amazon.co.uk, keescook@google.com, torvalds@linux-foundation.org,
+ kirill.shutemov@linux.intel.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 12, 2019 at 4:14 PM Dave Young <dyoung@redhat.com> wrote:
->
-> On 02/12/19 at 10:37am, Bhupesh Sharma wrote:
-> > Hi Kazu,
-> >
-> > On 02/04/2019 09:34 PM, Kazuhito Hagio wrote:
-> > > On 1/30/2019 8:48 PM, Dave Young wrote:
-> > > > + more people
-> > > > On 01/30/19 at 05:53pm, Bhupesh Sharma wrote:
-> > > > > With ARMv8.2-LVA and LPA architecture extensions, arm64 hardware which
-> > > > > supports these extensions can support upto 52-bit virtual and 52-bit
-> > > > > physical addresses respectively.
-> > > > >
-> > > > > Since at the moment we enable the support of these extensions via CONFIG
-> > > > > flags, e.g.
-> > > > >   - LPA via CONFIG_ARM64_PA_BITS_52
-> > > > >
-> > > > > there are no clear mechanisms in user-space right now to
-> > > > > deteremine these CONFIG flag values and also determine the PARange and
-> > > > > VARange address values.
-> > > > >
-> > > > > User-space tools like 'makedumpfile' and 'crash-utility' can instead
-> > > > > use the 'MAX_USER_VA_BITS' and 'MAX_PHYSMEM_BITS' values to determine
-> > > > > the maximum virtual address and physical address (respectively)
-> > > > > supported by underlying kernel.
-> > > > >
-> > > > > A reference 'makedumpfile' implementation which uses this approach to
-> > > > > determining the maximum physical address is available in [0].
-> > > > >
-> > > > > [0].
-> > > > https://github.com/bhupesh-sharma/makedumpfile/blob/52-bit-pa-support-via-vmcore-v1/arch/arm64.c#L490
-> > > >
-> > > > I'm not objecting the patch, just want to make sure to make clear about
-> > > > things and make sure these issues are aware by people, and leave arm
-> > > > people to review the arm bits.
-> > > >
-> > > > 1. MAX_PHYSMEM_BITS
-> > > > As we previously found, back to 2014 makedumpfile took a patch to read the
-> > > > value from vmcore but the kernel patch was not accepted.
-> > > > So we should first make clear if this is really needed, why other arches
-> > > > do not need this in makedumpfile.
-> > > >
-> > > > If we really need it then should it be arm64 only?
-> > > >
-> > > > If it is arm64 only then the makedumpfile code should read this number
-> > > > only for arm64.
-> > >
-> > > Sorry for the delay.
-> > >
-> > > According to the kernel patch, some of arm32 platforms may need it
-> > > http://lists.infradead.org/pipermail/kexec/2014-May/011909.html
-> > > but except for them (and arm64), makedumpfile can manage with kernel
-> > > version and some switches to determine this value so far.
-> > >
-> > > >
-> > > > Also Lianbo added the vmcoreinfo documents, I believe it stays in -tip
-> > > > tree,  need to make sure to document this as well.
-> > > >
-> > > > 2. MAX_USER_VA_BITS
-> > > > Does makedumpfile care about userspace VA bits?  I do not see other code
-> > > > doing this,  Kazu and Dave A should be able to comment.
-> > >
-> > > The mapping makedumpfile uses on arm64 is swapper_pg_dir only, so
-> > > unless the config affects its structure or something, makedumpfile
-> > > will not need this value.
-> >
-> > I captured this case in more details while sending out the makedumpfile
-> > enablement patch for ARMv8.2-LVA (see [0]), but here is a brief summary on
-> > the same:
-> >
-> > Since at the moment we enable the support of the ARMv8.2-LVA extension for
-> > 52-bit user-space VA in the kernel via a CONFIG flags
-> > (CONFIG_ARM64_USER_VA_BITS_52), so there are no clear mechanisms in
-> > user-space to determine this CONFIG
-> > flag value and use it to determine the address range values.
-> >
-> > Since 'VA_BITS' are already exported via vmcoreinfo, if we export
-> > 'MAX_USER_VA_BITS' as well, we can use the same in user-space to check if
-> > the 'MAX_USER_VA_BITS' value is greater than 'VA_BITS'. If yes, then we are
-> > running a use-case where user-space is 52-bit while the underlying kernel is
-> > still 48-bit.
->
-> Problem is why this is needed, it sounds like you are talking about some
-> non-exist use case.
+On 2/12/19 7:52 AM, Khalid Aziz wrote:
+> On 1/23/19 7:24 AM, Konrad Rzeszutek Wilk wrote:
+>> On Thu, Jan 10, 2019 at 02:09:37PM -0700, Khalid Aziz wrote:
+>>> From: Juerg Haefliger <juerg.haefliger@canonical.com>
+>>>
+>>> Enable support for eXclusive Page Frame Ownership (XPFO) for arm64 and
+>>> provide a hook for updating a single kernel page table entry (which is
+>>> required by the generic XPFO code).
+>>>
+>>> v6: use flush_tlb_kernel_range() instead of __flush_tlb_one()
+>>>
+>>> CC: linux-arm-kernel@lists.infradead.org
+>>> Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+>>> Signed-off-by: Tycho Andersen <tycho@docker.com>
+>>> Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+>>> ---
+>>>   arch/arm64/Kconfig     |  1 +
+>>>   arch/arm64/mm/Makefile |  2 ++
+>>>   arch/arm64/mm/xpfo.c   | 58 ++++++++++++++++++++++++++++++++++++++++++
+>>>   3 files changed, 61 insertions(+)
+>>>   create mode 100644 arch/arm64/mm/xpfo.c
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index ea2ab0330e3a..f0a9c0007d23 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -171,6 +171,7 @@ config ARM64
+>>>   	select SWIOTLB
+>>>   	select SYSCTL_EXCEPTION_TRACE
+>>>   	select THREAD_INFO_IN_TASK
+>>> +	select ARCH_SUPPORTS_XPFO
+>>>   	help
+>>>   	  ARM 64-bit (AArch64) Linux support.
+>>>   
+>>> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
+>>> index 849c1df3d214..cca3808d9776 100644
+>>> --- a/arch/arm64/mm/Makefile
+>>> +++ b/arch/arm64/mm/Makefile
+>>> @@ -12,3 +12,5 @@ KASAN_SANITIZE_physaddr.o	+= n
+>>>   
+>>>   obj-$(CONFIG_KASAN)		+= kasan_init.o
+>>>   KASAN_SANITIZE_kasan_init.o	:= n
+>>> +
+>>> +obj-$(CONFIG_XPFO)		+= xpfo.o
+>>> diff --git a/arch/arm64/mm/xpfo.c b/arch/arm64/mm/xpfo.c
+>>> new file mode 100644
+>>> index 000000000000..678e2be848eb
+>>> --- /dev/null
+>>> +++ b/arch/arm64/mm/xpfo.c
+>>> @@ -0,0 +1,58 @@
+>>> +/*
+>>> + * Copyright (C) 2017 Hewlett Packard Enterprise Development, L.P.
+>>> + * Copyright (C) 2016 Brown University. All rights reserved.
+>>> + *
+>>> + * Authors:
+>>> + *   Juerg Haefliger <juerg.haefliger@hpe.com>
+>>> + *   Vasileios P. Kemerlis <vpk@cs.brown.edu>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify it
+>>> + * under the terms of the GNU General Public License version 2 as published by
+>>> + * the Free Software Foundation.
+>>> + */
+>>> +
+>>> +#include <linux/mm.h>
+>>> +#include <linux/module.h>
+>>> +
+>>> +#include <asm/tlbflush.h>
+>>> +
+>>> +/*
+>>> + * Lookup the page table entry for a virtual address and return a pointer to
+>>> + * the entry. Based on x86 tree.
+>>> + */
+>>> +static pte_t *lookup_address(unsigned long addr)
+>>> +{
+>>> +	pgd_t *pgd;
+>>> +	pud_t *pud;
+>>> +	pmd_t *pmd;
+>>> +
+>>> +	pgd = pgd_offset_k(addr);
+>>> +	if (pgd_none(*pgd))
+>>> +		return NULL;
+>>> +
+>>> +	pud = pud_offset(pgd, addr);
+>>> +	if (pud_none(*pud))
+>>> +		return NULL;
+>>> +
+>>> +	pmd = pmd_offset(pud, addr);
+>>> +	if (pmd_none(*pmd))
+>>> +		return NULL;
+>>> +
+>>> +	return pte_offset_kernel(pmd, addr);
+>>> +}
+>>> +
+>>> +/* Update a single kernel page table entry */
+>>> +inline void set_kpte(void *kaddr, struct page *page, pgprot_t prot)
+>>> +{
+>>> +	pte_t *pte = lookup_address((unsigned long)kaddr);
+>>> +
+>>> +	set_pte(pte, pfn_pte(page_to_pfn(page), prot));
+>>
+>> Thought on the other hand.. what if the page is PMD? Do you really want
+>> to do this?
+>>
+>> What if 'pte' is NULL?
+>>> +}
+>>> +
+>>> +inline void xpfo_flush_kernel_tlb(struct page *page, int order)
+>>> +{
+>>> +	unsigned long kaddr = (unsigned long)page_address(page);
+>>> +	unsigned long size = PAGE_SIZE;
+>>> +
+>>> +	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
+>>
+>> Ditto here. You are assuming it is PTE, but it may be PMD or such.
+>> Or worts - the lookup_address could be NULL.
+>>
+>>> +}
+>>> -- 
+>>> 2.17.1
+>>>
+> 
+> Hi Konrad,
+> 
+> This makes sense. x86 version of set_kpte() checks pte for NULL and also
+> checks if the page is PMD. Now what you said about adding level to
+> lookup_address() for arm makes more sense.
+> 
+> Can someone with knowledge of arm64 mmu make recommendations here?
+> 
+> Thanks,
+> Khalid
+> 
 
-I already explained this in an earlier reply to your initial comments
-(see <http://lists.infradead.org/pipermail/kexec/2019-January/022395.html>).
-Perhaps you missed reading it, so here are the architecturally
-possible and kernel supported uses cases with ARMv8.2 extensions
-(depending on the combination of CONFIG flags and kernel version):
-
-- 48-bit kernel VA + 48-bit user-space VA + 52-bit PA
-- 48-bit kernel VA + 52-bit user-space VA + 52-bit PA
-- 52-bit kernel VA + 52-bit user-space VA + 52-bit PA
-
-Please see 'config ARM64_USER_VA_BITS_52'  help text inside
-'arch/arm64/Kconfig' for more details:
-config ARM64_USER_VA_BITS_52
-    bool "52-bit (user)"
-    depends on ARM64_64K_PAGES && (ARM64_PAN || !ARM64_SW_TTBR0_PAN)
-    help
-      Enable 52-bit virtual addressing for userspace when explicitly
-      requested via a hint to mmap(). The kernel will continue to
-      use 48-bit virtual addresses for its own mappings.
-
-BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
-(which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
-mentioned that the changes look necessary.
-
-[0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
+arm64 can't split larger pages and requires everything must be
+mapped as pages (see [RFC PATCH v7 08/16] arm64/mm: disable
+section/contiguous mappings if XPFO is enabled) . Any
+situation where we would get something other than a pte
+would be a bug.
 
 Thanks,
-Bhupesh
-
-> >
-> > The increased 'PTRS_PER_PGD' value for such cases needs to be then
-> > calculated as is done by the underlying kernel (see
-> > 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
-> >
-> > #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
-> >
-> > Also, note that 'arch/arm64/include/asm/memory.h' defines 'MAX_USER_VA_BITS'
-> > as 'VA_BITS' in case 'CONFIG_ARM64_USER_VA_BITS_52' is set to 'n':
-> >
-> > #ifdef CONFIG_ARM64_USER_VA_BITS_52
-> > #define MAX_USER_VA_BITS      52
-> > #else
-> > #define MAX_USER_VA_BITS      VA_BITS
-> > #endif
-> >
-> > So, makedumpfile will need this symbol exported in vmcore to make the above
-> > determination.
-> >
-> > [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022425.html
-> >
-> > Thanks,
-> > Bhupesh
->
-> Thanks
-> Dave
+Laura
 
 _______________________________________________
 linux-arm-kernel mailing list
