@@ -4,69 +4,92 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6FBAC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:05:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DDE7FC282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:06:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 94F7C2073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:05:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC7092073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 09:06:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sZ9QAKNY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94F7C2073D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y19jnZyZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="SYBKsO7B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC7092073D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Aue4bmtClVAtZYnnfiBz3JqMMyJQExdYX57wpO5LkDA=; b=sZ9QAKNYs0c9Q4
-	htkNgCUsOOMMeaH0R/3HaiBZg4+ZGfaCQr/gDZswtgeAKAvNYAFmEPSBWhqI+fgkVp+jUWfjrfJWf
-	OWn2nvGkkg1YC6g0oExkL0s+WoY6+kT8TnTojDdB8JdsTkjTGx42Igiza+xR0trSUrV2emoe0URSg
-	M6Tk9v0gv5qpYSHMnbxpjY7mHpsNGxerd5CjIJxSxRmUAOp+yk8XLg0IZrFR6Q4z28uUC4XKLFImg
-	kYgaASV4lyeh3LZM5SHhpyy/CrxbI8nnnwQrHZpJuR5wPq/2g6jB7RLL706wUwk6eiGqU8Wic8M1o
-	LcUNU6QdWeJ1AuZ+/fyg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=CE4KoJg5tFrgcI04neeFIBj0P8oar+LSUC3bDgawEqg=; b=Y19jnZyZdmSx0G
+	MYk5IWh/+Wi/JLNok6PX6Ixa05kETsoY6xvEZdc5DssmTKDRWcPXFbehccTZ6YCnQaZVq/eyK+GAq
+	y6NnAIrTX7Asi136Wxxu0TKx/UWT+VxReiWmhnm8T/bhaCl3CmXa0gpEAHoibAjZaEsCEh7RbPsDS
+	YNVphR8eOMclrkvT0XHNUzbQSkbGpaQoI8ui5QWf/y7jIoPeJuA4M2Gn+luI62WzQ1jIyduVQlqmI
+	9JlWAaLL4V4rJU6S8MXRdz4wWRxdWS0KmVNYO4ewcz39uimwzPvKHeZHB1+up84Iv0ndXqRXb6v0f
+	kWvx0+fcyfaadp+Zyxsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtU0n-0002yg-27; Tue, 12 Feb 2019 09:05:53 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gtU1G-0003HB-4l; Tue, 12 Feb 2019 09:06:22 +0000
+Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtU0i-0002yA-BF; Tue, 12 Feb 2019 09:05:50 +0000
-X-UUID: 6e8aac45697a4c7397a7652d66f58921-20190212
-X-UUID: 6e8aac45697a4c7397a7652d66f58921-20190212
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <andrew-sh.cheng@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1951783122; Tue, 12 Feb 2019 01:05:43 -0800
-Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 01:05:42 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 12 Feb 2019 17:05:40 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 12 Feb 2019 17:05:40 +0800
-Message-ID: <1549962340.7155.2.camel@mtksdaap41>
-Subject: Re: [PATCH 3/3] devfreq: add mediatek cci devfreq
-From: andrew-sh.cheng <andrew-sh.cheng@mediatek.com>
-To: Nicolas Boichat <drinkcat@chromium.org>
-Date: Tue, 12 Feb 2019 17:05:40 +0800
-In-Reply-To: <CANMq1KAbaZWM0BQWdKgg8nQhOovBR9Y=cFyd1kG0FAteWhZtiw@mail.gmail.com>
-References: <1548743704-16821-1-git-send-email-andrew-sh.cheng@mediatek.com>
- <1548743704-16821-4-git-send-email-andrew-sh.cheng@mediatek.com>
- <CANMq1KAbaZWM0BQWdKgg8nQhOovBR9Y=cFyd1kG0FAteWhZtiw@mail.gmail.com>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1gtU1C-0003Gg-SR
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 09:06:20 +0000
+Received: by mail-wm1-x344.google.com with SMTP id x7so2045057wmj.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 01:06:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=OOsj5rP0qK8yaK+fW00SckoKIFsWt0RwbpvgFzFULGU=;
+ b=SYBKsO7BU34O3kZ7oAJLjzl5oMZzPPuxg1U5aSrWvqxl/pHNcIBHdGS9wKMsEmNmWD
+ 8tCswthB8oAkMtB8qVBeVaI+Oxy0nGguEONZW3Kchvhu5ZGEIbUoI8Hqil/mL2HgHBpn
+ gEHI2U2Wi/bf0qPVwYzp70AWDuFBnqQ31AmLMUkw23YK+YgNBH7HMGCqsiJ8KEYYGbsu
+ T3SbHTcdm4CFLBWIpcKyCZkndmkSd2QyJMolKYTyOKUMGFg+/MRlU6tS6kZ+jvhvHad8
+ 8ii4uaQiQBd0ob7UlSr6iBnWINDyPxDk3xZidiWm2lWP5H+guH4CQnLSfan5UqzVxt3R
+ cnXg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=OOsj5rP0qK8yaK+fW00SckoKIFsWt0RwbpvgFzFULGU=;
+ b=JHYitK+9eJnwpbljwOSyckPN+BN/l9Siss4fV4DUp4Z6i725jHGcDXC0wC3bZ+bkzH
+ G9/UXHzie8QYuwe8q57hfWcolWGNvYIxFH2L9k8yJ6asGWsQtMZQ8o3XAzXcIbKAyAGj
+ yJcwEAmAmQDsm1lHaZz5TGGwxhA7CHugsRC1E+3STx2YGQDI5JPV3uPtsNdYPG1uQ7dP
+ KTaL42p/P4eF5DfUw6Lmxr8WSj/MFaJTvxLr96EngbrHrwRUtbfMuNJ6H0w+Tcuqjnxa
+ 6wibAfzzL1dAA5byRit9m6vMp5zSVWpRQtpQYmqda5+TWEG/zV1dbuQs+Kvd/KkhcUzH
+ q4Zg==
+X-Gm-Message-State: AHQUAuZ8OfuX4qBB7qtxCS9A7/yn4Hz6ApgY5ihUXFnoPy7WGXtA4DY7
+ vD1r2VQOxd85M7HLxOtz+meMHQ==
+X-Google-Smtp-Source: AHgI3IYmD5CiC3t02W9DKCrH2RMMDy0EnshKKhY1JZEgIzi1s77ABZAVaHgtWlDapGQufpAqTnV5zw==
+X-Received: by 2002:a1c:4683:: with SMTP id t125mr2099331wma.9.1549962376753; 
+ Tue, 12 Feb 2019 01:06:16 -0800 (PST)
+Received: from [192.168.27.65] (sju31-1-78-210-255-2.fbx.proxad.net.
+ [78.210.255.2])
+ by smtp.googlemail.com with ESMTPSA id u17sm9195303wrg.71.2019.02.12.01.06.14
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 12 Feb 2019 01:06:15 -0800 (PST)
+Subject: Re: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce
+ timer for Milbeaut SoCs
+To: Sugaya Taichi <sugaya.taichi@socionext.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+References: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Message-ID: <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
+Date: Tue, 12 Feb 2019 10:06:13 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_010548_398715_48D36DE7 
-X-CRM114-Status: GOOD (  33.58  )
+X-CRM114-CacheID: sfid-20190212_010618_926136_082D2572 
+X-CRM114-Status: GOOD (  23.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,348 +101,145 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- srv_heupstream@mediatek.com, linux-pm@vger.kernel.org,
- Viresh Kumar <viresh.kumar@linaro.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, lkml <linux-kernel@vger.kernel.org>,
- Chanwoo
- Choi <cw00.choi@samsung.com>, Kyungmin Park <kyungmin.park@samsung.com>,
- Rob Herring <robh+dt@kernel.org>, "moderated list:ARM/Mediatek SoC
- support" <linux-mediatek@lists.infradead.org>,
- MyungJoo Ham <myungjoo.ham@samsung.com>,
- Matthias Brugger <matthias.bgg@gmail.com>, Fan Chen <fan.chen@mediatek.com>,
- linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 2019-02-01 at 10:43 +0700, Nicolas Boichat wrote:
-> On Tue, Jan 29, 2019 at 1:36 PM Andrew-sh Cheng
-> <andrew-sh.cheng@mediatek.com> wrote:
-> >
-> > From: "Andrew-sh.Cheng" <andrew-sh.cheng@mediatek.com>
-> >
-> > For big/little cpu cluster architecture,
-> > not only CPU frequency, but CCI frequency will also affect performance.
-> >
-> > Little cores and cci share the same buck in Mediatek mt8183 IC,
-> > so we add a CCI devfreq which will get notification when buck voltage
-> > is changed, then CCI devfreq can set cci frequency as high as possible.
-> >
-> > Signed-off-by: Andrew-sh.Cheng <andrew-sh.cheng@mediatek.com>
-> > ---
-> >  drivers/devfreq/Kconfig              |   9 ++
-> >  drivers/devfreq/Makefile             |   1 +
-> >  drivers/devfreq/mt8183-cci-devfreq.c | 224 +++++++++++++++++++++++++++++++++++
-> >  3 files changed, 234 insertions(+)
-> >  create mode 100644 drivers/devfreq/mt8183-cci-devfreq.c
-> >
-> > diff --git a/drivers/devfreq/Kconfig b/drivers/devfreq/Kconfig
-> > index 6a172d3..0b14aab 100644
-> > --- a/drivers/devfreq/Kconfig
-> > +++ b/drivers/devfreq/Kconfig
-> > @@ -113,6 +113,15 @@ config ARM_RK3399_DMC_DEVFREQ
-> >            It sets the frequency for the memory controller and reads the usage counts
-> >            from hardware.
-> >
-> > +config ARM_MT8183_CCI_DEVFREQ
-> > +       tristate "MT8183 CCI DEVFREQ Driver"
-> > +       depends on ARM_MEDIATEK_CPUFREQ
-> > +       help
-> > +               This adds devfreq for cci clock
-> 
-> It might be nice to spell out that CCI stands for "Cache Coherent Interconnect".
-I will modify in next patch.
-> 
-> > +               which is shared the same regulator with cpu cluster.
-> > +               It can track buck voltage and update a proper cci frequency.
-> > +               Use notification to get regulator status.
-> > +
-> >  source "drivers/devfreq/event/Kconfig"
-> >
-> >  endif # PM_DEVFREQ
-> > diff --git a/drivers/devfreq/Makefile b/drivers/devfreq/Makefile
-> > index 32b8d4d..25afe8c 100644
-> > --- a/drivers/devfreq/Makefile
-> > +++ b/drivers/devfreq/Makefile
-> > @@ -11,6 +11,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)     += governor_passive.o
-> >  obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)   += exynos-bus.o
-> >  obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)   += rk3399_dmc.o
-> >  obj-$(CONFIG_ARM_TEGRA_DEVFREQ)                += tegra-devfreq.o
-> > +obj-$(CONFIG_ARM_MT8183_CCI_DEVFREQ)   += mt8183-cci-devfreq.o
-> >
-> >  # DEVFREQ Event Drivers
-> >  obj-$(CONFIG_PM_DEVFREQ_EVENT)         += event/
-> > diff --git a/drivers/devfreq/mt8183-cci-devfreq.c b/drivers/devfreq/mt8183-cci-devfreq.c
-> > new file mode 100644
-> > index 0000000..4837892
-> > --- /dev/null
-> > +++ b/drivers/devfreq/mt8183-cci-devfreq.c
-> > @@ -0,0 +1,224 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +//
-> > +// Copyright (c) 2018 MediaTek Inc.
-> > +#include <linux/cpu.h>
-> > +#include <linux/cpufreq.h>
-> > +#include <linux/devfreq.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/regulator/consumer.h>
-> > +
-> > +#include "governor.h"
-> > +
-> > +struct cci_devfreq_data {
-> > +       struct devfreq          *devfreq;
-> > +       struct regulator        *proc_reg;
-> > +       struct clk              *cci_clk;
-> > +       unsigned long           buck_volt;
-> > +       int                     volt_increasing;
-> > +       struct notifier_block   nb;
-> > +};
-> > +
-> > +static int mtk_cci_governor_get_target(struct devfreq *devfreq,
-> > +                                      unsigned long *freq)
-> > +{
-> > +       struct cci_devfreq_data *cci_devdata;
-> > +       int     i, opp_count;
-> 
-> No tab here: single space between int and i.
-I will modify in next patch.
-> 
-> > +       struct dev_pm_opp       *opp;
-> > +       unsigned long   opp_rate, opp_voltage;
-> > +
-> > +       cci_devdata = dev_get_drvdata(devfreq->dev.parent);
-> > +
-> > +       /* find available frequency */
-> > +       opp_count = dev_pm_opp_get_opp_count(devfreq->dev.parent);
-> > +       for (i = 0, opp_rate = ULONG_MAX; i < opp_count; i++, opp_rate--) {
-> > +               opp = dev_pm_opp_find_freq_floor(devfreq->dev.parent,
-> > +                                                &opp_rate);
-> 
-> This is quite inefficient as each call to dev_pm_opp_find_freq_floor
-> may go through the whole OPP table (so your loop is O(n**2), but this
-> can be done in O(n) by simply walking through the list).
-> 
-> I'd just copy what dev_pm_opp_find_freq_ceil does
-> (https://elixir.bootlin.com/linux/v4.19/source/drivers/opp/core.c#L425).
-> Or maybe we need a new function in the opp core.
-I will add an API for opp framework for this in next patch
-> 
-> > +               opp_voltage = dev_pm_opp_get_voltage(opp);
-> > +               dev_pm_opp_put(opp);
-> > +
-> > +               if (opp_voltage <= cci_devdata->buck_volt)
-> > +                       break;
-> > +       }
-> > +       *freq = opp_rate;
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int mtk_cci_governor_event_handler(struct devfreq *devfreq,
-> > +                                         unsigned int event, void *data)
-> > +{
-> > +       return 0;
-> > +}
-> > +
-> > +static struct devfreq_governor mtk_cci_devfreq_governor = {
-> > +       .name = "voltage_monitor",
-> > +       .get_target_freq = mtk_cci_governor_get_target,
-> > +       .event_handler = mtk_cci_governor_event_handler,
-> > +};
-> > +
-> > +static int mtk_cci_devfreq_target(struct device *dev, unsigned long *freq,
-> > +                                 u32 flags)
-> > +{
-> > +       struct cci_devfreq_data *cci_devdata;
-> > +
-> > +       cci_devdata = dev_get_drvdata(dev);
-> > +
-> > +       clk_set_rate(cci_devdata->cci_clk, *freq);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static struct devfreq_dev_profile cci_devfreq_profile = {
-> > +       .polling_ms     = 0,
-> > +       .target         = mtk_cci_devfreq_target,
-> > +};
-> > +
-> > +static int cci_devfreq_regulator_notifier(struct notifier_block *nb,
-> > +                                         unsigned long val, void *data)
-> > +{
-> > +       struct cci_devfreq_data *cci_devdata =
-> > +               container_of(nb, struct cci_devfreq_data, nb);
-> > +
-> > +       /* deal with reduce frequency */
-> > +       if (val & REGULATOR_EVENT_PRE_VOLTAGE_CHANGE) {
-> > +               struct pre_voltage_change_data *pvc_data = data;
-> > +
-> > +               if (pvc_data->old_uV > pvc_data->min_uV) {
-> > +                       cci_devdata->volt_increasing = 0;
-> > +                       cci_devdata->buck_volt =
-> > +                               (unsigned long)(pvc_data->min_uV);
-> > +                       mutex_lock(&cci_devdata->devfreq->lock);
-> > +                       update_devfreq(cci_devdata->devfreq);
-> > +                       mutex_unlock(&cci_devdata->devfreq->lock);
-> > +               } else {
-> > +                       cci_devdata->volt_increasing = 1;
-> > +               }
-> > +       }
-> > +       /* deal with abort reduce frequency */
-> > +       if ((val & REGULATOR_EVENT_ABORT_VOLTAGE_CHANGE) ||
-> > +           /* deal with increase frequency */
-> > +           ((val & REGULATOR_EVENT_VOLTAGE_CHANGE) &&
-> > +            cci_devdata->volt_increasing == 1)) {
-> > +               cci_devdata->buck_volt = (unsigned long)data;
-> > +               mutex_lock(&cci_devdata->devfreq->lock);
-> > +               update_devfreq(cci_devdata->devfreq);
-> > +               mutex_unlock(&cci_devdata->devfreq->lock);
-> > +       }
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int mtk_cci_devfreq_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device *cci_dev = &pdev->dev;
-> > +       struct cci_devfreq_data *cci_devdata;
-> > +       struct notifier_block *nb;
-> > +       int ret;
-> > +
-> > +       dev_pm_opp_of_add_table(&pdev->dev);
-> > +
-> > +       cci_devdata = devm_kzalloc(cci_dev, sizeof(*cci_devdata), GFP_KERNEL);
-> > +       if (!cci_devdata)
-> > +               return -ENOMEM;
-> > +       nb = &cci_devdata->nb;
-> > +       cci_devdata->cci_clk = ERR_PTR(-ENODEV);
-> 
-> This one is useless as you set cci_clk again just below.
-> 
-> > +       cci_devdata->proc_reg = ERR_PTR(-ENODEV);
-> 
-> For this one, I'd just create 2 goto targets below, instead of those
-> ifs in the error path.
-I will modify and change to 2 goto in next patch.
-> 
-> > +
-> > +       cci_devdata->cci_clk = clk_get(cci_dev, "cci_clock");
-> > +       ret = PTR_ERR_OR_ZERO(cci_devdata->cci_clk);
-> > +       if (ret) {
-> > +               if (ret == -EPROBE_DEFER)
-> > +                       pr_err("cci clock not ready, retry\n");
-> > +               else
-> > +                       pr_err("no clock for cci: %d\n", ret);
-> > +
-> > +               goto out_free_resources;
-> > +       }
-> > +
-> > +       cci_devdata->proc_reg = regulator_get_optional(cci_dev, "proc");
-> > +       ret = PTR_ERR_OR_ZERO(cci_devdata->proc_reg);
-> > +       if (ret) {
-> > +               if (ret == -EPROBE_DEFER)
-> > +                       pr_err("cci regulator not ready, retry\n");
-> > +               else
-> > +                       pr_err("no regulator for cci: %d\n", ret);
-> > +
-> > +               goto out_free_resources;
-> > +       }
-> > +
-> > +       platform_set_drvdata(pdev, cci_devdata);
-> > +
-> > +       /* create cci_devfreq and add to cci device.
-> > +        * governor is voltage_monitor.
-> > +        * governor will get platform_device data to make decision.
-> > +        */
-> > +       cci_devdata->devfreq = devm_devfreq_add_device(cci_dev,
-> > +                                                      &cci_devfreq_profile,
-> > +                                                      "voltage_monitor",
-> > +                                                      NULL);
-> > +
-> > +       nb->notifier_call = cci_devfreq_regulator_notifier;
-> > +       regulator_register_notifier(cci_devdata->proc_reg,
-> > +                                   nb);
-> > +
-> > +       return 0;
-> > +
-> > +out_free_resources:
-> > +       if (!IS_ERR(cci_devdata->cci_clk))
-> > +               clk_put(cci_devdata->cci_clk);
-> > +       if (!IS_ERR(cci_devdata->proc_reg))
-> > +               regulator_put(cci_devdata->proc_reg);
-> > +
-> > +       return ret;
-> > +}
-> > +
-> > +static const struct of_device_id mediatek_cci_devfreq_of_match[] = {
-> > +       { .compatible = "mediatek,mt8183-cci" },
-> > +       { },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mediatek_cci_devfreq_of_match);
-> > +
-> > +static struct platform_driver cci_devfreq_driver = {
-> > +       .probe  = mtk_cci_devfreq_probe,
-> > +       .driver = {
-> > +               .name = "mediatek-cci-devfreq",
-> > +               .of_match_table = mediatek_cci_devfreq_of_match,
-> > +       },
-> > +};
-> > +
-> > +static int __init mtk_cci_devfreq_init(void)
-> > +{
-> > +       int ret = 0;
-> > +
-> > +       ret = devfreq_add_governor(&mtk_cci_devfreq_governor);
-> > +       if (ret) {
-> > +               pr_err("%s: failed to add governor: %d\n", __func__, ret);
-> > +               return ret;
-> > +       }
-> > +
-> > +       ret = platform_driver_register(&cci_devfreq_driver);
-> > +       if (ret)
-> > +               devfreq_remove_governor(&mtk_cci_devfreq_governor);
-> > +
-> > +       return ret;
-> > +}
-> > +module_init(mtk_cci_devfreq_init)
-> > +
-> > +static void __exit mtk_cci_devfreq_exit(void)
-> > +{
-> > +       int ret = 0;
-> > +
-> > +       platform_driver_unregister(&cci_devfreq_driver);
-> > +
-> > +       ret = devfreq_remove_governor(&mtk_cci_devfreq_governor);
-> > +       if (ret)
-> > +               pr_err("%s: failed to remove governor: %d\n", __func__, ret);
-> > +}
-> > +module_exit(mtk_cci_devfreq_exit)
-> > +
-> > +MODULE_LICENSE("GPL v2");
-> > +MODULE_DESCRIPTION("Mediatek CCI devfreq driver");
-> > +MODULE_AUTHOR("andrew-sh.cheng");
-> > +
-> > --
-> > 1.8.1.1.dirty
-> >
-> >
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek@lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
-
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMDgvMDIvMjAxOSAxMzoyNiwgU3VnYXlhIFRhaWNoaSB3cm90ZToKPiBBZGQgdGltZXIgZHJp
+dmVyIGZvciBNaWxiZWF1dCBTb0NzIHNlcmllcy4KPiAKPiBUaGUgdGltZXIgaGFzIHR3byAzMi1i
+aXQgd2lkdGggZG93biBjb3VudGVycywgb25lIG9mIHdoaWNoIGlzIGNvbmZpZ3VyZWQKPiBhcyBh
+IGNsb2NrZXZlbnQgZGV2aWNlIGFuZCB0aGUgb3RoZXIgaXMgY29uZmlndXJlZCBhcyBhIGNsb2Nr
+IHNvdXJjZS4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBTdWdheWEgVGFpY2hpIDxzdWdheWEudGFpY2hp
+QHNvY2lvbmV4dC5jb20+CgpEbyB3YW50IG1lIHRvIHRha2UgaXQgdGhyb3VnaCBteSB0cmVlPwoK
+PiAtLS0KPiAgZHJpdmVycy9jbG9ja3NvdXJjZS9LY29uZmlnICAgICAgICAgIHwgICA5ICsrCj4g
+IGRyaXZlcnMvY2xvY2tzb3VyY2UvTWFrZWZpbGUgICAgICAgICB8ICAgMSArCj4gIGRyaXZlcnMv
+Y2xvY2tzb3VyY2UvdGltZXItbWlsYmVhdXQuYyB8IDE2MSArKysrKysrKysrKysrKysrKysrKysr
+KysrKysrKysrKysrKwo+ICAzIGZpbGVzIGNoYW5nZWQsIDE3MSBpbnNlcnRpb25zKCspCj4gIGNy
+ZWF0ZSBtb2RlIDEwMDY0NCBkcml2ZXJzL2Nsb2Nrc291cmNlL3RpbWVyLW1pbGJlYXV0LmMKPiAK
+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9jbG9ja3NvdXJjZS9LY29uZmlnIGIvZHJpdmVycy9jbG9j
+a3NvdXJjZS9LY29uZmlnCj4gaW5kZXggYTllMjZmNi4uOTEwMWI4ZiAxMDA2NDQKPiAtLS0gYS9k
+cml2ZXJzL2Nsb2Nrc291cmNlL0tjb25maWcKPiArKysgYi9kcml2ZXJzL2Nsb2Nrc291cmNlL0tj
+b25maWcKPiBAQCAtNjM0LDQgKzYzNCwxMyBAQCBjb25maWcgR1g2NjA1U19USU1FUgo+ICAJaGVs
+cAo+ICAJICBUaGlzIG9wdGlvbiBlbmFibGVzIHN1cHBvcnQgZm9yIGd4NjYwNXMgU09DJ3MgdGlt
+ZXIuCj4gIAo+ICtjb25maWcgTUlMQkVBVVRfVElNRVIKPiArCWJvb2wgIk1pbGJlYXV0IHRpbWVy
+IGRyaXZlciIgaWYgQ09NUElMRV9URVNUCj4gKwlkZXBlbmRzIG9uIE9GCj4gKwlkZXBlbmRzIG9u
+IEFSTQo+ICsJc2VsZWN0IFRJTUVSX09GCj4gKwlzZWxlY3QgQ0xLU1JDX01NSU8KPiArCWhlbHAK
+PiArCSAgRW5hYmxlcyB0aGUgc3VwcG9ydCBmb3IgTWlsYmVhdXQgdGltZXIgZHJpdmVyLgo+ICsK
+PiAgZW5kbWVudQo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2Nsb2Nrc291cmNlL01ha2VmaWxlIGIv
+ZHJpdmVycy9jbG9ja3NvdXJjZS9NYWtlZmlsZQo+IGluZGV4IGNkZDIxMGYuLjZmMjU0M2IgMTAw
+NjQ0Cj4gLS0tIGEvZHJpdmVycy9jbG9ja3NvdXJjZS9NYWtlZmlsZQo+ICsrKyBiL2RyaXZlcnMv
+Y2xvY2tzb3VyY2UvTWFrZWZpbGUKPiBAQCAtNTUsNiArNTUsNyBAQCBvYmotJChDT05GSUdfQ0xL
+U1JDX1RJXzMySykJKz0gdGltZXItdGktMzJrLm8KPiAgb2JqLSQoQ09ORklHX0NMS1NSQ19OUFMp
+CSs9IHRpbWVyLW5wcy5vCj4gIG9iai0kKENPTkZJR19PWE5BU19SUFNfVElNRVIpCSs9IHRpbWVy
+LW94bmFzLXJwcy5vCj4gIG9iai0kKENPTkZJR19PV0xfVElNRVIpCQkrPSB0aW1lci1vd2wubwo+
+ICtvYmotJChDT05GSUdfTUlMQkVBVVRfVElNRVIpCSs9IHRpbWVyLW1pbGJlYXV0Lm8KPiAgb2Jq
+LSQoQ09ORklHX1NQUkRfVElNRVIpCSs9IHRpbWVyLXNwcmQubwo+ICBvYmotJChDT05GSUdfTlBD
+TTdYWF9USU1FUikJKz0gdGltZXItbnBjbTd4eC5vCj4gIG9iai0kKENPTkZJR19SREFfVElNRVIp
+CQkrPSB0aW1lci1yZGEubwo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2Nsb2Nrc291cmNlL3RpbWVy
+LW1pbGJlYXV0LmMgYi9kcml2ZXJzL2Nsb2Nrc291cmNlL3RpbWVyLW1pbGJlYXV0LmMKPiBuZXcg
+ZmlsZSBtb2RlIDEwMDY0NAo+IGluZGV4IDAwMDAwMDAuLmYyMDE5YTgKPiAtLS0gL2Rldi9udWxs
+Cj4gKysrIGIvZHJpdmVycy9jbG9ja3NvdXJjZS90aW1lci1taWxiZWF1dC5jCj4gQEAgLTAsMCAr
+MSwxNjEgQEAKPiArLy8gU1BEWC1MaWNlbnNlLUlkZW50aWZpZXI6IEdQTC0yLjAKPiArLyoKPiAr
+ICogQ29weXJpZ2h0IChDKSAyMDE4IFNvY2lvbmV4dCBJbmMuCj4gKyAqLwo+ICsKPiArI2luY2x1
+ZGUgPGxpbnV4L2Nsay5oPgo+ICsjaW5jbHVkZSA8bGludXgvaW50ZXJydXB0Lmg+Cj4gKyNpbmNs
+dWRlIDxsaW51eC9pcnEuaD4KPiArI2luY2x1ZGUgPGxpbnV4L2lycXJldHVybi5oPgo+ICsjaW5j
+bHVkZSA8bGludXgvc2NoZWRfY2xvY2suaD4KPiArI2luY2x1ZGUgInRpbWVyLW9mLmgiCj4gKwo+
+ICsjZGVmaW5lIE1MQl9UTVJfVE1DU1JfT0ZTCTB4MAo+ICsjZGVmaW5lIE1MQl9UTVJfVE1SX09G
+UwkJMHg0Cj4gKyNkZWZpbmUgTUxCX1RNUl9UTVJMUjFfT0ZTCTB4OAo+ICsjZGVmaW5lIE1MQl9U
+TVJfVE1STFIyX09GUwkweGMKPiArI2RlZmluZSBNTEJfVE1SX1JFR1NaUENICTB4MTAKPiArCj4g
+KyNkZWZpbmUgTUxCX1RNUl9UTUNTUl9PVVRMCUJJVCg1KQo+ICsjZGVmaW5lIE1MQl9UTVJfVE1D
+U1JfUkVMRAlCSVQoNCkKPiArI2RlZmluZSBNTEJfVE1SX1RNQ1NSX0lOVEUJQklUKDMpCj4gKyNk
+ZWZpbmUgTUxCX1RNUl9UTUNTUl9VRglCSVQoMikKPiArI2RlZmluZSBNTEJfVE1SX1RNQ1NSX0NO
+VEUJQklUKDEpCj4gKyNkZWZpbmUgTUxCX1RNUl9UTUNTUl9UUkcJQklUKDApCj4gKwo+ICsjZGVm
+aW5lIE1MQl9UTVJfVE1DU1JfQ1NMX0RJVjIJMAo+ICsjZGVmaW5lIE1MQl9UTVJfRElWX0NOVAkJ
+Mgo+ICsKPiArI2RlZmluZSBNTEJfVE1SX1NSQ19DSCAgKDEpCj4gKyNkZWZpbmUgTUxCX1RNUl9F
+VlRfQ0ggICgwKQo+ICsKPiArI2RlZmluZSBNTEJfVE1SX1NSQ19DSF9PRlMJKE1MQl9UTVJfUkVH
+U1pQQ0ggKiBNTEJfVE1SX1NSQ19DSCkKPiArI2RlZmluZSBNTEJfVE1SX0VWVF9DSF9PRlMJKE1M
+Ql9UTVJfUkVHU1pQQ0ggKiBNTEJfVE1SX0VWVF9DSCkKPiArCj4gKyNkZWZpbmUgTUxCX1RNUl9T
+UkNfVE1DU1JfT0ZTCShNTEJfVE1SX1NSQ19DSF9PRlMgKyBNTEJfVE1SX1RNQ1NSX09GUykKPiAr
+I2RlZmluZSBNTEJfVE1SX1NSQ19UTVJfT0ZTCShNTEJfVE1SX1NSQ19DSF9PRlMgKyBNTEJfVE1S
+X1RNUl9PRlMpCj4gKyNkZWZpbmUgTUxCX1RNUl9TUkNfVE1STFIxX09GUwkoTUxCX1RNUl9TUkNf
+Q0hfT0ZTICsgTUxCX1RNUl9UTVJMUjFfT0ZTKQo+ICsjZGVmaW5lIE1MQl9UTVJfU1JDX1RNUkxS
+Ml9PRlMJKE1MQl9UTVJfU1JDX0NIX09GUyArIE1MQl9UTVJfVE1STFIyX09GUykKPiArCj4gKyNk
+ZWZpbmUgTUxCX1RNUl9FVlRfVE1DU1JfT0ZTCShNTEJfVE1SX0VWVF9DSF9PRlMgKyBNTEJfVE1S
+X1RNQ1NSX09GUykKPiArI2RlZmluZSBNTEJfVE1SX0VWVF9UTVJfT0ZTCShNTEJfVE1SX0VWVF9D
+SF9PRlMgKyBNTEJfVE1SX1RNUl9PRlMpCj4gKyNkZWZpbmUgTUxCX1RNUl9FVlRfVE1STFIxX09G
+UwkoTUxCX1RNUl9FVlRfQ0hfT0ZTICsgTUxCX1RNUl9UTVJMUjFfT0ZTKQo+ICsjZGVmaW5lIE1M
+Ql9UTVJfRVZUX1RNUkxSMl9PRlMJKE1MQl9UTVJfRVZUX0NIX09GUyArIE1MQl9UTVJfVE1STFIy
+X09GUykKPiArCj4gKyNkZWZpbmUgTUxCX1RJTUVSX1JBVElORwk1MDAKPiArCj4gK3N0YXRpYyBp
+cnFyZXR1cm5fdCBtbGJfdGltZXJfaW50ZXJydXB0KGludCBpcnEsIHZvaWQgKmRldl9pZCkKPiAr
+ewo+ICsJc3RydWN0IGNsb2NrX2V2ZW50X2RldmljZSAqY2xrID0gZGV2X2lkOwo+ICsJc3RydWN0
+IHRpbWVyX29mICp0byA9IHRvX3RpbWVyX29mKGNsayk7Cj4gKwl1MzIgdmFsOwo+ICsKPiArCXZh
+bCA9IHJlYWRsX3JlbGF4ZWQodGltZXJfb2ZfYmFzZSh0bykgKyBNTEJfVE1SX0VWVF9UTUNTUl9P
+RlMpOwo+ICsJdmFsICY9IH5NTEJfVE1SX1RNQ1NSX1VGOwo+ICsJd3JpdGVsX3JlbGF4ZWQodmFs
+LCB0aW1lcl9vZl9iYXNlKHRvKSArIE1MQl9UTVJfRVZUX1RNQ1NSX09GUyk7Cj4gKwo+ICsJY2xr
+LT5ldmVudF9oYW5kbGVyKGNsayk7Cj4gKwo+ICsJcmV0dXJuIElSUV9IQU5ETEVEOwo+ICt9Cj4g
+Kwo+ICtzdGF0aWMgaW50IG1sYl9zZXRfc3RhdGVfcGVyaW9kaWMoc3RydWN0IGNsb2NrX2V2ZW50
+X2RldmljZSAqY2xrKQo+ICt7Cj4gKwlzdHJ1Y3QgdGltZXJfb2YgKnRvID0gdG9fdGltZXJfb2Yo
+Y2xrKTsKPiArCXUzMiB2YWwgPSBNTEJfVE1SX1RNQ1NSX0NTTF9ESVYyOwo+ICsKPiArCXdyaXRl
+bF9yZWxheGVkKHZhbCwgdGltZXJfb2ZfYmFzZSh0bykgKyBNTEJfVE1SX0VWVF9UTUNTUl9PRlMp
+Owo+ICsKPiArCXdyaXRlbF9yZWxheGVkKHRvLT5vZl9jbGsucGVyaW9kLCB0aW1lcl9vZl9iYXNl
+KHRvKSArCj4gKwkJCQlNTEJfVE1SX0VWVF9UTVJMUjFfT0ZTKTsKPiArCXZhbCB8PSBNTEJfVE1S
+X1RNQ1NSX1JFTEQgfCBNTEJfVE1SX1RNQ1NSX0NOVEUgfAo+ICsJCU1MQl9UTVJfVE1DU1JfVFJH
+IHwgTUxCX1RNUl9UTUNTUl9JTlRFOwo+ICsJd3JpdGVsX3JlbGF4ZWQodmFsLCB0aW1lcl9vZl9i
+YXNlKHRvKSArIE1MQl9UTVJfRVZUX1RNQ1NSX09GUyk7Cj4gKwlyZXR1cm4gMDsKPiArfQo+ICsK
+PiArc3RhdGljIGludCBtbGJfc2V0X3N0YXRlX29uZXNob3Qoc3RydWN0IGNsb2NrX2V2ZW50X2Rl
+dmljZSAqY2xrKQo+ICt7Cj4gKwlzdHJ1Y3QgdGltZXJfb2YgKnRvID0gdG9fdGltZXJfb2YoY2xr
+KTsKPiArCXUzMiB2YWwgPSBNTEJfVE1SX1RNQ1NSX0NTTF9ESVYyOwo+ICsKPiArCXdyaXRlbF9y
+ZWxheGVkKHZhbCwgdGltZXJfb2ZfYmFzZSh0bykgKyBNTEJfVE1SX0VWVF9UTUNTUl9PRlMpOwo+
+ICsJcmV0dXJuIDA7Cj4gK30KPiArCj4gK3N0YXRpYyBpbnQgbWxiX2Nsa2V2dF9uZXh0X2V2ZW50
+KHVuc2lnbmVkIGxvbmcgZXZlbnQsCj4gKwkJCQkgICBzdHJ1Y3QgY2xvY2tfZXZlbnRfZGV2aWNl
+ICpjbGspCj4gK3sKPiArCXN0cnVjdCB0aW1lcl9vZiAqdG8gPSB0b190aW1lcl9vZihjbGspOwo+
+ICsKPiArCXdyaXRlbF9yZWxheGVkKGV2ZW50LCB0aW1lcl9vZl9iYXNlKHRvKSArIE1MQl9UTVJf
+RVZUX1RNUkxSMV9PRlMpOwo+ICsJd3JpdGVsX3JlbGF4ZWQoTUxCX1RNUl9UTUNTUl9DU0xfRElW
+MiB8Cj4gKwkJCU1MQl9UTVJfVE1DU1JfQ05URSB8IE1MQl9UTVJfVE1DU1JfSU5URSB8Cj4gKwkJ
+CU1MQl9UTVJfVE1DU1JfVFJHLCB0aW1lcl9vZl9iYXNlKHRvKSArCj4gKwkJCU1MQl9UTVJfRVZU
+X1RNQ1NSX09GUyk7Cj4gKwlyZXR1cm4gMDsKPiArfQo+ICsKPiArc3RhdGljIGludCBtbGJfY29u
+ZmlnX2Nsb2NrX3NvdXJjZShzdHJ1Y3QgdGltZXJfb2YgKnRvKQo+ICt7Cj4gKwl3cml0ZWxfcmVs
+YXhlZCgwLCB0aW1lcl9vZl9iYXNlKHRvKSArIE1MQl9UTVJfU1JDX1RNQ1NSX09GUyk7Cj4gKwl3
+cml0ZWxfcmVsYXhlZCh+MCwgdGltZXJfb2ZfYmFzZSh0bykgKyBNTEJfVE1SX1NSQ19UTVJfT0ZT
+KTsKPiArCXdyaXRlbF9yZWxheGVkKH4wLCB0aW1lcl9vZl9iYXNlKHRvKSArIE1MQl9UTVJfU1JD
+X1RNUkxSMV9PRlMpOwo+ICsJd3JpdGVsX3JlbGF4ZWQofjAsIHRpbWVyX29mX2Jhc2UodG8pICsg
+TUxCX1RNUl9TUkNfVE1STFIyX09GUyk7Cj4gKwl3cml0ZWxfcmVsYXhlZChCSVQoNCkgfCBCSVQo
+MSkgfCBCSVQoMCksIHRpbWVyX29mX2Jhc2UodG8pICsKPiArCQlNTEJfVE1SX1NSQ19UTUNTUl9P
+RlMpOwo+ICsJcmV0dXJuIDA7Cj4gK30KPiArCj4gK3N0YXRpYyBpbnQgbWxiX2NvbmZpZ19jbG9j
+a19ldmVudChzdHJ1Y3QgdGltZXJfb2YgKnRvKQo+ICt7Cj4gKwl3cml0ZWxfcmVsYXhlZCgwLCB0
+aW1lcl9vZl9iYXNlKHRvKSArIE1MQl9UTVJfRVZUX1RNQ1NSX09GUyk7Cj4gKwlyZXR1cm4gMDsK
+PiArfQo+ICsKPiArc3RhdGljIHN0cnVjdCB0aW1lcl9vZiB0byA9IHsKPiArCS5mbGFncyA9IFRJ
+TUVSX09GX0lSUSB8IFRJTUVSX09GX0JBU0UgfCBUSU1FUl9PRl9DTE9DSywKPiArCj4gKwkuY2xr
+ZXZ0ID0gewo+ICsJCS5uYW1lID0gIm1sYi1jbGtldnQiLAo+ICsJCS5yYXRpbmcgPSBNTEJfVElN
+RVJfUkFUSU5HLAo+ICsJCS5jcHVtYXNrID0gY3B1X3Bvc3NpYmxlX21hc2ssCj4gKwkJLmZlYXR1
+cmVzID0gQ0xPQ0tfRVZUX0ZFQVRfRFlOSVJRIHwgQ0xPQ0tfRVZUX0ZFQVRfT05FU0hPVCwKPiAr
+CQkuc2V0X3N0YXRlX29uZXNob3QgPSBtbGJfc2V0X3N0YXRlX29uZXNob3QsCj4gKwkJLnNldF9z
+dGF0ZV9wZXJpb2RpYyA9IG1sYl9zZXRfc3RhdGVfcGVyaW9kaWMsCj4gKwkJLnNldF9uZXh0X2V2
+ZW50ID0gbWxiX2Nsa2V2dF9uZXh0X2V2ZW50LAo+ICsJfSwKPiArCj4gKwkub2ZfaXJxID0gewo+
+ICsJCS5mbGFncyA9IElSUUZfVElNRVIgfCBJUlFGX0lSUVBPTEwsCj4gKwkJLmhhbmRsZXIgPSBt
+bGJfdGltZXJfaW50ZXJydXB0LAo+ICsJfSwKPiArfTsKPiArCj4gK3N0YXRpYyB1NjQgbm90cmFj
+ZSBtbGJfdGltZXJfc2NoZWRfcmVhZCh2b2lkKQo+ICt7Cj4gKwlyZXR1cm4gfnJlYWRsX3JlbGF4
+ZWQodGltZXJfb2ZfYmFzZSgmdG8pICsgTUxCX1RNUl9TUkNfVE1SX09GUyk7Cj4gK30KPiArCj4g
+K3N0YXRpYyBpbnQgX19pbml0IG1sYl90aW1lcl9pbml0KHN0cnVjdCBkZXZpY2Vfbm9kZSAqbm9k
+ZSkKPiArewo+ICsJaW50IHJldDsKPiArCXVuc2lnbmVkIGxvbmcgcmF0ZTsKPiArCj4gKwlyZXQg
+PSB0aW1lcl9vZl9pbml0KG5vZGUsICZ0byk7Cj4gKwlpZiAocmV0KQo+ICsJCXJldHVybiByZXQ7
+Cj4gKwo+ICsJcmF0ZSA9IHRpbWVyX29mX3JhdGUoJnRvKSAvIE1MQl9UTVJfRElWX0NOVDsKPiAr
+CW1sYl9jb25maWdfY2xvY2tfc291cmNlKCZ0byk7Cj4gKwljbG9ja3NvdXJjZV9tbWlvX2luaXQo
+dGltZXJfb2ZfYmFzZSgmdG8pICsgTUxCX1RNUl9TUkNfVE1SX09GUywKPiArCQlub2RlLT5uYW1l
+LCByYXRlLCBNTEJfVElNRVJfUkFUSU5HLCAzMiwKPiArCQljbG9ja3NvdXJjZV9tbWlvX3JlYWRs
+X2Rvd24pOwo+ICsJc2NoZWRfY2xvY2tfcmVnaXN0ZXIobWxiX3RpbWVyX3NjaGVkX3JlYWQsIDMy
+LCByYXRlKTsKPiArCW1sYl9jb25maWdfY2xvY2tfZXZlbnQoJnRvKTsKPiArCWNsb2NrZXZlbnRz
+X2NvbmZpZ19hbmRfcmVnaXN0ZXIoJnRvLmNsa2V2dCwgdGltZXJfb2ZfcmF0ZSgmdG8pLCAxNSwK
+PiArCQkweGZmZmZmZmZmKTsKPiArCXJldHVybiAwOwo+ICt9Cj4gK1RJTUVSX09GX0RFQ0xBUkUo
+bWxiX3Blcml0aW1lciwgInNvY2lvbmV4dCxtaWxiZWF1dC10aW1lciIsCj4gKwkJbWxiX3RpbWVy
+X2luaXQpOwo+IAoKCi0tIAogPGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFyby5vcmcg4pSC
+IE9wZW4gc291cmNlIHNvZnR3YXJlIGZvciBBUk0gU29DcwoKRm9sbG93IExpbmFybzogIDxodHRw
+Oi8vd3d3LmZhY2Vib29rLmNvbS9wYWdlcy9MaW5hcm8+IEZhY2Vib29rIHwKPGh0dHA6Ly90d2l0
+dGVyLmNvbS8jIS9saW5hcm9vcmc+IFR3aXR0ZXIgfAo8aHR0cDovL3d3dy5saW5hcm8ub3JnL2xp
+bmFyby1ibG9nLz4gQmxvZwoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
+bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
+c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
