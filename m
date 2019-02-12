@@ -2,71 +2,84 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D6F3C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:24:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B720C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:25:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9C1D2070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:24:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 077172070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:25:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xj6uORpu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9C1D2070D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gFxz+fMs";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="Qnh8semr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 077172070D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JPd8J9aLs09hbbh5aY/fmG/kz48mwO6xnvMVKZMmP+o=; b=Xj6uORpucLhZ5h
-	y73Dz3UwWP5q+0D4E5fRSBu+CM2v5DtgjSHQbE8W+CAD1Rv4tlsBiP0v7+a64/bgToEF7/37IcKeQ
-	AAibMzVp8ZEQRe24rOTRyYnHQud3/gva/pUWFvHX2G5+WnXv5UEIFuLBYvgYLbNglxq7TdZSBykfc
-	/A9L0KP7pq/x2EB9rjNDTcr65pHlvaqSrgl1WqqTmtwi0RIO9nfpaqnNfC4aXZur3Mqi71SHwWRx7
-	hEA97DWix10SVqapzTsMrnaxyOB4WGNy3nE0dvah5CdPnxQTnTePooqurU4NAfkmoV+0oOcjWCm4a
-	tg/6xv5vt2tNImHka9Xw==;
+	List-Owner; bh=/GU2ZFMtThorcjvEcBD8MdRCOKuqq3p5BkyS3OKFSNo=; b=gFxz+fMsZBx/0h
+	0LNTm3CN7bs77L7w1V39+dnKQerpiUYsS54OroqZeAszeBzS05jdjHgWphIEgs9dizMgc926tV08y
+	9kfCgvHhDSGMt9s7lHwagPuc9kLfCBGh+wPBzCuwFiUJ6IL/rF1Oma5pyfvWSZRK3lrWNTTm6u7Oe
+	ZuMDlu4yIEuZBfCeXpAEBTjFvzK6BDGsED7/NoaaatHTf6Tml3w7VU4Qm1dMtiIxflHIESA1xvJiw
+	etjEePQpzO6l6vXlXiMbyaeD3hlWiPkmJSyMl5qt491E+qoa4vSOd059IXgLuEFDEEGRorjWTeaD0
+	+XRWTDfTqXsSXind3Sxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtTMw-0007Q2-6Z; Tue, 12 Feb 2019 08:24:42 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gtTNO-0008Mf-GM; Tue, 12 Feb 2019 08:25:10 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtTMs-0007Pf-9X
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:24:39 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gtTMo-0005jG-MZ; Tue, 12 Feb 2019 09:24:34 +0100
-Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gtTMo-0008Hu-1a; Tue, 12 Feb 2019 09:24:34 +0100
-Date: Tue, 12 Feb 2019 09:24:34 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Marco Felsch <m.felsch@pengutronix.de>
-Subject: Re: [PATCH 04/15] ARM: dts: imx6qdl-phytec-pbab01/pfla02: Use
- explicit swpad values
-Message-ID: <20190212082433.zuxowda75huzewxc@pengutronix.de>
-References: <20190211141333.28725-1-u.kleine-koenig@pengutronix.de>
- <20190211141333.28725-4-u.kleine-koenig@pengutronix.de>
- <20190212081545.z2dwoddnm2idsvne@pengutronix.de>
+ id 1gtTNK-0007p9-7o
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:25:08 +0000
+Received: by mail-lf1-x141.google.com with SMTP id f5so1268358lfc.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 00:25:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=wktXpzSXXJvpSrZpX4mhoTSLqogh/PevmF85W+dF9cM=;
+ b=Qnh8semrh1DcHuUkDn5qlRRsHDJtErWfRjfO0x5CZad7WonhInbg3jmEkYvfRyWr25
+ KfC+FMr6Zytqe8TroVrLAsmbRNO+QVtYvZN4k+vPsRELO/BpNsEkvilYGbUzaT431WAu
+ MxYMmoeN0xDvQLLJREa4eQV97ehPXqe0x6TnT9KwtvMYNLanvKjr4no5lI19yFDp0SXQ
+ j8j+L6HMY6i628yPGr2c8yF9I2e7XHzPRTHkqYJ1Ane9yuMiM+VIFhTpAC+06mQ23yFk
+ ht/Du1kNG1fcJQHZ0kHR7Nc56WuBOf8P1hPIVjzWeQv8QharGPdSrVKLlZGGY0ssE3h9
+ lp8w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=wktXpzSXXJvpSrZpX4mhoTSLqogh/PevmF85W+dF9cM=;
+ b=GiRY6giOktek+yv4mfMEDWNswAAbMzrD+KC2PqxGOHHlKHPbY7PhAd/QMY7iAdZLRF
+ nd9P3LXtR/Ffgt2tdMupsZ4dALZed0ty/+2yWnqyoxMyX5FSbn2gDBaH5rXTbDUE5AoM
+ C/ACThxrVth92HDdQfQEArfSP5F7TW7lNW/Z3ktyXyjhgek/x4Iw7s2Ky/pZzDWyh3Sd
+ jRJZGe3c8w92fpSwS39J+exlK+hWzVK7QW4rPeGkxoMQvlE0wyxxc2dJBiZP6dB2+ljh
+ hZ0kinzuSHL0NtbTiq+aU8G7FT4LsIe+v2FUJGzG96VyaAq1J/dpDCaL0SBEF/CAO+CG
+ i1Pg==
+X-Gm-Message-State: AHQUAuahxbMzaOvPPY7WdLhtWANe9wsRJsxhFl0h5HSQ0yqgdI5v/A1l
+ sKgzfX/V35s4ST3QSlkckE08goC8FZX8gOLk5+iq/A==
+X-Google-Smtp-Source: AHgI3IYYib9XJLsQp00hGP3I2v1BP6kkaVEtUEkfH7PpxS7yItLf9x3za9NEjPM/h8WYvpIMMI/RdGWDDMekSQyqATo=
+X-Received: by 2002:ac2:42c5:: with SMTP id n5mr1565426lfl.115.1549959903405; 
+ Tue, 12 Feb 2019 00:25:03 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190212081545.z2dwoddnm2idsvne@pengutronix.de>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+References: <a9718ae1e97a5911f47874fe23c00ef297d7fed8.1548158832.git.baolin.wang@linaro.org>
+ <CAK8P3a2zkhrZLMi5KZ5=fGJCt85dad3_pZC0o7GqcwJkk4es9w@mail.gmail.com>
+ <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
+In-Reply-To: <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
+From: Baolin Wang <baolin.wang@linaro.org>
+Date: Tue, 12 Feb 2019 16:24:51 +0800
+Message-ID: <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
+Subject: Re: [PATCH 1/3] dt-bindings: dmaengine: Add one new cell to present
+ hardware slave id
+To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_002438_483755_7061F535 
-X-CRM114-Status: GOOD (  19.28  )
+X-CRM114-CacheID: sfid-20190212_002506_424012_E347FDA6 
+X-CRM114-Status: GOOD (  27.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,80 +91,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ eric.long@unisoc.com, arm-soc <arm@kernel.org>,
+ Lyra Zhang <zhang.lyra@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Orson Zhai <orsonzhai@gmail.com>, Dan Williams <dan.j.williams@intel.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 12, 2019 at 09:15:45AM +0100, Marco Felsch wrote:
-> Hi Uwe,
-> =
+Hi Arnd,
 
-> On 19-02-11 15:13, Uwe Kleine-K=F6nig wrote:
-> > Instead of relying on reset defaults or a bootloader to configure
-> > use explicit values for the swpad configuration. Here the reset
-> > defaults of the i.MX6dl are used owing to lack of other evidence. (They
-> > differ from the i.MX6q defaults for GPIO_0 and KEY_ROW4.)
-> =
+On Fri, 1 Feb 2019 at 19:53, Baolin Wang <baolin.wang@linaro.org> wrote:
+>
+> Hi Arnd,
+> On Thu, 31 Jan 2019 at 00:52, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Tue, Jan 22, 2019 at 2:21 PM Baolin Wang <baolin.wang@linaro.org> wrote:
+> > >
+> > > The DMA engine clients can trigger DMA engine automatically by setting
+> > > the corresponding hardware slave id for the DMA engine. Thus add one
+> > > cell to present the hardware slave id for DMA clients.
+> > >
+> > > Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+> > > ---
+> > >  Documentation/devicetree/bindings/dma/sprd-dma.txt |   12 +++++++-----
+> > >  1 file changed, 7 insertions(+), 5 deletions(-)
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/dma/sprd-dma.txt b/Documentation/devicetree/bindings/dma/sprd-dma.txt
+> > > index 7a10fea..7812cf0 100644
+> > > --- a/Documentation/devicetree/bindings/dma/sprd-dma.txt
+> > > +++ b/Documentation/devicetree/bindings/dma/sprd-dma.txt
+> > > @@ -6,8 +6,8 @@ Required properties:
+> > >  - compatible: Should be "sprd,sc9860-dma".
+> > >  - reg: Should contain DMA registers location and length.
+> > >  - interrupts: Should contain one interrupt shared by all channel.
+> > > -- #dma-cells: must be <1>. Used to represent the number of integer
+> > > -       cells in the dmas property of client device.
+> > > +- #dma-cells: must be <2>. Used to represent the channel id and slave id
+> > > +       of integer cells in the dmas property of client device.
+> > >  - #dma-channels : Number of DMA channels supported. Should be 32.
+> > >  - clock-names: Should contain the clock of the DMA controller.
+> > >  - clocks: Should contain a clock specifier for each entry in clock-names.
+> > > @@ -28,14 +28,16 @@ apdma: dma-controller@20100000 {
+> > >
+> > >  Client:
+> > >  DMA clients connected to the Spreadtrum DMA controller must use the format
+> > > -described in the dma.txt file, using a two-cell specifier for each channel.
+> > > -The two cells in order are:
+> > > +described in the dma.txt file, using a three-cell specifier for each channel.
+> > > +The three cells in order are:
+> > >  1. A phandle pointing to the DMA controller.
+> > >  2. The channel id.
+> > > +3. The hardware slave id which is used for clients to trigger DMA engine
+> > > +automatically.
+> >
+> > I notice that this is an incompatible binding change. Is that necessary?
+> > If the current code works, I'd suggest allowing both #dma-cells=<2>
+> > and <3>, and then implementing both in the driver.
+>
+> Yes, this is necessary.
+>
+> Yes, current code can work, but the problem is that the DMA clients
+> must add one property (something like "sprd,slave-id") to specify the
+> slave id. So considering this, we want to change the dma-cells to 2,
+> including dma channel and dma slave id, which can avoid introducing
+> some similar properties for DMA clients.
+>
+> Now there are no DMA clients in mainline for Spreadtrum platform, and
+> we want to upstream our first DMA clients: SPI controller. So no other
+> drivers need to change when we changing dma cells. Thanks.
 
-> Rely on the reset/bootloader values isn't that good at all. Since the
-> bootloader use case can be different. I've checked your patch against a
-> vanilla barebox (bootloader) which includes this devicetree. My test
-> setup was a imx6q pfla02 SoM and a pbab01 baseboard. Please look my
-> comment below.
-> =
+Do you have any other concerns about this patch set? If not, I think
+Vinod can apply this patch set. Thanks.
 
-> > =
-
-> > Signed-off-by: Uwe Kleine-K=F6nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> >  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi | 20 ++++++++++----------
-> >  1 file changed, 10 insertions(+), 10 deletions(-)
-> > =
-
-> > diff --git a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi b/arch/arm/bo=
-ot/dts/imx6qdl-phytec-pfla02.dtsi
-> > index 1b50b01e9bac..8e04ab7df2d7 100644
-> > --- a/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-> > +++ b/arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi
-> > @@ -211,11 +211,11 @@
-> >  	imx6q-phytec-pfla02 {
-> >  		pinctrl_hog: hoggrp {
-> >  			fsl,pins =3D <
-> > -				MX6QDL_PAD_EIM_D23__GPIO3_IO23 0x80000000
-> > -				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24 0x80000000 /* SPI NOR chipselect=
- */
-> > -				MX6QDL_PAD_SD4_DAT1__GPIO2_IO09  0x80000000 /* PMIC interrupt */
-> > -				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30 0x80000000 /* Green LED */
-> > -				MX6QDL_PAD_EIM_EB3__GPIO2_IO31 0x80000000 /* Red LED */
-> > +				MX6QDL_PAD_EIM_D23__GPIO3_IO23		0x1b0b0
-> > +				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x1b0b0 /* SPI NOR chipselect */
-> > +				MX6QDL_PAD_SD4_DAT1__GPIO2_IO09		0x1b0b0 /* PMIC interrupt */
-> > +				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30	0x1b0b0 /* Green LED */
-> > +				MX6QDL_PAD_EIM_EB3__GPIO2_IO31		0x1b0b1 /* Red LED */
-> =
-
-> Don't wanna nitpick, the MX6QDL_PAD_EIM_EB3__GPIO2_IO31 pad should be
-> configured to 0x1b0b0 too, but I don't know the default imx6dl
-> behaviour as you mentioned above. So I'm fine with the patch.
-
-This is a bug in my linter's data table. EIM_EB3 should use 0x1b0b0 on
-both imx6q and imx6dl.
-
-I will wait a bit more for feedback, and then probably respin with this
-fixed. Thanks for your input.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-- 
+Baolin Wang
+Best Regards
 
 _______________________________________________
 linux-arm-kernel mailing list
