@@ -2,22 +2,22 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82478C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:58:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA1E3C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:59:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AB56222C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:58:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 80BB9222C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 19:59:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G/bwXugD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="D253Chez"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AB56222C4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuSk6LtN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80BB9222C1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,70 +25,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PE4UXnLFAHviSw3ls7BdzXsr3l0tFKrRIuAN6zFmzVo=; b=G/bwXugDttlp5L
-	1ZdwVeygOeWmZPuBjm6qCP4pk2ptWcSYTiWWFdV8tx/zprSy2JaAnsiKv/2riDNVh75flm3WZIwRO
-	Lv1+1jVmskbLK1XvWU/nYUsrcfzRBh22FpkdLKgmp+K7dIaORCw/qtgYGukmE2lL8HNwj6RRUxtVF
-	AovdkYm5jHk31miNhBrwSb2MgDvr3slPHpQaFpx344/ljrvC5hSNwWcttJpChDCdI6YjosSmiQR+k
-	Gf29pVYEGj7wk8zlJzNZ5eVbD+kJXVwC9QHlyuClleqyJm8OxtKysRFEZXQiIqCbK8sc9gcjLEhh/
-	ZP10YmOUQJ5KI5UD1PpQ==;
+	List-Owner; bh=ddH1BwBMK7gI9AAyrVM71FNZWK4UkfIvnfHSqINLIRI=; b=SuSk6LtNEIJdbn
+	wWYGfmhlXNsGVa1xx0F3XrO97yQSgMDk0VvlM4k60J1yPhAEgpbNsKb9TFlKYA7JmJ3atRRMVgY9e
+	r7KfvpVXe49qvYoE1uK1ypG58PAq2jO+xnfdhFlSz6NDonQ8Er81zChlUUfh175NHD76Or5/gkqjd
+	4NG8km+Vo6o8A959da0QSqhT3LQq67/NDpxxHKa3zv/HHF2t+PXkuHOuvyjt1fQCtpu9AA1BenNpr
+	QbvNtuGQOy4XZslCvs1Dk3ljb0DJyofnSN8/vnkDGKafyJvWcv6u8yw7rsLPU8npVV7OPUoPpA1KI
+	FAVT6W2q3lORL+NNNVmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gteCL-00021B-8I; Tue, 12 Feb 2019 19:58:29 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gteDA-0002wO-Uo; Tue, 12 Feb 2019 19:59:20 +0000
+Received: from mail-lf1-f68.google.com ([209.85.167.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gteCG-00020e-Uq
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:58:26 +0000
-Received: by mail-lf1-x144.google.com with SMTP id b20so2964012lfa.12
+ id 1gteD5-0002qH-8P
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 19:59:18 +0000
+Received: by mail-lf1-f68.google.com with SMTP id f5so2962792lfc.13
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 11:58:24 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linux-foundation.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=/n+2vOYomTB5BLs+7tL7KTaBHH30/oos+ud6/cnVnSI=;
- b=D253Chez2iaEQIcdy2TZNsUlaqMRm9VIwWrpW4fWK//FTDXCKKfklGuD0o642xmL34
- Mp7YirjzpQRotbrv0djWXVT+vJS5/MLsACCfzpkJ9An4MiWd9dVmmIgjhdo9yVZ3/bHH
- 9o6+1iNpzzKTb5pLfsCFl4j2YHGc18WAFp/jg=
+ Tue, 12 Feb 2019 11:59:14 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=/n+2vOYomTB5BLs+7tL7KTaBHH30/oos+ud6/cnVnSI=;
- b=bVwr5fgn3qu3coulScMyNMAos1TOYA5/tcaPZdwvsKWQVyolBXWrsYhxvMuCLoevE9
- +DqNC7AZMDI3IcmmP41wC8XKJx/69HIOu5J3Hsybx/NZ3v/vf1NyK4zBzgd79J8lo6zp
- /I/Jh78V7zIPa3gXoKTdzFor9YyD9F9YOyf2vh48MPAma1wJMDHOnoOSVLjZ9s9v0yQW
- 9n2P2KSCchlfH/SyzNIZfBoUDEZ4d5cmsbP2hyJFTo4JKH+mg6olMBm4JJH8YwrmD6o0
- ohT0Ker+77laevEPqUmO6oeqzGW/ZeMBb6VUPn8T2hihaatT6ily8+debsoMCmScAnyL
- EAbA==
-X-Gm-Message-State: AHQUAubgmtBf2FI8lzVxmnRe3NEPm5j586pImJNvVybPA9NK9uPDg5F3
- nfukD9c+s1GLyuoxxh81YoelDc3l+7c=
-X-Google-Smtp-Source: AHgI3IYsYoUsySPn2tlkvt/a2oB03wm73MTIBFpO4PD4VA2ZtgakvdtPDq+9HNKPAqNId1kuWDBr2g==
-X-Received: by 2002:a19:ab09:: with SMTP id u9mr3438626lfe.149.1550001502164; 
- Tue, 12 Feb 2019 11:58:22 -0800 (PST)
-Received: from mail-lj1-f181.google.com (mail-lj1-f181.google.com.
- [209.85.208.181])
- by smtp.gmail.com with ESMTPSA id c140sm1801737lfd.36.2019.02.12.11.58.19
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 11:58:20 -0800 (PST)
-Received: by mail-lj1-f181.google.com with SMTP id q128so3130442ljb.11
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 11:58:19 -0800 (PST)
-X-Received: by 2002:a2e:7316:: with SMTP id
- o22-v6mr1693665ljc.82.1550001499483; 
- Tue, 12 Feb 2019 11:58:19 -0800 (PST)
+ bh=07JrEihgXJzN2I1jr+e09/NftVJM67wk9LLYm8Albzc=;
+ b=sB29hZYxDdIFMNyy/BTp2Ui1B0OMd7anzfPm33AsOOWx1OSDax5/JGdhfmzxJTkeOF
+ 6b+AYtN/ebovU6qwPO9p4d+StYwUOtK3hN0y9+qqyKNClXighywFn/pAGTk9qUwXOMVK
+ Ih/uyJENjIek5uVGhTSqchhhhzSoVvmO0bHeEztolhN9J6o+T5Aqr2ctPVT9Kt+ut7Q2
+ xESID8BbkZszGAc5QJYqSP9D31IlKHVPH3JMaRoWrONjcTlUMLCPCDQkGYwF6KbRf2/B
+ egrk3aCXGO1Fh1AHB+IOXIEIz2UKNhW2bzKKMQpEhp5QMTtKxriW+mBkD+amLKsmQnY7
+ qnfw==
+X-Gm-Message-State: AHQUAubKcoEGzQdbmGhKpYUbTuQOIEMLhRcTz4JR1DC+kLi827WM70JP
+ 9s9s55Snkb4enYqd2xXdNU0cNMyuQd+mvsvfwlrXfw==
+X-Google-Smtp-Source: AHgI3IZiJEeE2DePEpsOyX6wiUYJg/8i6fuT4gT7C4jX4MycNsNwy3T0QoRfK3whLvXxy0VrIzOdHLu6jqm0JYui53U=
+X-Received: by 2002:a19:2906:: with SMTP id p6mr3461021lfp.17.1550001553136;
+ Tue, 12 Feb 2019 11:59:13 -0800 (PST)
 MIME-Version: 1.0
-References: <1549913486-16799-1-git-send-email-longman@redhat.com>
- <1549913486-16799-3-git-send-email-longman@redhat.com>
-In-Reply-To: <1549913486-16799-3-git-send-email-longman@redhat.com>
-From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Tue, 12 Feb 2019 11:58:03 -0800
-X-Gmail-Original-Message-ID: <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
-Message-ID: <CAHk-=wjTmSg6zX=xKFSPZor7FWi3s4D0dy-hz_M=yeF_6478QA@mail.gmail.com>
-Subject: Re: [PATCH v2 2/2] locking/rwsem: Optimize down_read_trylock()
-To: Waiman Long <longman@redhat.com>
+References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
+ <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
+ <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
+ <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
+In-Reply-To: <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Wed, 13 Feb 2019 01:29:00 +0530
+Message-ID: <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
+Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
+ 'MAX_PHYSMEM_BITS' to vmcoreinfo
+To: Dave Young <dyoung@redhat.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_115825_030778_7E4F0A45 
-X-CRM114-Status: GOOD (  18.32  )
+X-CRM114-CacheID: sfid-20190212_115915_320031_A04CC81E 
+X-CRM114-Status: GOOD (  34.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,82 +84,161 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
- the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
- sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Kazuhito Hagio <k-hagio@ab.jp.nec.com>,
+ "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
+ "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
+ Will Deacon <will.deacon@arm.com>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ James Morse <james.morse@arm.com>, Borislav Petkov <bp@alien8.de>,
+ "anderson@redhat.com" <anderson@redhat.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 11:31 AM Waiman Long <longman@redhat.com> wrote:
+On Tue, Feb 12, 2019 at 4:14 PM Dave Young <dyoung@redhat.com> wrote:
 >
-> Modify __down_read_trylock() to make it generate slightly better code
-> (smaller and maybe a tiny bit faster).
-
-This looks good, but I would ask you to try one slightly different approach.
-
-Instead of this:
-
->        long tmp = atomic_long_read(&sem->count);
+> On 02/12/19 at 10:37am, Bhupesh Sharma wrote:
+> > Hi Kazu,
+> >
+> > On 02/04/2019 09:34 PM, Kazuhito Hagio wrote:
+> > > On 1/30/2019 8:48 PM, Dave Young wrote:
+> > > > + more people
+> > > > On 01/30/19 at 05:53pm, Bhupesh Sharma wrote:
+> > > > > With ARMv8.2-LVA and LPA architecture extensions, arm64 hardware which
+> > > > > supports these extensions can support upto 52-bit virtual and 52-bit
+> > > > > physical addresses respectively.
+> > > > >
+> > > > > Since at the moment we enable the support of these extensions via CONFIG
+> > > > > flags, e.g.
+> > > > >   - LPA via CONFIG_ARM64_PA_BITS_52
+> > > > >
+> > > > > there are no clear mechanisms in user-space right now to
+> > > > > deteremine these CONFIG flag values and also determine the PARange and
+> > > > > VARange address values.
+> > > > >
+> > > > > User-space tools like 'makedumpfile' and 'crash-utility' can instead
+> > > > > use the 'MAX_USER_VA_BITS' and 'MAX_PHYSMEM_BITS' values to determine
+> > > > > the maximum virtual address and physical address (respectively)
+> > > > > supported by underlying kernel.
+> > > > >
+> > > > > A reference 'makedumpfile' implementation which uses this approach to
+> > > > > determining the maximum physical address is available in [0].
+> > > > >
+> > > > > [0].
+> > > > https://github.com/bhupesh-sharma/makedumpfile/blob/52-bit-pa-support-via-vmcore-v1/arch/arm64.c#L490
+> > > >
+> > > > I'm not objecting the patch, just want to make sure to make clear about
+> > > > things and make sure these issues are aware by people, and leave arm
+> > > > people to review the arm bits.
+> > > >
+> > > > 1. MAX_PHYSMEM_BITS
+> > > > As we previously found, back to 2014 makedumpfile took a patch to read the
+> > > > value from vmcore but the kernel patch was not accepted.
+> > > > So we should first make clear if this is really needed, why other arches
+> > > > do not need this in makedumpfile.
+> > > >
+> > > > If we really need it then should it be arm64 only?
+> > > >
+> > > > If it is arm64 only then the makedumpfile code should read this number
+> > > > only for arm64.
+> > >
+> > > Sorry for the delay.
+> > >
+> > > According to the kernel patch, some of arm32 platforms may need it
+> > > http://lists.infradead.org/pipermail/kexec/2014-May/011909.html
+> > > but except for them (and arm64), makedumpfile can manage with kernel
+> > > version and some switches to determine this value so far.
+> > >
+> > > >
+> > > > Also Lianbo added the vmcoreinfo documents, I believe it stays in -tip
+> > > > tree,  need to make sure to document this as well.
+> > > >
+> > > > 2. MAX_USER_VA_BITS
+> > > > Does makedumpfile care about userspace VA bits?  I do not see other code
+> > > > doing this,  Kazu and Dave A should be able to comment.
+> > >
+> > > The mapping makedumpfile uses on arm64 is swapper_pg_dir only, so
+> > > unless the config affects its structure or something, makedumpfile
+> > > will not need this value.
+> >
+> > I captured this case in more details while sending out the makedumpfile
+> > enablement patch for ARMv8.2-LVA (see [0]), but here is a brief summary on
+> > the same:
+> >
+> > Since at the moment we enable the support of the ARMv8.2-LVA extension for
+> > 52-bit user-space VA in the kernel via a CONFIG flags
+> > (CONFIG_ARM64_USER_VA_BITS_52), so there are no clear mechanisms in
+> > user-space to determine this CONFIG
+> > flag value and use it to determine the address range values.
+> >
+> > Since 'VA_BITS' are already exported via vmcoreinfo, if we export
+> > 'MAX_USER_VA_BITS' as well, we can use the same in user-space to check if
+> > the 'MAX_USER_VA_BITS' value is greater than 'VA_BITS'. If yes, then we are
+> > running a use-case where user-space is 52-bit while the underlying kernel is
+> > still 48-bit.
 >
->        while (tmp >= 0) {
->                if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
->                                        tmp + RWSEM_ACTIVE_READ_BIAS)) {
->                        return 1;
->                }
->        }
+> Problem is why this is needed, it sounds like you are talking about some
+> non-exist use case.
 
-try doing this instead:
+I already explained this in an earlier reply to your initial comments
+(see <http://lists.infradead.org/pipermail/kexec/2019-January/022395.html>).
+Perhaps you missed reading it, so here are the architecturally
+possible and kernel supported uses cases with ARMv8.2 extensions
+(depending on the combination of CONFIG flags and kernel version):
 
-        long tmp = 0;
+- 48-bit kernel VA + 48-bit user-space VA + 52-bit PA
+- 48-bit kernel VA + 52-bit user-space VA + 52-bit PA
+- 52-bit kernel VA + 52-bit user-space VA + 52-bit PA
 
-        do {
-                if (atomic_long_try_cmpxchg_acquire(&sem->count, &tmp,
-                                        tmp + RWSEM_ACTIVE_READ_BIAS)) {
-                        return 1;
-        } while (tmp >= 0);
-        return 0;
+Please see 'config ARM64_USER_VA_BITS_52'  help text inside
+'arch/arm64/Kconfig' for more details:
+config ARM64_USER_VA_BITS_52
+    bool "52-bit (user)"
+    depends on ARM64_64K_PAGES && (ARM64_PAN || !ARM64_SW_TTBR0_PAN)
+    help
+      Enable 52-bit virtual addressing for userspace when explicitly
+      requested via a hint to mmap(). The kernel will continue to
+      use 48-bit virtual addresses for its own mappings.
 
-because especially when it comes to locking, it's usually better to
-just *guess* that the lock is unlocked, than it is to actually read
-from the line to see what the state is.
+BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
+(which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
+mentioned that the changes look necessary.
 
-Often - but certainly not always - the lock is the first access to the
-target cacheline, and assuming the trylock is successful (which I
-think is the case we want to optimize for), we're much better off
-causing that first access to be a read-for-ownership, rather than a
-read-for-sharing.
+[0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
 
-Because if you first read from the line, and then do a cmpxchg, and if
-the line was not in the cache, your cache coherency protocol will
-generally go through two states: first shared (for the initial read)
-and then exclusive-dirty (for the cmpxchg).
+Thanks,
+Bhupesh
 
-Now, this is obviously very micro-architecture dependent, and in fact
-the microarchitecture could even see the "predict fallthrough to a
-cmpxchg with the same address" and turn the first read into a
-read-for-ownership, but we've done this at some point before, and the
-"guess unlocked" was actually the one that performed better.
-
-Of course, the downside is that it might be worse when the guess is
-incorrect - either because of a nested read lock or due to an actual
-conflict with a write, but on the whole those *should* be the rare
-cases, and not the cases where we necessarily optimize for latency of
-the operation.
-
-Hmm?
-
-                    Linus
+> >
+> > The increased 'PTRS_PER_PGD' value for such cases needs to be then
+> > calculated as is done by the underlying kernel (see
+> > 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
+> >
+> > #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
+> >
+> > Also, note that 'arch/arm64/include/asm/memory.h' defines 'MAX_USER_VA_BITS'
+> > as 'VA_BITS' in case 'CONFIG_ARM64_USER_VA_BITS_52' is set to 'n':
+> >
+> > #ifdef CONFIG_ARM64_USER_VA_BITS_52
+> > #define MAX_USER_VA_BITS      52
+> > #else
+> > #define MAX_USER_VA_BITS      VA_BITS
+> > #endif
+> >
+> > So, makedumpfile will need this symbol exported in vmcore to make the above
+> > determination.
+> >
+> > [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022425.html
+> >
+> > Thanks,
+> > Bhupesh
+>
+> Thanks
+> Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
