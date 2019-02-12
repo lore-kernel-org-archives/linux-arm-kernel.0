@@ -2,83 +2,62 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71F72C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:35:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8078C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:39:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C16D2184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:35:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 893B92184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:39:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uaJCpKVQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C16D2184A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hmMAOJTL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 893B92184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hD7/+KQ1iRI2BdbpALX2gebnLa0m2ivtOY6Sz2dMd/Y=; b=uaJCpKVQ1bK5Zu
-	gMdeTliI5gIe3z9+E0AYhww2SbteiU/gWxKTx0te61ZM2jOItj7syxnV2NHtpuu4BXPH+FKiYXrs8
-	RnfMbclETbRKeqxjqiMMjhGmL2SVnzcYEHbglNHVp//OHbFqsxYoEXVYSgJrzzLNOZy2ZXo9pRnFD
-	YnQ/uJcw5BQAbFs4F7gcy3+EtZnL2kImAFExLwP1vssBtt0SXcDQkBc6Ki4HUF57pEnh59ztOnckC
-	doP/UJ8mDapLXlkRnlsUy6qFszm2Ad72M+yzxO7D67TAX2Qu7PQsSNDa3WfNzBrYt6YQU/URe0zy1
-	0IARZsv5TUvktTgPFrtA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=t8RED/lFh0dQ9ipFMHABCq7IucawCJ81DNwJ0TxYrWI=; b=hmMAOJTLYW/CO9qKA4HWyZ1j+
+	2x/VxbkQmeppYV0dxK8xO/Zia7GB8Hc2yNJQkxp+EsNTvFZd8pxuHr6elGm2uOGX0giHF/x4BGCHD
+	AcOS52vRCuU4aZ+8CeEiAghzArSq65jTvZ35I2uvGO/bqiD4Cjcp8hHyf5n8EfNLdoOvTiWDx1dZn
+	YaERq6/newdDu8WOKHL19CgtY9iMkJAvQsVxNmjgMlJtiKHN814NU2eopYUcbu3CH/bThE825d+1u
+	JFKOYmkieihBFrouiFQLxsOfw1WzP0MxlOCFrCHSsexbdh2rVNiv75ku+GNmk83yulWmYz1yaHdcT
+	ikbAr4c6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtTWu-0004Ya-Gc; Tue, 12 Feb 2019 08:35:00 +0000
-Received: from mail-ed1-f67.google.com ([209.85.208.67])
+	id 1gtTak-0006wZ-BX; Tue, 12 Feb 2019 08:38:58 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtTWs-0004Y9-4B
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:34:59 +0000
-Received: by mail-ed1-f67.google.com with SMTP id 10so1430574eds.7
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 00:34:57 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=GchSLQL+MK3+aDAYq+CRIhaNVIm9FvskzFFpE48PnmM=;
- b=Jt3PM46o8Fi7GGdsE6lifjc9+LqOy7Ollqjdoza/ZcTZzB0kDn9G+m2+07KBKA32Vk
- MG9kX+xSjWMLNPiLCAhuhOwSCt/4gaKAz4gFen/En3AA7tzuG6HVhf75gxAXwsyV8ZRB
- 1gkZ4awrcl9yaXiYfJfDPqr0ldkTLpquNHVYjJ6hWKRLoI+2dQ6eRbKQLDVipTNzcaQ+
- l20KXD8I/gWiEMECR7ggotkSpmb9TEhNe7MLuazm7cgRq3yi6FcCoxPvCle1fhE/F3yK
- /CtI7PUhlQTNZxdorR/3ldTTiksmnCoOlMtzeLP1DcS2D/YyG6Fm0ZWVaIP0DKWOgrV6
- X9Dg==
-X-Gm-Message-State: AHQUAuYBOcpG3baSFPmy7y7jpjhphfRVQlnFOrV8RTGm1q8CEYbDhtfD
- VEpDHMlDNBolZt3aTN/P62t1zYjP6BU=
-X-Google-Smtp-Source: AHgI3IYMbYy8jPeAH8mnhKy8pJnbjQrqyzI0FRKPH5qoXeG4T/bgQHiPvjLexdTwjkkNoe/cqEiDfA==
-X-Received: by 2002:a50:ee0d:: with SMTP id g13mr2158414eds.230.1549960495733; 
- Tue, 12 Feb 2019 00:34:55 -0800 (PST)
-Received: from mail-wr1-f47.google.com (mail-wr1-f47.google.com.
- [209.85.221.47])
- by smtp.gmail.com with ESMTPSA id h9sm3735836ede.93.2019.02.12.00.34.54
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 00:34:54 -0800 (PST)
-Received: by mail-wr1-f47.google.com with SMTP id v13so1665116wrw.5
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 00:34:54 -0800 (PST)
-X-Received: by 2002:adf:efc2:: with SMTP id i2mr1896955wrp.44.1549960494217;
- Tue, 12 Feb 2019 00:34:54 -0800 (PST)
-MIME-Version: 1.0
-References: <20190201113743.10058-1-harald@ccbib.org>
-In-Reply-To: <20190201113743.10058-1-harald@ccbib.org>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Tue, 12 Feb 2019 16:34:46 +0800
-X-Gmail-Original-Message-ID: <CAGb2v66MHGrpFuA8eBKhVLXPcriwGb-o4_3jfyLJ4HwEBVD3GA@mail.gmail.com>
-Message-ID: <CAGb2v66MHGrpFuA8eBKhVLXPcriwGb-o4_3jfyLJ4HwEBVD3GA@mail.gmail.com>
-Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+ id 1gtTag-0006vn-8Y
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:38:56 +0000
+X-Originating-IP: 90.88.22.177
+Received: from localhost (aaubervilliers-681-1-80-177.w90-88.abo.wanadoo.fr
+ [90.88.22.177]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 050F91BF207;
+ Tue, 12 Feb 2019 08:38:50 +0000 (UTC)
+Date: Tue, 12 Feb 2019 09:38:50 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Harald Geyer <harald@ccbib.org>
+Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+Message-ID: <20190212083850.7genwc6ipnxtl7eo@flea>
+References: <20190211111245.GA18147@lst.de>
+ <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
+ <20190211153945.e34fpwkuk67l7lc6@flea>
+ <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+MIME-Version: 1.0
+In-Reply-To: <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_003458_161251_54045024 
-X-CRM114-Status: GOOD (  14.44  )
+X-CRM114-CacheID: sfid-20190212_003854_447865_47B22E69 
+X-CRM114-Status: GOOD (  14.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,45 +69,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, info@olimex.com,
- Maxime Ripard <maxime.ripard@bootlin.com>, Mark Brown <broonie@kernel.org>,
- Vasily Khoruzhick <anarsoul@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- ibu@radempa.de, linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ info@olimex.com, Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============7772432879733703169=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 1, 2019 at 7:37 PM Harald Geyer <harald@ccbib.org> wrote:
->
-> The TERES-I has internal speakers (left, right), internal microphone
-> and a headset combo jack (headphones + mic).
->
-> The headphone lines are multiplexed with the debug console.
-> The headphone and mic detect lines of the A64 are connected properly,
-> but AFAIK currently unsupported by the driver.
->
-> Signed-off-by: Harald Geyer <harald@ccbib.org>
-> ---
-> Hi all,
->
-> a couple of issues make this patch RFC:
->
-> hpvcc-supply vs. cpvdd-supply:
-> On the A64 manual the pin is called CPVDD and the binding documents
-> requires a cpvdd-supply property. However in the actual driver and
-> devicetrees so far hpvcc-supply is used. This is a very new binding,
-> so we have the luxury to decide either way, I think. Any input from
-> the devicetree maintainers would be appreciated.
 
-Sorry about the screw-up. I'll send out patches fixing this once I
-test them. The preferred name is CPVDD, as that is what the datasheet
-uses.
+--===============7772432879733703169==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="mbfotkrj5qb4aubt"
+Content-Disposition: inline
 
-ChenYu
+
+--mbfotkrj5qb4aubt
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Mon, Feb 11, 2019 at 08:32:35PM +0100, Harald Geyer wrote:
+> > We want to model this properly. I guess using a pinctrl driver
+> > controlled through GPIO (similar to what regulator-gpio is) would be a
+> > good first step.
+>=20
+> I considered this too, but didn't like it:
+>=20
+> 1) Seems like a bit of overkill.
+>
+> 2) The HW at hand is a rather different kind of multiplexer than
+> what pinctrl assumes. We don't want two mutually exclusive devices,
+> (Ie don't make the kernel unbind /dev/console for the sake of audio.)
+> but we want switch the jack between two devices, that might both be
+> active at the same time. This looks more like the channel multiplexers
+> used with many ADCs and such. I guess, I could start a new subsystem
+> around this. Seems like even more overkill.
+
+I'm not quite sure about how that's different from what pinctrl
+assumes. pinctrl assumes to handle devices that have multiple signals
+as input, and one as output. Isn't that exactly what you have?
+
+And pinctrl can be used dynamically as well if you need to
+
+> Instead I just got the original patch working, by implementing
+> "output-high" DT property in sunxi-pinctrl. I'll send a patch for
+> review soon.
+
+What do you want to do with output-high exactly?
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--mbfotkrj5qb4aubt
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGKGGgAKCRDj7w1vZxhR
+xYuZAQCp23Sdst8xXZYRMCqrva1rMoo7KVAz/EnclmklBSRcBwEAlMhswxQCB6Dp
+RricCHumMDXZn3wRD/p4F0DLvdczYA4=
+=+Dq1
+-----END PGP SIGNATURE-----
+
+--mbfotkrj5qb4aubt--
+
+
+--===============7772432879733703169==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7772432879733703169==--
+
