@@ -2,77 +2,134 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-6.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEF3EC169C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:04:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F032AC169C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:17:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8E1EA2186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:04:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B971D21B18
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 02:17:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jnwg57Lb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E1EA2186A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V+GvBpWQ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=wavesemi.onmicrosoft.com header.i=@wavesemi.onmicrosoft.com header.b="ozG293VS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B971D21B18
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mips.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EWDQq4DsHxZmeKhSIsnW/8t2UDxQfHY7OShFDyd/OLA=; b=jnwg57LbieoMWq
-	9attAI/sv3SRy6au6Vdfv26LtwIeNj0vtMLCizXwNAkoAoPpAeu1nWPPgSx4ZkA0iZCPpoojlYad0
-	K8w//ETgF/Df0LB2jHZSfF+cJyCj7PQIMv3kGUIW3HDOQ0tXPncmdDqG4wk3y/nMzUdAhxbvLJCMR
-	b/Cw36cNx/3f/Qw6omiL0IJkbQK5yyJQWju/ptz2FU3T+kn+PXJP6BwblviC0DaYJD6RnlH2R/nDE
-	IqxLd7Ypt8+saUG0kWNGCMioFR4On3HN2glANoJb8xppNmbPhs0GNLatdujlq/9A1+zlZB0s1+C5x
-	FGZySqq5N6DZiZOIdxSg==;
+	List-Owner; bh=e2SaVPblwooZLejzQCXg2Bho9q7n6i2MTKHnE9ekk2M=; b=V+GvBpWQ6rmzEZ
+	l3iShBnrsvD4lTV8xxeJAKOvSK7szWPMC05WjyGtDDKDHpuQ9MKJqlgXMQT/RUoOlMWY0Ko9f1TO2
+	52nFbfOEaugWt+WtxDgJUYBZhtz2gD9l5qgFD0kPfljFPZ1OGbsCnkkPDcjXv3d1aRXXVM1U3jtBA
+	l3QkbeF1b3pI9+933CGgKNTo75MSOLP4UVdOa3Zys+j/zxNWPTiSUwoEavD6B7DLWaxFl94gb7wiU
+	6bJlj6X7tSHUJMJ6PrZedKk30h7/lc/n9bEjFpSb0PpyyXEMK6UutrLc4eAwIE5HuygGH/nAmpzIr
+	FQFF3fEVR1Tze1q8hUCw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtNRQ-00058o-He; Tue, 12 Feb 2019 02:04:56 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gtNdd-0001UO-Kt; Tue, 12 Feb 2019 02:17:33 +0000
+Received: from mail-eopbgr820108.outbound.protection.outlook.com
+ ([40.107.82.108] helo=NAM01-SN1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtNRL-00057q-TY; Tue, 12 Feb 2019 02:04:54 +0000
-X-UUID: 8485bbddf1ba4f0a9293906bcd3773f2-20190211
-X-UUID: 8485bbddf1ba4f0a9293906bcd3773f2-20190211
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <chaotian.jing@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1537031911; Mon, 11 Feb 2019 18:04:22 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 11 Feb 2019 18:04:21 -0800
-Received: from MTKCAS36.mediatek.inc (172.27.4.186) by mtkmbs03n1.mediatek.inc
- (172.21.101.181) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Tue, 12 Feb 2019 10:04:19 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 12 Feb 2019 10:04:18 +0800
-Message-ID: <1549937058.16070.5.camel@mhfsdcap03>
-Subject: Re: [PATCH] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
-From: Chaotian Jing <chaotian.jing@mediatek.com>
-To: Adrian Hunter <adrian.hunter@intel.com>
-Date: Tue, 12 Feb 2019 10:04:18 +0800
-In-Reply-To: <4c8a616f-f424-fd58-43c5-d6042665bc58@intel.com>
-References: <1548921212-5219-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
- <1548985091.10251.26.camel@mhfsdcap03>
- <CAPDyKFqHJn9uVkd5z4D5JvNKOtbn3E3SwL_WSgLb1=Lw1SgyUg@mail.gmail.com>
- <0e95e1a1-843e-38ea-c4bb-e6c48432ea7c@intel.com>
- <CAPDyKFrvSgK0Om7GUJ143j=U2xDG4n6z6Ym-1znbtMbaw==HkQ@mail.gmail.com>
- <c9120e57-ad7c-174d-c155-0186e0b9c359@intel.com>
- <CAPDyKFotLzLxW=Wq6hCPFmwTQ=T43rJV9h=+p5jfgrMBe=d8BA@mail.gmail.com>
- <4c8a616f-f424-fd58-43c5-d6042665bc58@intel.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gtNdZ-0001Tq-SQ; Tue, 12 Feb 2019 02:17:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=wavesemi.onmicrosoft.com; s=selector1-wavecomp-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=sLNA/8E7XxiU5SNRQ2CEjv6lzgrFvdP2XeYgmRA9AuI=;
+ b=ozG293VSNp8I8yx7T3BVAOWNeNHvL2sN0w+HaTqXvDWnouYd91TVzT0ck0bFrJ0PrAdp+SidTNqnMq8BOQHnzm06uhgBw6UIGz5nQhojJwpv4GAy+EMnSSuCO7l3iTEdKPBmUGPIg49G7nbxWfkUdLSw6HLffZD8W5v40wbeHlc=
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com (10.174.162.17) by
+ MWHPR2201MB1518.namprd22.prod.outlook.com (10.174.170.155) with Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.24; Tue, 12 Feb 2019 02:17:26 +0000
+Received: from MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::7d5e:f3b0:4a5:4636]) by MWHPR2201MB1277.namprd22.prod.outlook.com
+ ([fe80::7d5e:f3b0:4a5:4636%9]) with mapi id 15.20.1601.023; Tue, 12 Feb 2019
+ 02:17:26 +0000
+From: Paul Burton <paul.burton@mips.com>
+To: Christoph Hellwig <hch@lst.de>
+Subject: Re: [PATCH 06/12] dma-mapping: improve selection of
+ dma_declare_coherent availability
+Thread-Topic: [PATCH 06/12] dma-mapping: improve selection of
+ dma_declare_coherent availability
+Thread-Index: AQHUwg7wztMik5M5KE2guV+HlCSoLKXbbhKA
+Date: Tue, 12 Feb 2019 02:17:26 +0000
+Message-ID: <20190212021724.cp4snlcqbm3kqtzu@pburton-laptop>
+References: <20190211133554.30055-1-hch@lst.de>
+ <20190211133554.30055-7-hch@lst.de>
+In-Reply-To: <20190211133554.30055-7-hch@lst.de>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BYAPR03CA0002.namprd03.prod.outlook.com
+ (2603:10b6:a02:a8::15) To MWHPR2201MB1277.namprd22.prod.outlook.com
+ (2603:10b6:301:24::17)
+user-agent: NeoMutt/20180716
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=pburton@wavecomp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [67.207.99.198]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 9dfcaee2-f573-43f7-6c6f-08d690903b2a
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR2201MB1518; 
+x-ms-traffictypediagnostic: MWHPR2201MB1518:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; MWHPR2201MB1518;
+ 23:azaZ1cGJ61L0XoyxK8Dc51MaxQQ+esp1XB9FDjq?=
+ =?us-ascii?Q?/g57vHvs9iwd7Y4e6qa6Ke5f5h8JhfBX4J2Nse+blKx5H8OCQVFdsSobIdjS?=
+ =?us-ascii?Q?S6MpFq726gt2YuR+ZVFmw6zrtJ/kLl9Vo7H1XlRuTjI1T7LqewYJPu+6NaPc?=
+ =?us-ascii?Q?mseBdhHx5RUxrQ/JKvaigCrQpgYyubrRyjjowsKMwhM3M4mqXtSXxIEPCRD5?=
+ =?us-ascii?Q?qphy77CXyNeZhh3BzFLJGFw9mgEGaERS795SKYIwqHlTk9sM4c8sNW27T+s/?=
+ =?us-ascii?Q?pJZjMN0mKxXqvoZAJ5K654+c6qCYxBWzgjfb9C620aqhNddnwvWlykOIhaFJ?=
+ =?us-ascii?Q?5dlthwGOcEygUN8+08EAtDfG8/cQ/ns2i2jH7Sh09blV0PXufUpXXQGcEwYY?=
+ =?us-ascii?Q?rNYTwDp6DmalDvyIt8bZtZSaS0qnvhTYSMB52KGO24XISLlcntBtNNzWlwyD?=
+ =?us-ascii?Q?J54Z9wVFVOIr6SB/G13OgvQ1Zba8tCCo5H1Fj0ruc3T8cA3NhLMJHTxULy3E?=
+ =?us-ascii?Q?wBHiWE4q+aDS4shd98vjhBjtok09bHCLHtbaR8NR722akgIpXcNUyQmBtFKp?=
+ =?us-ascii?Q?zYhrpZjiR9SFDybg3fPnYJEOomkycxGuT5128EvuwtQhy/nrTfNFHhvonQkQ?=
+ =?us-ascii?Q?DWQYy5kTpCllgu2MJOfBu07R07qxXi6GeTmuyWxASE+qvJz+QsnE66S5kQYb?=
+ =?us-ascii?Q?q4gev4yMehHVxPkFb9QmvW5tFBNwWyYDUsUq4X9OcxVVm2L+zM8hpR6CbJ8b?=
+ =?us-ascii?Q?wTQdXXWfvliiNEXOGa7mdTC8ZYj/3SlrPzkmsxbqqLAZGcIzgLY5W5M8E3JM?=
+ =?us-ascii?Q?qwoMLf87R8jy3B1LR3ELWl8zA48t5LBl7jDSik1RtIGlhR0gSAdvDQqzCTuW?=
+ =?us-ascii?Q?EO0V853Q+Op2iKeBLzKe5fpyNQ/T29OZzALeJwMPtzyEOidmY+4FS/IHBmpa?=
+ =?us-ascii?Q?sHI4zxo1J9Tt9uOWkQnjQ3I9f5SI7kj3mpz9zDZQnlF2kusu2jN2vbffMrZ5?=
+ =?us-ascii?Q?YaGOvA5WS3NTsLVaADcwm+iF0yxm7hPIMI1HLfOkBOzWL6h7nvA/K9a731M0?=
+ =?us-ascii?Q?NY12EfZTmmWK/fYwRPriYOlgUnTfXVHts+TQe/6Ad1HNM4oo6asbhJYJINDh?=
+ =?us-ascii?Q?0vTX4PEZKHveyer1zpZ6f4rkSzVMVGVcKsYAN3LXh6AxJQ7xZ0J/yMOCMYe4?=
+ =?us-ascii?Q?Oaf2/ueyi57Z6kwQeRitq6Ui7l6EyU+u6WJxA4suWKZ5dgJxq338xs6+oaAo?=
+ =?us-ascii?Q?Z8qPH9s+/Lj4M90aPhRPReTey3RjcyIr3yTGs6p6UUqZnrmvUZLHrwaIjpbY?=
+ =?us-ascii?Q?gEWB8fGNAzZqkODTRf1uAVec=3D?=
+x-microsoft-antispam-prvs: <MWHPR2201MB151846352CEF0CE2B38C4092C1650@MWHPR2201MB1518.namprd22.prod.outlook.com>
+x-forefront-prvs: 0946DC87A1
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(7916004)(396003)(366004)(346002)(376002)(136003)(39850400004)(199004)(189003)(486006)(33716001)(81166006)(2906002)(53936002)(97736004)(68736007)(386003)(8936002)(476003)(44832011)(1076003)(11346002)(14454004)(66066001)(7416002)(6436002)(4744005)(81156014)(446003)(26005)(25786009)(6246003)(6916009)(99286004)(8676002)(42882007)(478600001)(76176011)(54906003)(256004)(52116002)(305945005)(9686003)(7736002)(6512007)(33896004)(71200400001)(316002)(6506007)(71190400001)(6486002)(58126008)(3846002)(6116002)(106356001)(186003)(229853002)(105586002)(4326008)(102836004);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:MWHPR2201MB1518;
+ H:MWHPR2201MB1277.namprd22.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: wavecomp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 4L+haswJ6uv1RBUXPnSknQtUAgOiS3kDE2H/b7RVDbzX1U0BrnWr4lKTJNzelIgvuLllJJQFQLeNqMEzqvm9nUSZjqbWg5Mlplry4uiLrLrInA7v9O61x6nRaVF7fGJ8OBzxOPst8iqgyi5hwXLTbBFfHiHwZ1+fugEpdo6ykVfVPmW641hQ2pdgCOItnm4egE45x7/sOdKdnZgsKmDDsJZOrNcQFfzb1XGF/NyesNPgmmE5pBdTl3c7Da57yLFXgXZ7V7D8cTkxhva2EzB2RoDIYesW8RiAo/SxbQHtrWqhipIa65SHUjAgNw+98zUXJ2g/UIwsb+vFhgUpjzflb9i1cpsjrE64zObzePfVXqgG1LIPVFzI4y4GWO6LDVKbzYW7p326Qx8TEvCeo6V3Hw9fJJ164vVtVW6zl6kUeNk=
+Content-ID: <101BE7318D87D541944405D342ACE1DB@namprd22.prod.outlook.com>
 MIME-Version: 1.0
-X-MTK: N
+X-OriginatorOrg: mips.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9dfcaee2-f573-43f7-6c6f-08d690903b2a
+X-MS-Exchange-CrossTenant-originalarrivaltime: 12 Feb 2019 02:17:26.1259 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 463607d3-1db3-40a0-8a29-970c56230104
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR2201MB1518
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_180451_964753_FC0CA62F 
-X-CRM114-Status: GOOD (  44.51  )
+X-CRM114-CacheID: sfid-20190211_181729_924148_0D67BD5C 
+X-CRM114-Status: UNSURE (   8.24  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,215 +141,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Shawn Lin <shawn.lin@rock-chips.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-mediatek@lists.infradead.org,
- Harish Jenny K N <harish_kandiga@mentor.com>,
- Hongjie Fang <hongjiefang@asrmicro.com>,
- Matthias Brugger <matthias.bgg@gmail.com>, Simon
- Horman <horms+renesas@verge.net.au>, Kyle Roeschley <kyle.roeschley@ni.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: "linux-xtensa@linux-xtensa.org" <linux-xtensa@linux-xtensa.org>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ "linux-sh@vger.kernel.org" <linux-sh@vger.kernel.org>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ "x86@kernel.org" <x86@kernel.org>,
+ "linux-mips@vger.kernel.org" <linux-mips@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "iommu@lists.linux-foundation.org" <iommu@lists.linux-foundation.org>,
+ "linux-riscv@lists.infradead.org" <linux-riscv@lists.infradead.org>,
+ "linux-snps-arc@lists.infradead.org" <linux-snps-arc@lists.infradead.org>,
+ Lee Jones <lee.jones@linaro.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-02-05 at 15:42 +0200, Adrian Hunter wrote:
-> On 5/02/19 3:06 PM, Ulf Hansson wrote:
-> > On Mon, 4 Feb 2019 at 14:42, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> >>
-> >> On 4/02/19 12:54 PM, Ulf Hansson wrote:
-> >>> On Mon, 4 Feb 2019 at 10:58, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> >>>>
-> >>>> On 1/02/19 10:10 AM, Ulf Hansson wrote:
-> >>>>> On Fri, 1 Feb 2019 at 02:38, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> >>>>>>
-> >>>>>> On Thu, 2019-01-31 at 16:58 +0100, Ulf Hansson wrote:
-> >>>>>>> On Thu, 31 Jan 2019 at 08:53, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> >>>>>>>>
-> >>>>>>>> mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
-> >>>>>>>> Therefore, any commands sent to the card should use HS400 timing.
-> >>>>>>>> It is incorrect to reduce frequency to 50Mhz before sending the switch
-> >>>>>>>> command, in this case, only reduce clock frequency to 50Mhz but without
-> >>>>>>>> host timming change, host is still in hs400 mode but clock changed from
-> >>>>>>>> 200Mhz to 50Mhz, which makes the tuning result unsuitable and cause
-> >>>>>>>> the switch command gets response CRC error.
-> >>>>>>>
-> >>>>>>> According the eMMC spec there is no violation by decreasing the clock
-> >>>>>>> frequency like this. We can use whatever value <=200MHz.
-> >>>>>>>
-> >>>>>>> However, perhaps in practice this becomes an issue, due to the tuning
-> >>>>>>> for HS400 has been done on the "current" frequency.
-> >>>>>>>
-> >>>>>>> As as start, I think you need to clarify this in the changelog.
-> >>>>>>>
-> >>>>>> Yes, reduce clock frequency to 50Mhz is no Spec violation, but it may
-> >>>>>> cause __mmc_switch() gets response CRC error, decreasing the clock but
-> >>>>>> without HOST mode change, on the host side, host driver do not know
-> >>>>>> what's operation the core layer want to do and can only set current bus
-> >>>>>> clock to 50Mhz, without tuning parameter change, it has a chance lead to
-> >>>>>> response CRC error. even lower clock frequency, but with the wrong
-> >>>>>> tuning parameter setting(the setting is of hs400 tuning @200Mhz).
-> >>>>>
-> >>>>> Right, makes sense.
-> >>>>>
-> >>>>>>>>
-> >>>>>>>> this patch refers to mmc_select_hs400(), make the reduce clock frequency
-> >>>>>>>> after card timing change.
-> >>>>>>>>
-> >>>>>>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> >>>>>>>> ---
-> >>>>>>>>  drivers/mmc/core/mmc.c | 8 ++++----
-> >>>>>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
-> >>>>>>>>
-> >>>>>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> >>>>>>>> index da892a5..21b811e 100644
-> >>>>>>>> --- a/drivers/mmc/core/mmc.c
-> >>>>>>>> +++ b/drivers/mmc/core/mmc.c
-> >>>>>>>> @@ -1239,10 +1239,6 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
-> >>>>>>>>         int err;
-> >>>>>>>>         u8 val;
-> >>>>>>>>
-> >>>>>>>> -       /* Reduce frequency to HS */
-> >>>>>>>> -       max_dtr = card->ext_csd.hs_max_dtr;
-> >>>>>>>> -       mmc_set_clock(host, max_dtr);
-> >>>>>>>> -
-> >>>>>>>
-> >>>>>>> As far as I can tell, the reason to why we change the clock frequency
-> >>>>>>> *before* the call to __mmc_switch() below, is probably to try to be on
-> >>>>>>> the safe side and conform to the spec.
-> >>>>>>>
-> >>>>>> Agree, it Must be more safe with lower clock frequency, but the
-> >>>>>> precondition is to make the host side recognize current timing is not
-> >>>>>> HS400 mode. it has no method to find a safe setting to ensure no
-> >>>>>> response CRC error when reduce clock from 200Mhz to 50Mhz.
-> >>>>>>> However, I think you have a point, as the call to __mmc_switch(),
-> >>>>>>> passes the "send_status" parameter as false, no other command than the
-> >>>>>>> CMD6 is sent to the card.
-> >>>>>>>
-> >>>>>> yes, the send status command was sent only after __mmc_switch() done.
-> >>>>>>>>         /* Switch HS400 to HS DDR */
-> >>>>>>>>         val = EXT_CSD_TIMING_HS;
-> >>>>>>>>         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
-> >>>>>>>> @@ -1253,6 +1249,10 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
-> >>>>>>>>
-> >>>>>>>>         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
-> >>>>>>>>
-> >>>>>>>> +       /* Reduce frequency to HS */
-> >>>>>>>> +       max_dtr = card->ext_csd.hs_max_dtr;
-> >>>>>>>> +       mmc_set_clock(host, max_dtr);
-> >>>>>>>> +
-> >>>>>>>
-> >>>>>>> Perhaps it's even more correct to change the clock frequency before
-> >>>>>>> the call to mmc_set_timing(host, MMC_TIMING_MMC_DDR52). Otherwise you
-> >>>>>>> will be using the DDR52 timing in the controller, but with a too high
-> >>>>>>> frequency.
-> >>>>>>>
-> >>>>>> for Our host, it has no impact to change the clock before or after
-> >>>>>> change timing, as the mmc_set_timing() is only for host side, not
-> >>>>>> related to MMC card side and no commands sent do card before the
-> >>>>>> timing/clock change completed.
-> >>>>>
-> >>>>> Alright. After a second thought, it actually looks more consistent
-> >>>>> with mmc_select_hs400() to do it after, as what you propose in
-> >>>>> $subject patch.
-> >>>>>
-> >>>>> So, let's keep it as is.
-> >>>>>
-> >>>>>>>>         err = mmc_switch_status(card);
-> >>>>>>>>         if (err)
-> >>>>>>>>                 goto out_err;
-> >>>>>>>> --
-> >>>>>>>> 1.8.1.1.dirty
-> >>>>>>>>
-> >>>>>>>
-> >>>>>>> Finally, it sounds like you are trying to fix a real problem, can you
-> >>>>>>> please provide some more information what is happening when the
-> >>>>>>> problem occurs at your side?
-> >>>>>>>
-> >>>>>> Yes, I got a problem with new kernel version. with
-> >>>>>> commit:57da0c042f4af52614f4bd1a148155a299ae5cd8, this commit makes
-> >>>>>> re-tuning every time when access RPMB partition.
-> >>>>>
-> >>>>> Okay, could you please add this as fixes tag for the next version of the patch.
-> >>>>>
-Ok, sorry for late reply due to Chinese New Year.
-> >>>>>>
-> >>>>>> in fact, our host tuning result of hs400 is very stable and almost never
-> >>>>>> get response CRC error with clock frequency at 200Mhz. but cannot ensure
-> >>>>>> this tuning result also suitable when running at HS400 mode @50Mhz. as I
-> >>>>>> mentioned before, the host side does not know the reason of reduce clock
-> >>>>>> frequency to 50Mhz at HS400 mode, so what's the host side can do is only
-> >>>>>> reduce the bus clock to 50Mhz, even it can just only set the tuning
-> >>>>>> setting to default when clock frequency lower than 50Mhz, but both card
-> >>>>>> & host side are still at HS400 mode, still cannot ensure this setting is
-> >>>>>> suitable.
-> >>>>>
-> >>>>> Right, thanks for clarifying.
-> >>>>>
-> >>>>> So I am expecting a new version with a fixes tag and some
-> >>>>> clarification of the changelog, then I am ready to apply this to give
-> >>>>> it some test.
-> >>>>
-> >>>> The switch from HS400 mode is done for tuning at times when CRC errors are a
-> >>>> possibility e.g. after a CRC error during transfer.  So if the frequency is
-> >>>> not to be reduced, then some mitigation is needed for the possibility that
-> >>>> the CMD6 response itself will have a CRC error.
-> >>>
-> >>> That's a good point!
-> >>>
-> >>> However, how can we know that a CMD6 command is successfully
-> >>> completed, if there is CRC errors detected during the transmission? I
-> >>> guess we can't!?
-> >>
-> >> Yes, in that case, the only option is to assume the CMD6 was successful,
-> >> like in
-> >>
-> >>   commit ef3d232245ab7a1bf361c52449e612e4c8b7c5ab
-> >>   Author: Adrian Hunter <adrian.hunter@intel.com>
-> >>   Date:   Fri Dec 2 13:16:35 2016 +0200
-> >>
-> >>       mmc: mmc: Relax checking for switch errors after HS200 switch
-> > 
-> > Well, relaxing the check for switch errors, is to me a different
-> > thing. This means we are first doing the CMD6, then allowing the
-> > following status command (CMD13) to have CRC errors. Actually, even
-> > the spec mention this as a case to consider. I guess it's because the
-> > card internally have switched to a new speed mode timing.
-> > 
-> > Allowing CRC errors for the actual CMD6 sound more fragile to me. Of
-> > course, we can always try and see what happens.
-> > 
-> > Chaotian, can you give it a go? Somehow, change the call to
-> > __mmc_switch() in mmc_hs400_to_hs200(), so the CMD6 doesn't have the
-> > CRC flag set.
-> > 
-Yes, but should we add a new argument of __mmc_switch(), like "bool
-ignore_crc" ?? for now, there are too many argument of __mmc_switch().
-> >>
-> >> If we are going to do that, then we could stick with lowering the frequency
-> >> first.
-> > 
-> > Let's see what Chaotian's test may show.
-> > 
-> >>
-> >> Also I wonder if the mediatek driver could change to fixed sampling in
-> >> ->set_ios() when the frequency drops for HS400 mode?
-> > 
-> > Well, this sounds like a generic problem so if this is a possible
-> > generic solution that would be great.
-> > 
-> > Is this what sdhci is doing already?
+Hi Christoph,
+
+On Mon, Feb 11, 2019 at 02:35:48PM +0100, Christoph Hellwig wrote:
+> This API is primarily used through DT entries, but two architectures
+> and two drivers call it directly.  So instead of selecting the config
+> symbol for random architectures pull it in implicitly for the actual
+> users.  Also rename the Kconfig option to describe the feature better.
 > 
-> Not at present, but some drivers seem to be adjusting their settings for
-> HS400 based on the frequency e.g. sdhci_msm_hs400()
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 
-It's hard to find a suitable setting for all cards when running at HS400
-mode @50Mhz.
+Acked-by: Paul Burton <paul.burton@mips.com> # MIPS
 
+Thanks,
+    Paul
 
 _______________________________________________
 linux-arm-kernel mailing list
