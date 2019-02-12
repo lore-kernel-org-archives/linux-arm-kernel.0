@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB0AFC282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:41:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FD62C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:41:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88EBA20449
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:41:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F82820842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 10:41:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kNWTfv4h";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="dltVY8Rg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88EBA20449
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NtMlC6gm";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="scpWTfj6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F82820842
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DrEbh/e73lLkl0shP2BpyMhcUiQQqRAsY6qmQo1rQUw=; b=kNWTfv4h+dRSTl
-	jjg6u4tN4W/1GrW5bR/ug5rYGiToYvRug6i9KHAV/X4Vx/n+9T0vPFuf1nJzX8VlILpJwL4Cn2wJ9
-	PnZmsm/BCIEnoVZgrFygJ79O08R5C4cV6yph+ifWDnTIC1abv1DfbKRjyZ6qMEdfSQtJQgPZMYsTi
-	OKnCGv2lqeTVIDVzY/3puJulmC+9cATnZ6tvxU8ZERY99+HRVXHapvIpQA2V57OFW85i6m1r5fbN0
-	SjyFX19mfQvrNxvK+vBxzRkHn4oNTyfKAtSVNECkZAl+fikznUW17ZNZ0796IxKucaiixjWVGsNNA
-	sHm4y/Bd1XL7K/3oKX4A==;
+	List-Owner; bh=ZKmNiCIWfdNgoi3niEeLNGjYZXTS4fcc2M4PHlX+Zt8=; b=NtMlC6gmrBeehz
+	gobmUECBrqDliIX05gxFJz9CNUU9U1J1VoZeGva/mo7NNHegiTFd3x1JAD6z7bOEB4KdfRL5yURmo
+	wRKEJvJBYq2OvSHO1MEYh+TBvqDmrGk72DATGDMoGYreTE3JuZ87OXnwZiR3xfQC3mQs8C5WHuw2l
+	K9xST2k1+/aFxsoemTrwuXxsE/4vVRwkIx3wPQuQlt6l56vLG9P7IrsrTkcdiwPEQRmRzrQkzeUSR
+	CdFRgb8Z+tEzm+3ElFeKdfzl9j3hU/O5NqOVYMuZNAkhOEDs3q3eiG9zFUln1vscIKIVxuQkve7nM
+	IvovLcB+kfeMd2D20iZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtVUl-0000Tb-K1; Tue, 12 Feb 2019 10:40:55 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gtVUz-0000iz-RP; Tue, 12 Feb 2019 10:41:09 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtVT3-0005zh-T2
+ id 1gtVT1-0005wv-NK
  for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 10:39:15 +0000
-Received: by mail-wm1-x344.google.com with SMTP id b11so2367324wmj.1
+Received: by mail-wm1-x343.google.com with SMTP id q21so2432535wmc.5
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 02:39:09 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:07 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=KqCZkQam34X7Bd200BUIwd7m0iyaXsOBKajs3xqc3eI=;
- b=dltVY8Rg9Jt6pvWMqt4mQnCPaY35Oj1OYdIytpSfageeZyQdjxWEmzC06SRbAD13oq
- MwRlr/zdYfEL32h57Ni6Gn1Awqhih/IZHeFUenxtdZ9lOhue+rAnMSx2CBHTe1QsIBoo
- r83Cp/nifNT5AtfHbKVC0ipsTZp6ycsDtdZAOhH8AXXuyeudX6W3JI/NW1sHAPw+tsqq
- R52zODkbXnUJtyGzY5NgJLvmqWtBK+AuPCPxeUmKdLv3vEccM7uNADI7Sc7ZW9KlMdfk
- F6ZcCBRu9l//0c9505kXf4a7PETbtT4y0QfMxJaLz4QmeEpeS3axILCck/jlSEer/hbG
- YAeQ==
+ bh=9eYjYNduzPZNy43v8Fvj91hRMMSatkg8sxxgZqtJcIw=;
+ b=scpWTfj6AIQBsrq8qtg/D72R0kOYfWTl2M3Vvp5bUjnp/qum9J2pfmEIBevpiUovsm
+ MSmcu/QNgWOiwSXY/zLgA96rWtHhM5D1ufut9HeM1AJYZEjByceCLAHqZRpzFQxCKpcf
+ 8GySpjQ8lnXivaupCSRuJU/OPD9qxYl1yX84rpHqIijckq4LiZs/lH/N9qjn17RnGTwI
+ xaG4m/tO0INZkXkC43SVmv5lJjgIDMveY5CkKsytQUYes3kPa+cS3LlZbuTJzb+VcTh3
+ RAiWmZnTJYxf4KOcOMAmRyBOBNxHON/jjXDTPxmFVCbwYC/b9orSqREl+oBNdO1fTwYJ
+ VexQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=KqCZkQam34X7Bd200BUIwd7m0iyaXsOBKajs3xqc3eI=;
- b=d9EKuvzBpuM7gJBXmdoWf+L59tUd7lbTBEYeZbeAk0i+xJRVGbvs6lh+B9BQ/51DHq
- 73vTB8+mWAZGoygsRfEuMsp5/WouB9LprK0IR4xPzWgKNtStEd7jNmEIDkxd2MWb0cYq
- JOHSXZ1aIJZt3YIyyBldiEyy3fu+Fw8FzOVMba5XfKiaxD8YMCmVYs/g+Pej3YDIb67W
- 3IkDWKlIZ+JKZ/c+W0OlRIFPG5SRv15nQc2DSwbWuTPWA5/WhIO5x9uoFokn+fTQOmsz
- nTryFONAy7Da+fyDrEDN4vwy0DFoXjZUyA6L1PBgD5M9q7JPFd46o4b/1fvVIsL1s37e
- fFhQ==
-X-Gm-Message-State: AHQUAua7J6IHfmucDXiBIMDoohXeM3OldNFD+UZ92z6l36XMjC+Vjnql
- uwgaRzIRHmMXNDzEtXCo3+ECPA==
-X-Google-Smtp-Source: AHgI3IayhylVm8s5vzLnSD2obQATi986qVmsxzmPPX8fbDSSNN9weyF77qA/hPaXkwgx4e13YDKSYg==
-X-Received: by 2002:a7b:cc86:: with SMTP id p6mr2302570wma.32.1549967948526;
- Tue, 12 Feb 2019 02:39:08 -0800 (PST)
+ bh=9eYjYNduzPZNy43v8Fvj91hRMMSatkg8sxxgZqtJcIw=;
+ b=GzrEmfZr7ue8McGxrPUnksQHvRSsXcqm2nWemVAP5PNVClMljg5F43UzgnjF6Irc/o
+ tW2KABDSX/dSjhMiKF9rbgIJ4RjZ4T1Ddd50eilhn8kBEkY9tljuiBrF+lNuru1kJGHl
+ vUp2tFMgQzZuBR8tNkyW6OSMRNcWthFQDtWY1RcoNI8dHTbsElKZC0kyS+mCB7CRqhke
+ bvdoAXjTZDNY7Q6cy69xJQUzLaf/eM3BGic8TXr428syd+QLLX45INISwso5AuVNLfVn
+ UNq5qPfHSUZOt5Pox4kem/m6mKLMxZudya08kD3jaLEDdEHrkpmQS0be+IvcX4jx1rIi
+ R6qw==
+X-Gm-Message-State: AHQUAuZ72te/8sa/hSSNFE2+oBfHtgvCyw+X5M0knaWKei/VNz41nWgs
+ UvK8NRh+soSRkxBePwBH5IZaog==
+X-Google-Smtp-Source: AHgI3IZiMw2guHRj6ab24ZpqwfjDpkTeg7tEybiHDP7sfihCTVoIKU3lOk77ryJcZTvrBfatm6PHIQ==
+X-Received: by 2002:a1c:eb1a:: with SMTP id j26mr2235754wmh.127.1549967946056; 
+ Tue, 12 Feb 2019 02:39:06 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-38-32.w90-86.abo.wanadoo.fr. [90.86.93.32])
- by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.07
+ by smtp.gmail.com with ESMTPSA id c14sm3708656wrn.12.2019.02.12.02.39.04
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 02:39:07 -0800 (PST)
+ Tue, 12 Feb 2019 02:39:05 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
  Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 10/37] ARM: davinci: aintc: drop GPL license boilerplate
-Date: Tue, 12 Feb 2019 11:38:08 +0100
-Message-Id: <20190212103835.7768-11-brgl@bgdev.pl>
+Subject: [PATCH v3 08/37] ARM: davinci: select SPARSE_IRQ
+Date: Tue, 12 Feb 2019 11:38:06 +0100
+Message-Id: <20190212103835.7768-9-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190212103835.7768-1-brgl@bgdev.pl>
 References: <20190212103835.7768-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_023910_689302_981C7FFE 
-X-CRM114-Status: GOOD (  13.13  )
+X-CRM114-CacheID: sfid-20190212_023908_086416_023ABEC8 
+X-CRM114-Status: GOOD (  14.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,47 +108,123 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Replace the GPLv2 or later license boilerplate with an SPDX identifier.
+Everything is in place now for SPARSE_IRQ. Select it and set
+DAVINCI_INTC_START to NR_IRQS.
+
+We now need to include mach/irqs.h in a couple places as it is no
+longer indirectly included after selecting SPARSE_IRQ.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/irq.c | 26 ++++++--------------------
- 1 file changed, 6 insertions(+), 20 deletions(-)
+ arch/arm/Kconfig                            | 1 +
+ arch/arm/mach-davinci/board-da830-evm.c     | 1 +
+ arch/arm/mach-davinci/board-da850-evm.c     | 1 +
+ arch/arm/mach-davinci/board-dm644x-evm.c    | 1 +
+ arch/arm/mach-davinci/devices-da8xx.c       | 1 +
+ arch/arm/mach-davinci/include/mach/common.h | 4 +++-
+ arch/arm/mach-davinci/include/mach/irqs.h   | 1 -
+ arch/arm/mach-davinci/irq.c                 | 1 +
+ 8 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index f7770fdcad68..1037f49e050f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -595,6 +595,7 @@ config ARCH_DAVINCI
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select PM_GENERIC_DOMAINS_OF if PM && OF
+ 	select RESET_CONTROLLER
++	select SPARSE_IRQ
+ 	select USE_OF
+ 	select ZONE_DMA
+ 	help
+diff --git a/arch/arm/mach-davinci/board-da830-evm.c b/arch/arm/mach-davinci/board-da830-evm.c
+index c4da635ee4ce..41f5a51fee9a 100644
+--- a/arch/arm/mach-davinci/board-da830-evm.c
++++ b/arch/arm/mach-davinci/board-da830-evm.c
+@@ -36,6 +36,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include "cp_intc.h"
+ #include <mach/mux.h>
+ #include <mach/da8xx.h>
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index 44bca048dfd0..317f48560534 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -46,6 +46,7 @@
+ #include "cp_intc.h"
+ #include <mach/da8xx.h>
+ #include <mach/mux.h>
++#include <mach/irqs.h>
+ #include "sram.h"
+ 
+ #include <asm/mach-types.h>
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index b80c4ee76217..16ffed2525e6 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -36,6 +36,7 @@
+ #include <asm/mach/arch.h>
+ 
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <linux/platform_data/i2c-davinci.h>
+ #include <mach/serial.h>
+ #include <mach/mux.h>
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 298165095d31..3104a3eb2ddf 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -25,6 +25,7 @@
+ #include <mach/cputype.h>
+ #include <mach/da8xx.h>
+ #include <mach/time.h>
++#include <mach/irqs.h>
+ 
+ #include "asp.h"
+ #include "cpuidle.h"
+diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+index d840023eaaac..1ceed0345988 100644
+--- a/arch/arm/mach-davinci/include/mach/common.h
++++ b/arch/arm/mach-davinci/include/mach/common.h
+@@ -17,7 +17,9 @@
+ #include <linux/types.h>
+ #include <linux/reboot.h>
+ 
+-#define DAVINCI_INTC_START		0
++#include <asm/irq.h>
++
++#define DAVINCI_INTC_START		NR_IRQS
+ #define DAVINCI_INTC_IRQ(_irqnum)	(DAVINCI_INTC_START + (_irqnum))
+ 
+ void davinci_timer_init(struct clk *clk);
+diff --git a/arch/arm/mach-davinci/include/mach/irqs.h b/arch/arm/mach-davinci/include/mach/irqs.h
+index 03c446635301..8f9fc7a56ce8 100644
+--- a/arch/arm/mach-davinci/include/mach/irqs.h
++++ b/arch/arm/mach-davinci/include/mach/irqs.h
+@@ -401,6 +401,5 @@
+ /* da850 currently has the most gpio pins (144) */
+ #define DAVINCI_N_GPIO			144
+ /* da850 currently has the most irqs so use DA850_N_CP_INTC_IRQ */
+-#define NR_IRQS				(DA850_N_CP_INTC_IRQ + DAVINCI_N_GPIO)
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
 diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index 5bfbd9c70a2e..eadbb9d75415 100644
+index 80bf99c8fa55..34b0eec4de4e 100644
 --- a/arch/arm/mach-davinci/irq.c
 +++ b/arch/arm/mach-davinci/irq.c
-@@ -1,23 +1,9 @@
--/*
-- * Interrupt handler for DaVinci boards.
-- *
-- * Copyright (C) 2006 Texas Instruments.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-- *
-- */
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+//
-+// Copyright (C) 2006, 2019 Texas Instruments.
-+//
-+// Interrupt handler for DaVinci boards.
-+
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/interrupt.h>
+@@ -28,6 +28,7 @@
+ #include <mach/hardware.h>
+ #include <mach/cputype.h>
+ #include <mach/common.h>
++#include <mach/irqs.h>
+ #include <asm/mach/irq.h>
+ #include <asm/exception.h>
+ 
 -- 
 2.20.1
 
