@@ -2,77 +2,85 @@ Return-Path: <SRS0=CPNf=QT=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CCA49C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:41:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AADD3C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:43:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9691B2186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:41:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7E36D21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 07:43:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="stKaihxY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="y58azOvo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9691B2186A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ys4htsn6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="jfclj01V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E36D21773
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/xJZS80gOyxs6mCN3bCGniuZDZxaUAWaENfrouc+lI4=; b=stKaihxYVYiMeO
-	+UWZSqMMpNrg7TVbWLGywY8jO3gWEUao+R0Kew4Jy5oXnTSk3fyKMD9BVdc+ECB1hqNMQloC3cmzW
-	9p7NUlUHLJ/xqSDzTiwVv5KrERMj3jKryo7YYF+zy0fqWIDeU8rk5lNAVxm0jmh318r4HC3e6NDpJ
-	Zb40ziEd2eBmZwJWMpWtYD67yRYZcaomtGsqFWQhzI1gZjy/b19brx2WJzIEhqQ+RC+0QT9LME9KF
-	ApKjY9OHH2LyWviVb5qEwOP9cqkvQo2d5kTd6NhR448Fq2HOscbxjUPH1LurpH6o3BKMxli/4E0X2
-	UCgVHaQPX8mK4DmmSxng==;
+	List-Owner; bh=ygXYYu+XSnETeuVdh/ySt3rk9H0qaotQLOnG6WAd7M4=; b=Ys4htsn6ZLa7+l
+	64jCEdyKv976leLYGWENpnzSQECcV2jcZdIpN/QBcNAXtcjB4Hb6XiFvUPZusyLeqd8GOlIRXsm2M
+	Ix4DNwbeJiG0MoMwX2Hv+0pUy4JRFYXHpEhuu+ItzN2ERdTqs0exFUwSIxXYwMJKoPRy5gTs0z0Cs
+	GloykcAompINcJqsqN6e9QypGH3WKPpzwg7GVsggsACBa5XIl7ekIuJOR5NkF/2Vofw0FWKZe99Gn
+	p2cK+w8V2tBdky0K0XLU7VzJd8b+L/qDoc5An8VS9FihMphzWmkwpTzRTZsHNuN9xm8dFLKqj7+gK
+	KVruM7uv6uJQ+IZd4+xQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtSgg-0003S5-Ro; Tue, 12 Feb 2019 07:41:02 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gtSiv-0004DQ-Co; Tue, 12 Feb 2019 07:43:21 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtSgd-0003Ri-LE
- for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:41:01 +0000
-Received: from mail-lj1-f169.google.com (mail-lj1-f169.google.com
- [209.85.208.169])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4E250218E0
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 07:40:58 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1549957258;
- bh=22c6w0mM8SX1qrkqCwOkIr6+XXGxbLmpsxYY+44otTM=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=y58azOvoWqElTWDvVmuiRoJh4KwcPcT4uFU0+1yQNDN4wRKy/7VHeARcESubKdFcW
- uH1avxPyyAo6X4QqIlAWgUxw/HvEhxusBktsUJ9q+uURFMU3br3uUhJT8RHhjXFbCa
- a9ZzmNlV8XFIW6/etx3O92dZxC8tZEftz2kW0WGk=
-Received: by mail-lj1-f169.google.com with SMTP id v14-v6so1368084ljv.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 11 Feb 2019 23:40:58 -0800 (PST)
-X-Gm-Message-State: AHQUAuY29Hy/Zp+jxc+vt6XNGDirnbmzomXO4zJl+XYVvFefAq3EveD9
- aBPip3t2Hj/YQwyfquT/dwxFmY21E3y2oFW54UY=
-X-Google-Smtp-Source: AHgI3IYwJedyNAOZQ2WU2J994ecuC/FkCcLV/qm178dahnUgp/BRGPZisdHjKBuzxAX5sTIwF3t9wO0Nwtilj7QiSgc=
-X-Received: by 2002:a2e:890b:: with SMTP id
- d11-v6mr1531161lji.113.1549957256391; 
- Mon, 11 Feb 2019 23:40:56 -0800 (PST)
+ id 1gtSir-0004Ce-PC
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 07:43:19 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1C7h3kY016216;
+ Tue, 12 Feb 2019 01:43:03 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1549957383;
+ bh=nqNc1lB1v00qnzhIwpt5R76UxbptykZ6L8JCKcovRQY=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=jfclj01VkHFlMSllXpS3GjwGvczn+j9z30xmJuru1HLRyENoXpN9gKTlG8x4ib4hW
+ HonoUbT8sSQXoq6kNu8d3tRLfLv3aXOEUWRv+a1WkDr+cyFA7aePqVD5KEykxkRYqv
+ Q5Cs23fY+gj2mb1R6gjdioIvaeF+Z0Mx6l+SDuRQ=
+Received: from DFLE105.ent.ti.com (dfle105.ent.ti.com [10.64.6.26])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1C7h3wm078712
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 12 Feb 2019 01:43:03 -0600
+Received: from DFLE105.ent.ti.com (10.64.6.26) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
+ Feb 2019 01:43:02 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE105.ent.ti.com
+ (10.64.6.26) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 12 Feb 2019 01:43:02 -0600
+Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
+ [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1C7gsrv000385;
+ Tue, 12 Feb 2019 01:42:59 -0600
+From: Lokesh Vutla <lokeshvutla@ti.com>
+To: <marc.zyngier@arm.com>, Tony Lindgren <tony@atomide.com>, Nishanth Menon
+ <nm@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring
+ <robh+dt@kernel.org>, <tglx@linutronix.de>, <jason@lakedaemon.net>
+Subject: [PATCH v5 01/10] firmware: ti_sci: Add support to get TISCI handle
+ using of_phandle
+Date: Tue, 12 Feb 2019 13:12:28 +0530
+Message-ID: <20190212074237.2875-2-lokeshvutla@ti.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20190212074237.2875-1-lokeshvutla@ti.com>
+References: <20190212074237.2875-1-lokeshvutla@ti.com>
 MIME-Version: 1.0
-References: <20190211181531.GA3238@embeddedor>
-In-Reply-To: <20190211181531.GA3238@embeddedor>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Tue, 12 Feb 2019 08:40:45 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPeHp7sKkZ+jXmTXk5GEF_7G5ujfm3Lw==G3T4thfD+F7Q@mail.gmail.com>
-Message-ID: <CAJKOXPeHp7sKkZ+jXmTXk5GEF_7G5ujfm3Lw==G3T4thfD+F7Q@mail.gmail.com>
-Subject: Re: [PATCH] clk: samsung: s3c2443: Mark expected switch fall-through
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190211_234059_710377_4C55D855 
-X-CRM114-Status: GOOD (  15.66  )
+X-CRM114-CacheID: sfid-20190211_234317_899586_6F5CE332 
+X-CRM114-Status: GOOD (  18.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,43 +92,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- Kees Cook <keescook@chromium.org>, Stephen Boyd <sboyd@kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Tomasz Figa <tomasz.figa@gmail.com>, linux-kernel@vger.kernel.org,
- Chanwoo Choi <cw00.choi@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Device Tree Mailing List <devicetree@vger.kernel.org>,
+ Peter Ujfalusi <peter.ujfalusi@ti.com>, Lokesh Vutla <lokeshvutla@ti.com>,
+ Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCAxMSBGZWIgMjAxOSBhdCAxOTo0MCwgR3VzdGF2byBBLiBSLiBTaWx2YQo8Z3VzdGF2
-b0BlbWJlZGRlZG9yLmNvbT4gd3JvdGU6Cj4KPiBJbiBwcmVwYXJhdGlvbiB0byBlbmFibGluZyAt
-V2ltcGxpY2l0LWZhbGx0aHJvdWdoLCBtYXJrIHN3aXRjaAo+IGNhc2VzIHdoZXJlIHdlIGFyZSBl
-eHBlY3RpbmcgdG8gZmFsbCB0aHJvdWdoLgo+Cj4gVGhpcyBwYXRjaCBmaXhlcyB0aGUgZm9sbG93
-aW5nIHdhcm5pbmdzOgo+Cj4gZHJpdmVycy9jbGsvc2Ftc3VuZy9jbGstczNjMjQ0My5jOiBJbiBm
-dW5jdGlvbiDigJhzM2MyNDQzX2NvbW1vbl9jbGtfaW5pdOKAmToKPiBkcml2ZXJzL2Nsay9zYW1z
-dW5nL2Nsay1zM2MyNDQzLmM6MzkwOjM6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxs
-IHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQo+ICAgIHNhbXN1bmdfY2xrX3JlZ2lz
-dGVyX2FsaWFzKGN0eCwgczNjMjQ1MF9hbGlhc2VzLAo+ICAgIF5+fn5+fn5+fn5+fn5+fn5+fn5+
-fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fgo+ICAgICAgQVJSQVlfU0laRShzM2MyNDUwX2Fs
-aWFzZXMpKTsKPiAgICAgIH5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn4KPiBkcml2ZXJzL2Ns
-ay9zYW1zdW5nL2Nsay1zM2MyNDQzLmM6MzkzOjI6IG5vdGU6IGhlcmUKPiAgIGNhc2UgUzNDMjQx
-NjoKPiAgIF5+fn4KPgo+IFdhcm5pbmcgbGV2ZWwgMyB3YXMgdXNlZDogLVdpbXBsaWNpdC1mYWxs
-dGhyb3VnaD0zCj4KPiBOb3RpY2UgdGhhdCwgaW4gdGhpcyBwYXJ0aWN1bGFyIGNhc2UsICB0aGUg
-Y29kZSBjb21tZW50IGlzIG1vZGlmaWVkCj4gaW4gYWNjb3JkYW5jZSB3aXRoIHdoYXQgR0NDIGlz
-IGV4cGVjdGluZyB0byBmaW5kLgo+Cj4gVGhpcyBwYXRjaCBpcyBwYXJ0IG9mIHRoZSBvbmdvaW5n
-IGVmZm9ydHMgdG8gZW5hYmxlCj4gLVdpbXBsaWNpdC1mYWxsdGhyb3VnaC4KCkkgc2F3IHRoaXMg
-aW4gbXVsdGlwbGUgcGxhY2VzIGFscmVhZHkgYW5kIEkgdGhpbmsgZml4IGlzIHdyb25nLiBUaGUK
-cG9pbnQgaXMgdGhhdCB0aGUgY29kZSBpcyBjb3JyZWN0IC0gdGhlIGZhbGwgdGhyb3VnaCBpcyBt
-YXJrZWQKcHJvcGVybHkuCgpJdCBpcyBqdXN0IHRoZSBHQ0Mgd2hpY2ggaGFzIHRvIGJlIGZpeGVk
-IG5vdCB0aGUgY29kZS4gWW91IHdhbnQgdG8KYWRqdXN0IHRoZSBjb2RlIGZvciBzcGVjaWZpYyB2
-ZXJzaW9uIG9mIEdDQyBhbmQgd2hhdCBpZiBHQ0MgY2hhbmdlcwppdHMgd2FybmluZz8gRm9yIGV4
-YW1wbGUgR0NDIG1pZ2h0IHJlcXVpcmUgImZhbGwgdGhyb3VnaDogIi4uLiBvciBhbnkKb3RoZXIg
-c3ludGF4LiBBbm90aGVyIHBvaW50IC0gd2hhdCBhYm91dCBjbGFuZydzIHN5bnRheD8KCkJlc3Qg
-cmVnYXJkcywKS3J6eXN6dG9mCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVs
-QGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9s
-aXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+From: Grygorii Strashko <grygorii.strashko@ti.com>
+
+TISCI has been updated to have support for Resource management(likes
+interrupts etc..). And there can be multiple device instances of a
+resource type in a SoC. So every driver corresponding to a resource type
+should get a TISCI handle so that it can make TISCI calls. And each
+DT node corresponding to a device should exist under its corresponding
+bus node as per the SoC architecture.
+
+But existing apis in TISCI library assumes that all TISCI users are
+child nodes of TISCI. Which is not true in the above case. So introduce
+(devm_)ti_sci_get_by_phandle() apis that can be used by TISCI users
+to get TISCI handle using of phandle property.
+
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
+Changes since v4:
+- None
+
+ drivers/firmware/ti_sci.c              | 83 ++++++++++++++++++++++++++
+ include/linux/soc/ti/ti_sci_protocol.h | 17 ++++++
+ 2 files changed, 100 insertions(+)
+
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index 69ed1464175c..f0cafa8a2ee9 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -1781,6 +1781,89 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(devm_ti_sci_get_handle);
+ 
++/**
++ * ti_sci_get_by_phandle() - Get the TI SCI handle using DT phandle
++ * @np:		device node
++ * @propname:	property name containing phandle on TISCI node
++ *
++ * NOTE: The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ * ti_sci_put_handle must be balanced with successful ti_sci_get_by_phandle
++ * Return: pointer to handle if successful, else:
++ * -EPROBE_DEFER if the instance is not ready
++ * -ENODEV if the required node handler is missing
++ * -EINVAL if invalid conditions are encountered.
++ */
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
++{
++	struct ti_sci_handle *handle = NULL;
++	struct device_node *ti_sci_np;
++	struct ti_sci_info *info;
++	struct list_head *p;
++
++	if (!np) {
++		pr_err("I need a device pointer\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	ti_sci_np = of_parse_phandle(np, property, 0);
++	if (!ti_sci_np)
++		return ERR_PTR(-ENODEV);
++
++	mutex_lock(&ti_sci_list_mutex);
++	list_for_each(p, &ti_sci_list) {
++		info = list_entry(p, struct ti_sci_info, node);
++		if (ti_sci_np == info->dev->of_node) {
++			handle = &info->handle;
++			info->users++;
++			break;
++		}
++	}
++	mutex_unlock(&ti_sci_list_mutex);
++	of_node_put(ti_sci_np);
++
++	if (!handle)
++		return ERR_PTR(-EPROBE_DEFER);
++
++	return handle;
++}
++EXPORT_SYMBOL_GPL(ti_sci_get_by_phandle);
++
++/**
++ * devm_ti_sci_get_by_phandle() - Managed get handle using phandle
++ * @dev:	Device pointer requesting TISCI handle
++ * @propname:	property name containing phandle on TISCI node
++ *
++ * NOTE: This releases the handle once the device resources are
++ * no longer needed. MUST NOT BE released with ti_sci_put_handle.
++ * The function does not track individual clients of the framework
++ * and is expected to be maintained by caller of TI SCI protocol library.
++ *
++ * Return: 0 if all went fine, else corresponding error.
++ */
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	const struct ti_sci_handle *handle;
++	const struct ti_sci_handle **ptr;
++
++	ptr = devres_alloc(devm_ti_sci_release, sizeof(*ptr), GFP_KERNEL);
++	if (!ptr)
++		return ERR_PTR(-ENOMEM);
++	handle = ti_sci_get_by_phandle(dev_of_node(dev), property);
++
++	if (!IS_ERR(handle)) {
++		*ptr = handle;
++		devres_add(dev, ptr);
++	} else {
++		devres_free(ptr);
++	}
++
++	return handle;
++}
++EXPORT_SYMBOL_GPL(devm_ti_sci_get_by_phandle);
++
+ static int tisci_reboot_handler(struct notifier_block *nb, unsigned long mode,
+ 				void *cmd)
+ {
+diff --git a/include/linux/soc/ti/ti_sci_protocol.h b/include/linux/soc/ti/ti_sci_protocol.h
+index 18435e5c6364..515587e9d373 100644
+--- a/include/linux/soc/ti/ti_sci_protocol.h
++++ b/include/linux/soc/ti/ti_sci_protocol.h
+@@ -217,6 +217,10 @@ struct ti_sci_handle {
+ const struct ti_sci_handle *ti_sci_get_handle(struct device *dev);
+ int ti_sci_put_handle(const struct ti_sci_handle *handle);
+ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev);
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property);
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property);
+ 
+ #else	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+@@ -236,6 +240,19 @@ const struct ti_sci_handle *devm_ti_sci_get_handle(struct device *dev)
+ 	return ERR_PTR(-EINVAL);
+ }
+ 
++static inline
++const struct ti_sci_handle *ti_sci_get_by_phandle(struct device_node *np,
++						  const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
++
++static inline
++const struct ti_sci_handle *devm_ti_sci_get_by_phandle(struct device *dev,
++						       const char *property)
++{
++	return ERR_PTR(-EINVAL);
++}
+ #endif	/* CONFIG_TI_SCI_PROTOCOL */
+ 
+ #endif	/* __TISCI_PROTOCOL_H */
+-- 
+2.19.2
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
