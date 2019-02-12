@@ -4,74 +4,75 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3880C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:05:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E55CC282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:09:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A284921773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:05:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D7D6C21773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 12 Feb 2019 08:09:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BYQa6lAT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A284921773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n5RQqTJf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7D6C21773
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZHbsZo/wR5S8pbXz3YixyGzMLZnLnLEc8CYQVdTBcdA=; b=BYQa6lATH3Z/Qg
-	fbcmxkBIiDq+jwKaOAQuDQQKrzeR/DBEcE6xTX4OT6Nq46cFtIt3VOgR+etx1pePJkihe7/uAPk5F
-	HAEEzlYcSYz3ZwZwaYFNPsHBdHDbZBpGjQPOkCpHdcZ4XWxVQEsY7wBUZT3sSkl7m6q/RSfyPD3IO
-	NN/Q6LgD0EN5mOqne75uca+42uxJe6a59W5Kw3heEPPZh6IpXgOzLadzbtPNY1OpqdsqdOagEQD8L
-	FEtLDwz0euB4mh0gVtT/WUCGyrkdwAUGqLlHDDmtsIuxGJ4Us+PXXZ2ALU2tk+EFg054oqOErLLyZ
-	afYhJz/+Xm0giVUXfJvg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=e+m9m2+6iqwCgUUEzebC342cP9/J5VKGAQAzt7cRtE0=; b=n5RQqTJf6PeFH4
+	ZRkRvmYL+g6MUHtgZ1FCrcjd8tm1dZ2uRADZtb3JMGay9TkVkmIwy+/c7V4oE4gWpsJAF53YNcipj
+	gSGpRZ/3qXeDb3rKfu+MK0j1ZxPOpAnsXPoRyaFBGYMBKC+irMZYMfbV4KkAT2sZF2cq1LDFNXqlG
+	BYSsz/1iXU52ZhAT3QPYADnLoHZVZ76mu7GuOIIDF7JSwxxYD/NUd6P4JTPHJj4dGNqhaTW30gMgc
+	8YmrEsz8426y8DUgbu4QbuUZR2rrwiILa+vbsYjgoFrnlIwMU8cuXmiasAaoUlCQ2Z1aW75TUDOvB
+	D2e4E8oPnTY/gJRXB3TQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtT4V-0008NT-FP; Tue, 12 Feb 2019 08:05:39 +0000
-Received: from mga02.intel.com ([134.134.136.20])
+	id 1gtT7f-0000p6-5y; Tue, 12 Feb 2019 08:08:55 +0000
+Received: from mga18.intel.com ([134.134.136.126])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtT4R-0008Mo-LB; Tue, 12 Feb 2019 08:05:37 +0000
+ id 1gtT7Z-0000o5-Qu
+ for linux-arm-kernel@lists.infradead.org; Tue, 12 Feb 2019 08:08:52 +0000
 X-Amp-Result: SKIPPED(no attachment in message)
 X-Amp-File-Uploaded: False
-Received: from orsmga001.jf.intel.com ([10.7.209.18])
- by orsmga101.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 12 Feb 2019 00:05:34 -0800
+Received: from orsmga003.jf.intel.com ([10.7.209.27])
+ by orsmga106.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 12 Feb 2019 00:08:49 -0800
 X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,361,1544515200"; d="scan'208";a="137908087"
-Received: from ahunter-desktop.fi.intel.com (HELO [10.237.72.56])
- ([10.237.72.56])
- by orsmga001.jf.intel.com with ESMTP; 12 Feb 2019 00:05:29 -0800
-Subject: Re: [PATCH] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
-To: Chaotian Jing <chaotian.jing@mediatek.com>
-References: <1548921212-5219-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
- <1548985091.10251.26.camel@mhfsdcap03>
- <CAPDyKFqHJn9uVkd5z4D5JvNKOtbn3E3SwL_WSgLb1=Lw1SgyUg@mail.gmail.com>
- <0e95e1a1-843e-38ea-c4bb-e6c48432ea7c@intel.com>
- <CAPDyKFrvSgK0Om7GUJ143j=U2xDG4n6z6Ym-1znbtMbaw==HkQ@mail.gmail.com>
- <c9120e57-ad7c-174d-c155-0186e0b9c359@intel.com>
- <CAPDyKFotLzLxW=Wq6hCPFmwTQ=T43rJV9h=+p5jfgrMBe=d8BA@mail.gmail.com>
- <4c8a616f-f424-fd58-43c5-d6042665bc58@intel.com>
- <1549937058.16070.5.camel@mhfsdcap03>
-From: Adrian Hunter <adrian.hunter@intel.com>
-Organization: Intel Finland Oy, Registered Address: PL 281, 00181 Helsinki,
- Business Identity Code: 0357606 - 4, Domiciled in Helsinki
-Message-ID: <566c0c11-be9c-73a3-d7ff-34aed3ad7db0@intel.com>
-Date: Tue, 12 Feb 2019 10:04:04 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
-MIME-Version: 1.0
-In-Reply-To: <1549937058.16070.5.camel@mhfsdcap03>
+X-IronPort-AV: E=Sophos;i="5.58,361,1544515200"; d="scan'208";a="125776819"
+Received: from pgsmsx106.gar.corp.intel.com ([10.221.44.98])
+ by orsmga003.jf.intel.com with ESMTP; 12 Feb 2019 00:08:45 -0800
+Received: from pgsmsx109.gar.corp.intel.com ([169.254.14.167]) by
+ PGSMSX106.gar.corp.intel.com ([169.254.9.56]) with mapi id 14.03.0415.000;
+ Tue, 12 Feb 2019 16:08:44 +0800
+From: "Ong, Hean Loong" <hean.loong.ong@intel.com>
+To: "daniel@ffwll.ch" <daniel@ffwll.ch>
+Subject: Re: [PATCHv13 3/3] ARM:drm ivip Intel FPGA Video and Image
+ Processing Suite
+Thread-Topic: [PATCHv13 3/3] ARM:drm ivip Intel FPGA Video and Image
+ Processing Suite
+Thread-Index: AQHUwqcMqt4+BHOT4EWKwDta36P7caXbSOsA
+Date: Tue, 12 Feb 2019 08:08:44 +0000
+Message-ID: <60ce72a2ec9fe9d51a037d300119f912a8eb6aef.camel@intel.com>
+References: <20190212023623.2646-1-hean.loong.ong@intel.com>
+ <20190212023623.2646-4-hean.loong.ong@intel.com>
+ <20190212074605.GW23159@phenom.ffwll.local>
+In-Reply-To: <20190212074605.GW23159@phenom.ffwll.local>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [10.226.243.17]
+Content-ID: <61EDB86BE462654FB80F87965BD3AE86@intel.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_000535_749120_3E2D34AB 
-X-CRM114-Status: GOOD (  36.41  )
+X-CRM114-CacheID: sfid-20190212_000849_953584_552C5104 
+X-CRM114-Status: GOOD (  31.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,236 +84,734 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Shawn Lin <shawn.lin@rock-chips.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-mediatek@lists.infradead.org,
- Harish Jenny K N <harish_kandiga@mentor.com>,
- Hongjie Fang <hongjiefang@asrmicro.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Simon Horman <horms+renesas@verge.net.au>,
- Kyle Roeschley <kyle.roeschley@ni.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "rienk.dejong@quest-innovations.com" <rienk.dejong@quest-innovations.com>,
+ "noralf@tronnes.org" <noralf@tronnes.org>, "See, 
+ Chin Liang" <chin.liang.see@intel.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ "dinguyen@kernel.org" <dinguyen@kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, "Vetter,
+ Daniel" <daniel.vetter@intel.com>, "sam@ravnborg.org" <sam@ravnborg.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "Ong@freedesktop.org" <Ong@freedesktop.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 12/02/19 4:04 AM, Chaotian Jing wrote:
-> On Tue, 2019-02-05 at 15:42 +0200, Adrian Hunter wrote:
->> On 5/02/19 3:06 PM, Ulf Hansson wrote:
->>> On Mon, 4 Feb 2019 at 14:42, Adrian Hunter <adrian.hunter@intel.com> wrote:
->>>>
->>>> On 4/02/19 12:54 PM, Ulf Hansson wrote:
->>>>> On Mon, 4 Feb 2019 at 10:58, Adrian Hunter <adrian.hunter@intel.com> wrote:
->>>>>>
->>>>>> On 1/02/19 10:10 AM, Ulf Hansson wrote:
->>>>>>> On Fri, 1 Feb 2019 at 02:38, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->>>>>>>>
->>>>>>>> On Thu, 2019-01-31 at 16:58 +0100, Ulf Hansson wrote:
->>>>>>>>> On Thu, 31 Jan 2019 at 08:53, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->>>>>>>>>>
->>>>>>>>>> mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
->>>>>>>>>> Therefore, any commands sent to the card should use HS400 timing.
->>>>>>>>>> It is incorrect to reduce frequency to 50Mhz before sending the switch
->>>>>>>>>> command, in this case, only reduce clock frequency to 50Mhz but without
->>>>>>>>>> host timming change, host is still in hs400 mode but clock changed from
->>>>>>>>>> 200Mhz to 50Mhz, which makes the tuning result unsuitable and cause
->>>>>>>>>> the switch command gets response CRC error.
->>>>>>>>>
->>>>>>>>> According the eMMC spec there is no violation by decreasing the clock
->>>>>>>>> frequency like this. We can use whatever value <=200MHz.
->>>>>>>>>
->>>>>>>>> However, perhaps in practice this becomes an issue, due to the tuning
->>>>>>>>> for HS400 has been done on the "current" frequency.
->>>>>>>>>
->>>>>>>>> As as start, I think you need to clarify this in the changelog.
->>>>>>>>>
->>>>>>>> Yes, reduce clock frequency to 50Mhz is no Spec violation, but it may
->>>>>>>> cause __mmc_switch() gets response CRC error, decreasing the clock but
->>>>>>>> without HOST mode change, on the host side, host driver do not know
->>>>>>>> what's operation the core layer want to do and can only set current bus
->>>>>>>> clock to 50Mhz, without tuning parameter change, it has a chance lead to
->>>>>>>> response CRC error. even lower clock frequency, but with the wrong
->>>>>>>> tuning parameter setting(the setting is of hs400 tuning @200Mhz).
->>>>>>>
->>>>>>> Right, makes sense.
->>>>>>>
->>>>>>>>>>
->>>>>>>>>> this patch refers to mmc_select_hs400(), make the reduce clock frequency
->>>>>>>>>> after card timing change.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
->>>>>>>>>> ---
->>>>>>>>>>  drivers/mmc/core/mmc.c | 8 ++++----
->>>>>>>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
->>>>>>>>>>
->>>>>>>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>>>>>>>>> index da892a5..21b811e 100644
->>>>>>>>>> --- a/drivers/mmc/core/mmc.c
->>>>>>>>>> +++ b/drivers/mmc/core/mmc.c
->>>>>>>>>> @@ -1239,10 +1239,6 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
->>>>>>>>>>         int err;
->>>>>>>>>>         u8 val;
->>>>>>>>>>
->>>>>>>>>> -       /* Reduce frequency to HS */
->>>>>>>>>> -       max_dtr = card->ext_csd.hs_max_dtr;
->>>>>>>>>> -       mmc_set_clock(host, max_dtr);
->>>>>>>>>> -
->>>>>>>>>
->>>>>>>>> As far as I can tell, the reason to why we change the clock frequency
->>>>>>>>> *before* the call to __mmc_switch() below, is probably to try to be on
->>>>>>>>> the safe side and conform to the spec.
->>>>>>>>>
->>>>>>>> Agree, it Must be more safe with lower clock frequency, but the
->>>>>>>> precondition is to make the host side recognize current timing is not
->>>>>>>> HS400 mode. it has no method to find a safe setting to ensure no
->>>>>>>> response CRC error when reduce clock from 200Mhz to 50Mhz.
->>>>>>>>> However, I think you have a point, as the call to __mmc_switch(),
->>>>>>>>> passes the "send_status" parameter as false, no other command than the
->>>>>>>>> CMD6 is sent to the card.
->>>>>>>>>
->>>>>>>> yes, the send status command was sent only after __mmc_switch() done.
->>>>>>>>>>         /* Switch HS400 to HS DDR */
->>>>>>>>>>         val = EXT_CSD_TIMING_HS;
->>>>>>>>>>         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
->>>>>>>>>> @@ -1253,6 +1249,10 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
->>>>>>>>>>
->>>>>>>>>>         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
->>>>>>>>>>
->>>>>>>>>> +       /* Reduce frequency to HS */
->>>>>>>>>> +       max_dtr = card->ext_csd.hs_max_dtr;
->>>>>>>>>> +       mmc_set_clock(host, max_dtr);
->>>>>>>>>> +
->>>>>>>>>
->>>>>>>>> Perhaps it's even more correct to change the clock frequency before
->>>>>>>>> the call to mmc_set_timing(host, MMC_TIMING_MMC_DDR52). Otherwise you
->>>>>>>>> will be using the DDR52 timing in the controller, but with a too high
->>>>>>>>> frequency.
->>>>>>>>>
->>>>>>>> for Our host, it has no impact to change the clock before or after
->>>>>>>> change timing, as the mmc_set_timing() is only for host side, not
->>>>>>>> related to MMC card side and no commands sent do card before the
->>>>>>>> timing/clock change completed.
->>>>>>>
->>>>>>> Alright. After a second thought, it actually looks more consistent
->>>>>>> with mmc_select_hs400() to do it after, as what you propose in
->>>>>>> $subject patch.
->>>>>>>
->>>>>>> So, let's keep it as is.
->>>>>>>
->>>>>>>>>>         err = mmc_switch_status(card);
->>>>>>>>>>         if (err)
->>>>>>>>>>                 goto out_err;
->>>>>>>>>> --
->>>>>>>>>> 1.8.1.1.dirty
->>>>>>>>>>
->>>>>>>>>
->>>>>>>>> Finally, it sounds like you are trying to fix a real problem, can you
->>>>>>>>> please provide some more information what is happening when the
->>>>>>>>> problem occurs at your side?
->>>>>>>>>
->>>>>>>> Yes, I got a problem with new kernel version. with
->>>>>>>> commit:57da0c042f4af52614f4bd1a148155a299ae5cd8, this commit makes
->>>>>>>> re-tuning every time when access RPMB partition.
->>>>>>>
->>>>>>> Okay, could you please add this as fixes tag for the next version of the patch.
->>>>>>>
-> Ok, sorry for late reply due to Chinese New Year.
->>>>>>>>
->>>>>>>> in fact, our host tuning result of hs400 is very stable and almost never
->>>>>>>> get response CRC error with clock frequency at 200Mhz. but cannot ensure
->>>>>>>> this tuning result also suitable when running at HS400 mode @50Mhz. as I
->>>>>>>> mentioned before, the host side does not know the reason of reduce clock
->>>>>>>> frequency to 50Mhz at HS400 mode, so what's the host side can do is only
->>>>>>>> reduce the bus clock to 50Mhz, even it can just only set the tuning
->>>>>>>> setting to default when clock frequency lower than 50Mhz, but both card
->>>>>>>> & host side are still at HS400 mode, still cannot ensure this setting is
->>>>>>>> suitable.
->>>>>>>
->>>>>>> Right, thanks for clarifying.
->>>>>>>
->>>>>>> So I am expecting a new version with a fixes tag and some
->>>>>>> clarification of the changelog, then I am ready to apply this to give
->>>>>>> it some test.
->>>>>>
->>>>>> The switch from HS400 mode is done for tuning at times when CRC errors are a
->>>>>> possibility e.g. after a CRC error during transfer.  So if the frequency is
->>>>>> not to be reduced, then some mitigation is needed for the possibility that
->>>>>> the CMD6 response itself will have a CRC error.
->>>>>
->>>>> That's a good point!
->>>>>
->>>>> However, how can we know that a CMD6 command is successfully
->>>>> completed, if there is CRC errors detected during the transmission? I
->>>>> guess we can't!?
->>>>
->>>> Yes, in that case, the only option is to assume the CMD6 was successful,
->>>> like in
->>>>
->>>>   commit ef3d232245ab7a1bf361c52449e612e4c8b7c5ab
->>>>   Author: Adrian Hunter <adrian.hunter@intel.com>
->>>>   Date:   Fri Dec 2 13:16:35 2016 +0200
->>>>
->>>>       mmc: mmc: Relax checking for switch errors after HS200 switch
->>>
->>> Well, relaxing the check for switch errors, is to me a different
->>> thing. This means we are first doing the CMD6, then allowing the
->>> following status command (CMD13) to have CRC errors. Actually, even
->>> the spec mention this as a case to consider. I guess it's because the
->>> card internally have switched to a new speed mode timing.
->>>
->>> Allowing CRC errors for the actual CMD6 sound more fragile to me. Of
->>> course, we can always try and see what happens.
->>>
->>> Chaotian, can you give it a go? Somehow, change the call to
->>> __mmc_switch() in mmc_hs400_to_hs200(), so the CMD6 doesn't have the
->>> CRC flag set.
->>>
-> Yes, but should we add a new argument of __mmc_switch(), like "bool
-> ignore_crc" ?? for now, there are too many argument of __mmc_switch().
-
-One solution for too many arguments is to make a structure to contain them. e.g.
-
-struct mmc_switch_args {
-	u8 set;
-	u8 index;
-	u8 value;
-	unsigned int timeout_ms;
-	unsigned char timing;
-	bool use_busy_signal;
-	bool send_status;
-	bool retry_crc_err;
-};
-
-int __mmc_switch(struct mmc_card *card, struct mmc_switch_args *args)
-
->>>>
->>>> If we are going to do that, then we could stick with lowering the frequency
->>>> first.
->>>
->>> Let's see what Chaotian's test may show.
->>>
->>>>
->>>> Also I wonder if the mediatek driver could change to fixed sampling in
->>>> ->set_ios() when the frequency drops for HS400 mode?
->>>
->>> Well, this sounds like a generic problem so if this is a possible
->>> generic solution that would be great.
->>>
->>> Is this what sdhci is doing already?
->>
->> Not at present, but some drivers seem to be adjusting their settings for
->> HS400 based on the frequency e.g. sdhci_msm_hs400()
+On Tue, 2019-02-12 at 08:46 +0100, Daniel Vetter wrote:
+> On Tue, Feb 12, 2019 at 10:36:23AM +0800, Hean-Loong, Ong via dri-
+> devel wrote:
+> > From: Ong, Hean Loong <hean.loong.ong@intel.com>
+> > 
+> > Driver for Intel FPGA Video and Image Processing Suite Frame Buffer
+> > II.
+> > The driver only supports the Intel Arria10 devkit and its variants.
+> > This driver can be either loaded staticlly or in modules.
+> > The OF device tree binding is located at:
+> > Documentation/devicetree/bindings/display/altr,vip-fb2.txt
+> > 
+> > Signed-off-by: Ong, Hean Loong <hean.loong.ong@intel.com>
 > 
-> It's hard to find a suitable setting for all cards when running at HS400
-> mode @50Mhz.
+> It looks like your cover letter and patch 2 didn't make it to the
+> list
+> somehow. Please check those aren't stuck on your side (list admins
+> didn't
+> see them yet).
 > 
+That's weird my git send-email says everything was okay
+
+> > ---
+> >  drivers/gpu/drm/Kconfig               |    2 +
+> >  drivers/gpu/drm/Makefile              |    1 +
+> >  drivers/gpu/drm/ivip/Kconfig          |   14 ++
+> >  drivers/gpu/drm/ivip/Makefile         |    6 +
+> >  drivers/gpu/drm/ivip/intel_vip_conn.c |   91 +++++++++
+> >  drivers/gpu/drm/ivip/intel_vip_drv.c  |  332
+> > +++++++++++++++++++++++++++++++++
+> >  drivers/gpu/drm/ivip/intel_vip_drv.h  |   73 +++++++
+> >  7 files changed, 519 insertions(+), 0 deletions(-)
+> >  create mode 100644 drivers/gpu/drm/ivip/Kconfig
+> >  create mode 100644 drivers/gpu/drm/ivip/Makefile
+> >  create mode 100644 drivers/gpu/drm/ivip/intel_vip_conn.c
+> >  create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.c
+> >  create mode 100644 drivers/gpu/drm/ivip/intel_vip_drv.h
+> > 
+> > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> > index 4385f00..0251a9f 100644
+> > --- a/drivers/gpu/drm/Kconfig
+> > +++ b/drivers/gpu/drm/Kconfig
+> > @@ -235,6 +235,8 @@ source "drivers/gpu/drm/nouveau/Kconfig"
+> >  
+> >  source "drivers/gpu/drm/i915/Kconfig"
+> >  
+> > +source "drivers/gpu/drm/ivip/Kconfig"
+> > +
+> >  config DRM_VGEM
+> >  	tristate "Virtual GEM provider"
+> >  	depends on DRM
+> > diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+> > index ce8d1d3..85a5694 100644
+> > --- a/drivers/gpu/drm/Makefile
+> > +++ b/drivers/gpu/drm/Makefile
+> > @@ -63,6 +63,7 @@ obj-$(CONFIG_DRM_AMDGPU)+= amd/amdgpu/
+> >  obj-$(CONFIG_DRM_MGA)	+= mga/
+> >  obj-$(CONFIG_DRM_I810)	+= i810/
+> >  obj-$(CONFIG_DRM_I915)	+= i915/
+> > +obj-$(CONFIG_DRM_IVIP)	+= ivip/
+> >  obj-$(CONFIG_DRM_MGAG200) += mgag200/
+> >  obj-$(CONFIG_DRM_V3D)  += v3d/
+> >  obj-$(CONFIG_DRM_VC4)  += vc4/
+> > diff --git a/drivers/gpu/drm/ivip/Kconfig
+> > b/drivers/gpu/drm/ivip/Kconfig
+> > new file mode 100644
+> > index 0000000..1d08b90
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/Kconfig
+> > @@ -0,0 +1,14 @@
+> > +config DRM_IVIP
+> > +        tristate "Intel FGPA Video and Image Processing"
+> > +        depends on DRM && OF
+> > +        select DRM_GEM_CMA_HELPER
+> > +        select DRM_KMS_HELPER
+> > +        select DRM_KMS_FB_HELPER
+> > +        select DRM_KMS_CMA_HELPER
+> > +        help
+> > +		  Choose this option if you have an Intel FPGA
+> > Arria 10 system
+> > +		  and above with an Intel Display Port IP. This
+> > does not support
+> > +		  legacy Intel FPGA Cyclone V display port.
+> > Currently only single
+> > +		  frame buffer is supported. Note that ACPI and
+> > X_86 architecture
+> > +		  is not supported for Arria10. If M is selected
+> > the module will be
+> > +		  called ivip.
+> > diff --git a/drivers/gpu/drm/ivip/Makefile
+> > b/drivers/gpu/drm/ivip/Makefile
+> > new file mode 100644
+> > index 0000000..8c54e11
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/Makefile
+> > @@ -0,0 +1,6 @@
+> > +#
+> > +# Makefile for the drm device driver.  This driver provides
+> > support for the
+> > +# Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and
+> > higher.
+> > +
+> > +obj-$(CONFIG_DRM_IVIP) += ivip.o
+> > +ivip-objs := intel_vip_drv.o intel_vip_conn.o
+> > diff --git a/drivers/gpu/drm/ivip/intel_vip_conn.c
+> > b/drivers/gpu/drm/ivip/intel_vip_conn.c
+> > new file mode 100644
+> > index 0000000..93ce0b3
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/intel_vip_conn.c
+> > @@ -0,0 +1,91 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2019 Intel Corporation.
+> > + *
+> > + * intel_vip_conn.c -- Intel Video and Image Processing(VIP)
+> > + * Frame Buffer II driver
+> > + *
+> > + * This driver supports the Intel VIP Frame Reader component.
+> > + * More info on the hardware can be found in the Intel Video
+> > + * and Image Processing Suite User Guide at this address
+> > + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> > + *
+> > + * Authors:
+> > + * Walter Goossens <waltergoossens@home.nl>
+> > + * Thomas Chou <thomas@wytron.com.tw>
+> > + * Chris Rauer <crauer@altera.com>
+> > + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> > + *
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/kernel.h>
+> > +#include <drm/drm_atomic_helper.h>
+> > +#include <drm/drm_crtc_helper.h>
+> > +#include <drm/drm_encoder_slave.h>
+> > +#include <drm/drm_plane_helper.h>
+> > +
+> > +static enum drm_connector_status
+> > +intelvipfb_drm_connector_detect(struct drm_connector *connector,
+> > bool force)
+> > +{
+> > +	return connector_status_connected;
+> > +}
+> > +
+> > +static void intelvipfb_drm_connector_destroy(struct drm_connector
+> > *connector)
+> > +{
+> > +	drm_connector_unregister(connector);
+> > +	drm_connector_cleanup(connector);
+> > +}
+> > +
+> > +static const struct drm_connector_funcs
+> > intelvipfb_drm_connector_funcs = {
+> > +	.detect = intelvipfb_drm_connector_detect,
+> > +	.reset = drm_atomic_helper_connector_reset,
+> > +	.fill_modes = drm_helper_probe_single_connector_modes,
+> > +	.atomic_duplicate_state =
+> > drm_atomic_helper_connector_duplicate_state,
+> > +	.atomic_destroy_state =
+> > drm_atomic_helper_connector_destroy_state,
+> > +	.destroy = intelvipfb_drm_connector_destroy,
+> > +};
+> > +
+> > +static int intelvipfb_drm_connector_get_modes(struct drm_connector
+> > *connector)
+> > +{
+> > +	struct drm_device *drm = connector->dev;
+> > +	int count;
+> > +
+> > +	count = drm_add_modes_noedid(connector, drm-
+> > >mode_config.max_width,
+> > +			drm->mode_config.max_height);
+> > +	drm_set_preferred_mode(connector, drm-
+> > >mode_config.max_width,
+> > +			drm->mode_config.max_height);
+> > +	return count;
+> > +}
+> > +
+> > +static const struct drm_connector_helper_funcs
+> > +intelvipfb_drm_connector_helper_funcs = {
+> > +	.get_modes = intelvipfb_drm_connector_get_modes,
+> > +};
+> > +
+> > +struct drm_connector *
+> > +intelvipfb_conn_setup(struct drm_device *drm)
+> > +{
+> > +	struct drm_connector *conn;
+> > +	int ret;
+> > +
+> > +	conn = devm_kzalloc(drm->dev, sizeof(*conn), GFP_KERNEL);
+> > +	if (IS_ERR(conn))
+> > +		return NULL;
+> > +
+> > +	drm_connector_helper_add(conn,
+> > &intelvipfb_drm_connector_helper_funcs);
+> > +	ret = drm_connector_init(drm, conn,
+> > &intelvipfb_drm_connector_funcs,
+> > +			DRM_MODE_CONNECTOR_DisplayPort);
+> > +	if (ret < 0) {
+> > +		dev_err(drm->dev, "failed to initialize drm
+> > connector\n");
+> > +		ret = -ENOMEM;
+> > +		goto error_connector_cleanup;
+> > +	}
+> > +
+> > +	return conn;
+> > +
+> > +error_connector_cleanup:
+> > +	drm_connector_cleanup(conn);
+> > +
+> > +	return NULL;
+> > +}
+> > diff --git a/drivers/gpu/drm/ivip/intel_vip_drv.c
+> > b/drivers/gpu/drm/ivip/intel_vip_drv.c
+> > new file mode 100644
+> > index 0000000..38790b7
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/intel_vip_drv.c
+> > @@ -0,0 +1,332 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2019 Intel Corporation.
+> > + *
+> > + * intel_vip_core.c -- Intel Video and Image Processing(VIP)
+> > + * Frame Buffer II driver
+> > + *
+> > + * This driver supports the Intel VIP Frame Reader component.
+> > + * More info on the hardware can be found in the Intel Video
+> > + * and Image Processing Suite User Guide at this address
+> > + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> > + *
+> > + * Authors:
+> > + * Walter Goossens <waltergoossens@home.nl>
+> > + * Thomas Chou <thomas@wytron.com.tw>
+> > + * Chris Rauer <crauer@altera.com>
+> > + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> > + *
+> > + */
+> > +
+> > +#include <drm/drm_atomic.h>
+> > +#include <drm/drm_atomic_helper.h>
+> > +#include <drm/drm_crtc_helper.h>
+> > +#include <drm/drm_fb_helper.h>
+> > +#include <drm/drm_fb_cma_helper.h>
+> > +#include <drm/drm_gem_cma_helper.h>
+> > +#include <drm/drm_gem_framebuffer_helper.h>
+> > +#include <drm/drm_plane_helper.h>
+> > +#include <drm/drm_simple_kms_helper.h>
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/module.h>
+> > +
+> > +#include "intel_vip_drv.h"
+> > +
+> > +static inline struct intelvipfb_priv *
+> > +pipe_to_intelvipdrm(struct drm_simple_display_pipe *pipe)
+> > +{
+> > +	return container_of(pipe, struct intelvipfb_priv, pipe);
+> > +}
+> > +
+> > +DEFINE_DRM_GEM_CMA_FOPS(drm_fops);
+> > +
+> > +static struct drm_driver intelvipfb_drm = {
+> > +	.driver_features =
+> > +			DRIVER_MODESET | DRIVER_GEM |
+> > +			DRIVER_PRIME | DRIVER_ATOMIC,
+> > +	.gem_free_object_unlocked = drm_gem_cma_free_object,
+> > +	.gem_vm_ops = &drm_gem_cma_vm_ops,
+> > +	.dumb_create = drm_gem_cma_dumb_create,
+> > +	.dumb_destroy = drm_gem_dumb_destroy,
+> > +	.prime_handle_to_fd = drm_gem_prime_handle_to_fd,
+> > +	.prime_fd_to_handle = drm_gem_prime_fd_to_handle,
+> > +	.gem_prime_export = drm_gem_prime_export,
+> > +	.gem_prime_import = drm_gem_prime_import,
+> > +	.gem_prime_get_sg_table = drm_gem_cma_prime_get_sg_table,
+> > +	.gem_prime_import_sg_table =
+> > drm_gem_cma_prime_import_sg_table,
+> > +	.gem_prime_vmap = drm_gem_cma_prime_vmap,
+> > +	.gem_prime_vunmap = drm_gem_cma_prime_vunmap,
+> > +	.gem_prime_mmap = drm_gem_cma_prime_mmap,
+> > +	.name = DRIVER_NAME,
+> > +	.date = "20190129",
+> > +	.desc = "Intel FPGA VIP SUITE",
+> > +	.major = 1,
+> > +	.minor = 0,
+> > +	.ioctls = NULL,
+> > +	.patchlevel = 0,
+> > +	.fops = &drm_fops,
+> > +};
+> > +
+> > +/*
+> > + * Setting up information derived from OF Device Tree Nodes
+> > + * max-width, max-height, bits per pixel, memory port width
+> > + */
+> > +
+> > +static int intelvipfb_drm_setup(struct device *dev,
+> > +					struct intelvipfb_priv
+> > *priv)
+> > +{
+> > +	struct drm_device *drm = priv->drm;
+> > +	struct device_node *np = dev->of_node;
+> > +	int mem_word_width;
+> > +	int max_h, max_w;
+> > +	int ret;
+> > +
+> > +	ret = of_property_read_u32(np, "altr,max-width", &max_w);
+> > +	if (ret) {
+> > +		dev_err(dev,
+> > +			"Missing required parameter 'altr,max-
+> > width'");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(np, "altr,max-height", &max_h);
+> > +	if (ret) {
+> > +		dev_err(dev,
+> > +			"Missing required parameter 'altr,max-
+> > height'");
+> > +		return ret;
+> > +	}
+> > +
+> > +	ret = of_property_read_u32(np, "altr,mem-port-width",
+> > &mem_word_width);
+> > +	if (ret) {
+> > +		dev_err(dev, "Missing required parameter
+> > 'altr,mem-port-width '");
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (!(mem_word_width >= 32 && mem_word_width % 32 == 0)) {
+> > +		dev_err(dev,
+> > +			"mem-word-width is set to %i. must be >=
+> > 32 and multiple of 32.",
+> > +			 mem_word_width);
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	drm->mode_config.min_width = 640;
+> > +	drm->mode_config.min_height = 480;
+> > +	drm->mode_config.max_width = max_w;
+> > +	drm->mode_config.max_height = max_h;
+> > +	drm->mode_config.preferred_depth = 32;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int intelvipfb_of_probe(struct platform_device *pdev)
+> > +{
+> > +	int retval;
+> > +	struct resource *reg_res;
+> > +	struct intelvipfb_priv *priv;
+> > +	struct device *dev = &pdev->dev;
+> > +	struct drm_device *drm;
+> > +
+> > +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> > +	if (!priv)
+> > +		return -ENOMEM;
+> > +
+> > +	/* setup DRM */
+> > +	drm = drm_dev_alloc(&intelvipfb_drm, dev);
 > 
+> Just a tiny bikeshed: Recommended style nowadays is to use
+> drm_dev_init
+> an embed drm_device into your driver private structure. This means
+> you
+> can't use devm_kzalloc (but to be really strict, almost all usage of
+> devm_kzalloc in drm drivers is broken, but that's an entirely
+> different
+> story). Would be great to switch over to drm_dev_init to align better
+> with
+> some of the planned work we have.
+> 
+Sure I think I can fix this
+> 
+> > +	if (IS_ERR(drm))
+> > +		return PTR_ERR(drm);
+> > +
+> > +	retval = dma_set_mask_and_coherent(drm->dev,
+> > DMA_BIT_MASK(32));
+> > +	if (retval)
+> > +		return -ENODEV;
+> > +
+> > +	priv->drm = drm;
+> > +
+> > +	reg_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	if (!reg_res)
+> > +		return -ENOMEM;
+> > +
+> > +	priv->base = devm_ioremap_resource(dev, reg_res);
+> > +
+> > +	if (IS_ERR(priv->base)) {
+> > +		dev_err(dev, "devm_ioremap_resource failed\n");
+> > +		retval = PTR_ERR(priv->base);
+> > +		return -ENOMEM;
+> > +	}
+> > +
+> > +	intelvipfb_drm_setup(dev, priv);
+> > +
+> > +	dev_set_drvdata(dev, priv);
+> > +
+> > +	return intelvipfb_probe(dev);
+> > +}
+> > +
+> > +static int intelvipfb_of_remove(struct platform_device *pdev)
+> > +{
+> > +	return intelvipfb_remove(&pdev->dev);
+> > +}
+> > +
+> > +static void intelvipfb_enable(struct drm_simple_display_pipe
+> > *pipe,
+> > +				struct drm_crtc_state *crtc_state,
+> > +				struct drm_plane_state *
+> > +				plane_state)
+> > +{
+> > +	/*
+> > +	 * The frameinfo variable has to correspond to the size of
+> > the VIP Suite
+> > +	 * Frame Reader register 7 which will determine the
+> > maximum size used
+> > +	 * in this frameinfo
+> > +	 */
+> > +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> > +	u32 frameinfo;
+> > +	void __iomem *base = priv->base;
+> > +	struct drm_plane_state *state = pipe->plane.state;
+> > +	dma_addr_t addr;
+> > +
+> > +	addr = drm_fb_cma_get_gem_addr(state->fb, state, 0);
+> > +
+> > +	frameinfo =
+> > +		readl(base + INTELVIPFB_FRAME_READER) &
+> > 0x00ffffff;
+> > +	writel(frameinfo, base + INTELVIPFB_FRAME_INFO);
+> > +	writel(addr, base + INTELVIPFB_FRAME_START);
+> > +	/* Finally set the control register to 1 to start
+> > streaming */
+> > +	writel(1, base + INTELVIPFB_CONTROL);
+> > +}
+> > +
+> > +static void intelvipfb_disable(struct drm_simple_display_pipe
+> > *pipe)
+> > +{
+> > +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> > +	void __iomem *base = priv->base;
+> > +	/* set the control register to 0 to stop streaming */
+> > +	writel(0, base + INTELVIPFB_CONTROL);
+> > +}
+> > +
+> > +static const struct drm_mode_config_funcs
+> > intelvipfb_mode_config_funcs = {
+> > +	.fb_create = drm_gem_fb_create,
+> > +	.atomic_check = drm_atomic_helper_check,
+> > +	.atomic_commit = drm_atomic_helper_commit,
+> > +};
+> > +
+> > +static void intelvipfb_setup_mode_config(struct drm_device *drm)
+> > +{
+> > +	drm_mode_config_init(drm);
+> > +	drm->mode_config.funcs = &intelvipfb_mode_config_funcs;
+> > +}
+> > +
+> > +void intelvipfb_display_pipe_update(struct drm_simple_display_pipe
+> > *pipe,
+> > +				    struct drm_plane_state
+> > *old_state)
+> > +{
+> > +	struct intelvipfb_priv *priv = pipe_to_intelvipdrm(pipe);
+> > +	struct drm_framebuffer *fb = pipe->plane.state->fb;
+> > +	struct drm_crtc *crtc = &priv->pipe.crtc;
+> > +
+> > +	if (fb && fb != old_state->fb) {
+> > +		if (priv->fb_dirty)
+> > +			priv->fb_dirty(fb, NULL, 0, 0, NULL, 0);
+> > +	}
+> 
+> ->fb_dirty here seems entirely unused. It's also incomplete, there's
+> a lot
+> more to implementing manual upload support than just this here (you
+> need
+> to setup framebuffers with the dirty callback, plus register the new
+> damage property). Imo better if we add this when you start using it,
+> hence
+> please remove ->fb_dirty here and from the headers.
 
+Noted.
+> 
+> > +
+> > +	if (crtc->state->event) {
+> > +		spin_lock_irq(&crtc->dev->event_lock);
+> > +		drm_crtc_send_vblank_event(crtc, crtc->state-
+> > >event);
+> > +		spin_unlock_irq(&crtc->dev->event_lock);
+> > +		crtc->state->event = NULL;
+> > +	}
+> > +}
+> > +EXPORT_SYMBOL(intelvipfb_display_pipe_update);
+> > +
+> > +static struct drm_simple_display_pipe_funcs priv_funcs = {
+> > +	.prepare_fb = drm_gem_fb_simple_display_pipe_prepare_fb,
+> > +	.update = intelvipfb_display_pipe_update,
+> > +	.enable = intelvipfb_enable,
+> > +	.disable = intelvipfb_disable
+> > +};
+> > +
+> > +int intelvipfb_probe(struct device *dev)
+> > +{
+> > +	int retval;
+> > +	struct drm_device *drm;
+> > +	struct intelvipfb_priv *priv = dev_get_drvdata(dev);
+> > +
+> > +	struct drm_connector *connector;
+> > +	u32 formats[] = {DRM_FORMAT_XRGB8888};
+> > +
+> > +	drm = priv->drm;
+> > +
+> > +	intelvipfb_setup_mode_config(drm);
+> 
+> Personally I'd inline this, it's just 2 lines.
+> 
+> > +
+> > +	connector = intelvipfb_conn_setup(drm);
+> > +	if (!connector) {
+> > +		dev_err(drm->dev, "Connector setup failed\n");
+> > +		goto err_mode_config;
+> > +	}
+> > +
+> > +	retval = drm_simple_display_pipe_init(drm,
+> > +						&priv->pipe,
+> > +						&priv_funcs,
+> > +						formats,
+> > +						ARRAY_SIZE(formats
+> > ),
+> > +						NULL, connector);
+> > +
+> > +	if (retval < 0) {
+> > +		dev_err(drm->dev, "Cannot setup simple display
+> > pipe\n");
+> > +		goto err_mode_config;
+> > +	}
+> > +
+> > +	drm_mode_config_reset(drm);
+> > +
+> > +	drm_dev_register(drm, 0);
+> > +
+> > +	drm_fbdev_generic_setup(drm, 32);
+> > +
+> > +	dev_info(drm->dev, "ivip: Successfully created fb\n");
+> > +
+> > +	return retval;
+> > +
+> > +err_mode_config:
+> > +
+> > +	drm_mode_config_cleanup(drm);
+> > +	return -ENODEV;
+> > +}
+> > +
+> > +int intelvipfb_remove(struct device *dev)
+> > +{
+> > +	struct intelvipfb_priv *priv = dev_get_drvdata(dev);
+> > +	struct drm_device *drm =  priv->drm;
+> > +
+> > +	drm_dev_unregister(drm);
+> > +
+> > +	drm_mode_config_cleanup(drm);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id intelvipfb_of_match[] = {
+> > +	{ .compatible = "altr,vip-frame-buffer-2.0" },
+> > +	{},
+> > +/*
+> > + * The name vip-frame-buffer-2.0 is derived from
+> > + * http://www.altera.com/literature/ug/ug_vip.pdf
+> > + * frame buffer IP cores section 14
+> > + */
+> > +};
+> > +
+> > +MODULE_DEVICE_TABLE(of, intelvipfb_of_match);
+> > +
+> > +static struct platform_driver intelvipfb_driver = {
+> > +	.probe = intelvipfb_of_probe,
+> > +	.remove = intelvipfb_of_remove,
+> > +	.driver = {
+> > +		.name = DRIVER_NAME,
+> > +		.of_match_table = intelvipfb_of_match,
+> > +	},
+> > +};
+> > +
+> > +module_platform_driver(intelvipfb_driver);
+> > +
+> > +/* Original author of Altera Frame Buffer*/
+> > +MODULE_AUTHOR("Walter Goossens <waltergoossens@home.nl>");
+> > +MODULE_AUTHOR("Thomas Chou <thomas@wytron.com.tw>");
+> > +MODULE_AUTHOR("Chris Rauer <crauer@altera.com>");
+> > +/* Author of Intel FPGA Frame Buffer II*/
+> > +MODULE_AUTHOR("Ong, Hean-Loong <hean.loong.ong@intel.com>");
+> > +MODULE_DESCRIPTION("Intel VIP Frame Buffer II driver");
+> > +MODULE_LICENSE("GPL v2");
+> > diff --git a/drivers/gpu/drm/ivip/intel_vip_drv.h
+> > b/drivers/gpu/drm/ivip/intel_vip_drv.h
+> > new file mode 100644
+> > index 0000000..821e74e
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/ivip/intel_vip_drv.h
+> > @@ -0,0 +1,73 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +/*
+> > + * Copyright (C) 2019 Intel Corporation.
+> > + *
+> > + * Intel Video and Image Processing(VIP) Frame Buffer II driver.
+> > + * Frame Buffer II driver
+> > + *
+> > + * This driver supports the Intel VIP Frame Reader component.
+> > + * More info on the hardware can be found in the Intel Video
+> > + * and Image Processing Suite User Guide at this address
+> > + * http://www.altera.com/literature/ug/ug_vip.pdf.
+> > + *
+> > + * Authors:
+> > + * Walter Goossens <waltergoossens@home.nl>
+> > + * Thomas Chou <thomas@wytron.com.tw>
+> > + * Chris Rauer <crauer@altera.com>
+> > + * Ong, Hean-Loong <hean.loong.ong@intel.com>
+> > + *
+> > + */
+> > +#ifndef _INTEL_VIP_DRV_H
+> > +#define _INTEL_VIP_DRV_H
+> > +
+> > +#define DRIVER_NAME    "intelvipfb"
+> > +#define BYTES_PER_PIXEL	 4
+> > +#define CRTC_NUM	        1
+> > +#define CONN_NUM	        1
+> > +
+> > +/* control registers */
+> > +#define INTELVIPFB_CONTROL	      0
+> > +#define INTELVIPFB_STATUS	       0x4
+> > +#define INTELVIPFB_INTERRUPT	    0x8
+> > +#define INTELVIPFB_FRAME_COUNTER	0xC
+> > +#define INTELVIPFB_FRAME_DROP	   0x10
+> > +#define INTELVIPFB_FRAME_INFO	   0x14
+> > +#define INTELVIPFB_FRAME_START	  0x18
+> > +#define INTELVIPFB_FRAME_READER	         0x1C
+> > +
+> > +int intelvipfb_probe(struct device *dev);
+> > +int intelvipfb_remove(struct device *dev);
+> > +int intelvipfb_setup_crtc(struct drm_device *drm);
+> > +struct drm_connector *intelvipfb_conn_setup(struct drm_device
+> > *drm);
+> > +
+> > +struct intelvipfb_priv {
+> > +	/**
+> > +	 * @pipe: Display pipe structure
+> > +	 */
+> > +	struct drm_simple_display_pipe pipe;
+> > +
+> > +	/**
+> > +	 * @drm: DRM device
+> > +	 */
+> > +	struct drm_device *drm;
+> > +
+> > +	/**
+> > +	 * @dirty_lock: Serializes framebuffer flushing
+> > +	 */
+> > +	struct mutex dirty_lock;
+> > +
+> > +	/**
+> > +	 * @base: Base memory for the framebuffer
+> > +	 */
+> > +	void    __iomem *base;
+> > +
+> > +	/**
+> > +	 * @fb_dirty: Framebuffer dirty callback
+> > +	 */
+> > +	int (*fb_dirty)(struct drm_framebuffer *framebuffer,
+> > +			struct drm_file *file_priv, unsigned int
+> > flags,
+> > +			unsigned int color, struct drm_clip_rect
+> > *clips,
+> > +			unsigned int num_clips);
+> > +};
+> > +
+> > +#endif
+> 
+> Very tidy driver, nice work. This looks ready (aside from the tiny
+> nits),
+> one last question: What's the plan with maintainig this? For small
+> drivers
+> I always recommend drm-misc:
+> 
+> https://drm.pages.freedesktop.org/maintainer-tools/committer-drm-misc
+> .html#small-drivers
+> 
+> This would mean you'd need to familiarize yourself with the tooling
+> and
+> everything. But this also only makes sense if you expect that there
+> will
+> be more contributions from your (or your team).
+> 
+> If you want to maintain this in drm-misc pls also add a corresponding
+> MAINTAINERS entry, with you as maintainer and the drm-misc repo as
+> git
+> repo.
+> 
+> Cheers, Daniel
 
+Thanks for looking into this Daniel. Currently there are no long term
+roadmap for this driver but it has to be in the upstream kernel.
+
+I'd like to contribute to drm-misc however I'd need some guidance in
+familiarizing myself with the tooling.
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
