@@ -2,21 +2,22 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CD6F7C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:29:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF573C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:31:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9CCDE2073D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:29:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 80C092073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:31:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ii7U0txt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CCDE2073D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=techsingularity.net
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eH+4dq5D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80C092073D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,44 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ed4B5ymtY/SwDa2YI8oweXqzMzdVlUnQYONR/2JfXy4=; b=ii7U0txtxH4q+2
-	TsNg3DYKp+wFtlr4WqB114bKd7ArF/F3/o7/er21p7NWeqVwZQOZMZ6zyiY6aro8hWdbrsaQaT/ig
-	jijFffrREKdsUnublA8zXvPoT5IGAJDuXE7pX68rWjRok4/bAQKSX5IkFk29U1MWAxDzH52Igt5rZ
-	8hY4EvHYth+1V5c/Jl3r/uDyZkXNrczJRlXyBc6xJr6VYP66HAlAYH/fJIyWySDlZU3zvlJFQgZ3v
-	tH5MStpgLVX972SyojFdlP4ICtaKRXF3esMF5ovbl/cbu8WjgId7fkeiOxyvJLcyAYJW5RG2hWBVl
-	ThR7xuRUsaoKCcvEo2rg==;
+	List-Owner; bh=naHNtT/H0NTS5gV8EML6dh5eAXYe19zsqJAMJzw6etY=; b=eH+4dq5DEbYmwA
+	S05nOru1l0z/NIcS6CU0K9V21CdHht6DOUl5GI0CrL+FPHi7iUihTLhd5L+wjG8o9beMhd/OExS4P
+	4EOuBBUQWqBqgKFwUBbbGBEYg/ha+RudNL2Mm7QSYVtzh3t6hQY2AzRK5unE3QXQY+XQMdNIRwbmM
+	++mZKKCj7cFP6VXEgeixEndu2J7ylf8DmRmHzFvx49OPZAui3YaZsAfpAHZArz/E/V1vl5pKPFtd2
+	ZUMCUgziFUu/KsfOPTVRGgG96gJDEaNMR4E9lSqYW6Jsf3J4v5pb/5czp5uBxO9oaSYy0NvDvSDiF
+	gZouc23DCZvrfzcc/+mg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtsjZ-0005UI-9W; Wed, 13 Feb 2019 11:29:45 +0000
-Received: from outbound-smtp12.blacknight.com ([46.22.139.17])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtsjV-0005Tu-Qw
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:29:43 +0000
-Received: from mail.blacknight.com (pemlinmail05.blacknight.ie [81.17.254.26])
- by outbound-smtp12.blacknight.com (Postfix) with ESMTPS id
- E6A3B1C2195 for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 11:29:39 +0000 (GMT)
-Received: (qmail 8247 invoked from network); 13 Feb 2019 11:29:39 -0000
-Received: from unknown (HELO techsingularity.net)
- (mgorman@techsingularity.net@[37.228.225.79])
- by 81.17.254.9 with ESMTPSA (AES256-SHA encrypted, authenticated);
- 13 Feb 2019 11:29:39 -0000
-Date: Wed, 13 Feb 2019 11:29:38 +0000
-From: Mel Gorman <mgorman@techsingularity.net>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: 5.0-rc kernel hangs on early boot
-Message-ID: <20190213112938.GP9565@techsingularity.net>
-References: <20190213082134.GA21834@yury-thinkpad>
- <20190213111843.GA1912@brain-police>
- <20190213112141.GO9565@techsingularity.net>
- <20190213112520.GB1912@brain-police>
+	id 1gtskl-0006y5-Vm; Wed, 13 Feb 2019 11:30:59 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtski-0006xi-Te
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:30:58 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3F933A78;
+ Wed, 13 Feb 2019 03:30:55 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 72E053F557;
+ Wed, 13 Feb 2019 03:30:53 -0800 (PST)
+Date: Wed, 13 Feb 2019 11:30:51 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Peng Fan <peng.fan@nxp.com>
+Subject: Re: [PATCH 3/3] arm64: mmu: pgd_pgtable_alloc: drop barrier
+Message-ID: <20190213113050.GC22119@lakrids.cambridge.arm.com>
+References: <20190213094831.7292-1-peng.fan@nxp.com>
+ <20190213094831.7292-3-peng.fan@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190213112520.GB1912@brain-police>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190213094831.7292-3-peng.fan@nxp.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_032942_007048_18E1EEB0 
-X-CRM114-Status: GOOD (  10.36  )
+X-CRM114-CacheID: sfid-20190213_033056_961722_E3DFDA5B 
+X-CRM114-Status: GOOD (  21.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,35 +71,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrea Arcangeli <aarcange@redhat.com>, Yury Norov <yury.norov@gmail.com>,
- Vlastimil Babka <vbabka@suse.cz>, Catalin Marinas <catalin.marinas@arm.com>,
- linux-kernel@vger.kernel.org, Michal Hocko <mhocko@kernel.org>,
- Zi Yan <zi.yan@cs.rutgers.edu>, David Rientjes <rientjes@google.com>,
- Andrew Morton <akpm@linux-foundation.org>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "yaojun8558363@gmail.com" <yaojun8558363@gmail.com>,
+ "cpandya@codeaurora.org" <cpandya@codeaurora.org>,
+ "van.freenix@gmail.com" <van.freenix@gmail.com>,
+ "robin.murphy@arm.com" <robin.murphy@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 11:25:21AM +0000, Will Deacon wrote:
-> > Thanks Will.
-> > 
-> > While I agree that going OOM early is a problem and would explain why
-> > the boosting logic was hit at all, it's still the case that the boosting
-> > should not divide by zero. Even if the booting is broken due to a lack
-> > of memory, I'd still not prefer to crash due to 1c30844d2dfe272d58c.
-> 
-> Yup, sorry, our previous mails crossed paths. Your patch looks sensible in
-> its own right, I'm just left wondering why we're OOM so early during boot!
-> 
+On Wed, Feb 13, 2019 at 09:37:38AM +0000, Peng Fan wrote:
+> The barriers are added for empty_zero_page, however the
+> empty zero page has been moved to bss area by
+> commit 5227cfa71f9e ("arm64: mm: place empty_zero_page in bss"),
+> and it alreay added "dsb     ishst" in head.S to make sure
+> the empty zero page visible to PTW.
 
-I completely agree that it's worth pinning down both issues.
+The "zeroed page" the comment refers to is not empty_zero_page.
 
--- 
-Mel Gorman
-SUSE Labs
+The page
+the comment refers to is an arbitrary page returned by
+__get_free_page(), which has been filled with zeroed at some point
+thanks to PGALLOC_GFP containing __GFP_ZERO.
+
+> pgd_pgtable_alloc is only called by __create_pgd_mapping, and
+> there are implicit barriers in __create_pgd_mapping, so we
+> could remove the barrier pgd_pgtable_alloc
+
+I don't think this is true.
+
+Consider:
+
+  create_pgd_mapping()
+  -> __create_pgd_mapping()
+     -> alloc_init_pud()
+        -> pgtable_alloc() // pgd_pgtable_alloc()
+	-> __pgd_populate()
+
+... where AFAICT there is no barrier between pgtable_alloc() and
+__pgd_populate().
+
+Where is the barrier between the page zeroing and the update of the pgd
+entry?
+
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Peng Fan <peng.fan@nxp.com>
+> ---
+> 
+> Note: this patch tested on qemu-system-aarch64, not real hardware.
+> 
+>  arch/arm64/mm/mmu.c | 2 --
+>  1 file changed, 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index f61fa7c8fd2e..04e3d4d070ce 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -371,8 +371,6 @@ static phys_addr_t pgd_pgtable_alloc(void)
+>  	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
+>  		BUG();
+>  
+> -	/* Ensure the zeroed page is visible to the page table walker */
+> -	dsb(ishst);
+>  	return __pa(ptr);
+>  }
+>  
+> -- 
+> 2.16.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
