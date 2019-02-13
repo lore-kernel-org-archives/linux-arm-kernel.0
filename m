@@ -2,54 +2,58 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 810A2C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 07:05:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55337C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 07:05:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32D36222C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 07:05:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 23DB221904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 07:05:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I/TOnpcr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32D36222C2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KYYhaUEp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23DB221904
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=/futOYAB0M3iyxSwt+ly2X6tvcGW/2VoeWR7rC83tXE=; b=I/TOnpcrBWGJYG
-	MaKkHlGD4xbQKKu03QuZKeM9reC/NB2Z9NTyBRbE2L9TTHHUVtP9QVuH/RKuLUi8NMC5tyEBxjWjD
-	BmtWoCqfbckq6ptb914EL/cSJqK1iQQV5IITM6KI5pmU5WMahtEP9LlmFwzar05qRLpKyVfhN4JAr
-	HHzqq0qW6HBtFRfCN5+Ph3QoqNN0tzBq6CBr+Wn6J7hb1Rq/7vwjOHYkXDzWMR3klWJQWBPaXKJ32
-	l0+O24CSfGQ2Rs+UtSL4yPLFvGo3PVGinqsk2huCoL2DOI4vIUw94zV2El7JRHn2slm1EK1kWEg0a
-	+5B6TYZGoN6K1n4oHN7g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2YRShYS82ALunKjekGXrrD4fhqLPikANmHzN/JgGQqo=; b=KYYhaUEpMI3wWx
+	K63+xiqFzTolYj6KCd/7TF4vFkr5cyzQ198nqAtsuxpSvJJyAj0QR4DySeskzcTDScS+iKz5VAJz1
+	URREJuMqUADQ2EGC62XNIqeKXingdQqO37vrVmPK2TR5upW01jOEEDiQ1gx5+dhY/H14ZixX02tPh
+	tf1YLK8hB7bj03SefHl7MlYAe1irLNSAK1ph3GD99thwfqk1uWCrYTnVjLKA0Mz+Xo4ssV3GUu3LM
+	K6FQElPG+iiWsdvyPVLQMh5aljO3oEdYVrRxBKG1OnUlXbiuIiWNuqZPY++tRqPSA6E4MwQuKZWKD
+	WYcw4ZvKSg9Hrbrra0sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtobm-0002vJ-PO; Wed, 13 Feb 2019 07:05:26 +0000
+	id 1gtocC-0003J2-CQ; Wed, 13 Feb 2019 07:05:52 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtobW-0001pT-Of
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 07:05:13 +0000
+ id 1gtobX-0001rX-Bp
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 07:05:14 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 2D3235FBF9; Wed, 13 Feb 2019 15:05:04 +0800 (CST)
+ id 344B35F9C2; Wed, 13 Feb 2019 15:05:04 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Mark Brown <broonie@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
  Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: [PATCH 0/2] arm64: allwinner: a64: Rename hpvcc-supply to cpvdd-supply
-Date: Wed, 13 Feb 2019 15:04:55 +0800
-Message-Id: <20190213070457.26049-1-wens@csie.org>
+Subject: [PATCH 1/2] ASoC: sunxi: sun50i-codec-analog: Rename hpvcc regulator
+ supply to cpvdd
+Date: Wed, 13 Feb 2019 15:04:56 +0800
+Message-Id: <20190213070457.26049-2-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190213070457.26049-1-wens@csie.org>
+References: <20190213070457.26049-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_230511_020837_5663DDAC 
-X-CRM114-Status: GOOD (  10.31  )
+X-CRM114-CacheID: sfid-20190212_230511_546171_9FFD3743 
+X-CRM114-Status: GOOD (  11.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,38 +73,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi everyone,
+The A64 datasheet lists the supply rail for the headphone amp's charge
+pump as "CPVDD". cpvdd-supply is the name of the property for this power
+rail specified in the device tree bindings. "HPVCC" was the name used in
+the A33 datasheet for the same function.
 
-This is a small series to fix the CPVDD regulator supply name for the
-A64 codec. The datasheet specifies the name "CPVDD" for the supply rail
-for the audio codec's internal headphone amp charge pump.
+Rename the supply so it matches the datasheet, bindings, and the subject
+from the original commit.
 
-Somehow I managed to write "CPVDD" in the commit message and the device
-tree binding, but used "HPVCC" (which is the name used by the A33) in
-the device tree files and the device driver. (facepalm)
+Fixes: ca0412a05756 ("ASoC: sunxi: sun50i-codec-analog: Add support for cpvdd regulator supply")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ sound/soc/sunxi/sun50i-codec-analog.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This feature was just introduced in v5.0-rc1, so if we could merge this
-as fixes for v5.0 that would be great.
-
-Thanks, and sorry for the blunder on my part.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  ASoC: sunxi: sun50i-codec-analog: Rename hpvcc regulator supply to
-    cpvdd
-  arm64: dts: allwinner: a64: Rename hpvcc-supply to cpvdd-supply
-
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts       | 2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts     | 2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi      | 2 +-
- sound/soc/sunxi/sun50i-codec-analog.c                     | 4 ++--
- 5 files changed, 6 insertions(+), 6 deletions(-)
-
+diff --git a/sound/soc/sunxi/sun50i-codec-analog.c b/sound/soc/sunxi/sun50i-codec-analog.c
+index df1fed0aa001..d105c90c3706 100644
+--- a/sound/soc/sunxi/sun50i-codec-analog.c
++++ b/sound/soc/sunxi/sun50i-codec-analog.c
+@@ -274,7 +274,7 @@ static const struct snd_soc_dapm_widget sun50i_a64_codec_widgets[] = {
+ 	 * stream widgets at the card level.
+ 	 */
+ 
+-	SND_SOC_DAPM_REGULATOR_SUPPLY("hpvcc", 0, 0),
++	SND_SOC_DAPM_REGULATOR_SUPPLY("cpvdd", 0, 0),
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun50i_codec_hp_src),
+ 	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN50I_ADDA_HP_CTRL,
+@@ -362,7 +362,7 @@ static const struct snd_soc_dapm_route sun50i_a64_codec_routes[] = {
+ 	{ "Headphone Source Playback Route", "Mixer", "Left Mixer" },
+ 	{ "Headphone Source Playback Route", "Mixer", "Right Mixer" },
+ 	{ "Headphone Amp", NULL, "Headphone Source Playback Route" },
+-	{ "Headphone Amp", NULL, "hpvcc" },
++	{ "Headphone Amp", NULL, "cpvdd" },
+ 	{ "HP", NULL, "Headphone Amp" },
+ 
+ 	/* Microphone Routes */
 -- 
 2.20.1
 
