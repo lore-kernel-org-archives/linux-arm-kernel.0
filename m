@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 725FAC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:34:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 182E4C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:34:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FCF1222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:34:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DE510222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:34:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fCwNaWSu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="YDWzlYBr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FCF1222B2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V2niKT5E";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="K+u2BXE8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE510222B2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,68 +27,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=oFojoqRGaDSMn9jtdh5TakTJ92R4gnkoTdSJ56+GKKs=; b=fCwNaWSuyg9bZXSQ2hHUG7/566
-	zrgR6k6xar12K/q3DsbGT//UxFI9jkaXLXMtzJgoBoUXhwbyYdlTSHIq86w7DwO6D7gLAS7+sSrPW
-	xAEF5b8eM2ubsMdqd3ukQ5Y0El+9UmZ9qrREhYh6Gvrux6qPqnwRA0M3oZu9gXHOXWt0Pzxj5d2aI
-	zm9/Z7LkF+d+zquGSmoam6e8cKyjunDkh45PTW4UCvGUJriIjbtvzkJ0HU5cZKOuPrDOLc7D2nC0I
-	fRd2I4wVynyQkctocT7GfjhdudkLEiL9eqChMsFCrJBKoSeu99JtiP2IA6dykwFZVKluBp9b0cqt4
-	1go4wuaQ==;
+	bh=XykL4mtV6XiR65LsgR+Hhl2d+i3LyAXoeuHZNASYryc=; b=V2niKT5EIWrPZ4N4ApvlOIgbuc
+	Yk4v+KGWnPeOZLvDqgRxH2W6YXNuvFqyVky+VeRYNVlnM95gyDd8LV6awJcN3S/OVXXV/fQNl1TM/
+	Pynqt5vD7adCuHyKrPU9ohIIhaOR0hJy4mWJVbam5xOEQfU1Xw7rpPgW7B3R1RiiBiu3FceEqT49c
+	L4aGrAxwZO+uzfRAkg1YDNNRlwGppZHjO6IR8gdCjNpGFpYMtOtMCjH1rZY1gf+HDcLDwnGyeulPp
+	tc57Jfp30YB+qEFtGAlrjNBlnsH2lcbk9X/s85VfPXXcG27uHrW5XcrDRXUvrJN7iiVb4cnNdGnek
+	ZQ8NoDFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gttk6-00069W-Ra; Wed, 13 Feb 2019 12:34:22 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gttkH-0006NT-BP; Wed, 13 Feb 2019 12:34:33 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gttjw-0005uI-6H
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 12:34:14 +0000
-Received: by mail-pl1-x643.google.com with SMTP id e5so1106664plb.5
+ id 1gttk0-0005zY-Et
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 12:34:20 +0000
+Received: by mail-pg1-x544.google.com with SMTP id w7so1057175pgp.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 04:34:11 -0800 (PST)
+ Wed, 13 Feb 2019 04:34:16 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :in-reply-to:references;
- bh=5wfuddSW6tp5kYw+zApWLVum/WpZ+TiS9aNH3MKdYzo=;
- b=YDWzlYBrahihGwb5mYJoLKo/xZVNfbd33CPt1cbrzZWuoYd4mrO9sghY/jilXAFcPb
- b+yIqYLo+3iLfK4qo47FIeJm2alKAr0zD7IigOBYuDuxyVSpMP81wwKWqbTBYYM32ikY
- 7eP1H9UzdYWPJFg2EjQnEimpR2CCNOZFBn4j1318kKvcCLVBMmufv0TQAAgb3M4oLi1l
- 30XJVvAP2EU26QLC1+acFBj30jN9YNYmUNZ9h8iy2/P/sF5ZNAOJHkXaW5iopbmtTGVe
- 6FnpZ6gyNHgcI2r4cNt4APQ10EgSKsA5vc7FTpYqtJ3E7dF+lR4m5xxIEi9dEOxUb171
- KI1A==
+ bh=TsYSQ/G0YznTAgTKSekGveHgCX9PxIa5Y7B9m7W0j9A=;
+ b=K+u2BXE8igH9mZ5PXj92nX6kf00B7E4SIonYnZdN76QA5DDQe+PbEmkmz8iP2a49Mc
+ uE5vBYjcHExxmpQT2+jeCXEbGfxlZLpDUD0NFNA+H3nDVZvPV/Wa6fEup4fZUomy0hbC
+ 69/VDJuxrS+cNBBlVnAZuptQnAIzO+bZMe7BN6E1ZIYliug9BFIXqB1qerjLskzPOmlW
+ wNGZEYi128Ls+AATJPire+8gcSzsxxBAOi+Jfh2MRTWJ1A9lbIhYOGJROro6VeBKb8xc
+ Lv+zNRmnYMKofHCyLEZxM8+TlUvChbvJc40bSJpvJoc18NkN3OzpRyRnXyK3Sn2GZ2Q9
+ nkcg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:in-reply-to:references;
- bh=5wfuddSW6tp5kYw+zApWLVum/WpZ+TiS9aNH3MKdYzo=;
- b=hB/5dcJz2PUibnt4aWgvTbsxYUOpXF/m1jLS/G156BO8cVvaMHuaubu/GqehcjSH76
- /Vbl0b8ZjRmGPq5YpCKa1dne2J9BpMP2yCk/Q+fmLHEf6cBO6/MB2UmQPNTTrS3zxCEr
- xrh0qyOloEHHF5vtSQ5W3z8k4VL3a2Onxwi8N6+gwEMHtqS/eCpuI1M3b9naFL97xckw
- EZiSWY+c5yYGWlx0MLCLzItBP2pMxxP5E95FuUSNYp3jEFrSB7eUF7HW28fgG35ysr+e
- ON2AginiNEMSZ8WFoMGLHI/Wwzsyny1ko6OPvWBAwq1dZPC4mIHahuDCMOPZuBdTg+jM
- QV7g==
-X-Gm-Message-State: AHQUAuYGUw94r2dlAtjDSClQdRVup03jGM2Mw8zzpv2LCj7G7yCNz6nF
- tj3PBcrAV7UrQaYvXCDVBlte8w==
-X-Google-Smtp-Source: AHgI3IaSAf6j7onzDfTCKd/8Gy4kNKVuhVwJS5+E/ZiiK7RgY9Mi89ivH5Pa1AS62RhmQ6pxvoD77A==
-X-Received: by 2002:a17:902:bd0b:: with SMTP id
- p11mr274548pls.259.1550061251528; 
- Wed, 13 Feb 2019 04:34:11 -0800 (PST)
+ bh=TsYSQ/G0YznTAgTKSekGveHgCX9PxIa5Y7B9m7W0j9A=;
+ b=HyxM5mC3aMppcRT3Gc5q1h5Dp85jyVy42/zbR6r+0NNsuew3clBTaQe74428HEmpKs
+ g2hhTnHcXCp44YLy4iEOLp4eDoY0SqjfXc+6QTNr5WvVQWGodwRIqE3TBYuU+XdoTrjg
+ sMoUmh3OzcfU3Vzvzi8NgqFLRG3olrXRoDYY6VXFUj3F2fMb96voAufC+dNpVow+nz7j
+ 7ji3QwALiijq1J629gIWjkhpTVzPYGUrqoSY0YlNRPmuaic97tRvQJKOVCfffj7mCgs5
+ +mp2Ac2I1KcKfNkCpcYXddw+feW6i8LA+F8FkbKRXoVZqsriDaB03wqbSsbbiBlBt3PG
+ uzOA==
+X-Gm-Message-State: AHQUAubwy6Kn8NwOj+B1DJwOpv7ZTd3W5xCrqRAfbpOvdLjSCM1jQisu
+ ucfohCdgH8mYcIVk+YDnC+e1dw==
+X-Google-Smtp-Source: AHgI3IasfNSW9A1fNEEBfWE7qbZtE4VaXKaB3tivIDyCvYJl0ojIazlXhuIdAmvJqFEljsjrumLvuQ==
+X-Received: by 2002:a63:6bc1:: with SMTP id g184mr275245pgc.25.1550061255741; 
+ Wed, 13 Feb 2019 04:34:15 -0800 (PST)
 Received: from baolinwangubtpc.spreadtrum.com ([117.18.48.102])
- by smtp.gmail.com with ESMTPSA id l5sm21223640pgl.51.2019.02.13.04.34.07
+ by smtp.gmail.com with ESMTPSA id l5sm21223640pgl.51.2019.02.13.04.34.11
  (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 13 Feb 2019 04:34:10 -0800 (PST)
+ Wed, 13 Feb 2019 04:34:15 -0800 (PST)
 From: Baolin Wang <baolin.wang@linaro.org>
 To: robh+dt@kernel.org,
 	mark.rutland@arm.com,
 	arnd@arndb.de
-Subject: [PATCH v2 1/5] arm64: dts: sprd: Remove PMIC INTC irq trigger type
-Date: Wed, 13 Feb 2019 20:32:45 +0800
-Message-Id: <b6a32917d1e231277d240a4084bebb6ad91247e3.1550060544.git.baolin.wang@linaro.org>
+Subject: [PATCH v2 2/5] arm64: dts: sprd: Add ADC calibration support
+Date: Wed, 13 Feb 2019 20:32:46 +0800
+Message-Id: <0213394a8e432e0ee0809f9032427d971ea9cde2.1550060544.git.baolin.wang@linaro.org>
 X-Mailer: git-send-email 1.7.9.5
 In-Reply-To: <cover.1550060543.git.baolin.wang@linaro.org>
 References: <cover.1550060543.git.baolin.wang@linaro.org>
 In-Reply-To: <cover.1550060543.git.baolin.wang@linaro.org>
 References: <cover.1550060543.git.baolin.wang@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_043412_372329_E10FF590 
-X-CRM114-Status: GOOD (  10.36  )
+X-CRM114-CacheID: sfid-20190213_043416_833039_1280DB92 
+X-CRM114-Status: GOOD (  11.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,54 +108,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Spreadtrum PMIC INTC controller has no registers to set trigger type,
-since it is always high level trigger as default. So remove its child
-devices' irq trigger type setting and change #interrupt-cells to 1.
+This patch adds phandles to the calibration cells provided by the Efuse
+device, which is used to calibrate the ADC channel scales.
 
 Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
 ---
- arch/arm64/boot/dts/sprd/sc2731.dtsi |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/sprd/sc2731.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/sprd/sc2731.dtsi b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-index 82bd642..f2f2aa5 100644
+index f2f2aa5..a2edc25 100644
 --- a/arch/arm64/boot/dts/sprd/sc2731.dtsi
 +++ b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-@@ -13,7 +13,7 @@
- 		spi-max-frequency = <26000000>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
- 		interrupt-controller;
--		#interrupt-cells = <2>;
-+		#interrupt-cells = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-@@ -43,14 +43,14 @@
- 			compatible = "sprd,sc27xx-rtc", "sprd,sc2731-rtc";
- 			reg = <0x280>;
- 			interrupt-parent = <&sc2731_pmic>;
--			interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <2>;
+@@ -63,6 +63,14 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			hwlocks = <&hwlock 12>;
++
++			adc_big_scale: calib@24 {
++				reg = <0x24 0x2>;
++			};
++
++			adc_small_scale: calib@26 {
++				reg = <0x26 0x2>;
++			};
  		};
  
- 		pmic_eic: gpio@300 {
- 			compatible = "sprd,sc27xx-eic";
- 			reg = <0x300>;
- 			interrupt-parent = <&sc2731_pmic>;
--			interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <5>;
- 			gpio-controller;
- 			#gpio-cells = <2>;
- 			interrupt-controller;
-@@ -69,7 +69,7 @@
- 			compatible = "sprd,sc27xx-adc", "sprd,sc2731-adc";
- 			reg = <0x480>;
- 			interrupt-parent = <&sc2731_pmic>;
--			interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupts = <0>;
+ 		pmic_adc: adc@480 {
+@@ -72,6 +80,8 @@
+ 			interrupts = <0>;
  			#io-channel-cells = <1>;
  			hwlocks = <&hwlock 4>;
++			nvmem-cell-names = "big_scale_calib", "small_scale_calib";
++			nvmem-cells = <&adc_big_scale>, <&adc_small_scale>;
  		};
+ 
+ 		vibrator@ec8 {
 -- 
 1.7.9.5
 
