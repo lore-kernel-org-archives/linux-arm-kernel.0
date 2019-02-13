@@ -2,22 +2,23 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16733C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:57:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F0536C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:01:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D619421934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:57:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C0DED222D1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:01:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XnHPdzkq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D619421934
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nW22W2fF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Ta1+v11L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0DED222D1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GhBrikYq0DVMJGyjoBV7Ekt+xFVcMvAzu6lu8QcYB5o=; b=XnHPdzkqYwRoGt
-	ezSos7q3M6DXuNkQ3HMjk4mTAAsa5bZ6hr2RwTjIlt9qyE9MKOCSoaoKsPVZ2gGJ8mr9PrgHhplMF
-	576oxutj6C60uf852ypRtVO9+m1K37jBa8TFVbefFTqANPcCj2IK2jRJohXGjINk1BwxOuW/PkV9A
-	b9pq9v05TKd5Ifr1soDep3yPHh+8mPdYvHBzJHx+yledwfRmWZqXPbQICqtOGrqMI95UtDFGMY2lC
-	k96DHmP9ZH89qZ7tjnF9xY9PgmYjYJN/he6rwicNnZHl9uIqbgEThKIQtRntk5a+/iVcP6cj0i33+
-	uCQER2GZZ190RHGe3xzg==;
+	List-Owner; bh=qAYew2kvskG7ouf6XLqgiQNCZ1bUbDBdZwWNnVUWdwE=; b=nW22W2fFZLx6d0
+	Kxi9LAUyYUbZSouM+TdcTaSj0J6qbSrkysen6+vhUxeYuX13N81zER3NZM21PD2inb6fLfvMUwVPe
+	35X8bbyPzvZMbOntR/k4fhryBYGTBzEeY8eold9y6FisNAFvDkhw2mcxeXQW8r9GJUcZdZOv1xhUq
+	lE3h5QlkMJC9J8Io03uCGPuEUmjUAp0PimvE8t5tvNO48McfqU9LCz8/eYKOVS/MNIRziGFeDkobG
+	6eaqyc5yWT7CMJN5fdwjhzMt1osiLzyuimMhr7J8k7rgbGYTuS4s76J15o1PihKPkOCs/LpUWPeNN
+	3HnFKwyovmPwEdOAeM1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtxr2-0003Uq-Vm; Wed, 13 Feb 2019 16:57:48 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtxqz-0003UD-35
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 16:57:46 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CD8921596;
- Wed, 13 Feb 2019 08:57:43 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 541233F675;
- Wed, 13 Feb 2019 08:57:42 -0800 (PST)
-Date: Wed, 13 Feb 2019 16:57:39 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH v3 3/9] PCI: keystone: Use hwirq to get the legacy IRQ
- number offset
-Message-ID: <20190213165739.GE2280@e107981-ln.cambridge.arm.com>
-References: <20190213132629.24790-1-kishon@ti.com>
- <20190213132629.24790-4-kishon@ti.com>
+	id 1gtxuQ-0005Be-A3; Wed, 13 Feb 2019 17:01:18 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtxuF-00058p-OR
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:01:14 +0000
+Received: by mail-pg1-x543.google.com with SMTP id r11so1402825pgp.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 09:01:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=CsGa6xrCqoqf0+VNg/zr8QUSD2calqzCdb+HFhflSIg=;
+ b=Ta1+v11LXRHE/m6bXl5bYCsrBWRz/5QZ7KpLJx/oTBx/nbCuz6bWAvfekWwrVt3Ki1
+ 0VVTcz9dXsYVNRrA3o3AX381GM9U3qYYxYNYeHIN8DM45K+g9Umf5zS1fvlJyuLd8BM7
+ d7Wb9hT5ZOUss5/hrhMHbjTZpBhs13i/WevDw=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=CsGa6xrCqoqf0+VNg/zr8QUSD2calqzCdb+HFhflSIg=;
+ b=O2SwovDce17TtngAe7dtlv4+i4d77O0j6W+rP4+YwsgTPDUucPKlHKpRk8a0ifY02K
+ EjkPL0bL3MmXLm7uvxwK2eZ8/gxaZ6BHAckcPAu7E9fUyXcnDhXpnfBZ5Ylw42i8ZmqL
+ HD7+lWfMUzXmPDdgoqrhnV8DpZ8Kpq4dBQGcE2+ivFlE9kTJum7SN1QzR9H7ercAeHz0
+ gXmlVxgplwN9H1vO9HN/QvSnNRhSdMyhbohohXcqf66RcQcB4cMn7+lt17THY+CM8KT/
+ Hq6btpH9rvGd2Mzojg3llZq7weCvnAqTadiGspKChJlJyZH6/BpSzRK7RwSHOYayK5DL
+ veAA==
+X-Gm-Message-State: AHQUAub5LpgablV+Dnm4bAQhil0HUV6j6QUp//cFhn3dNT8cISD2fW1B
+ jNXe+Ot1b5+k+8+5fvqQjAiaaw==
+X-Google-Smtp-Source: AHgI3IbLTH8zTax3udBIg0vtWgutmzVS9f7NPA1eVw8b7yj25dnkT5eQqLtSZJNS2N0blTJn4eCqtg==
+X-Received: by 2002:a63:9501:: with SMTP id p1mr1302223pgd.149.1550077266604; 
+ Wed, 13 Feb 2019 09:01:06 -0800 (PST)
+Received: from localhost ([2620:15c:202:1:75a:3f6e:21d:9374])
+ by smtp.gmail.com with ESMTPSA id b15sm14524523pfj.44.2019.02.13.09.01.05
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 13 Feb 2019 09:01:05 -0800 (PST)
+Date: Wed, 13 Feb 2019 09:01:05 -0800
+From: Matthias Kaehlcke <mka@chromium.org>
+To: Pi-Hsun Shih <pihsun@chromium.org>
+Subject: Re: [PATCH v4 2/6] remoteproc/mediatek: add SCP support for mt8183
+Message-ID: <20190213170105.GX117604@google.com>
+References: <20190131093131.245531-1-pihsun@chromium.org>
+ <20190131093131.245531-3-pihsun@chromium.org>
+ <20190202001749.GT81583@google.com>
+ <CANdKZ0ds2s46h-Rs-4aJSuVFkoaeEzXi96m2zbx5XjBhhsc3Xw@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190213132629.24790-4-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <CANdKZ0ds2s46h-Rs-4aJSuVFkoaeEzXi96m2zbx5XjBhhsc3Xw@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_085745_159147_B092A751 
-X-CRM114-Status: GOOD (  20.96  )
+X-CRM114-CacheID: sfid-20190213_090107_790676_055A83A6 
+X-CRM114-Status: GOOD (  19.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,102 +97,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
- Bjorn Helgaas <bhelgaas@google.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ohad Ben-Cohen <ohad@wizery.com>, Nicolas Boichat <drinkcat@chromium.org>,
+ Erin Lo <erin.lo@mediatek.com>,
+ "open list:REMOTE PROCESSOR \(REMOTEPROC\) SUBSYSTEM"
+ <linux-remoteproc@vger.kernel.org>, open list <linux-kernel@vger.kernel.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 06:56:23PM +0530, Kishon Vijay Abraham I wrote:
-> ks_pcie_legacy_irq_handler() uses 'virq' to get the IRQ number offset.
-> This offset is used to get the correct IRQ_STATUS register
-> corresponding to the IRQ line that raised the interrupt.
-> There is no guarantee that 'virq' assigned for consecutive hardware
-> IRQ will be contiguous. And this might get us an incorrect IRQ number
-> offset.
-> 
-> Fix it here by using 'hwirq' to get the IRQ number offset.
-> 
-> Link: https://lkml.kernel.org/r/bb081d21-7c03-0357-4294-7e92d95d838c@arm.com
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/pci/controller/dwc/pci-keystone.c | 17 +++++++++++++----
->  1 file changed, 13 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-> index e8b1d8eca78e..d35ac712a9f8 100644
-> --- a/drivers/pci/controller/dwc/pci-keystone.c
-> +++ b/drivers/pci/controller/dwc/pci-keystone.c
-> @@ -87,7 +87,7 @@ struct keystone_pcie {
->  	struct dw_pcie		*pci;
->  	/* PCI Device ID */
->  	u32			device_id;
-> -	int			legacy_host_irqs[PCI_NUM_INTX];
-> +	int			legacy_host_irq;
->  	struct			device_node *legacy_intc_np;
->  
->  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
-> @@ -582,11 +582,11 @@ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
->   */
->  static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
->  {
-> -	unsigned int irq = irq_desc_get_irq(desc);
-> +	unsigned int irq = desc->irq_data.hwirq;
->  	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
->  	struct dw_pcie *pci = ks_pcie->pci;
->  	struct device *dev = pci->dev;
-> -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
-> +	u32 irq_offset = irq - ks_pcie->legacy_host_irq;
-
-I think you should use the plain hwirq number (that if I understand
-correctly range in [0,3]) and drop legacy_host_irq.
-
-See below.
-
->  	struct irq_chip *chip = irq_desc_get_chip(desc);
->  
->  	dev_dbg(dev, ": Handling legacy irq %d\n", irq);
-> @@ -657,6 +657,7 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
->  	struct device_node *np = ks_pcie->np;
->  	struct device_node *intc_np;
->  	int irq_count, irq, ret, i;
-> +	struct irq_data *irq_data;
->  
->  	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
->  	if (!intc_np) {
-> @@ -677,7 +678,15 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
->  			ret = -EINVAL;
->  			goto err;
->  		}
-> -		ks_pcie->legacy_host_irqs[i] = irq;
-> +
-> +		if (!ks_pcie->legacy_host_irq) {
-> +			irq_data = irq_get_irq_data(irq);
-> +			if (!irq_data) {
-> +				ret = -EINVAL;
-> +				goto err;
-> +			}
-> +			ks_pcie->legacy_host_irq = irq_data->hwirq;
-
-This depends on DT property ordering and may well be wrong. On top
-of that as I said above I do not think it is even needed.
-
-Thanks,
-Lorenzo
-
-> +		}
->  
->  		irq_set_chained_handler_and_data(irq,
->  						 ks_pcie_legacy_irq_handler,
-> -- 
-> 2.17.1
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBGZWIgMTMsIDIwMTkgYXQgMTE6MjA6MThBTSArMDgwMCwgUGktSHN1biBTaGloIHdy
+b3RlOgo+IEhpLAo+IAo+IFRoYW5rcyBmb3IgdGhlIHJldmlldywgd291bGQgYWRkcmVzcyBtb3N0
+IGNvbW1lbnRzIGluIG5leHQgdmVyc2lvbiBvZiBwYXRjaC4KPiAKPiBPbiBTYXQsIEZlYiAyLCAy
+MDE5IGF0IDg6MTcgQU0gTWF0dGhpYXMgS2FlaGxja2UgPG1rYUBjaHJvbWl1bS5vcmc+IHdyb3Rl
+Ogo+ID4KPiA+IEhpIFBpLUhzdW4sCj4gPgo+ID4gYSBmZXcgY29tbWVudHMgaW5saW5lLgo+ID4K
+PiA+IEl0J3MgdGhlIGZpcnN0IHRpbWUgSSBkYWJibGUgaW50byByZW1vdGVwcm9jLCBJIGRvbid0
+IGNsYWltIHRvIGhhdmUgYQo+ID4gY29tcGxldGUgdW5kZXJzdGFuZGluZyBvZiB0aGUgZHJpdmVy
+IGF0IHRoaXMgcG9pbnQgOy0pCj4gPgo+ID4gT24gVGh1LCBKYW4gMzEsIDIwMTkgYXQgMDU6MzE6
+MjdQTSArMDgwMCwgUGktSHN1biBTaGloIHdyb3RlOgo+ID4gPiBkaWZmIC0tZ2l0IGEvZHJpdmVy
+cy9yZW1vdGVwcm9jL210a19zY3AuYyBiL2RyaXZlcnMvcmVtb3RlcHJvYy9tdGtfc2NwLmMKPiA+
+ID4gbmV3IGZpbGUgbW9kZSAxMDA2NDQKPiA+ID4gaW5kZXggMDAwMDAwMDAwMDAwMDAuLjkyMGM4
+MWMzNTI1YzJhCj4gPiA+IC0tLSAvZGV2L251bGwKPiA+ID4gKysrIGIvZHJpdmVycy9yZW1vdGVw
+cm9jL210a19zY3AuYwo+ID4gPiArICAgICAgICAgICAgIHJldHVybiByZXQ7Cj4gPiA+ICsgICAg
+IH0KPiA+ID4gKwo+ID4gPiArICAgICB3cml0ZWwoMHgwLCBzY3AtPnJlZ19iYXNlICsgTVQ4MTgz
+X1NDUF9TUkFNX1BETik7Cj4gPgo+ID4gd2hhdCBpcyB0aGUgcHVycG9zZSBvZiB0aGlzIHdyaXRl
+Pwo+ID4KPiAKPiBBbnN3ZXIgZnJvbSBFcmluOgo+IFRoZSBjb2RlIG5lZWRzIHRvIGV4ZWN1dGUg
+b24gc2Nw4oCZcyBTUkFNLgo+IFdlIG5lZWQgdG8gdHVybiBvbiB0aGUgcG93ZXIgb2YgU1JBTSBi
+ZWZvcmUgdXNpbmcgaXQuCgpQbGVhc2UgYWRkIGEgYnJpZWYgY29tbWVudCBzaW5jZSB0aGlzIGlz
+IG5vdCBldmlkZW50IGZyb20gdGhlIGNvZGUuCgpUaGFua3MKCk1hdHRoaWFzCgpfX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1h
+aWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xp
+c3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
