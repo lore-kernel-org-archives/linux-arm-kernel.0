@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E7BCFC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:32:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 57A9AC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BF1642086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:32:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E68D2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sASZo3T4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF1642086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nYzooxFp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E68D2086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tOtg6MVB5b/dpQHrZ4kOKQI3urbCgtUOqDGTAVdGhAg=; b=sASZo3T4msfKuO
-	ey9Ykb7TBlWLnJKp5dlkoktfZ5iegWoUKlwYWQgcpkVfAvTQe78m26pd//ugPPUzZAB6DZoB0DIaU
-	NjcfyN1ZQH2NADAqZi1tCYJOs1LkcGXHZwdow1USsx2kSWe7llBlk4Ua/N6jbFZ6yCrRgyatokddL
-	qaUIMPIFPnImTKgv7sJePnInQaH3NbV/SQihbGUEy2XhX3k1f4Uo/Uzcxk6feqwTeM9WuHnXOkbhD
-	gObftxzpbTnOALjEtyez5rvf7LHyLUNmJ8uO45bYsJhodIKxr7CvfKxO7btOB030dieV4UdDRB1bb
-	GWYO+6BAd4jrb7pYuSAw==;
+	List-Owner; bh=wD9ID3+UVrpKRM4L5L5SaMtf6PD/8ub+slweuJhB09A=; b=nYzooxFpvaJxih
+	0rcVE2IsMmvyFo1dNUWsUfJB2ydjNuRB1Z+Oa463v3WYBcv0auhwC0kjWjy1F2FvyBrNnCiMd212P
+	nIGHKfIIPqYLA9xK145IcUzAdfZr/dhqMA/Nl7wm+IaKA7gMk8LVdmIGwHYTgw+O9/Y5VBMcyA67S
+	nTmCAVWbJHPzxCrFqs+9prhVHBQRCi6esO/J9WN1GWQYMIbH97RepUuTJgxfKfrKXGBbf/IUnJUyn
+	mdz+xZb+Q4ghdbQ988MoBPXSbYiCG6q+bxx4m3+Q0icDAAM1F70O8symvYobj2/6V1fPNx7pg+/Je
+	Z397QEeYOy9hxnHsYJZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzKi-0004lf-Vy; Wed, 13 Feb 2019 18:32:32 +0000
+	id 1gtzL3-0005Cv-6q; Wed, 13 Feb 2019 18:32:53 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzIE-00008K-LF; Wed, 13 Feb 2019 18:29:59 +0000
+ id 1gtzIH-0000EO-3U; Wed, 13 Feb 2019 18:30:01 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH 14/21] dma-iommu: refactor iommu_dma_free
-Date: Wed, 13 Feb 2019 19:29:13 +0100
-Message-Id: <20190213182920.16764-15-hch@lst.de>
+Subject: [PATCH 15/21] dma-iommu: don't remap contiguous allocations for
+ coherent devices
+Date: Wed, 13 Feb 2019 19:29:14 +0100
+Message-Id: <20190213182920.16764-16-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213182920.16764-1-hch@lst.de>
 References: <20190213182920.16764-1-hch@lst.de>
@@ -67,79 +68,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Reorder the checks a bit so that a non-remapped allocation is the
-fallthrough case, as this will ease making remapping conditional.
-Also get rid of the confusing game with the size and iosize variables
-and rename the handle argument to the more standard dma_handle.
+There is no need to remap for pte attributes, or for a virtually
+contiguous address, so just don't do it.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/iommu/dma-iommu.c | 46 ++++++++++++++++++++-------------------
- 1 file changed, 24 insertions(+), 22 deletions(-)
+ drivers/iommu/dma-iommu.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index b8a2159ca31a..ff6c6bf30c90 100644
+index ff6c6bf30c90..3199c9c81294 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -1069,34 +1069,36 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
- }
+@@ -1049,10 +1049,10 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
  
- static void iommu_dma_free(struct device *dev, size_t size, void *cpu_addr,
--		dma_addr_t handle, unsigned long attrs)
-+		dma_addr_t dma_handle, unsigned long attrs)
- {
--	size_t iosize = size;
-+	struct page *page;
+ 		addr = iommu_dma_alloc_contiguous(dev, iosize, handle, gfp,
+ 				attrs);
+-		if (!addr)
+-			return NULL;
+-		page = virt_to_page(addr);
++		if (coherent || !addr)
++			return addr;
  
--	size = PAGE_ALIGN(size);
- 	/*
--	 * @cpu_addr will be one of 4 things depending on how it was allocated:
--	 * - A remapped array of pages for contiguous allocations.
--	 * - A remapped array of pages from iommu_dma_alloc_remap(), for all
--	 *   non-atomic allocations.
--	 * - A non-cacheable alias from the atomic pool, for atomic
--	 *   allocations by non-coherent devices.
--	 * - A normal lowmem address, for atomic allocations by
--	 *   coherent devices.
-+	 * cpu_addr can be one of 4 things depending on how it was allocated:
-+	 *
-+	 *  (1) A non-cacheable alias from the atomic pool.
-+	 *  (2) A remapped array of pages from iommu_dma_alloc_remap().
-+	 *  (3) A remapped contiguous lowmem allocation.
-+	 *  (4) A normal lowmem address.
-+	 *
- 	 * Hence how dodgy the below logic looks...
- 	 */
--	if (dma_in_atomic_pool(cpu_addr, size)) {
--		iommu_dma_free_pool(dev, size, cpu_addr, handle);
--	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
--		iommu_dma_free_contiguous(dev, iosize,
--				vmalloc_to_page(cpu_addr), handle);
--		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
--	} else if (is_vmalloc_addr(cpu_addr)){
--		iommu_dma_free_remap(dev, iosize, cpu_addr, handle);
--	} else {
--		iommu_dma_free_contiguous(dev, iosize, virt_to_page(cpu_addr),
--				handle);
-+	if (dma_in_atomic_pool(cpu_addr, PAGE_ALIGN(size))) {
-+		iommu_dma_free_pool(dev, size, cpu_addr, dma_handle);
-+		return;
++		page = virt_to_page(addr);
+ 		addr = dma_common_contiguous_remap(page, size, VM_USERMAP, prot,
+ 				__builtin_return_address(0));
+ 		if (!addr) {
+@@ -1060,8 +1060,7 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
+ 			return NULL;
+ 		}
+ 
+-		if (!coherent)
+-			arch_dma_prep_coherent(page, iosize);
++		arch_dma_prep_coherent(page, iosize);
+ 	} else {
+ 		addr = iommu_dma_alloc_remap(dev, iosize, handle, gfp, attrs);
  	}
-+
-+	if (is_vmalloc_addr(cpu_addr)) {
-+		if (!(attrs & DMA_ATTR_FORCE_CONTIGUOUS)) {
-+			iommu_dma_free_remap(dev, size, cpu_addr, dma_handle);
-+			return;
-+		}
-+		page = vmalloc_to_page(cpu_addr);
-+		dma_common_free_remap(cpu_addr, PAGE_ALIGN(size), VM_USERMAP);
-+	} else
-+		page = virt_to_page(cpu_addr);
-+
-+	iommu_dma_free_contiguous(dev, size, page, dma_handle);
- }
- 
- static int iommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 -- 
 2.20.1
 
