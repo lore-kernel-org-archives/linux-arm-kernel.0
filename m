@@ -2,75 +2,82 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A2F28C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:56:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE6A2C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:09:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70D6B222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:56:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8E04F222AE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:09:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rPRuirUc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="O2mhGTXv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70D6B222B2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p7orTwdG";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="s/+MFZFQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E04F222AE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=/U86Do1VE+LxK8DH85eqY0+DU7MT81Hw83zMpLs4VC4=; b=rPRuirUc33zS6zL0dtNx3GUk7
-	wqafdtHi4jEv/XEhrPpe0PEjO8OAnK6OA+KgTAOpD8eFSLCtmHRB2+h9Hn41AoGiFqeIV9Gr+eyc8
-	otxs9cGwtPNbIAIuIfRlS4L35dTmzkHtR1z3eIpsq/NeXtVpGswNgdi4I5YJfF9oZ+Ri8KK8cY4CF
-	0FYWH66/uBULwU1I1+DpKIrPQpevzaJ0RPKFziL/hAUcEYCRc+ppFlLy65XcBwnVaC+uzs1QF4WmQ
-	x9hsNSuJpnJo/II0zDVpz0hKiGMwCZFtL026ahAC5AIpFaFwJ3YCjVkYlp4EmXb1Shv/APj5hwpu0
-	r559MPmSw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KQKuwLlXgIBcJ0ZNNh2jwYvBcNb71m7JNMSXHaHAK4s=; b=p7orTwdG7zo4bB
+	A3OAgU+RMEfd90LSVbmkKOkPxVLH/EzmwqeYHlhqHOm7cbIAjL8Q5DJI5lmhJMTbShysLNgakzXhb
+	khVFA27vvuxbziVjmjP7I1R3XdWdaY68r+h/Rv+3UKKoLQcVMVz42jzwnzuUBcnkFEVFv/AmbNtbK
+	tKhesyR5sRebZhKS1H4cVVIsD6G6MoXSiiQbFiIxdTcIGoZrobPewSmK2Sc3OS4n81u8sTS+svNLL
+	drMPusTcMFyRu+ZVxjA1+pVycJGfJapLX3tQ3/Z6WmfHP4WerOVnBbohBy1R3bjqXaj4z32npqeWg
+	lS/wBjvfdZAvuSkUvmvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtt9n-0001bB-1q; Wed, 13 Feb 2019 11:56:51 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gttLx-0005Av-EG; Wed, 13 Feb 2019 12:09:25 +0000
+Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtt9j-0001ak-Ts
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:56:49 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=lEHTEwx8LjfWPDnCIJL0kg24n/DJWgYAHayPimS1RpY=; b=O2mhGTXvRGaeKnIhhWjz6Q2Ei
- ZnFCMA+lfXzS4CpcmZTBs+OlzokDFkesffafPVoF29vVBvRb+o4U1fqakfyJkCCxqG4k5Qp+qdAEp
- eGAZaKa6y+5Cs40w9Hz+YIohGw4pCLqHPXf47mJelNv6/Ck5eM1N6/t+JnGSpN7grN+GI=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gtt9e-00048c-RE; Wed, 13 Feb 2019 11:56:42 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 338E21128158; Wed, 13 Feb 2019 11:56:42 +0000 (GMT)
-Date: Wed, 13 Feb 2019 11:56:42 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Stefan Agner <stefan@agner.ch>
-Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
-Message-ID: <20190213115642.GC7540@sirena.org.uk>
-References: <20190107132226.16216-1-stefan@agner.ch>
- <20190107132226.16216-2-stefan@agner.ch>
- <1549573243.3075.72.camel@impinj.com>
- <20190211012305.GA21496@dragon>
- <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
+ id 1gttLt-00059m-92
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 12:09:22 +0000
+Received: by mail-ua1-x944.google.com with SMTP id e16so671876uam.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 04:09:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Tomadc5NLuTEZWSBt9A/Z/OxsLDygmn8C6sD5u1RnAk=;
+ b=s/+MFZFQdJ5wc+fCrcDEdY98PFQKR/CkdOol5xVzknngHj2Mf6EjCRTZYeMbClJyXJ
+ Vt1zdHaQp/xFOIFVa/MV3L5vdiG0+9av6+IYIy8Dgm7NEoBag56GjgFoGq8Vhz0k3lMV
+ F9fShJEFK1IFPGdiXCL8bz0JvsMJqDbig1PH31wnLCSs61EY7WEOi3JST6O6obqQWC4s
+ jApFMc5UjrgfNgTLUr0kFKH29B6thd5h0CLSvIwFGEL2xY0Ik9VFUbOv4nKg5clbUOhn
+ vujiF7hqOujrN3GA+B/IqO0klktNmmlJj4SEV8Zq/xGHFF+ItvbDFeNUXPRkrfEx54aL
+ 1P9w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Tomadc5NLuTEZWSBt9A/Z/OxsLDygmn8C6sD5u1RnAk=;
+ b=JN5YXQHhOv8vZsrsgeRfsmGnAbV8oDVzNv8KOqXr+Vi3Us0JGyibP1AVy8AO8e6D1w
+ aho4cHqItMxW0JJrnRfAP6WgVtkYnmGQ3NpEYg7Hm8dkIy6ZyVNSGwkVANMF50j6e1PF
+ 4ajeZAfs7/DAowRr/OkyvowbYBiiwOTn/fI96J8PBBnbdtXo5GSxdXVJUBgUMwOVZ+3d
+ pQk5I0hmXp/DPMjQSjg0qw9tVW9qXHYgbJh/vRGxM1l6booK85ZWVn1O+W2EcdYa+fo9
+ 72MVhfO36algxuz/n8M0ghV+9/6AAk3Z6tfsA9pcUMLpQdCi+6hQnenl0jK2vMBixynf
+ ZR/g==
+X-Gm-Message-State: AHQUAuaG1D/XXr4GZvq4Ua6SbrJd3BYEy/FTlBOQDWB68P69uRImzr5R
+ d0VQvUFB6stjie9czDi7P8xtik0xk1PBbsMSLojzoQ==
+X-Google-Smtp-Source: AHgI3IYKJI/LELk31xcRwzxAgH9EsF+YE5I4BAcQjqNLWWzOUqdfVYoErIEDJkKVxxDYnIhK0mxyOLo6njWBHweJTaw=
+X-Received: by 2002:ab0:238e:: with SMTP id b14mr48222uan.119.1550059759809;
+ Wed, 13 Feb 2019 04:09:19 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
-X-Cookie: Nothing is but what is not.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <1550048812-29068-1-git-send-email-chaotian.jing@mediatek.com>
+In-Reply-To: <1550048812-29068-1-git-send-email-chaotian.jing@mediatek.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 13 Feb 2019 13:08:43 +0100
+Message-ID: <CAPDyKFpNEhXT0dD_p85Ab2H_nHtr5r86BLcvkLVUsdwtYLUs4g@mail.gmail.com>
+Subject: Re: [PATCH v1] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
+To: Chaotian Jing <chaotian.jing@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_035648_120764_F03CA3B9 
-X-CRM114-Status: GOOD (  12.86  )
+X-CRM114-CacheID: sfid-20190213_040921_332436_9B51AC1E 
+X-CRM114-Status: GOOD (  23.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,67 +89,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, s.hauer@pengutronix.de,
- linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-imx@nxp.com,
- kernel@pengutronix.de, fabio.estevam@nxp.com, Shawn Guo <shawnguo@kernel.org>,
- linux-arm-kernel@lists.infradead.org, Trent Piepho <tpiepho@impinj.com>
-Content-Type: multipart/mixed; boundary="===============3593256947149686187=="
+Cc: srv_heupstream <srv_heupstream@mediatek.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Adrian Hunter <adrian.hunter@intel.com>, linux-mediatek@lists.infradead.org,
+ Harish Jenny K N <harish_kandiga@mentor.com>,
+ Hongjie Fang <hongjiefang@asrmicro.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Simon Horman <horms+renesas@verge.net.au>,
+ Kyle Roeschley <kyle.roeschley@ni.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, 13 Feb 2019 at 10:07, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>
+> mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
+> Therefore, any commands sent to the card should use HS400 timing.
+> reduce clock frequency to 50Mhz but without host timming change
+> may cause CMD6 response CRC error. because host still running at
+> hs400 mode, and it's hard to find a suitable setting for all eMMC
+> cards when clock frequency reduced to 50Mhz but card & host still
+> in hs400 mode.
+> this patch refers to mmc_select_hs400(), make the reduce clock frequency
+> after card timing change.
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> Fixes: ef3d232245ab ("mmc: mmc: Relax checking for switch errors after HS200 switch")
+> ---
+>  drivers/mmc/core/mmc.c | 29 +++++++++++++++++++++++------
+>  1 file changed, 23 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 09c688f..00adc2d 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1239,20 +1239,37 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+>         int err;
+>         u8 val;
+>
+> -       /* Reduce frequency to HS */
+> -       max_dtr = card->ext_csd.hs_max_dtr;
+> -       mmc_set_clock(host, max_dtr);
+> -
+>         /* Switch HS400 to HS DDR */
+>         val = EXT_CSD_TIMING_HS;
+>         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+>                            val, card->ext_csd.generic_cmd6_time, 0,
+>                            true, false, true);
+> -       if (err)
+> -               goto out_err;
+> +       /*
+> +        * as we are on the way to do re-tune, so if the CMD6 got response CRC
+> +        * error, do not treat it as error.
+> +        */
+> +       if (err) {
+> +               if (err == -EILSEQ) {
+> +                       /*
+> +                        * card will busy after sending out response and host
+> +                        * driver may not wait busy de-assert when get
+> +                        * response CRC error. so just wait enough time to
+> +                        * ensure card leave busy state.
+> +                        */
+> +                       mmc_delay(card->ext_csd.generic_cmd6_time);
+> +                       pr_debug("%s: %s switch to HS got CRC error\n",
+> +                                mmc_hostname(host), __func__);
+> +               } else {
+> +                       goto out_err;
+> +               }
+> +       }
+>
+>         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+>
+> +       /* Reduce frequency to HS */
+> +       max_dtr = card->ext_csd.hs_max_dtr;
+> +       mmc_set_clock(host, max_dtr);
+> +
 
---===============3593256947149686187==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="R+My9LyyhiUvIEro"
-Content-Disposition: inline
+What Adrian suggested was to not to move this part, but instead, only
+allow CRC errors from the CMD6 as above.
 
+I guess it didn't work for you?
 
---R+My9LyyhiUvIEro
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
+>         err = mmc_switch_status(card);
+>         if (err)
+>                 goto out_err;
+> --
+> 1.8.1.1.dirty
+>
 
-On Tue, Feb 12, 2019 at 08:20:46PM +0100, Stefan Agner wrote:
-
-> > I dropped both patches from my tree.
-
-> I think this is the wrong approach to disable DMA on those devices. The
-> device tree is supposed to describe the complete hardware. If the driver
-> is not ready to support DMA for that particular variant, we should add
-> this information in the driver. We have compatible strings for i.MX
-> 6UL/i.MX 7 to disable DMA accordingly.
-
-Yes, that seems sensible - it's vanishingly unlikely that there's any
-problem in the hardware here, it's software bugs and quirking in the
-driver seems better than changing the DT.
-
---R+My9LyyhiUvIEro
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxkBfkACgkQJNaLcl1U
-h9AVqwf+JOiZLu406UOLhIQJf6RMKFfrh1E7dVOI4A8MUZhEkZ4t3RHBOPpFJILe
-xRdXkUyv12y6dk81ztTLFnZH1eK6jN4J7j9ETei5mfJ6KrJc93PzyHZhD/pQvBk0
-Q64HFEg0uE6b4hK0OhEjMl/02xVgRWhEQkENwWoX7JLKL3Zo0ZYOVIg+LJyk3jux
-tCgZBq5OPlANasZ6PYXg3iqlVOPyhnPRjggu4ILoUhB83ukKTOIp5ZoKJq7f/kwT
-JpS15NDnUVYVp8NDwwqBGXpoZEdTPaHCYxX2Uetm8jPF/6KYlYWvKqjSOqs+Nu5j
-iEoDyWU56KtZZ4OhQYdGkuBxYWhDcg==
-=bamr
------END PGP SIGNATURE-----
-
---R+My9LyyhiUvIEro--
-
-
---===============3593256947149686187==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3593256947149686187==--
-
