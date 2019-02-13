@@ -2,139 +2,92 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D7B4C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:53:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5015DC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:56:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A99C2075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:53:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20CA6222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:56:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fu0szkJ8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="qDJvN5kf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A99C2075D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EWQBZ7xg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Wo+rn4+r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20CA6222B2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=s3K6u3FD25Yv8AE+v7eiEpqGktLIw8RBIXOiKvsPObE=; b=Fu0szkJ8uhllfT
-	xBHDFIGIgttaMnts8l6BNS4KotIQZ4sJSrZUF0VMnytmQhnCc3jII51Ux8FivgiWtHmher/PUWHf1
-	5btdI5sLP8b1QCpwc3eR6LguZcHzJtxBKCKSlngj6xLGTvb4bWg5wYUgBgU7IOkR0I6H/jDNSTtsH
-	B9l4dZh4lLSIYJdccwQP7xbboelUFCulXxd3h063OcdNhv94/TqhcbDVcaEhcgdEqDqTuTO3UJCr/
-	ttg3chblDUwh8FXmhoO6pF/2nl3nH7QfMTwDO7R1FQqW0Uhhkl6R+KehvsQXaTXc2c8CTgkU2/Mi6
-	RNbCaJGg7IFRrAi93UeQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=hMXss1BJ998sRWl1ZM8zDXmds7Wt0hgTyuz0BYQm+lQ=; b=EWQBZ7xgbmO1cQ
+	Vkd3M2RhKFcrcUtvq2CEdQSkXy2LzsXFJ6PuBV5k+DC8/ZeQwKmenZDLZog3K5v4yAFEC7Ot57Cn2
+	rSs85Rug8K6lpbUz3ErJd9yguSDZMbdanSJzM2Ci19/bkvviPPuP3NsBnLvHeqz2ReFJ4JzO0hatU
+	co8qnnc13E+5Tae/fPk7MhMowY++DHFvy6TGDQfwj9bGBxOHcwRw90IRM1NTlIagwYrVO++EazKtb
+	fjwzUaej8iQYOYNWlLOZWg05uhur2bRTd6kgq6KpmxOzYeDTzTJM24i2osz1aKNSX39CFY2rW/Wid
+	gbEbBUcy8IsQig7QZ3yQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtuyS-0002zq-0Q; Wed, 13 Feb 2019 13:53:16 +0000
-Received: from mail-db5eur03on0614.outbound.protection.outlook.com
- ([2a01:111:f400:fe0a::614]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+	id 1gtv1T-0004zg-VC; Wed, 13 Feb 2019 13:56:23 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtuyN-0002yc-W0
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:53:13 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=59V7AEZrq509O809mYwAsMWvNF5jyBYkQR7kI9p9H6Q=;
- b=qDJvN5kfrACiq1N1oWJ0JD47X6BOqLgDbxO9wmmtaLLemilbP+AbG6A0mvgtcOf77Qs5gEn5ETAvyN/RC6XlSfAVhyaKhrSQ1k2DrZLaKJFlU8jAc8R7hesGLzvOoa6kMQwULjcwtmUSuFKql2R4iNotVWABk7YCxb67q/oStLc=
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com (20.178.122.159) by
- VI1PR04MB1584.eurprd04.prod.outlook.com (10.164.84.142) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Wed, 13 Feb 2019 13:53:04 +0000
-Received: from VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::fc57:e5ed:7fb2:2c67]) by VI1PR04MB5533.eurprd04.prod.outlook.com
- ([fe80::fc57:e5ed:7fb2:2c67%5]) with mapi id 15.20.1622.016; Wed, 13 Feb 2019
- 13:53:04 +0000
-From: Leonard Crestez <leonard.crestez@nxp.com>
-To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Topic: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Index: AQHUw6CRSTAGnhFbAkysZVsEDWdrJKXdv4gA
-Date: Wed, 13 Feb 2019 13:53:04 +0000
-Message-ID: <59b181b77605f516b0e3a896ddce0224b4504b30.camel@nxp.com>
-References: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
- <1550064410-28417-2-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1550064410-28417-2-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [95.76.156.53]
-x-mailer: Evolution 3.28.5-0ubuntu0.18.04.1 
-x-clientproxiedby: AM5PR06CA0022.eurprd06.prod.outlook.com
- (2603:10a6:206:2::35) To VI1PR04MB5533.eurprd04.prod.outlook.com
- (2603:10a6:803:d2::31)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=leonard.crestez@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 2c80df25-2c93-4b28-2714-08d691ba9354
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB1584; 
-x-ms-traffictypediagnostic: VI1PR04MB1584:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtWSTFQUjA0TUIxNTg0OzIzOnFraUdxcy9tcFR1NGZpTkNTcDlxT3I4bVlq?=
- =?utf-8?B?QzNoNGY2T3dMNDhlVnliSWhsS3djWG90ODJtTXd4d0hzeTZOd2lhM2VlN2p4?=
- =?utf-8?B?ZEdGYkNCTXJmdkxWS0Z4WFdRNU1KOVMrajdJRTllb0U3U3NVaFZvL0RTT2tN?=
- =?utf-8?B?cmMzd2wwSWFtbTRIcXFrY3plc3lBK3dwMUlnemQ5QmkvdnJMRXF5Qmpad0xL?=
- =?utf-8?B?TVBXaFVEb1c5aTVuTENmOVZva2FRYmhmTm1sbWdvNk9Jc2VGeE1xaVloZEQy?=
- =?utf-8?B?QWppUnBDaUxBc0hiOHVtR1M4c0ZYV3ZsZ0g4Q1dLZmJGakNtQ2pOdHNlWFpL?=
- =?utf-8?B?c3NNTWIwQW5scGdtdjlXclZNRW5ubWJHTzdFd09Ra2pYeCtXeG9nR1VSWU9t?=
- =?utf-8?B?cDhiM1VycjBRSGxIU2tYUXU4RU5lZ1YyY25Ic1prQjF3b01pbk0rb1V5Qk45?=
- =?utf-8?B?N3RleVpJb0t3NkRWTHVyT2djcW1RUGRiUEFybVpjN2ZWbDlTV1V4b1RLY1pn?=
- =?utf-8?B?OGxIcjhaamNLZWoyalBxNGdub0x2QWNmTWRJRlNhOWhJSWJkeVVXTEJ5VUV1?=
- =?utf-8?B?anZvWUJWdGJCaDVMV3FWU3REZldhd2RVY09jeWxrZTdrdDhuNnJ1ZVFTWkJH?=
- =?utf-8?B?eWZkd3kzZmVpY2NLTUJQL0dWUWJqcndBekJiYjJFTE5VaDJIRW9sZEFVK2I1?=
- =?utf-8?B?cy9aT3gvbVgyUUdvWUEwOVIzVUZ5cHpaNThiL2ZqR3RpaWJHNGkxSWVlRFN6?=
- =?utf-8?B?QU05ZjJtQ0FlZzJBM2N6TUQrM0pSaWt4cXZGYlpoTnNycWUyeWp5dlpOYUhv?=
- =?utf-8?B?L2U5bmlBWGZBS1ZTYi90aUNLVEg3ZGs4SE05TFVoS3FQM05tZ0RoL24xMG9r?=
- =?utf-8?B?VUNkYytFdjdpSzVTZGFlYW9KM3pISzdSZDRpMTVETFEvcnZtZXcxZlNoL0RF?=
- =?utf-8?B?TlN3aDMzVVdERHNLd2h5S1hLelJaSWRjNVhSNmNmcDJ4SDMzVzFxcXpMRUZs?=
- =?utf-8?B?RDFzZG1DKzFlOEZyb3pTSy9iR2VmblpYdVQyMFcvVmtTckM3dFhjOHM0R0hS?=
- =?utf-8?B?VDJldkNxbithN1lSeTNZNEZaQ1I3bHlyNER5YXo4cGJpdGdEUFVqMTJCRk04?=
- =?utf-8?B?UWRQajN5b1BaeWRFbndUbU1VWkU3M3Vla3k4cDJvYVZ2Ykk4WC9KSnExV2RT?=
- =?utf-8?B?ZW5zbzZGVU1kMVBIL1JrMFI0SG9sZ3pxQkVpRTMvRTNjRVRZb25MSDdJcldL?=
- =?utf-8?B?cTN3WGtPVEN5MG5OVXA5VVQ3WTRlYzk3YThaM3BhZnNiYnhoVHNGNTg5dmJF?=
- =?utf-8?B?NzRXZlppT08wSDZ1ZEE0OU1xZnVhTzlQeWFEM1FldXllbFZLVFUxWlNNeFNB?=
- =?utf-8?B?bHJGdTVMeWtyTFRJMThQK0p4V2JKdWVZTmlWbHJ4ZjJBMysrTkpOSCtOYStz?=
- =?utf-8?B?RmwxYXJHVDJ4R015V2toNlN3NVgzVGFsN3o1Y25CS0tlSEVOK2V0WUtBSjRw?=
- =?utf-8?B?MnRBS0JSck1qMXdxZld5M2J4OSs0SWFwdW9QRGkwbEIrazNuVW56bmxHY0NN?=
- =?utf-8?B?d1F3Y2xKU2VoUXdvdFZqRzcxdk1PMGRXRnlMK3VYTUc3b3F4RDE0OXlHbWdF?=
- =?utf-8?B?L09xT0VsenhyNEdadTVUNzRYSERmZ3JaK2ZpS2I1T1NpYWVRaEg5aUE3eEw3?=
- =?utf-8?B?bGZlUjkvUVQrczZXbE50bm1DazdWRUxuYzdOSmhwNUFxUmpkZ2VNYzFZcnJl?=
- =?utf-8?B?VnE4QnAzVHg1dmRJdVNIcGlEbWdLRC96Z3VvSEhNWG5DVVg2dXB3T0p6NnM5?=
- =?utf-8?Q?OdArObFQs4L6i?=
-x-microsoft-antispam-prvs: <VI1PR04MB1584C9D510B13DD5DBD24288EE660@VI1PR04MB1584.eurprd04.prod.outlook.com>
-x-forefront-prvs: 094700CA91
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(346002)(366004)(396003)(136003)(39860400002)(189003)(199004)(53936002)(316002)(36756003)(54906003)(86362001)(105586002)(6512007)(37006003)(99286004)(52116002)(2906002)(8676002)(81156014)(6246003)(71190400001)(11346002)(229853002)(66066001)(6486002)(76176011)(6436002)(2616005)(8936002)(50226002)(81166006)(186003)(71200400001)(446003)(68736007)(486006)(118296001)(6636002)(3846002)(14444005)(478600001)(6506007)(26005)(44832011)(97736004)(14454004)(25786009)(476003)(6116002)(7416002)(106356001)(305945005)(256004)(386003)(6862004)(4326008)(7736002)(102836004)(99106002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB1584;
- H:VI1PR04MB5533.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: MGsM+miX+MRT0cGGHZkLZq6o6OlyRiP3o4eQFiS3okvgTQBGx9qXCUtMGIxlWz6O5FSf9PFEKTWtntBClOVDtjk37gmxRDa39qIWB4spmpsfrS0YY5L7svL+LUgsvaE2tQrBoCIONKIs2FHu9TQ6j99g24SGb+KFr+QB0NhR9eTtjttEmflUN50f6COQpQi2cmaSS3uGPr+1EYlrlou6QZhqEdQbiuHSBpZeLqV7po7jkoOFvmze82y4zMoIt0HN9r8T5bxcpA1zNfYcWKRt8vNRkaQScKdaBFVKiI6plnk6bXrIe4I4Mr/j4zklmc2doV7KmJkkL3YkSkjB74O2lmBCF8bD1frd7S6pZOuyiliMo4cSn4roBwPPYXx6PeY7xrfjcUG2fx0WKolF3g8zgTUk93678bxdYFeY8UFjalw=
-Content-ID: <DFFAC317CCAA5545B90CE2DCE255FAB8@eurprd04.prod.outlook.com>
+ id 1gtv1P-0004yX-N8; Wed, 13 Feb 2019 13:56:21 +0000
+Received: by mail-pl1-x643.google.com with SMTP id s1so1191232plp.9;
+ Wed, 13 Feb 2019 05:56:19 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=V2qFA0OcwjrK68risolzFdRV/D9+52UF5C3nMIQDVp4=;
+ b=Wo+rn4+rpbWNXMXw8f961P6oxr28SV0R3AE2+Iuvqh7fxEkblbcFpBrThrdGUZASMo
+ +obY5tWBT5FcDq1TCc2YALzjSj/RwS62oxijXHr27AMGgQQ5EAXv7KDXIR8qS+CriIzl
+ v+ii3rGwru5TZogwAVIdxKFZ3HcsQXSMp2qyjqUotAp7B0lv2662QZR8uNlKx7/r97Wt
+ Q1kF7Xrwhfuo0ODVWB5AEbZlo/SYZi2B7iswqgis9OVmaodYPCQ5gXnYca7KlKSYKhWN
+ qJ16mA6TwoJHT3BVnzle1LT/35tmCVTvOSmsrJwpZE+NSxRv6QEEiAd7//aDbrQIA0zS
+ /cfg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=V2qFA0OcwjrK68risolzFdRV/D9+52UF5C3nMIQDVp4=;
+ b=XyX8iA4AjeslnQaML4NNra0xYOuJLovWEeo7onpWPvnDk+Mwo9N1SVeC8gKHyD7dUy
+ DC8H+21yqmSaHbqdIPbUpjag0vNeAierwR9owRoS9PXSbq8JUxNjWif9e3bWzEug+QXG
+ gSNzNdpSdk+7b0QA4NodLeFxQn7yCMFqRVaWsxBFYwHMLHKyb+bWXsG3V2IBVP9J0pfa
+ t9i1HTdHGldeQ5pPqLtXshCRhoBZutMD78i1nb6pbQjmPS885lc5kH5tANvoiFHMg+/A
+ YEc6D/OkI3u7FdJxhUoXUok+bQXpttKsAqzv78CIXs6IiLU4WyK4JK+GFWaoXRGpC8rv
+ oZfA==
+X-Gm-Message-State: AHQUAuYqAsJYER08kILe2x+qhe3Twgkm1hUjNpfT+DofooVil+s2s5n9
+ 2cb5Nfit015t37bMQVRjDxg=
+X-Google-Smtp-Source: AHgI3IZ+SXZkfuwQeWGM2fq41k8bLY3tiDCzMWyTKTaAYfDA8NidP+PtWIWRFYBlC0duiJnXDlxZqA==
+X-Received: by 2002:a17:902:161:: with SMTP id 88mr683223plb.306.1550066178456; 
+ Wed, 13 Feb 2019 05:56:18 -0800 (PST)
+Received: from jordon-HP-15-Notebook-PC ([49.207.48.54])
+ by smtp.gmail.com with ESMTPSA id y20sm26266582pfd.161.2019.02.13.05.56.16
+ (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Wed, 13 Feb 2019 05:56:17 -0800 (PST)
+Date: Wed, 13 Feb 2019 19:30:35 +0530
+From: Souptick Joarder <jrdr.linux@gmail.com>
+To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
+ kirill.shutemov@linux.intel.com, vbabka@suse.cz, riel@surriel.com,
+ sfr@canb.auug.org.au, rppt@linux.vnet.ibm.com, peterz@infradead.org,
+ linux@armlinux.org.uk, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
+ treding@nvidia.com, keescook@chromium.org, m.szyprowski@samsung.com,
+ stefanr@s5r6.in-berlin.de, hjc@rock-chips.com, heiko@sntech.de,
+ airlied@linux.ie, oleksandr_andrushchenko@epam.com, joro@8bytes.org,
+ pawel@osciak.com, kyungmin.park@samsung.com, mchehab@kernel.org,
+ boris.ostrovsky@oracle.com, jgross@suse.com
+Subject: [PATCH v3 0/9] mm: Use vm_map_pages() and vm_map_pages_zero() API
+Message-ID: <20190213140035.GA21935@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2c80df25-2c93-4b28-2714-08d691ba9354
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 13:53:02.8155 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB1584
+Content-Disposition: inline
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_055312_028020_C061C56C 
-X-CRM114-Status: GOOD (  17.35  )
+X-CRM114-CacheID: sfid-20190213_055619_774620_82AA4A1B 
+X-CRM114-Status: GOOD (  12.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -146,76 +99,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "sboyd@kernel.org" <sboyd@kernel.org>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Daniel Baluta <daniel.baluta@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, xen-devel@lists.xen.org, linux-mm@kvack.org,
+ iommu@lists.linux-foundation.org, linux1394-devel@lists.sourceforge.net,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-02-13 at 13:32 +0000, Anson Huang wrote:
-> On NXP's i.MX SoCs with system controller inside, CPU frequency
-> scaling can ONLY be done by system controller firmware, and it
-> can ONLY be requested from secure mode, so Linux kernel has to
-> call ARM SMC to trap to ARM-Trusted-Firmware to request system
-> controller firmware to do CPU frequency scaling.
+Previouly drivers have their own way of mapping range of
+kernel pages/memory into user vma and this was done by
+invoking vm_insert_page() within a loop.
 
-> +#ifdef CONFIG_CPUFREQ_DT
-> +#define IMX_SIP_CPUFREQ			0xC2000001
-> +#define IMX_SIP_SET_CPUFREQ		0x00
-> +
->  static struct imx_sc_ipc *ccm_ipc_handle;
+As this pattern is common across different drivers, it can
+be generalized by creating new functions and use it across
+the drivers.
 
-Without CONFIG_CPUFREQ_DT the ccm_ipc_handle won't be defined and build
-will break.
+vm_map_pages() is the API which could be used to map
+kernel memory/pages in drivers which has considered vm_pgoff.
 
-But is there a good reason for ifdef? In general clock function are
-compiled even if no driver is calling them.
+vm_map_pages_zero() is the API which could be used to map
+range of kernel memory/pages in drivers which has not considered
+vm_pgoff. vm_pgoff is passed default as 0 for those drivers.
 
-> +#ifdef CONFIG_CPUFREQ_DT
-> +	/* CPU clock can ONLY be done by TF-A */
-> +	if (clk->clk_type == IMX_SC_PM_CLK_CPU) {
-> +		struct arm_smccc_res res;
-> +		unsigned int cluster_id;
-> +		int i;
-> +
-> +		for (i = 0; i < ARRAY_SIZE(imx_sc_cpufreq_data); i++) {
-> +			if (!strcmp(clk_hw_get_name(hw),
-> +				imx_sc_cpufreq_data[i].clk_name)) {
-> +				cluster_id = imx_sc_cpufreq_data[i].cluster_id;
-> +				break;
-> +			}
-> +		}
-> +
-> +		/*
-> +		 * As some other clock types have same value as
-> +		 * IMX_SC_PM_CLK_CPU, so we need to double check
-> +		 * the clock being scaled is indeed CPU clock which
-> +		 * matches the table we define.
-> +		 */
-> +		if (i < ARRAY_SIZE(imx_sc_cpufreq_data)) {
-> +			arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
-> +				cluster_id, rate, 0, 0, 0, 0, &res);
-> +			return 0;
-> +		}
-> +	}
-> +#endif
+We _could_ then at a later "fix" these drivers which are using
+vm_map_pages_zero() to behave according to the normal vm_pgoff
+offsetting simply by removing the _zero suffix on the function
+name and if that causes regressions, it gives us an easy way to revert.
 
-The code inside the ifdef would look better in a separate
-imx_clk_atf_set_rate function. Maybe even separate clk_ops?
+Tested on Rockchip hardware and display is working fine, including talking
+to Lima via prime.
+
+v1 -> v2:
+        Few Reviewed-by.
+
+        Updated the change log in [8/9]
+
+        In [7/9], vm_pgoff is treated in V4L2 API as a 'cookie'
+        to select a buffer, not as a in-buffer offset by design
+        and it always want to mmap a whole buffer from its beginning.
+        Added additional changes after discussing with Marek and
+        vm_map_pages() could be used instead of vm_map_pages_zero().
+
+v2 -> v3:
+        Corrected the documentation as per review comment.
+
+        As suggested in v2, renaming the interfaces to -
+        *vm_insert_range() -> vm_map_pages()* and
+        *vm_insert_range_buggy() -> vm_map_pages_zero()*.
+        As the interface is renamed, modified the code accordingly,
+        updated the change logs and modified the subject lines to use the
+        new interfaces. There is no other change apart from renaming and
+        using the new interface.
+
+	Patch[1/9] & [4/9], Tested on Rockchip hardware.
+
+Souptick Joarder (9):
+  mm: Introduce new vm_map_pages() and vm_map_pages_zero() API
+  arm: mm: dma-mapping: Convert to use vm_map_pages()
+  drivers/firewire/core-iso.c: Convert to use vm_map_pages_zero()
+  drm/rockchip/rockchip_drm_gem.c: Convert to use vm_map_pages()
+  drm/xen/xen_drm_front_gem.c: Convert to use vm_map_pages()
+  iommu/dma-iommu.c: Convert to use vm_map_pages()
+  videobuf2/videobuf2-dma-sg.c: Convert to use vm_map_pages()
+  xen/gntdev.c: Convert to use vm_map_pages()
+  xen/privcmd-buf.c: Convert to use vm_map_pages_zero()
+
+ arch/arm/mm/dma-mapping.c                          | 22 ++----
+ drivers/firewire/core-iso.c                        | 15 +---
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c        | 17 +----
+ drivers/gpu/drm/xen/xen_drm_front_gem.c            | 18 ++---
+ drivers/iommu/dma-iommu.c                          | 12 +---
+ drivers/media/common/videobuf2/videobuf2-core.c    |  7 ++
+ .../media/common/videobuf2/videobuf2-dma-contig.c  |  6 --
+ drivers/media/common/videobuf2/videobuf2-dma-sg.c  | 22 ++----
+ drivers/xen/gntdev.c                               | 16 ++---
+ drivers/xen/privcmd-buf.c                          |  8 +--
+ include/linux/mm.h                                 |  4 ++
+ mm/memory.c                                        | 81 ++++++++++++++++++++++
+ mm/nommu.c                                         | 14 ++++
+ 13 files changed, 136 insertions(+), 106 deletions(-)
+
+-- 
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
