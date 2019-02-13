@@ -2,50 +2,48 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64A59C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 236CCC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B80E222D1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E33662086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NHXidvlA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B80E222D1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shNeDowc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E33662086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+bP4L6jOeKCFCTUGNGecdEg47WIOLMt5E1c+rP9CD5o=; b=NHXidvlAYRUCdg
-	IEKaWog07/cdOUkF05T/jkTy+VDrFsjh/PqfT59+0B/9zJ+fBpgXTiQ4VKGzCq94hmEMnnAiiMxjj
-	fNqzUpydyRY4Hwy0v30DaaGQTR4cBF6zD8e9C3mVrKNQv0Y+5psi9TnpbAyshsYVY0qLT9A+s6AJy
-	irn2NlESPkCi5gsc3bc/VqAvkQnJD+iVqMvS6X/rIeUNkWHuAjWLjCXxTLXMYxKUXFV5R+0nwj4OO
-	jcU3YG8qyWCoCsZW/Qc6UiquMFq1sBUrbh34rc/I5cbQrhaVVmowXsKkCtwT99QzavyaoNJuuM+ql
-	g9uzesSian310D3Xe/Mg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=SzXNhhzIX2CoMEQdVwBhRLnwCrrzkB7oTXIliaChWfs=; b=shNeDowcsXnZnk
+	sjY9CGTTY/CuRwmcjPnUGUEkB52fPNfZD0wOOV/WsaLL2yC1lIHFjqvSfpIpNCMXuB+DdssXuZ/8p
+	6qr9oVdveCA1tyMdcDehou17v85ERFWH9/IJB39S3GIRvab/kwrzDmxdCofGEQGbwyMKiZdv+iDSB
+	M4bLwMvulEjefNVWnWe79CKJKO7kNnYsYk53VvxRb1g2pJbvlOKeQTrCzTx6yKfKkUE0psX58U0cq
+	GpTq1+62K3Lj9POVMTt8srmGwC74IPoiOaY17BawMnJ3dB2sdWL/1ud2QGdlZ5O0RluxjFbk8dPU8
+	/t528/iyOusi1cZH46iQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzIy-0002Og-UI; Wed, 13 Feb 2019 18:30:44 +0000
+	id 1gtzJC-0002eZ-DJ; Wed, 13 Feb 2019 18:30:58 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzHn-0007sN-KX; Wed, 13 Feb 2019 18:29:32 +0000
+ id 1gtzHc-0007a5-N4; Wed, 13 Feb 2019 18:29:21 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH 04/21] dma-iommu: cleanup dma-iommu.h
-Date: Wed, 13 Feb 2019 19:29:03 +0100
-Message-Id: <20190213182920.16764-5-hch@lst.de>
+Subject: implement generic dma_map_ops for IOMMUs v2
+Date: Wed, 13 Feb 2019 19:28:59 +0100
+Message-Id: <20190213182920.16764-1-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190213182920.16764-1-hch@lst.de>
-References: <20190213182920.16764-1-hch@lst.de>
 MIME-Version: 1.0
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -67,54 +65,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-No need for a __KERNEL__ guard outside uapi and add a missing comment
-describing the #else cpp statement.  Last but not least include
-<linux/errno.h> instead of the asm version, which is frowned upon.
+Hi Robin,
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- include/linux/dma-iommu.h | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+please take a look at this series, which implements a completely generic
+set of dma_map_ops for IOMMU drivers.  This is done by taking the
+existing arm64 code, moving it to drivers/iommu and then massaging it
+so that it can also work for architectures with DMA remapping.  This
+should help future ports to support IOMMUs more easily, and also allow
+to remove various custom IOMMU dma_map_ops implementations, like Tom
+was planning to for the AMD one.
 
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index e760dc5d1fa8..3e206f4ee173 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -16,14 +16,14 @@
- #ifndef __DMA_IOMMU_H
- #define __DMA_IOMMU_H
- 
--#ifdef __KERNEL__
-+#include <linux/errno.h>
- #include <linux/types.h>
--#include <asm/errno.h>
- 
- #ifdef CONFIG_IOMMU_DMA
- #include <linux/dma-mapping.h>
- #include <linux/iommu.h>
- #include <linux/msi.h>
-+#include <linux/types.h>
- 
- int iommu_dma_init(void);
- 
-@@ -74,7 +74,7 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
- void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
- void iommu_dma_get_resv_regions(struct device *dev, struct list_head *list);
- 
--#else
-+#else /* CONFIG_IOMMU_DMA */
- 
- struct iommu_domain;
- struct msi_msg;
-@@ -108,5 +108,4 @@ static inline void iommu_dma_get_resv_regions(struct device *dev, struct list_he
- }
- 
- #endif	/* CONFIG_IOMMU_DMA */
--#endif	/* __KERNEL__ */
- #endif	/* __DMA_IOMMU_H */
--- 
-2.20.1
+A git tree is also available at:
 
+    git://git.infradead.org/users/hch/misc.git dma-iommu-ops.2
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-iommu-ops.2
+
+Changes since v1:
+ - only include other headers in dma-iommu.h if CONFIG_DMA_IOMMU is enabled
+ - keep using a scatterlist in iommu_dma_alloc
+ - split out mmap/sgtable fixes and move them early in the series
+ - updated a few commit logs
 
 _______________________________________________
 linux-arm-kernel mailing list
