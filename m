@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B268EC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:39:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5CCAFC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:40:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7CE61222C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:39:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D58B222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:40:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o+UnwuAb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="XYJLElqV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CE61222C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AoWSH4up";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="1yZNOTCK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D58B222BE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,66 +25,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HHG+2T5mN3IuRrC0LKnoRb2JQoloT6/Of/SSc3E9cBI=; b=o+UnwuAbNBN8vk
-	ZGhe4cGKVyHarJVoL78KhREVXYAoI2Mf4CJkSGsuecCBGRZSLfGIZrtxEjf+WOE6kZUC6uzsWRNd2
-	QM0VytUzCZ8ORFu8CCDkj1UwgX6f4XdW5a7BxDZ43/38ntvPOqZjHikKqs60z5Juh9RP4aqbrIVAY
-	hq3B5OXK2fTCf5h5OlvPDrpuuCWU+MdsVLa9tACBUr0hYxguCYglya6zXDU/DnnNFWgG/ij+Bw/ZV
-	xOf3iYPe7LiufJ/aUtN7PFJXUUDjpc4zwH47mhF6bBBZMrdAmmAeur8u/WJu8u9GVRVW9P3gD6ROw
-	h/WUBNJoCUk9Mprb0IFg==;
+	List-Owner; bh=4VGh79+kzXluNqVlko2QA2R/GmBDlQcUhB29XHI8PCw=; b=AoWSH4upx0LfLp
+	++Zzjz92wHIwK7NK5uL4Bt/LXHA7cc2jbdvo0k7mj19s5PMv9+zUZ7Hf+rJfbB4M0RuLUWbvAm9Qn
+	+EdUhEt09fdlz7pxEBzI+pFEut5kXKje5Puxop+Sr7axbwFq2IF4RBbEek8Ylwux5nRwjIQXqFoBH
+	S/M9uVBVuMUCdDyWRiFlszUs0RVjTR1MfdScKdDWOmD6lmQmyKixCgnahAEMx5QVCnD3EEroY4W+Q
+	fU7SwdVygYk7zJdDSQ6dYRULv/Ed/3WjB+P6IEhKRV3R7YunVcLgVOqwNRfVca9o2u/T5TkebEpYZ
+	+cn+5KkJtuXYcohorQLA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtq4K-0004LR-Rq; Wed, 13 Feb 2019 08:39:00 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gtq5z-0006AY-FU; Wed, 13 Feb 2019 08:40:43 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtq4G-0004K8-Hp
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 08:38:58 +0000
-Received: by mail-wm1-x342.google.com with SMTP id d15so1460295wmb.3
+ id 1gtq5s-000653-TS
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 08:40:40 +0000
+Received: by mail-wr1-x442.google.com with SMTP id i12so1518005wrw.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 00:38:56 -0800 (PST)
+ Wed, 13 Feb 2019 00:40:36 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=baylibre-com.20150623.gappssmtp.com; s=20150623;
  h=message-id:subject:from:to:cc:date:in-reply-to:references
  :user-agent:mime-version:content-transfer-encoding;
- bh=zYPxwD3KaOIMYFSe9JlfKDwbgdzNPJqs8i8EAHw3GRI=;
- b=XYJLElqVy8VQFvf52aNhx5HtzGexhS3IDntGrRaZgHf+urtk0shv8h3OzWsXWacOtq
- SfS2giUxQEu0Zc42qeNMxkZzMny66vkKrY9ng45RzLjW1xbp7G1ABDz5h87Nz3qyiRQR
- HnrhnR2VmtbNLX36z4TLJu88Nfgod91voNUFO0LltSKvoQ5AD/dViQwTndHFmAnqmcUa
- ChWdwyOGO14SSfAU0nGw+D1Eck68L3TfAtb5PiggJ2rMZxvLHMHtmA1QMOC3D9Di/yIE
- kvrgHm27lp9L9l4HMeIflqfDQxIcfl7YHPtsDZeJxbbvzxUDvyO0WmKoAcZRyTveBRsG
- is5A==
+ bh=6uT2+UA6yn0rcHTMvIP/MBTxOkvBxyWG8VSGdzDRTFQ=;
+ b=1yZNOTCKutPPE55+mNpGBKozypxhrvkadz1kxAXp9OiIBLTHXqQlq1/rtzTuQShGlS
+ 14ZPEMO8DsNsp8phdPu1ZauDmXUy8i8oDvXcvXWp4p4A/4lKOyverx0xQs9Vogdvxw+o
+ WUeqouG2DVEYi0tCVESrwU5CZIrRoxbiB7SW6Adzs5EPcAKpv1Dn+ZQuboXj5tu5QHRJ
+ hWktBayTuQSfHwyobrvpR+uHZCn3PmoltNaiqGXLxSDDpSs6c3+58xTUPmhS9Rx8mk2+
+ zL33koEbsbp8AwK5x6vF8xvBFvZlvVk3wGSpDQ5u7y1DzpHxhRBEHEhlMTLquDHkhlRc
+ gqYg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
  :references:user-agent:mime-version:content-transfer-encoding;
- bh=zYPxwD3KaOIMYFSe9JlfKDwbgdzNPJqs8i8EAHw3GRI=;
- b=mgF9lEtBwlN64J7l+WpXtu9xeOiCoRL2pc7UXSdhGAckjVVp2yp9mpcF4RWC6J8/O8
- MqmJwZvFXWUslgkeAhIysyzHGi32feqlP39saNcADNPX53ASVPkDvIZW8hcoVmFI0eYI
- hrTNxVi3sLO3C51YewP8wkZYpNeJQpornTeEgdrVSkfCN7dw5BtiUn404GyqZ/cEAm3z
- lelrSPUTAfTzN8Ncl9yUt7pfM52Jhta1FIp4vcNLCZMZIzqcUKndnByITiOZtza1p/SW
- p8q+ghiGJY1JFzLUwupUrQ3GxJQEykOK/txQTK/sGSujOSRPUHbPIqKjtQroHiPXhopN
- ayfA==
-X-Gm-Message-State: AHQUAubhlThn1Czq02RRB2uNF/rGRPajtsceOxZCbyJdlcQoKjp70LGO
- n8yZ3KRkwPnfW+tv0NhVtE69iQ==
-X-Google-Smtp-Source: AHgI3IbDETGS5T9Qe1wD6lousIHYmIbj/GWqPRmQwncCH/7oQdwkT4kZ/2HczP1Rd6/XpL/H0syYLw==
-X-Received: by 2002:a1c:23c4:: with SMTP id j187mr2267610wmj.13.1550047134662; 
- Wed, 13 Feb 2019 00:38:54 -0800 (PST)
+ bh=6uT2+UA6yn0rcHTMvIP/MBTxOkvBxyWG8VSGdzDRTFQ=;
+ b=T63uA5thG/btunYDsVOK2jYjo4z+K7Y3Ph5ewP0LUHcZz+3nrSsBTcti2ssEXbrLmn
+ PMTb3ALGCpmwjNEafb2nduaaN5PDQ99g7aTDWC2qiy8Z7JCpzDipVvkg7Uvwp0f0eZKp
+ qVW+Dz2mhxtjHMkCrqnbw1A6UfHpAWoEyDyYzhq0x+Id6mC48S3Tz4oGUD26fFVnlYxa
+ 2K2Mhu7FZwYBAcBXVfsaReOqziH4KP3iUd6HHdjwe9SrYlbZCNzUf9P57ZSv8EBnafMi
+ LBJc+DQETPo3BQMBMAdS/T3psuRNxXNZj2w0bVnykAWuLUJ1t0cwb3zcUnO+FNIbXWbq
+ 6cmw==
+X-Gm-Message-State: AHQUAuZEaDVp3oZhCdy0FsWvVzzYyuvdAhFI0R7Lzu0plJN7jRvGAqUR
+ rQdMzb2bUaprUEtzISGZg3CTHjh+q3k=
+X-Google-Smtp-Source: AHgI3Ianfn8sdNuun1GX3VCGyVRzPbztB3flDFRP8+4dH/HK+XuUTwll1RCxyNKW2y9cuM3yi+I5Rw==
+X-Received: by 2002:adf:edd1:: with SMTP id v17mr6110872wro.300.1550047235224; 
+ Wed, 13 Feb 2019 00:40:35 -0800 (PST)
 Received: from boomer.baylibre.com
  (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr. [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id z3sm10337785wmi.32.2019.02.13.00.38.53
+ by smtp.gmail.com with ESMTPSA id o18sm29858337wrg.40.2019.02.13.00.40.34
  (version=TLS1_3 cipher=AEAD-AES256-GCM-SHA384 bits=256/256);
- Wed, 13 Feb 2019 00:38:53 -0800 (PST)
-Message-ID: <98eaeaca26bc83db1a8d1f1362b56e3a32073bb3.camel@baylibre.com>
-Subject: Re: [PATCH v2 0/2] clk: meson: Add G12A AO Clock + Reset Controller
+ Wed, 13 Feb 2019 00:40:34 -0800 (PST)
+Message-ID: <fc50a3a7f1efc8d2f6054a944848897ed8baf536.camel@baylibre.com>
+Subject: Re: [RESEND PATCH v2 0/2] clk: meson8b: fix typo "ABP" -> "APB"
 From: Jerome Brunet <jbrunet@baylibre.com>
-To: Neil Armstrong <narmstrong@baylibre.com>
-Date: Wed, 13 Feb 2019 09:38:53 +0100
-In-Reply-To: <20190212162859.20743-1-narmstrong@baylibre.com>
-References: <20190212162859.20743-1-narmstrong@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>, 
+ linux-amlogic@lists.infradead.org, narmstrong@baylibre.com,
+ robh+dt@kernel.org,  devicetree@vger.kernel.org
+Date: Wed, 13 Feb 2019 09:40:33 +0100
+In-Reply-To: <20190210222603.6404-1-martin.blumenstingl@googlemail.com>
+References: <20190210222603.6404-1-martin.blumenstingl@googlemail.com>
 User-Agent: Evolution 3.30.4 (3.30.4-1.fc29) 
 Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_003856_732639_FBAD37E1 
-X-CRM114-Status: GOOD (  15.46  )
+X-CRM114-CacheID: sfid-20190213_004036_971035_C2F3632D 
+X-CRM114-Status: GOOD (  15.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,59 +98,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: sboyd@kernel.org, mark.rutland@arm.com, mturquette@baylibre.com,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-02-12 at 17:28 +0100, Neil Armstrong wrote:
-> This patchset add support for the Amlogic G12A SoC family Always-On
-> clock and reset controller.
+On Sun, 2019-02-10 at 23:26 +0100, Martin Blumenstingl wrote:
+> It turns out that I'm not good at spelling "APB". Unfortunately an ABP
+> (instead of APB) typo snug into two clocks in v5.0.
 > 
-> This adds support for clocks on the Always-On domain like :
-> - Always-On UARTS & I2C Controllers
-> - CEC Controllers
-> - SARADC source and bus clock
-> - Infrared Decoder/Encoder bus clock
-> - USB 32K reference clock
+> Currently there are no users of that clock yet, so fix it now
+> before it's too late (meaning before it's used by <something>).
 > 
-> This also adds resets lines for :
-> - Always-On UARTS & I2C Controllers
-> - SARADC, Infrared Decoder/Encoder
+> I decided to go the "normal" route where we can have separate
+> branches for the dt-bindings and the drivers in the clk-meson
+> repo. This means:
+> - new (typo-free) clock #define
+> - change the clock controller to use the new #define
+> - (next development cycle) drop the old #define
 > 
-> This patchset depends on the ("clk: meson: rework drivers dependencies")
-> from Jerome Brunet at [1].
+> resend - changes since v2 at [1]:
+> - include the device-tree maintainers / mailing list
 > 
-> Changes from v1 at [2]:
-> - Moved unused bindings ID out of the dt-bindings header
-> - Added comment about CLK_IGNORE_UNUSED
+> Changes since v1 at [0]:
+> - split into a dt-bindings and clock controller driver patch
 > 
-> [1] https://lkml.kernel.org/r/20190201125841.26785-1-jbrunet@baylibre.com
-> [2] https://lkml.kernel.org/r/20190204091331.9298-1-narmstrong@baylibre.com
 > 
-> Neil Armstrong (2):
->   dt-bindings: clk: add G12A AO Clock and Reset Bindings
->   clk: meson: Add G12A AO Clock + Reset Controller
+> [0] https://patchwork.kernel.org/cover/10742001/
+> [1] https://patchwork.kernel.org/cover/10772199/
+> 
+> 
+> Martin Blumenstingl (2):
+>   dt-bindings: clock: meson8b: add APB clock definition
+>   clk: meson: meson8b: fix the naming of the APB clocks
+> 
+>  drivers/clk/meson/meson8b.c              | 26 ++++++++++++------------
+>  drivers/clk/meson/meson8b.h              |  2 +-
+>  include/dt-bindings/clock/meson8b-clkc.h |  1 +
+>  3 files changed, 15 insertions(+), 14 deletions(-)
+> 
 
 Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-
-> 
->  .../bindings/clock/amlogic,gxbb-aoclkc.txt    |   1 +
->  drivers/clk/meson/Kconfig                     |   2 +
->  drivers/clk/meson/Makefile                    |   2 +-
->  drivers/clk/meson/g12a-aoclk.c                | 454 ++++++++++++++++++
->  drivers/clk/meson/g12a-aoclk.h                |  34 ++
->  include/dt-bindings/clock/g12a-aoclkc.h       |  34 ++
->  include/dt-bindings/reset/g12a-aoclkc.h       |  18 +
->  7 files changed, 544 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/clk/meson/g12a-aoclk.c
->  create mode 100644 drivers/clk/meson/g12a-aoclk.h
->  create mode 100644 include/dt-bindings/clock/g12a-aoclkc.h
->  create mode 100644 include/dt-bindings/reset/g12a-aoclkc.h
-> 
-
 
 
 _______________________________________________
