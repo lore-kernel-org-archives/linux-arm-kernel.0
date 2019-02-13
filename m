@@ -2,60 +2,65 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C96FC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:33:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A00A5C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:37:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E024F222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:33:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60CDA222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:37:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f8F4/p1Q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E024F222B2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C+ICIm2E"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60CDA222B2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U719t4jmbW0dGG6oDiVOFCQi4x7rfVtPbxZfc4UJnSI=; b=f8F4/p1QVQLw2k
-	TGxieHidFCTUMFy7ub/pKqs6SMJn7+3cghz6r29WCa4PFIy4mmggns8G6g8dsj73xIXjtwMqun4n1
-	waCf5sopLhKkXvuf9fgWt03MakYrRuC8CKM5vRitz0Fp90jEWoJEAOmJwwiQn8UDIymz7X3Xbf4RD
-	B8JacPjOQfyB2AVIGJwz2pM54pF/htkqNS40dAV/NcYGvzCMT7mpgV+5Lt6P1+dXW4akH/SwtMFrY
-	yaH0ihkMwYhDBrUhxq/jTKOlcwyEtlkkVJ5I/mw9dghYpmcHP/Yvh5vU2FblLe/7m9+96wLqQDOYr
-	X7zqsi1mP3R/vK1yv2qA==;
+	List-Owner; bh=C+Dq8eeCjyl72f1FeQLK0PCMYRRBX3CGxrKtHQz0RQU=; b=C+ICIm2EEosohi
+	FfgiouHvyBzTcGpmNlN8xkCNRt3t07Z9wCrjRNB7mTu/k7ElN9pP5acQybEf5JfQT+I+LW4fCyOsO
+	zKNEV6q1moeLF9rLiOHCzXn9NOr9BbS9aSEqACffYpy0Q9KY4AQd4MuqD7W82XmAseC5Cu5MpdR3V
+	PRFpSZYn+hX9VzmYqGrcVqA4nP54pV+VIc/FzPyI5z2mkVZ8jxfbYbrvZpoArB991MEQ9P8Dcu4t7
+	UFhlZuhF7RG7BOMCeEEWCmuPS3FQi2DwYpHbq8EZsOYobcBR1ot2Rc/vyPju1tY6jrAYz/oBbJisZ
+	PK+vVPqFeHxzY/O7nY5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtvbe-0006T6-V0; Wed, 13 Feb 2019 14:33:46 +0000
-Received: from relay10.mail.gandi.net ([217.70.178.230])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtvbb-0006Sf-2R
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:33:44 +0000
-Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay10.mail.gandi.net (Postfix) with ESMTPSA id 39D7C240025;
- Wed, 13 Feb 2019 14:33:39 +0000 (UTC)
-Message-ID: <a170e16bed016b0ba79b4f0a1181639598c7b205.camel@bootlin.com>
-Subject: Re: [PATCH v3 5/8] drm/sun4i: dsi: Fix DRQ calculation
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
- <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
-Date: Wed, 13 Feb 2019 15:33:38 +0100
-In-Reply-To: <e858ff6509e0d3f657fd9229b28f4ac177a04a76.1549896081.git-series.maxime.ripard@bootlin.com>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <e858ff6509e0d3f657fd9229b28f4ac177a04a76.1549896081.git-series.maxime.ripard@bootlin.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.5 
+	id 1gtveh-0008R5-K6; Wed, 13 Feb 2019 14:36:55 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtvee-0008QG-Kc; Wed, 13 Feb 2019 14:36:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2FD0380D;
+ Wed, 13 Feb 2019 06:36:52 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 73D603F557;
+ Wed, 13 Feb 2019 06:36:49 -0800 (PST)
+Date: Wed, 13 Feb 2019 14:36:46 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH 11/15] PCI: pci-epf-test: Use pci_epc_get_features to get
+ EPC features
+Message-ID: <20190213143646.GC25260@e107981-ln.cambridge.arm.com>
+References: <20190107064148.10152-1-kishon@ti.com>
+ <20190107064148.10152-12-kishon@ti.com>
+ <20190212150718.GA28306@e107981-ln.cambridge.arm.com>
+ <6d72cfdf-97a7-4aab-f746-d0e545431ea2@ti.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <6d72cfdf-97a7-4aab-f746-d0e545431ea2@ti.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_063343_260871_04C3B38B 
-X-CRM114-Status: GOOD (  15.63  )
+X-CRM114-CacheID: sfid-20190213_063652_678601_1756F6F2 
+X-CRM114-Status: GOOD (  21.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,62 +72,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel@lists.freedesktop.org,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
+Cc: Heiko Stuebner <heiko@sntech.de>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ Alan Douglas <adouglas@cadence.com>, Jia-Ju Bai <baijiaju1990@gmail.com>,
+ Cyrille Pitchen <cyrille.pitchen@free-electrons.com>,
+ Jingoo Han <jingoohan1@gmail.com>, Bjorn Helgaas <bhelgaas@google.com>,
+ linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
-> The DRQ calculation code in the Allwinner BSP uses the vertical front
-> porch value as the condition, but we're using the video back porch.
+On Wed, Feb 13, 2019 at 07:08:18PM +0530, Kishon Vijay Abraham I wrote:
+> Hi Lorenzo,
 > 
-> Since I always confuse the two, and I'm the original author of that code, I
-> guess I deserved a brown paper bag.
+> On 12/02/19 8:37 PM, Lorenzo Pieralisi wrote:
+> > On Mon, Jan 07, 2019 at 12:11:44PM +0530, Kishon Vijay Abraham I wrote:
+> > 
+> > [...]
+> > 
+> >>  static int pci_epf_test_bind(struct pci_epf *epf)
+> >>  {
+> >>  	int ret;
+> >>  	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
+> >>  	struct pci_epf_header *header = epf->header;
+> >> +	const struct pci_epc_features *epc_features;
+> >> +	enum pci_barno test_reg_bar = BAR_0;
+> >>  	struct pci_epc *epc = epf->epc;
+> >>  	struct device *dev = &epf->dev;
+> >> +	bool linkup_notifier = false;
+> >> +	bool msix_capable = false;
+> >> +	bool msi_capable = true;
+> >>  
+> >>  	if (WARN_ON_ONCE(!epc))
+> >>  		return -EINVAL;
+> >>  
+> >> -	if (epc->features & EPC_FEATURE_NO_LINKUP_NOTIFIER)
+> >> -		epf_test->linkup_notifier = false;
+> >> -	else
+> >> -		epf_test->linkup_notifier = true;
+> >> -
+> >> -	epf_test->msix_available = epc->features & EPC_FEATURE_MSIX_AVAILABLE;
+> >> +	epc_features = pci_epc_get_features(epc, epf->func_no);
+> > 
+> > I think it would work out better if struct pci_epc_features was
+> > allocated in the caller (stack) and pci_epc_get_features() take a
+> > pointer parameter to it rather than the callee and the callee would just
+> > have to fill it out, this also removes data in the driver that is not
+> > really useful.
+> > 
+> > Is there any other reason behind the current design choice ?
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Assuming that the BSP's hbp is referring to the back porch only, then
-calculating ht - x - hbp does give us the front porch + hsync length.
-
-Well, let's guess that this about the front porch only until we know
-better. It's certainly better than using the back porch anyway :)
-
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-
-Cheers,
-
-Paul
-
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Some drivers are used by multiple platforms each with different features. In
+> such cases it's cleaner to have separate epc_feature table for each platform.
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index 2518a0d7567c..8e6392831e9d 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -372,9 +372,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
->  	struct mipi_dsi_device *device = dsi->device;
->  	u32 val = 0;
->  
-> -	if ((mode->hsync_end - mode->hdisplay) > 20) {
-> +	if ((mode->hsync_start - mode->hdisplay) > 20) {
->  		/* Maaaaaagic */
-> -		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
-> +		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
->  
->  		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
->  		drq /= 32;
--- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
+> I think the driver should maintain some sort of data to even populate
+> pci_epc_features allocated by EP function driver.
 
+You mean that every EP controller driver should keep a table of
+pci_epc_features (instead of a single instance) to be matched using DT
+compatible strings to detect the platform variations ?
+
+Thanks,
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
