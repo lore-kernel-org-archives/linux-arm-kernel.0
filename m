@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A98AFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 21:41:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88CD5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 21:41:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7971A222CC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 21:41:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 596A9222A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 21:41:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hzG7EBPx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="fSmuiGaL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7971A222CC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IU1s5u1+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="q1WNXKCF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 596A9222A4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,66 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Cn41d7P70tyy4Z0PLht48TfrLb4nIt0ql9IR6ztq8h0=; b=hzG7EBPxikhWhQ
-	qrGZ7ZwnAxD7SmEDzTMzdVmKtu3+ZQ5GuJ4Z0bbmCK4feIZ6PnTReoWymQ/+phMsJpVWQuxCb7vfh
-	eFZWC9ELeLiV9Q1RN9yrpsY5zA8qv1/v8wGjukKxsNzkZY6s9Yw/lUafxlV7Fu/4kWiaGnKUEdEpQ
-	dwOTigD9REtA8wN/fWLVT5nuxJ5GfoNhrYNmJRR/r2avsnOXl5YT3lj7iqLhlxXLUY1c1DZAd5YZo
-	Ke8bMpffIKS9ktknuLl+YochQ1byiSD61GLSmkaw95qW8ycbVbX7n+cIo4ikwtDzgvNp0lKbfaGq4
-	81fATMwzBzifF1y6FBcg==;
+	List-Owner; bh=LAXEdkuYEdswRqpeZaXiHZEcmnhyfb1ILhc3+yshMlU=; b=IU1s5u1+sWxhkx
+	esTYGgHwWt1+J7TgI0PcKuEeQUeB01ckfwIdCmTChtBzXEOYz5sO0pMP3CNsj+2OwKTAWD+m1+TBD
+	3Nbqj02MUVE4WPgbyoNU62rsW0eXs1f8JOiFjSCMWvqVUFCTOlBVxyF1HUrYYUUQ+a+EkfvXy/bSz
+	wgASmcwFjBYL31siQLdiig2IMG3U8Ld20ox+atiBLmRF3UcqM/rtvxsBavUOnZGEldaAwUbMLAXoG
+	by3wcKUpPC4BeHY08i98xR1uQ8ZpRJSFKjq/zmeNF2dc2KtEULLoosi61241icnsohOYZH3nlHXRT
+	EjhWoofcTHLVqj2KHf7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu2HQ-00058Z-Ue; Wed, 13 Feb 2019 21:41:20 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gu2Hh-0005RV-OF; Wed, 13 Feb 2019 21:41:37 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu2HN-00056d-8N
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 21:41:19 +0000
-Received: by mail-pg1-x542.google.com with SMTP id y1so1776021pgk.11
+ id 1gu2HR-000593-3r
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 21:41:26 +0000
+Received: by mail-pf1-x443.google.com with SMTP id g6so1793960pfh.13
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 13:41:17 -0800 (PST)
+ Wed, 13 Feb 2019 13:41:21 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=irYv0xqfxLq9eyi1hZL6+OFFikwsolagLNKzHmLmsDI=;
- b=fSmuiGaLyJQY2gMc8QKrxHYpM/QBJuMTPyej4qwJ4LBaAEOrEQixJ/O93WT+TdRN4C
- QNHGo79Rc6gvUeSHCJlns1okxy7sFWx/UG3XrPUq46OlI0C9jhOlaQkr7wALsOV9RWe0
- ZresE/vLbLm+8+CU88rXXKJSroDhs43s46dM9SLR9jj3qmXYl3RAocpv7FzOX337ArAO
- we1RulDUcgyMWmmeCcB0pQ9KcvaXlCXVquoENEXkQASGxupARbDvojUR4A1o3qXpOt+x
- RF1ThrQPvmIuL1hoj2xunaNUzvf3W53ewlA8u/TlRgdIID3ntd3ivs+iFjcKV0bb0Iss
- Zicw==
+ bh=wLmvmqHuKLo0jMVgOhqswHV98llcZw1Y6p8Tf9a/GTU=;
+ b=q1WNXKCFMPXvHsH+kdD7TkDmIxQxz7Gu3pdOfEDuN3WB5/J7dGJwEssoHkOBzL0HtS
+ kw0e5+VdnhaGxZ+bgfhXVR6SDCi8kaa/idKEojjauORIQp78+qAtJXXsTcwASDeAN60x
+ PMLKepbIeDEIkHOGqzHZ8z4B4QUALNto96iuffAv4d86iZAyghGNFzzYC1Wa0e0w1A0V
+ 7U5PGPze9tg5P8Y+rywGjTqFQ/behg0w7F376uEv8Q79iyS4P5L8NR6M86T8H8hUwHXI
+ HGdPr69lwNhiek1k1OI2grvcGVbCvvLCPhAyz7eRPVJlbwczMBvDHHownIeSQp2Zn4lS
+ Cpmw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=irYv0xqfxLq9eyi1hZL6+OFFikwsolagLNKzHmLmsDI=;
- b=bmNzrqJGnMtYlY799iavnGENPmGrMDV/Qm/qDDuaQK/x7JvyiMCrxODvWcvivj5M8P
- c8Ax9l2m3boyhxUsYupnFFK/b/2HMo2hiEbts25j5I1LgGQWgETnJoNWhob3RsKajLpQ
- aDKmTngwMJLAR0FmEVNN+FZbagdLoiVZbUgpCCZKs4E/l2fQiBIAGgVHxU9PdqU1C1uD
- IUkVpHjRmCi6GyePyhVZbxcEGSxLHyQrI/iacRRvONIfarO0/ZCgDudejGWwBALiewMc
- 98vepKivCRiK8pmYfCmIruwyz2nIyPRA9p/hPfLRxCMr6n/sAYpS2r2xFlUnDqS9Phoj
- vSZQ==
-X-Gm-Message-State: AHQUAuZ/CSsoE0TEJszPNlapi2kHKJtyrv1qyZhMQEJf3UenWPm8k8X3
- 7UMTnnSpapfrHyuZ8v+S2bw=
-X-Google-Smtp-Source: AHgI3IYyzFpAT4H0kv5rJUFUvP0YLTaqWAkByRWTtEuPVJlryBPzkD7gPOtHjQ9fKGj9WkLAw979Qw==
-X-Received: by 2002:a65:5c4b:: with SMTP id v11mr253368pgr.333.1550094076803; 
- Wed, 13 Feb 2019 13:41:16 -0800 (PST)
+ bh=wLmvmqHuKLo0jMVgOhqswHV98llcZw1Y6p8Tf9a/GTU=;
+ b=W2RJg18MeJIb+hp7qkdmWQk+PwEnctF3O9er/WtUXpHQLtCdaMY6GHjhubz0vjmcBz
+ psNVy0XkqNqMBKgtLvl7HAXb1O8F+e4uGlv+m4p9h9oJiD5yUqWgrAcZNYc0n9R5dM+0
+ S4sLe4YTThp3Narf9nrf9r+AjJMlhRlg6Zq51xSIz9SeWX5EZr6x7z0fudbj93qEUzet
+ wuXb2Bx/nZ5MCSY9JNms1gd9b9VPDDEpQdX8srtagw1ZANbcVyIFUpqILq4laUtHZemX
+ sgdXXpWqXEnr7UeJrVEyKIj/Gq9qvNU9Kyhrhc9BWncCHJkrxTW0j+nv6KopuIlc5KO3
+ wSyA==
+X-Gm-Message-State: AHQUAuZJeDLIdkd1UXZGZUEA/TG1LLk5lRFu8A1Gf1vX6bS9PX562uTv
+ lfrK2AQskqSCJ/m3/+LEzAc=
+X-Google-Smtp-Source: AHgI3IaF1fZqE0Mi2O9QOjJawD2AH4b0sAQ6qMAOlYxBBSuKw2C2dyiZHFLf/ghj1TijKIzOqxljBg==
+X-Received: by 2002:a63:68ca:: with SMTP id d193mr280117pgc.53.1550094080651; 
+ Wed, 13 Feb 2019 13:41:20 -0800 (PST)
 Received: from localhost.localdomain ([103.51.74.137])
- by smtp.gmail.com with ESMTPSA id w128sm335321pfw.79.2019.02.13.13.41.13
+ by smtp.gmail.com with ESMTPSA id w128sm335321pfw.79.2019.02.13.13.41.17
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 13 Feb 2019 13:41:16 -0800 (PST)
+ Wed, 13 Feb 2019 13:41:20 -0800 (PST)
 From: Anand Moon <linux.amoon@gmail.com>
 To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [RFC 1/2] ARM: dts: exynos: Add proper regulator states for
- suspend-to-mem for odroid-u3
-Date: Wed, 13 Feb 2019 21:40:51 +0000
-Message-Id: <20190213214052.2427-2-linux.amoon@gmail.com>
+Subject: [RFC 2/2] soc: samsung: pmu: Add the PMU data of exynos4412 to
+ support low-power state
+Date: Wed, 13 Feb 2019 21:40:52 +0000
+Message-Id: <20190213214052.2427-3-linux.amoon@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213214052.2427-1-linux.amoon@gmail.com>
 References: <20190213214052.2427-1-linux.amoon@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_134117_337871_3025A346 
-X-CRM114-Status: GOOD (  14.75  )
+X-CRM114-CacheID: sfid-20190213_134121_480645_1FB363A6 
+X-CRM114-Status: GOOD (  17.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,260 +107,164 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add suspend-to-mem node to regulator core to be enabled or disabled
-during system suspend and also support changing the regulator operating
-mode during runtime and when the system enter sleep mode.
+This patch adds configration for PMU (Power Management Unit) state
+tuning for exynos4412 SoC in order to enter low-power mode during
+suspend power modes and help resume from suspend state.
 
+Fixes: bfce552d0b1 ("drivers: soc: Add support for Exynos PMU driver")
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Cc: Krzysztof Kozlowski <krzk@kernel.org>
 Cc: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
 
-Changes from previos patch
-[0] https://patchwork.kernel.org/patch/10712549/
+Changes from previous patch.
+New patch to this series to support suspend and resume state
 
-Set all the WAKEUP source regulator in suspend-on state.
-LD04, LD012, LD015, LD020, LD022
-Set all the non used regulator in suspend-odd state
-LD02, LD03, LD05, LD06, LD07, LD011, LD013, LDO14, LD016
-
-BUCK5, BUCK6, BUCK7 and not confirable as per driver max77686-regulator
-
-Tested on microSD card and it resumes correcly after suspend.
-eMMC is not able to resume after entering into suspend state,
-which need to be investigated and how to debug more.
+Changes have been tested on microSD card but fails to resume on cMMC.
+It need to be investigated and more debuging
 ---
- .../boot/dts/exynos4412-odroid-common.dtsi    | 63 +++++++++++++++++++
- arch/arm/boot/dts/exynos4412-odroidu3.dts     |  3 +
- 2 files changed, 66 insertions(+)
+ drivers/soc/samsung/exynos4-pmu.c           | 83 +++++++++++++++++++++
+ include/linux/soc/samsung/exynos-regs-pmu.h | 21 ++++++
+ 2 files changed, 104 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-index 08d3a0a7b4eb..e984461c37d9 100644
---- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-+++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-@@ -288,6 +288,9 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo3_reg: LDO3 {
-@@ -295,6 +298,9 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo4_reg: LDO4 {
-@@ -302,6 +308,9 @@
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo5_reg: LDO5 {
-@@ -310,6 +319,9 @@
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo6_reg: LDO6 {
-@@ -317,6 +329,9 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo7_reg: LDO7 {
-@@ -324,18 +339,27 @@
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo8_reg: LDO8 {
- 				regulator-name = "VDD10_HDMI_1.0V";
- 				regulator-min-microvolt = <1000000>;
- 				regulator-max-microvolt = <1000000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo10_reg: LDO10 {
- 				regulator-name = "VDDQ_MIPIHSI_1.8V";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo11_reg: LDO11 {
-@@ -343,6 +367,9 @@
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo12_reg: LDO12 {
-@@ -351,6 +378,9 @@
- 				regulator-max-microvolt = <3300000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo13_reg: LDO13 {
-@@ -359,6 +389,9 @@
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo14_reg: LDO14 {
-@@ -367,6 +400,9 @@
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo15_reg: LDO15 {
-@@ -375,6 +411,9 @@
- 				regulator-max-microvolt = <1000000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo16_reg: LDO16 {
-@@ -383,6 +422,9 @@
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			ldo20_reg: LDO20 {
-@@ -396,6 +438,9 @@
- 				regulator-min-microvolt = <2800000>;
- 				regulator-max-microvolt = <2800000>;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo22_reg: LDO22 {
-@@ -405,6 +450,9 @@
- 				 */
- 				regulator-name = "LDO22";
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			ldo25_reg: LDO25 {
-@@ -413,6 +461,9 @@
- 				regulator-max-microvolt = <1800000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck1_reg: BUCK1 {
-@@ -421,6 +472,9 @@
- 				regulator-max-microvolt = <1100000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck2_reg: BUCK2 {
-@@ -429,6 +483,9 @@
- 				regulator-max-microvolt = <1350000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+				};
- 			};
- 
- 			buck3_reg: BUCK3 {
-@@ -437,6 +494,9 @@
- 				regulator-max-microvolt = <1050000>;
- 				regulator-always-on;
- 				regulator-boot-on;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck4_reg: BUCK4 {
-@@ -444,6 +504,9 @@
- 				regulator-min-microvolt = <900000>;
- 				regulator-max-microvolt = <1100000>;
- 				regulator-microvolt-offset = <50000>;
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			buck5_reg: BUCK5 {
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index 2bdf899df436..4ebde09fc51d 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -82,6 +82,9 @@
- 	regulator-name = "LDO22_VDDQ_MMC4_2.8V";
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <2800000>;
-+	regulator-state-mem {
-+		regulator-on-in-suspend;
-+	};
+diff --git a/drivers/soc/samsung/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
+index a7cdbf1aac0c..d261a0d2371e 100644
+--- a/drivers/soc/samsung/exynos4-pmu.c
++++ b/drivers/soc/samsung/exynos4-pmu.c
+@@ -200,10 +200,93 @@ static const struct exynos_pmu_conf exynos4412_pmu_config[] = {
+ 	{ PMU_TABLE_END,},
  };
  
- &mshc_0 {
++static unsigned int const exynos4412_list_feed[] = {
++	EXYNOS4_ARM_CORE0_OPTION,
++	EXYNOS4_ARM_CORE1_OPTION,
++	EXYNOS4_ARM_CORE2_OPTION,
++	EXYNOS4_ARM_CORE3_OPTION,
++	EXYNOS4_ARM_COMMON_OPTION,
++	EXYNOS4_CAM_OPTION,
++	EXYNOS4_TV_OPTION,
++	EXYNOS4_MFC_OPTION,
++	EXYNOS4_G3D_OPTION,
++	EXYNOS4_LCD0_OPTION,
++	EXYNOS4_ISP_OPTION,
++	EXYNOS4_MAUDIO_OPTION,
++	EXYNOS4_GPS_OPTION,
++	EXYNOS4_GPS_ALIVE_OPTION,
++};
++
++static void exynos4412_pmu_central_seq(bool enable)
++{
++	unsigned int value;
++
++	value = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	if (enable)
++		value &= ~S5P_CENTRAL_LOWPWR_CFG;
++	else
++		value |= S5P_CENTRAL_LOWPWR_CFG;
++	pmu_raw_writel(value, S5P_CENTRAL_SEQ_CONFIGURATION);
++
++	value = pmu_raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION_COREBLK);
++	if (enable)
++		value &= ~S5P_CENTRAL_LOWPWR_CFG;
++	else
++		value |= S5P_CENTRAL_LOWPWR_CFG;
++	pmu_raw_writel(value, S5P_CENTRAL_SEQ_CONFIGURATION_COREBLK);
++}
++
++static void exynos4412_pmu_init(void)
++{
++	unsigned int value;
++	int i;
++
++	/* Enable USE_STANDBY_WFI for all CORE */
++	pmu_raw_writel(S5P_USE_STANDBY_WFI_ALL, S5P_CENTRAL_SEQ_OPTION);
++
++	/* Decides whether to use retention capability */
++	value  = pmu_raw_readl(S5P_ARM_L2_0_OPTION);
++	value &= ~EXYNOS_L2_USE_RETENTION;
++	pmu_raw_writel(value, S5P_ARM_L2_0_OPTION);
++
++	value = pmu_raw_readl(S5P_ARM_L2_1_OPTION);
++	value &= ~EXYNOS_L2_USE_RETENTION;
++	pmu_raw_writel(value, S5P_ARM_L2_1_OPTION);
++
++	/* Set PSHOLD port for output high */
++	value = pmu_raw_readl(S5P_PS_HOLD_CONTROL);
++	value |= S5P_PS_HOLD_OUTPUT_HIGH;
++	pmu_raw_writel(value, S5P_PS_HOLD_CONTROL);
++
++	/* Enable signal for PSHOLD port */
++	value = pmu_raw_readl(S5P_PS_HOLD_CONTROL);
++	value |= S5P_PS_HOLD_EN;
++	pmu_raw_writel(value, S5P_PS_HOLD_CONTROL);
++
++	/* Enable only SC_FEEDBACK */
++	for (i = 0; i < ARRAY_SIZE(exynos4412_list_feed); i++) {
++		value =  pmu_raw_readl(exynos4412_list_feed[i]);
++		value &= ~(EXYNOS_USE_SC_COUNTER);
++		value |= EXYNOS_USE_SC_FEEDBACK;
++		pmu_raw_writel(value, exynos4412_list_feed[i]);
++	}
++
++	exynos4412_pmu_central_seq(false);
++
++	pr_info("EXYNOS4x12 PMU Initialize\n");
++}
++
++static void exynos4412_powerdown_conf(enum sys_powerdown mode)
++{
++	exynos4412_pmu_central_seq(true);
++}
++
+ const struct exynos_pmu_data exynos4210_pmu_data = {
+ 	.pmu_config	= exynos4210_pmu_config,
+ };
+ 
+ const struct exynos_pmu_data exynos4412_pmu_data = {
+ 	.pmu_config		= exynos4412_pmu_config,
++	.pmu_init		= exynos4412_pmu_init,
++	.powerdown_conf		= exynos4412_powerdown_conf,
+ };
+diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
+index 5addaf5ccbce..6beed3e669d2 100644
+--- a/include/linux/soc/samsung/exynos-regs-pmu.h
++++ b/include/linux/soc/samsung/exynos-regs-pmu.h
+@@ -16,6 +16,8 @@
+ 
+ #define S5P_CENTRAL_SEQ_CONFIGURATION		0x0200
+ 
++#define S5P_CENTRAL_SEQ_CONFIGURATION_COREBLK   0x0240
++
+ #define S5P_CENTRAL_LOWPWR_CFG			(1 << 16)
+ 
+ #define S5P_CENTRAL_SEQ_OPTION			0x0208
+@@ -347,6 +349,25 @@
+ #define EXYNOS3_OPTION_USE_SC_FEEDBACK			(1 << 1)
+ #define EXYNOS3_OPTION_SKIP_DEACTIVATE_ACEACP_IN_PWDN	(1 << 7)
+ 
++/* EXYNOS4 */
++#define EXYNOS_USE_SC_FEEDBACK					BIT(1)
++#define EXYNOS_USE_SC_COUNTER					BIT(0)
++
++#define EXYNOS4_ARM_CORE0_OPTION				0x2008
++#define EXYNOS4_ARM_CORE1_OPTION				0x2088
++#define EXYNOS4_ARM_CORE2_OPTION				0x2108
++#define EXYNOS4_ARM_CORE3_OPTION				0x2188
++#define EXYNOS4_ARM_COMMON_OPTION				0x2408
++#define EXYNOS4_CAM_OPTION					0x3C08
++#define EXYNOS4_TV_OPTION					0x3C28
++#define EXYNOS4_MFC_OPTION					0x3C48
++#define EXYNOS4_G3D_OPTION					0x3C68
++#define EXYNOS4_LCD0_OPTION					0x3C88
++#define EXYNOS4_ISP_OPTION					0x3CA8
++#define EXYNOS4_MAUDIO_OPTION					0x3CC8
++#define EXYNOS4_GPS_OPTION					0x3CE8
++#define EXYNOS4_GPS_ALIVE_OPTION				0x3D08
++
+ /* For EXYNOS5 */
+ 
+ #define EXYNOS5_AUTO_WDTRESET_DISABLE				0x0408
 -- 
 2.20.1
 
