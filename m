@@ -2,93 +2,130 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D56FDC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:02:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5CE1C282C4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:09:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A406621B68
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:02:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 785D4207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:09:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MQG/TK/Z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="SuJwfuys"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A406621B68
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DOgx2lL0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="IGaPIEqD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 785D4207E0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tHgHZnKZ/AHnxxfGkPWlCanI2HkX0f7KtLdw48dRnOo=; b=MQG/TK/ZNintlz
-	0FUBDaCjjZwwKx9Ghhtfy/xZBQPzPibHgZWk1oy8t3Dryfrf8sJHkkTJ1huGK7onvXPr+YqkSa7HY
-	pth2eluKAacJKNcTTRENWu19V6p6UASycu4/S4/E7jQb22uqBym5fLVm0b2AscYsY7JOyspeTRDR9
-	H3GUpESPibw40N/vfPzgFbDFYKKVj5e5H2NHhwn+dFY1TPb011GZzXs4YfZtlaVEGxto111/7NUVw
-	cmkQ8GoCA6BVGRQDDytX0XBaOk4oiIk/myOMpYQneuhPc3rJrJry0PZIKkIwtrzwUsh7rs6MchLNw
-	ggFoGMXJpBHLsdJq4r6Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=nSfko8tab2pNAWJahdB9XDp5cPva1Dmt28MARVJ2l4c=; b=DOgx2lL0H2JDB+
+	ewa1u2A2eQUFWsSxz8BTVUTYcTmaWckNWDQg62rg0MSctxVHKoZxG8CJ9UtLmJuZqbHfFKNFbRZkV
+	pT7SVuFJBPEhXVLPrXubYhUni40sDR6DUwapMS1lsD+ElWaASLkie8HUWIYOrAzZRpf5aQZ9+lF42
+	8Flvu7RnuA5p+4nPuc6cuo5Loa7vM4kqzIOabTZN4gaG6B8uF/g0an1M68aO/qN/QHXEi5DaFB+ZA
+	HGeH8UjgkVnuZupXMCIjKOJL8qjCXYA/PLXzYwcUzxYRzXlJMwrlXbrT47c/pmsvtdttRYXpJ+3EX
+	/8vUpz7+8fA4CrmPoIAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtkoe-0002ln-4K; Wed, 13 Feb 2019 03:02:28 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gtkv5-0004g5-2y; Wed, 13 Feb 2019 03:09:07 +0000
+Received: from mail-db5eur03on0605.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0a::605]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtkoZ-0002kz-Uu
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 03:02:25 +0000
-Received: by mail-ot1-x344.google.com with SMTP id i5so1511278oto.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 19:02:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=PMU1/TQWCnMHC5lCOveXcIzdUREG8BzeB87IXaJ0KOE=;
- b=SuJwfuysL5A18uM8XkhFSpoUC6sFu7YwyqKGwB8V6xhIckAUCFxXlYmZHliwI/1+M9
- kpR3EVmH2YQgoTaz3syhgYb7fOG5EU7KP+77YblsaXfDgo/zpuLfFGr+Em4olflplBCB
- drpoRRwFZAd45owdGvzyz/GORgOmZK5KEQMPg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=PMU1/TQWCnMHC5lCOveXcIzdUREG8BzeB87IXaJ0KOE=;
- b=GQsfGT5PvtePLqX9gKsWK1mnk6qQ9ItK18lOkgBmvT9L042a/Q8zG+QfH+4n2TO5jC
- SlD+AKJGEmImvlY9l9YqarP6P57gaaojdsMnt+WVEa8325tXb2v0L2EV6FMTxWXL6Rpq
- UnbkM0NgIigqJi+07sweU2XDLdlKn+XwsNzcb4kYa4Qs81Znz9aocLoYft6WUHsAWOPt
- G4zdfGKBWz47LRo7kmjLDWu9mNyibXGjs2o0+SkVKyncK1Dju7EwfIgFvlaWKNVDUBUX
- 3uE3TrJ3GoUcF5jn0zrj8TBbL2ZgUqP7xhHeVe5NTeHR+osoLuvY+R79FDSw8b0mZKky
- DPAg==
-X-Gm-Message-State: AHQUAuY5Ccj96eD1+LtvyQCbEjNy3pbKnhqawv9KcYLFBa76NDB/8hcC
- oNwoe6PN2K8G8hE0tWkldp3NCVSvxCY=
-X-Google-Smtp-Source: AHgI3IaTnpQbJxrSI7OkBxjuD2Uz31GRbOU4+ZYFKvYtDHDKtg7rcOehqUFVEN98Sg4z+blV+A7DHg==
-X-Received: by 2002:a9d:5f85:: with SMTP id g5mr555986oti.333.1550026942218;
- Tue, 12 Feb 2019 19:02:22 -0800 (PST)
-Received: from mail-ot1-f54.google.com (mail-ot1-f54.google.com.
- [209.85.210.54])
- by smtp.gmail.com with ESMTPSA id v20sm6016479otk.77.2019.02.12.19.02.20
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 12 Feb 2019 19:02:20 -0800 (PST)
-Received: by mail-ot1-f54.google.com with SMTP id i20so1606561otl.0
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 12 Feb 2019 19:02:20 -0800 (PST)
-X-Received: by 2002:a9d:7e8b:: with SMTP id m11mr7286136otp.80.1550026939459; 
- Tue, 12 Feb 2019 19:02:19 -0800 (PST)
+ id 1gtkv0-0004f8-VM
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 03:09:04 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=9hadABVmIenAV+K4vIKEUEa78OqsP9peJGF1D2CDyp8=;
+ b=IGaPIEqDPRZBTJyVqiP03OMNq5ZoCVa9Wal4nyHoFrZlI06WPGnTlXK2i3U4dkAPbmdKgLGwk4EB78UxCGJOdxtH9au8uhhf3zlil/1c2sswxKOhswNdIPedGozizpGCdHt7z23eqIDAuYLm23wsqstjs3q+IuEsH/fiUZ3Faw4=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3724.eurprd04.prod.outlook.com (52.134.66.147) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.22; Wed, 13 Feb 2019 03:08:58 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
+ 03:08:58 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>, "will.deacon@arm.com"
+ <will.deacon@arm.com>, "rjw@rjwysocki.net" <rjw@rjwysocki.net>,
+ "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>, Aisheng Dong
+ <aisheng.dong@nxp.com>, Daniel Baluta <daniel.baluta@nxp.com>, Andy Gross
+ <andy.gross@linaro.org>, "horms+renesas@verge.net.au"
+ <horms+renesas@verge.net.au>, "heiko@sntech.de" <heiko@sntech.de>,
+ "arnd@arndb.de" <arnd@arndb.de>, "bjorn.andersson@linaro.org"
+ <bjorn.andersson@linaro.org>, "jagan@amarulasolutions.com"
+ <jagan@amarulasolutions.com>, "enric.balletbo@collabora.com"
+ <enric.balletbo@collabora.com>, "marc.w.gonzalez@free.fr"
+ <marc.w.gonzalez@free.fr>, "olof@lixom.net" <olof@lixom.net>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-pm@vger.kernel.org"
+ <linux-pm@vger.kernel.org>
+Subject: [PATCH 1/3] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Topic: [PATCH 1/3] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Index: AQHUw0l12uqkL+fgkEG7l0YedIa+eQ==
+Date: Wed, 13 Feb 2019 03:08:57 +0000
+Message-ID: <1550027011-7884-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0150.apcprd02.prod.outlook.com
+ (2603:1096:202:16::34) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3724;
+ 6:zzCViibVj+AhkDg2jsl+/AZS6YPZFrJOrCypKpwsyHhanoe/EpQEX6tLTW/H9FlPwhhY7PA22P3em4DHVX5n8+W14aeRGwRO3KEGqpZxkMZ93SB8EWR3WYgeRF8G5g6B/tuqrXKQfjwxYRukyNpyoRTY8UiS/vRWlIgiO9UBvzXqW1+Uscs0rXXmtVwzZ1qsjO+NRFdJrc4rWmYfNUtqVZmAbh9OXrfuxDlI9D/8pdFI7xC1URX3hH5uau3BWpAALBxz11JZX2TeoM8UsPetUeSJy3p+bRdgTXQ7QTY4jYEhTs5hiHDSpAGwp2hsKTNFnNhf2DOtDpGwiULfVgj/xwBEidRPifPpKQDaWebP2GPSCLXjJ92y2AZgJvDtNIKCkcEXeC43oNwdnarRCWDZ9KTsVqDR1VNoG6qGB+j8dU/HB4FMBA+kK1iIbwIjbnJSAd4OE5TBdrQi5d13zxWqOw==;
+ 5:5qwcRVnEmx4XDaGS5HLuYp9RxFeRwT3DSZKbulellllyFsoEigyYMyX2lweQndBjN3vjYveNVgVlW927nNdiY5eTGiExv/BC/+LXTapgxhByVSffS+yJpsYNLlJxeKflWBSIG9kPwJ/HDZ0g5c9l+movoZbOp7MvIHLqmhu69XGF5q2CAhMhmhQNIVw/6r2tmFvGdTGjV4R8m/vYlOdt2g==;
+ 7:FEvz7j2rHTfYyckN2emi/6+rp54CCXxHrJtgut4d8qd9gPI9XMhz7/rs2B6paaXZdbiEbz0q7mlyGvEwyAOy0/+ug/zhgsPUxvSJ5kF5ksDZVSB44Jti7LxRUZXxFzHV9LbmGIzDWZ2zjt4Li122lQ==
+x-ms-office365-filtering-correlation-id: 22ffc791-f02c-4ca4-db71-08d69160980e
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3724; 
+x-ms-traffictypediagnostic: DB3PR0402MB3724:
+x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
+x-microsoft-antispam-prvs: <DB3PR0402MB372438FE6B140B78B4625A48F5660@DB3PR0402MB3724.eurprd04.prod.outlook.com>
+x-forefront-prvs: 094700CA91
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(376002)(346002)(396003)(39860400002)(136003)(199004)(189003)(50226002)(97736004)(81166006)(81156014)(8676002)(7736002)(110136005)(305945005)(2906002)(256004)(52116002)(8936002)(476003)(486006)(2616005)(99286004)(3846002)(7416002)(6116002)(71200400001)(71190400001)(86362001)(36756003)(26005)(53936002)(478600001)(68736007)(386003)(2501003)(14454004)(186003)(102836004)(6506007)(2201001)(316002)(66066001)(4326008)(105586002)(6512007)(106356001)(25786009)(6486002)(4744005)(6436002)(32563001)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3724;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: agodWra/oj/qDBzTR6IjzZ/bchzWsl90BfIaiMmKpMOVy2JXEb+X2Rc3/KiR4pgIV9QUQkIVCjYFXfJSY5ArxsMSTyODN/G/ii6DSwLNSz6CwhVnS2yvOcjJpYNl85WTDVEhRnUHabKWxUlqpVqJfH+/X4DyCi3G8BYcH8axFvC6FbFnX/o3HfXn0RffUA7/19s5RQ8Iui2FTLICGYVX1066/r/Cx9GfyHwik11QH6o0BYeATwvAxUl1k3Km1DVcF7egZ0yObl1dSFwRJj0lXleddtAffbxKm3I8UYFZNure4nfxguY3tQKP496tVvAb/xUUafXt5wIEWz5V1gAKzVlZdvYfcaqKK0uu9OZyaKRIl2SpsIL2p7oPEBMKdvQ5xYYPY3Rehm0m86voqrK06NNufbY0dyGUb1Ke2UWWeIA=
 MIME-Version: 1.0
-References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
- <CAAFQd5AcqiwAb30ajLxmj6LZoabVygUsAB8A+drpityOAvY60A@mail.gmail.com>
- <4a1346315224850faf31345b577ce3a29c069f3a.camel@collabora.com>
-In-Reply-To: <4a1346315224850faf31345b577ce3a29c069f3a.camel@collabora.com>
-From: Tomasz Figa <tfiga@chromium.org>
-Date: Wed, 13 Feb 2019 12:02:08 +0900
-X-Gmail-Original-Message-ID: <CAAFQd5DE+T6KJ0TXcQUxLSnog5enQf5G0SVM+5t6f60VjcovFw@mail.gmail.com>
-Message-ID: <CAAFQd5DE+T6KJ0TXcQUxLSnog5enQf5G0SVM+5t6f60VjcovFw@mail.gmail.com>
-Subject: Re: [PATCH v3 0/2] media: cedrus: Add H264 decoding support
-To: Ezequiel Garcia <ezequiel@collabora.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 22ffc791-f02c-4ca4-db71-08d69160980e
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 03:08:49.6780 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3724
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_190224_023194_9EF44D7E 
-X-CRM114-Status: GOOD (  29.71  )
+X-CRM114-CacheID: sfid-20190212_190903_379497_A6352F40 
+X-CRM114-Status: UNSURE (   9.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,124 +137,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Alexandre Courbot <acourbot@chromium.org>, Jonas Karlman <jonas@kwiboo.se>,
- Maxime Ripard <maxime.ripard@bootlin.com>, jenskuske@gmail.com,
- linux-sunxi@googlegroups.com,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jernej Skrabec <jernej.skrabec@gmail.com>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hans.verkuil@cisco.com>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Nicolas Dufresne <nicolas.dufresne@collabora.com>,
- Pawel Osciak <posciak@chromium.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 6:22 AM Ezequiel Garcia <ezequiel@collabora.com> wrote:
->
-> Hey Tomasz,
->
-> On Tue, 2019-02-12 at 21:50 +0900, Tomasz Figa wrote:
-> > Hi Maxime,
-> >
-> > On Mon, Feb 11, 2019 at 11:39 PM Maxime Ripard
-> > <maxime.ripard@bootlin.com> wrote:
-> > > Hi,
-> > >
-> > > Here is a new version of the H264 decoding support in the cedrus
-> > > driver.
-> >
-> > Thanks for working on this. Please see my comments below.
-> >
-> > > As you might already know, the cedrus driver relies on the Request
-> > > API, and is a reverse engineered driver for the video decoding engine
-> > > found on the Allwinner SoCs.
-> > >
-> > > This work has been possible thanks to the work done by the people
-> > > behind libvdpau-sunxi found here:
-> > > https://github.com/linux-sunxi/libvdpau-sunxi/
-> > >
-> > > I've tested the various ABI using this gdb script:
-> > > http://code.bulix.org/jl4se4-505620?raw
-> > >
-> > > And this test script:
-> > > http://code.bulix.org/8zle4s-505623?raw
-> > >
-> > > The application compiled is quite trivial:
-> > > http://code.bulix.org/e34zp8-505624?raw
-> > >
-> > > The output is:
-> > > arm:    builds/arm-test-v4l2-h264-structures
-> > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-> > > x86:    builds/x86-test-v4l2-h264-structures
-> > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-> > > x64:    builds/x64-test-v4l2-h264-structures
-> > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-> > > arm64:  builds/arm64-test-v4l2-h264-structures
-> > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-> > >
-> > > Let me know if there's any flaw using that test setup, or if you have
-> > > any comments on the patches.
-> > >
-> > > Maxime
-> > >
-> > > Changes from v2:
-> > >   - Simplified _cedrus_write_ref_list as suggested by Jernej
-> > >   - Set whether the frame is used as reference using nal_ref_idc
-> > >   - Respect chroma_format_idc
-> > >   - Fixes for the scaling list and prediction tables
-> > >   - Wrote the documentation for the flags
-> > >   - Added a bunch of defines to the driver bit fields
-> > >   - Reworded the controls and data format descriptions as suggested
-> > >     by Hans
-> > >   - Reworked the controls' structure field size to avoid padding
-> > >   - Removed the long term reference flag
-> >
-> > This and...
-> >
->
-> Maxime has dropped this because of Ayaka's mail about long term references
-> not making much sense in stateless decoders.
+Add i.MX8QXP CPU opp table to support cpufreq.
 
-I haven't seen any argument confirming that thesis, though. I should
-have kicked in earlier, sorry.
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
->
-> I noticed that RK3399 TRM has a field to specify long term refs and
-> so was wondering about this item as well.
->
-> > >   - Reintroduced the neighbor info buffer
-> > >   - Removed the ref_pic_list_p0/b0/b1 arrays that are redundant with the
-> > >     one in the DPB
-> >
-> > these are used in our Rockchip VDEC driver.
-> >
-> > Could you elaborate on the reasons why they got removed?
-> >
->
-> If I understood correctly, there are two reference picture lists.
-> P-frames will populate ref_pic_list0 and B-frames will populate both.
->
-> According to this, v4l2_ctrl_h264_slice_param.ref_pic_list0 and .ref_pic_list1
-> should be enough and ref_pic_list_p0/b0/b1 are not needed.
->
-> What do you think?
+diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+index 4c3dd95..3c27975 100644
+--- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+@@ -34,6 +34,14 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			operating-points = <
++			       /* kHz  uV*/
++			       1200000 1100000
++				900000 1000000
++			>;
++			clocks = <&clk IMX_A35_CLK>;
++			clock-latency = <61036>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		A35_1: cpu@1 {
+-- 
+2.7.4
 
-The lists in v4l2_ctrl_h264_slice_param are expected to be past the
-per-slice modification stage (which is quite complicated and better
-done in userspace), while the ones in v4l2_ctrl_h264_decode_param just
-in the original order. Rockchip VPU expects them in the original order
-and does the modification in the hardware.
-
-Best regards,
-Tomasz
 
 _______________________________________________
 linux-arm-kernel mailing list
