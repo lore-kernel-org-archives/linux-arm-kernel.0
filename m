@@ -2,22 +2,22 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 67EFDC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A8C8C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37A2A2190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DAD2E2190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uOnO06Ok"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A2A2190A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aGsm0pdT";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="orYKLCJU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAD2E2190A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
@@ -25,49 +25,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=+dOh9FDfvFIK7mNqoFqcJxjLnsxhBmQOJms7ok8ql6U=; b=uOnO06Oksld81By84bLsbC/Tq
-	B4V3bfz591Khn09WRhcLX3WkDXBvPOvKMhzD0WzV7xhOzrw65CqfvEt06rBUe5sXEdP7RtTdHpQ8d
-	X0Rs1RD8aU6T0JTIT54gC7LyiLaZQ/iTfj0inxbCoEH18jwbUfSL4hp0r4VeoIuRaHqrNVqBuSnto
-	/bvTIUVCL6NN939LieTtXZBIHaVhLhd7/p57fF8WOLf7nhMLCdBWR1rn1SmkoXmEatCHInEG5vfao
-	WmNUOnZt9fQdyVJ3QFYOdO9k69xctSMNdx001g97w7k7NwjQfJOK1OEHrGyI/Qp/Gl/IOlV5ZjVGB
-	6ZnbmdOQA==;
+	 bh=LQMWjpSBvAE0H6dVu8i95HycZRf661USsUJQTr2/9ZM=; b=aGsm0pdT72EfcpyXKdXO3c2V+
+	ru6lxrABykrMnSOLRlJQUHBmfBpHzQZP9Vh2vSO4NDJsKLDE2edPTptEJ2tF8l3Pvfg0huGuYXhoJ
+	3dIP6xYWay5l67Os/5ivPQ3r3CqlDO50EKzskHFfzClcKfXBVKtYUFXXVJXALK/gwD9Q21RnQ+Evc
+	2Xo7+R3vTy5HdMS5XRjWS4MfFzRRuduOP9Th0NI0lC+1jNc1XhI4TePsEhSlzJp/2csd8WKQ7FDdo
+	VTpFY7N60YUq0iSr565hPPVdr3xLY7dlUwRRScFnvJ+PTsWU8YNioMzVqR1TxFdOKqpdatNSlwKDR
+	zKitgWd7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtrrm-0008Jh-F0; Wed, 13 Feb 2019 10:34:10 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtrri-0008Iu-6H
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 10:34:08 +0000
-Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
- by mx.socionext.com with ESMTP; 13 Feb 2019 19:34:02 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by kinkan-ex.css.socionext.com (Postfix) with ESMTP id 07F4018009B;
- Wed, 13 Feb 2019 19:34:03 +0900 (JST)
-Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Wed, 13 Feb 2019 19:34:02 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id ACA021A04E1;
- Wed, 13 Feb 2019 19:34:02 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 97922121B6C;
- Wed, 13 Feb 2019 19:34:02 +0900 (JST)
-Subject: Re: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce
- timer for Milbeaut SoCs
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org, 
- linux-arm-kernel@lists.infradead.org
-References: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
- <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <c6fd5a9d-17df-a13d-7634-4c54d3e65f9c@socionext.com>
-Date: Wed, 13 Feb 2019 19:34:01 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gtrs1-00007R-Um; Wed, 13 Feb 2019 10:34:25 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtrry-00005h-Nl
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 10:34:24 +0000
+Received: by mail-wr1-x441.google.com with SMTP id t18so1896535wrx.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 02:34:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=LieBVVVdKyP95R11D2/eV7vtBd1PQludtrUBXGSu3nM=;
+ b=orYKLCJUmA96E1zSha13AuODx2x5fQdXLKXU8d50AMbg+kdqmzUM+qFpsuP/dlCjdc
+ QyfdBvRL9B+WQ5KonUOwh+qqI3cT9A5znkCjaTB5XnvPQ152e7wiE7fzRDcU9AnaR1Xw
+ 7hBCRh+0fFJsBLyZP9nD3Fs3398b8P2Lfk2vkaYsJWmIT/7eNVEWNBsEQHG0P4CtP94G
+ zSXks0IWEi6abI0382kHkp/Kmut8gXu9Wz4OesAITTKmOIt2E23lY9pxFpK47/e1nRBh
+ x1rCYqSBqtZWDPphniqxZ99zShFjiFzeMAM4iS/lFKgjfCiKdLlLECLhQmi5Hk2qKlcc
+ IzCA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=LieBVVVdKyP95R11D2/eV7vtBd1PQludtrUBXGSu3nM=;
+ b=U0eYeB/+bhWNHMwpiBMr304GN6n/duVS/wGL4Rr726V6XFrByhLUFnz+JYL/Qjiv2w
+ QW+GfB4AK6LX46eus0RRdAbPQd38yc6WFBDHOayexNN9imOO2HILU2rLxySxduQhedbZ
+ gdKfxTMaKLSHUgc/B9sI92zvh93/MtQlqkNY8HSxYGbhcHRyp0xB+qyEEAc0trj0+r71
+ /CBxdtWcv1WeeyI38u6v9A1LpOpv75aQf2w2reQEwLkN5exja72co3PY1bMW0Lm6Jcck
+ He6nlXZ+0kzlj7L032MiKoIXFX1jXlClsPxr9fEE2qvd0SOKqBm5yE6H9/SxRQMAPrIh
+ mDiw==
+X-Gm-Message-State: AHQUAuZ/d3dzUloIDmW0b2BCkD/Uv5ZgILegmC/w1ynwruEd0lebSuuZ
+ ZzkH7/YWxlsfFVm+wq0Z1M6M8Q==
+X-Google-Smtp-Source: AHgI3IZ9gdzX+Ei5Qdffvbq/TjBcqttowzcjuLbJBczHgzdJ7VS4+1MlY1pwpNqAwF2hvmdofluffA==
+X-Received: by 2002:a5d:42c3:: with SMTP id t3mr6261626wrr.232.1550054060836; 
+ Wed, 13 Feb 2019 02:34:20 -0800 (PST)
+Received: from [192.168.86.34]
+ (cpc89974-aztw32-2-0-cust43.18-1.cable.virginm.net. [86.30.250.44])
+ by smtp.googlemail.com with ESMTPSA id e9sm27785424wrc.56.2019.02.13.02.34.19
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 13 Feb 2019 02:34:20 -0800 (PST)
+Subject: Re: [PATCH 0/4] Add nvmem support on STM32
+To: Fabrice Gasnier <fabrice.gasnier@st.com>, robh+dt@kernel.org,
+ alexandre.torgue@st.com
+References: <1548866336-14765-1-git-send-email-fabrice.gasnier@st.com>
+ <4aaa83b2-35a6-e2c2-a3f4-6579b5d67038@st.com>
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Message-ID: <46a59513-a322-1e14-41b5-ecbd4c478286@linaro.org>
+Date: Wed, 13 Feb 2019 10:34:19 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
+In-Reply-To: <4aaa83b2-35a6-e2c2-a3f4-6579b5d67038@st.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_023406_661302_42886929 
-X-CRM114-Status: GOOD (  25.62  )
+X-CRM114-CacheID: sfid-20190213_023422_787492_BF93DDDE 
+X-CRM114-Status: GOOD (  16.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,246 +100,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
+Cc: mark.rutland@arm.com, lionel.debieve@st.com, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, mcoquelin.stm32@gmail.com,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
 
-On 2019/02/12 18:06, Daniel Lezcano wrote:
-> On 08/02/2019 13:26, Sugaya Taichi wrote:
->> Add timer driver for Milbeaut SoCs series.
->>
->> The timer has two 32-bit width down counters, one of which is configured
->> as a clockevent device and the other is configured as a clock source.
->>
->> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+
+On 13/02/2019 10:15, Fabrice Gasnier wrote:
+> On 1/30/19 5:38 PM, Fabrice Gasnier wrote:
+>> Non volatile memory area is available on STM32. It contains various
+>> factory programmed information such as unique device ID, analog calibration...
+>> This patchset adds NVMEM support to access these data.
 > 
-> Do want me to take it through my tree?
->
+> Hello,
+> 
+> Gentle reminder for this new driver review
+Nvmem provider driver itself looks fine for me, but I am unable to take 
+this as 5.1 material, as I normally take nvmem patches which are 
+reviewed and ready before rc5.
 
-Yes, please.
-
-By the way, the patch series includes other sub-system drivers, so 
-should it be splitted into each driver patch ?
+dt bindings patch needs an ack from DT maintainers.
 
 Thanks,
-Sugaya Taichi
-
->> ---
->>   drivers/clocksource/Kconfig          |   9 ++
->>   drivers/clocksource/Makefile         |   1 +
->>   drivers/clocksource/timer-milbeaut.c | 161 +++++++++++++++++++++++++++++++++++
->>   3 files changed, 171 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-milbeaut.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a9e26f6..9101b8f 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -634,4 +634,13 @@ config GX6605S_TIMER
->>   	help
->>   	  This option enables support for gx6605s SOC's timer.
->>   
->> +config MILBEAUT_TIMER
->> +	bool "Milbeaut timer driver" if COMPILE_TEST
->> +	depends on OF
->> +	depends on ARM
->> +	select TIMER_OF
->> +	select CLKSRC_MMIO
->> +	help
->> +	  Enables the support for Milbeaut timer driver.
->> +
->>   endmenu
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index cdd210f..6f2543b 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
->>   obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
->>   obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
->>   obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
->> +obj-$(CONFIG_MILBEAUT_TIMER)	+= timer-milbeaut.o
->>   obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
->>   obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
->>   obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
->> diff --git a/drivers/clocksource/timer-milbeaut.c b/drivers/clocksource/timer-milbeaut.c
->> new file mode 100644
->> index 0000000..f2019a8
->> --- /dev/null
->> +++ b/drivers/clocksource/timer-milbeaut.c
->> @@ -0,0 +1,161 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (C) 2018 Socionext Inc.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqreturn.h>
->> +#include <linux/sched_clock.h>
->> +#include "timer-of.h"
->> +
->> +#define MLB_TMR_TMCSR_OFS	0x0
->> +#define MLB_TMR_TMR_OFS		0x4
->> +#define MLB_TMR_TMRLR1_OFS	0x8
->> +#define MLB_TMR_TMRLR2_OFS	0xc
->> +#define MLB_TMR_REGSZPCH	0x10
->> +
->> +#define MLB_TMR_TMCSR_OUTL	BIT(5)
->> +#define MLB_TMR_TMCSR_RELD	BIT(4)
->> +#define MLB_TMR_TMCSR_INTE	BIT(3)
->> +#define MLB_TMR_TMCSR_UF	BIT(2)
->> +#define MLB_TMR_TMCSR_CNTE	BIT(1)
->> +#define MLB_TMR_TMCSR_TRG	BIT(0)
->> +
->> +#define MLB_TMR_TMCSR_CSL_DIV2	0
->> +#define MLB_TMR_DIV_CNT		2
->> +
->> +#define MLB_TMR_SRC_CH  (1)
->> +#define MLB_TMR_EVT_CH  (0)
->> +
->> +#define MLB_TMR_SRC_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_SRC_CH)
->> +#define MLB_TMR_EVT_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_EVT_CH)
->> +
->> +#define MLB_TMR_SRC_TMCSR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMCSR_OFS)
->> +#define MLB_TMR_SRC_TMR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMR_OFS)
->> +#define MLB_TMR_SRC_TMRLR1_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR1_OFS)
->> +#define MLB_TMR_SRC_TMRLR2_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR2_OFS)
->> +
->> +#define MLB_TMR_EVT_TMCSR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMCSR_OFS)
->> +#define MLB_TMR_EVT_TMR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMR_OFS)
->> +#define MLB_TMR_EVT_TMRLR1_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR1_OFS)
->> +#define MLB_TMR_EVT_TMRLR2_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR2_OFS)
->> +
->> +#define MLB_TIMER_RATING	500
->> +
->> +static irqreturn_t mlb_timer_interrupt(int irq, void *dev_id)
->> +{
->> +	struct clock_event_device *clk = dev_id;
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val;
->> +
->> +	val = readl_relaxed(timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	val &= ~MLB_TMR_TMCSR_UF;
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +
->> +	clk->event_handler(clk);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int mlb_set_state_periodic(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
->> +
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +
->> +	writel_relaxed(to->of_clk.period, timer_of_base(to) +
->> +				MLB_TMR_EVT_TMRLR1_OFS);
->> +	val |= MLB_TMR_TMCSR_RELD | MLB_TMR_TMCSR_CNTE |
->> +		MLB_TMR_TMCSR_TRG | MLB_TMR_TMCSR_INTE;
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_set_state_oneshot(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
->> +
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_clkevt_next_event(unsigned long event,
->> +				   struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +
->> +	writel_relaxed(event, timer_of_base(to) + MLB_TMR_EVT_TMRLR1_OFS);
->> +	writel_relaxed(MLB_TMR_TMCSR_CSL_DIV2 |
->> +			MLB_TMR_TMCSR_CNTE | MLB_TMR_TMCSR_INTE |
->> +			MLB_TMR_TMCSR_TRG, timer_of_base(to) +
->> +			MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_config_clock_source(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_SRC_TMCSR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR1_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR2_OFS);
->> +	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
->> +		MLB_TMR_SRC_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_config_clock_event(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static struct timer_of to = {
->> +	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
->> +
->> +	.clkevt = {
->> +		.name = "mlb-clkevt",
->> +		.rating = MLB_TIMER_RATING,
->> +		.cpumask = cpu_possible_mask,
->> +		.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT,
->> +		.set_state_oneshot = mlb_set_state_oneshot,
->> +		.set_state_periodic = mlb_set_state_periodic,
->> +		.set_next_event = mlb_clkevt_next_event,
->> +	},
->> +
->> +	.of_irq = {
->> +		.flags = IRQF_TIMER | IRQF_IRQPOLL,
->> +		.handler = mlb_timer_interrupt,
->> +	},
->> +};
->> +
->> +static u64 notrace mlb_timer_sched_read(void)
->> +{
->> +	return ~readl_relaxed(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS);
->> +}
->> +
->> +static int __init mlb_timer_init(struct device_node *node)
->> +{
->> +	int ret;
->> +	unsigned long rate;
->> +
->> +	ret = timer_of_init(node, &to);
->> +	if (ret)
->> +		return ret;
->> +
->> +	rate = timer_of_rate(&to) / MLB_TMR_DIV_CNT;
->> +	mlb_config_clock_source(&to);
->> +	clocksource_mmio_init(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS,
->> +		node->name, rate, MLB_TIMER_RATING, 32,
->> +		clocksource_mmio_readl_down);
->> +	sched_clock_register(mlb_timer_sched_read, 32, rate);
->> +	mlb_config_clock_event(&to);
->> +	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to), 15,
->> +		0xffffffff);
->> +	return 0;
->> +}
->> +TIMER_OF_DECLARE(mlb_peritimer, "socionext,milbeaut-timer",
->> +		mlb_timer_init);
->>
+srini
 > 
+> Best Regards,
+> Fabrice
 > 
-
+>>
+>> Fabrice Gasnier (4):
+>>    dt-bindings: nvmem: Add STM32 factory-programmed romem
+>>    nvmem: Add driver for STM32 factory-programmed read only mem
+>>    nvmem: stm32: add support for STM32MP15 BSEC to control OTP data
+>>    ARM: dts: stm32: Add romem and temperature calibration on stm32mp157c
+>>
+>>   .../devicetree/bindings/nvmem/st,stm32-romem.txt   |  31 ++++
+>>   arch/arm/boot/dts/stm32mp157c.dtsi                 |  13 ++
+>>   drivers/nvmem/Kconfig                              |  10 +
+>>   drivers/nvmem/Makefile                             |   2 +
+>>   drivers/nvmem/stm32-romem.c                        | 202 +++++++++++++++++++++
+>>   5 files changed, 258 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/nvmem/st,stm32-romem.txt
+>>   create mode 100644 drivers/nvmem/stm32-romem.c
+>>
 
 _______________________________________________
 linux-arm-kernel mailing list
