@@ -5,80 +5,85 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C7A9C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:25:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20F23C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:25:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6484222D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:25:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6BED222D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:25:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egVZYLQL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FaeBd61c"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6484222D0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mWZpf51i";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="V9m4qIn/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6BED222D0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=mZaJ7WQKi0yHorzjFUVlcvR3WAGZzfmHsUVERkR0W9Q=; b=egV
-	ZYLQLaRNd3iHmlNKl8UPuAq0IVjgfPu0yGDN+eZm0KslieQ75rIk8ej7ZOO7+naRd0K9MMUsoYNZU
-	I0cJ4fvratROecEzUPQsnl/qrYCILF6yicQXjFtB+eQU/iEzgKMSdkN8WZIfuF6oyufaWr4MAqlIT
-	HNZ6jn5078dZj22YMgJezWE6phkLjOdRntEgyOzNvvRrSEvE+DHFAJCWtyrKa75KODvt4QHTXStDX
-	teB7g0TzOM1jWFal1YiEqve/RgqSqxkArPjXMszvTyNQWgsw5j5cniLnrHhv9o/wHwXPBN+xiEb44
-	DNmUFJ2ILKcVhJRQdjGtN9xbjEAU4Eg==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=sJRQOBVhLM6Gc7Y9yYaTe5buISIHTjlnad5xTPgSaSs=; b=mWZpf51iMZej0unCF8O5FX9LiU
+	AQbz8Oky655+7ggLw6/AWJa4yC80E/JU3qjbDOb/jo6zpZNkkRRjlYoqgVmGU7PvJ+F+h+eiRL0er
+	GG6mRNBz4UnCMN9T49lrycjvZ4YvB3xDMx+PwMn4CnJafMa33pm5Pomz2NgmCnMZ8IMV0cF9OT/Ok
+	2MVpR/2VaMdit1hAhvbU5CtDc+aEDeH0V2nIRRIWmYD9l59eZSM9atCFzYdILWuzsc/+JNS0u66vk
+	rSaTpjXC7U/B7o7MUYoT48b+7EQg8BW3mWmJIhSU8vdU+q6gfB+hrvuOfDMgPMSgmlFY7NZHO/urY
+	qJDm1Stw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzDo-0005lt-77; Wed, 13 Feb 2019 18:25:24 +0000
-Received: from mail-qt1-x844.google.com ([2607:f8b0:4864:20::844])
+	id 1gtzDx-0005y6-UR; Wed, 13 Feb 2019 18:25:33 +0000
+Received: from mail-qt1-x841.google.com ([2607:f8b0:4864:20::841])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzDk-0005lG-JQ
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 18:25:22 +0000
-Received: by mail-qt1-x844.google.com with SMTP id v10so3735770qtp.8
+ id 1gtzDn-0005le-7D
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 18:25:24 +0000
+Received: by mail-qt1-x841.google.com with SMTP id e5so3703327qtr.12
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 10:25:20 -0800 (PST)
+ Wed, 13 Feb 2019 10:25:22 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=zOZ+8nSG8Sb03iEOL0M+UcixMozhCfMx/rRiG5VgEIU=;
- b=FaeBd61cuAxoz36aUMD4hEM8q9L9Bz0uJwQ/qd1Ao2mfYlXgYV2NfIe/A4CXurPyTW
- OES7YmZld5cxuTjJnZV4etMyNx+RqVLlMjk2LUYPsgoFIQp78MY3x6getP1QoJb/l87r
- p6MjWSOYDK+ildAhyv7b/YbifrWD+ts+9EuvGdix2r4R1Jfz7ip+kmNIFg/1izikBJuH
- rWmqVAQVmRpmoiEYCockV9EHN9PUeywO0t0hbsvPuPr+iFa0klexyRs5VeJXoYs52YWO
- mw4SM81GJ7WeMOXqSh1TZsW0J0srDvAFLJJ38WGvWW1l6NwZ+vd72aYDOtFeJX+J7alu
- GFQg==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=n3Xu0BCtuANGPfTq7pDx0Dw85z3aUADWv9EPMLBjSo4=;
+ b=V9m4qIn/fCaLOxUcOzm7UoN5r7xlxcDng8wp1/GvDikaPHYHBeBhok7kLX3yoedvkS
+ +h9qI46A59EpnsDa1RbmzhqBIojDieOQVA4xEbF8MC5jrPVZJSThLPeiGWkyno64o+MU
+ Ec95/lcr1ecTAt7pLnbjJH49zbXtlZmgdht7UxNRe1L1Xj+bxomU62t3l1ieA166q++M
+ 362T0pndE2ej+3tT+g4vqyHkTG3V2s6eH15A7Avfd8f795N4z330OEgd72HBQeIJj9Ku
+ y4q+IXn9eetgH6qY4dh5cesYe0cwYFarffubN+niGxcjTK3VdnJ6UxAJdO4F+FEicYB2
+ uM0A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=zOZ+8nSG8Sb03iEOL0M+UcixMozhCfMx/rRiG5VgEIU=;
- b=NWx+jhrq4fanfu+02NDhL1VCWO2CA0PzvzEdUd4rGsNmRYH4zvy46RuZ4URzXFH1De
- U/k5W9XJzuN3pZ+Y+BW678mT5Tk68ZTDVcbiRbkDCF3h/Q3eve8LxMyFjUCo4Mib+h8O
- WjZBIzLdP/oUcWc7x3yd7SdcJtZy816EgoSDXWCDFrnFokKO9joINs+PGWJ9kScRU+8H
- /8+O6cK+PefZ4/M6Zv9qgLjGLMeH3y+z5ViV/vsNKWfb/oyoWW9xlEtEo+sGexJ66Yel
- FmTcbER5OHmiS/L6OwiPvRe2zqOfmwB5UjJxztOAMaiNY2DQ4h+gmrqulPKILYv352yy
- 4Bog==
-X-Gm-Message-State: AHQUAuZqGiRAUJ/K0yh+mwjvEe4AeG7pAL4/Ilx2L5nQ5ItWOdFdC578
- njG+hOm6uSlzK9wHcEh2AfI37v+2
-X-Google-Smtp-Source: AHgI3IZWErdvSELjNgsCD/uxC1Dt7/a9VdhRh7UfceJWLDCqXLgVf2cLmilQIJFanTlhR8QbFJ7tKw==
-X-Received: by 2002:ac8:23aa:: with SMTP id q39mr1536600qtq.82.1550082319153; 
- Wed, 13 Feb 2019 10:25:19 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=n3Xu0BCtuANGPfTq7pDx0Dw85z3aUADWv9EPMLBjSo4=;
+ b=M2+0+g2Rzy8864WGKbtkbR2lQugRXoaT8aEq3lKeWtJK3GIh4hTKiHiklvffxWtUgv
+ CxU2hpl4jcvt6OaN1sfJkjgH/hgHx+n2KLUGQsvP1lqT2UhSVEyee2tH7YBS8dkKa7Ez
+ R+zjvO+VlTey/tdoqxgGTl4QvXi/fqkShtYGDKICugwJeaz3RWYUaVQ4ikvtJV6aRM43
+ rMxanMMpGAiSNSFzeVjPURrKMHIXqAg/AcDVgH+Sh0ZcK1V20YNIZ9OcvQckr3PPoPii
+ RN+W0bR3OXBa4WdPXeC9dmCyIPDtE0PVuJLe/KrmrYi5dYKEWZOb9A5QkaJjV3bIM+1G
+ EixQ==
+X-Gm-Message-State: AHQUAuaEy/BawQ/PE4tGSc+wfx4gvyyy13alE2zHLiM1+8/ZivZO6VoH
+ xxi+tB4m2E0sJBiAo1ifT5U=
+X-Google-Smtp-Source: AHgI3IaEcr8gc5+WILMkWFfdRoF2f7bBeYI5l6z5X+fOyHZhwZdKIk8n9mZc48TRMz7GEiYHrk1P4g==
+X-Received: by 2002:ac8:1a56:: with SMTP id q22mr1547602qtk.59.1550082321902; 
+ Wed, 13 Feb 2019 10:25:21 -0800 (PST)
 Received: from fabio-Latitude-E5450.nxp.com ([2804:14c:482:a73::1])
- by smtp.gmail.com with ESMTPSA id l129sm1596796qkb.44.2019.02.13.10.25.16
+ by smtp.gmail.com with ESMTPSA id l129sm1596796qkb.44.2019.02.13.10.25.19
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 13 Feb 2019 10:25:18 -0800 (PST)
+ Wed, 13 Feb 2019 10:25:21 -0800 (PST)
 From: Fabio Estevam <festevam@gmail.com>
 To: shawnguo@kernel.org
-Subject: [PATCH v2 1/2] ARM: dts: vf610-zii: Disable SNVS RTC
-Date: Wed, 13 Feb 2019 16:24:38 -0200
-Message-Id: <20190213182439.6184-1-festevam@gmail.com>
+Subject: [PATCH v2 2/2] ARM: dts: vf610-zii-ssmb-spu3: Disable watchdog
+Date: Wed, 13 Feb 2019 16:24:39 -0200
+Message-Id: <20190213182439.6184-2-festevam@gmail.com>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190213182439.6184-1-festevam@gmail.com>
+References: <20190213182439.6184-1-festevam@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_102520_663133_3DA85D9A 
-X-CRM114-Status: GOOD (  11.58  )
+X-CRM114-CacheID: sfid-20190213_102523_259161_2B3FC13E 
+X-CRM114-Status: GOOD (  11.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,81 +104,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-None of these vf610-zii boards have a battery or super-capacitor
-holding up power to the SNVS RTC embedded in the Vybrid SoC,
-so it is preferable to disable the snvsrtc node.
+On vf610-zii-ssmb-spu3 board there is a supervisory microcontroller that
+provides the watchdog functionality, so disable the on-chip Vybrid's
+watchdog. 
 
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
 Changes since v1:
-- Also touch the recently introduced vf610-zii-ssmb-dtu.dts (Andrew)
+- None
 
- arch/arm/boot/dts/vf610-zii-cfu1.dts      | 4 ++++
- arch/arm/boot/dts/vf610-zii-scu4-aib.dts  | 4 ++++
- arch/arm/boot/dts/vf610-zii-ssmb-dtu.dts  | 4 ++++
  arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts | 4 ++++
- 4 files changed, 16 insertions(+)
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/vf610-zii-cfu1.dts b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-index 445c7dc306b2..440de578d8af 100644
---- a/arch/arm/boot/dts/vf610-zii-cfu1.dts
-+++ b/arch/arm/boot/dts/vf610-zii-cfu1.dts
-@@ -236,6 +236,10 @@
- 	};
- };
- 
-+&snvsrtc {
-+	status = "disabled";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart0>;
-diff --git a/arch/arm/boot/dts/vf610-zii-scu4-aib.dts b/arch/arm/boot/dts/vf610-zii-scu4-aib.dts
-index de6dfa57bec5..e3952e9ea0db 100644
---- a/arch/arm/boot/dts/vf610-zii-scu4-aib.dts
-+++ b/arch/arm/boot/dts/vf610-zii-scu4-aib.dts
-@@ -671,6 +671,10 @@
- 	};
- };
- 
-+&snvsrtc {
-+	status = "disabled";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart0>;
-diff --git a/arch/arm/boot/dts/vf610-zii-ssmb-dtu.dts b/arch/arm/boot/dts/vf610-zii-ssmb-dtu.dts
-index 2b10672fadbd..60dad9c228a9 100644
---- a/arch/arm/boot/dts/vf610-zii-ssmb-dtu.dts
-+++ b/arch/arm/boot/dts/vf610-zii-ssmb-dtu.dts
-@@ -211,6 +211,10 @@
- 	};
- };
- 
-+&snvsrtc {
-+	status = "disabled";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart0>;
 diff --git a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
-index 0d9fe5ac83a3..6df3ef979eb0 100644
+index 6df3ef979eb0..e10603bdd18f 100644
 --- a/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
 +++ b/arch/arm/boot/dts/vf610-zii-ssmb-spu3.dts
-@@ -219,6 +219,10 @@
+@@ -254,6 +254,10 @@
  	};
  };
  
-+&snvsrtc {
++&wdoga5 {
 +	status = "disabled";
 +};
 +
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart0>;
+ &iomuxc {
+ 	pinctrl_dspi1: dspi1grp {
+ 		fsl,pins = <
 -- 
 2.17.1
 
