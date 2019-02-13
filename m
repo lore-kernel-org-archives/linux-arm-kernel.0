@@ -2,141 +2,85 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 03320C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2726C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:37:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C397C2075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71A92217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:37:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QwHnbBxm";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="O16oOpSy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C397C2075D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EBUeZ6QB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="w08p/rIs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71A92217F5
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lBHalVuUAlBZoMDxHaPVnT4joopd0bWwkoFin6oNfZs=; b=QwHnbBxm82DKbb
-	IAUcEybs/ArWeOihPG0VwAKj+Kw+SvDaIfGbTJyOKOawoB9eDnHPfhVKfrFnDH9Ixb+SWhRCErCNr
-	xskHFae/UdJ9yy9+iSfTYuX0CHSxxQ+n3VwVxZOcgzqpHObrwpcEX8e7nbp9vVMk8ILpGKCobQvqY
-	7LcDu5pPQSrbtlS+eXzziuRWJsUtqpRdPRRymZUHY5ekpWwN94yTecWQq/ttc3jbvobrCRF4yRqRy
-	qthbv5yuMG20r9jRhDrFPi2e1n5tgDbciIHV/yF0LaqHskS+v8DkdWPLc+QL8LGxS2aN+C3IaXwFF
-	Of1b0fU1IDlLDx1c4r2Q==;
+	List-Owner; bh=GkJ5QLntJT6g1styNG7BflJOHRI2iYiLIN4SRc91BsA=; b=EBUeZ6QBey9yFn
+	wQkQXCfO0PqHaH16Wd4rERoWpKQxGNa5YW10QI4IGY2QL0lyPhqFHYPijVA1FboesjkkYJtV+DpNq
+	S1x6skj2m42W0oeHWNyG86KG1N4b+0+onsHkvfx/022UhcpiegHRiHoMuxBOb0YPvHY2AADJo1QV4
+	swUBmiV6KjZmPbIbnSDhvZ8wFXV6yJrazj/kLNiH0d92OHIP718viQcpfZ1N2FfznV5nT59Iqqsht
+	0uHSsUoAN6rC+TviTEEanDq6LsGBlebUMqy7YacxFIyO8ida0WUM/xGrylmHEB/Hoi3LCvxb5DFYG
+	kIQttCRlkwjKg3INB4wA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtuea-0001M0-Eg; Wed, 13 Feb 2019 13:32:44 +0000
-Received: from mail-eopbgr70047.outbound.protection.outlook.com ([40.107.7.47]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gtuii-00035m-Kf; Wed, 13 Feb 2019 13:37:00 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtueQ-0001AA-AZ
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:32:36 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=0oPvs3Oa7jwLZ2aU642zhPKnBvU6t2mEAjVTLCR56rE=;
- b=O16oOpSyFe/rrGWl1WstPyLYsRbJ+qiNweNuSxBFIEWBWqaVLsCxztCsqmFh6y9RJIgQ4Dhh1ewCSQtyBGStFDARQhIQpeseXHTwAxzgeXoe/nRXuYvz5LhWHPGTfC3XzH7yOxm/C7ndKL56cP/8Vpd+/okUsBGsR0pq6yoWHKI=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3657.eurprd04.prod.outlook.com (52.134.69.142) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Wed, 13 Feb 2019 13:32:29 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
- 13:32:29 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
- <sboyd@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>, Daniel Baluta
- <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "viresh.kumar@linaro.org"
- <viresh.kumar@linaro.org>
-Subject: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Topic: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Index: AQHUw6CQ13JKnp8jt0O33OXV5gABVA==
-Date: Wed, 13 Feb 2019 13:32:28 +0000
-Message-ID: <1550064410-28417-2-git-send-email-Anson.Huang@nxp.com>
-References: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR04CA0045.apcprd04.prod.outlook.com
- (2603:1096:202:14::13) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 4c8bd59f-a6a4-492c-4587-08d691b7b2c3
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3657; 
-x-ms-traffictypediagnostic: DB3PR0402MB3657:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3657;
- 23:TXB9KQigjDGIl53PnMYTzjuJ0APKhK+77nl38?=
- =?iso-8859-1?Q?fLfUb81CFHQDrbPACxxdS1A/gwaBzjmRyf6A3/3+4bVnspNB9uhkY1ZqoV?=
- =?iso-8859-1?Q?vxXwrAvKVywQDA2PCDuz/plyrJ7pQcGXNoC/V831EqatMaFMiwmxMMlnk6?=
- =?iso-8859-1?Q?cTLaW3lt0jLEJv+vvcMU/u66nPQ9Hsvv1YC70ktOlxEdNF3txBZ36MKdtS?=
- =?iso-8859-1?Q?zgPW3dSNCJnm15eOGl9jFuNPO3vaJliVEFkf8qBxXB0ubGadVEA5Qswv+Q?=
- =?iso-8859-1?Q?4ybhzK4lIRL2aVS6dVuapPixhYf2CxEWAOPw/3Mi/ZW1m/+gzJz4SQEJh7?=
- =?iso-8859-1?Q?Es+VTsyYxAXV3lXeS7Bzev2MpwmIHZTMKUIrdn6eTMkCF9jQ2XhVhqttzu?=
- =?iso-8859-1?Q?zoqa/ZvUULMaYhkrzdayRjyrNEvo8WVD168vvNmGcGfXafeK67v23aWTDl?=
- =?iso-8859-1?Q?BWExYj/xsZqA9rgkU3TwNeEz3YsGEGkj5P17NSXc0vSglZKOowz9iQLDKT?=
- =?iso-8859-1?Q?F3/Ln6szxO2VWW7SGI4EH9BO+7zN+IReP49dZv3OAHkmMwwLPwMoqAaI7X?=
- =?iso-8859-1?Q?e2tervJH4F+fk4XYSUVm5bdh0BKM+u1O9o4M7y6Dj9PdarMkGgKMm7GPTD?=
- =?iso-8859-1?Q?Mg13pFzItrnNTJWlRyKkZZAAaxlnoGmyK40OnOC93P6ir6ATvXNXUSqfVL?=
- =?iso-8859-1?Q?4ZeWSeBDa6QvbI8Y4zzC5+iYTM5UfnzS9wsgnWPHnNprHyMoMIbI/lc6nm?=
- =?iso-8859-1?Q?j+a6iAxvUFvcO6LR/dMEbQGntfmOca4IfhK295bbQdivX7FWXUx+P29w0r?=
- =?iso-8859-1?Q?6M6u03r6px5bvnU+thg0hizfOmDONsg8oWjJXTntpfW9aEgHAJAVH4IUgB?=
- =?iso-8859-1?Q?a23Zy6YDoPtGUpGoVmRX8S9KY+ZetVEbOsWdmk3hQErbstxyVVMWdFsfi2?=
- =?iso-8859-1?Q?FwCOpLhkuqyp941fUByewcptbwEmAsA+kNU5Vb/FVBAglP30fcZJRflFOn?=
- =?iso-8859-1?Q?p4aPdQlLF3dMr4YYZHfD+RBKQFSYS2f5qWeGtljK6NO0bU6cSGv5YJJHSY?=
- =?iso-8859-1?Q?W+Z/s9w0xR8EAEYL/PyH0zNzWF56fnKCuRV6nv1FGUnM7xeQXvFl7gCdIn?=
- =?iso-8859-1?Q?mJifvzFQ1KX0OekqNOjoJBvmTkJ+PapHvzN72Xe39S31PVZvDuayoHSszI?=
- =?iso-8859-1?Q?EXbXzXyHL/nODX/2wHwwR4/0zOT3IbGhPxuosO+bmDVG5jmRdhYTVApLPV?=
- =?iso-8859-1?Q?2rZgttBHlTeXtdEuVk1n/i27l//9HEk0njjZJd58o3ZKYwcOkDyvW+pNwt?=
- =?iso-8859-1?Q?kczqFJRAdtxCq5tI/8kqvvYOD?=
-x-microsoft-antispam-prvs: <DB3PR0402MB36578C92C0DAD613461FA755F5660@DB3PR0402MB3657.eurprd04.prod.outlook.com>
-x-forefront-prvs: 094700CA91
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(376002)(366004)(346002)(396003)(39860400002)(199004)(189003)(54534003)(6436002)(486006)(6486002)(106356001)(11346002)(478600001)(2616005)(53936002)(476003)(26005)(25786009)(52116002)(76176011)(105586002)(14454004)(2201001)(4326008)(186003)(8676002)(8936002)(446003)(50226002)(99286004)(256004)(81166006)(110136005)(86362001)(14444005)(81156014)(316002)(305945005)(7736002)(68736007)(6512007)(6116002)(3846002)(386003)(71190400001)(102836004)(6506007)(71200400001)(2906002)(36756003)(7416002)(66066001)(97736004)(2501003)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3657;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: LM2E0vnlZQZa3cuG08jUrq1fyU+V2XiB8y/SRdkhflWCIpFpmFSUCQPRpbcgyHu+pMX2+r5LumzjMoJwaCfHH2laCVycVkKEwbTtpnEUc54KRa9HcrViaCMvSSW4SXtm6EQFgsbI700Rxj8SUhyLwOSOpRZQrEYyOFyl1/pOBdZ7R8Z0bGYcDXiWBpHLOgZjEIvLLdKmL4C/ryDeYC4yLqCw9HqTp3DeosmoyVyIdbzgYbJYzOsuR6fMH7RUM5nkE1bMJv/eHrwja9mImnnWn+zj32xVdouLBS6kdk6TZSsaPtMShBLOQLCOGxxVDeSB+Io/MlQfgUkaS3jvCRh7XxLzvIGjrdfNs/YjZrqKyG2r7n8fgAs6n5UNl4vmg4tJQ/K8JLxRdK9d/QA/W32YSR3b9LBqLXnDpDt+1IkSp6Y=
+ id 1gtuib-0002xo-NI
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:36:55 +0000
+Received: by mail-pl1-x642.google.com with SMTP id 101so1176721pld.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 05:36:52 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=n+xpNGTBUJTFj8aS5gzxBxlHPbKgKMsr1yQqNDU1whc=;
+ b=w08p/rIs9IF9WB9OMf1R+mbyfgQQ07QA0Mh3F/Bp3fkWGWogWT8m5VRfhAhCgxE+wQ
+ R/vDF/V/uuSEp8+pdfGIQwH2Mr1aOP1goyVAStNFMtXPnv0lv86/0w4bRbC3rfXp3306
+ 5pmO/xJHhMrApVHevvqJKz0HPgw+06K9dZWHDKYvkV+kpcEayGbvctt7qmPnqyfHQ4Hv
+ 3nul8BSsBy2H5EQk8bNJ58J9AcL55r8WmnKVUn551RGLBa9QRQD7Q1bduHoRXPkN7gMj
+ 9B8qzWVtvbXhdznLM4iAs9ieH5WwdR6WPI/TJxOV5vrZmLAC55/qmRsEK47l1MszcpdA
+ OEIQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=n+xpNGTBUJTFj8aS5gzxBxlHPbKgKMsr1yQqNDU1whc=;
+ b=n6AkMFD33jufDMDVKWYAKtNj/IzlYwzKQPthH+jz6L0ZO2yswruGrkDnvn0y5XphkT
+ /QP/rwTpitTnaljhLd7WEJxp/5NyZMqkHfB/9ad48cYMOwsFidsnz1wMWbm6i66Xrzf/
+ gWaLMMjBsBQqZQjE1Nny5CC44V6MSZXllkHqcgfywqvSYpj1XOMQ78+9nNiP3kWBxRr3
+ 50QO6n+QtE69RpJDVskkDO3nD/6P0ZaTDoFCFMVtRqN+g94LzXMsqVLKwdFoEFFH/Dzk
+ n14FrCqwnSrUux87a6SK0uTnR/4elL2+YGWoZhYIlmnNL2UAvabeJwSIFG36zOH2HMls
+ +gpA==
+X-Gm-Message-State: AHQUAubWo8UClHoxYKxUYD7MtMMQF9k/SlhctAcX7Z84LozOB6aXX9p8
+ 3KBT5JrRMJjuj4Oz/FDAj6CqQEs0PwpcrKf9H55jOQ==
+X-Google-Smtp-Source: AHgI3IbhK68A9iubDxa2AvZUsBMfHxwwf55FuC5hSB+MQs3VjUYIA0seUsgl9se+Y4CIINk8i3AF94tDrbWkJXpAEXM=
+X-Received: by 2002:a17:902:690c:: with SMTP id
+ j12mr600056plk.206.1550065012184; 
+ Wed, 13 Feb 2019 05:36:52 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 4c8bd59f-a6a4-492c-4587-08d691b7b2c3
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 13:32:23.3272 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3657
+References: <1548351151-3722-1-git-send-email-igor.opaniuk@linaro.org>
+In-Reply-To: <1548351151-3722-1-git-send-email-igor.opaniuk@linaro.org>
+From: Igor Opaniuk <igor.opaniuk@linaro.org>
+Date: Wed, 13 Feb 2019 15:36:16 +0200
+Message-ID: <CAModR+WY-m+2mTEsgKe5vdH8OsSkV7cRBFQaMd0PHHAaJyzZSQ@mail.gmail.com>
+Subject: Re: [PATCH v2 1/1] tee: add cancellation support to client interface
+To: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, 
+ Linux ARM <linux-arm-kernel@lists.infradead.org>, tee-dev@lists.linaro.org, 
+ Jens Wiklander <jens.wiklander@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_053234_880258_E65A070B 
-X-CRM114-Status: GOOD (  17.06  )
+X-CRM114-CacheID: sfid-20190213_053653_905097_7E17857F 
+X-CRM114-Status: GOOD (  19.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,107 +92,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Sumit Garg <sumit.garg@linaro.org>,
+ "Zengtao \(B\)" <prime.zeng@hisilicon.com>,
+ Jerome Forissier <jerome.forissier@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On NXP's i.MX SoCs with system controller inside, CPU frequency
-scaling can ONLY be done by system controller firmware, and it
-can ONLY be requested from secure mode, so Linux kernel has to
-call ARM SMC to trap to ARM-Trusted-Firmware to request system
-controller firmware to do CPU frequency scaling.
+On Thu, 24 Jan 2019 at 19:32, Igor Opaniuk <igor.opaniuk@linaro.org> wrote:
+>
+> Add support of cancellation request to the TEE kernel internal
+> client interface. Can be used by software TPM drivers, that leverage
+> TEE under the hood (for instance TPM2.0 mobile profile), for requesting
+> cancellation of time-consuming operations (RSA key-pair generation etc.).
+>
+> Signed-off-by: Igor Opaniuk <igor.opaniuk@linaro.org>
+> ---
+>
+> v2:
+> - use tee_ioctl_cancel_arg to provide session and cancel_id
+> - fix tee_client_cancel_req function description header
+>
+>  drivers/tee/tee_core.c  | 10 ++++++++++
+>  include/linux/tee_drv.h | 12 ++++++++++++
+>  2 files changed, 22 insertions(+)
+>
+> diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+> index 7b2bb4c..1148175 100644
+> --- a/drivers/tee/tee_core.c
+> +++ b/drivers/tee/tee_core.c
+> @@ -1027,6 +1027,16 @@ int tee_client_invoke_func(struct tee_context *ctx,
+>  }
+>  EXPORT_SYMBOL_GPL(tee_client_invoke_func);
+>
+> +int tee_client_cancel_req(struct tee_context *ctx,
+> +                         struct tee_ioctl_cancel_arg *arg)
+> +{
+> +       if (!ctx->teedev->desc->ops->cancel_req)
+> +               return -EINVAL;
+> +       return ctx->teedev->desc->ops->cancel_req(ctx, arg->cancel_id,
+> +                                                 arg->session);
+> +}
+> +EXPORT_SYMBOL_GPL(tee_client_cancel_req);
+> +
+>  static int __init tee_init(void)
+>  {
+>         int rc;
+> diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
+> index 6cfe058..177016e 100644
+> --- a/include/linux/tee_drv.h
+> +++ b/include/linux/tee_drv.h
+> @@ -526,6 +526,18 @@ int tee_client_invoke_func(struct tee_context *ctx,
+>                            struct tee_ioctl_invoke_arg *arg,
+>                            struct tee_param *param);
+>
+> +/**
+> + * tee_client_cancel_req() - Request cancellation of the previous open-session
+> + * or invoke-command operations in a Trusted Application
+> + * @ctx:       TEE Context
+> + * @arg:       Cancellation arguments, see description of
+> + *             struct tee_ioctl_cancel_arg
+> + *
+> + * Returns < 0 on error else 0 if the cancellation was successfully requested.
+> + */
+> +int tee_client_cancel_req(struct tee_context *ctx,
+> +                         struct tee_ioctl_cancel_arg *arg);
+> +
+>  static inline bool tee_param_is_memref(struct tee_param *param)
+>  {
+>         switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+> --
+> 2.7.4
+>
+Hi,
 
-This patch adds i.MX system controller CPU frequency scaling support,
-it reuses cpufreq-dt driver and implement the CPU frequency scaling
-inside SCU clock driver.
+Just gentle reminder - v2 patch has been sitting in ML for almost 2
+weeks with no review (all issues mentioned in v1 were addressed).
+If anyone has any objections/suggestions, please let me know.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-ChangeLog since V1:
-	- reuse cpufreq-dt driver for CPU frequency scaling and implement the CPU
-	  frequency scaling inside SCU clock driver.
----
- drivers/clk/imx/clk-scu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c
-index 7ccf7ed..65fb63c 100644
---- a/drivers/clk/imx/clk-scu.c
-+++ b/drivers/clk/imx/clk-scu.c
-@@ -4,14 +4,32 @@
-  *   Dong Aisheng <aisheng.dong@nxp.com>
-  */
- 
-+#include <linux/arm-smccc.h>
- #include <linux/clk-provider.h>
- #include <linux/err.h>
- #include <linux/slab.h>
- 
- #include "clk-scu.h"
- 
-+#ifdef CONFIG_CPUFREQ_DT
-+#define IMX_SIP_CPUFREQ			0xC2000001
-+#define IMX_SIP_SET_CPUFREQ		0x00
-+
- static struct imx_sc_ipc *ccm_ipc_handle;
- 
-+struct imx_sc_cpufreq {
-+	const char *clk_name;
-+	u32 cluster_id;
-+};
-+
-+static const struct imx_sc_cpufreq imx_sc_cpufreq_data[] = {
-+	{
-+		.clk_name = "a35_clk",
-+		.cluster_id = 0,
-+	},
-+};
-+#endif
-+
- /*
-  * struct clk_scu - Description of one SCU clock
-  * @hw: the common clk_hw
-@@ -161,6 +179,35 @@ static int clk_scu_set_rate(struct clk_hw *hw, unsigned long rate,
- 	struct imx_sc_msg_req_set_clock_rate msg;
- 	struct imx_sc_rpc_msg *hdr = &msg.hdr;
- 
-+#ifdef CONFIG_CPUFREQ_DT
-+	/* CPU clock can ONLY be done by TF-A */
-+	if (clk->clk_type == IMX_SC_PM_CLK_CPU) {
-+		struct arm_smccc_res res;
-+		unsigned int cluster_id;
-+		int i;
-+
-+		for (i = 0; i < ARRAY_SIZE(imx_sc_cpufreq_data); i++) {
-+			if (!strcmp(clk_hw_get_name(hw),
-+				imx_sc_cpufreq_data[i].clk_name)) {
-+				cluster_id = imx_sc_cpufreq_data[i].cluster_id;
-+				break;
-+			}
-+		}
-+
-+		/*
-+		 * As some other clock types have same value as
-+		 * IMX_SC_PM_CLK_CPU, so we need to double check
-+		 * the clock being scaled is indeed CPU clock which
-+		 * matches the table we define.
-+		 */
-+		if (i < ARRAY_SIZE(imx_sc_cpufreq_data)) {
-+			arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
-+				cluster_id, rate, 0, 0, 0, 0, &res);
-+			return 0;
-+		}
-+	}
-+#endif
-+
- 	hdr->ver = IMX_SC_RPC_VERSION;
- 	hdr->svc = IMX_SC_RPC_SVC_PM;
- 	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_RATE;
--- 
-2.7.4
-
+Thanks!
+--
+Regards,
+Igor Opaniuk
 
 _______________________________________________
 linux-arm-kernel mailing list
