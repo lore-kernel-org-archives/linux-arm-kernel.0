@@ -2,132 +2,80 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 204B0C282C4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:09:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AFF21C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:13:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1B68218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:09:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B27321B1A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 03:13:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HhbwPo12";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="l4wjwtPQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1B68218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NwjO6h6v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B27321B1A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L32o7yu/FWbK0dmCp8Zk8o+zfBoUhJOQw3hiU60jr8c=; b=HhbwPo12XeCQwK
-	X/EHCt63RSVo0/cqyaqQGHZmxJYGN+W5G5AUDROtpUqVlCr0t/u4XL8RWsMjy9PyJSWNZzG4k3oiP
-	x8ml04cUC3U9DGA0DO6w9PLAvxArt4wOHOlZJ+ju4tHXN4XttR5eOMa3xyYTrQnd4SZxAuaMErE+L
-	3NJMZd19564bZvUa6bVYTPiXTZYxXxR7fdXM6fCQC6tGUifb8zUuz41lukmuMzEBAe39rh10Kr98X
-	YO48o5NwD5rHi2rJg1wJTYwAm3pUSJt9sjWc4239tJS+WVz4STX4AsTe1BWCYzX08e30EknoK9PMf
-	2URKLOaNbjwGY3SdJcFQ==;
+	List-Owner; bh=nEjK9sBlJbTaeiLyy52in/M8BmnqgNQ781hl/yEPcos=; b=NwjO6h6vure/Ja
+	61N6ROiNBB5uwoGiH7cfoCK9hTJ+7I6egIKZxrgXZ+jR/dX6L+5C3tha4zgTpBOcjtz6ErYhYgBIW
+	Un6AbTaOVFIQOI6h2gEyE91RR0zLji4NVozkCjb1SffwD6dQjlRwnwj1WBWIOr+Ri3SwT42C5SJKY
+	DDYSt2eNZU0vBnYwYY/81dqmO/AI27wWZsNZ0CuSZMtnqOOY+m0GoXUEEPGbXDCODZUkisuFqvv4u
+	9JclEX1Wo4I4Xla8XhMBoqcmP6eFDPI696kmVxmgZS4LMa5fRtRc0/fzTJvn8Hd7vshlYqit4X5OE
+	nf9mYuGAJ5BLY+FqNEsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtkvf-0005EW-68; Wed, 13 Feb 2019 03:09:43 +0000
-Received: from mail-eopbgr40084.outbound.protection.outlook.com ([40.107.4.84]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
+	id 1gtkzP-0007Ff-GU; Wed, 13 Feb 2019 03:13:35 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtkvO-0004zJ-Nq
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 03:09:37 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=ESTAN2xODOVRrMPO0gHEyfekXMIGo93RGB9zhn3yZwc=;
- b=l4wjwtPQaDIAWtW3zKWzNdKGX7NarNVrsLbELD5Ta9gbX1tafPUdqn1WA4SJcSe8onvk0r7v3G9r1dumvQmEhgqPDmkmOPnjV70y+PUF8yq9FVlDk3sg95tTIgxIIUlZltQ2LWYF/b+bhopvavF4wSKiVNaCdJdX15N/GyogCnM=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3724.eurprd04.prod.outlook.com (52.134.66.147) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.22; Wed, 13 Feb 2019 03:09:15 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
- 03:09:15 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>, "will.deacon@arm.com"
- <will.deacon@arm.com>, "rjw@rjwysocki.net" <rjw@rjwysocki.net>,
- "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>, Aisheng Dong
- <aisheng.dong@nxp.com>, Daniel Baluta <daniel.baluta@nxp.com>, Andy Gross
- <andy.gross@linaro.org>, "horms+renesas@verge.net.au"
- <horms+renesas@verge.net.au>, "heiko@sntech.de" <heiko@sntech.de>,
- "arnd@arndb.de" <arnd@arndb.de>, "bjorn.andersson@linaro.org"
- <bjorn.andersson@linaro.org>, "jagan@amarulasolutions.com"
- <jagan@amarulasolutions.com>, "enric.balletbo@collabora.com"
- <enric.balletbo@collabora.com>, "marc.w.gonzalez@free.fr"
- <marc.w.gonzalez@free.fr>, "olof@lixom.net" <olof@lixom.net>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-pm@vger.kernel.org"
- <linux-pm@vger.kernel.org>
-Subject: [PATCH 3/3] cpufreq: imx-sc: add i.mx system controller cpufreq
- support
-Thread-Topic: [PATCH 3/3] cpufreq: imx-sc: add i.mx system controller cpufreq
- support
-Thread-Index: AQHUw0mAk7D4InMTwEi38x/B8uOIAw==
-Date: Wed, 13 Feb 2019 03:09:15 +0000
-Message-ID: <1550027011-7884-3-git-send-email-Anson.Huang@nxp.com>
-References: <1550027011-7884-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1550027011-7884-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0150.apcprd02.prod.outlook.com
- (2603:1096:202:16::34) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3724;
- 6:AoEyeCor673jgWKrFPJoIPWzaF59eOY8c0d+waDbGboqphftwrUN87TzpZI8PjjDq4Bd8G8RzjUC5esKwT1ofEwPBBEs+LON5RbBoU7z5IxQTOqvIfPOZ0Abdp2psfqq6dAGy2SgDLzCZ+3JpQfNq2qsF0Vci3Uy7xkgIlwegjQXHz09XyP1xouvRbL2EmcLHo2uAoiyTCv4PhYQ2vWIxDSTK7bag8ww6nkhRo8Pi/YU7AfWO6xHD5Gsefsu/qW5Ru9TIpMi+rGzAwEAONP8H3macsbxfB9FDdUyoY1fq5XJRLFekeDRVcEkG272KTFNDLYIlmfZDYgtPgcpimg0glZ05D5WSvMEjh8oLgCdy6Gd0f8TXy9rJUys5aZ0EuOwMSw52FHL6DXuOef80gvqzs9rQWhUctMyduPTHnikB/yC7OABPzMIPt7CHB6qbh6zSp646Sit3rbrFpsCEIpxfw==;
- 5:YF6A17F3y1+0FDbZ+c0Sp1Pwk3iUyRY7nkqH+mxRjPcGS4xZ0gRGiiMJidlAoutWY7m/6bNil7hPaEIrMpm6LThK7XtgIb/FxmXrXcBwBneCF9aAifM6mfB6ABxPTthGzosMAgYCDGCjPeE4cB09IRfEQDRWcMvtZoPBTNGDdFGd98f6GCvg3HHp/LTYNkfzC1Lj22UEtJqCpGvzC+9rdA==;
- 7:Yp3WaPRa48bUqGWgznMteLy4qFXk9jkY0CIgVjjFuKhFusbibkkVbUJi/09XOpPuszEuBpQfznaYM94iQabEacNmoLRVMwf8IvqeCaBsDVYr3KiZshRfZvKtc4S2131+qMRhNjqYQB8aQ0kF4TfHiw==
-x-ms-office365-filtering-correlation-id: 5fd999be-9608-4a72-f87f-08d69160a29d
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3724; 
-x-ms-traffictypediagnostic: DB3PR0402MB3724:
-x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
-x-microsoft-antispam-prvs: <DB3PR0402MB37241E93573DDFC90E1D749BF5660@DB3PR0402MB3724.eurprd04.prod.outlook.com>
-x-forefront-prvs: 094700CA91
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(376002)(346002)(396003)(39860400002)(136003)(199004)(189003)(50226002)(97736004)(81166006)(81156014)(8676002)(7736002)(110136005)(446003)(305945005)(2906002)(256004)(52116002)(8936002)(476003)(486006)(2616005)(99286004)(11346002)(3846002)(14444005)(7416002)(6116002)(71200400001)(71190400001)(86362001)(36756003)(26005)(53936002)(478600001)(68736007)(386003)(2501003)(14454004)(186003)(102836004)(6506007)(2201001)(76176011)(316002)(66066001)(4326008)(105586002)(6512007)(106356001)(25786009)(6486002)(6436002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3724;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: Adlm22p5rshd/trynX8g4zOyTtQfA3hx7V8+zj6wf9NQtmyxuhdDY4XWl8PEs3kN/5JlQmJxH/ktft9CdpqUW4GFpD3xRGQG8SVDqPGfwOXnyJPNLknLuLQAl6gFpG8vmnc2gbVFGH/cfats3ZeApzm1Dg2T+bu0+JW0wHUxLExu3D988RHNTrSnBF+8h2qxOd7xpRq+7j1az/A4NMM7YiLAIxMeVlfRQBIz9v4fb2N1s/Yeu2d1puJgIh8UP3OscINLYxFL45rEfVN7GaYyexVmmtSvdLPFj/EOUd7KHl8vv+HWqtJuQvispo4Pzm8rUp0al9ffgPJNJ56MCuc+Vwy8D8dukXuvfZ1SQ/AJ+q7DWG55t12DqjWyRyPuMhEU1BpHqmppUZ5V1TG9Grwrj5O89/GCaibdTAc2bqOuwl0=
+ id 1gtkzK-0007Ej-R8; Wed, 13 Feb 2019 03:13:33 +0000
+X-UUID: 3d926256f1694cc28301a9da5dc87b4a-20190212
+X-UUID: 3d926256f1694cc28301a9da5dc87b4a-20190212
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ (envelope-from <chaotian.jing@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1973495751; Tue, 12 Feb 2019 19:13:20 -0800
+Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 12 Feb 2019 19:13:19 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by mtkmbs03n1.mediatek.inc
+ (172.21.101.181) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Wed, 13 Feb 2019 11:13:17 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Wed, 13 Feb 2019 11:13:14 +0800
+Message-ID: <1550027594.16070.15.camel@mhfsdcap03>
+Subject: Re: [PATCH] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
+From: Chaotian Jing <chaotian.jing@mediatek.com>
+To: Adrian Hunter <adrian.hunter@intel.com>
+Date: Wed, 13 Feb 2019 11:13:14 +0800
+In-Reply-To: <1550019275.16070.6.camel@mhfsdcap03>
+References: <1548921212-5219-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFruCCs_un1oR-gd1P=ZGryyHwKuY0SkvLO2=Jm1bGV6sQ@mail.gmail.com>
+ <1548985091.10251.26.camel@mhfsdcap03>
+ <CAPDyKFqHJn9uVkd5z4D5JvNKOtbn3E3SwL_WSgLb1=Lw1SgyUg@mail.gmail.com>
+ <0e95e1a1-843e-38ea-c4bb-e6c48432ea7c@intel.com>
+ <CAPDyKFrvSgK0Om7GUJ143j=U2xDG4n6z6Ym-1znbtMbaw==HkQ@mail.gmail.com>
+ <c9120e57-ad7c-174d-c155-0186e0b9c359@intel.com>
+ <CAPDyKFotLzLxW=Wq6hCPFmwTQ=T43rJV9h=+p5jfgrMBe=d8BA@mail.gmail.com>
+ <4c8a616f-f424-fd58-43c5-d6042665bc58@intel.com>
+ <1549937058.16070.5.camel@mhfsdcap03>
+ <566c0c11-be9c-73a3-d7ff-34aed3ad7db0@intel.com>
+ <1550019275.16070.6.camel@mhfsdcap03>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5fd999be-9608-4a72-f87f-08d69160a29d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 03:09:07.3710 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3724
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_190927_324430_9F91D544 
-X-CRM114-Status: GOOD (  19.21  )
+X-CRM114-CacheID: sfid-20190212_191330_892448_243E131E 
+X-CRM114-Status: GOOD (  48.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,255 +87,246 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-mediatek@lists.infradead.org,
+ Harish Jenny K N <harish_kandiga@mentor.com>,
+ Hongjie Fang <hongjiefang@asrmicro.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Simon
+ Horman <horms+renesas@verge.net.au>, Kyle Roeschley <kyle.roeschley@ni.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On NXP's i.MX SoCs with system controller inside, CPU frequency
-scaling can ONLY be done by system controller firmware, and it
-can ONLY be requested from secure mode, so Linux cpufreq driver has
-to call ARM SMC to trap to ARM-Trusted-Firmware to request system
-controller firmware to do CPU frequency scaling.
+On Wed, 2019-02-13 at 08:54 +0800, Chaotian Jing wrote:
+> On Tue, 2019-02-12 at 10:04 +0200, Adrian Hunter wrote:
+> > On 12/02/19 4:04 AM, Chaotian Jing wrote:
+> > > On Tue, 2019-02-05 at 15:42 +0200, Adrian Hunter wrote:
+> > >> On 5/02/19 3:06 PM, Ulf Hansson wrote:
+> > >>> On Mon, 4 Feb 2019 at 14:42, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> > >>>>
+> > >>>> On 4/02/19 12:54 PM, Ulf Hansson wrote:
+> > >>>>> On Mon, 4 Feb 2019 at 10:58, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> > >>>>>>
+> > >>>>>> On 1/02/19 10:10 AM, Ulf Hansson wrote:
+> > >>>>>>> On Fri, 1 Feb 2019 at 02:38, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > >>>>>>>>
+> > >>>>>>>> On Thu, 2019-01-31 at 16:58 +0100, Ulf Hansson wrote:
+> > >>>>>>>>> On Thu, 31 Jan 2019 at 08:53, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> > >>>>>>>>>>
+> > >>>>>>>>>> mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
+> > >>>>>>>>>> Therefore, any commands sent to the card should use HS400 timing.
+> > >>>>>>>>>> It is incorrect to reduce frequency to 50Mhz before sending the switch
+> > >>>>>>>>>> command, in this case, only reduce clock frequency to 50Mhz but without
+> > >>>>>>>>>> host timming change, host is still in hs400 mode but clock changed from
+> > >>>>>>>>>> 200Mhz to 50Mhz, which makes the tuning result unsuitable and cause
+> > >>>>>>>>>> the switch command gets response CRC error.
+> > >>>>>>>>>
+> > >>>>>>>>> According the eMMC spec there is no violation by decreasing the clock
+> > >>>>>>>>> frequency like this. We can use whatever value <=200MHz.
+> > >>>>>>>>>
+> > >>>>>>>>> However, perhaps in practice this becomes an issue, due to the tuning
+> > >>>>>>>>> for HS400 has been done on the "current" frequency.
+> > >>>>>>>>>
+> > >>>>>>>>> As as start, I think you need to clarify this in the changelog.
+> > >>>>>>>>>
+> > >>>>>>>> Yes, reduce clock frequency to 50Mhz is no Spec violation, but it may
+> > >>>>>>>> cause __mmc_switch() gets response CRC error, decreasing the clock but
+> > >>>>>>>> without HOST mode change, on the host side, host driver do not know
+> > >>>>>>>> what's operation the core layer want to do and can only set current bus
+> > >>>>>>>> clock to 50Mhz, without tuning parameter change, it has a chance lead to
+> > >>>>>>>> response CRC error. even lower clock frequency, but with the wrong
+> > >>>>>>>> tuning parameter setting(the setting is of hs400 tuning @200Mhz).
+> > >>>>>>>
+> > >>>>>>> Right, makes sense.
+> > >>>>>>>
+> > >>>>>>>>>>
+> > >>>>>>>>>> this patch refers to mmc_select_hs400(), make the reduce clock frequency
+> > >>>>>>>>>> after card timing change.
+> > >>>>>>>>>>
+> > >>>>>>>>>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > >>>>>>>>>> ---
+> > >>>>>>>>>>  drivers/mmc/core/mmc.c | 8 ++++----
+> > >>>>>>>>>>  1 file changed, 4 insertions(+), 4 deletions(-)
+> > >>>>>>>>>>
+> > >>>>>>>>>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > >>>>>>>>>> index da892a5..21b811e 100644
+> > >>>>>>>>>> --- a/drivers/mmc/core/mmc.c
+> > >>>>>>>>>> +++ b/drivers/mmc/core/mmc.c
+> > >>>>>>>>>> @@ -1239,10 +1239,6 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+> > >>>>>>>>>>         int err;
+> > >>>>>>>>>>         u8 val;
+> > >>>>>>>>>>
+> > >>>>>>>>>> -       /* Reduce frequency to HS */
+> > >>>>>>>>>> -       max_dtr = card->ext_csd.hs_max_dtr;
+> > >>>>>>>>>> -       mmc_set_clock(host, max_dtr);
+> > >>>>>>>>>> -
+> > >>>>>>>>>
+> > >>>>>>>>> As far as I can tell, the reason to why we change the clock frequency
+> > >>>>>>>>> *before* the call to __mmc_switch() below, is probably to try to be on
+> > >>>>>>>>> the safe side and conform to the spec.
+> > >>>>>>>>>
+> > >>>>>>>> Agree, it Must be more safe with lower clock frequency, but the
+> > >>>>>>>> precondition is to make the host side recognize current timing is not
+> > >>>>>>>> HS400 mode. it has no method to find a safe setting to ensure no
+> > >>>>>>>> response CRC error when reduce clock from 200Mhz to 50Mhz.
+> > >>>>>>>>> However, I think you have a point, as the call to __mmc_switch(),
+> > >>>>>>>>> passes the "send_status" parameter as false, no other command than the
+> > >>>>>>>>> CMD6 is sent to the card.
+> > >>>>>>>>>
+> > >>>>>>>> yes, the send status command was sent only after __mmc_switch() done.
+> > >>>>>>>>>>         /* Switch HS400 to HS DDR */
+> > >>>>>>>>>>         val = EXT_CSD_TIMING_HS;
+> > >>>>>>>>>>         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+> > >>>>>>>>>> @@ -1253,6 +1249,10 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+> > >>>>>>>>>>
+> > >>>>>>>>>>         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+> > >>>>>>>>>>
+> > >>>>>>>>>> +       /* Reduce frequency to HS */
+> > >>>>>>>>>> +       max_dtr = card->ext_csd.hs_max_dtr;
+> > >>>>>>>>>> +       mmc_set_clock(host, max_dtr);
+> > >>>>>>>>>> +
+> > >>>>>>>>>
+> > >>>>>>>>> Perhaps it's even more correct to change the clock frequency before
+> > >>>>>>>>> the call to mmc_set_timing(host, MMC_TIMING_MMC_DDR52). Otherwise you
+> > >>>>>>>>> will be using the DDR52 timing in the controller, but with a too high
+> > >>>>>>>>> frequency.
+> > >>>>>>>>>
+> > >>>>>>>> for Our host, it has no impact to change the clock before or after
+> > >>>>>>>> change timing, as the mmc_set_timing() is only for host side, not
+> > >>>>>>>> related to MMC card side and no commands sent do card before the
+> > >>>>>>>> timing/clock change completed.
+> > >>>>>>>
+> > >>>>>>> Alright. After a second thought, it actually looks more consistent
+> > >>>>>>> with mmc_select_hs400() to do it after, as what you propose in
+> > >>>>>>> $subject patch.
+> > >>>>>>>
+> > >>>>>>> So, let's keep it as is.
+> > >>>>>>>
+> > >>>>>>>>>>         err = mmc_switch_status(card);
+> > >>>>>>>>>>         if (err)
+> > >>>>>>>>>>                 goto out_err;
+> > >>>>>>>>>> --
+> > >>>>>>>>>> 1.8.1.1.dirty
+> > >>>>>>>>>>
+> > >>>>>>>>>
+> > >>>>>>>>> Finally, it sounds like you are trying to fix a real problem, can you
+> > >>>>>>>>> please provide some more information what is happening when the
+> > >>>>>>>>> problem occurs at your side?
+> > >>>>>>>>>
+> > >>>>>>>> Yes, I got a problem with new kernel version. with
+> > >>>>>>>> commit:57da0c042f4af52614f4bd1a148155a299ae5cd8, this commit makes
+> > >>>>>>>> re-tuning every time when access RPMB partition.
+> > >>>>>>>
+> > >>>>>>> Okay, could you please add this as fixes tag for the next version of the patch.
+> > >>>>>>>
+> > > Ok, sorry for late reply due to Chinese New Year.
+> > >>>>>>>>
+> > >>>>>>>> in fact, our host tuning result of hs400 is very stable and almost never
+> > >>>>>>>> get response CRC error with clock frequency at 200Mhz. but cannot ensure
+> > >>>>>>>> this tuning result also suitable when running at HS400 mode @50Mhz. as I
+> > >>>>>>>> mentioned before, the host side does not know the reason of reduce clock
+> > >>>>>>>> frequency to 50Mhz at HS400 mode, so what's the host side can do is only
+> > >>>>>>>> reduce the bus clock to 50Mhz, even it can just only set the tuning
+> > >>>>>>>> setting to default when clock frequency lower than 50Mhz, but both card
+> > >>>>>>>> & host side are still at HS400 mode, still cannot ensure this setting is
+> > >>>>>>>> suitable.
+> > >>>>>>>
+> > >>>>>>> Right, thanks for clarifying.
+> > >>>>>>>
+> > >>>>>>> So I am expecting a new version with a fixes tag and some
+> > >>>>>>> clarification of the changelog, then I am ready to apply this to give
+> > >>>>>>> it some test.
+> > >>>>>>
+> > >>>>>> The switch from HS400 mode is done for tuning at times when CRC errors are a
+> > >>>>>> possibility e.g. after a CRC error during transfer.  So if the frequency is
+> > >>>>>> not to be reduced, then some mitigation is needed for the possibility that
+> > >>>>>> the CMD6 response itself will have a CRC error.
+> > >>>>>
+> > >>>>> That's a good point!
+> > >>>>>
+> > >>>>> However, how can we know that a CMD6 command is successfully
+> > >>>>> completed, if there is CRC errors detected during the transmission? I
+> > >>>>> guess we can't!?
+> > >>>>
+> > >>>> Yes, in that case, the only option is to assume the CMD6 was successful,
+> > >>>> like in
+> > >>>>
+> > >>>>   commit ef3d232245ab7a1bf361c52449e612e4c8b7c5ab
+> > >>>>   Author: Adrian Hunter <adrian.hunter@intel.com>
+> > >>>>   Date:   Fri Dec 2 13:16:35 2016 +0200
+> > >>>>
+> > >>>>       mmc: mmc: Relax checking for switch errors after HS200 switch
+> > >>>
+> > >>> Well, relaxing the check for switch errors, is to me a different
+> > >>> thing. This means we are first doing the CMD6, then allowing the
+> > >>> following status command (CMD13) to have CRC errors. Actually, even
+> > >>> the spec mention this as a case to consider. I guess it's because the
+> > >>> card internally have switched to a new speed mode timing.
+> > >>>
+> > >>> Allowing CRC errors for the actual CMD6 sound more fragile to me. Of
+> > >>> course, we can always try and see what happens.
+> > >>>
+> > >>> Chaotian, can you give it a go? Somehow, change the call to
+> > >>> __mmc_switch() in mmc_hs400_to_hs200(), so the CMD6 doesn't have the
+> > >>> CRC flag set.
+@Adrian, @Ulf, another question: if remove the MMC_RSP_CRC flag, it will
+have big impact to all host driver, as the "mmc_resp_type()" can not get
+MMC_RESP_R1B return value, so many host drivers use mmc_resp_type() to
+get resp type. if We make CMD6 does not have CRC flag set, then We must
+modify the using of "mmc_resp_type()" to "mmc_resp_type() | MMC_RSP_CRC"
+in all host drives. the same issue occurs at other place which remove
+MMC_RSP_CRC(eg. mmc_cqe_recovery()).
+> > >>>
+> > > Yes, but should we add a new argument of __mmc_switch(), like "bool
+> > > ignore_crc" ?? for now, there are too many argument of __mmc_switch().
+> > 
+> > One solution for too many arguments is to make a structure to contain them. e.g.
+> > 
+> > struct mmc_switch_args {
+> > 	u8 set;
+> > 	u8 index;
+> > 	u8 value;
+> > 	unsigned int timeout_ms;
+> > 	unsigned char timing;
+> > 	bool use_busy_signal;
+> > 	bool send_status;
+> > 	bool retry_crc_err;
+> > };
+> > 
+> > int __mmc_switch(struct mmc_card *card, struct mmc_switch_args *args)
+> > 
+> Sure, I will upload new patch to do that.
+> > >>>>
+> > >>>> If we are going to do that, then we could stick with lowering the frequency
+> > >>>> first.
+> > >>>
+> > >>> Let's see what Chaotian's test may show.
+> > >>>
+> > >>>>
+> > >>>> Also I wonder if the mediatek driver could change to fixed sampling in
+> > >>>> ->set_ios() when the frequency drops for HS400 mode?
+> > >>>
+> > >>> Well, this sounds like a generic problem so if this is a possible
+> > >>> generic solution that would be great.
+> > >>>
+> > >>> Is this what sdhci is doing already?
+> > >>
+> > >> Not at present, but some drivers seem to be adjusting their settings for
+> > >> HS400 based on the frequency e.g. sdhci_msm_hs400()
+> > > 
+> > > It's hard to find a suitable setting for all cards when running at HS400
+> > > mode @50Mhz.
+> > > 
+> > > 
+> > 
+> 
 
-This patch adds i.MX system controller cpufreq driver support,
-when doing CPU frequency scaling, cpufreq driver will do ARM SMC
-call and trap to ARM-Trusted-Firmware, then SIP(silicon provider)
-service will communicate with system controller for CPU frequenct
-scaling.
-
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/cpufreq/Kconfig.arm      |   9 ++
- drivers/cpufreq/Makefile         |   1 +
- drivers/cpufreq/imx-sc-cpufreq.c | 183 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 drivers/cpufreq/imx-sc-cpufreq.c
-
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 179a1d3..6d76465 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -92,6 +92,15 @@ config ARM_IMX6Q_CPUFREQ
- 
- 	  If in doubt, say N.
- 
-+config ARM_IMX_SC_CPUFREQ
-+	tristate "NXP i.MX SoC system controller cpufreq support"
-+	select PM_OPP
-+	help
-+	  This adds cpufreq driver support for NXP i.MX series SoCs with system
-+	  controller inside.
-+
-+	  If in doubt, say N.
-+
- config ARM_KIRKWOOD_CPUFREQ
- 	def_bool MACH_KIRKWOOD
- 	help
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index 689b26c..28ab9fb 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -56,6 +56,7 @@ obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
- obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
- obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
- obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
-+obj-$(CONFIG_ARM_IMX_SC_CPUFREQ)	+= imx-sc-cpufreq.o
- obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
- obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
- obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
-diff --git a/drivers/cpufreq/imx-sc-cpufreq.c b/drivers/cpufreq/imx-sc-cpufreq.c
-new file mode 100644
-index 0000000..dfc89abe
---- /dev/null
-+++ b/drivers/cpufreq/imx-sc-cpufreq.c
-@@ -0,0 +1,183 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright 2017-2019 NXP.
-+ */
-+
-+#include <linux/arm-smccc.h>
-+#include <linux/clk.h>
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/err.h>
-+#include <linux/firmware/imx/sci.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/pm_opp.h>
-+#include <linux/platform_device.h>
-+#include <linux/syscalls.h>
-+
-+#define MAX_CLUSTER		1
-+
-+#define IMX_SIP_CPUFREQ			0xC2000001
-+#define IMX_SIP_SET_CPUFREQ		0x00
-+
-+struct imx_sc_cpufreq {
-+	struct device *cpu_dev;
-+	struct clk *cpu_clk;
-+};
-+
-+static struct cpufreq_frequency_table *freq_table[MAX_CLUSTER];
-+static struct imx_sc_cpufreq cluster_freq[MAX_CLUSTER];
-+static unsigned int transition_latency[MAX_CLUSTER];
-+static DEFINE_SPINLOCK(cpufreq_psci_lock);
-+
-+static int imx_sc_cpufreq_set_target(struct cpufreq_policy *policy,
-+				     unsigned int index)
-+{
-+	unsigned int cluster_id = topology_physical_package_id(policy->cpu);
-+	unsigned int old_freq, new_freq;
-+	struct arm_smccc_res res;
-+
-+	new_freq = freq_table[cluster_id][index].frequency;
-+	old_freq = policy->cur;
-+
-+	dev_dbg(cluster_freq[cluster_id].cpu_dev, "%u MHz --> %u MHz\n",
-+		old_freq / 1000, new_freq / 1000);
-+
-+	spin_lock(&cpufreq_psci_lock);
-+	arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
-+		cluster_id, new_freq * 1000, 0, 0, 0, 0, &res);
-+	spin_unlock(&cpufreq_psci_lock);
-+
-+	return 0;
-+}
-+
-+static int imx_sc_cpufreq_init(struct cpufreq_policy *policy)
-+{
-+	int cluster_id = topology_physical_package_id(policy->cpu);
-+	int opp_num, ret = 0;
-+
-+	policy->clk = cluster_freq[cluster_id].cpu_clk;
-+	policy->cur = clk_get_rate(cluster_freq[cluster_id].cpu_clk) / 1000;
-+	cpumask_copy(policy->cpus, topology_core_cpumask(policy->cpu));
-+
-+	policy->freq_table = freq_table[cluster_id];
-+	policy->cpuinfo.transition_latency = transition_latency[cluster_id];
-+	opp_num = dev_pm_opp_get_opp_count(cluster_freq[cluster_id].cpu_dev);
-+	policy->suspend_freq = freq_table[cluster_id][opp_num - 1].frequency;
-+
-+	dev_info(cluster_freq[cluster_id].cpu_dev,
-+		"cluster %d running at freq %d MHz, suspend freq %d MHz\n",
-+		cluster_id, policy->cur / 1000, policy->suspend_freq / 1000);
-+
-+	return ret;
-+}
-+
-+static struct cpufreq_driver imx_sc_cpufreq_driver = {
-+	.flags = CPUFREQ_NEED_INITIAL_FREQ_CHECK |
-+		 CPUFREQ_IS_COOLING_DEV,
-+	.verify = cpufreq_generic_frequency_table_verify,
-+	.target_index = imx_sc_cpufreq_set_target,
-+	.get = cpufreq_generic_get,
-+	.init = imx_sc_cpufreq_init,
-+	.name = "imx-sc-cpufreq",
-+	.attr = cpufreq_generic_attr,
-+#ifdef CONFIG_PM
-+	.suspend = cpufreq_generic_suspend,
-+#endif
-+};
-+
-+static int imx_sc_cpufreq_probe(struct platform_device *pdev)
-+{
-+	struct imx_sc_ipc *cpufreq_ipc_handle;
-+	struct device *cpu_dev;
-+	struct device_node *np;
-+	int cluster_id, ret = 0;
-+
-+	/* wait mailbox driver ready */
-+	ret = imx_scu_get_handle(&cpufreq_ipc_handle);
-+	if (ret)
-+		return ret;
-+
-+	cpu_dev = get_cpu_device(0);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu device 0\n");
-+		return -ENODEV;
-+	}
-+
-+	np = of_node_get(cpu_dev->of_node);
-+	if (!np) {
-+		pr_warn("failed to find cpu 0 node\n");
-+		return -ENODEV;
-+	}
-+
-+	ret = dev_pm_opp_of_add_table(cpu_dev);
-+	if (ret < 0) {
-+		dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
-+		goto put_node;
-+	}
-+
-+	cluster_id = topology_physical_package_id(0);
-+	cluster_freq[cluster_id].cpu_dev = cpu_dev;
-+	cluster_freq[cluster_id].cpu_clk = devm_clk_get(cpu_dev, NULL);
-+	if (IS_ERR(cluster_freq[cluster_id].cpu_clk)) {
-+		dev_err(cpu_dev, "failed to get cluster %d clock\n",
-+			cluster_id);
-+		ret = -ENOENT;
-+		goto put_node;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table[cluster_id]);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto out_free_opp;
-+	}
-+
-+	if (of_property_read_u32(np, "clock-latency",
-+		&transition_latency[cluster_id]))
-+		transition_latency[cluster_id] = CPUFREQ_ETERNAL;
-+
-+	ret = cpufreq_register_driver(&imx_sc_cpufreq_driver);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to register cpufreq driver: %d\n",
-+			ret);
-+		goto free_freq_table;
-+	}
-+
-+	goto put_node;
-+
-+free_freq_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table[cluster_id]);
-+out_free_opp:
-+	dev_pm_opp_of_remove_table(cpu_dev);
-+put_node:
-+	of_node_put(np);
-+	return ret;
-+}
-+
-+static int imx_sc_cpufreq_remove(struct platform_device *pdev)
-+{
-+	cpufreq_unregister_driver(&imx_sc_cpufreq_driver);
-+
-+	return 0;
-+}
-+
-+static int __init imx_sc_register_cpufreq(void)
-+{
-+	platform_device_register_simple("imx-sc-cpufreq", -1, NULL, 0);
-+
-+	return 0;
-+}
-+device_initcall(imx_sc_register_cpufreq);
-+
-+static struct platform_driver imx_sc_cpufreq_platdrv = {
-+	.driver = {
-+		.name	= "imx-sc-cpufreq",
-+	},
-+	.probe		= imx_sc_cpufreq_probe,
-+	.remove		= imx_sc_cpufreq_remove,
-+};
-+module_platform_driver(imx_sc_cpufreq_platdrv);
-+
-+MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
-+MODULE_DESCRIPTION("NXP i.MX system controller cpufreq driver");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
 
 
 _______________________________________________
