@@ -2,88 +2,69 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BDAFAC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:00:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B71D7C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:00:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8AECB20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:00:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 882D520836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:00:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="spWTF6cP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FTkvJIhi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AECB20836
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="R0tkGZqG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 882D520836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
-	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=O61jEXtxrFACT2UV6AMuQzY81fJcfgL1qE8VONmjN/o=; b=spWTF6cPMeYkeP
-	y2ZP0Q1UimiaIHF7l0/y9T66lnw2rfc5heW1gD22DHXvIz/gtXTwNJsDIo06UfcDrWZKlFc2AjXFN
-	Py86wVMi62gQHP+7gTqseIN895RubtbIYEMMpIh/aqwZzSs/J7acqzfntN5f/s0isxzMOQXHl8cSW
-	3sxrAtS3JgHEbAlqOyQKxEG38yub+A0o6CF9Q+FuAUaacU0gq/6PUkRC21tRwoe9eMIR1WVnp2UJ+
-	6myprOUVrcjC1fqeowmo8ais9nlNLE6I5gSDhYMaC4wD5NSW2uLBe5tyLEADz3HUNjlU5+3chH40N
-	b0MyVgQuvmZHTmiwF0LQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4LGPWnKs9qR0y2fydWt0xriMXklcsSnagNmCPBDT7ok=; b=R0tkGZqGTt1c/2
+	n/hJT7Vm4xvX2EFS4CtM2AqmhhNintOh7Sa4C6fgfCpS+z/FBJOblcOkH/XKeIOwy5n5m8Q9Y+C/6
+	lGncvttZhULDaAO5fTe/XDWizEhhDD3j5HlyL1udy0nL0Ys9vS6J2HzxBS/kogr73Mm4bgh/mL8IW
+	g8nWLf0jJx8sR6jJvFr/DiflSI0UBr9wFR32ZGtvzE17Us6fhaHm0TWEljfBoIAsmaWGLERLxqcYl
+	kob+LMytYHTLA0JGIU6qI36FBd5QifxAF1vEJDTiHB03FmdpsRQXN8AbOKZr7gT4Vmyen2iVvMT1u
+	H+kuBcav5IPdWi7WazPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtv5M-0007yM-RO; Wed, 13 Feb 2019 14:00:24 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtv5I-0007wq-1J; Wed, 13 Feb 2019 14:00:22 +0000
-Received: by mail-pf1-x441.google.com with SMTP id n74so1174352pfi.9;
- Wed, 13 Feb 2019 06:00:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=+cqpEOgVsQX6FuKbkjkqnPdK6JJEhfhSEvMIkCtIVgk=;
- b=FTkvJIhiZxuB2UN3OVrDxEf8j3emEZw9A9itD1oPd+tVJ0e8g/nDyZISMfbdyXaAP6
- Ku+f1/oU09s8dZXMCE15EC/lZ4jhE9XpyVezCzRAsRLdy/21AR6rTdyIxoZbfsMxmQYr
- o1QFAdcjEMZ4hpVPbwUZfbKD3bP3YaF5W6bCDSkoV9uE7cMXX9QTOFBJsVTZFBub3vD/
- tLP1kpXdfL6PFeEz95+peYCFGB2V3ZREDDgo2MiHR2YRRTInP7Ujlzf+v8xIEwW/acLG
- YYBPMe+meJlZK/PpLg21XpK/Zqy+ohSuq8qV9XGFBs8K15TIr80jXNZJz+mddYFSLU45
- kSXQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
- :content-disposition:user-agent;
- bh=+cqpEOgVsQX6FuKbkjkqnPdK6JJEhfhSEvMIkCtIVgk=;
- b=o2ogiSPuioy2ru/8jKNJnr7dfx5yy+zKxRwlbtz/yS/4mfn3Mbc6qQEh4Zm65Dsmr4
- 0Cg5IpDmB6Eb9yCCNqZadM73c7le1fH+Q+9WjUmgVOb+5j6yI3iLSUq03Pyc+9TH02Fz
- cv93vyRYOU9jav9XLBqLRULn3t6Z5yR4LCj8qSco3E0kbE2ThNSRahn8vUcsYgzFN1Aj
- NAWbbLPgHweF7r64nRf3EXOWT7CNrFSkYzq2rXOhsGXwM6mFmtuld26pxi4Rg6mOPHAr
- N3idijDEWu6P0d+2LCugQ2X+oFt/hefQvwN893nxh1P/1LBVNzFviYK0LE03pB8rdJMC
- lYBw==
-X-Gm-Message-State: AHQUAuYVSZzkVOrDxkC0Frx9wF7807YGNwubPDe5MZOA/KW8OXWMaWpf
- zlneUEC4nAYpzZs2eusjblqxXFMp
-X-Google-Smtp-Source: AHgI3IYGzYQtaDAzpRnw4j6/fnsbGP2OWM7ItsKgcpabtFzajnCQ7pxNpaBmZJle8XOTxzleQFh85A==
-X-Received: by 2002:a63:5442:: with SMTP id e2mr628034pgm.282.1550066419102;
- Wed, 13 Feb 2019 06:00:19 -0800 (PST)
-Received: from jordon-HP-15-Notebook-PC ([49.207.48.54])
- by smtp.gmail.com with ESMTPSA id o2sm27521833pfa.149.2019.02.13.06.00.17
- (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 13 Feb 2019 06:00:18 -0800 (PST)
-Date: Wed, 13 Feb 2019 19:34:36 +0530
-From: Souptick Joarder <jrdr.linux@gmail.com>
-To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie,
- linux@armlinux.org.uk, robin.murphy@arm.com
-Subject: [PATCH v3 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_map_pages()
-Message-ID: <20190213140436.GA22010@jordon-HP-15-Notebook-PC>
+	id 1gtv5Y-0008EE-SS; Wed, 13 Feb 2019 14:00:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtv5U-0008A4-Sy
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:00:34 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E76DE80D;
+ Wed, 13 Feb 2019 06:00:31 -0800 (PST)
+Received: from brain-police (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6B7C43F557;
+ Wed, 13 Feb 2019 06:00:29 -0800 (PST)
+Date: Wed, 13 Feb 2019 14:00:26 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Peter Zijlstra <peterz@infradead.org>
+Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
+ in unsafe region
+Message-ID: <20190213140025.GB6346@brain-police>
+References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+ <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
+ <20190211134527.GA121589@gmail.com>
+ <20190211135159.GC32511@hirez.programming.kicks-ass.net>
+ <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
+ <20190213103553.GO32494@hirez.programming.kicks-ass.net>
+ <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
+ <20190213131720.GU32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-User-Agent: Mutt/1.5.21 (2010-09-15)
+In-Reply-To: <20190213131720.GU32494@hirez.programming.kicks-ass.net>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_060020_080811_06A6B77F 
-X-CRM114-Status: GOOD (  13.24  )
+X-CRM114-CacheID: sfid-20190213_060032_947872_1D68E9C6 
+X-CRM114-Status: GOOD (  19.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,62 +76,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-rockchip@lists.infradead.org
+Cc: Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ linux-kernel@vger.kernel.org, valentin.schneider@arm.com, mingo@redhat.com,
+ james.morse@arm.com, hpa@zytor.com, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_map_pages() to map range of kernel
-memory to user vma.
+Hi Peter,
 
-Tested on Rockchip hardware and display is working,
-including talking to Lima via prime.
+On Wed, Feb 13, 2019 at 02:17:20PM +0100, Peter Zijlstra wrote:
+> On Wed, Feb 13, 2019 at 10:50:21AM +0000, Julien Thierry wrote:
+> > On 13/02/2019 10:35, Peter Zijlstra wrote:
+> > > On Tue, Feb 12, 2019 at 09:15:13AM +0000, Julien Thierry wrote:
+> > > 
+> > >>>>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+> > >>>>> index a674c7db..b1bb7e9 100644
+> > >>>>> --- a/kernel/sched/core.c
+> > >>>>> +++ b/kernel/sched/core.c
+> > >>>>> @@ -3289,6 +3289,14 @@ static inline void schedule_debug(struct task_struct *prev)
+> > >>>>>  		__schedule_bug(prev);
+> > >>>>>  		preempt_count_set(PREEMPT_DISABLED);
+> > >>>>>  	}
+> > >>>>> +
+> > >>>>> +	if (IS_ENABLED(CONFIG_DEBUG_UACCESS_SLEEP) &&
+> > >>>>> +	    unlikely(unsafe_user_region_active())) {
+> > >>>>> +		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
+> > >>>>> +		       prev->comm, prev->pid, preempt_count());
+> > >>>>> +		dump_stack();
+> > >>>>> +	}
+> > >>>>> +
+> > >>>>>  	rcu_sleep_check();
+> > >>>>>
+> > >>>>>  	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
+> > > 
+> > >> I guess I'll drop the might_resched() part of this patch if that sounds
+> > >> alright.
+> > > 
+> > > I'm still confused by the schedule_debug() part. How is that not broken?
+> > 
+> > Hmmm, I am not exactly sure which part you expect to be broken, I guess
+> > it's because of the nature of the uaccess unsafe accessor usage.
+> > 
+> > Basically, the following is a definite no:
+> > 	if (user_access_begin(ptr, size)) {
+> > 
+> > 		[...]
+> > 
+> > 		//something that calls schedule
+> > 
+> > 		[...]
+> > 
+> > 		user_access_end();
+> > 	}
+> > 	
+> > 
+> > However the following is fine:
+> > 
+> > - user_access_begin(ptr, size)
+> > - taking irq/exception
+> > - get preempted
+> 
+> This; how is getting preempted fundamentally different from scheduling
+> ourselves?
 
-Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 17 ++---------------
- 1 file changed, 2 insertions(+), 15 deletions(-)
+The difference is because getting preempted in the sequence above is
+triggered off the back of an interrupt. On arm64, and I think also on x86,
+the user access state (SMAP or PAN) is saved and restored across exceptions
+but not across context switch. Consequently, taking an irq in a
+user_access_{begin,end} section and then scheduling is fine, but calling
+schedule directly within such a section is not.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index a8db758..a2ebb08 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -221,26 +221,13 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
- 					      struct vm_area_struct *vma)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
--	unsigned int i, count = obj->size >> PAGE_SHIFT;
-+	unsigned int count = obj->size >> PAGE_SHIFT;
- 	unsigned long user_count = vma_pages(vma);
--	unsigned long uaddr = vma->vm_start;
--	unsigned long offset = vma->vm_pgoff;
--	unsigned long end = user_count + offset;
--	int ret;
- 
- 	if (user_count == 0)
- 		return -ENXIO;
--	if (end > count)
--		return -ENXIO;
- 
--	for (i = offset; i < end; i++) {
--		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
--		if (ret)
--			return ret;
--		uaddr += PAGE_SIZE;
--	}
--
--	return 0;
-+	return vm_map_pages(vma, rk_obj->pages, count);
- }
- 
- static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
--- 
-1.9.1
+Julien -- please yell if I've missed some crucial detail, but I think that's
+the gist of what we're trying to describe here.
 
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
