@@ -2,82 +2,66 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0589FC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 09:38:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB65AC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 09:45:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CAC7321901
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 09:38:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C41E222BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 09:45:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k7QWxpId";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="GWnjly4m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAC7321901
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lyXM7KvL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C41E222BA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LepwQ5M/BXDovfuqWmA4jyTmEnK/e+l84EGX/X5GfNs=; b=k7QWxpIdzVt+DP
-	PEU9amsXpOYr+17UgK8tGViuU7a0RpF9YAq5wNV+97ANdLzjmfa0srMcxVGav+j9vWplmYjNxqVJk
-	yWRKUt5t+WAT0uhvnQ+CWTnWEgCv5HsJKlgL67++84VC55Q8RBh275C5rqUH8ogJy+QXG9Br83Oh4
-	A3/zbGUeZ9+Y26FNl2MxBDvTomP1LfbZ6yekrMwPQiZCsFXiZzbYzo9FcKT58o2oyLeSUTlXX2YiC
-	0KKiB1locF+NpqSKnEtrqIxMf6X3S9RJkafAmB4w1QjmsENh1BYQTOYqrPXwZvvVYrwJYCZpYspGw
-	dU9KCD6PkdUFBYe/T6Sg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=sgJ+cIvEJxq5CeeF9ygPfoawUyOKf7F7LZg/Hsg4DCk=; b=lyXM7KvLfdWf/YPocDK3cdpjb
+	vgtrO2p4asusNm6HXL7En2UWzBSmFiXL3jUdZfHfSs6hACO3Wcf1NvW0dy69HU5pRuBIpoEotuyaV
+	daIHAouvarMAFYihTzAvkm7BjPolXtY+3kW94RTbhCjSeeDzcgUrRLbZF4AXcq+knSf/E9zBCt/8E
+	M/otjd55DuLjv090YymCQnYLwubdxDkgdrIAXTuQZ3zGWI+YcRXUMFlZlyfzfdJXxUm8cL1E/WT+v
+	RNx7IBqyLJ/L8Rdl+8/IgLUTOEAIgH2WywFLxfLKdwGtzSFHFWHoYfWRoke36wZtCA6GOQy0mu/kK
+	DI6Ju4PeA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtqzm-0002zL-AO; Wed, 13 Feb 2019 09:38:22 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gtr6E-0004w0-5N; Wed, 13 Feb 2019 09:45:02 +0000
+Received: from relay9-d.mail.gandi.net ([217.70.183.199])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtqzZ-0002sl-BQ
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 09:38:20 +0000
-Received: by mail-lj1-x242.google.com with SMTP id v16so1376447ljg.13
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 01:38:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=diTfoAa5QUfTzyCKudm3waVERUH6mf8lPhS8olEIfwA=;
- b=GWnjly4m3L0IPD8SDnUMVRj095jutzkbt+WpZ4AyR75rL3aN1aeilvTWTZknhajSTO
- +exUHWeBQE4QHYcCwzlJQbUnHfYteFTcOLvIVyVUmqNv2mbJZ8CO5B+Aeoj9Tr/cycRm
- JKqxvK+fRwkn5FWypypefqhiNarWhMvklhU03TI4sgoUxW0X3sTP9EQ3LVkLq7TJvNXy
- 2KawqSEBABa3QDDw7unRB/p2zuFivYfS7qTCwUraKb+06dzISxdpgUDOQ6RobeEgjT6h
- 6+BEs/vTUVi6l4ZUrWyxMhIV2wlFpEiN9BT6zGvQkY8kKKoSM3XBqPzK2t63eChCL1EE
- vmxw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=diTfoAa5QUfTzyCKudm3waVERUH6mf8lPhS8olEIfwA=;
- b=CBGdxYa5H+hnASTcL3/7pvN7B/oGskRqwD4i62/u+pp0H48XEOlEUX4d2Os/C38KaN
- XTcxV6lqCGBtbI6Ull1R9Zy/khen5rHiSPpHe9xGhRUHf+ovYuRfFPZGPIKUVoeXkFTN
- LUQqAbqe87Md20Px7p8wupEDvlJW+ilb/3/auQYjNeBevTpX4Vgh3MEH0g/vGR194osh
- 8zY0RnjIQZz7S6O4/SmTD7IYKr76iXVcbIQjGecma7a3i4dSUYQty8STzqvRbQVnr2pJ
- DHe2759RDt3mfUadxuiumXYiiiJNpRbTCh5tLUiUtfZtV/4xnYZ0L+msci3X62fb/pDO
- ckjQ==
-X-Gm-Message-State: AHQUAuZcD2MD6NvivpceVe9laBMGhOT9FXLkoma39WR95Yg8u9TQrK6d
- lIcogel630Hk4ClTYzL7LYBBgPgYkq1oFdEQ6KN0DQ==
-X-Google-Smtp-Source: AHgI3IZ+FvuvTd0D4WtEj7MZhxu41YRPzxL1ogMPwCR5y2mnUKndGUmf0teqhdLj+kLcleGt0/NDay4QAwlsHrjnXhs=
-X-Received: by 2002:a2e:6a18:: with SMTP id f24mr582828ljc.97.1550050687163;
- Wed, 13 Feb 2019 01:38:07 -0800 (PST)
+ id 1gtr69-0004vW-F2
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 09:45:00 +0000
+X-Originating-IP: 90.88.30.68
+Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
+ [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 2822DFF809;
+ Wed, 13 Feb 2019 09:44:42 +0000 (UTC)
+Date: Wed, 13 Feb 2019 10:44:42 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Harald Geyer <harald@ccbib.org>
+Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+Message-ID: <20190213094442.da2dy6d5bb527nft@flea>
+References: <20190211111245.GA18147@lst.de>
+ <E1gtBlV-0000Wl-Cv@stardust.g4.wien.funkfeuer.at>
+ <20190211153945.e34fpwkuk67l7lc6@flea>
+ <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+ <20190212083850.7genwc6ipnxtl7eo@flea>
+ <E1gtUZn-0000NW-MA@stardust.g4.wien.funkfeuer.at>
+ <20190212100929.iqsxu443qrkl6myf@flea>
+ <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
 MIME-Version: 1.0
-References: <20190208104046.21817-1-thomas.petazzoni@bootlin.com>
-In-Reply-To: <20190208104046.21817-1-thomas.petazzoni@bootlin.com>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Wed, 13 Feb 2019 10:37:55 +0100
-Message-ID: <CACRpkdaSbcHAV=3NHYRujC7xEvVcbLJpV+k5sHdvFsRpYFsCbg@mail.gmail.com>
-Subject: Re: [PATCH] gpio: zynq: properly support runtime PM for GPIO used as
- interrupts
-To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+In-Reply-To: <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_013809_571106_43FECBC7 
-X-CRM114-Status: GOOD (  12.65  )
+X-CRM114-CacheID: sfid-20190213_014457_801219_733DB15F 
+X-CRM114-Status: GOOD (  40.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,47 +73,174 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Michal Simek <michal.simek@xilinx.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ info@olimex.com, Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============8096033062538905620=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 11:40 AM Thomas Petazzoni
-<thomas.petazzoni@bootlin.com> wrote:
 
-> The Zynq GPIO driver currently implements runtime PM by:
->
->  - Enabling runtime PM support in ->probe() and letting the runtime PM
->    reference counter drop to zero at the end of ->probe().
->
->  - Increasing the runtime PM reference counter in ->request() and
->    decreasing it in ->free().
->
-> However, the latter is not sufficient: when a GPIO is used as an
-> interrupt, ->request() and ->free() are not called. Due to this, the
-> runtime PM counter remains to zero when the only GPIOs in use are used
-> as interrupts, causing them to simply not work.
->
-> To address this problem, this commit implement the
-> ->irq_request_resources() and ->irq_release_resources() hooks,
-> ensuring that the runtime PM counter is properly
-> incremented/decremented. Since we override the default hooks, we keep
-> the existing behavior by making sure they call gpiochip_reqres_irq() /
-> gpiochip_relres_irq() respectively.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+--===============8096033062538905620==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="z5xaxtwbz6nm3a4l"
+Content-Disposition: inline
 
-Patch applied with Shubhrajyoti's review tag.
 
-Yours,
-Linus Walleij
+--z5xaxtwbz6nm3a4l
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+
+
+On Tue, Feb 12, 2019 at 08:37:36PM +0100, Harald Geyer wrote:
+> Maxime Ripard writes:
+> > > > And pinctrl can be used dynamically as well if you need to
+> > >
+> > > Can you explain or point me to the relevant explanation in the docs? I
+> > > don't seem to know about it.
+> >=20
+> > pinctrl_select_state is what you would want to call,
+> > you would have a good example of that runtime change in
+> > drivers/i2c/muxes/i2c-mux-pinctrl.c.
+>=20
+> I believe we have misunderstood each other somewhere. The above example
+> seems to be about one device (mux driver) requesting a set of pins and th=
+en
+> switching between different pinconfig states thereby activating
+> different subsets of pins.
+
+Not quite, it's supposed to drive two set of pins (with different
+muxings) connected to a single i2c controller. It's a 1-N relationship
+
+> I don't see a way to have two devices request the same set of pins.
+> I could write gpio-mux-pinctrl, but I don't see how this helps much
+> either.
+
+You can't at the same time. But precisely, pinctrl provides the
+guarantee and the synchronisation needed for two devices to operate on
+the same set of pins
+>=20
+> > > > > Instead I just got the original patch working, by implementing
+> > > > > "output-high" DT property in sunxi-pinctrl. I'll send a patch for
+> > > > > review soon.
+> > > >
+> > > > What do you want to do with output-high exactly?
+> > >
+> > > Exactly what I do in the patch that started this thread. (I'll resend
+> > > when wens' cpvdd patch is available for me to rebase onto.)
+> >=20
+> > There's a few issues with that approach as well:
+> >=20
+> >   - We're actively trying to remove the pinctrl nodes for the GPIOs
+>=20
+> For what reason? Maybe it doesn't apply to this usecase?
+
+This is kind of separate. At the moment, on all our SoCs but the H6,
+requesting a pin to a separate state using pinctrl doesn't mark the
+GPIO muxed on that pin as reserved, so through the GPIO userspace
+interface (or calling gpio_request from within the kernel, but that
+seems less of a risk) anyone is free to just request a GPIO on a pin
+already requested, behind the consumer drivers' back. Which is pretty
+bad.
+
+There's support for such a check in pinctrl, and we did enable it for
+the H6. However, one of its side effect is that you can't have a
+pinctrl node for a GPIO anymore (at least without significantly
+reworking the GPIO API in the kernel).
+
+We did enable it for the H6, since it didn't have any backward
+compatibility to take care of, but it's disabled at the moment for all
+the other SoCs to be able to flip that switch at some point. And
+that's why we're moving away from it as well.
+
+> >   - It's completely static: if one only wants to use the UART all the
+> >   time, they would have to change the DTB, which might or might not be
+> >   possible. Note that this could be trickier: why would you prevent the
+> >   console from working for example if the audio support isn't built in?
+> >   or as a module that might or might not be loaded?
+>=20
+> No, it's not that static:
+> * Before the audio device probes, UART is active. (You want UART all the
+>   time: Just prevent the audio module from loading.)
+
+If the bootloader configured it that way, if the audio support was
+compiled as a module and not builtin, or if no-one fiddles with that
+pin for whatever reason. 1 and (especially) 2 are pretty big ifs.=20
+
+> * When you have used audio and suddenly want to have UART instead: Just
+>   unbind the audio device and set the gpio to low or input from userspace.
+>   (I intended unbinding to be sufficient, but it seems pinctrl doesn't
+>    set the pin back to input when it is freed and I don't see a straight
+>    forward way to force that. I guess it is okay however: Somebody
+>    switching between UART and audio regularly has to know about the
+>    details anyway.)
+
+And this one is going to be a nightmare for distros to discover :/
+
+> I also tested suspend/resume/poweroff and it mostly works. The only
+> glitch is, that during suspend there is a short period of UART noise
+> on the HP. (But no such problem during resume or poweroff.) I suspect
+> the regulator supplying the gpio bank is shut down quite early when
+> suspending. It doesn't matter for this discussion: There likely would
+> be the same behaviour with any other approach too.
+>=20
+> I think the real downside of this approach is, that using the UART
+> makes the internal speakers/mic unuseable too.
+
+That's also a pretty big issue.
+
+> But we need a way to control the mux from userspace and aside from
+> unbinding the ideas proposed thus far are:
+>
+> a) control the gpio directly
+> b) control the gpio via leds-gpio
+>=20
+> (a) was dismissed because we can't set a default from DT
+> (b) was dismissed because some rogue app might try to blink it
+>=20
+> The clean solution might be to write mux-gpio, which is actually
+> identical to leds-gpio but lives in /sys/class/mux_switches/ and
+> uses different filenames. But that's going down the "invent a new
+> subsystem road", which I believe is overkill for what is a debugging
+> facility for a single board.
+
+I still believe we should aim at supporting this through pinctrl, and
+adding an userspace API is definitely easier than a full subsystem.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--z5xaxtwbz6nm3a4l
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGPnCgAKCRDj7w1vZxhR
+xRYVAP9aN5xv6piEdObz9wKlMqZ8DWwYC6JTFtm2zks6oHaQlQD8CZd80xxbTYBf
+qCIGLU7fxc+n9jaOzQF6MRmuoNjpAgk=
+=D9Us
+-----END PGP SIGNATURE-----
+
+--z5xaxtwbz6nm3a4l--
+
+
+--===============8096033062538905620==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============8096033062538905620==--
+
