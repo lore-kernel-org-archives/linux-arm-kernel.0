@@ -2,86 +2,90 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E894DC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:29:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3E55C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:29:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6AA42075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:29:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 746882075D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:29:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhfyXHKI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="tgVc5Dv4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6AA42075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ODzfroYL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="nYNHnr2Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 746882075D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=SjmJ/vr+R/T04ux/uZKC2DyQgfkATSOi1LWE5JIHfU4=; b=QhfyXHKIACaP6F
-	w6Rwrrdov14JTlndnvHq+uun1WYLJVceESH96dvxSMyubX+ThuLf9n+e/zCuHJsdaB4gmFy20U2Wv
-	025kk1gZthYRY+fzrrkEqjM87d5ZHb9/aqev7JgVuGVM3b+utz9hfeSNbSV7OlecKbzpb3GFpydT+
-	NKPUFPm/pk7osncONs+Bup/Ya1/luyrN9DRxJQSt5D7krekVDFd8NheSrSueYnqaZJfo0fG8XGr/A
-	+iT8quAkizq3mo4uCmSt3LzwBjEyeLqGDvKkXOhMNIkhXhXvrZwRfgdjqMcCNe38dbgGiK27CVFLj
-	/kueZDhETZ4D9GNt2txg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9b0WQ2pNKY49M5O1cmyqXP2lNe3nzyH1iRrGNTCJFDk=; b=ODzfroYLBDDZQT
+	qeHt5xQOe7CGH2Gm0xpwzwG6yDCR8jsMx/cOl7+HRur2ca0vnPUVp7I4hbk5aYfxnKYO2oR2Ir6n1
+	uF2O/p06EHIi8UpW3XbKRq8aA9DcBV7HsUzz7ztyyod3wnI/smzsD1PlDfnoS0KmHf7jdXPXpZaDY
+	xGU7J84VUea1DKPro36jFA83WOrpdvPY3ySHCFupocjrHk2wAL2pLpzpCyBVuayOsCeD6pSE/0R41
+	iMw2HOL5+t+M4LwdwoQGBg2Skg8h6I41xElixodTyvgEbb0TNbpEyjBbfje7LgrqoH9AIpxM/8jls
+	gsL32gZoRDLUlGeSTTxg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtubU-0006VX-QS; Wed, 13 Feb 2019 13:29:32 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gtube-0006jA-TH; Wed, 13 Feb 2019 13:29:43 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtuab-0005O8-1V
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:29:07 +0000
-Received: by mail-wm1-x344.google.com with SMTP id x7so2448118wmj.0
+ id 1gtuad-0005RU-R4
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:29:09 +0000
+Received: by mail-wr1-x443.google.com with SMTP id l5so1409559wrw.6
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 05:28:36 -0800 (PST)
+ Wed, 13 Feb 2019 05:28:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=i9o4DqUCQ064zKrRPoul8NXb1+SU7ZbGoV/daMhaY58=;
- b=tgVc5Dv4hEY7lyna2aHflwOA9joGrHmxd55hgh+/uuhjS7gWqrqjSkWdyP+M143eX3
- SBC8zBIfywCN6VLopKgXomVIs72byMXJp+XP9OAtco2ywcTP0ni5mYCWQPgT0qXxr5v2
- vcytiKa3zIBFA6O7PGeSp3E8NNQ4k+H7lraE32wzJjDYBu15hC36WKs299XkUTWasvj5
- T9rRbhmCFDj9kkXXlshKD8fsH/OVTbEAowv/5FtqxWGEHy9fLkEU2JebUlznGysWaGvv
- XMDL3AcjMoXz7tlTUOtLCZ+lMaaVchm2L85g1hLaN+1jyeEVJLapNSfO7xqxnKJmggz+
- mhFw==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=SvFSLn76SFJDwEu/S0bVHnKlVxmVyL4jfmZ7pu7W45E=;
+ b=nYNHnr2Zsxh+UaDXNN6yzU0ly6IkH762vDdfRfYhFGRyB9VVEUhGSKXoIhjVWQ29Bt
+ l2yS5gAG5bivhvIuH0KftYXcDIWlzChYzt8+KrCFslMDBc9AieVDkLJ84502Gr6BKIUv
+ 74QqC+GSpz2LRAsaf+0fS+l0UCI4NBnbriNKoblA6yN2j4sTfAZYqAxr7bkQ+Pc6a7z6
+ wc6XYmVEWEcK/Yo+ukBHyLnIlHl8bULoeyucuYm8aaN4NS4MdkhKx0wukq6yCP/kZcZL
+ 2eZLLQzFUC3BFc9hN1aD2HD1GE2dpll2qP3LLEGP6wmqJfLJeYp5NXI0lhY5YG7sV3sb
+ Wt7w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=i9o4DqUCQ064zKrRPoul8NXb1+SU7ZbGoV/daMhaY58=;
- b=m0Oxie8XCnBx8T+CQJyOfeMo1++beBtZ60mV1Xi/8SITrymE1B0nb3TImcsxeSJ08g
- bUFUQvytzuzDNS8BnW5yeZdKqZ6HZSxXxbr5JcRknncn3TMOH3ocaon5u1ERxM0XILKD
- NLzBfB6Vp5egYcAafVWV6RJpS9peXwWIejog77EmjkIJeu5QodkXBFtqaRyWMqtrqVbi
- d70pnDAZaomG2GKDamJoDqU+LKM3Y6OaDqBpVbU8M7AeZ6gl9OknHhoB55CJHhqzf9xa
- BqCJ/u2ExEqRl5cx5ziPk5Kr8oysG3qwJ18XiugbYRgNLk8L8PorSvWz1qP4Agav8a9x
- 2D0Q==
-X-Gm-Message-State: AHQUAuZWBndohdeaxlBegXtPi/bYug4KS47IuG8cgXvvWfMeEikUZhiH
- BPXEtmuycDjEpBke/6FkvHchNw==
-X-Google-Smtp-Source: AHgI3IYOYShdNWrBo9WLCcQPQjNJDR5XjZyTSju6bLJMQfS4QoGxCSwl4eBKNPTRseXx+ON3/FIk3A==
-X-Received: by 2002:a1c:a941:: with SMTP id s62mr361881wme.16.1550064515364;
- Wed, 13 Feb 2019 05:28:35 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=SvFSLn76SFJDwEu/S0bVHnKlVxmVyL4jfmZ7pu7W45E=;
+ b=QlanOSN7UY+Xbp+1mwaLUgeZ21CarPP63YXL3pUxBa5oC44IzHqT1x18kptv3Bbp1n
+ besAhU2Q1mG5NIFeYdaCXGZTnKM9jylBY0/ld8dW99eZMWfaSCYBuIIJlqBdNTbUq+8L
+ H1yNbWDhXFyykV5oE550jGkrS+awBcXu2xrGjvz7/tY/gxd/i21DeSv87Ur2TFxc9lEO
+ 3p9x2ml5TmjVou0Zc3Px4V07zOMCL44vrY7/dt7w5mP3Jvam0aOPrEPSuK/5qCX6Vzoi
+ m6QaSMvjynegt0+/Fty1Wnjfga4rvnAscWMMWxfgVn1gTbSekSzLvVBpOlgm46kCsscU
+ lsdA==
+X-Gm-Message-State: AHQUAuYiwrZhoyYWulNl33NglCKBMyituc5QEs0+hKh0MX1cVIpP2jiX
+ VYJ04GMCdhNqie7OLfrphvZ/tA83X3I=
+X-Google-Smtp-Source: AHgI3IZVubh1ey1AnRQ8u+x4lnSZlgsf8/ratFtS4LSrAz+twyaMAqm54+WCe3g/zrNVCc7jXNwozg==
+X-Received: by 2002:adf:fa0d:: with SMTP id m13mr402593wrr.93.1550064518026;
+ Wed, 13 Feb 2019 05:28:38 -0800 (PST)
 Received: from localhost.localdomain
  (aputeaux-684-1-27-200.w90-86.abo.wanadoo.fr. [90.86.252.200])
- by smtp.gmail.com with ESMTPSA id x3sm22841195wrd.19.2019.02.13.05.28.34
+ by smtp.gmail.com with ESMTPSA id x3sm22841195wrd.19.2019.02.13.05.28.36
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 13 Feb 2019 05:28:34 -0800 (PST)
+ Wed, 13 Feb 2019 05:28:37 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: linux-efi@vger.kernel.org
-Subject: [PATCH 0/2] efi/arm/gicv3: implement fix for memory reservation issue
-Date: Wed, 13 Feb 2019 14:27:36 +0100
-Message-Id: <20190213132738.10294-1-ard.biesheuvel@linaro.org>
+Subject: [PATCH 2/2] efi/arm: Revert "Defer persistent reservations until
+ after paging_init()"
+Date: Wed, 13 Feb 2019 14:27:38 +0100
+Message-Id: <20190213132738.10294-3-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190213132738.10294-1-ard.biesheuvel@linaro.org>
+References: <20190213132738.10294-1-ard.biesheuvel@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_052837_903455_6188F628 
-X-CRM114-Status: GOOD (  12.54  )
+X-CRM114-CacheID: sfid-20190213_052840_362702_5AACF5F8 
+X-CRM114-Status: GOOD (  12.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,38 +107,86 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Another attempt at fixing the chicked-and-egg issue where the number of
-memblock reservations for GICv3 LPI tables overflow the statically
-allocated table, and reallocating it involves allocating memory pages
-that may turn out to be the ones we were attempting to reserve in the
-first place.
+This reverts commit eff896288872d687d9662000ec9ae11b6d61766f, which
+deferred the processing of persistent memory reservations to a point
+where the memory may have already been allocated and overwritten,
+defeating the purpose.
 
-If this is accepted as an appropriate fix, something similar should be
-backported to v4.19 as well, although there, we'll need to increase the
-memblock reservation table size even more, given that it lacks a later
-optimization to the EFI memreserve code to merge the linked list entries.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/setup.c               | 1 -
+ drivers/firmware/efi/efi.c              | 4 ----
+ drivers/firmware/efi/libstub/arm-stub.c | 3 ---
+ include/linux/efi.h                     | 7 -------
+ 4 files changed, 15 deletions(-)
 
-Cc: Catalin Marinas <catalin.marinas@arm.com> 
-Cc: Will Deacon <will.deacon@arm.com> 
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com> 
-Cc: James Morse <james.morse@arm.com>
-Cc: linux-mm@kvack.org 
-
-Ard Biesheuvel (2):
-  arm64: account for GICv3 LPI tables in static memblock reserve table
-  efi/arm: Revert "Defer persistent reservations until after
-    paging_init()"
-
- arch/arm64/include/asm/memory.h         | 11 +++++++++++
- arch/arm64/kernel/setup.c               |  1 -
- drivers/firmware/efi/efi.c              |  4 ----
- drivers/firmware/efi/libstub/arm-stub.c |  3 ---
- include/linux/efi.h                     |  7 -------
- include/linux/memblock.h                |  3 ---
- mm/memblock.c                           | 10 ++++++++--
- 7 files changed, 19 insertions(+), 20 deletions(-)
-
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 4b0e1231625c..d09ec76f08cf 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -313,7 +313,6 @@ void __init setup_arch(char **cmdline_p)
+ 	arm64_memblock_init();
+ 
+ 	paging_init();
+-	efi_apply_persistent_mem_reservations();
+ 
+ 	acpi_table_upgrade();
+ 
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index 4c46ff6f2242..55b77c576c42 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -592,11 +592,7 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
+ 
+ 		early_memunmap(tbl, sizeof(*tbl));
+ 	}
+-	return 0;
+-}
+ 
+-int __init efi_apply_persistent_mem_reservations(void)
+-{
+ 	if (efi.mem_reserve != EFI_INVALID_TABLE_ADDR) {
+ 		unsigned long prsv = efi.mem_reserve;
+ 
+diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+index eee42d5e25ee..c037c6c5d0b7 100644
+--- a/drivers/firmware/efi/libstub/arm-stub.c
++++ b/drivers/firmware/efi/libstub/arm-stub.c
+@@ -75,9 +75,6 @@ void install_memreserve_table(efi_system_table_t *sys_table_arg)
+ 	efi_guid_t memreserve_table_guid = LINUX_EFI_MEMRESERVE_TABLE_GUID;
+ 	efi_status_t status;
+ 
+-	if (IS_ENABLED(CONFIG_ARM))
+-		return;
+-
+ 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA, sizeof(*rsv),
+ 				(void **)&rsv);
+ 	if (status != EFI_SUCCESS) {
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index 45ff763fba76..28604a8d0aa9 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1198,8 +1198,6 @@ static inline bool efi_enabled(int feature)
+ extern void efi_reboot(enum reboot_mode reboot_mode, const char *__unused);
+ 
+ extern bool efi_is_table_address(unsigned long phys_addr);
+-
+-extern int efi_apply_persistent_mem_reservations(void);
+ #else
+ static inline bool efi_enabled(int feature)
+ {
+@@ -1218,11 +1216,6 @@ static inline bool efi_is_table_address(unsigned long phys_addr)
+ {
+ 	return false;
+ }
+-
+-static inline int efi_apply_persistent_mem_reservations(void)
+-{
+-	return 0;
+-}
+ #endif
+ 
+ extern int efi_status_to_err(efi_status_t status);
 -- 
 2.20.1
 
