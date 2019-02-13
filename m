@@ -2,20 +2,20 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5364C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:32:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 617F9C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:34:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A8D3620838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:32:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 351852086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:34:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bQniNQ3X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A8D3620838
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fjAFoHrD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 351852086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,44 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=36MaSLYMTD45e46VabJedn9rynKpRi+/xBGEuOVknCM=; b=bQniNQ3Xrnyk5P
-	cGo2t1uGayuB4IeABJeqNgqC5nt5mloqHa6T68CVYDyC8hFlg3qEp2LL8a2iM4oJihvWhU4J2H9VE
-	lqRJ3HZF6k1/wL9oHV+QGSlx/rWI5ByOm40ocPQLDfEGFIbAZtW0blTXHSaQI3rXcb0aeUeLAo91I
-	piuK8WwFVZBWloSBtqx9kZs7KV+q+P2MqdsgDTbpxjAQV+EAw6W2R2dr/niVvMjtjwGweFGqB2Vjg
-	bSbvwe9a4wCsSNWXwgOznu+BM4ZCEhMcVpVtQVsD5QKUL7YRYGaXkgkeodBdm1RuYxQtiQVmpj/Ab
-	Z7qGrrAAzOK9Xdo30fCw==;
+	List-Owner; bh=/UgEA1tCAAVHqqahJYl+yhdvFqz7UVV+EUsTevoXkSw=; b=fjAFoHrDdJ+P9e
+	8tLh5rLgKUnxGgkkL515DpPV3cgrVH11vQRZTZT8odi7U9LLwIdsfsTF+nAXXbaN52dOCmNkzT5JW
+	GqWN/jXIcaceO4kMuAdyb/q/ZaH0QZCePajmtipDL1A1XOwI+2b14OQLk3wsYqNiuqLMVQ/cPkqhZ
+	p3a7m/wEQIVsJ87hzHsxd7syslgsUqGDcj1EPnyHhn+inIHFNP/+8QRMs+oz3JKaUmZTdWP++mq5N
+	/conZm59OQF6iYaUwuxJQZC4qJy8JFMV8o4jNkk03To9B1xENQmcU4FprHLzfc1M2c/5uvFexVUul
+	657GedlgQnRpZkAcQYUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtyOs-00037U-AL; Wed, 13 Feb 2019 17:32:46 +0000
+	id 1gtyQT-0003QR-Qv; Wed, 13 Feb 2019 17:34:25 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtyOo-00036Z-M2
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:32:44 +0000
+ id 1gtyQQ-0003Q3-LX
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:34:24 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9E10DA78;
- Wed, 13 Feb 2019 09:32:40 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1B12FA78;
+ Wed, 13 Feb 2019 09:34:22 -0800 (PST)
 Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- D81F63F675; Wed, 13 Feb 2019 09:32:38 -0800 (PST)
+ 05D403F675; Wed, 13 Feb 2019 09:34:19 -0800 (PST)
 From: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v5 1/5] arm64: Add utilities to save restore pointer
- authentication keys
-To: James Morse <james.morse@arm.com>,
- Amit Daniel Kachhap <amit.kachhap@arm.com>
+Subject: Re: [PATCH v5 2/5] arm64/kvm: preserve host HCR_EL2/MDCR_EL2 value
+To: Amit Daniel Kachhap <amit.kachhap@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-2-git-send-email-amit.kachhap@arm.com>
- <88ccd568-f027-6cdf-b4f1-6709d76102c1@arm.com>
-Message-ID: <adbeb25c-fa88-41fd-7819-5f412a762b64@arm.com>
-Date: Wed, 13 Feb 2019 17:32:37 +0000
+ <1548658727-14271-3-git-send-email-amit.kachhap@arm.com>
+Message-ID: <8de32a89-4aa1-bffb-78dd-45feddc9216e@arm.com>
+Date: Wed, 13 Feb 2019 17:34:18 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <88ccd568-f027-6cdf-b4f1-6709d76102c1@arm.com>
+In-Reply-To: <1548658727-14271-3-git-send-email-amit.kachhap@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_093242_733667_ACD9BAC8 
-X-CRM114-Status: GOOD (  18.01  )
+X-CRM114-CacheID: sfid-20190213_093422_764707_FF4B844A 
+X-CRM114-Status: GOOD (  15.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,66 +71,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Dave Martin <Dave.Martin@arm.com>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
+ kvmarm@lists.cs.columbia.edu,
  Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+ Dave Martin <Dave.Martin@arm.com>, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 31/01/2019 16:20, James Morse wrote:
-> Hi Amit,
+On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
+> When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
+> is a constant value. This works today, as the host HCR_EL2 value is
+> always the same, but this will get in the way of supporting extensions
+> that require HCR_EL2 bits to be set conditionally for the host.
 > 
-> On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
->> The keys can be switched either inside an assembly or such
->> functions which do not have pointer authentication checks, so a GCC
->> attribute is added to enable it.
->>
->> A function ptrauth_keys_store is added which is similar to existing
->> function ptrauth_keys_switch but saves the key values in memory.
->> This may be useful for save/restore scenarios when CPU changes
->> privilege levels, suspend/resume etc.
-> 
-> 
->> diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
->> index 15d4951..98441ce 100644
->> --- a/arch/arm64/include/asm/pointer_auth.h
->> +++ b/arch/arm64/include/asm/pointer_auth.h
->> @@ -11,6 +11,13 @@
->>  
->>  #ifdef CONFIG_ARM64_PTR_AUTH
->>  /*
->> + * Compile the function without pointer authentication instructions. This
->> + * allows pointer authentication to be enabled/disabled within the function
->> + * (but leaves the function unprotected by pointer authentication).
->> + */
->> +#define __no_ptrauth	__attribute__((target("sign-return-address=none")))
-> 
-> The documentation[0] for this says 'none' is the default. Will this only
-> take-effect once the kernel supports pointer-auth for the host? (Is this just
-> documentation until then?)
+> To allow such features to work without KVM having to explicitly handle
+> every possible host feature combination, this patch has KVM save/restore
+> the host HCR when switching to/from a guest HCR. The saving of the
+> register is done once during cpu hypervisor initialization state and is
+> just restored after switch from guest.
 
-Yes, I don't think this should be in this series, since we're not
-building the kernel with pointer auth yet.
+Why is this patch needed? I couldn't find anything in this series that
+sets HCR_EL2 conditionally for the host. It seems like the kernel still
+always sets it to HCR_HOST_VHE_FLAGS/HCR_HOST_NVHE_FLAGS.
 
-> 
-> ('noptrauth' would fit with 'notrace' slightly better)
+Looking back at v2 of the userspace pointer auth series, it seems that
+the API/APK bits were set conditionally [1], so this patch would have
+been needed to preserve HCR_EL2. But as of v3 of that series, the bits
+have been set unconditionally through HCR_HOST_NVHE_FLAGS [2].
 
-(But worse with e.g. __noreturn, __notrace_funcgraph, __init,
-__always_inline, __exception. Not sure what the pattern is. Would
-__noptrauth be better?)
+Is there something else I've missed?
 
 Thanks,
 Kristina
 
-> 
-> [0]
-> https://gcc.gnu.org/onlinedocs/gcc/AArch64-Function-Attributes.html#AArch64-Function-Attributes
-> 
-
+[1] https://lore.kernel.org/linux-arm-kernel/20171127163806.31435-6-mark.rutland@arm.com/
+[2] https://lore.kernel.org/linux-arm-kernel/20180417183735.56985-5-mark.rutland@arm.com/
 
 _______________________________________________
 linux-arm-kernel mailing list
