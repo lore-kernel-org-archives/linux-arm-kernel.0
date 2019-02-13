@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A101C282DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98383C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C2E52086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A4C8222D1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:30:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dd+6ceCw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C2E52086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dGYWRNgC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A4C8222D1
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uqUUTiZaLbGpLhFTttnOuYYrAA7LjDh7gYEHhgrhAqg=; b=Dd+6ceCwBDYFN+
-	c/15wcjma7708r8JcTOpszy88EDdaDa9Hiu2uxIduOatyqc36EqLSRRBtqT6hd71Zu+HZFw8kXmpX
-	+IbRPOT+PF6wrp1ebkJj58sS6B89wZtRdTg/aaci2TAatF4KLyub7gSjFOzxPaLOTJoKQVx7DuxFs
-	1XB2Dkkwlwdi/8zE33Mk3j4x1sLXJ+XknJu3qryrdNzbNSgLGK2gvYtxwcx7FdZp2MfjYKPhn6+ia
-	RF59xROb1XuKTCq60p38wUySIoB0U3m8wwxbHHaBYy0Rd04Z2vKmrpW9Tn4Nr5WRe49oPbQtEiauc
-	Tro+ypBPPpZOA+ir7gdg==;
+	List-Owner; bh=M5Igpa4ZYCNAGEKdmn4TJH5LRbZ2ZY+JVyY6oe5VtP8=; b=dGYWRNgC+llApG
+	CPxiLKkBNw7pJ1fXLZQKrmXq0zY7tFPHFzT3/cUy+98fWXxfVKxRgy6d3uiokBZDB9c0edIyN5KO8
+	dREI1rmaDrVUJDN4yOQZWUeiOhL+odB+yn9CbyDYARFYVNsAtQtfcwXVrKC1cZqQ4ru+fDloFbvUv
+	FNtTxcnFO8rbTgUhXvoCr8wHu70H53O0YY/cZXtIMHj9Ldjg0XogMHMN1A340pRseHAWYdZ0Hnjtt
+	frmQqG3bOW83ycYvv1RsOy1/NGJBTkaDWWuZgQtvugZdNicf3Rrzb3CdloNGDRlRBCw1j5kFZGHCH
+	WB6bCvsmjC98vNTKvPpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzId-0001te-6k; Wed, 13 Feb 2019 18:30:23 +0000
+	id 1gtzIo-00029W-FF; Wed, 13 Feb 2019 18:30:34 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzHi-0007kZ-IH; Wed, 13 Feb 2019 18:29:26 +0000
+ id 1gtzHl-0007of-5Y; Wed, 13 Feb 2019 18:29:29 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH 02/21] arm64/iommu: improve mmap bounds checking
-Date: Wed, 13 Feb 2019 19:29:01 +0100
-Message-Id: <20190213182920.16764-3-hch@lst.de>
+Subject: [PATCH 03/21] dma-mapping: add a Kconfig symbol to indicated
+ arch_dma_prep_coherent presence
+Date: Wed, 13 Feb 2019 19:29:02 +0100
+Message-Id: <20190213182920.16764-4-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213182920.16764-1-hch@lst.de>
 References: <20190213182920.16764-1-hch@lst.de>
@@ -67,60 +68,74 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The nr_pages checks should be done for all mmap requests, not just those
-using remap_pfn_range.
+Add a Kconfig symbol that indicates an architecture provides a
+arch_dma_prep_coherent implementation, and provide a stub otherwise.
+
+This will allow the generic dma-iommu code to it while still allowing
+to be built for cache coherent architectures.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm64/mm/dma-mapping.c | 21 ++++++++-------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+ arch/arm64/Kconfig              | 1 +
+ arch/csky/Kconfig               | 1 +
+ include/linux/dma-noncoherent.h | 6 ++++++
+ kernel/dma/Kconfig              | 3 +++
+ 4 files changed, 11 insertions(+)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index be88beb2e377..e54288921e72 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -73,19 +73,9 @@ static int __swiotlb_get_sgtable_page(struct sg_table *sgt,
- static int __swiotlb_mmap_pfn(struct vm_area_struct *vma,
- 			      unsigned long pfn, size_t size)
- {
--	int ret = -ENXIO;
--	unsigned long nr_vma_pages = vma_pages(vma);
--	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	unsigned long off = vma->vm_pgoff;
--
--	if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
--		ret = remap_pfn_range(vma, vma->vm_start,
--				      pfn + off,
--				      vma->vm_end - vma->vm_start,
--				      vma->vm_page_prot);
--	}
--
--	return ret;
-+	return remap_pfn_range(vma, vma->vm_start, pfn + vma->vm_pgoff,
-+			      vma->vm_end - vma->vm_start,
-+			      vma->vm_page_prot);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 87ec7be25e97..52175007ffb7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -13,6 +13,7 @@ config ARM64
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_DMA_COHERENT_TO_PFN
+ 	select ARCH_HAS_DMA_MMAP_PGPROT
++	select ARCH_HAS_DMA_PREP_COHERENT
+ 	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FAST_MULTIPLIER
+diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+index 398113c845f5..8b84d4362ff6 100644
+--- a/arch/csky/Kconfig
++++ b/arch/csky/Kconfig
+@@ -1,5 +1,6 @@
+ config CSKY
+ 	def_bool y
++	select ARCH_HAS_DMA_PREP_COHERENT
+ 	select ARCH_HAS_SYNC_DMA_FOR_CPU
+ 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
+ 	select ARCH_USE_BUILTIN_BSWAP
+diff --git a/include/linux/dma-noncoherent.h b/include/linux/dma-noncoherent.h
+index 69b36ed31a99..9741767e400f 100644
+--- a/include/linux/dma-noncoherent.h
++++ b/include/linux/dma-noncoherent.h
+@@ -72,6 +72,12 @@ static inline void arch_sync_dma_for_cpu_all(struct device *dev)
  }
- #endif /* CONFIG_IOMMU_DMA */
+ #endif /* CONFIG_ARCH_HAS_SYNC_DMA_FOR_CPU_ALL */
  
-@@ -241,6 +231,8 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 			      unsigned long attrs)
- {
-+	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
-+	unsigned long off = vma->vm_pgoff;
- 	struct vm_struct *area;
- 	int ret;
++#ifdef CONFIG_ARCH_HAS_DMA_PREP_COHERENT
+ void arch_dma_prep_coherent(struct page *page, size_t size);
++#else
++static inline void arch_dma_prep_coherent(struct page *page, size_t size)
++{
++}
++#endif /* CONFIG_ARCH_HAS_DMA_PREP_COHERENT */
  
-@@ -249,6 +241,9 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
- 	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
- 		return ret;
+ #endif /* _LINUX_DMA_NONCOHERENT_H */
+diff --git a/kernel/dma/Kconfig b/kernel/dma/Kconfig
+index bde9179c6ed7..c3b2a5ae2dd4 100644
+--- a/kernel/dma/Kconfig
++++ b/kernel/dma/Kconfig
+@@ -35,6 +35,9 @@ config ARCH_HAS_SYNC_DMA_FOR_CPU
+ config ARCH_HAS_SYNC_DMA_FOR_CPU_ALL
+ 	bool
  
-+	if (off >= nr_pages || vma_pages(vma) > nr_pages - off)
-+		return -ENXIO;
++config ARCH_HAS_DMA_PREP_COHERENT
++	bool
 +
- 	if (!is_vmalloc_addr(cpu_addr)) {
- 		unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
- 		return __swiotlb_mmap_pfn(vma, pfn, size);
+ config ARCH_HAS_DMA_COHERENT_TO_PFN
+ 	bool
+ 
 -- 
 2.20.1
 
