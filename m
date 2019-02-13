@@ -2,93 +2,62 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27DCBC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:37:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D9D2C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:48:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E9603222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:37:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BE76206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 12:48:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K3pG6XCP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="tmteZ4Ya"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9603222B2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Aags0la/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BE76206BB
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=MC64kBcEUr385xBCR5+Mu+OStJGBob14eGQeIlXRXU0=; b=K3pG6XCPiJwlMjywStEatV2rN1
-	Nb/3PEZtSdTn5z1befaURoGpEYojyuCpz8Nvwf0xeBtsQJwlCWi9S35lEWkowRk65LAbOy845CYiY
-	hwEmeFpjhJDBVDflTIKe7MD7nipGxlQf6NIAWBCJ+ywPTOwfscD9+xabiR1RTXmZL62jtM5n+K8dD
-	VJbGDY4gnb4NYFKY/uhhKWm0FtWLEi5YNo8N830S6+2U5Ct1U06r2THml1JXrGaNYmcCFZsWttwrh
-	QOFk/A87LgXSjCbW1jLO3iGaZALSXKxhZfpwklmx9pRgKgm1fWtYCLmj5Tht7bivo6U9XM/BA2qhF
-	JH3iGeSg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rRq1XoEF5PVTt+CSuQRHaJR57xq27mSv65XUkbJy9rw=; b=Aags0la/Azee8G
+	v1jhnW4G59hncUxiEs3VInpzOi1DC6ygaTNpm0lqnhPVqvd1+2e19TpFMnUC4exH033H0kIPMOPJq
+	XRsLhM0T8KfJQlyFW/8lbPyxQG7/Vr9iO/j0MFb1lggRD5+iCp2E2NZuEB66L3C7ELVCqZOeodkOs
+	GLNZNRQHn6reqaSwkTal6E/bmhbCzsRl3epgSqYjSKP9cl79iTB2kaSxc+a5KZY4Ylsfl/lHfPwaP
+	QnRMdHcp5769BdLMW1/nfXO6AnLI63vExrVI0NNnmFihaxr1BYxeXjX/2NLR/gsQAlAQeUIkwa17Z
+	rR1Nor+r7Eq4bMaZPHSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gttmr-0008Mz-6N; Wed, 13 Feb 2019 12:37:13 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gttk4-000660-Ex
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 12:34:22 +0000
-Received: by mail-pf1-x441.google.com with SMTP id b7so1077715pfi.8
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 04:34:20 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :in-reply-to:references;
- bh=FGaARlyO45jSVlRCo3Ba46kwztIqiQvxEWOsLPfUyBY=;
- b=tmteZ4Yadx1Xj9sG8FjJzb/XQPKilq9yCsNYjoVZLRWUeNlKFBj20Hj8lf4izmYo+Y
- bbeGCWqccyS9rQx2mLdyJdaEyxg9LQoJHkArA1j4+WFLIBkZ/KsWvN4ODiaQxNttHHkR
- EwMAQ79vWNIuNG+PBfqs86YTYnu68D6h2ZruC0dK3pdyx7t9OTXKx+SzPO0DDz3kPl7X
- Pl9ZnKlNAzcHzZatc7X9UWT1XsN3zg5o6jD0fqONbJ4Rhm8+a5ZizaCaK1lwGBmReHOj
- IY4QGtiQ/igG6Lco8H4XRwozAfMo9moQS56Kiu8zFudHq+QrCqC3OnbFRLQlPQSC4Sml
- +nEg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:in-reply-to:references;
- bh=FGaARlyO45jSVlRCo3Ba46kwztIqiQvxEWOsLPfUyBY=;
- b=cg2DSI4MG11z6EZzo/7sugdkqiOGepAEBGMUA7U2Xkelmy7j/XTDaUHldGXae/ySgd
- eXoWZBIEud8wTpa13qlBeQpxX2/C+WQowkDfDd+OpL0JhkDoqBKYJOecjYTb/oFE1ZHg
- oB9dZUJnuK8Ra/gOZTrIgHtCWp3YXCFouAv/h3NjeOPPZZsLofxQBMxFwRjjTTAQNyI0
- MfDLEr0XN/tchoLMJPhG6wGmiF26c0OmEUP7/+UPjnFBmHwWPpPA+b4ZPEiCzS0uLOJN
- mWt/8ZKa8w523rM/lySAkoDCxPXmkrdtki9y+0GrZitbVoXjBc6Ka3APk6AgihNzeqNA
- Z+OQ==
-X-Gm-Message-State: AHQUAuYxpmCUgiB2pK4l2pXZeWXClEWbZRiQB3uqY7aimf+IHr/347oY
- TqewXcwZTRKJ6FRKACt8dWlDGw==
-X-Google-Smtp-Source: AHgI3IZrWYzG9huHS10ehbGpwHIHSv79LI09Vcrf45ydQgH291PARN3sX4S/vYIcLE4vYgUdlpfxRw==
-X-Received: by 2002:a63:d347:: with SMTP id u7mr232319pgi.383.1550061259786;
- Wed, 13 Feb 2019 04:34:19 -0800 (PST)
-Received: from baolinwangubtpc.spreadtrum.com ([117.18.48.102])
- by smtp.gmail.com with ESMTPSA id l5sm21223640pgl.51.2019.02.13.04.34.15
- (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 13 Feb 2019 04:34:19 -0800 (PST)
-From: Baolin Wang <baolin.wang@linaro.org>
-To: robh+dt@kernel.org,
-	mark.rutland@arm.com,
-	arnd@arndb.de
-Subject: [PATCH v2 3/5] arm64: dts: sprd: Add SC2731 charger device
-Date: Wed, 13 Feb 2019 20:32:47 +0800
-Message-Id: <ecfa4740cd1255f358b307af946cb059f7776090.1550060544.git.baolin.wang@linaro.org>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <cover.1550060543.git.baolin.wang@linaro.org>
-References: <cover.1550060543.git.baolin.wang@linaro.org>
-In-Reply-To: <cover.1550060543.git.baolin.wang@linaro.org>
-References: <cover.1550060543.git.baolin.wang@linaro.org>
+	id 1gttyC-0003r0-4c; Wed, 13 Feb 2019 12:48:56 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtty9-0003qZ-KW
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 12:48:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4073080D;
+ Wed, 13 Feb 2019 04:48:51 -0800 (PST)
+Received: from brain-police (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DE75E3F557;
+ Wed, 13 Feb 2019 04:48:46 -0800 (PST)
+Date: Wed, 13 Feb 2019 12:48:43 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Jann Horn <jannh@google.com>
+Subject: Re: [PATCH] mmap.2: describe the 5level paging hack
+Message-ID: <20190213124842.GD1912@brain-police>
+References: <20190211163653.97742-1-jannh@google.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190211163653.97742-1-jannh@google.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_043420_720213_E9581AC7 
-X-CRM114-Status: UNSURE (   9.23  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190213_044853_685199_AB3FD2A2 
+X-CRM114-Status: GOOD (  32.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,70 +69,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, baolin.wang@linaro.org, zhang.lyra@gmail.com,
- broonie@kernel.org, linux-kernel@vger.kernel.org, arm@kernel.org,
- olof@lixom.net, orsonzhai@gmail.com, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: linux-arch@vger.kernel.org, linux-man@vger.kernel.org,
+ Catalin Marinas <catalin.marinas@arm.com>, Dave Hansen <dave.hansen@intel.com>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ linuxppc-dev@lists.ozlabs.org, Andy Lutomirski <luto@amacapital.net>,
+ linux-mm@kvack.org, Paul Mackerras <paulus@samba.org>, mtk.manpages@gmail.com,
+ Michael Ellerman <mpe@ellerman.id.au>,
+ Andrew Morton <akpm@linux-foundation.org>, linux-api@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add charger device node and related battery node for SC2731 PMIC.
+Hi Jann,
 
-Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
----
- arch/arm64/boot/dts/sprd/sc2731.dtsi      |    6 ++++++
- arch/arm64/boot/dts/sprd/sp9860g-1h10.dts |   16 ++++++++++++++++
- 2 files changed, 22 insertions(+)
+On Mon, Feb 11, 2019 at 05:36:53PM +0100, Jann Horn wrote:
+> The manpage is missing information about the compatibility hack for
+> 5-level paging that went in in 4.14, around commit ee00f4a32a76 ("x86/mm:
+> Allow userspace have mappings above 47-bit"). Add some information about
+> that.
+> 
+> While I don't think any hardware supporting this is shipping yet (?), I
+> think it's useful to try to write a manpage for this API, partly to
+> figure out how usable that API actually is, and partly because when this
+> hardware does ship, it'd be nice if distro manpages had information about
+> how to use it.
+> 
+> Signed-off-by: Jann Horn <jannh@google.com>
+> ---
+> This patch goes on top of the patch "[PATCH] mmap.2: fix description of
+> treatment of the hint" that I just sent, but I'm not sending them in a
+> series because I want the first one to go in, and I think this one might
+> be a bit more controversial.
+> 
+> It would be nice if the architecture maintainers and mm folks could have
+> a look at this and check that what I wrote is right - I only looked at
+> the source for this, I haven't tried it.
+> 
+>  man2/mmap.2 | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/man2/mmap.2 b/man2/mmap.2
+> index 8556bbfeb..977782fa8 100644
+> --- a/man2/mmap.2
+> +++ b/man2/mmap.2
+> @@ -67,6 +67,8 @@ is NULL,
+>  then the kernel chooses the (page-aligned) address
+>  at which to create the mapping;
+>  this is the most portable method of creating a new mapping.
+> +On Linux, in this case, the kernel may limit the maximum address that can be
+> +used for allocations to a legacy limit for compatibility reasons.
+>  If
+>  .I addr
+>  is not NULL,
+> @@ -77,6 +79,19 @@ or equal to the value specified by
+>  and attempt to create the mapping there.
+>  If another mapping already exists there, the kernel picks a new
+>  address, independent of the hint.
+> +However, if a hint above the architecture's legacy address limit is provided
+> +(on x86-64: above 0x7ffffffff000, on arm64: above 0x1000000000000, on ppc64 with
+> +book3s: above 0x7fffffffffff or 0x3fffffffffff, depending on page size), the
+> +kernel is permitted to allocate mappings beyond the architecture's legacy
+> +address limit.
 
-diff --git a/arch/arm64/boot/dts/sprd/sc2731.dtsi b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-index a2edc25..dbf6242 100644
---- a/arch/arm64/boot/dts/sprd/sc2731.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc2731.dtsi
-@@ -17,6 +17,12 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
-+		charger@0 {
-+			compatible = "sprd,sc2731-charger";
-+			reg = <0x0>;
-+			monitored-battery = <&bat>;
-+		};
-+
- 		led-controller@200 {
- 			compatible = "sprd,sc27xx-bltc", "sprd,sc2731-bltc";
- 			reg = <0x200>;
-diff --git a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-index 3bd18e3..2a963bd 100644
---- a/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-+++ b/arch/arm64/boot/dts/sprd/sp9860g-1h10.dts
-@@ -41,6 +41,22 @@
- 		#size-cells = <2>;
- 		ranges;
- 	};
-+
-+	bat: battery {
-+		compatible = "simple-battery";
-+		charge-full-design-microamp-hours = <1900000>;
-+		charge-term-current-microamp = <120000>;
-+		constant_charge_voltage_max_microvolt = <4350000>;
-+		internal-resistance-micro-ohms = <250000>;
-+		ocv-capacity-celsius = <20>;
-+		ocv-capacity-table-0 = <4185000 100>, <4113000 95>, <4066000 90>,
-+			<4022000 85>, <3983000 80>, <3949000 75>,
-+			<3917000 70>, <3889000 65>, <3864000 60>,
-+			<3835000 55>, <3805000 50>, <3787000 45>,
-+			<3777000 40>, <3773000 35>, <3770000 30>,
-+			<3765000 25>, <3752000 20>, <3724000 15>,
-+			<3680000 10>, <3605000 5>, <3400000 0>;
-+	};
- };
- 
- &uart0 {
--- 
-1.7.9.5
+On arm64 we support 36-bit, 39-bit, 42-bit, 47-bit, 48-bit and 52-bit user
+virtual addresses, some of which also enforce a particular page size of 4k,
+16k or 64k. With the exception of 52-bit, the user virtual address size is
+fixed at compile time and mmap() can allocate up to the maximum address
+size.
 
+When 52-bit virtual addressing is configured, we continue to allocate up to
+48 bits unless either a hint is passed to mmap() as you describe, or
+CONFIG_ARM64_FORCE_52BIT=y (this is really intended as a debug option and is
+hidden behind EXPERT as well as being off by default).
+
+One thing that just occurred to me is that our ASLR code is probably pretty
+weak for addresses greater than 48 bits because I don't think it was updated
+when we added 52-bit support. I'll take a deeper look when I get some time.
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
