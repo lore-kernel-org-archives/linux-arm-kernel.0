@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A155EC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:49:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32FE9C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:49:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6ED562075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:49:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0052E207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:49:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LOl8n6x6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="yROAmfrB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6ED562075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TYfJQMKi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="WOxdY/jQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0052E207E0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sSDQJzatHaU98/Oj6lujpyugYoQ335E+TDMmH0LL4v4=; b=LOl8n6x6Js/Oq/
-	Yt1Jm6GzkK3f2/3u2AiMIm/xyHb2IUazjbSAcLwYR9g8Z/bhB8I7poAPWhQpfa0X5UKcoJg7ExVRf
-	fh4miOkEpuQ57QNRcN0Rit8EHODOvslQv4PgJghYWGH5Y1KrcVjWHfAowcrQpxHYCAsAmIsUDntL9
-	sZmSCVgKVuoYDk4A+f4vZDV2/Lf9Jda/21W1T2fsDpV1oVBGX/Bw6wV0nYYMSHQg+CpBRVQG/FBnK
-	U4982i1G+ArCzhi2uePIKZhpi2YB9Itw1rPynlDqTxSNXS0oB1EonJMww+nStWBV1cMqdxKUt1I73
-	pQlboMg3nvHx50xTeOqA==;
+	List-Owner; bh=iFsNQb5vL1AGtpcnI+DFTUWiM1Id5BNVlY5r1kEiSmU=; b=TYfJQMKiR8vBES
+	JcD0euXWIr0bHg36oui+3C3z4jkqNftkZxy6ksrqFbVNHveY9HGp1bzbvq5QT+NdIXZUNKOAdjg73
+	0NaLoBxSi5QtHkVMzHcvFIhUgRoVy0hyTxeoQHcMw3ci05+sWLE2aMMaskUEx/VfxLtDoujQYLSF4
+	qSGY/lEu7aeJlyqV9YSgrO8YJH3DkIxL7GxvnuokhlRl8XLpXwOwjdh4LNj2YSB9Hns6rkUhY+nI3
+	+Y7+lpNdG2zstiSoomVU5DXYWHtN8BGcEaOqM2eJpyYa0vvkWd6qSRe6r685TwLJF8Ca3+Wn4oasW
+	l2KoWBCh9N0rWYK40HBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtuuW-0000Zk-D2; Wed, 13 Feb 2019 13:49:12 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gtuug-0000mS-2s; Wed, 13 Feb 2019 13:49:22 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtuuJ-0000Gi-U2
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:49:02 +0000
-Received: by mail-wr1-x443.google.com with SMTP id c8so2572246wrs.4
+ id 1gtuuL-0000Gx-KR
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:49:03 +0000
+Received: by mail-wm1-x341.google.com with SMTP id y185so1934545wmd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 05:48:59 -0800 (PST)
+ Wed, 13 Feb 2019 05:49:00 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=Z5NWXobnBI5jIuwlQDhfvxrRfdqtyysOnjYOnhaMuiw=;
- b=yROAmfrBnbjOVIvAzZiEGvXoiD8SR90yOF/LTA1cAJaiZu2MBj/mmEyJXWj/B+rgdS
- hhJQeMMEnf/Udv6WHeUx5nBzxpZCDYdF8Lv5zE7ALyOGGqywq4e8wcL37QsAcR2M92p6
- cIh1EawFjqJnxlmZchx2j8u2MbKueu5qqYb3Nh3amihfIwBxg020LRvsgYzIAfkIQ9P8
- +hCTyIZm6HHeL9dX905Ayk+8cdsA1zFdXQfdlGT5ncpiG7c0YEtQw+UDY7aY5krw/YpS
- EFrWtpX7RHG41DVfAeqsbH7B2ofaR/LEDvR3FdIRxoBAOyDPTyd/F/2VbLIwEUC6E3DE
- nh5A==
+ bh=oEjaCbJAI7v1M+EBiHgejuQl+NdCAyaoj/59FsOaZdQ=;
+ b=WOxdY/jQNyU3QUdgwc7S/5/eubNDSXUsh3jaw2xdt5w/y6LzOxWP61Q3R0Impb7SYT
+ 6XZlTBGgZO+nmDvggpeaoJPFnyhi9y7Ob/rpazmZZUnX/gUyzPeoc9EUAx4t/8gOjUpf
+ b4nhNP0kMbabzMZZ7qcmBWwovdoeU4m+cfZzW4ciDa+K5f/bmZn2UC4gcblh4jbnEkWO
+ QdKCncnBD6Rxot8+hX2YHoAt/f6gmsNysvoIlCaNMb492TG9d5GDhzu4RwdxyFqOlsqB
+ pX5vcD/KEQ65Cw8erYrnlRy49sCiMBLp8BXXaRY6RDqVyLvAS1gsIhUltwttH7wvCPKb
+ ZOXw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=Z5NWXobnBI5jIuwlQDhfvxrRfdqtyysOnjYOnhaMuiw=;
- b=seRlMYh/VT6ac0QprHxaW2GjQpzayAMjgp7HEJkfcjBtoUsenCkL3a38LIXXZU0VP8
- Wd//2iO1VEOviV3FefBkIanj+11e6EG4O+ziZeUbo8CszRT+uOPsCBNYfxGL3iCi5/IQ
- rH4+Ag/QQ2JMYSTedORCXxdTXfiDlv+MnqfjT0Kah7of40kKPE1QJryRZoA0d97r5yS7
- UBRVC/zyqaZSrcetJtycJVCMbkSDaRVUDzXWAz670zFylyUaCnShlYdrBBgI+3/+s9SD
- qInAu8xvb6o1zE8rVlD2n2z/QQhgD4W2dZxmePa1fIFjk9JmICCkOgaIk9iKwTVKGHsG
- zR0w==
-X-Gm-Message-State: AHQUAuZQr10ZsDdVZaB+FOhxL7PoVixgNNmzhcyJlWeKp2AimLIG8QXf
- OgptTpJ728Jq6Q0manNVXnyogg==
-X-Google-Smtp-Source: AHgI3IaTdY031fTX1VU5pob/RrG964471oEE5xmOJBAygSOLUfZbhujt9vV9XykIEumDxY7HWnoXog==
-X-Received: by 2002:a5d:550f:: with SMTP id b15mr492845wrv.251.1550065738231; 
- Wed, 13 Feb 2019 05:48:58 -0800 (PST)
+ bh=oEjaCbJAI7v1M+EBiHgejuQl+NdCAyaoj/59FsOaZdQ=;
+ b=IM73onW15dpJCLOwgl+6M2bYSkoTkY2LWONITXdnWkTuFdQtB7VTHjVZZTrYi34wQS
+ bfldRxTDuoB6pnQefdUL/r98I3+D2cblUk1GGeD7n32wrKMNSpDyDo+YUdFKkV9SeUFz
+ 0Z6bf26bfw+jou6t/psE2HXVFxsbvLAbl+lfNSTNI0+lKmAquV/qS4btDgxmn7qiPEyZ
+ PlkjtOqtOiELsQAoNgyw6cU/310C0/zkXl9ccS9fCGqyUMm4UHf/VhHfi1A6Ca2IHAtU
+ SvLgoV4xRvBKWEburL2/1py2L2T9ZlaDMxvsNZ/xvW9HU9WWsyjdv3k1G+tkgLOYDDhL
+ Dbhw==
+X-Gm-Message-State: AHQUAuYiHZlmR0IYi7wcLr6ppiXOplBdUIkUwspS1e7kn1y3RY8ONiuL
+ Y/+2VqoSXnihf7FKqGJ7W01lvQuuhtM=
+X-Google-Smtp-Source: AHgI3IbC1OIsE/j9eYtGYBRKfxu8AW58LnKn915Sl0raXjwGS/EMezyt952G82d+Ba1ol9Pm02GkZw==
+X-Received: by 2002:a1c:a98b:: with SMTP id s133mr359038wme.129.1550065739319; 
+ Wed, 13 Feb 2019 05:48:59 -0800 (PST)
 Received: from linaro.org ([2a00:23c5:6815:3901:cf0e:17bd:f425:fac3])
- by smtp.gmail.com with ESMTPSA id g11sm3333838wmk.26.2019.02.13.05.48.57
+ by smtp.gmail.com with ESMTPSA id g11sm3333838wmk.26.2019.02.13.05.48.58
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 13 Feb 2019 05:48:57 -0800 (PST)
+ Wed, 13 Feb 2019 05:48:58 -0800 (PST)
 From: Mike Leach <mike.leach@linaro.org>
 To: coresight@lists.linaro.org, linux@armlinux.org.uk,
  linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v5 1/3] drivers: amba: Updates to component identification for
- driver matching.
-Date: Wed, 13 Feb 2019 13:48:21 +0000
-Message-Id: <20190213134823.20150-2-mike.leach@linaro.org>
+Subject: [PATCH v5 2/3] drivers: amba: Update component matching to use the
+ CoreSight UCI values.
+Date: Wed, 13 Feb 2019 13:48:22 +0000
+Message-Id: <20190213134823.20150-3-mike.leach@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213134823.20150-1-mike.leach@linaro.org>
 References: <20190213134823.20150-1-mike.leach@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_054859_994787_508668C0 
-X-CRM114-Status: GOOD (  18.93  )
+X-CRM114-CacheID: sfid-20190213_054901_676224_6C5124AC 
+X-CRM114-Status: GOOD (  17.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,33 +106,14 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The CoreSight specification (ARM IHI 0029E), updates the ID register
-requirements for components on an AMBA bus, to cover both traditional
-ARM Primecell type devices, and newer CoreSight and other components.
+The patches provide an update of amba_device and matching code to handle
+the additional registers required for the Class 0x9 (CoreSight) UCI.
 
-The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
-cases to uniquely identify components. CoreSight components related to
-a single function can share Peripheral ID values, and must be further
-identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
-PMU and Debug hardware of the A35 all share the same PID.
+The *data pointer in the amba_id is used by the driver to provide extended
+ID register values for matching.
 
-Bits 15:12 of the CID are defined to be the device class.
-Class 0xF remains for PrimeCell and legacy components.
-Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-at present.
-Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-
-The specification futher defines which classes of device use the standard
-CID/PID pair, and when additional ID registers are required.
-
-This patch introduces the amba_cs_uci_id structure which will be used in
-all coresight drivers for indentification via the private data pointer in
-the amba_id structure.
-
-Existing drivers that currently use the amba_id->data pointer for private
-data are updated to use the amba_cs_uci_id->data pointer. Macros and
-inline functions are added to simplify this code.
+CoreSight components where PID/CID pair is currently sufficient for
+unique identification need not provide this additional information.
 
 Signed-off-by: Mike Leach <mike.leach@linaro.org>
 Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
@@ -140,247 +121,106 @@ Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 Tested-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 44 ++++++-------------
- drivers/hwtracing/coresight/coresight-priv.h  | 32 ++++++++++++++
- drivers/hwtracing/coresight/coresight-stm.c   | 14 ++----
- drivers/hwtracing/coresight/coresight-tmc.c   | 30 ++++---------
- include/linux/amba/bus.h                      | 33 ++++++++++++++
- 5 files changed, 90 insertions(+), 63 deletions(-)
+ drivers/amba/bus.c       | 45 +++++++++++++++++++++++++++++++++-------
+ include/linux/amba/bus.h |  6 ++++++
+ 2 files changed, 43 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 9a63e87ea5f3..be302ec5f66b 100644
---- a/drivers/hwtracing/coresight/coresight-etm3x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -871,7 +871,7 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 	}
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 41b706403ef7..b4dae624b9af 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -26,19 +26,36 @@
  
- 	pm_runtime_put(&adev->dev);
--	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	dev_info(dev, "%s initialized\n", (char *)coresight_get_uci_data(id));
- 	if (boot_enable) {
- 		coresight_enable(drvdata->csdev);
- 		drvdata->boot_enable = true;
-@@ -915,36 +915,18 @@ static const struct dev_pm_ops etm_dev_pm_ops = {
- };
+ #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
  
- static const struct amba_id etm_ids[] = {
--	{	/* ETM 3.3 */
--		.id	= 0x000bb921,
--		.mask	= 0x000fffff,
--		.data	= "ETM 3.3",
--	},
--	{	/* ETM 3.5 - Cortex-A5 */
--		.id	= 0x000bb955,
--		.mask	= 0x000fffff,
--		.data	= "ETM 3.5",
--	},
--	{	/* ETM 3.5 */
--		.id	= 0x000bb956,
--		.mask	= 0x000fffff,
--		.data	= "ETM 3.5",
--	},
--	{	/* PTM 1.0 */
--		.id	= 0x000bb950,
--		.mask	= 0x000fffff,
--		.data	= "PTM 1.0",
--	},
--	{	/* PTM 1.1 */
--		.id	= 0x000bb95f,
--		.mask	= 0x000fffff,
--		.data	= "PTM 1.1",
--	},
--	{	/* PTM 1.1 Qualcomm */
--		.id	= 0x000b006f,
--		.mask	= 0x000fffff,
--		.data	= "PTM 1.1",
--	},
-+	/* ETM 3.3 */
-+	CS_AMBA_ID_DATA(0x000bb921, "ETM 3.3"),
-+	/* ETM 3.5 - Cortex-A5 */
-+	CS_AMBA_ID_DATA(0x000bb955, "ETM 3.5"),
-+	/* ETM 3.5 */
-+	CS_AMBA_ID_DATA(0x000bb956, "ETM 3.5"),
-+	/* PTM 1.0 */
-+	CS_AMBA_ID_DATA(0x000bb950, "PTM 1.0"),
-+	/* PTM 1.1 */
-+	CS_AMBA_ID_DATA(0x000bb95f, "PTM 1.1"),
-+	/* PTM 1.1 Qualcomm */
-+	CS_AMBA_ID_DATA(0x000b006f, "PTM 1.1"),
- 	{ 0, 0},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 579f34943bf1..02a1f5204f9d 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -6,6 +6,7 @@
- #ifndef _CORESIGHT_PRIV_H
- #define _CORESIGHT_PRIV_H
- 
-+#include <linux/amba/bus.h>
- #include <linux/bitops.h>
- #include <linux/io.h>
- #include <linux/coresight.h>
-@@ -159,4 +160,35 @@ static inline int etm_readl_cp14(u32 off, unsigned int *val) { return 0; }
- static inline int etm_writel_cp14(u32 off, u32 val) { return 0; }
- #endif
- 
-+/*
-+ * Macros and inline functions to handle CoreSight UCI data and driver
-+ * private data in AMBA ID table entries, and extract data values.
-+ */
+-static const struct amba_id *
+-amba_lookup(const struct amba_id *table, struct amba_device *dev)
++/* called on periphid match and class 0x9 coresight device. */
++static int
++amba_cs_uci_id_match(const struct amba_id *table, struct amba_device *dev)
+ {
+ 	int ret = 0;
++	struct amba_cs_uci_id *uci;
 +
-+/* coresight AMBA ID, no UCI, no driver data: id table entry */
-+#define CS_AMBA_ID(pid)			\
-+	{				\
-+		.id	= pid,		\
-+		.mask	= 0x000fffff,	\
-+	}
++	uci = table->data;
+ 
++	/* no table data or zero mask - return match on periphid */
++	if (!uci || (uci->devarch_mask == 0))
++		return 1;
 +
-+/* coresight AMBA ID, UCI with driver data only: id table entry. */
-+#define CS_AMBA_ID_DATA(pid, dval)				\
-+	{							\
-+		.id	= pid,					\
-+		.mask	= 0x000fffff,				\
-+		.data	=  (void *)&(struct amba_cs_uci_id)	\
-+			{				\
-+				.data = (void *)dval,	\
-+			}				\
-+	}
-+
-+/* extract the data value from a UCI structure given amba_id pointer. */
-+static inline void *coresight_get_uci_data(const struct amba_id *id)
-+{
-+	if (id->data)
-+		return ((struct amba_cs_uci_id *)(id->data))->data;
-+	return 0;
++	/* test against read devtype and masked devarch value */
++	ret = (dev->uci.devtype == uci->devtype) &&
++		((dev->uci.devarch & uci->devarch_mask) == uci->devarch);
++	return ret;
 +}
 +
- #endif
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index ef339ff22090..2a70cdd68a7b 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -874,7 +874,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	pm_runtime_put(&adev->dev);
- 
--	dev_info(dev, "%s initialized\n", (char *)id->data);
-+	dev_info(dev, "%s initialized\n", (char *)coresight_get_uci_data(id));
- 	return 0;
- 
- stm_unregister:
-@@ -909,16 +909,8 @@ static const struct dev_pm_ops stm_dev_pm_ops = {
- };
- 
- static const struct amba_id stm_ids[] = {
--	{
--		.id     = 0x000bb962,
--		.mask   = 0x000fffff,
--		.data	= "STM32",
--	},
--	{
--		.id	= 0x000bb963,
--		.mask	= 0x000fffff,
--		.data	= "STM500",
--	},
-+	CS_AMBA_ID_DATA(0x000bb962, "STM32"),
-+	CS_AMBA_ID_DATA(0x000bb963, "STM500"),
- 	{ 0, 0},
- };
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index ea249f0bcd73..2a02da3d630f 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -443,7 +443,8 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 		desc.type = CORESIGHT_DEV_TYPE_SINK;
- 		desc.subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
- 		desc.ops = &tmc_etr_cs_ops;
--		ret = tmc_etr_setup_caps(drvdata, devid, id->data);
-+		ret = tmc_etr_setup_caps(drvdata, devid,
-+					 coresight_get_uci_data(id));
- 		if (ret)
- 			goto out;
- 		break;
-@@ -475,26 +476,13 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
++static const struct amba_id *
++amba_lookup(const struct amba_id *table, struct amba_device *dev)
++{
+ 	while (table->mask) {
+-		ret = (dev->periphid & table->mask) == table->id;
+-		if (ret)
+-			break;
++		if (((dev->periphid & table->mask) == table->id) &&
++			((dev->cid != CORESIGHT_CID) ||
++			 (amba_cs_uci_id_match(table, dev))))
++			return table;
+ 		table++;
+ 	}
+-
+-	return ret ? table : NULL;
++	return NULL;
  }
  
- static const struct amba_id tmc_ids[] = {
--	{
--		.id     = 0x000bb961,
--		.mask   = 0x000fffff,
--	},
--	{
--		/* Coresight SoC 600 TMC-ETR/ETS */
--		.id	= 0x000bb9e8,
--		.mask	= 0x000fffff,
--		.data	= (void *)(unsigned long)CORESIGHT_SOC_600_ETR_CAPS,
--	},
--	{
--		/* Coresight SoC 600 TMC-ETB */
--		.id	= 0x000bb9e9,
--		.mask	= 0x000fffff,
--	},
--	{
--		/* Coresight SoC 600 TMC-ETF */
--		.id	= 0x000bb9ea,
--		.mask	= 0x000fffff,
--	},
-+	CS_AMBA_ID(0x000bb961),
-+	/* Coresight SoC 600 TMC-ETR/ETS */
-+	CS_AMBA_ID_DATA(0x000bb9e8, (unsigned long)CORESIGHT_SOC_600_ETR_CAPS),
-+	/* Coresight SoC 600 TMC-ETB */
-+	CS_AMBA_ID(0x000bb9e9),
-+	/* Coresight SoC 600 TMC-ETF */
-+	CS_AMBA_ID(0x000bb9ea),
- 	{ 0, 0},
- };
+ static int amba_match(struct device *dev, struct device_driver *drv)
+@@ -399,10 +416,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
+ 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
+ 				(i * 8);
  
++		if (cid == CORESIGHT_CID) {
++			/* set the base to the start of the last 4k block */
++			void __iomem *csbase = tmp + size - 4096;
++
++			dev->uci.devarch =
++				readl(csbase + UCI_REG_DEVARCH_OFFSET);
++			dev->uci.devtype =
++				readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
++		}
++
+ 		amba_put_disable_pclk(dev);
+ 
+-		if (cid == AMBA_CID || cid == CORESIGHT_CID)
++		if (cid == AMBA_CID || cid == CORESIGHT_CID) {
+ 			dev->periphid = pid;
++			dev->cid = cid;
++		}
+ 
+ 		if (!dev->periphid)
+ 			ret = -ENODEV;
 diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index d143c13bed26..e3c36223e40b 100644
+index e3c36223e40b..f99b74a6e4ca 100644
 --- a/include/linux/amba/bus.h
 +++ b/include/linux/amba/bus.h
-@@ -25,6 +25,39 @@
- #define AMBA_CID	0xb105f00d
- #define CORESIGHT_CID	0xb105900d
+@@ -58,6 +58,10 @@ struct amba_cs_uci_id {
+ 	void *data;
+ };
  
-+/*
-+ * CoreSight Architecture specification updates the ID specification
-+ * for components on the AMBA bus. (ARM IHI 0029E)
-+ *
-+ * Bits 15:12 of the CID are the device class.
-+ *
-+ * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
-+ * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-+ * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-+ * at present.
-+ * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-+ *
-+ * Remaining CID bits stay as 0xb105-00d
-+ */
-+
-+/**
-+ * Class 0x9 components use additional values to form a Unique Component
-+ * Identifier (UCI), where peripheral ID values are identical for different
-+ * components. Passed to the amba bus code from the component driver via
-+ * the amba_id->data pointer.
-+ * @devarch	: coresight devarch register value
-+ * @devarch_mask: mask bits used for matching. 0 indicates UCI not used.
-+ * @devtype	: coresight device type value
-+ * @data	: additional driver data. As we have usurped the original
-+ *		pointer some devices may still need additional data
-+ */
-+struct amba_cs_uci_id {
-+	unsigned int devarch;
-+	unsigned int devarch_mask;
-+	unsigned int devtype;
-+	void *data;
-+};
++/* define offsets for registers used by UCI */
++#define UCI_REG_DEVTYPE_OFFSET	0xFCC
++#define UCI_REG_DEVARCH_OFFSET	0xFBC
 +
  struct clk;
  
  struct amba_device {
+@@ -65,6 +69,8 @@ struct amba_device {
+ 	struct resource		res;
+ 	struct clk		*pclk;
+ 	unsigned int		periphid;
++	unsigned int		cid;
++	struct amba_cs_uci_id	uci;
+ 	unsigned int		irq[AMBA_NR_IRQS];
+ 	char			*driver_override;
+ };
 -- 
 2.19.1
 
