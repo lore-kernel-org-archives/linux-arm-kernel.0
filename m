@@ -2,79 +2,71 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31B06C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:18:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D217C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:21:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E24D6222CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:18:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21554222CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:21:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wq6ue7r0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E24D6222CA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ulmoUbBr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=163.com header.i=@163.com header.b="B43ZzV6y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21554222CD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=163.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hZwQO6BVgtS1b702gg3nZhFtvKGgqukf+6XUOGxzXHA=; b=Wq6ue7r0AZVGmC
-	K4SDD5c+nadTDrcA+Ebbvc2h58dj6bYzdwON7eEaSCXYdge2RuKdrBCN1xU8VB1daPUwlL1+kS2Bf
-	L40xI24F82An0EciIVANLevV6uOvzsHORDKyhefCBkbGHzmTrvlTpXLW/RV3LY4CCnmJM/3m1EE7A
-	24r2mgEPEp0VdOP82iCbLH0nzteAUh6HB5rykm6kcrGdxH8f/JPdE4uClwJy48rmcQxzHjdCRE5gH
-	bkZLK4I+9okWmNi7GM2F5cn61wPrXim7e3MZrUDMwxYEXu4cZMGSU1CiVXegrg36EjloYSDjxGQP7
-	vRFA69n5ZEk1Slr1o9PA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=tRU2xbxQAxqmhxhGGBk/ejTnrtzziTMlXAxW2A6GQgA=; b=ulm
+	oUbBrbrA66quVk9FMc0+p5cqmGrjTBW7JUy24tXuiFPuDJqMyAq+Rqf6eHsAk2kVJw+LnOCprSt+a
+	A6w6XasUrlU3U8rityZVAT2Q+ZNs4qvK7AOFiQQp71eAPMC+RdqKERtIrWEuUFDqgQ2MkA0J6zPcm
+	CGmhpcA4/Of1dXwJiHv6zbl6KpFm/iIMQ1GtT1fJn8LZVjiucu5zzXCo+snApU+RMcuB48feDzAkI
+	FT1b+jH160h6ubPmf45x7hUNRMUDXW8lBGPLCv6+4df1+m+kuRSOLXlkpsY8X26IDf/49d/CryWO1
+	H8kEwtrZGyyyrROrzP+MJaVKzYDFZGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtwIS-0002bx-5s; Wed, 13 Feb 2019 15:18:00 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtwIN-0002bS-P0
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:17:58 +0000
-Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1DFF6nQ024692; Wed, 13 Feb 2019 16:17:49 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qhv0m7wea-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 13 Feb 2019 16:17:49 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id ACD1231;
- Wed, 13 Feb 2019 15:17:48 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 69DF3584D;
- Wed, 13 Feb 2019 15:17:48 +0000 (GMT)
-Received: from [10.48.0.167] (10.75.127.51) by SFHDAG5NODE3.st.com
- (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 13 Feb
- 2019 16:17:47 +0100
-Subject: Re: [PATCH v3 3/3] pwm: core: add consumer device link
-To: Thierry Reding <thierry.reding@gmail.com>
-References: <1550055012-23348-1-git-send-email-fabrice.gasnier@st.com>
- <1550055012-23348-4-git-send-email-fabrice.gasnier@st.com>
- <20190213125353.GI647@ulmo>
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-Message-ID: <dc7396d4-d458-0a19-b996-2e1fa41a2fb7@st.com>
-Date: Wed, 13 Feb 2019 16:17:47 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <20190213125353.GI647@ulmo>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.51]
-X-ClientProxiedBy: SFHDAG5NODE2.st.com (10.75.127.14) To SFHDAG5NODE3.st.com
- (10.75.127.15)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-13_09:, , signatures=0
+	id 1gtwLf-00055B-9U; Wed, 13 Feb 2019 15:21:19 +0000
+Received: from m12-17.163.com ([220.181.12.17])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtwLc-00053v-20
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:21:17 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=163.com;
+ s=s110527; h=From:Subject:Date:Message-Id; bh=JS4RGYTdm5rUrpgn+q
+ ISygEYopSRQ9C2C1Tg46GD540=; b=B43ZzV6yG0HaXsekE/AKGHMve3JkWKdlJU
+ z1fkehq+55oXmEuIn/V7D43GRmM42WNHVkjcm+w4gIeHKf/QyfUu+KJlPSX/lXo8
+ yYU0ByvBYfys3zW/9/K3YbYVPiZdIiYZlScMk4jpkcVuzc8zY781pLhHb+gQudnG
+ P6cwDd7mE=
+Received: from yangwei-T440.lan (unknown [125.69.43.124])
+ by smtp13 (Coremail) with SMTP id EcCowAAHMb_fNWRceZBkFg--.32302S3;
+ Wed, 13 Feb 2019 23:21:04 +0800 (CST)
+From: Yang Wei <albin_yang@163.com>
+To: netdev@vger.kernel.org,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH net] net: nuvoton: w90p910_ether: replace dev_kfree_skb_irq by
+ dev_consume_skb_irq for drop profiles
+Date: Wed, 13 Feb 2019 23:21:02 +0800
+Message-Id: <1550071262-4889-1-git-send-email-albin_yang@163.com>
+X-Mailer: git-send-email 2.7.4
+X-CM-TRANSID: EcCowAAHMb_fNWRceZBkFg--.32302S3
+X-Coremail-Antispam: 1Uf129KBjvdXoWrtrWDKF17tFWxtw4rXrWUJwb_yoWfCFb_C3
+ 4UXrWxA398Jrn8trW0gw4F9r9Y9wn8ZrW8CF4Iq3y3X3yUK3s5CF1kurnxGrnxWa18XF17
+ GrW2qFZxA342qjkaLaAFLSUrUUUUUb8apTn2vfkv8UJUUUU8Yxn0WfASr-VFAUDa7-sFnT
+ 9fnUUvcSsGvfC2KfnxnUUI43ZEXa7IUjRwZ3UUUUU==
+X-Originating-IP: [125.69.43.124]
+X-CM-SenderInfo: pdoex0xb1d0wi6rwjhhfrp/1tbiEQBaolWBkKV6fQAAsP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_071756_163892_A2F21D51 
-X-CRM114-Status: GOOD (  31.92  )
+X-CRM114-CacheID: sfid-20190213_072116_535632_A4E1103F 
+X-CRM114-Status: UNSURE (   9.42  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,210 +78,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
- tduszyns@gmail.com, linux-kernel@vger.kernel.org, linux-pwm@vger.kernel.org,
- robh+dt@kernel.org, mcoquelin.stm32@gmail.com, u.kleine-koenig@pengutronix.de,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Cc: yang.wei9@zte.com.cn, davem@davemloft.net, mcuos.com@gmail.com,
+ albin_yang@163.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/13/19 1:53 PM, Thierry Reding wrote:
-> On Wed, Feb 13, 2019 at 11:50:12AM +0100, Fabrice Gasnier wrote:
->> Add a device link between the PWM consumer and the PWM provider. This
->> enforces the PWM user to get suspended before the PWM provider. It
->> allows proper synchronization of suspend/resume sequences: the PWM user
->> is responsible for properly stopping PWM, before the provider gets
->> suspended: see [1]. Add the device link in:
->> - of_pwm_get()
->> - pwm_get()
->> - devm_ variants
->> as it requires a reference to the device for the PWM consumer.
->>
->> [1] https://lkml.org/lkml/2019/2/5/770
->>
->> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->> Changes in v3:
->> - add struct device to of_get_pwm() arguments to handle device link from
->>   there.
->> ---
->>  drivers/pwm/core.c  | 14 +++++++++++---
->>  include/linux/pwm.h |  6 ++++--
->>  2 files changed, 15 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
->> index 1581f6a..8cb5d4bc 100644
->> --- a/drivers/pwm/core.c
->> +++ b/drivers/pwm/core.c
->> @@ -638,6 +638,7 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
->>  
->>  /**
->>   * of_pwm_get() - request a PWM via the PWM framework
->> + * @dev: device for PWM consumer
->>   * @np: device node to get the PWM from
->>   * @con_id: consumer name
->>   *
->> @@ -655,7 +656,8 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
->>   * Returns: A pointer to the requested PWM device or an ERR_PTR()-encoded
->>   * error code on failure.
->>   */
->> -struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
->> +struct pwm_device *of_pwm_get(struct device *dev, struct device_node *np,
->> +			      const char *con_id)
->>  {
->>  	struct pwm_device *pwm = NULL;
->>  	struct of_phandle_args args;
->> @@ -689,6 +691,9 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
->>  	if (IS_ERR(pwm))
->>  		goto put;
->>  
->> +	if (!device_link_add(dev, pwm->chip->dev, DL_FLAG_AUTOREMOVE_CONSUMER))
->> +		pr_debug("%s(): device link not added\n", __func__);
-> 
-> I think it's better to turn this into dev_dbg(dev, ...) and maybe
-> mention which supplier it failed to link to, something like:
-> 
-> 	if (!device_link_add(...))
-> 		dev_dbg(dev, "failed to create device link to %s\n",
-> 			pwm->chip->dev);
+From: Yang Wei <yang.wei9@zte.com.cn>
 
-Hi Thierry,
+dev_consume_skb_irq() should be called in w90p910_ether_start_xmit()
+when skb xmit done. It makes drop profiles(dropwatch, perf) more
+friendly.
 
-Thanks for reviewing.
+Signed-off-by: Yang Wei <yang.wei9@zte.com.cn>
+---
+ drivers/net/ethernet/nuvoton/w90p910_ether.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I can update this: I used pr_debug() as there are pr_err() calls
-elsewhere in this routine.
-BTW, do you wish an additional patch to turn pr_err() into dev_err() in
-of_pwm_get()?
+diff --git a/drivers/net/ethernet/nuvoton/w90p910_ether.c b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+index c662c6f..67bf02b 100644
+--- a/drivers/net/ethernet/nuvoton/w90p910_ether.c
++++ b/drivers/net/ethernet/nuvoton/w90p910_ether.c
+@@ -630,7 +630,7 @@ static int w90p910_ether_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	if (!(w90p910_send_frame(dev, skb->data, skb->len))) {
+ 		ether->skb = skb;
+-		dev_kfree_skb_irq(skb);
++		dev_consume_skb_irq(skb);
+ 		return 0;
+ 	}
+ 	return -EAGAIN;
+-- 
+2.7.4
 
-> 
-> Also, I wonder if this should perhaps be dev_err(). Under what
-> circumstances does this fail?
 
-Well, here is a comment from "device_link_add()" routine:
-"
-/*
- * If the supplier has not been fully registered yet or there is a
- * reverse dependency between the consumer and the supplier already in
- * the graph, return NULL.
- */
-"
-
-=> Here the PWM supplier is already registered. (It seems a probe defer
-can be returned few lines above otherwise.)
-
-Other possibilities: kzalloc() failed, no consumer or supplier has been
-provided (or invalid flags, but this is hardcoded here.).
-
-So, I see two case here:
-1 - The caller provided a 'dev' for PWM consumer... So, NULL link is an
-error when consumer & supplier has been passed correctly.
-=> I can add a check on 'dev' for PWM consumer and report an error here:
-   return -EINVAL
-
-2 - The caller can't provide a 'dev' for PWM consumer as you mention
-bellow: "to allow code to get at the PWM if they didn't have..."
-=> We should probably add a dev_warn() here, with no error ?
-Please see here after.
-
-> 
->> +
->>  	/*
->>  	 * If a consumer name was not given, try to look it up from the
->>  	 * "pwm-names" property if it exists. Otherwise use the name of
->> @@ -771,7 +776,7 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
->>  
->>  	/* look up via DT first */
->>  	if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
->> -		return of_pwm_get(dev->of_node, con_id);
->> +		return of_pwm_get(dev, dev->of_node, con_id);
->>  
->>  	/*
->>  	 * We look up the provider in the static table typically provided by
->> @@ -851,6 +856,9 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
->>  	pwm->args.period = chosen->period;
->>  	pwm->args.polarity = chosen->polarity;
->>  
->> +	if (!device_link_add(dev, pwm->chip->dev, DL_FLAG_AUTOREMOVE_CONSUMER))
->> +		pr_debug("%s(): device link not added\n", __func__);
-> 
-> Same here. Also: not sure if we really need to include __func__ in the
-> message.
-> 
->> +
->>  	return pwm;
->>  }
->>  EXPORT_SYMBOL_GPL(pwm_get);
->> @@ -939,7 +947,7 @@ struct pwm_device *devm_of_pwm_get(struct device *dev, struct device_node *np,
->>  	if (!ptr)
->>  		return ERR_PTR(-ENOMEM);
->>  
->> -	pwm = of_pwm_get(np, con_id);
->> +	pwm = of_pwm_get(dev, np, con_id);
->>  	if (!IS_ERR(pwm)) {
->>  		*ptr = pwm;
->>  		devres_add(dev, ptr);
->> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
->> index d5199b5..895e074 100644
->> --- a/include/linux/pwm.h
->> +++ b/include/linux/pwm.h
->> @@ -406,7 +406,8 @@ struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
->>  		const struct of_phandle_args *args);
->>  
->>  struct pwm_device *pwm_get(struct device *dev, const char *con_id);
->> -struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id);
->> +struct pwm_device *of_pwm_get(struct device *dev, struct device_node *np,
->> +			      const char *con_id);
-> 
-> I'm slightly concerned about this. I think one of the reasons why this
-> was introduced was to allow code to get at the PWM if they didn't have
-> a struct device * available. However, it doesn't seem like there are any
-> users of that function, so this seems fine.
-
-The git blame pointed out commit 8eb961279960:
-"
-pwm: core: Rename of_pwm_request() to of_pwm_get() and export it
-
-Allow client driver to use of_pwm_get() to get the PWM they need. This
-is needed for drivers which handle more than one PWM separately, like
-leds-pwm driver, which have:
-"
-...
-
-For instance, I tested the leds-pwm driver. It uses the devm_* variant
-now (as others), there is a struct device * available. So yes, it seems
-fine.
-
-The only thing maybe out of tree code? This is where I have a doubt on
-having a mandatory struct device * to enforce consumer link creation...
-or make it optional (e.g. behave as a 'legacy' API) and warn the caller.
-
-Please let me know your feeling.
-Best regards,
-Fabrice
-
-> 
-> Thierry
-> 
->>  void pwm_put(struct pwm_device *pwm);
->>  
->>  struct pwm_device *devm_pwm_get(struct device *dev, const char *con_id);
->> @@ -494,7 +495,8 @@ static inline struct pwm_device *pwm_get(struct device *dev,
->>  	return ERR_PTR(-ENODEV);
->>  }
->>  
->> -static inline struct pwm_device *of_pwm_get(struct device_node *np,
->> +static inline struct pwm_device *of_pwm_get(struct device *dev,
->> +					    struct device_node *np,
->>  					    const char *con_id)
->>  {
->>  	return ERR_PTR(-ENODEV);
->> -- 
->> 1.9.1
->>
 
 _______________________________________________
 linux-arm-kernel mailing list
