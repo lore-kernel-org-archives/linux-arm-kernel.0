@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04B0DC282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:58:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E1884C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:59:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C9F31207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:58:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD99520836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:59:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SYlfkjtw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="pbigDwG3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9F31207E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WB8l/4K+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HHXHCXDq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD99520836
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=LacHrzkRLThnLynaaORXfyuuDEOnTOpBIdlX8qgBqyM=; b=SYlfkjtwqEyPti
-	DsmQhZr+h5kuRzq/4wrIA5kQ8vjb+ddg9kU4MvTyWbOXnmTdPcjU6Z/vspDmFNPz9HG5tROiXWLHh
-	ZGv5jeaXWfCJ2+keRoxeNkhV0kHw+5qn820b2CYqflMJP4Vi3BBlbOzKQDS+f1HrXV5ZoAQjIfuCk
-	bSK2oCEpDoD9DEh43hu11tlaYSQbByk4YWkgjhDwX7t2upQjMPB3rCESazxfxs07GmtuMhYXsxBN3
-	c0u3ZjDWPUzmYsTK2tFrou/XlGtXhwRSRaLwuYyvF30lzfHBcwWAKDWADWNd6MiyW7Xen9Pdqt6RL
-	vwoFj+qYyuKRBcU+SiJQ==;
+	List-Owner; bh=DmBU1luKQ8/XBfbzyFqw5IyKhIg+RsGTRx3g/018AW8=; b=WB8l/4K+mAXfHe
+	k5kGuxKlrqfNCr0Q2ZLVhvH1/V84A4MVuz1KZ3+Fg3NFqXRtEKb2U0W+1lPcKgjL9PFXOvPs479wm
+	7Xhn/dm3AEUlE/P46kPCN+fG8RZMgy2SdmBVGjRiZGU3aZoBg5nzdHsmd9/Z9buiUhRO0JffPJWQO
+	9NeFBgjxWZdde60BzARNELdMGSei6YZpU4OIBXFZhDP9YZ83rSyjAIEzkfrzJgFGe9Ltd1cMDIK3d
+	bQFIYQ5kiqKWsAir+JdgTdkvTx9IwGVOQuBwLmO3OcDhb7QjVu1qhPo2FQMWtV9KEmTFfD5ncfCfE
+	4c32FqcP+TSGU9qxUFvg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtv3i-0005rf-KL; Wed, 13 Feb 2019 13:58:42 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gtv4H-0006Ns-Jt; Wed, 13 Feb 2019 13:59:17 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtv3f-0005qY-MG
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:58:41 +0000
-Received: by mail-pl1-x644.google.com with SMTP id e5so1208702plb.5
+ id 1gtv4D-0006M5-OP
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:59:15 +0000
+Received: by mail-pl1-x642.google.com with SMTP id b5so1214475plr.4
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 05:58:39 -0800 (PST)
+ Wed, 13 Feb 2019 05:59:13 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=cNyFM0J2DfW9voxw9FzV7E7Y/LrzsWkGDKLqwe0d5pk=;
- b=pbigDwG3xTm4YxvGqJgLG5mkUt5O5OB6iH/4JOZPoXunwWHE5QfP4W9AElQvSudJa3
- oftivCtQcvYNS8YSZXakLgY/n/6uMXhgwbuZgbrYOMW2A6d9qxKamu6y4VDWZG9hKIXJ
- Ozs0l8wXg2IVBGQ5Lx1acSQcHqvuaQpFa+H5Y1d0IpRM9leug/xYa7/aLNdDjG8Ibi0w
- 4YGogL/vRIFJoYsg51t1pmC4flEIvAwvnxiLzYGzdVd4eEsIiXYF+OFdhEXjta13phln
- wgXDc3SFMpLh8t92NQ4l/buWitqvWvWgjk6iHFgB8KwSjqoqS1sBA9XRvXu1Nzpx0Uuh
- rkog==
+ :user-agent; bh=naB3KMuHNTCaDD6/Z64EGJGrk7XQ7GW1pzVQ9Q3Vf6s=;
+ b=HHXHCXDqjrbjv9vKNBt9+7oEqMLimW2KaqFOqXNr/HA7rhmmEUFkNlY/u1NnQgZNbH
+ +CDaalSV78Qcw6kY5OQUhGjsfrH+by8CS5/gJGu3VNqes+WPN1dRNmLxWbGIfZdm7c8f
+ 15gEiqZIi9KcnTmJeiE0/uvejDFQlK3pGLnh1YPOu2dqmZ2OMrKZkGjN68Mg+yf3YDmN
+ Ttkvg6nMsBdyaGH/uB7E4ipzK3thPAR0ZqymOfIw+XSoxI5PHoZerSNybOokoRu9/Y+c
+ A3BYZAAsc1mpb1sa8omgtYbiZEsojeWq9nmMQjwKjC3dkqWy7hcLdNXjZUfWSeiI7qP3
+ 8jAA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
  :content-disposition:user-agent;
- bh=cNyFM0J2DfW9voxw9FzV7E7Y/LrzsWkGDKLqwe0d5pk=;
- b=M4Hzp8EDHUlGbVQG2TUaEmLMmMIslyl9927JyxlVBu9YqPU9kiORUxsfKspCuvGHGN
- 8sV+lC1bb3WxALY5MV+StFI51bGmd73ogk0Mr/QzPk+cxaQwy66e4/4FHGy9Pk3hypmi
- b0C2LTy08jktOD5RG0s+kXSLtHlyYpWkis35LFBV7Q5f9S9wiTo8jP2fGI8P08N34XO9
- umAGmVtdxj6qYqWxotyUtoZqDmNelh6qpGQp4TUwX0zNu4P8e+s5otzKEmbyiFlMDV4z
- kz3NV0mr0fuo/gDbL2sVKxY9bQl8WUkhfEiIFqEj49gxU6j0pEOI1010duecZLOSbxB0
- 2+vw==
-X-Gm-Message-State: AHQUAuY1hzFeGzqZ89sWJnTv12fl1EwAXXYDvNrQR4YW4vi5u8W3mQKc
- JhU1rTUY/RGhPDE3QhRFoAvfNJxE
-X-Google-Smtp-Source: AHgI3IabBr7i0UINT5tZChzG9mkUSIkz97ziRf+i4G4ZGRQ2Pfd1KkCHgUpEt1D+OFFkb4bWmp/4Cw==
-X-Received: by 2002:a17:902:20e2:: with SMTP id
- v31mr640198plg.307.1550066318585; 
- Wed, 13 Feb 2019 05:58:38 -0800 (PST)
+ bh=naB3KMuHNTCaDD6/Z64EGJGrk7XQ7GW1pzVQ9Q3Vf6s=;
+ b=DvtAjYapLbQRhUP+KUuZ4/Mc+1b4tVbcAkxmS2bRVLQqIIVn1+wjGO+WdYWhOQnx6z
+ L2JpIK5iAgMS8XwjuN/jwT8wQ0g85ggJXcDV/ZmTxfcScXvWAyEzBiyOXnEnBXPHLfsT
+ aagvuCcn4RlR4W3H1pklNzt9qsWD0LDO7AqsJuaT0PgUu/7c8aQOdVSZ42QE1otn6phF
+ yHEkWwtBuizsBOwLR43/lUl+ckCNKxFsmitf6mNJk6I7jw258WMpHysyzDtYqxaDWqhj
+ 6dGVGFGM6zGW9fTvNy4++3DPezJYgUQ27EbaBupxBrYjryj+Bu2qZF7ZFeJTM8M4dY//
+ aUmw==
+X-Gm-Message-State: AHQUAuazwP320RnVGFIsaOMDUFH06/b5+pSrWMiQrZZ8ozVOPaH6FY1t
+ oUr0/C4CEvEt7swAZviOzEk=
+X-Google-Smtp-Source: AHgI3IYElBePFcn4s9J3Tqwya9pPVWfxESsTKj0N4GiKgmRE7PyggN/XPQLDEGJiVcCZzaxyw7jtWA==
+X-Received: by 2002:a17:902:724c:: with SMTP id
+ c12mr673309pll.144.1550066353286; 
+ Wed, 13 Feb 2019 05:59:13 -0800 (PST)
 Received: from jordon-HP-15-Notebook-PC ([49.207.48.54])
- by smtp.gmail.com with ESMTPSA id f67sm30721286pfc.141.2019.02.13.05.58.37
+ by smtp.gmail.com with ESMTPSA id a15sm24035107pgd.4.2019.02.13.05.59.11
  (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 13 Feb 2019 05:58:37 -0800 (PST)
-Date: Wed, 13 Feb 2019 19:32:56 +0530
+ Wed, 13 Feb 2019 05:59:12 -0800 (PST)
+Date: Wed, 13 Feb 2019 19:33:30 +0530
 From: Souptick Joarder <jrdr.linux@gmail.com>
 To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- linux@armlinux.org.uk, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
- treding@nvidia.com, keescook@chromium.org, m.szyprowski@samsung.com
-Subject: [PATCH v3 2/9] arm: mm: dma-mapping: Convert to use vm_map_pages()
-Message-ID: <20190213140256.GA21977@jordon-HP-15-Notebook-PC>
+ stefanr@s5r6.in-berlin.de, linux@armlinux.org.uk, robin.murphy@arm.com
+Subject: [PATCH v3 3/9] drivers/firewire/core-iso.c: Convert to use
+ vm_map_pages_zero()
+Message-ID: <20190213140330.GA21993@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_055839_724825_4A5DCF80 
-X-CRM114-Status: GOOD (  14.63  )
+X-CRM114-CacheID: sfid-20190213_055913_792438_B71A3723 
+X-CRM114-Status: GOOD (  13.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,63 +97,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-mm@kvack.org, linux1394-devel@lists.sourceforge.net,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_map_pages() to map range of kernel
-memory to user vma.
+Convert to use vm_map_pages_zero() to map range of kernel memory
+to user vma.
+
+This driver has ignored vm_pgoff and mapped the entire pages. We
+could later "fix" these drivers to behave according to the normal
+vm_pgoff offsetting simply by removing the _zero suffix on the
+function name and if that causes regressions, it gives us an easy
+way to revert.
 
 Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 ---
- arch/arm/mm/dma-mapping.c | 22 ++++++----------------
- 1 file changed, 6 insertions(+), 16 deletions(-)
+ drivers/firewire/core-iso.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index f1e2922..de7c76e 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1575,31 +1575,21 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
- 		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		    unsigned long attrs)
+diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
+index 35e784c..5414eb1 100644
+--- a/drivers/firewire/core-iso.c
++++ b/drivers/firewire/core-iso.c
+@@ -107,19 +107,8 @@ int fw_iso_buffer_init(struct fw_iso_buffer *buffer, struct fw_card *card,
+ int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
+ 			  struct vm_area_struct *vma)
  {
--	unsigned long uaddr = vma->vm_start;
--	unsigned long usize = vma->vm_end - vma->vm_start;
- 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
--	unsigned long off = vma->vm_pgoff;
-+	int err;
- 
- 	if (!pages)
- 		return -ENXIO;
- 
--	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
-+	if (vma->vm_pgoff >= nr_pages)
- 		return -ENXIO;
- 
--	pages += off;
+-	unsigned long uaddr;
+-	int i, err;
 -
--	do {
--		int ret = vm_insert_page(vma, uaddr, *pages++);
--		if (ret) {
--			pr_err("Remapping memory failed: %d\n", ret);
--			return ret;
--		}
+-	uaddr = vma->vm_start;
+-	for (i = 0; i < buffer->page_count; i++) {
+-		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
+-		if (err)
+-			return err;
+-
 -		uaddr += PAGE_SIZE;
--		usize -= PAGE_SIZE;
--	} while (usize > 0);
-+	err = vm_map_pages(vma, pages, nr_pages);
-+	if (err)
-+		pr_err("Remapping memory failed: %d\n", err);
- 
+-	}
+-
 -	return 0;
-+	return err;
++	return vm_map_pages_zero(vma, buffer->pages,
++					buffer->page_count);
  }
- static int arm_iommu_mmap_attrs(struct device *dev,
- 		struct vm_area_struct *vma, void *cpu_addr,
+ 
+ void fw_iso_buffer_destroy(struct fw_iso_buffer *buffer,
 -- 
 1.9.1
 
