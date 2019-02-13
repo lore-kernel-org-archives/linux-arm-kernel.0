@@ -2,70 +2,65 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DCB1C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:07:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA999C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:15:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E3FB2222C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:07:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB35D222B5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:15:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uWrNHdlg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E3FB2222C2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JP7y4HkY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB35D222B5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=techsingularity.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CiX8lW9UrtJz/eEqKdj8YeUghLvcCGgf7cXd1gZLttk=; b=uWrNHdlgSmQLTP
-	XJZFy9pXC8ctjRCupgSTLHUpY/+QNW+Ho/hIChcFHVOH0+XkI0J6q9aBtKtadPOdRGvwArds8NmHJ
-	Ka9eYGYl+PsR1N+b0oWKoyoaSSqZD7ktOzEw2TTlEPJb7VftpBD8gOuzfvSOc07rpxZvHPkMGcIRT
-	+JAXV4ahYdMIqfnLs799Vadl6WV4lVU4CaXcohwXCnj1mbG5ylTa8jeerBFJDRZZ0JdE4S+geXdFJ
-	vafGvWu+oZR9kVhbhDLPdBZGN7yvQm1nkCuG779kSGZT/C8EVwoQe1qwjZ5HuLyF1BrM0l9vcq6cu
-	bv/sFAP3024w+TTGqRzQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RcFx/IZVUzFakM70dgdE2v0KJBTZoZzvVeMau14zvTQ=; b=JP7y4HkYN32WJj
+	+T0tssRNxUp6K/wNEMHS8vfvnoU1BqjfeUWL69I/uRSEu8JEtox0gVGB7es6TpvKIRzVc60fMnJUj
+	KJuphXxBOXYoCYCAkLwh9+qsYsMm4VqghnKxTU6eJFbLQiFYuZ938lu4bbFC4BKUtmhXjkmsGOXr8
+	PcQow0sPUjA3wsfAP2Bsvv8E0OgGIQED/t2r2UiEmqtlNr5RaUZg62VqDcFhryy2uNTp1F48S7Yqi
+	7ZUSgUc/TcYWeDz+YKjesCmh+MoNcgIBQOD4BFehk2m4zGaibvPZeiPhAI4YuJxIknvqSSUjojLtG
+	MqNotqfhwbE5Ay/oUG0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtvCI-0002bX-GH; Wed, 13 Feb 2019 14:07:34 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtvCF-0002ax-5G
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:07:33 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9B8D080D;
- Wed, 13 Feb 2019 06:07:30 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 111273F557;
- Wed, 13 Feb 2019 06:07:25 -0800 (PST)
-Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
- in unsafe region
-To: Will Deacon <will.deacon@arm.com>, Peter Zijlstra <peterz@infradead.org>
-References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
- <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
- <20190211134527.GA121589@gmail.com>
- <20190211135159.GC32511@hirez.programming.kicks-ass.net>
- <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
- <20190213103553.GO32494@hirez.programming.kicks-ass.net>
- <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
- <20190213131720.GU32494@hirez.programming.kicks-ass.net>
- <20190213140025.GB6346@brain-police>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <01b58beb-c1e7-3205-031a-39a25e94e11e@arm.com>
-Date: Wed, 13 Feb 2019 14:07:23 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gtvJv-00061Z-1q; Wed, 13 Feb 2019 14:15:27 +0000
+Received: from outbound-smtp13.blacknight.com ([46.22.139.230])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtvJq-000605-Gx
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:15:24 +0000
+Received: from mail.blacknight.com (unknown [81.17.254.26])
+ by outbound-smtp13.blacknight.com (Postfix) with ESMTPS id 2870F1C18B1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 14:15:20 +0000 (GMT)
+Received: (qmail 20426 invoked from network); 13 Feb 2019 14:15:20 -0000
+Received: from unknown (HELO techsingularity.net)
+ (mgorman@techsingularity.net@[37.228.225.79])
+ by 81.17.254.9 with ESMTPSA (AES256-SHA encrypted, authenticated);
+ 13 Feb 2019 14:15:20 -0000
+Date: Wed, 13 Feb 2019 14:15:18 +0000
+From: Mel Gorman <mgorman@techsingularity.net>
+To: Vlastimil Babka <vbabka@suse.cz>
+Subject: Re: [PATCH] mm, page_alloc: Fix a division by zero error when
+ boosting watermarks
+Message-ID: <20190213141518.GS9565@techsingularity.net>
+References: <20190213131923.GQ9565@techsingularity.net>
+ <295be99c-d09a-5572-fa49-2673a62c295b@suse.cz>
 MIME-Version: 1.0
-In-Reply-To: <20190213140025.GB6346@brain-police>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <295be99c-d09a-5572-fa49-2673a62c295b@suse.cz>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_060731_209598_4DA00F87 
-X-CRM114-Status: GOOD (  20.02  )
+X-CRM114-CacheID: sfid-20190213_061522_699982_C60D4A50 
+X-CRM114-Status: GOOD (  16.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,104 +72,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, linux-kernel@vger.kernel.org,
- valentin.schneider@arm.com, mingo@redhat.com, james.morse@arm.com,
- hpa@zytor.com, Ingo Molnar <mingo@kernel.org>,
+Cc: Andrea Arcangeli <aarcange@redhat.com>, Yury Norov <yury.norov@gmail.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Michal Hocko <mhocko@kernel.org>,
+ linux-mm@kvack.org, David Rientjes <rientjes@google.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 13/02/2019 14:00, Will Deacon wrote:
-> Hi Peter,
+On Wed, Feb 13, 2019 at 02:42:36PM +0100, Vlastimil Babka wrote:
+> On 2/13/19 2:19 PM, Mel Gorman wrote:
+> > Yury Norov reported that an arm64 KVM instance could not boot since after
+> > v5.0-rc1 and could addressed by reverting the patches
+> > 
+> > 1c30844d2dfe272d58c ("mm: reclaim small amounts of memory when an external
+> > 73444bc4d8f92e46a20 ("mm, page_alloc: do not wake kswapd with zone lock held")
+> > 
+> > The problem is that a division by zero error is possible if boosting occurs
+> > either very early in boot or if the high watermark is very small. This
+> > patch checks for the conditions and avoids boosting in those cases.
 > 
-> On Wed, Feb 13, 2019 at 02:17:20PM +0100, Peter Zijlstra wrote:
->> On Wed, Feb 13, 2019 at 10:50:21AM +0000, Julien Thierry wrote:
->>> On 13/02/2019 10:35, Peter Zijlstra wrote:
->>>> On Tue, Feb 12, 2019 at 09:15:13AM +0000, Julien Thierry wrote:
->>>>
->>>>>>>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
->>>>>>>> index a674c7db..b1bb7e9 100644
->>>>>>>> --- a/kernel/sched/core.c
->>>>>>>> +++ b/kernel/sched/core.c
->>>>>>>> @@ -3289,6 +3289,14 @@ static inline void schedule_debug(struct task_struct *prev)
->>>>>>>>  		__schedule_bug(prev);
->>>>>>>>  		preempt_count_set(PREEMPT_DISABLED);
->>>>>>>>  	}
->>>>>>>> +
->>>>>>>> +	if (IS_ENABLED(CONFIG_DEBUG_UACCESS_SLEEP) &&
->>>>>>>> +	    unlikely(unsafe_user_region_active())) {
->>>>>>>> +		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
->>>>>>>> +		       prev->comm, prev->pid, preempt_count());
->>>>>>>> +		dump_stack();
->>>>>>>> +	}
->>>>>>>> +
->>>>>>>>  	rcu_sleep_check();
->>>>>>>>
->>>>>>>>  	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
->>>>
->>>>> I guess I'll drop the might_resched() part of this patch if that sounds
->>>>> alright.
->>>>
->>>> I'm still confused by the schedule_debug() part. How is that not broken?
->>>
->>> Hmmm, I am not exactly sure which part you expect to be broken, I guess
->>> it's because of the nature of the uaccess unsafe accessor usage.
->>>
->>> Basically, the following is a definite no:
->>> 	if (user_access_begin(ptr, size)) {
->>>
->>> 		[...]
->>>
->>> 		//something that calls schedule
->>>
->>> 		[...]
->>>
->>> 		user_access_end();
->>> 	}
->>> 	
->>>
->>> However the following is fine:
->>>
->>> - user_access_begin(ptr, size)
->>> - taking irq/exception
->>> - get preempted
->>
->> This; how is getting preempted fundamentally different from scheduling
->> ourselves?
+> Hmm is it really a division by zero? The following line sets max_boost to
+> pageblock_nr_pages if it's zero. And where would the division happen anyway?
 > 
-> The difference is because getting preempted in the sequence above is
-> triggered off the back of an interrupt. On arm64, and I think also on x86,
-> the user access state (SMAP or PAN) is saved and restored across exceptions
-> but not across context switch. Consequently, taking an irq in a
-> user_access_{begin,end} section and then scheduling is fine, but calling
-> schedule directly within such a section is not.
-> 
-> Julien -- please yell if I've missed some crucial detail, but I think that's
-> the gist of what we're trying to describe here.
+> So I wonder what's going on, your patch should AFAICS only take effect when
+> zone->_watermark[WMARK_HIGH] is 0 or 1 to begin with, otherwise max_boost is at
+> least 2?
 > 
 
-Yes, this summarizes things correctly. Thanks!
+The issue can occur if pageblock_nr_pages is also zero or not yet
+initialised. It means the changelog is misleading because it  has to
+trigger very early in boot as happened with Yury.
 
-I might also stress out that this limitation is already existing for x86
-(and is in the arm64 patches picked by Catalin for 5.1), as was
-discussed in here:
+> Also upon closer look, I think that (prior to the patch), boost_watermark()
+> could be reduced (thanks to the max+min capping) to
+> 
+> zone->watermark_boost = pageblock_nr_pages
+> 
 
-https://lkml.org/lkml/2018/11/23/430
-
-So this patch is not introducing new semantics, it is only making
-existing ones explicit.
-
-If the current state is not good, we need to re-discuss the semantics of
-user_access regions.
-
-Thanks,
+I don't think it's worth being fancy about it if we're hitting
+fragmentation issues that early in boot.
 
 -- 
-Julien Thierry
+Mel Gorman
+SUSE Labs
 
 _______________________________________________
 linux-arm-kernel mailing list
