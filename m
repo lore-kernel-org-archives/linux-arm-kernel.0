@@ -2,22 +2,22 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F094C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:30:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F01BC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:30:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5DBA2222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:30:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4897D222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:30:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OnDzWJxI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5DBA2222B2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=techsingularity.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o4JeTyQR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4897D222B2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,42 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2xcaDn8wEMxYnSKGYgJxRZ4aXTtBk/nbZz4+I3x64kk=; b=OnDzWJxIy7kKrY
-	Hbzt3y2BLmk9vOVIrEgEKOGDNdXpmhpTmhVkMZsAthfFB3nBPdVbQJnztS0DPx4uyV38lUW/i2var
-	689dNzeZDX0s42q9NeAZQJfSg1jb7TfSegAWgMEbIATPuEa91FeSn03TPgzW2c4Y1F+b7gN4L+BVm
-	mg05PC+lEPZ8Bn2koN78TVWx8wZbGd11kq01dZT2Vx/QxDgL6OgOVnXuKwHIg0j/beim0ZZBVZ78H
-	XX7fgKIfvOxygHBeu3lcR7JqCZwnjQ54EOQYCgJjByWoVn5kCmuCN4gBor6LAcOl6rQjoI2kolqbO
-	7Wb2EMgF1LZl5cC1bzSQ==;
+	List-Owner; bh=9Dz7wsxjbB1U2unbgJnBg//3Gx9HY+TPXxPhU7ZkmaY=; b=o4JeTyQRzIlGWI
+	HZKU1ojpFQJdS2S0JKcdb6H0djx+wEnuZPgEG05rGxQ+cc7PcjSuIOE/SOVpUubP8LW7ZgVS04+73
+	xVhfq7UWI8d/BL9Zs8dXIVqrI9FBETnCFsiFGssO+xSGvjP9Ly8mNHMGZ77FiSSBQ1nLqpnARK0Kd
+	NLeKUQWtj0wmCmo2rF+cdRo8DkdD696XgWNswx2VWzG1WifowQ2RBZTYPUl16jw0C6A642/O7+Tf6
+	v+fAI+edNlIYWHCNPDjQp50G1mMjg/7GDsd9ntpzX4uPODpAVvmAroLHYMt3mTY1a1pw4Wb8fZHY4
+	cnvf/0T3LdUxWP8z90wg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtvYM-00059a-1l; Wed, 13 Feb 2019 14:30:22 +0000
-Received: from outbound-smtp04.blacknight.com ([81.17.249.35])
+	id 1gtvYa-0005Ov-8s; Wed, 13 Feb 2019 14:30:36 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtvYI-00058e-0u
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:30:19 +0000
-Received: from mail.blacknight.com (pemlinmail03.blacknight.ie [81.17.254.16])
- by outbound-smtp04.blacknight.com (Postfix) with ESMTPS id 9211998A96
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 14:30:14 +0000 (UTC)
-Received: (qmail 2776 invoked from network); 13 Feb 2019 14:30:14 -0000
-Received: from unknown (HELO techsingularity.net)
- (mgorman@techsingularity.net@[37.228.225.79])
- by 81.17.254.9 with ESMTPSA (AES256-SHA encrypted, authenticated);
- 13 Feb 2019 14:30:14 -0000
-Date: Wed, 13 Feb 2019 14:30:13 +0000
-From: Mel Gorman <mgorman@techsingularity.net>
-To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH] mm, page_alloc: Fix a division by zero error when boosting
- watermarks v2
-Message-ID: <20190213143012.GT9565@techsingularity.net>
-References: <20190213131923.GQ9565@techsingularity.net>
+ id 1gtvYV-0005KB-Sv
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:30:33 +0000
+Received: from bigeasy by Galois.linutronix.de with local (Exim 4.80)
+ (envelope-from <bigeasy@linutronix.de>)
+ id 1gtvYT-0003RW-9D; Wed, 13 Feb 2019 15:30:29 +0100
+Date: Wed, 13 Feb 2019 15:30:29 +0100
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+To: Julien Grall <julien.grall@arm.com>
+Subject: Re: [RFC PATCH] arm64/fpsimd: Don't disable softirq when touching
+ FPSIMD/SVE state
+Message-ID: <20190213143029.ad2kzg7vtuo3zpjk@linutronix.de>
+References: <20190208165513.8435-1-julien.grall@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190213131923.GQ9565@techsingularity.net>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20190208165513.8435-1-julien.grall@arm.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_063018_199249_46123896 
-X-CRM114-Status: GOOD (  12.59  )
+X-CRM114-CacheID: sfid-20190213_063032_073772_0FBDAC31 
+X-CRM114-Status: GOOD (  23.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,61 +66,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrea Arcangeli <aarcange@redhat.com>, Yury Norov <yury.norov@gmail.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Michal Hocko <mhocko@kernel.org>,
- linux-mm@kvack.org, linux-arm-kernel@lists.infradead.org,
- David Rientjes <rientjes@google.com>, Vlastimil Babka <vbabka@suse.cz>
+Cc: linux-rt-users@vger.kernel.org, ard.biesheuvel@linaro.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Dave.Martin@arm.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Yury Norov reported that an arm64 KVM instance could not boot since after
-v5.0-rc1 and could addressed by reverting the patches
+On 2019-02-08 16:55:13 [+0000], Julien Grall wrote:
+> When the kernel is compiled with CONFIG_KERNEL_MODE_NEON, some part of
+> the kernel may be able to use FPSIMD/SVE. This is for instance the case
+> for crypto code.
+> 
+> Any use of FPSIMD/SVE in the kernel are clearly marked by using the
+> function kernel_neon_{begin, end}. Furthermore, this can only be used
+> when may_use_simd() returns true.
 
-1c30844d2dfe272d58c ("mm: reclaim small amounts of memory when an external
-73444bc4d8f92e46a20 ("mm, page_alloc: do not wake kswapd with zone lock held")
+This is equal what x86 is currently doing. The naming is slightly
+different, there is irq_fpu_usable().
 
-The problem is that a division by zero error is possible if boosting
-occurs very early in boot if the system has very little memory. This
-patch avoids the division by zero error.
+> The current implementation of may_use_simd() allows softirq to use
+> FPSIMD/SVE unless it is currently in used (i.e kernel_neon_busy is true).
+> When in used, softirqs usually fallback to a software method.
+> 
+> At the moment, as a softirq may use FPSIMD/SVE, softirqs are disabled
+> when touching the FPSIMD/SVE context. This has the drawback to disable
+> all softirqs even if they are not using FPSIMD/SVE.
 
-Fixes: 1c30844d2dfe ("mm: reclaim small amounts of memory when an external fragmentation event occurs")
-Reported-and-tested-by: Yury Norov <yury.norov@gmail.com>
-Tested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Mel Gorman <mgorman@techsingularity.net>
----
- mm/page_alloc.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Is this bad? This means also that your crypto code will not be
+interrupted by a softirq. Also if you would get rid of it, you could
+avoid the software fallback in case may_use_simd() says false.
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index d295c9bc01a8..bb1c7d843ebf 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -2170,6 +2170,18 @@ static inline void boost_watermark(struct zone *zone)
- 
- 	max_boost = mult_frac(zone->_watermark[WMARK_HIGH],
- 			watermark_boost_factor, 10000);
-+
-+	/*
-+	 * high watermark may be uninitialised if fragmentation occurs
-+	 * very early in boot so do not boost. We do not fall
-+	 * through and boost by pageblock_nr_pages as failing
-+	 * allocations that early means that reclaim is not going
-+	 * to help and it may even be impossible to reclaim the
-+	 * boosted watermark resulting in a hang.
-+	 */
-+	if (!max_boost)
-+		return;
-+
- 	max_boost = max(pageblock_nr_pages, max_boost);
- 
- 	zone->watermark_boost = min(zone->watermark_boost + pageblock_nr_pages,
+> As a softirq should not rely on been able to use simd at a given time,
+> there are limited reason to keep softirq disabled when touching the
+> FPSIMD/SVE context. Instead, we can only disable preemption and tell
+> the NEON unit is currently in use.
+> 
+> This patch introduces two new helpers kernel_neon_{disable, enable} to
+> mark the area using FPSIMD/SVE context and use them in replacement of
+> local_bh_{disable, enable}. The functions kernel_neon_{begin, end} are
+> also re-implemented to use the new helpers.
+> 
+> Signed-off-by: Julien Grall <julien.grall@arm.com>
+> 
+> ---
+> 
+> I have been exploring this solution as an alternative approach to the RT
+> patch "arm64: fpsimd: use preemp_disable in addition to local_bh_disable()".
+> 
+> So far, the patch has only been lightly tested.
+> 
+> For RT-linux, it might be possible to use migrate_{enable, disable}. I
+> am quite new with RT and have some trouble to understand the semantics
+> of migrate_{enable, disable}. So far, I am still unsure if it is possible
+> to run another userspace task on the same CPU while getting preempted
+> when the migration is disabled.
 
--- 
-Mel Gorman
-SUSE Labs
+In RT:
+- preemt_disable() is the same as !RT. A thread can not be suspend. An
+  interrupt may interrupt. However on RT we have threaded interrupts so
+  the interrupt is limited to the first-level handler (not the threaded
+  handler).
+
+- migrate_disable() means that the thread can not be moved to another
+  CPU. It can be suspended.
+
+- local_bh_disable() disables the BH: No softirq can run. In RT
+  local_bh_disable() does not inherit preempt_disable(). Two different
+  softirqs can be executed in parallel.
+  The BH is usually invoked at the end of the threaded interrupt
+  (because the threaded interrupt handler raises the softirq). It can
+  also run in the ksoftirqd.
+
+Usually you should not get preempted in a migrate_disable() section. A
+SCHED_OTHER task should not interrupt another SCHED_OTHER task in a
+migrate_disable() section. A task with a higher priority (a RT/DL task)
+will. Since threaded interrupts run with a RT priority of 50, they will
+interrupt your task in a migrate_disable() section.
+
+
+Sebastian
 
 _______________________________________________
 linux-arm-kernel mailing list
