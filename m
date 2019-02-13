@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 57A9AC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3540C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E68D2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 964F72086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nYzooxFp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E68D2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Obm64Rud"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 964F72086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,25 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wD9ID3+UVrpKRM4L5L5SaMtf6PD/8ub+slweuJhB09A=; b=nYzooxFpvaJxih
-	0rcVE2IsMmvyFo1dNUWsUfJB2ydjNuRB1Z+Oa463v3WYBcv0auhwC0kjWjy1F2FvyBrNnCiMd212P
-	nIGHKfIIPqYLA9xK145IcUzAdfZr/dhqMA/Nl7wm+IaKA7gMk8LVdmIGwHYTgw+O9/Y5VBMcyA67S
-	nTmCAVWbJHPzxCrFqs+9prhVHBQRCi6esO/J9WN1GWQYMIbH97RepUuTJgxfKfrKXGBbf/IUnJUyn
-	mdz+xZb+Q4ghdbQ988MoBPXSbYiCG6q+bxx4m3+Q0icDAAM1F70O8symvYobj2/6V1fPNx7pg+/Je
-	Z397QEeYOy9hxnHsYJZA==;
+	List-Owner; bh=Elm7F89nt/5gjuRyObuV3SEHHynIlyOJ1f9UlfUJhcQ=; b=Obm64RudN/6+ji
+	f9YipBT3UjQl3EuMRM7IQ1jBH4sF0E4bS9z3pEncv8KQC8iU5rYAYMyCv/Fa4N03IyRVxYz9L0X/u
+	FT1/Ja/VE++j+QPguCRUv5AbHQOmuv5UJPoHIU5pDz2K6xNQNvWaJ4mlNHcDrW/AnAO5JOvr3yeCo
+	zj0wUEih16ugpWkLmTYdmKECoV2/QQ7j23aWm+NkEKA6upM2vABAUBq7uUuPKTUIuQUPujRNJpNuq
+	NN4vcfulSRdTd8AiQJc2ozTlsoSq0qxULdYrAYKaq63tRdICdhvteTQgGCLU4UjO8neOIPF9gL08R
+	lR3xp/ZAdm64m1aw25rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzL3-0005Cv-6q; Wed, 13 Feb 2019 18:32:53 +0000
+	id 1gtzLC-0005QT-RU; Wed, 13 Feb 2019 18:33:02 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzIH-0000EO-3U; Wed, 13 Feb 2019 18:30:01 +0000
+ id 1gtzIJ-0000Jw-TW; Wed, 13 Feb 2019 18:30:04 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH 15/21] dma-iommu: don't remap contiguous allocations for
- coherent devices
-Date: Wed, 13 Feb 2019 19:29:14 +0100
-Message-Id: <20190213182920.16764-16-hch@lst.de>
+Subject: [PATCH 16/21] dma-iommu: factor contiguous remapped allocations into
+ helpers
+Date: Wed, 13 Feb 2019 19:29:15 +0100
+Message-Id: <20190213182920.16764-17-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213182920.16764-1-hch@lst.de>
 References: <20190213182920.16764-1-hch@lst.de>
@@ -68,39 +68,84 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There is no need to remap for pte attributes, or for a virtually
-contiguous address, so just don't do it.
+This moves the last remaning non-dispatch code out of iommu_dma_alloc,
+preparing to refactor the allocation method selection.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/iommu/dma-iommu.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/iommu/dma-iommu.c | 48 +++++++++++++++++++++++----------------
+ 1 file changed, 29 insertions(+), 19 deletions(-)
 
 diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index ff6c6bf30c90..3199c9c81294 100644
+index 3199c9c81294..5a7ca5271532 100644
 --- a/drivers/iommu/dma-iommu.c
 +++ b/drivers/iommu/dma-iommu.c
-@@ -1049,10 +1049,10 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
+@@ -675,6 +675,29 @@ static void *iommu_dma_alloc_remap(struct device *dev, size_t size,
+ 	return NULL;
+ }
  
- 		addr = iommu_dma_alloc_contiguous(dev, iosize, handle, gfp,
++static void *iommu_dma_alloc_contiguous_remap(struct device *dev, size_t size,
++		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
++{
++	pgprot_t prot = arch_dma_mmap_pgprot(dev, PAGE_KERNEL, attrs);
++	struct page *page;
++	void *addr;
++
++	addr = iommu_dma_alloc_contiguous(dev, size, dma_handle, gfp, attrs);
++	if (!addr)
++		return NULL;
++
++	page = virt_to_page(addr);
++	addr = dma_common_contiguous_remap(page, PAGE_ALIGN(size), VM_USERMAP,
++			prot, __builtin_return_address(0));
++	if (!addr)
++		goto out_free;
++	arch_dma_prep_coherent(page, size);
++	return addr;
++out_free:
++	iommu_dma_free_contiguous(dev, size, page, *dma_handle);
++	return NULL;
++}
++
+ /**
+  * iommu_dma_mmap_remap - Map a remapped page array into provided user VMA
+  * @cpu_addr: virtual address of the memory to be remapped
+@@ -1024,8 +1047,6 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
+ 	size_t iosize = size;
+ 	void *addr;
+ 
+-	size = PAGE_ALIGN(size);
+-
+ 	/*
+ 	 * Some drivers rely on this, and we probably don't want the
+ 	 * possibility of stale kernel data being read by devices anyway.
+@@ -1044,23 +1065,12 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
+ 		return iommu_dma_alloc_contiguous(dev, iosize, handle, gfp,
  				attrs);
--		if (!addr)
--			return NULL;
+ 	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+-		pgprot_t prot = arch_dma_mmap_pgprot(dev, PAGE_KERNEL, attrs);
+-		struct page *page;
+-
+-		addr = iommu_dma_alloc_contiguous(dev, iosize, handle, gfp,
+-				attrs);
+-		if (coherent || !addr)
+-			return addr;
+-
 -		page = virt_to_page(addr);
-+		if (coherent || !addr)
-+			return addr;
- 
-+		page = virt_to_page(addr);
- 		addr = dma_common_contiguous_remap(page, size, VM_USERMAP, prot,
- 				__builtin_return_address(0));
- 		if (!addr) {
-@@ -1060,8 +1060,7 @@ static void *iommu_dma_alloc(struct device *dev, size_t size,
- 			return NULL;
- 		}
- 
--		if (!coherent)
--			arch_dma_prep_coherent(page, iosize);
-+		arch_dma_prep_coherent(page, iosize);
+-		addr = dma_common_contiguous_remap(page, size, VM_USERMAP, prot,
+-				__builtin_return_address(0));
+-		if (!addr) {
+-			iommu_dma_free_contiguous(dev, iosize, page, *handle);
+-			return NULL;
+-		}
+-
+-		arch_dma_prep_coherent(page, iosize);
++		if (coherent)
++			addr = iommu_dma_alloc_contiguous(dev, iosize, handle,
++					gfp, attrs);
++		else
++			addr = iommu_dma_alloc_contiguous_remap(dev, iosize,
++					handle, gfp, attrs);
  	} else {
  		addr = iommu_dma_alloc_remap(dev, iosize, handle, gfp, attrs);
  	}
