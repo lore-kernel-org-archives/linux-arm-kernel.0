@@ -2,65 +2,81 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50954C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:36:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EAFCC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:43:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 233EE2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:36:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0E9F120700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:43:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SjQhg3i5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 233EE2086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BXiQdk/8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="oxJpZinK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0E9F120700
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tl8VUTnkwJcxvIemkmduAlO1rz6llFkrW14oOQnyL+s=; b=SjQhg3i5qSONzd
-	BZyyscNaySra19/AfbcIJWZ+qPmJ/L30UbIzjwsBbal04/o3MyJqKvy3+lvlHktq0RT3deTSbNABE
-	BzNtiu99ucHBZJkagTd3TFcbnRJUdyZLw4DD70dEjX3fXM/dSENt9WDtQI/pSRlga5DA1wNocbQaX
-	VM4O+Z6Vwbqq4ETd5P6/PDMxZX0xZnE6alMyoHdOIlWM+t6MtH5O/loDl1Qq3hWJoOjUssDIhuzSS
-	mqFIGyoZZaPz/pVfaysOefzG48s7XapRLhVmgzRjbUqYcqeX+AC2DWGCRWK5xSMx9pXDX0mMB3O6t
-	NGnSswPU6zRfzDIJO3DQ==;
+	List-Archive:List-Unsubscribe:List-Id:Date:From:References:Message-ID:Subject
+	:In-Reply-To:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EM2hdFNl9wnaYe6cFZ7Ccnqb0IVPnD+008voURj2MP0=; b=BXiQdk/8lEVY3l
+	4mnMyzcgNeLJSxFwfFp9P3ZHaYcUE2U2vUeIs29A+7zOO7ms2kqyt0xAwVMctxUSHpVTiepFDvTbz
+	dpxKHDMA9ruhWKJmNgNTs4g1NiypckoJI9BYuuVObE6aVnaET0YAsUMUiSOQ2LRuwE/nugQAS9gZ4
+	/HjBhGiVziEUK46aI/TojnDYPSwi//4qwxm1czGtHWvqxYWn9oc7/R5jrcp4E/WUpqhtP+zNbYfik
+	hTocPH0gWAoQ39IH0M4f1iH91t7YQowRsOjgoqcFK9IQthVZNoZ9jcY7yDHOxMGmcL4GVYkP8Fn4Q
+	+W9hV9D96CURPI4Z5o+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtyRz-0005m4-JA; Wed, 13 Feb 2019 17:35:59 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtyRq-0005iy-Vq
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:35:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 809B6A78;
- Wed, 13 Feb 2019 09:35:50 -0800 (PST)
-Received: from [10.1.197.21] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 4B5773F675; Wed, 13 Feb 2019 09:35:48 -0800 (PST)
-From: Kristina Martsenko <kristina.martsenko@arm.com>
-Subject: Re: [PATCH v5 5/5] arm64/kvm: control accessibility of ptrauth key
- registers
-To: Amit Daniel Kachhap <amit.kachhap@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-6-git-send-email-amit.kachhap@arm.com>
-Message-ID: <6ddfa9ae-5c98-540e-b4aa-8149c8515c9e@arm.com>
-Date: Wed, 13 Feb 2019 17:35:46 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gtyYo-0001WF-Du; Wed, 13 Feb 2019 17:43:02 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtyYk-00017X-Gu
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:42:59 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2A34D20700;
+ Wed, 13 Feb 2019 17:42:57 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550079777;
+ bh=8/a6GqEt6IT+kCPU/DD4c6vSzGl+dSgpHTaX8RXnqr4=;
+ h=To:In-Reply-To:Subject:References:Cc:From:Date:From;
+ b=oxJpZinKS2N45QtSrCM9rsIGt2314DzJ/uiBNjioVEzC7Ndm2NZxLbyQiaZHOAxIY
+ 3SNsKq49ZQXqcjZUe4HcmiE085f2ytnPehwdBtc5ZpD/uO6yjMRJfVYSV+n9wRb+u3
+ ZEDxworNAcBcZ/x170y1BbLh1LjykvNTmDKeYpdo=
 MIME-Version: 1.0
-In-Reply-To: <1548658727-14271-6-git-send-email-amit.kachhap@arm.com>
-Content-Language: en-US
+To: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>,
+ Aisheng Dong <aisheng.dong@nxp.com>, Anson Huang <anson.huang@nxp.com>,
+ Daniel Baluta <daniel.baluta@nxp.com>
+In-Reply-To: <1550073243-11242-2-git-send-email-Anson.Huang@nxp.com>
+User-Agent: alot/0.8
+Subject: Re: [PATCH V3 2/2] clk: imx: scu: add cpu frequency scaling support
+Message-ID: <155007977634.115909.4465011219844819801@swboyd.mtv.corp.google.com>
+References: <1550073243-11242-1-git-send-email-Anson.Huang@nxp.com>
+ <1550073243-11242-2-git-send-email-Anson.Huang@nxp.com>
+From: Stephen Boyd <sboyd@kernel.org>
+Date: Wed, 13 Feb 2019 09:42:56 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_093551_071673_D5388857 
-X-CRM114-Status: GOOD (  25.24  )
+X-CRM114-CacheID: sfid-20190213_094258_592063_286780CA 
+X-CRM114-Status: UNSURE (   9.88  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,178 +88,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- kvmarm@lists.cs.columbia.edu,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Dave Martin <Dave.Martin@arm.com>, linux-kernel@vger.kernel.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
-> According to userspace settings, ptrauth key registers are conditionally
-> present in guest system register list based on user specified flag
-> KVM_ARM_VCPU_PTRAUTH.
-> 
-> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-> Cc: kvmarm@lists.cs.columbia.edu
-> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  Documentation/arm64/pointer-authentication.txt |  3 ++
->  arch/arm64/kvm/sys_regs.c                      | 42 +++++++++++++++++++-------
->  2 files changed, 34 insertions(+), 11 deletions(-)
-> 
-> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-> index 0529a7d..3be4ee1 100644
-> --- a/Documentation/arm64/pointer-authentication.txt
-> +++ b/Documentation/arm64/pointer-authentication.txt
-> @@ -87,3 +87,6 @@ created by passing a flag (KVM_ARM_VCPU_PTRAUTH) requesting this feature
->  to be enabled. Without this flag, pointer authentication is not enabled
->  in KVM guests and attempted use of the feature will result in an UNDEFINED
->  exception being injected into the guest.
-> +
-> +Additionally, when KVM_ARM_VCPU_PTRAUTH is not set then KVM will filter
-> +out the authentication key registers from userspace.
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 2546a65..b46a78e 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1334,12 +1334,6 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	{ SYS_DESC(SYS_TTBR1_EL1), access_vm_reg, reset_unknown, TTBR1_EL1 },
->  	{ SYS_DESC(SYS_TCR_EL1), access_vm_reg, reset_val, TCR_EL1, 0 },
->  
-> -	PTRAUTH_KEY(APIA),
-> -	PTRAUTH_KEY(APIB),
-> -	PTRAUTH_KEY(APDA),
-> -	PTRAUTH_KEY(APDB),
-> -	PTRAUTH_KEY(APGA),
-> -
->  	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
->  	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
->  	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
-> @@ -1491,6 +1485,14 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
->  };
->  
-> +static const struct sys_reg_desc ptrauth_reg_descs[] = {
-> +	PTRAUTH_KEY(APIA),
-> +	PTRAUTH_KEY(APIB),
-> +	PTRAUTH_KEY(APDA),
-> +	PTRAUTH_KEY(APDB),
-> +	PTRAUTH_KEY(APGA),
-> +};
-> +
->  static bool trap_dbgidr(struct kvm_vcpu *vcpu,
->  			struct sys_reg_params *p,
->  			const struct sys_reg_desc *r)
-> @@ -2093,6 +2095,8 @@ static int emulate_sys_reg(struct kvm_vcpu *vcpu,
->  	r = find_reg(params, table, num);
->  	if (!r)
->  		r = find_reg(params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> +	if (!r && kvm_arm_vcpu_ptrauth_allowed(vcpu))
-> +		r = find_reg(params, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->  
->  	if (likely(r)) {
->  		perform_access(vcpu, params, r);
-> @@ -2206,6 +2210,8 @@ static const struct sys_reg_desc *index_to_sys_reg_desc(struct kvm_vcpu *vcpu,
->  	r = find_reg_by_id(id, &params, table, num);
->  	if (!r)
->  		r = find_reg(&params, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> +	if (!r && kvm_arm_vcpu_ptrauth_allowed(vcpu))
-> +		r = find_reg(&params, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->  
->  	/* Not saved in the sys_reg array and not otherwise accessible? */
->  	if (r && !(r->reg || r->get_user))
-> @@ -2487,18 +2493,22 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+Quoting Anson Huang (2019-02-13 07:59:32)
+> @@ -145,6 +161,39 @@ static long clk_scu_round_rate(struct clk_hw *hw, unsigned long rate,
+>         return rate;
 >  }
 >  
->  /* Assumed ordered tables, see kvm_sys_reg_table_init. */
-> -static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
-> +static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind,
-> +			const struct sys_reg_desc *desc, unsigned int len)
->  {
->  	const struct sys_reg_desc *i1, *i2, *end1, *end2;
->  	unsigned int total = 0;
->  	size_t num;
->  	int err;
->  
-> +	if (desc == ptrauth_reg_descs && !kvm_arm_vcpu_ptrauth_allowed(vcpu))
-> +		return total;
+> +static bool clk_scu_atf_set_cpu_rate(struct clk_hw *hw, unsigned long rate)
+> +{
+> +       struct clk_scu *clk = to_clk_scu(hw);
+> +       struct arm_smccc_res res;
+> +       unsigned int cluster_id;
+> +       int i;
 > +
->  	/* We check for duplicates here, to allow arch-specific overrides. */
->  	i1 = get_target_table(vcpu->arch.target, true, &num);
->  	end1 = i1 + num;
-> -	i2 = sys_reg_descs;
-> -	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
-> +	i2 = desc;
-> +	end2 = desc + len;
->  
->  	BUG_ON(i1 == end1 || i2 == end2);
->  
-> @@ -2526,7 +2536,10 @@ unsigned long kvm_arm_num_sys_reg_descs(struct kvm_vcpu *vcpu)
->  {
->  	return ARRAY_SIZE(invariant_sys_regs)
->  		+ num_demux_regs()
-> -		+ walk_sys_regs(vcpu, (u64 __user *)NULL);
-> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, sys_reg_descs,
-> +				ARRAY_SIZE(sys_reg_descs))
-> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, ptrauth_reg_descs,
-> +				ARRAY_SIZE(ptrauth_reg_descs));
->  }
->  
->  int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-> @@ -2541,7 +2554,12 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->  		uindices++;
->  	}
->  
-> -	err = walk_sys_regs(vcpu, uindices);
-> +	err = walk_sys_regs(vcpu, uindices, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> +	if (err < 0)
-> +		return err;
-> +	uindices += err;
-> +
-> +	err = walk_sys_regs(vcpu, uindices, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->  	if (err < 0)
->  		return err;
->  	uindices += err;
-> @@ -2575,6 +2593,7 @@ void kvm_sys_reg_table_init(void)
->  	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
->  	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
->  	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
-> +	BUG_ON(check_sysreg_table(ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs)));
->  
->  	/* We abuse the reset function to overwrite the table itself. */
->  	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
-> @@ -2616,6 +2635,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
->  
->  	/* Generic chip reset first (so target could override). */
->  	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
-> +	reset_sys_reg_descs(vcpu, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->  
->  	table = get_target_table(vcpu->arch.target, true, &num);
->  	reset_sys_reg_descs(vcpu, table, num);
+> +       /* CPU frequency scaling can ONLY be done by ARM-Trusted-Firmware */
+> +       if (clk->clk_type == IMX_SC_PM_CLK_CPU) {
+> +               for (i = 0; i < ARRAY_SIZE(imx_sc_cpufreq_data); i++) {
+> +                       if (!strcmp(clk_hw_get_name(hw),
+> +                               imx_sc_cpufreq_data[i].clk_name)) {
+> +                               cluster_id = imx_sc_cpufreq_data[i].cluster_id;
+> +                               break;
+> +                       }
+> +               }
 
-This isn't very scalable, since we'd need to duplicate all the above
-code every time we add new system registers that are conditionally
-accessible.
+Is there some reason why these clks can't be determined once at boot
+time? It would be a good idea to avoid doing any sort of string
+comparison here, instead just calling the right arm_smccc_smc with the
+right arguments based on code that registers those types of clks.
 
-It seems that the SVE patches [1] solved this problem by adding a
-check_present() callback into struct sys_reg_desc. It probably makes
-sense to rebase onto that patch and just implement the callback for the
-ptrauth key registers as well.
-
-[1] https://lore.kernel.org/linux-arm-kernel/1547757219-19439-13-git-send-email-Dave.Martin@arm.com/
-
-Thanks,
-Kristina
 
 _______________________________________________
 linux-arm-kernel mailing list
