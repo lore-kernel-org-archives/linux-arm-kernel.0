@@ -2,132 +2,92 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1A39C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BF77C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 772DC222BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DBD6222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RoFXojiZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="g3GmU3xC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 772DC222BE
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VAf6pLeY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="f4mkl4eB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DBD6222B2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:Date:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9RydHsUNgyXTUaJGVrNkTBqUJshla3wHREzxHSClmd8=; b=RoFXojiZePMNoY
-	bSioYMOpl0VQlwlznxFO7DQUt8TsYMr/esH1UoIDSIzwFayeXmSELtO7GskGgSbkoUj4qdSNBQrY3
-	UScvvHPoD1U96PKHV2RG9nkto34deqfhHJPScDB3t9VnfuHdNCv1Rx+GBFCpXr+m97zAV1+Ano/iD
-	X7gHGT7JaAOA62QemiOIJeVsBuA4Xo9fQFVRenotGYPrdqbicpDKyBJ3dDepH29nXlPL0EFEnSVcQ
-	b1vJLFgu8Xai0KKvowRqAfkFJXgFwwZt50/6O/VMY08reIfB+vkyiD6bgxTIQEDsx3YrYaXgX9diG
-	gatmq/eSYnvBEqtxNwuA==;
+	List-Owner; bh=UzFE9Pm5s6PubAemXOUwBA1HS/JnWeoa1us2A7FCHYk=; b=VAf6pLeYD1y/M9
+	Jgfw4BOovS3Av6HjXnl9/I5L4gfb3Hk/dkcKyxIWNiFa9v2dWkJ8HNKSLoXHSLihXStxG1bBINArK
+	H3Wkd7ZWwvqNAc6RJsVpO+egnasF5qy3baKAIdckUOsH2QnRtalrLlARJFzSDd3Nd9STWM0LYo8LX
+	zEs/CDN18Wg7fG7SbquIuWQk9IU6/ev2ZBtra39Wo87cdtUZreTB8r94uW+gknZmi9D286/Bzj0xF
+	P8E3445Hiz0w/vvPKaIqn6MaNIUTXFq0ELgzpohA0WnPhu6Vd2U24sMbkhS+sclKNsA3flaBYWhJa
+	eSWTdYGc8qEDb+PUhGhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtt81-00085h-3n; Wed, 13 Feb 2019 11:55:01 +0000
-Received: from mail-eopbgr80052.outbound.protection.outlook.com ([40.107.8.52]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
+	id 1gtt8h-0001D4-Ux; Wed, 13 Feb 2019 11:55:43 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtt7y-00085C-Fn
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:55:00 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=vTZpymLax93ipnQOXUrsWmxM+y+KLH4kLeLeq9/khJY=;
- b=g3GmU3xCyTfhxwcmqjconJEZOtxCPmpfeTdua8+WY2FsfD973/Rod46t+ifoG4/jkwYeG6pWbvI2Q2S/FimdQMalXNULIeOy7DmQf8OmGu7nAZL+NVTWu5tNzSAXwyCTrxbmJV127ewQaLfNxOQkcHB4e0ho6OJAWkUZo6i1KBI=
-Received: from DB7PR04MB4490.eurprd04.prod.outlook.com (52.135.138.16) by
- DB7PR04MB4076.eurprd04.prod.outlook.com (52.135.130.29) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.16; Wed, 13 Feb 2019 11:54:55 +0000
-Received: from DB7PR04MB4490.eurprd04.prod.outlook.com
- ([fe80::fd45:a391:7591:1aa5]) by DB7PR04MB4490.eurprd04.prod.outlook.com
- ([fe80::fd45:a391:7591:1aa5%6]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
- 11:54:55 +0000
-From: Peng Fan <peng.fan@nxp.com>
-To: Mark Rutland <mark.rutland@arm.com>
-Subject: RE: [PATCH 3/3] arm64: mmu: pgd_pgtable_alloc: drop barrier
-Thread-Topic: [PATCH 3/3] arm64: mmu: pgd_pgtable_alloc: drop barrier
-Thread-Index: AQHUw3/CYobPCtINwEOlvcbOdnGfRqXdmCWAgAAGJyA=
-Date: Wed, 13 Feb 2019 11:54:55 +0000
-Message-ID: <DB7PR04MB4490EAD2E829E17CCE81C5F188660@DB7PR04MB4490.eurprd04.prod.outlook.com>
-References: <20190213094831.7292-1-peng.fan@nxp.com>
- <20190213094831.7292-3-peng.fan@nxp.com>
- <20190213113050.GC22119@lakrids.cambridge.arm.com>
-In-Reply-To: <20190213113050.GC22119@lakrids.cambridge.arm.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=peng.fan@nxp.com; 
-x-originating-ip: [119.31.174.68]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 9de51849-eaa3-4e4f-154b-08d691aa120f
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB7PR04MB4076; 
-x-ms-traffictypediagnostic: DB7PR04MB4076:
-x-microsoft-exchange-diagnostics: =?gb2312?B?MTtEQjdQUjA0TUI0MDc2OzIzOkZtQXZ5WXFFcEg1Y29KaUc2bnJDRHdCa1pp?=
- =?gb2312?B?bzM1NHZKRW52YnlYaEU1RGpIb0JzK2RBS1ZvTklteEdWQVpEYjVlSWhYNHRv?=
- =?gb2312?B?YzJNTlhzZTVWelJobmpXSWZXZlVqaU1RcnFvdVlLaXhUdVRFdXl3K21mcE9S?=
- =?gb2312?B?VDBmNTM0U0xRZ2FFM3Q1RHQ1M3A3aHNibmxmWXlVcjVENnZvSm1uL01yNUI1?=
- =?gb2312?B?M2dld1ZaQy9PK3c4S0ZWWnNFSTk4cXhaUnYrZXU0Y2ZKVkgwYTVnMTJFeCtL?=
- =?gb2312?B?MWhTQzZLRFZnRHM2aENyOTlvN0hjalhrMFd1NGNjUUpJRnd6Zm9hK3V2bisy?=
- =?gb2312?B?bmFzamxvdmVJd09mek1XS1Rlb05XYThpVGtjcEJEWGdTb1QxOFNMeXEzQktz?=
- =?gb2312?B?NUZ6cHYwR2pqNklOd2lYSkZ1dnFtcDBNSmlSMWNHNkwxQkZLcis3aEFWZ1F2?=
- =?gb2312?B?MUZDaVhEZytHbWdocW9Yd0RISHA2TURuSGZQZko3Z2R3V0tGa0VpMm5ZSlBW?=
- =?gb2312?B?RXQxcnFpeThvSFBiUmRVd3NybHd1NmNiUXcrYnJDQmNzZmZySVBwazhMdDI5?=
- =?gb2312?B?SkJkREZBdmk0SEdDZ1cvU00vTXR5dXNFMU1RQWZpQ1dabmJ2Q3Vxd00rVUVQ?=
- =?gb2312?B?QWwzVTExOEsrMG4zOEUraWdzQ3NKeGhGYkhwdytxczRCeXNZc25oQWd1alJt?=
- =?gb2312?B?YnhIYTdPWHlYa3RSd3BUTS82RVJLSVNGYWtOOWdld1JZN1pST0FqaERZdzUr?=
- =?gb2312?B?Y1ZqUFI1WS9NM2xBZ2lObHlnSS92US95WW5KZnpubXBJMDlWQ3hxQklCTHBN?=
- =?gb2312?B?UmU4Q1lSdVRYcVBGR1h0UWl3R045RTQwaEZKM1dXRnJuTzgvQzNJVFRlamZx?=
- =?gb2312?B?ODVPOUR3dDU4WG5RNlloN3pia2prS3lvenN4V2ZmWHlsdjJWR3NHR1dYN3la?=
- =?gb2312?B?TkJRWGJ0dlBHWFkxeEZNWGU0dU85aWlXTnBNb3VNSmduYi9vaWppZFczUGtJ?=
- =?gb2312?B?YXJHSm1zY1hCTnVhZ011RWt2ZGp5OFgrcHpvMTMrMW9PRGhnWWRuN0J2b3Rv?=
- =?gb2312?B?UUpIVEUrL0lqN0ppRE9oQUxJZ2YwUUJpTDUwVy9Oejh6dWFuNVBPL3dSNzZo?=
- =?gb2312?B?MnRlUDRBSEhsUE1mSkFGUjZWdFVrem1oTmZJeXRJS3hLRjBSUHhiNG5sZDVm?=
- =?gb2312?B?TzdROXB2bEhuWUNRTXkzYitJRWVvcUdJWEVPQWtjSHdEbGYwbWpYcGs4MkJH?=
- =?gb2312?B?YUxvZzlDRlRCdUVtQ2NMTG90WTQzRjBpZmxkU1hYOHhRcE4ydklsN0tlcG9m?=
- =?gb2312?B?OVpBV2NaektIRWFnaEdOa2xpdlQ1ekJlZzYxS2pSdE9aamVpa2ZWYVIyTFBi?=
- =?gb2312?B?OHpWaVhzYTM4cnlXOVcvQ3ZIQnlsVmxQdjUyd2p4QVBxdlo1aVF2SlFaODY3?=
- =?gb2312?B?Ulo0aG03RFhkZTJ5M20yTERMQms1by9nd2NVOG1hQ2JabzVzR3BmTUZVbXVS?=
- =?gb2312?B?WEhmTnNJdStoNHE0ekRFN2NYSCs2S0g1L0hzbTgrRVBUNTZjOGNYeFZUSlN6?=
- =?gb2312?B?aGdYQXFJL0UvbmtneWV2RUcxLzRBVG1NTmJXajFHa3FkeXZMSnJNSUxidDRO?=
- =?gb2312?B?VTgxUXd6SEM3a0kvOE0xTzFHVXdJdXZjUFBNR0s1bmI4ZjhyODBJNWJybGxC?=
- =?gb2312?Q?ZSlNbNlW9Jwl7RT44oiZ+vyYzoAVYtJSWEbi8Oe?=
-x-microsoft-antispam-prvs: <DB7PR04MB4076542340D12CA0A6EF2FFF88660@DB7PR04MB4076.eurprd04.prod.outlook.com>
-x-forefront-prvs: 094700CA91
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(396003)(376002)(346002)(39860400002)(13464003)(199004)(189003)(25786009)(106356001)(105586002)(71200400001)(33656002)(71190400001)(26005)(6436002)(53936002)(68736007)(54906003)(9686003)(55016002)(4326008)(6246003)(229853002)(316002)(7696005)(86362001)(76176011)(8676002)(53546011)(8936002)(476003)(81166006)(81156014)(478600001)(6916009)(14454004)(99286004)(256004)(186003)(97736004)(102836004)(44832011)(14444005)(2906002)(6116002)(486006)(3846002)(7416002)(66066001)(305945005)(7736002)(11346002)(74316002)(6506007)(446003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR04MB4076;
- H:DB7PR04MB4490.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 6gguK0SGzqa4rKe1dmtykZnouzG2LPXHDH19NdhANLNS89xc4FdQAPf/h6BPzQJbi9wGM9uJYQoJMHFPPBMsPDtrxgKlO4dlhPunoHPoSe08EWqiCpgFStFLZ5Um6flxRUd7f7927+51Dnwc+136xQ+ARjU2CWH23fmmOcbr7dmYRrfwGaqCE8Goh5qoNCQ6t4lWcF8ZaJ+lKnyN93awIXM9wugVET03w26LT62ED0NpKq55hP/2iRSW9GHC1J+FDKwxe79Pgs1b8mmOztdmbv6HOtF+a/uMWzEKRfFgXadwTeYGPIIfHwIAxYXh61bJTKB7JDo5+7y2ma5335B8PBRaPTbdrAGznK16RoS2QLAvcLm1o4VF6RY8NnHF0W7lCyEhVQos/AWrq+vDWP2RE6lnazJ29IRLoXkXkadGdFY=
+ id 1gtt8e-0001CX-4D
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:55:41 +0000
+Received: by mail-lf1-x142.google.com with SMTP id l10so1535645lfh.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 03:55:39 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:date:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=SACQ5M4HotXM/MYLGDRFVKPHZJfogzeYcVZ+MN/XhU8=;
+ b=f4mkl4eBBsyow13NsoWcy6TCJgJY3qmCYJ5OXfuE1gLUpq1a2dUlEBASHKokOdWVKk
+ gezG7rROm1xc9bXetKR/SBOCewP4OG2gO8zgmTjvkcXykqIYUW2Xorftbhdz8RL6ombp
+ rvy7lP0QVctGb3APbiXrl+LrqL2urnMBnbGEt+/C7BEw5mQ3fCjK59AxeX2316hADnYG
+ 5jI+wJUTwSeGNU6v9zCpoZTlnm6QGptLldPOdEeK2BXNLhmd9CpxNdRKxXhbAfSb702D
+ x4XpUiv5Rgjtl+a8w5+I9Edkm8Xi6mYL95iJkLUKmlL2/2+dv46y1P0VHqgWg8PKJ1Co
+ HKEg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:date:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=SACQ5M4HotXM/MYLGDRFVKPHZJfogzeYcVZ+MN/XhU8=;
+ b=ImsjII58fW0IQ2MiH5Tp5iPmE338Ljd3AtdM90R/3IlyR2UClENpoMFcnXUoLLDia7
+ 6hpzMukEonLfNaGEJGoCe0ZromVp+tfpEg2lcWWX4sAPsJcLP5WkJ/PNX1GeZxeCj4Zt
+ kGEbMTLtdK8hKL6wM0l3E+0hGAmL3C1pDVRXolJmQwRjNN/nChI1vuc7+JQ8lBl6LE3D
+ h8eRpaXJ+30KWlDoGSE1J14WRlTxXNW8rdX7LOudL49AVFw7WGK4MBkTtqMnZb8j3s0Q
+ PqkX8VeU8/wnaBmeAIB83ZhWAk58mREZAIs3+n4pCeOJquKnGVKluIdtva6XB8DYDr31
+ DE+w==
+X-Gm-Message-State: AHQUAuYfEZtGQX+GyXsb4qtmL1d+W4t6pvkomYo5a7rUUkDMWWChFBOU
+ SoO8Cv9Vnf8Pp6ZWLS5USBc=
+X-Google-Smtp-Source: AHgI3IbdNW1WvqVvocr/4aCjt3V04aLfT7CC3QIJ6fObKnzez5pQTJ9ndpoBUkr3Ttl1NLx+85f8GQ==
+X-Received: by 2002:a19:f607:: with SMTP id x7mr64132lfe.47.1550058938092;
+ Wed, 13 Feb 2019 03:55:38 -0800 (PST)
+Received: from localhost (pat-31-128-146-191.pool.powernet.com.ru.
+ [31.128.146.191])
+ by smtp.gmail.com with ESMTPSA id z85sm3151848lff.80.2019.02.13.03.55.36
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 13 Feb 2019 03:55:37 -0800 (PST)
+From: Yury Norov <yury.norov@gmail.com>
+X-Google-Original-From: Yury Norov <ynorov@marvell.com>
+Date: Wed, 13 Feb 2019 14:55:36 +0300
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: 5.0-rc kernel hangs on early boot
+Message-ID: <20190213115536.GB8928@yury-thinkpad>
+References: <20190213082134.GA21834@yury-thinkpad>
+ <20190213111843.GA1912@brain-police>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 9de51849-eaa3-4e4f-154b-08d691aa120f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 11:54:55.1829 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR04MB4076
+Content-Disposition: inline
+In-Reply-To: <20190213111843.GA1912@brain-police>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_035458_533344_6B6331EB 
-X-CRM114-Status: GOOD (  24.05  )
+X-CRM114-CacheID: sfid-20190213_035540_165483_6F2BCD7D 
+X-CRM114-Status: GOOD (  21.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -139,66 +99,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "yaojun8558363@gmail.com" <yaojun8558363@gmail.com>,
- "cpandya@codeaurora.org" <cpandya@codeaurora.org>,
- "van.freenix@gmail.com" <van.freenix@gmail.com>,
- "robin.murphy@arm.com" <robin.murphy@arm.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="gb2312"
-Content-Transfer-Encoding: base64
+Cc: Andrea Arcangeli <aarcange@redhat.com>, Yury Norov <yury.norov@gmail.com>,
+ Vlastimil Babka <vbabka@suse.cz>, Catalin Marinas <catalin.marinas@arm.com>,
+ Mel Gorman <mgorman@techsingularity.net>, linux-kernel@vger.kernel.org,
+ Zi Yan <zi.yan@cs.rutgers.edu>, David Rientjes <rientjes@google.com>,
+ Andrew Morton <akpm@linux-foundation.org>, Michal Hocko <mhocko@kernel.org>,
+ Linus Torvalds <torvalds@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTWFyaywNCg0KPiAtLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPiBGcm9tOiBNYXJrIFJ1
-dGxhbmQgW21haWx0bzptYXJrLnJ1dGxhbmRAYXJtLmNvbV0NCj4gU2VudDogMjAxOcTqMtTCMTPI
-1SAxOTozMQ0KPiBUbzogUGVuZyBGYW4gPHBlbmcuZmFuQG54cC5jb20+DQo+IENjOiBjYXRhbGlu
-Lm1hcmluYXNAYXJtLmNvbTsgd2lsbC5kZWFjb25AYXJtLmNvbTsNCj4gYXJkLmJpZXNoZXV2ZWxA
-bGluYXJvLm9yZzsgeWFvanVuODU1ODM2M0BnbWFpbC5jb207DQo+IGNwYW5keWFAY29kZWF1cm9y
-YS5vcmc7IHJvYmluLm11cnBoeUBhcm0uY29tOw0KPiBsaW51eC1hcm0ta2VybmVsQGxpc3RzLmlu
-ZnJhZGVhZC5vcmc7IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc7DQo+IHZhbi5mcmVlbml4
-QGdtYWlsLmNvbQ0KPiBTdWJqZWN0OiBSZTogW1BBVENIIDMvM10gYXJtNjQ6IG1tdTogcGdkX3Bn
-dGFibGVfYWxsb2M6IGRyb3AgYmFycmllcg0KPiANCj4gT24gV2VkLCBGZWIgMTMsIDIwMTkgYXQg
-MDk6Mzc6MzhBTSArMDAwMCwgUGVuZyBGYW4gd3JvdGU6DQo+ID4gVGhlIGJhcnJpZXJzIGFyZSBh
-ZGRlZCBmb3IgZW1wdHlfemVyb19wYWdlLCBob3dldmVyIHRoZSBlbXB0eSB6ZXJvDQo+ID4gcGFn
-ZSBoYXMgYmVlbiBtb3ZlZCB0byBic3MgYXJlYSBieSBjb21taXQgNTIyN2NmYTcxZjllICgiYXJt
-NjQ6IG1tOg0KPiA+IHBsYWNlIGVtcHR5X3plcm9fcGFnZSBpbiBic3MiKSwNCj4gPiBhbmQgaXQg
-YWxyZWF5IGFkZGVkICJkc2IgICAgIGlzaHN0IiBpbiBoZWFkLlMgdG8gbWFrZSBzdXJlDQo+ID4g
-dGhlIGVtcHR5IHplcm8gcGFnZSB2aXNpYmxlIHRvIFBUVy4NCj4gDQo+IFRoZSAiemVyb2VkIHBh
-Z2UiIHRoZSBjb21tZW50IHJlZmVycyB0byBpcyBub3QgZW1wdHlfemVyb19wYWdlLg0KDQpUaGFu
-a3MsIEkgdW5kZXJzdGFuZCB3cm9uZy4NCg0KPiANCj4gVGhlIHBhZ2UNCj4gdGhlIGNvbW1lbnQg
-cmVmZXJzIHRvIGlzIGFuIGFyYml0cmFyeSBwYWdlIHJldHVybmVkIGJ5IF9fZ2V0X2ZyZWVfcGFn
-ZSgpLA0KPiB3aGljaCBoYXMgYmVlbiBmaWxsZWQgd2l0aCB6ZXJvZWQgYXQgc29tZSBwb2ludCB0
-aGFua3MgdG8gUEdBTExPQ19HRlANCj4gY29udGFpbmluZyBfX0dGUF9aRVJPLg0KPiANCj4gPiBw
-Z2RfcGd0YWJsZV9hbGxvYyBpcyBvbmx5IGNhbGxlZCBieSBfX2NyZWF0ZV9wZ2RfbWFwcGluZywg
-YW5kIHRoZXJlDQo+ID4gYXJlIGltcGxpY2l0IGJhcnJpZXJzIGluIF9fY3JlYXRlX3BnZF9tYXBw
-aW5nLCBzbyB3ZSBjb3VsZCByZW1vdmUgdGhlDQo+ID4gYmFycmllciBwZ2RfcGd0YWJsZV9hbGxv
-Yw0KPiANCj4gSSBkb24ndCB0aGluayB0aGlzIGlzIHRydWUuDQo+IA0KPiBDb25zaWRlcjoNCj4g
-DQo+ICAgY3JlYXRlX3BnZF9tYXBwaW5nKCkNCj4gICAtPiBfX2NyZWF0ZV9wZ2RfbWFwcGluZygp
-DQo+ICAgICAgLT4gYWxsb2NfaW5pdF9wdWQoKQ0KPiAgICAgICAgIC0+IHBndGFibGVfYWxsb2Mo
-KSAvLyBwZ2RfcGd0YWJsZV9hbGxvYygpDQo+IAktPiBfX3BnZF9wb3B1bGF0ZSgpDQo+IA0KPiAu
-Li4gd2hlcmUgQUZBSUNUIHRoZXJlIGlzIG5vIGJhcnJpZXIgYmV0d2VlbiBwZ3RhYmxlX2FsbG9j
-KCkgYW5kDQo+IF9fcGdkX3BvcHVsYXRlKCkuDQo+IA0KPiBXaGVyZSBpcyB0aGUgYmFycmllciBi
-ZXR3ZWVuIHRoZSBwYWdlIHplcm9pbmcgYW5kIHRoZSB1cGRhdGUgb2YgdGhlIHBnZA0KPiBlbnRy
-eT8NCg0KSSB0aG91Z2ggdGhlIGJhcnJpZXIgaW4gX19wZ2RfcG9wdWxhdGUgY291bGQgYmUgZW5v
-dWdoLCBidXQgdGhpcyBpcyBub3QNCmVub3VnaCwgd2Ugc3RpbGwgbmVlZCBiYXJyaWVyIGJlZm9y
-ZSB3cml0ZSBwZ2QvcHVkL3BtZC9wdGUgZW50cmllcy4NCg0KU28gZHJvcCB0aGlzIHBhdGNoLg0K
-DQpUaGFua3MsDQpQZW5nLg0KDQo+IA0KPiBUaGFua3MsDQo+IE1hcmsuDQo+IA0KPiA+DQo+ID4g
-U2lnbmVkLW9mZi1ieTogUGVuZyBGYW4gPHBlbmcuZmFuQG54cC5jb20+DQo+ID4gLS0tDQo+ID4N
-Cj4gPiBOb3RlOiB0aGlzIHBhdGNoIHRlc3RlZCBvbiBxZW11LXN5c3RlbS1hYXJjaDY0LCBub3Qg
-cmVhbCBoYXJkd2FyZS4NCj4gPg0KPiA+ICBhcmNoL2FybTY0L21tL21tdS5jIHwgMiAtLQ0KPiA+
-ICAxIGZpbGUgY2hhbmdlZCwgMiBkZWxldGlvbnMoLSkNCj4gPg0KPiA+IGRpZmYgLS1naXQgYS9h
-cmNoL2FybTY0L21tL21tdS5jIGIvYXJjaC9hcm02NC9tbS9tbXUuYyBpbmRleA0KPiA+IGY2MWZh
-N2M4ZmQyZS4uMDRlM2Q0ZDA3MGNlIDEwMDY0NA0KPiA+IC0tLSBhL2FyY2gvYXJtNjQvbW0vbW11
-LmMNCj4gPiArKysgYi9hcmNoL2FybTY0L21tL21tdS5jDQo+ID4gQEAgLTM3MSw4ICszNzEsNiBA
-QCBzdGF0aWMgcGh5c19hZGRyX3QgcGdkX3BndGFibGVfYWxsb2Modm9pZCkNCj4gPiAgCWlmICgh
-cHRyIHx8ICFwZ3RhYmxlX3BhZ2VfY3Rvcih2aXJ0X3RvX3BhZ2UocHRyKSkpDQo+ID4gIAkJQlVH
-KCk7DQo+ID4NCj4gPiAtCS8qIEVuc3VyZSB0aGUgemVyb2VkIHBhZ2UgaXMgdmlzaWJsZSB0byB0
-aGUgcGFnZSB0YWJsZSB3YWxrZXIgKi8NCj4gPiAtCWRzYihpc2hzdCk7DQo+ID4gIAlyZXR1cm4g
-X19wYShwdHIpOw0KPiA+ICB9DQo+ID4NCj4gPiAtLQ0KPiA+IDIuMTYuNA0KPiA+DQpfX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
-IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
-L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Wed, Feb 13, 2019 at 11:18:44AM +0000, Will Deacon wrote:
+> Hi Yury,
+> 
+> On Wed, Feb 13, 2019 at 11:25:40AM +0300, Yury Norov wrote:
+> > My kernel on qemu/arm64 setup hangs at early boot since v5.0-rc1.
+> > Backtrace is not too verbose:
+> > (gdb) i threads
+> >   Id   Target Id         Frame
+> > * 1    Thread 1 (CPU#0 [running]) 0xffff000010a49b74 in __delay (cycles=4096)
+> >     at arch/arm64/lib/delay.c:49
+> >   2    Thread 2 (CPU#1 [halted ]) 0x0000000000000000 in ?? ()
+> >   3    Thread 3 (CPU#2 [halted ]) 0x0000000000000000 in ?? ()
+> >   4    Thread 4 (CPU#3 [halted ]) 0x0000000000000000 in ?? ()
+> > (gdb) bt
+> > #0  0xffff000010a49b74 in __delay (cycles=4096) at arch/arm64/lib/delay.c:49
+> > Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+> > 
+> > Reverting the patch
+> > 1c30844d2dfe272d58c ("mm: reclaim small amounts of memory when an external
+> > fragmentation event occurs") together with following patch
+> > 73444bc4d8f92e46a20 ("mm, page_alloc: do not wake kswapd with zone lock held")
+> > helps me to boot normally. 
+> > 
+> > Some system information is below, and config is attached.
+> 
+> FWIW, running with your command-line and .config under KVM with earlycon
+> leads to an early page allocation failure followed by a NULL dereference
+> during boot if only 1G is configured (log below). For the mm folks, it's
+> probably worth pointing out that you're using 64k pages.
+> 
+> Can you confirm that the kernel boots successfully if you pass more memory to
+> qemu (e.g. 2gb)?
+
+2G workaround works, I confirm. Also, Mel's fix provided in this thread works
+as well.
+
+Thanks,
+Yury
+
+> Will
+> 
+> --->8
+> 
+> [    0.000000] swapper: page allocation failure: order:0, mode:0x0(), nodemask=(null),cpuset=(null),mems_allowed=0-3
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc64.9.0+ #1
+> [    0.000000] Hardware name: linux,dummy-virt (DT)
+> [    0.000000] Call trace:
+> [    0.000000]  dump_backtrace+0x0/0x178
+> [    0.000000]  show_stack+0x24/0x30
+> [    0.000000]  dump_stack+0x90/0xb4
+> [    0.000000]  warn_alloc+0x100/0x188
+> [    0.000000]  __alloc_pages_nodemask+0xd48/0xd88
+> [    0.000000]  alloc_pages_current+0x8c/0xf8
+> [    0.000000]  allocate_slab+0x370/0x4a8
+> [    0.000000]  new_slab+0x98/0xc0
+> [    0.000000]  ___slab_alloc+0x27c/0x510
+> [    0.000000]  __slab_alloc+0x50/0x68
+> [    0.000000]  kmem_cache_alloc+0x1d0/0x1f8
+> [    0.000000]  bootstrap+0x34/0x170
+> [    0.000000]  kmem_cache_init+0x9c/0x130
+> [    0.000000]  start_kernel+0x240/0x464
+> [    0.000000] Mem-Info:
+> [    0.000000] active_anon:0 inactive_anon:0 isolated_anon:0
+> [    0.000000]  active_file:0 inactive_file:0 isolated_file:0
+> [    0.000000]  unevictable:0 dirty:0 writeback:0 unstable:0
+> [    0.000000]  slab_reclaimable:0 slab_unreclaimable:1
+> [    0.000000]  mapped:0 shmem:0 pagetables:0 bounce:0
+> [    0.000000]  free:7737 free_pcp:0 free_cma:0
+> [    0.000000] Node 0 active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:0kB dirty:0kB writeback:0kB shmem:0kB shmem_thp: 0kB shmem_pmdmapped: 0kB anon_thp: 0kB writeback_tmp:0kB unstable:0kB all_unreclaimable? no
+> [    0.000000] Node 0 DMA32 free:495168kB min:524288kB low:524288kB high:524288kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB writepending:0kB present:1048576kB managed:495232kB mlocked:0kB kernel_stack:0kB pagetables:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
+> [    0.000000] lowmem_reserve[]: 0 0 0
+> [    0.000000] Node 0 DMA32: 1*64kB (U) 4*128kB (U) 2*256kB (U) 3*512kB (U) 3*1024kB (U) 1*2048kB (U) 3*4096kB (U) 2*8192kB (U) 2*16384kB (U) 3*32768kB (U) 3*65536kB (U) 1*131072kB (U) 0*262144kB 0*524288kB = 495168kB
+> [    0.000000] 0 total pagecache pages
+> [    0.000000] 0 pages in swap cache
+> [    0.000000] Swap cache stats: add 0, delete 0, find 0/0
+> [    0.000000] Free swap  = 0kB
+> [    0.000000] Total swap = 0kB
+> [    0.000000] 16384 pages RAM
+> [    0.000000] 0 pages HighMem/MovableOnly
+> [    0.000000] 8646 pages reserved
+> [    0.000000] 8192 pages cma reserved
+> [    0.000000] SLUB: Unable to allocate memory on node -1, gfp=0x408000(GFP_NOWAIT|__GFP_ZERO)
+> [    0.000000]   cache: kmem_cache, object size: 336, buffer size: 384, default order: 0, min order: 0
+> [    0.000000]   node 0: slabs: 0, objs: 0, free: 0
+> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
+> [    0.000000] Mem abort info:
+> [    0.000000]   ESR = 0x96000045
+> [    0.000000]   Exception class = DABT (current EL), IL = 32 bits
+> [    0.000000]   SET = 0, FnV = 0
+> [    0.000000]   EA = 0, S1PTW = 0
+> [    0.000000] Data abort info:
+> [    0.000000]   ISV = 0, ISS = 0x00000045
+> [    0.000000]   CM = 0, WnR = 1
+> [    0.000000] [0000000000000000] user address but active_mm is swapper
+> [    0.000000] Internal error: Oops: 96000045 [#1] SMP
+> [    0.000000] Modules linked in:
+> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc64.9.0+ #1
+> [    0.000000] Hardware name: linux,dummy-virt (DT)
+> [    0.000000] pstate: 20000085 (nzCv daIf -PAN -UAO)
+> [    0.000000] pc : __memcpy+0x110/0x180
+> [    0.000000] lr : bootstrap+0x48/0x170
+> [    0.000000] sp : ffff00001104ff20
+> [    0.000000] x29: ffff00001104ff20 x28: 0000000080ea0018 
+> [    0.000000] x27: 0000000000000000 x26: 0000000000000000 
+> [    0.000000] x25: 0000000000000000 x24: ffff000010f80008 
+> [    0.000000] x23: ffff000010f92490 x22: ffff000011070000 
+> [    0.000000] x21: ffff000010f92490 x20: ffff000011a1f000 
+> [    0.000000] x19: 0000000000000000 x18: 0000000000000010 
+> [    0.000000] x17: 0000000000000000 x16: 0000000000000000 
+> [    0.000000] x15: ffffffffffffffff x14: 00000000ffffffff 
+> [    0.000000] x13: 00000000000000aa x12: 000000aa000000aa 
+> [    0.000000] x11: 0000000d00000000 x10: 0000015000000180 
+> [    0.000000] x9 : 0000000000000005 x8 : 0000000040002000 
+> [    0.000000] x7 : ffff000011030e80 x6 : 0000000000000000 
+> [    0.000000] x5 : 0000000000000000 x4 : 0000000000000000 
+> [    0.000000] x3 : 0000000000000000 x2 : 00000000000000d0 
+> [    0.000000] x1 : ffff000010f924d0 x0 : 0000000000000000 
+> [    0.000000] Process swapper (pid: 0, stack limit = 0x(____ptrval____))
+> [    0.000000] Call trace:
+> [    0.000000]  __memcpy+0x110/0x180
+> [    0.000000]  kmem_cache_init+0x9c/0x130
+> [    0.000000]  start_kernel+0x240/0x464
+> [    0.000000] Code: a8c12027 a8c12829 a8c1302b a8c1382d (a88120c7) 
+> [    0.000000] ---[ end trace a6053f496cb6dec0 ]---
+> [    0.000000] Kernel panic - not syncing: Fatal exception
+> [    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
