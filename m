@@ -2,140 +2,87 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1D26C282CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:13:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3DB8C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:13:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF811218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:13:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B8037218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:13:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W5i2ffwN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="szyYqyKe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF811218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s9Il7QE+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="QOARei3g";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="WpI0lke2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B8037218D3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Lo0Jgi/K1glPsrAdK14u6ZYp3dz5gjjI6OFjqOZXbJM=; b=W5i2ffwNeYaH9V
-	7UE0ldzol8vjncHvPJqgiz1NUoT1LMB7fMCuhwt/dbQVt/B9VpDmv/VD7ojsMSZbjsH1AyQA3cqBS
-	meSSAJoVqTK9w5JACq5pyIpxIDHHDwpX96IpHwcAe1o1A2OmhNcO/toMHl7/9PTApql9PlwIJgcZz
-	Klh3PPiPsgXNMWivhKUTb7g1/rsM0Pr2zdup+2jVz3nkFMDsfP8BMYcNNz4v7/iRJpCc5YXcr2m+d
-	DewaA9cjkuc/24hoNtmRYOcc7YHC7nyJsoe1OTQsFwGgSwYcvk+uhV4MfOpu/Z+rVdO387G581O47
-	2DKaFlI90GLDAJ2rX4Zg==;
+	List-Owner; bh=AJJDAUMwZDWtLia/fl8naWuCmHf0f5lLI9xtDixlcKo=; b=s9Il7QE+IijsoP
+	7pbYjScktdhTQ0n24yAvmbQtIfpqSv3CKDTjifmZwU/9oUkzmcsA/ywxgs42T+NYauJrCZdj3UVU4
+	lexnzDha/Ah7Qmg8G4BnUgiYcjz4MegEkSBykxZ72Uw46R1ZYeIzCoKauzEEXud9M/HbGxeWMAMPX
+	L5HvXETXdGdHgW1JD8GE0MLmA0TGaAEKoBNw+BCP3A5oLHaxnNyarIoJQxMeR6G+HZ+c0pilNM0jf
+	CAMmKaDjeLUH0hpgja8L/z75o2L5xwRh7zczFg5lRLaJQz8Kr2295uU64r18/7koXxjmx60u1tFb9
+	7nvb9ZeLhjpo+9Q95iig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtz23-0005Pf-Ee; Wed, 13 Feb 2019 18:13:15 +0000
-Received: from mail-eopbgr30044.outbound.protection.outlook.com ([40.107.3.44]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gtz2S-0005oT-Nm; Wed, 13 Feb 2019 18:13:40 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtz1T-0004dy-EL
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 18:12:42 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=IWTPLNbtuf/9VNzWLUjQaPgfR6KNSczRH6WDkiy1Zt4=;
- b=szyYqyKeOOWzwYzXvq3oWreZMmS/DCYCEOVAoN48y9dAM46ays4Cngheh1LhcRg4cVzmPt2sagQ/O6ODDhSuwIzY1Nl1gWdlJyqPVyzXbv7vGPVCwaf1b2/6V3qcUa27VXz6hJGiJFOS8CRW9xrN3pOz9XROg9fY7aTh4m1D/Uc=
-Received: from VI1PR04MB4910.eurprd04.prod.outlook.com (20.177.49.159) by
- VI1PR04MB6223.eurprd04.prod.outlook.com (20.179.26.148) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.16; Wed, 13 Feb 2019 18:12:36 +0000
-Received: from VI1PR04MB4910.eurprd04.prod.outlook.com
- ([fe80::6cc7:b375:76f7:b849]) by VI1PR04MB4910.eurprd04.prod.outlook.com
- ([fe80::6cc7:b375:76f7:b849%5]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
- 18:12:35 +0000
-From: Frank Li <frank.li@nxp.com>
-To: "mark.rutland@arm.com" <mark.rutland@arm.com>, "will.deacon@arm.com"
- <will.deacon@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- dl-linux-imx <linux-imx@nxp.com>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
- Aisheng Dong <aisheng.dong@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "lznuaa@gmail.com" <lznuaa@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH V3 4/4] MAINTAINERS: Added imx DDR performonitor driver
- maintainer information
-Thread-Topic: [PATCH V3 4/4] MAINTAINERS: Added imx DDR performonitor driver
- maintainer information
-Thread-Index: AQHUw8eyMhn1qIna7EuJ3Yf6EED4fg==
-Date: Wed, 13 Feb 2019 18:12:35 +0000
-Message-ID: <1550081533-25000-4-git-send-email-Frank.Li@nxp.com>
-References: <1550081533-25000-1-git-send-email-Frank.Li@nxp.com>
-In-Reply-To: <1550081533-25000-1-git-send-email-Frank.Li@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: SN6PR04CA0036.namprd04.prod.outlook.com
- (2603:10b6:805:3e::49) To VI1PR04MB4910.eurprd04.prod.outlook.com
- (2603:10a6:803:56::31)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=frank.li@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.5.2
-x-originating-ip: [64.157.242.222]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 11580771-0bac-4bb6-8ef5-08d691ded4a4
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB6223; 
-x-ms-traffictypediagnostic: VI1PR04MB6223:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR04MB6223;
- 23:6hw6V8O+YkKNm7iM8J+JgHi21paLVbLhIiCrdiL?=
- =?iso-8859-1?Q?V4WhEoPaN788bw23tfskGCIflSj8UHQ9JDBHQOfERfy09bdJG3yjTJs+Wy?=
- =?iso-8859-1?Q?Lswrfz1SNJXeZjYQtRVoFIr8+9bImZcTGLgb+yArOK5nNn0i1d4wUKUzXT?=
- =?iso-8859-1?Q?r22kewMaJYkeLxS3zJhW2c06yo01htBd5bOJdUiA8cGrOp6NJlRzlhoNz8?=
- =?iso-8859-1?Q?v8l04j8cpndQF5pFAGKaJYLbe2i/SQR1FnY0qpu7l7V6kZksjj5zT0PB1j?=
- =?iso-8859-1?Q?eABHb8hv3Rr704t39imN6bWpNzzsGoVhLAU7++MHkn6nESoMlYYmABcMxD?=
- =?iso-8859-1?Q?TBHQb8NJX9zyYA90QxH3yoAkl+GHT547Kz7/d/BwHxnlwbRhYSmGUYIQqn?=
- =?iso-8859-1?Q?HvVSb0oq4mQzHjGn1vbqD38qjgqj0ZXIoHnmMjfqF02asN+QfttCUM8hO3?=
- =?iso-8859-1?Q?eca9Tbzbz/8Oy7/v89SUuxrWNlUQT8Rxt+IJV0/CkrJrrPehbgHQlnpPZ2?=
- =?iso-8859-1?Q?rD4lI20AMn0liDCb4Hec4pTfYc4gFeKPki9CPrkocvCkl90UmlGFmMuRun?=
- =?iso-8859-1?Q?WRdYRWtHZHR9nIkRt8TItdt1qgDHeAj5EW+l+HZHwfCOT+68x3jKi58g16?=
- =?iso-8859-1?Q?jtrI2nkrKylH27cr9CEDXidCoEI1Tcp/kCVRk4Szf1pg8pM1w4uPqop6BK?=
- =?iso-8859-1?Q?3WorZ+tKOK0yrkhmWkwha09RyfE7qvjpp4tlqt+1cbM2svblujaDtGd3Fw?=
- =?iso-8859-1?Q?DSN6iAj6+Adyg0NqdH3gTznc3JpbH0AN1+ndZYP3Vt3JiNPchxQstpl+Fd?=
- =?iso-8859-1?Q?lRQ+NrDLcmX5eWwG0BXD+uy5NmLDT9+Kk5UqPb7j2lvVGQBYYQqZY+HFEt?=
- =?iso-8859-1?Q?/qPCyn8zyhFDs6dFI6n26Wq4+S4f2kbk3A8YXxdf4VrMa79tOpIiFIkVFO?=
- =?iso-8859-1?Q?JB2uwnroQrOsGKAVqaTNz9TJvk5Anlm7VcHQGrn5M4FvA4OrJxZ2XmOrbW?=
- =?iso-8859-1?Q?pO+Y7htuFLCUen+Opc4EXL+YgAWIpYlP3brsBAiXMrZKyZyHHijNO6KwNn?=
- =?iso-8859-1?Q?EhleCvDFmo3VA+D8QlLAOOWGzap64ls4iu0ikCxD4giUWJFZ0AYnSGMI4T?=
- =?iso-8859-1?Q?5/8C0zb2yzpS9gGHK3Njlp2FnrMip/j76m9la/E3U7hbdPYC9ywOQ2OuLX?=
- =?iso-8859-1?Q?muM5JwsRY1M84I/oVkuN458gT5ghFDN2/JxX9lMIvqndrHwPSF+mwu4y4O?=
- =?iso-8859-1?Q?v+cJtPCIKqotzwkceU9a4EPIzXZjZR95cbygZ2ZIkiieB5f6xduQYflRNy?=
- =?iso-8859-1?Q?rI=3D?=
-x-microsoft-antispam-prvs: <VI1PR04MB6223187C16B57C96C10DF04388660@VI1PR04MB6223.eurprd04.prod.outlook.com>
-x-forefront-prvs: 094700CA91
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(396003)(376002)(346002)(366004)(39860400002)(199004)(189003)(6436002)(2616005)(66066001)(76176011)(52116002)(2906002)(99286004)(6486002)(386003)(478600001)(102836004)(256004)(26005)(186003)(53936002)(6506007)(7416002)(36756003)(2501003)(110136005)(316002)(476003)(486006)(68736007)(446003)(6512007)(11346002)(105586002)(14454004)(4744005)(106356001)(86362001)(25786009)(2201001)(50226002)(8936002)(71190400001)(71200400001)(4326008)(305945005)(7736002)(8676002)(97736004)(81156014)(6116002)(81166006)(3846002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB6223;
- H:VI1PR04MB4910.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: iEbjFnXoN0HDHE18kN++qXuexpx5VW2FXKk6pgBfd9giFcOx/zfxUCNIXtgjZfiVoA5HT5XoL+SNvY34I0pnQwm95pcU5mez1bbWNMPtZB6w5/goieuUgQYpRYQEPYoscHroYnktDgoA5LFgHaTOAFBmgwutRnn4AYBBoydswg2LDZJxBeLZ8RUhc9ApkOqk3n74iEaMWerPWXyDAFvCyOl7dlaNVLsardL852ywRNBwZEw+sDRr7c0cVUSWoGV6EfpW1e+7Vi7oX2AwDVjDElz251ttbEKUqNqcgHp4+D3U5JORd/nvVXz2MJJjqWVROatvlbgooLm0rm9AH/TTiI8r5T4DTkLEwUzliUDtZx9sUAoe7JAciM7mf0hbCos0jEx50DkrBSTGTZQpjp7dLfe+SZCnPXFMJpzkAoY7eZw=
+ id 1gtz2Q-0005oJ-6d
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 13 Feb 2019 18:13:38 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=rO417quK3Qn8+Uw59Z6T+tNgZUbPT/W9xiWXHbGHtT4=; b=QOARei3gry2LD0Op6HdtUOln/
+ v2TzAFapZvyhIxVfbpjG4mHYhXAkMBtUJzN5QxFrBY2aU0Dz78n7KCV12liWtJc7YDIcGkRtgo1Ss
+ eSkjGBVKluEY/cWcR3AWV4ldMZ8iVBxFGNqt1ZxuJNfZqYarmaQiZV38Kzb3yLqSmwkKI/cifvnRH
+ 0W7YlwuI1Cjq5b7+uoPzp1aifcblSiXfuG02/oByMiraImZtTTkJeRyDKxmzkk7TXnPOiSJlvSD/y
+ ETSmspEGPVylsZXdfUnb079yR9JAgMMDP2pCAQ2YsZA95UklDf+E5R5dnHoCPcD5iPwQSobiV2aHv
+ zABa8BaYA==;
+Received: from vps0.lunn.ch ([185.16.172.187])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtz2N-0004HC-6N
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 18:13:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
+ s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
+ Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
+ List-Post:List-Owner:List-Archive;
+ bh=rO417quK3Qn8+Uw59Z6T+tNgZUbPT/W9xiWXHbGHtT4=; b=WpI0lke2YwH7r2j1Mm1uFMBc7w
+ Fyh+CWSe10yTITTE10VaIqqLfWd1HcUzsSfbg1qZMEFbiGdkawlW5b8LRin1pFYj72GoUfXQQp9Rt
+ y0tQegXGnghQigHtHyYqxTQP9QwuDIqdjb+snCcNZMdanXbuTQ5QGpYBybrstkamJs7o=;
+Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
+ (envelope-from <andrew@lunn.ch>)
+ id 1gtz2B-0000iF-QX; Wed, 13 Feb 2019 19:13:23 +0100
+Date: Wed, 13 Feb 2019 19:13:23 +0100
+From: Andrew Lunn <andrew@lunn.ch>
+To: Claudiu Manoil <claudiu.manoil@nxp.com>
+Subject: Re: [PATCH net-next 3/3] enetc: Add ENETC PF level external MDIO
+ support
+Message-ID: <20190213181323.GA708@lunn.ch>
+References: <1550055743-15542-1-git-send-email-claudiu.manoil@nxp.com>
+ <1550055743-15542-4-git-send-email-claudiu.manoil@nxp.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 11580771-0bac-4bb6-8ef5-08d691ded4a4
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 18:12:33.4710 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB6223
+Content-Disposition: inline
+In-Reply-To: <1550055743-15542-4-git-send-email-claudiu.manoil@nxp.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_101239_680930_D9DB846E 
-X-CRM114-Status: UNSURE (   8.29  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190213_131335_349779_C105FEAA 
+X-CRM114-Status: GOOD (  26.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -147,42 +94,167 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Frank Li <frank.li@nxp.com>
+Cc: devicetree@vger.kernel.org, netdev@vger.kernel.org,
+ alexandru.marginean@nxp.com, linux-kernel@vger.kernel.org,
+ Li Yang <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
+ "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add DDR perf counter driver maintainer information
+On Wed, Feb 13, 2019 at 01:02:23PM +0200, Claudiu Manoil wrote:
+> Each ENETC PF has its own MDIO interface, the corresponding
+> MDIO registers are mapped in the ENETC's Port register block.
+> The current patch adds a driver for these PF level MDIO buses,
+> so that each PF can manage directly its own external link.
+> 
+> Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
+> Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+> ---
+>  drivers/net/ethernet/freescale/enetc/Makefile     |   3 +-
+>  drivers/net/ethernet/freescale/enetc/enetc_mdio.c | 196 ++++++++++++++++++++++
+>  drivers/net/ethernet/freescale/enetc/enetc_pf.c   |  13 ++
+>  drivers/net/ethernet/freescale/enetc/enetc_pf.h   |   6 +
+>  4 files changed, 217 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/net/ethernet/freescale/enetc/enetc_mdio.c
+> 
+> diff --git a/drivers/net/ethernet/freescale/enetc/Makefile b/drivers/net/ethernet/freescale/enetc/Makefile
+> index 6976602..7139e41 100644
+> --- a/drivers/net/ethernet/freescale/enetc/Makefile
+> +++ b/drivers/net/ethernet/freescale/enetc/Makefile
+> @@ -1,6 +1,7 @@
+>  # SPDX-License-Identifier: GPL-2.0
+>  obj-$(CONFIG_FSL_ENETC) += fsl-enetc.o
+> -fsl-enetc-$(CONFIG_FSL_ENETC) += enetc.o enetc_cbdr.o enetc_ethtool.o
+> +fsl-enetc-$(CONFIG_FSL_ENETC) += enetc.o enetc_cbdr.o enetc_ethtool.o \
+> +				 enetc_mdio.o
+>  fsl-enetc-$(CONFIG_PCI_IOV) += enetc_msg.o
+>  fsl-enetc-objs := enetc_pf.o $(fsl-enetc-y)
+>  
+> diff --git a/drivers/net/ethernet/freescale/enetc/enetc_mdio.c b/drivers/net/ethernet/freescale/enetc/enetc_mdio.c
+> new file mode 100644
+> index 0000000..e71b4fd
+> --- /dev/null
+> +++ b/drivers/net/ethernet/freescale/enetc/enetc_mdio.c
+> @@ -0,0 +1,196 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+> +/* Copyright 2019 NXP */
+> +
+> +#include <linux/mdio.h>
+> +#include <linux/of_mdio.h>
+> +
+> +#include "enetc_pf.h"
+> +
+> +struct enetc_mdio_regs {
+> +	u32	mdio_cfg;	/* MDIO configuration and status */
+> +	u32	mdio_ctl;	/* MDIO control */
+> +	u32	mdio_data;	/* MDIO data */
+> +	u32	mdio_addr;	/* MDIO address */
+> +};
+> +
+> +#define bus_to_enetc_regs(bus)	(struct enetc_mdio_regs __iomem *)((bus)->priv)
+> +
+> +#define ENETC_MDIO_REG_OFFSET	0x1c00
+> +#define ENETC_MDC_DIV		258
+> +#define MDIO_CFG_CLKDIV(x)	((((x) >> 1) & 0xff) << 8)
+> +#define MDIO_CFG_BSY		BIT(0)
+> +#define MDIO_CFG_RD_ER		BIT(1)
+> +#define MDIO_CFG_ENC		BIT(6)
+> +#define MDIO_CFG_NEG		BIT(23)
+> +#define MDIO_CTL_DEV_ADDR(x)	((x) & 0x1f)
+> +#define MDIO_CTL_PORT_ADDR(x)	(((x) & 0x1f) << 5)
+> +#define MDIO_CTL_READ		BIT(15)
+> +#define MDIO_DATA(x)		((x) & 0xffff)
+> +
+> +#define TIMEOUT	1000
+> +static int enetc_wait_complete(struct device *dev,
+> +			       struct enetc_mdio_regs __iomem *regs)
+> +{
+> +	unsigned int timeout;
+> +
+> +	timeout = TIMEOUT;
+> +	while ((enetc_rd_reg(&regs->mdio_cfg) & MDIO_CFG_BSY) && timeout) {
+> +		cpu_relax();
+> +		timeout--;
+> +	}
+> +
+> +	if (!timeout) {
+> +		dev_err(dev, "timeout waiting for bus to be free\n");
+> +		return -ETIMEDOUT;
+> +	}
 
-Signed-off-by: Frank Li <Frank.Li@nxp.com>
----
-No change from v1 to v3
+Hi Claudiu
 
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+readx_poll_timeout()
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6ba068e..687be0f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -6163,6 +6163,13 @@ L:	linux-i2c@vger.kernel.org
- S:	Maintained
- F:	drivers/i2c/busses/i2c-cpm.c
- 
-+FREESCALE IMX DDR Performance Monitor DRIVER
-+M:	Frank Li <Frank.li@nxp.com>
-+L:	linux-arm-kernel@lists.infradead.org
-+S:	Maintained
-+F:	drivers/perf/fsl_imx8_ddr_perf.c
-+F:	Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
-+
- FREESCALE IMX LPI2C DRIVER
- M:	Dong Aisheng <aisheng.dong@nxp.com>
- L:	linux-i2c@vger.kernel.org
--- 
-2.5.2
+> +
+> +	return 0;
+> +}
+> +
+> +static int enetc_mdio_write(struct mii_bus *bus, int phy_id, int regnum,
+> +			    u16 value)
+> +{
+> +	struct enetc_mdio_regs __iomem *regs = bus_to_enetc_regs(bus);
+> +	u32 mdio_ctl, mdio_cfg;
+> +	u16 dev_addr;
+> +	int ret;
+> +
+> +	mdio_cfg = MDIO_CFG_CLKDIV(ENETC_MDC_DIV) | MDIO_CFG_NEG;
 
+What does MDIO_CFG_NEG mean?
+
+> +	if (regnum & MII_ADDR_C45) {
+> +		/* clause 45 */
+
+Does the comment add anything useful?
+
+> +		dev_addr = (regnum >> 16) & 0x1f;
+> +		mdio_cfg |= MDIO_CFG_ENC;
+
+Maybe MDIO_CFG_ENC could be called MDIO_CFG_C45? Assuming that is what
+it actually means?
+
+> +int enetc_mdio_probe(struct enetc_pf *pf)
+> +{
+> +	struct device *dev = &pf->si->pdev->dev;
+> +	struct enetc_mdio_regs __iomem *regs;
+> +	struct mii_bus *bus;
+> +	int ret;
+> +
+> +	bus = mdiobus_alloc_size(sizeof(regs));
+> +	if (!bus)
+> +		return -ENOMEM;
+> +
+> +	bus->name = "Freescale ENETC MDIO Bus";
+> +	bus->read = enetc_mdio_read;
+> +	bus->write = enetc_mdio_write;
+> +	bus->parent = dev;
+> +	snprintf(bus->id, MII_BUS_ID_SIZE, "%s", dev_name(dev));
+> +
+> +	/* store the enetc mdio base address for this bus */
+> +	regs = pf->si->hw.port + ENETC_MDIO_REG_OFFSET;
+> +	bus->priv = regs;
+> +
+> +	ret = of_mdiobus_register(bus, dev->of_node);
+
+It is a good idea to have an mdio node which contains the list of
+PHYs. You can get into odd situations if you don't do that.
+
+>  
+> @@ -770,12 +771,23 @@ static int enetc_of_get_phy(struct enetc_ndev_priv *priv)
+>  		priv->phy_node = of_node_get(np);
+>  	}
+>  
+> +	if (!of_phy_is_fixed_link(np)) {
+> +		err = enetc_mdio_probe(pf);
+> +		if (err) {
+> +			dev_err(priv->dev, "MDIO bus registration failed\n");
+
+enetc_mdio_probe() already prints an error message. You don't really
+need both.
+
+     Andrew
 
 _______________________________________________
 linux-arm-kernel mailing list
