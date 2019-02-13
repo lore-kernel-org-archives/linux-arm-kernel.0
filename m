@@ -2,77 +2,60 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C262C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:10:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 51475C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:29:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 69EE721904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:10:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21776222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 16:29:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WtZ9XYG/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="RZTsVZJx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 69EE721904
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i9nlmXwM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21776222B2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Mt4jiLYKd2vcamEicgePfkZU97e2FK9MyFqGQR+ehPg=; b=WtZ9XYG/6axBv9
-	yG+uiSfDAJhtuPNEiilWQ6FJkbuzEnC+8mRYYK/Hc2W2FlarFiiC6+XMXOL9pbxU+E28aTMwD08xi
-	n0APKnzMlpE5XnGstEK1qNxHyQj1i/0mRdQ7gApdN06UdASahEErhiOFEDUb4R8kZ7ZuTKaEhRv6T
-	OMs+q5Wb1i4tIyQafYlmfbOWfs4fol2vf/PvALu9OKTsxA2sxwnzDdQwI0pqTkf9vZePuNs5YH0xd
-	5B2Gl/cIn5T5xeRwAIJtW14/7C93tubGOWEeNGr83aBxeL0NykzlpTvmB7QcW+cs/AflNCCn+3QUZ
-	U78MSmnHFcCf6Mox+cYw==;
+	List-Owner; bh=7oSsuL8ok4Abt9+aD3CHdHL7AEU/S1GMZ9NEQKxl6mc=; b=i9nlmXwM5eU8l+
+	fi92Rm+MSM5c+YovbV0w09HY/RkdruvOu9aC4fiyTDKvRaaaY006z41Px2sfLRtoSaRtrFdqhumKp
+	1567YG39BC1ICsFXCyRYOVey17rk07o305EPM/LzBxzUwTh9VIRBNGO8Er0Y7ETDBJiDtDd5NXUII
+	h6KCkyrNgyxua+fUL9Qcd3CaX+IpeC2hRntLNHLx8yX9mKggXUvoPMflLwRJ694TU/jsCGyKUC2Fu
+	0rDRuGcRsLhhIxbRgjo3TBSSjnUmTtn7WRLHZtaXC50YPGJfFYWehz3qQBULsfiBEdZpf2DjsMR8k
+	eWSIm0lVsMpzTIsrMgUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtx6w-0001Zn-W7; Wed, 13 Feb 2019 16:10:10 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gtxP2-00016w-SV; Wed, 13 Feb 2019 16:28:52 +0000
+Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtx6t-0000rI-Cd
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 16:10:08 +0000
-Received: from mail-yb1-f182.google.com (mail-yb1-f182.google.com
- [209.85.219.182])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6CF92222B2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 16:10:06 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550074206;
- bh=1Ga0mlGbTkzTQOsOeEwy2Txp35a5K/9pjOTNmVoOdik=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=RZTsVZJxvrH/bhyKesfZoDwA2bSsvjfJ6bpsnQuA1hJ3gFKYZuM9M/+V/hORjgDvB
- U6vMuRtcANibSffBB/pz56v4+rEaQO5rpuFQmE2UFdQc4OH5j8Jk66HSavAebKj9/t
- jiTWYiLln42DmxNaDwU+uEpkc2vIQbFHmFIpXZ7A=
-Received: by mail-yb1-f182.google.com with SMTP id x9so1117901ybj.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 08:10:06 -0800 (PST)
-X-Gm-Message-State: AHQUAuZAoH9VzDyajVfatuJpGGTs+hHU0tmRRlIRg5K+wKbYv92783UU
- saOVxiooh22j5+7chSnHWl6SzrDR5yaoECgn2Q==
-X-Google-Smtp-Source: AHgI3IanZ3XokatEDtDVHGOCDtEM6FP+/DzqrlPsFEYfk2wta6svpTb9pnJnBWfdKNHT9TnSg1jtif/aVEEJ78GLltY=
-X-Received: by 2002:a25:6642:: with SMTP id z2mr1193642ybm.302.1550074205596; 
- Wed, 13 Feb 2019 08:10:05 -0800 (PST)
+ id 1gtxOy-00016G-MQ
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 16:28:50 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1])
+ (Authenticated sender: ezequiel) with ESMTPSA id 14D8227F765
+Message-ID: <2e468fd22b577f1a5fd5d3186d6cc88e442e07ec.camel@collabora.com>
+Subject: Re: [PATCH v3 0/2] media: cedrus: Add H264 decoding support
+From: Ezequiel Garcia <ezequiel@collabora.com>
+To: Tomasz Figa <tfiga@chromium.org>
+Date: Wed, 13 Feb 2019 13:28:34 -0300
+In-Reply-To: <CAAFQd5DE+T6KJ0TXcQUxLSnog5enQf5G0SVM+5t6f60VjcovFw@mail.gmail.com>
+References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
+ <CAAFQd5AcqiwAb30ajLxmj6LZoabVygUsAB8A+drpityOAvY60A@mail.gmail.com>
+ <4a1346315224850faf31345b577ce3a29c069f3a.camel@collabora.com>
+ <CAAFQd5DE+T6KJ0TXcQUxLSnog5enQf5G0SVM+5t6f60VjcovFw@mail.gmail.com>
+Organization: Collabora
+User-Agent: Evolution 3.30.5-1 
 MIME-Version: 1.0
-References: <20181205195050.4759-6-robh@kernel.org>
-In-Reply-To: <20181205195050.4759-6-robh@kernel.org>
-From: Rob Herring <robh@kernel.org>
-Date: Wed, 13 Feb 2019 10:09:53 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+xpRPvj=UcSo+jQKX1pB=9B3SV9jB5ZVhaVsKvOqtoOg@mail.gmail.com>
-Message-ID: <CAL_Jsq+xpRPvj=UcSo+jQKX1pB=9B3SV9jB5ZVhaVsKvOqtoOg@mail.gmail.com>
-Subject: Re: [PATCH] devfreq: Use of_node_name_eq for node name comparisons
-To: devicetree@vger.kernel.org, 
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_081007_479898_BE1C497F 
-X-CRM114-Status: GOOD (  18.45  )
+X-CRM114-CacheID: sfid-20190213_082848_991228_19AA56AF 
+X-CRM114-Status: GOOD (  30.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,73 +67,152 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
- Kyungmin Park <kyungmin.park@samsung.com>,
- MyungJoo Ham <myungjoo.ham@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,	Joerg 
+ Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Alexandre Courbot <acourbot@chromium.org>, Jonas Karlman <jonas@kwiboo.se>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, jenskuske@gmail.com,
+ linux-sunxi@googlegroups.com,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Jernej Skrabec <jernej.skrabec@gmail.com>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hans.verkuil@cisco.com>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Nicolas Dufresne <nicolas.dufresne@collabora.com>,
+ Pawel Osciak <posciak@chromium.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Dec 5, 2018 at 1:50 PM Rob Herring <robh@kernel.org> wrote:
->
-> Convert string compares of DT node names to use of_node_name_eq helper
-> instead. This removes direct access to the node name pointer.
->
-> For instances using of_node_cmp, this has the side effect of now using
-> case sensitive comparisons. This should not matter for any FDT based
-> system which all of these are.
->
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: linux-pm@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-samsung-soc@vger.kernel.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> ---
->  drivers/devfreq/devfreq-event.c     | 2 +-
->  drivers/devfreq/event/exynos-ppmu.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+On Wed, 2019-02-13 at 12:02 +0900, Tomasz Figa wrote:
+> On Wed, Feb 13, 2019 at 6:22 AM Ezequiel Garcia <ezequiel@collabora.com> wrote:
+> > Hey Tomasz,
+> > 
+> > On Tue, 2019-02-12 at 21:50 +0900, Tomasz Figa wrote:
+> > > Hi Maxime,
+> > > 
+> > > On Mon, Feb 11, 2019 at 11:39 PM Maxime Ripard
+> > > <maxime.ripard@bootlin.com> wrote:
+> > > > Hi,
+> > > > 
+> > > > Here is a new version of the H264 decoding support in the cedrus
+> > > > driver.
+> > > 
+> > > Thanks for working on this. Please see my comments below.
+> > > 
+> > > > As you might already know, the cedrus driver relies on the Request
+> > > > API, and is a reverse engineered driver for the video decoding engine
+> > > > found on the Allwinner SoCs.
+> > > > 
+> > > > This work has been possible thanks to the work done by the people
+> > > > behind libvdpau-sunxi found here:
+> > > > https://github.com/linux-sunxi/libvdpau-sunxi/
+> > > > 
+> > > > I've tested the various ABI using this gdb script:
+> > > > http://code.bulix.org/jl4se4-505620?raw
+> > > > 
+> > > > And this test script:
+> > > > http://code.bulix.org/8zle4s-505623?raw
+> > > > 
+> > > > The application compiled is quite trivial:
+> > > > http://code.bulix.org/e34zp8-505624?raw
+> > > > 
+> > > > The output is:
+> > > > arm:    builds/arm-test-v4l2-h264-structures
+> > > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+> > > > x86:    builds/x86-test-v4l2-h264-structures
+> > > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+> > > > x64:    builds/x64-test-v4l2-h264-structures
+> > > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+> > > > arm64:  builds/arm64-test-v4l2-h264-structures
+> > > >         SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+> > > > 
+> > > > Let me know if there's any flaw using that test setup, or if you have
+> > > > any comments on the patches.
+> > > > 
+> > > > Maxime
+> > > > 
+> > > > Changes from v2:
+> > > >   - Simplified _cedrus_write_ref_list as suggested by Jernej
+> > > >   - Set whether the frame is used as reference using nal_ref_idc
+> > > >   - Respect chroma_format_idc
+> > > >   - Fixes for the scaling list and prediction tables
+> > > >   - Wrote the documentation for the flags
+> > > >   - Added a bunch of defines to the driver bit fields
+> > > >   - Reworded the controls and data format descriptions as suggested
+> > > >     by Hans
+> > > >   - Reworked the controls' structure field size to avoid padding
+> > > >   - Removed the long term reference flag
+> > > 
+> > > This and...
+> > > 
+> > 
+> > Maxime has dropped this because of Ayaka's mail about long term references
+> > not making much sense in stateless decoders.
+> 
+> I haven't seen any argument confirming that thesis, though. I should
+> have kicked in earlier, sorry.
+> 
 
-Can someone apply this please.
+OK, in that case, we need to have this flag back.
 
->
-> diff --git a/drivers/devfreq/devfreq-event.c b/drivers/devfreq/devfreq-event.c
-> index d67242d87744..87e93406d7cd 100644
-> --- a/drivers/devfreq/devfreq-event.c
-> +++ b/drivers/devfreq/devfreq-event.c
-> @@ -240,7 +240,7 @@ struct devfreq_event_dev *devfreq_event_get_edev_by_phandle(struct device *dev,
->         }
->
->         list_for_each_entry(edev, &devfreq_event_list, node) {
-> -               if (!strcmp(edev->desc->name, node->name))
-> +               if (of_node_name_eq(node, edev->desc->name))
->                         goto out;
->         }
->         edev = NULL;
-> diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-> index c61de0bdf053..c2ea94957501 100644
-> --- a/drivers/devfreq/event/exynos-ppmu.c
-> +++ b/drivers/devfreq/event/exynos-ppmu.c
-> @@ -529,7 +529,7 @@ static int of_get_devfreq_events(struct device_node *np,
->                         if (!ppmu_events[i].name)
->                                 continue;
->
-> -                       if (!of_node_cmp(node->name, ppmu_events[i].name))
-> +                       if (of_node_name_eq(node, ppmu_events[i].name))
->                                 break;
->                 }
->
-> --
-> 2.19.1
->
+> > I noticed that RK3399 TRM has a field to specify long term refs and
+> > so was wondering about this item as well.
+> > 
+> > > >   - Reintroduced the neighbor info buffer
+> > > >   - Removed the ref_pic_list_p0/b0/b1 arrays that are redundant with the
+> > > >     one in the DPB
+> > > 
+> > > these are used in our Rockchip VDEC driver.
+> > > 
+> > > Could you elaborate on the reasons why they got removed?
+> > > 
+> > 
+> > If I understood correctly, there are two reference picture lists.
+> > P-frames will populate ref_pic_list0 and B-frames will populate both.
+> > 
+> > According to this, v4l2_ctrl_h264_slice_param.ref_pic_list0 and .ref_pic_list1
+> > should be enough and ref_pic_list_p0/b0/b1 are not needed.
+> > 
+> > What do you think?
+> 
+> The lists in v4l2_ctrl_h264_slice_param are expected to be past the
+> per-slice modification stage (which is quite complicated and better
+> done in userspace),
+
+The fact that these are RefPicList0 and RefPicList1, after
+the reordering stage should be better documented.
+
+> while the ones in v4l2_ctrl_h264_decode_param just
+> in the original order. Rockchip VPU expects them in the original order
+> and does the modification in the hardware.
+> 
+
+OK, I see.
+
+So, we have RefPicList0 and RefPicList1, and there is an initialization
+stage and a modification/reordering process.
+
+One could argue that it's more generic to just pass the initial list,
+but that would mean doing in the kernel something that is easier
+done in userspace (and parsers doing this are already available).
+
+The question would be what is the most generic way of passing
+the RefPicList0 and RefPicList1 in its initial state.
+
+1/ We create additional controls for these.
+
+2/ We put them on some of the other controls. Putting them on
+v4l2_ctrl_h264_decode_param didn't seem too wrong.
+
+Any objections to put them back in there?
+
+Regards,
+Ezequiel
+
 
 _______________________________________________
 linux-arm-kernel mailing list
