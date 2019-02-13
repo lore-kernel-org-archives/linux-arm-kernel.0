@@ -2,85 +2,88 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63C46C282CA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 04:26:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09948C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 04:26:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32E79222C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 04:26:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC0EE222C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 04:26:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pOm2DVgt";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="WSkJFxNz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32E79222C1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bEeNDkHz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="fitHZwNj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC0EE222C1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RONzMCjnMNuSlm3eJ/jq1WGaD7HfqyG4War6q+yjzaE=; b=pOm2DVgt1HalKm
-	ERVSh6IcEz+z+P/UC6m0/srmOrOghFNGfIud7a5Ooq7Ac5l7d4evG/GkujREhlT563UtwI+zDfbKL
-	mZ9GgUeD9mlqjlDkEwSF6YRV82/LKQqTqVXxjOZ6VR3vaZ7bSOwVu2EOu8MtXqbhVfmQWzmejkMir
-	VGTXEQ4OZNhLKN52IA5ac495r90lBKcdS8WyAhsL1tmboqpv4tY78QhskkTcpktq8LahF8m4jfJmB
-	6rFV7Eh3F54uTStoFWCpy+buzquH8AzQieSfrWcJfoqsW0L8nGp9XFevT9G4jXMxIBlbNQLtJUzoc
-	Oe8ocf0i7NkQEPIiAlTw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ly9RSsAmhope5ymp4kzUvMw8scM4/YKvuW2j1UrUb0o=; b=bEeNDkHzt09Km4
+	OCzjcCFwR751BtMt24HAG6+3vfBSrvdkbjI3xBwr6K0Hsf+rZZL1aB/jxLHZ/vKph5HALDaNneM9D
+	GRTkAnZMStN0GPlmN0pZolhuIP7FfhX05iOyc4KD7zDIF/1QSOMXrILmG8/KfDjiudqNfZ5iJNE7X
+	IRqOufVeK1XdA2oIDIdWi9DbUJBAfFOkaGvtYPZ1dE7rqP1lAD7fQpK2LmjI9/I/D3dvh4PdCLPme
+	BmwfJj5WCUUmt15AqDYJiEXDg7KWN0vE08XK8sFvFN4x3GaeTP8vp8pLdPx//H6RPzo+Da0p8sInv
+	1zyCSbYYTbwej2QbL/5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtm7W-0007TL-RA; Wed, 13 Feb 2019 04:26:02 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gtm7l-0007iC-I5; Wed, 13 Feb 2019 04:26:17 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtm7T-0007Sx-3Z
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 04:26:00 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1D4Ph6f126771;
- Tue, 12 Feb 2019 22:25:43 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550031943;
- bh=ldPf6PLPUt5wJrFZXASWy0gpWvDhqnPw/X7fS0wlK58=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=WSkJFxNzzQuTZIQC0ZgKlXSmKQY9PwoPJtMerive8BSJNg7bpMvM4iokndinubN1D
- aOrYAGR8rS+aZNtuWhbrMO6zEpFA3+mfzHoM1NZ2JN4rWdmT2Oxbn1Dt+t1HC4Cl79
- 1f/8wNZLIX8jXwqGugG/zkdzyUgsD+7qc+egbx/c=
-Received: from DFLE106.ent.ti.com (dfle106.ent.ti.com [10.64.6.27])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1D4PhJ6053604
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 12 Feb 2019 22:25:43 -0600
-Received: from DFLE104.ent.ti.com (10.64.6.25) by DFLE106.ent.ti.com
- (10.64.6.27) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 12
- Feb 2019 22:25:43 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE104.ent.ti.com
- (10.64.6.25) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 12 Feb 2019 22:25:43 -0600
-Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1D4Pd3S017352;
- Tue, 12 Feb 2019 22:25:39 -0600
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-To: Tony Lindgren <tony@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
-Date: Wed, 13 Feb 2019 09:55:22 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ id 1gtm7h-0007dM-3j
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 04:26:15 +0000
+Received: by mail-ot1-x343.google.com with SMTP id u16so1766203otk.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 12 Feb 2019 20:26:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Sd5Ml0besxYMG4NkLF0fkNk0tH0yX+PUzLjCoBwLSJo=;
+ b=fitHZwNjBXnqfYHVIgOBoCsG5KP3gzis3h+VVLdEZWYK3zEwKG06TvZtlFmJo9mk/8
+ Rk7BjgyZsPFpn7DAAgilkl/4GghSc5UP9TjWxMf/riwSPZE8YHQZz2wPOcni0yl+ob9q
+ UckGC+ZrVbmF1VpzoafWNJc8LOrzEVZYP/UW0rIy5vPnu1wXkBJWaOpEsazoIZZs4frf
+ k0gL6kXv52Tw2YpGsqh2PQY5X3k5MEq23e1njEFwcuvhPZRqnuA9LWJnAnEqRS14uEDH
+ VOVN9K8bzt5jG4YbylxKPmUGQUJaDHgGELd5C/lMHlxg1U+gLNcBvnE4RSgH0RjUJHwq
+ ekCA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=Sd5Ml0besxYMG4NkLF0fkNk0tH0yX+PUzLjCoBwLSJo=;
+ b=DFdQx98eIxM+fi+2ohrOJvq4fxN+5wRxfVX4eWcOeLh7IDS/flbxTBWmYGr4csC7Zc
+ e6dgN6jsv+a3aSnHJZvW/0B+OXs6kwwvpERygAiMQvXLiN1xiq57F7jPX+qIdobJCdNf
+ PY6IDNFCOw5g3jkSxGIO5Xe3iY2IBjB6Xz6nvPiNyqCw6QgLG4PXotKZ2ut/0jNkH3/j
+ nY8KBAUuIHA4WVhYoiP7iGO1GxjCsxeHoGMsaWt/uqANCU/EWqj8aJpJ6mJqC1I1oLK7
+ Zq+8GLMo9kb4ERYUCEytUN0Px7tqGWwGv04EBlw0XZiwJ5E8xSK7YlrnQyzBcwuit+hj
+ dp9w==
+X-Gm-Message-State: AHQUAuY7KgZo2hXH5grKdepWuoOMi6USfPnSG+Yv8BX/4q0prR94faIj
+ DL7iLENKld91CTKHWn7xkqH7jtaS
+X-Google-Smtp-Source: AHgI3IYUMerUKeJf7klbBxZ9mlo5bjz3DbQFIK30ipqXQFVV2SPbWAUnBXYy5RIqVC5bvi7hP+noxQ==
+X-Received: by 2002:a9d:7141:: with SMTP id y1mr6825013otj.177.1550031971225; 
+ Tue, 12 Feb 2019 20:26:11 -0800 (PST)
+Received: from localhost.localdomain (ip68-228-73-187.oc.oc.cox.net.
+ [68.228.73.187])
+ by smtp.gmail.com with ESMTPSA id a12sm6470650otl.39.2019.02.12.20.26.09
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 12 Feb 2019 20:26:10 -0800 (PST)
+From: Florian Fainelli <f.fainelli@gmail.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: dts: BCM5301X: Change Ethernet switch management port
+Date: Tue, 12 Feb 2019 20:25:59 -0800
+Message-Id: <20190213042600.27729-1-f.fainelli@gmail.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-In-Reply-To: <20190212162247.GK5720@atomide.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190212_202559_231468_70B62345 
-X-CRM114-Status: GOOD (  15.71  )
+X-CRM114-CacheID: sfid-20190212_202613_238439_475103B0 
+X-CRM114-Status: GOOD (  12.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,49 +95,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, Florian Fainelli <f.fainelli@gmail.com>,
+ Hauke Mehrtens <hauke@hauke-m.de>,
+ =?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?= <zajec5@gmail.com>,
+ open list <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ "maintainer:BROADCOM BCM5301X ARM ARCHITECTURE"
+ <bcm-kernel-feedback-list@broadcom.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
+BCM5301X has 3 Ethernet controllers: GMAC0, 1, 2 which map to ports 5, 7
+and 8 respectively of the internal switch. Future changes will turn on
+management mode in the Ethernet switch driver (b53) which will require
+us to use port 8.
 
-On 12/02/19 9:52 PM, Tony Lindgren wrote:
-> Hi,
-> 
-> * Lokesh Vutla <lokeshvutla@ti.com> [190212 07:43]:
->> +Example:
->> +--------
->> +The following example demonstrates both interrupt router node and the consumer
->> +node(main gpio) on the AM654 SoC:
->> +
->> +main_intr: interrupt-controller0 {
->> +	compatible = "ti,sci-intr";
->> +	interrupt-controller;
->> +	interrupt-parent = <&gic500>;
->> +	#interrupt-cells = <4>;
->> +	ti,sci = <&dmsc>;
->> +	ti,sci-dst-id = <56>;
->> +	ti,sci-rm-range-girq = <0x1>;
->> +};
-> 
-> Can you describe a bit what the "ti,sci-dst-id" is above?
-> 
-> These IDs seem to be listed at at [0] below, but is it really a property
-> of the hardware? Or is it some enumeration of SoC devices in the firmware?
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-This is the way that sysfw describes the hardware. In this case it is GIC and it
-is identified by this ID.
+diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+index 3fced3b7f1a8..affa9cc7422d 100644
+--- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
++++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+@@ -150,10 +150,15 @@
+ 			label = "wan";
+ 		};
+ 
+-		port@5 {
+-			reg = <5>;
++		port@8 {
++			reg = <8>;
+ 			label = "cpu";
+-			ethernet = <&gmac0>;
++			ethernet = <&gmac2>;
++
++			fixed-link {
++				speed = <1000>;
++				full-duplex;
++			};
+ 		};
+ 	};
+ };
+-- 
+2.19.1
 
-Thanks and regards,
-Lokesh
 
 _______________________________________________
 linux-arm-kernel mailing list
