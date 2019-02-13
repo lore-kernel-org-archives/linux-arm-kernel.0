@@ -2,21 +2,22 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DABAC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:20:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7650C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:20:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2CA2C222B1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:20:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 76F34222B1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:20:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F7JEeD4i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2CA2C222B1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=techsingularity.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bcZsuMUI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76F34222B1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,43 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dclWjKnKfRE1QxjhzYdpzAycdmKK7mPitz0aQ7bcpUs=; b=F7JEeD4iQH4uRg
-	TOzXecHTa4AmXil9SktA8vvCcdBY5g+hqpA6mEmm4XVl9SpD5P7l+/QlUUEI24/h96GMQkCLrktm/
-	k4jbrct8qmGVPBeOb4Utgj8UDgTmKTXN7hbYeRYdJfLNon6M8CKOv3T1zpgUqwnN+8AbLKEiFGrbC
-	UKTUWGhnRw8wb5lJ2uxmk4QkgJyow8KvMkw5AmHtn3Vs5X+7Ujn1n32nBedDz9Q86kkUBoedyaTCb
-	FLeV/kaS2he73bkiejkwWzelUuGtupx04eNV4KDMJfyFsSv0bIJG4XUmwbOFm6dhsS7IpmNYactvJ
-	gJ/t34Jh/REax0PJAGKQ==;
+	List-Owner; bh=jwcNZlR9cX64OzvaGtZ76gHQ34DcOAIxczclK0LdNnQ=; b=bcZsuMUIvsVOKM
+	eas30T+5oLtP/E7Q7MCveZNYQpm5ZXkyt8OfWY3vSstsSXczgEMt66jQkR+JhRKNQctxcJvkfK0Rg
+	QTiMl/gJroNqRw7lP2kcg4/V++4uiTdnfTOejIK0lJ6rhib8Br8lYAl+KW31cRb3Jk3Tan6WRORLs
+	2HNWAbuLAwC0pSfhhlNV74/V2OPPaEJOVcTTPrvIvpFckWdEbtP9zqdpCLsPc9YzX7GqTLW9/TpGC
+	om64psrmGCVrwnIWBedpL3kMsda+U9RpSFe32G3jPrMnR/Mjq7E8hOm7+cPB4O+syfLpgodex72Wg
+	+zEzSuPC0LnIlJ1YdS4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtuSK-0007FF-1W; Wed, 13 Feb 2019 13:20:04 +0000
-Received: from outbound-smtp11.blacknight.com ([46.22.139.106])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtuS8-00072N-6r
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:19:56 +0000
-Received: from mail.blacknight.com (pemlinmail03.blacknight.ie [81.17.254.16])
- by outbound-smtp11.blacknight.com (Postfix) with ESMTPS id
- 5E9581C241B for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 13:19:50 +0000 (GMT)
-Received: (qmail 17701 invoked from network); 13 Feb 2019 13:19:50 -0000
-Received: from unknown (HELO techsingularity.net)
- (mgorman@techsingularity.net@[37.228.225.79])
- by 81.17.254.9 with ESMTPSA (AES256-SHA encrypted, authenticated);
- 13 Feb 2019 13:19:50 -0000
-Date: Wed, 13 Feb 2019 13:19:48 +0000
-From: Mel Gorman <mgorman@techsingularity.net>
-To: Yury Norov <yury.norov@gmail.com>
-Subject: Re: 5.0-rc kernel hangs on early boot
-Message-ID: <20190213131948.GR9565@techsingularity.net>
-References: <20190213082134.GA21834@yury-thinkpad>
- <20190213111409.GN9565@techsingularity.net>
- <20190213115115.GA8928@yury-thinkpad>
+	id 1gtuSb-0000En-N6; Wed, 13 Feb 2019 13:20:21 +0000
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtuSY-00009s-H4; Wed, 13 Feb 2019 13:20:18 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id F076525D07E27; Wed, 13 Feb 2019 14:20:16 +0100 (CET)
+Date: Wed, 13 Feb 2019 14:20:16 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
+ in unsafe region
+Message-ID: <20190213132016.GO32534@hirez.programming.kicks-ass.net>
+References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+ <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
+ <20190211134527.GA121589@gmail.com>
+ <20190211135159.GC32511@hirez.programming.kicks-ass.net>
+ <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
+ <20190213103553.GO32494@hirez.programming.kicks-ass.net>
+ <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
+ <20190213131720.GU32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190213115115.GA8928@yury-thinkpad>
+In-Reply-To: <20190213131720.GU32494@hirez.programming.kicks-ass.net>
 User-Agent: Mutt/1.10.1 (2018-07-13)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_051952_764338_169D954D 
-X-CRM114-Status: GOOD (  17.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,62 +69,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrea Arcangeli <aarcange@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Michal Hocko <mhocko@kernel.org>, linux-arm-kernel@lists.infradead.org,
- David Rientjes <rientjes@google.com>,
- Andrew Morton <akpm@linux-foundation.org>, Zi Yan <zi.yan@cs.rutgers.edu>,
- Vlastimil Babka <vbabka@suse.cz>
+Cc: catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ valentin.schneider@arm.com, mingo@redhat.com, james.morse@arm.com,
+ hpa@zytor.com, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 02:51:15PM +0300, Yury Norov wrote:
-> On Wed, Feb 13, 2019 at 11:14:09AM +0000, Mel Gorman wrote:
-> > On Wed, Feb 13, 2019 at 11:25:40AM +0300, Yury Norov wrote:
-> > > Hi Mel, all,
+On Wed, Feb 13, 2019 at 02:17:20PM +0100, Peter Zijlstra wrote:
+> On Wed, Feb 13, 2019 at 10:50:21AM +0000, Julien Thierry wrote:
+> > On 13/02/2019 10:35, Peter Zijlstra wrote:
+> > > On Tue, Feb 12, 2019 at 09:15:13AM +0000, Julien Thierry wrote:
 > > > 
-> > > My kernel on qemu/arm64 setup hangs at early boot since v5.0-rc1.
-> > > Backtrace is not too verbose:
-> > > (gdb) i threads
-> > >   Id   Target Id         Frame
-> > > * 1    Thread 1 (CPU#0 [running]) 0xffff000010a49b74 in __delay (cycles=4096)
-> > >     at arch/arm64/lib/delay.c:49
-> > >   2    Thread 2 (CPU#1 [halted ]) 0x0000000000000000 in ?? ()
-> > >   3    Thread 3 (CPU#2 [halted ]) 0x0000000000000000 in ?? ()
-> > >   4    Thread 4 (CPU#3 [halted ]) 0x0000000000000000 in ?? ()
-> > > (gdb) bt
-> > > #0  0xffff000010a49b74 in __delay (cycles=4096) at arch/arm64/lib/delay.c:49
-> > > Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+> > >>>>> diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+> > >>>>> index a674c7db..b1bb7e9 100644
+> > >>>>> --- a/kernel/sched/core.c
+> > >>>>> +++ b/kernel/sched/core.c
+> > >>>>> @@ -3289,6 +3289,14 @@ static inline void schedule_debug(struct task_struct *prev)
+> > >>>>>  		__schedule_bug(prev);
+> > >>>>>  		preempt_count_set(PREEMPT_DISABLED);
+> > >>>>>  	}
+> > >>>>> +
+> > >>>>> +	if (IS_ENABLED(CONFIG_DEBUG_UACCESS_SLEEP) &&
+> > >>>>> +	    unlikely(unsafe_user_region_active())) {
+> > >>>>> +		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
+> > >>>>> +		       prev->comm, prev->pid, preempt_count());
+> > >>>>> +		dump_stack();
+> > >>>>> +	}
+> > >>>>> +
+> > >>>>>  	rcu_sleep_check();
+> > >>>>>
+> > >>>>>  	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 > > > 
-> > > Reverting the patch
-> > > 1c30844d2dfe272d58c ("mm: reclaim small amounts of memory when an external
-> > > fragmentation event occurs") together with following patch
-> > > 73444bc4d8f92e46a20 ("mm, page_alloc: do not wake kswapd with zone lock held")
-> > > helps me to boot normally. 
+> > >> I guess I'll drop the might_resched() part of this patch if that sounds
+> > >> alright.
 > > > 
+> > > I'm still confused by the schedule_debug() part. How is that not broken?
 > > 
-> > Well, that's a bad start to any day. Thanks for tracking it down. Does
-> > the following patch help? I can't test it properly as I didn't recreate
-> > your boot image or initrd but this appears to get past the initial boot
-> > phase at least.
+> > Hmmm, I am not exactly sure which part you expect to be broken, I guess
+> > it's because of the nature of the uaccess unsafe accessor usage.
+> > 
+> > Basically, the following is a definite no:
+> > 	if (user_access_begin(ptr, size)) {
+> > 
+> > 		[...]
+> > 
+> > 		//something that calls schedule
+> > 
+> > 		[...]
+> > 
+> > 		user_access_end();
+> > 	}
+> > 	
+> > 
+> > However the following is fine:
+> > 
+> > - user_access_begin(ptr, size)
+> > - taking irq/exception
+> > - get preempted
 > 
-> Hi Mel,
-> 
-> The patch works for me. The day gets better indeed. :-)
-> 
-> Tested-by: Yury Norov <yury.norov@gmail.com>
-> 
+> This; how is getting preempted fundamentally different from scheduling
+> ourselves?
 
-Thanks! I've resent the patch to Andrew so hopefully it'll be picked up
-before 5.0 is released.
+This is also the thing that PREEMPT_VOLUNTARY hinges on; it inserts
+'random' reschedule points through might_sleep() and cond_resched().
 
--- 
-Mel Gorman
-SUSE Labs
+If you're preemptible; you must be able to schedule and vice-versa.
+
+You're breaking that.
+
+> > - get resumed at some point in time
+> > - restore state + eret
+> > - user_access_end()
+> > 
+> > That's because exceptions/irq implicitly "suspend" the user access
+> > region. (That's what I'm trying to clarify with the comment)
+> > So, unsafe_user_region_active() should return false in a irq/exception
+> > context.
+> > 
+> > Is this what you were concerned about? Or there still something that
+> > might be broken?
+> 
+> I really hate the asymetry introduced between preemptible and being able
+> to schedule. Both end up calling __schedule() and there really should
+> not be a difference.
 
 _______________________________________________
 linux-arm-kernel mailing list
