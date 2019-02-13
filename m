@@ -2,22 +2,21 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74D1EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:21:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CED2AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:27:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40EBC21934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:21:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C9CE21934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:27:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GMBzUKrB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40EBC21934
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mGL6MPBs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C9CE21934
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +24,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WrAxazfxSl87mhmKgAevU3x/eZIIkG2yARofwkOir3U=; b=GMBzUKrBkXOBZI
-	4RIVl24gkDaMhEqI2Nf6bg90azWIqBYAvcIdawQ16G9xuuad9JjK5PFWKpzTkc13ofWqQlWzqWnw/
-	IHI3Pmk287zqkAfi/z1vw+V9ID4TT0YBVc6OY7ftBaWvqvCCDAZnk6ajMOXkCSDDXwUipHTMMLHFO
-	+6WMh4pDzbfPyVxaaPcy+m7uWLS0puMQtlDaGc2jmWse2nXRXos8NjCIfK7ccrAZ+j075Uw5BfLoh
-	9UwwExQe8pHB7bZywpij670yApItUYprrI5oDyWeN2RyQR0YNvgf6BbFoVmH1F+vx3TJtZ6xk9EYl
-	vIgyYMgrs1JJYL+CNY1A==;
+	List-Owner; bh=BlJ5Dgx+Pcw3daUPbCP9RW38sbcnrsdMNMzbl4wQqyk=; b=mGL6MPBsQWP74j
+	0PPlJEglXsuYTsDc/C10LWu1RMhREfcb0iF7ejAhiCjkSaxes44HoAsS6TeXtHu+sjAdDPODL7nHL
+	K9xlCmy0JRLuBMkSD1+X3ZleGexwPXkb2g1hljBZF6X1Qy6yUCcjBRoVbBJKlws0AiTsb4VFYvRpZ
+	A9Ekn0aBAhKWJ6GokwyyHxEz7KV5A2ddjOtfMc3TJVlzpdjHip75dY1ZQI0LWf2vYu4qXBSMOY+/h
+	JTI+3z3M48vX1Yhv7ANfIXfpNVs7W27q+M1oCsixGjGxn9N0Jh8myy1ATdGOKVmuSLvU0Go6o3P19
+	APzPazdIdHR9/RQ8q+dw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu2ud-0006DR-Pj; Wed, 13 Feb 2019 22:21:51 +0000
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu2ua-0006DD-Qd; Wed, 13 Feb 2019 22:21:48 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id CECC425E3DE45; Wed, 13 Feb 2019 23:21:46 +0100 (CET)
-Date: Wed, 13 Feb 2019 23:21:46 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Andy Lutomirski <luto@amacapital.net>
-Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
- in unsafe region
-Message-ID: <20190213222146.GC32494@hirez.programming.kicks-ass.net>
-References: <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
- <20190213103553.GO32494@hirez.programming.kicks-ass.net>
- <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
- <20190213131720.GU32494@hirez.programming.kicks-ass.net>
- <20190213140025.GB6346@brain-police>
- <20190213142524.GW32494@hirez.programming.kicks-ass.net>
- <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
- <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
- <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+	id 1gu2zi-00081X-1L; Wed, 13 Feb 2019 22:27:06 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gu2zf-000814-1C
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 22:27:04 +0000
+Received: by mail-ot1-f66.google.com with SMTP id b3so7176025otp.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 14:27:02 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=zAn8RFeQYoLA8lxdBOQ25WWJzWNjXK8/90SeqULz5do=;
+ b=Af9wfGFZq15haEvHqHGH9OinRCIQELhKPEqPtCVFSco6ZiYlsi1kFzuPZvQVwybJx7
+ PSRwLSZZhqwZ6qvtDOEc66r+buoj6DrZ8nXpqiwCr//6TjfGvklodr1fZKpPqKyVE1DC
+ 3ditfsC1OLcuRBuBtgvaFrhf7bVlyNEaJmN3g3IUVN9rKArL+NEThwnkNln9UIdCwKGx
+ LUEKqozDPZvYDCclEM3COy0NOHrtgGoBODkz7D9QqV+nHQiVkKIX1uVxV3TE/PwgQxjO
+ 8CI6a5j7S4h39pdLIgBjY5sUifGHgujtIPbBQN5ArH/AzO8HFH7nJidXG3WqPfY/Zqkq
+ Vh1Q==
+X-Gm-Message-State: AHQUAuYeQnKexOkKkBgJLeTdUMY2u1aAzuwa1bAddLBSO8Rru+BUx/r9
+ NDayC7MSqpXvHMs+kS83Ig==
+X-Google-Smtp-Source: AHgI3IY1w0jGZPfw9gk40cpNCv0rluNp25L/EsIfQHhfwG7lBjisOVZ5fKSIdWO0x6Ix13pVtGjftQ==
+X-Received: by 2002:a9d:6954:: with SMTP id p20mr267567oto.261.1550096821987; 
+ Wed, 13 Feb 2019 14:27:01 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id d7sm215956otq.27.2019.02.13.14.27.01
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 13 Feb 2019 14:27:01 -0800 (PST)
+Date: Wed, 13 Feb 2019 16:27:00 -0600
+From: Rob Herring <robh@kernel.org>
+To: Marc Zyngier <marc.zyngier@arm.com>
+Subject: Re: [PATCH V3 1/4] dt-binding: irq: imx-irqsteer: use irq number
+ instead of group number
+Message-ID: <20190213222700.GA31052@bogus>
+References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
+ <1548921464-28917-2-git-send-email-aisheng.dong@nxp.com>
+ <8db40cd7-7695-0267-c626-26ebe086b2b8@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+In-Reply-To: <8db40cd7-7695-0267-c626-26ebe086b2b8@arm.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190213_142703_074536_9AB1A164 
+X-CRM114-Status: GOOD (  22.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,47 +88,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, brgerst@gmail.com,
- Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
- jpoimboe@redhat.com, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, valentin.schneider@arm.com, mingo@redhat.com,
- james.morse@arm.com, luto@kernel.org, hpa@zytor.com, bp@alien8.de,
- tglx@linutronix.de, torvalds@linux-foundation.org,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>, "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCBGZWIgMTMsIDIwMTkgYXQgMTA6NTE6MjRBTSAtMDgwMCwgQW5keSBMdXRvbWlyc2tp
-IHdyb3RlOgo+ID4gT24gRmViIDEzLCAyMDE5LCBhdCA3OjQ1IEFNLCBQZXRlciBaaWpsc3RyYSA8
-cGV0ZXJ6QGluZnJhZGVhZC5vcmc+IHdyb3RlOgoKPiA+IFdoaWNoIEkgc3VwcG9zZSBtZWFucyB0
-aGF0IEdDQyBnZW5lcmF0ZXMgdGhlIFBVU0hGL1BPUEYgdG8gcHJlc2VydmUgdGhlCj4gPiBFRkxB
-R1MsIHNpbmNlIHdlIG1hcmsgdGhvc2UgZXhwbGljaXRseSBjbG9iYmVyZWQuCj4gPiAKPiAKPiBO
-b3QgcXVpdGUuICBBIGZsYWdzIGNsb2JiZXIgZG9lc27igJl0IHNhdmUgdGhlIGNvbnRyb2wgYml0
-cyBsaWtlIEFDCj4gZXhjZXB0IG9uIGNlcnRhaW4gcmF0aGVyIGJ1Z2d5IGxsdm0gY29tcGlsZXJz
-LiBUaGUgY2hhbmdlIHlvdeKAmXJlCj4gbG9va2luZyBmb3IgaXM6Cj4gCj4gaHR0cDovL2dpdC5r
-ZXJuZWwub3JnL3RpcC8yYzc1NzdhNzU4Mzc0N2M5YjcxZjI2ZGNlZDdmNjk2YjczOWRhNzQ1CgpJ
-bmRlZWQsIGZhaWxlZCB0byBmaW5kIHRoYXQuCgo+ID4gRm9yIGEgbGl0dGxlIGJpdCBvZiBjb250
-ZXh0OyBpdCB0dXJucyBvdXQgdGhhdCB1c2VyX2FjY2Vzc19iZWdpbigpIC8KPiA+IHVzZXJfYWNj
-ZXNzX2VuZCgpIHNldHMgRUZMQUdTLkFDIGFuZCBzY2hlZHVsaW5nIGluIGJldHdlZW4gdGhlcmUg
-d3JlY2tzCj4gPiB0aGF0IGJlY2F1c2Ugd2UncmUgYXBwYXJlbnRseSBub3Qgc2F2aW5nIHRoYXQg
-YW55bW9yZS4KPiAKPiBCdXQgb25seSBleHBsaWNpdCBzY2hlZHVsaW5nIOKAlCBwcmVlbXB0aW9u
-IGFuZCBzbGVlcHkgcGFnZSBmYXVsdHMgYXJlCj4gZmluZSBiZWNhdXNlIHRoZSBpbnRlcnJ1cHQg
-ZnJhbWUgc2F2ZXMgZmxhZ3MuCgpObywgbGlrZSBwb2ludGVkIG91dCBlbHNld2hlcmUgaW4gdGhp
-cyB0aHJlYWQsIGFueXRoaW5nIHRoYXQgZG9lcwpwcmVlbXB0X2Rpc2FibGUoKSBpcyB1dHRlcmx5
-IGJyb2tlbiB3aXRoIHRoaXMuCgpCZWNhdXNlIGF0IHRoYXQgcG9pbnQgdGhlIElSUSByZXR1cm4g
-cGF0aCBkb2Vzbid0IHJlc2NoZWR1bGUgYnV0CnByZWVtcHRfZW5hYmxlKCkgd2lsbCwgYW5kIHRo
-YXQgZG9lc24ndCBwcmVzZXJ2ZSBFRkxBR1MgYWdhaW4uCgo+ID4gTm93LCBJJ20gdGVtcHRlZCB0
-byBhZGQgdGhlIFBVU0hGIC8gUE9QRiByaWdodCBiYWNrIGJlY2F1c2Ugb2YgdGhpcywgYnV0Cj4g
-PiBmaXJzdCBJIHN1cHBvc2Ugd2UgbmVlZCB0byBmaWd1cmUgb3V0IGlmIHRoYXQgY2hhbmdlIHdh
-cyBvbiBwdXJwb3NlIGFuZAo+ID4gd2h5IHRoYXQgd2VudCBtaXNzaW5nIGZyb20gdGhlIENoYW5n
-ZWxvZy4KPiAKPiBUaGF04oCZcyBjZXJ0YWlubHkgdGhlIGVhc3kgc29sdXRpb24uIE9yIHdlIGNv
-dWxkIHRlYWNoIHRoZSBtaWdodF9zbGVlcAo+IGNoZWNrcyBhYm91dCB0aGlzLCBidXQgdGhhdCBj
-b3VsZCBiZSBhIG1lc3MuCgpUaGF0J3Mgbm90IGVub3VnaCwgd2UnZCBoYXZlIHRvIHRlYWNoIHBy
-ZWVtcHRfZGlzYWJsZSgpLCBidXQgd29yc2UsCnByZWVtcHRfZGlzYWJsZV9ub3RyYWNlKCkuCgpB
-bnl0aGluZyB0aGF0IGxhbmRzIGluIGZ0cmFjZSwgd2hpY2ggX3dpbGxfIHVzZQpwcmVlbXB0X2Rp
-c2FibGVfbm90cmFjZSgpLCB3aWxsIHNjcmV3IHRoaXMgdGhpbmcgdXAuCgpfX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxp
-bmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3Rz
-LmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Mon, Feb 11, 2019 at 03:35:40PM +0000, Marc Zyngier wrote:
+> On 31/01/2019 08:03, Aisheng Dong wrote:
+> > Not all 64 interrupts may be used in one group. e.g. most irqsteer in
+> > imx8qxp and imx8qm subsystems supports only 32 interrupts.
+> > 
+> > As the IP integration parameters are Channel number and interrupts number,
+> > let's use fsl,irqs-num to represents how many interrupts supported
+> > by this irqsteer channel.
+> > 
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Rob Herring <robh+dt@kernel.org>
+> > Cc: Shawn Guo <shawnguo@kernel.org>
+> > Cc: devicetree@vger.kernel.org
+> > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> > ChangeLog:
+> >  v1->v2:
+> >   * change property name fsl,irqs-per-chan to fsl,num-irqs.
+> > ---
+> >  .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt       | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> > index 45790ce..6d0a41b 100644
+> > --- a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqsteer.txt
+> > @@ -16,8 +16,8 @@ Required properties:
+> >  - #interrupt-cells: Specifies the number of cells needed to encode an
+> >    interrupt source. The value must be 1.
+> >  - fsl,channel: The output channel that all input IRQs should be steered into.
+> > -- fsl,irq-groups: Number of IRQ groups managed by this controller instance.
+> > -  Each group manages 64 input interrupts.
+> > +- fsl,num-irqs: Number of input interrupts of this channel.
+> > +  Should be multiple of 32 input interrupts and up to 512 interrupts.
+> >  
+> >  Example:
+> >  
+> > @@ -28,7 +28,7 @@ Example:
+> >  		clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>;
+> >  		clock-names = "ipg";
+> >  		fsl,channel = <0>;
+> > -		fsl,irq-groups = <1>;
+> > +		fsl,num-irqs = <64>;
+> >  		interrupt-controller;
+> >  		#interrupt-cells = <1>;
+> >  	};
+> > 
+> 
+> This is a change to an existing binding, so I'd need the Ack from a DT
+> maintainer before I can queue this.
+
+The DT maintainer doesn't care as long as there's an explanation that 
+says it's breaking compatibility and why it is okay to do so. This one 
+doesn't do that.
+
+Rob
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
