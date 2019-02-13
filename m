@@ -2,92 +2,75 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BF77C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2F28C282CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:56:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2DBD6222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:55:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 70D6B222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:56:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VAf6pLeY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="f4mkl4eB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DBD6222B2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rPRuirUc";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="O2mhGTXv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70D6B222B2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:Date:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UzFE9Pm5s6PubAemXOUwBA1HS/JnWeoa1us2A7FCHYk=; b=VAf6pLeYD1y/M9
-	Jgfw4BOovS3Av6HjXnl9/I5L4gfb3Hk/dkcKyxIWNiFa9v2dWkJ8HNKSLoXHSLihXStxG1bBINArK
-	H3Wkd7ZWwvqNAc6RJsVpO+egnasF5qy3baKAIdckUOsH2QnRtalrLlARJFzSDd3Nd9STWM0LYo8LX
-	zEs/CDN18Wg7fG7SbquIuWQk9IU6/ev2ZBtra39Wo87cdtUZreTB8r94uW+gknZmi9D286/Bzj0xF
-	P8E3445Hiz0w/vvPKaIqn6MaNIUTXFq0ELgzpohA0WnPhu6Vd2U24sMbkhS+sclKNsA3flaBYWhJa
-	eSWTdYGc8qEDb+PUhGhA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/U86Do1VE+LxK8DH85eqY0+DU7MT81Hw83zMpLs4VC4=; b=rPRuirUc33zS6zL0dtNx3GUk7
+	wqafdtHi4jEv/XEhrPpe0PEjO8OAnK6OA+KgTAOpD8eFSLCtmHRB2+h9Hn41AoGiFqeIV9Gr+eyc8
+	otxs9cGwtPNbIAIuIfRlS4L35dTmzkHtR1z3eIpsq/NeXtVpGswNgdi4I5YJfF9oZ+Ri8KK8cY4CF
+	0FYWH66/uBULwU1I1+DpKIrPQpevzaJ0RPKFziL/hAUcEYCRc+ppFlLy65XcBwnVaC+uzs1QF4WmQ
+	x9hsNSuJpnJo/II0zDVpz0hKiGMwCZFtL026ahAC5AIpFaFwJ3YCjVkYlp4EmXb1Shv/APj5hwpu0
+	r559MPmSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtt8h-0001D4-Ux; Wed, 13 Feb 2019 11:55:43 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gtt9n-0001bB-1q; Wed, 13 Feb 2019 11:56:51 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtt8e-0001CX-4D
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:55:41 +0000
-Received: by mail-lf1-x142.google.com with SMTP id l10so1535645lfh.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 03:55:39 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:date:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=SACQ5M4HotXM/MYLGDRFVKPHZJfogzeYcVZ+MN/XhU8=;
- b=f4mkl4eBBsyow13NsoWcy6TCJgJY3qmCYJ5OXfuE1gLUpq1a2dUlEBASHKokOdWVKk
- gezG7rROm1xc9bXetKR/SBOCewP4OG2gO8zgmTjvkcXykqIYUW2Xorftbhdz8RL6ombp
- rvy7lP0QVctGb3APbiXrl+LrqL2urnMBnbGEt+/C7BEw5mQ3fCjK59AxeX2316hADnYG
- 5jI+wJUTwSeGNU6v9zCpoZTlnm6QGptLldPOdEeK2BXNLhmd9CpxNdRKxXhbAfSb702D
- x4XpUiv5Rgjtl+a8w5+I9Edkm8Xi6mYL95iJkLUKmlL2/2+dv46y1P0VHqgWg8PKJ1Co
- HKEg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:date:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=SACQ5M4HotXM/MYLGDRFVKPHZJfogzeYcVZ+MN/XhU8=;
- b=ImsjII58fW0IQ2MiH5Tp5iPmE338Ljd3AtdM90R/3IlyR2UClENpoMFcnXUoLLDia7
- 6hpzMukEonLfNaGEJGoCe0ZromVp+tfpEg2lcWWX4sAPsJcLP5WkJ/PNX1GeZxeCj4Zt
- kGEbMTLtdK8hKL6wM0l3E+0hGAmL3C1pDVRXolJmQwRjNN/nChI1vuc7+JQ8lBl6LE3D
- h8eRpaXJ+30KWlDoGSE1J14WRlTxXNW8rdX7LOudL49AVFw7WGK4MBkTtqMnZb8j3s0Q
- PqkX8VeU8/wnaBmeAIB83ZhWAk58mREZAIs3+n4pCeOJquKnGVKluIdtva6XB8DYDr31
- DE+w==
-X-Gm-Message-State: AHQUAuYfEZtGQX+GyXsb4qtmL1d+W4t6pvkomYo5a7rUUkDMWWChFBOU
- SoO8Cv9Vnf8Pp6ZWLS5USBc=
-X-Google-Smtp-Source: AHgI3IbdNW1WvqVvocr/4aCjt3V04aLfT7CC3QIJ6fObKnzez5pQTJ9ndpoBUkr3Ttl1NLx+85f8GQ==
-X-Received: by 2002:a19:f607:: with SMTP id x7mr64132lfe.47.1550058938092;
- Wed, 13 Feb 2019 03:55:38 -0800 (PST)
-Received: from localhost (pat-31-128-146-191.pool.powernet.com.ru.
- [31.128.146.191])
- by smtp.gmail.com with ESMTPSA id z85sm3151848lff.80.2019.02.13.03.55.36
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Wed, 13 Feb 2019 03:55:37 -0800 (PST)
-From: Yury Norov <yury.norov@gmail.com>
-X-Google-Original-From: Yury Norov <ynorov@marvell.com>
-Date: Wed, 13 Feb 2019 14:55:36 +0300
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: 5.0-rc kernel hangs on early boot
-Message-ID: <20190213115536.GB8928@yury-thinkpad>
-References: <20190213082134.GA21834@yury-thinkpad>
- <20190213111843.GA1912@brain-police>
+ id 1gtt9j-0001ak-Ts
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:56:49 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=lEHTEwx8LjfWPDnCIJL0kg24n/DJWgYAHayPimS1RpY=; b=O2mhGTXvRGaeKnIhhWjz6Q2Ei
+ ZnFCMA+lfXzS4CpcmZTBs+OlzokDFkesffafPVoF29vVBvRb+o4U1fqakfyJkCCxqG4k5Qp+qdAEp
+ eGAZaKa6y+5Cs40w9Hz+YIohGw4pCLqHPXf47mJelNv6/Ck5eM1N6/t+JnGSpN7grN+GI=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gtt9e-00048c-RE; Wed, 13 Feb 2019 11:56:42 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 338E21128158; Wed, 13 Feb 2019 11:56:42 +0000 (GMT)
+Date: Wed, 13 Feb 2019 11:56:42 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Stefan Agner <stefan@agner.ch>
+Subject: Re: [PATCH 2/2] ARM: dts: imx7: add DMA properties for ECSPI
+Message-ID: <20190213115642.GC7540@sirena.org.uk>
+References: <20190107132226.16216-1-stefan@agner.ch>
+ <20190107132226.16216-2-stefan@agner.ch>
+ <1549573243.3075.72.camel@impinj.com>
+ <20190211012305.GA21496@dragon>
+ <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190213111843.GA1912@brain-police>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+In-Reply-To: <c8677ded56c2fc7c1d375816f1dd8d66@agner.ch>
+X-Cookie: Nothing is but what is not.
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_035540_165483_6F2BCD7D 
-X-CRM114-Status: GOOD (  21.64  )
+X-CRM114-CacheID: sfid-20190213_035648_120764_F03CA3B9 
+X-CRM114-Status: GOOD (  12.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,146 +82,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrea Arcangeli <aarcange@redhat.com>, Yury Norov <yury.norov@gmail.com>,
- Vlastimil Babka <vbabka@suse.cz>, Catalin Marinas <catalin.marinas@arm.com>,
- Mel Gorman <mgorman@techsingularity.net>, linux-kernel@vger.kernel.org,
- Zi Yan <zi.yan@cs.rutgers.edu>, David Rientjes <rientjes@google.com>,
- Andrew Morton <akpm@linux-foundation.org>, Michal Hocko <mhocko@kernel.org>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, s.hauer@pengutronix.de,
+ linux-kernel@vger.kernel.org, robh+dt@kernel.org, linux-imx@nxp.com,
+ kernel@pengutronix.de, fabio.estevam@nxp.com, Shawn Guo <shawnguo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, Trent Piepho <tpiepho@impinj.com>
+Content-Type: multipart/mixed; boundary="===============3593256947149686187=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 11:18:44AM +0000, Will Deacon wrote:
-> Hi Yury,
-> 
-> On Wed, Feb 13, 2019 at 11:25:40AM +0300, Yury Norov wrote:
-> > My kernel on qemu/arm64 setup hangs at early boot since v5.0-rc1.
-> > Backtrace is not too verbose:
-> > (gdb) i threads
-> >   Id   Target Id         Frame
-> > * 1    Thread 1 (CPU#0 [running]) 0xffff000010a49b74 in __delay (cycles=4096)
-> >     at arch/arm64/lib/delay.c:49
-> >   2    Thread 2 (CPU#1 [halted ]) 0x0000000000000000 in ?? ()
-> >   3    Thread 3 (CPU#2 [halted ]) 0x0000000000000000 in ?? ()
-> >   4    Thread 4 (CPU#3 [halted ]) 0x0000000000000000 in ?? ()
-> > (gdb) bt
-> > #0  0xffff000010a49b74 in __delay (cycles=4096) at arch/arm64/lib/delay.c:49
-> > Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-> > 
-> > Reverting the patch
-> > 1c30844d2dfe272d58c ("mm: reclaim small amounts of memory when an external
-> > fragmentation event occurs") together with following patch
-> > 73444bc4d8f92e46a20 ("mm, page_alloc: do not wake kswapd with zone lock held")
-> > helps me to boot normally. 
-> > 
-> > Some system information is below, and config is attached.
-> 
-> FWIW, running with your command-line and .config under KVM with earlycon
-> leads to an early page allocation failure followed by a NULL dereference
-> during boot if only 1G is configured (log below). For the mm folks, it's
-> probably worth pointing out that you're using 64k pages.
-> 
-> Can you confirm that the kernel boots successfully if you pass more memory to
-> qemu (e.g. 2gb)?
 
-2G workaround works, I confirm. Also, Mel's fix provided in this thread works
-as well.
+--===============3593256947149686187==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="R+My9LyyhiUvIEro"
+Content-Disposition: inline
 
-Thanks,
-Yury
 
-> Will
-> 
-> --->8
-> 
-> [    0.000000] swapper: page allocation failure: order:0, mode:0x0(), nodemask=(null),cpuset=(null),mems_allowed=0-3
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc64.9.0+ #1
-> [    0.000000] Hardware name: linux,dummy-virt (DT)
-> [    0.000000] Call trace:
-> [    0.000000]  dump_backtrace+0x0/0x178
-> [    0.000000]  show_stack+0x24/0x30
-> [    0.000000]  dump_stack+0x90/0xb4
-> [    0.000000]  warn_alloc+0x100/0x188
-> [    0.000000]  __alloc_pages_nodemask+0xd48/0xd88
-> [    0.000000]  alloc_pages_current+0x8c/0xf8
-> [    0.000000]  allocate_slab+0x370/0x4a8
-> [    0.000000]  new_slab+0x98/0xc0
-> [    0.000000]  ___slab_alloc+0x27c/0x510
-> [    0.000000]  __slab_alloc+0x50/0x68
-> [    0.000000]  kmem_cache_alloc+0x1d0/0x1f8
-> [    0.000000]  bootstrap+0x34/0x170
-> [    0.000000]  kmem_cache_init+0x9c/0x130
-> [    0.000000]  start_kernel+0x240/0x464
-> [    0.000000] Mem-Info:
-> [    0.000000] active_anon:0 inactive_anon:0 isolated_anon:0
-> [    0.000000]  active_file:0 inactive_file:0 isolated_file:0
-> [    0.000000]  unevictable:0 dirty:0 writeback:0 unstable:0
-> [    0.000000]  slab_reclaimable:0 slab_unreclaimable:1
-> [    0.000000]  mapped:0 shmem:0 pagetables:0 bounce:0
-> [    0.000000]  free:7737 free_pcp:0 free_cma:0
-> [    0.000000] Node 0 active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB isolated(anon):0kB isolated(file):0kB mapped:0kB dirty:0kB writeback:0kB shmem:0kB shmem_thp: 0kB shmem_pmdmapped: 0kB anon_thp: 0kB writeback_tmp:0kB unstable:0kB all_unreclaimable? no
-> [    0.000000] Node 0 DMA32 free:495168kB min:524288kB low:524288kB high:524288kB active_anon:0kB inactive_anon:0kB active_file:0kB inactive_file:0kB unevictable:0kB writepending:0kB present:1048576kB managed:495232kB mlocked:0kB kernel_stack:0kB pagetables:0kB bounce:0kB free_pcp:0kB local_pcp:0kB free_cma:0kB
-> [    0.000000] lowmem_reserve[]: 0 0 0
-> [    0.000000] Node 0 DMA32: 1*64kB (U) 4*128kB (U) 2*256kB (U) 3*512kB (U) 3*1024kB (U) 1*2048kB (U) 3*4096kB (U) 2*8192kB (U) 2*16384kB (U) 3*32768kB (U) 3*65536kB (U) 1*131072kB (U) 0*262144kB 0*524288kB = 495168kB
-> [    0.000000] 0 total pagecache pages
-> [    0.000000] 0 pages in swap cache
-> [    0.000000] Swap cache stats: add 0, delete 0, find 0/0
-> [    0.000000] Free swap  = 0kB
-> [    0.000000] Total swap = 0kB
-> [    0.000000] 16384 pages RAM
-> [    0.000000] 0 pages HighMem/MovableOnly
-> [    0.000000] 8646 pages reserved
-> [    0.000000] 8192 pages cma reserved
-> [    0.000000] SLUB: Unable to allocate memory on node -1, gfp=0x408000(GFP_NOWAIT|__GFP_ZERO)
-> [    0.000000]   cache: kmem_cache, object size: 336, buffer size: 384, default order: 0, min order: 0
-> [    0.000000]   node 0: slabs: 0, objs: 0, free: 0
-> [    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
-> [    0.000000] Mem abort info:
-> [    0.000000]   ESR = 0x96000045
-> [    0.000000]   Exception class = DABT (current EL), IL = 32 bits
-> [    0.000000]   SET = 0, FnV = 0
-> [    0.000000]   EA = 0, S1PTW = 0
-> [    0.000000] Data abort info:
-> [    0.000000]   ISV = 0, ISS = 0x00000045
-> [    0.000000]   CM = 0, WnR = 1
-> [    0.000000] [0000000000000000] user address but active_mm is swapper
-> [    0.000000] Internal error: Oops: 96000045 [#1] SMP
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 5.0.0-rc64.9.0+ #1
-> [    0.000000] Hardware name: linux,dummy-virt (DT)
-> [    0.000000] pstate: 20000085 (nzCv daIf -PAN -UAO)
-> [    0.000000] pc : __memcpy+0x110/0x180
-> [    0.000000] lr : bootstrap+0x48/0x170
-> [    0.000000] sp : ffff00001104ff20
-> [    0.000000] x29: ffff00001104ff20 x28: 0000000080ea0018 
-> [    0.000000] x27: 0000000000000000 x26: 0000000000000000 
-> [    0.000000] x25: 0000000000000000 x24: ffff000010f80008 
-> [    0.000000] x23: ffff000010f92490 x22: ffff000011070000 
-> [    0.000000] x21: ffff000010f92490 x20: ffff000011a1f000 
-> [    0.000000] x19: 0000000000000000 x18: 0000000000000010 
-> [    0.000000] x17: 0000000000000000 x16: 0000000000000000 
-> [    0.000000] x15: ffffffffffffffff x14: 00000000ffffffff 
-> [    0.000000] x13: 00000000000000aa x12: 000000aa000000aa 
-> [    0.000000] x11: 0000000d00000000 x10: 0000015000000180 
-> [    0.000000] x9 : 0000000000000005 x8 : 0000000040002000 
-> [    0.000000] x7 : ffff000011030e80 x6 : 0000000000000000 
-> [    0.000000] x5 : 0000000000000000 x4 : 0000000000000000 
-> [    0.000000] x3 : 0000000000000000 x2 : 00000000000000d0 
-> [    0.000000] x1 : ffff000010f924d0 x0 : 0000000000000000 
-> [    0.000000] Process swapper (pid: 0, stack limit = 0x(____ptrval____))
-> [    0.000000] Call trace:
-> [    0.000000]  __memcpy+0x110/0x180
-> [    0.000000]  kmem_cache_init+0x9c/0x130
-> [    0.000000]  start_kernel+0x240/0x464
-> [    0.000000] Code: a8c12027 a8c12829 a8c1302b a8c1382d (a88120c7) 
-> [    0.000000] ---[ end trace a6053f496cb6dec0 ]---
-> [    0.000000] Kernel panic - not syncing: Fatal exception
-> [    0.000000] ---[ end Kernel panic - not syncing: Fatal exception ]---
+--R+My9LyyhiUvIEro
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+
+On Tue, Feb 12, 2019 at 08:20:46PM +0100, Stefan Agner wrote:
+
+> > I dropped both patches from my tree.
+
+> I think this is the wrong approach to disable DMA on those devices. The
+> device tree is supposed to describe the complete hardware. If the driver
+> is not ready to support DMA for that particular variant, we should add
+> this information in the driver. We have compatible strings for i.MX
+> 6UL/i.MX 7 to disable DMA accordingly.
+
+Yes, that seems sensible - it's vanishingly unlikely that there's any
+problem in the hardware here, it's software bugs and quirking in the
+driver seems better than changing the DT.
+
+--R+My9LyyhiUvIEro
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxkBfkACgkQJNaLcl1U
+h9AVqwf+JOiZLu406UOLhIQJf6RMKFfrh1E7dVOI4A8MUZhEkZ4t3RHBOPpFJILe
+xRdXkUyv12y6dk81ztTLFnZH1eK6jN4J7j9ETei5mfJ6KrJc93PzyHZhD/pQvBk0
+Q64HFEg0uE6b4hK0OhEjMl/02xVgRWhEQkENwWoX7JLKL3Zo0ZYOVIg+LJyk3jux
+tCgZBq5OPlANasZ6PYXg3iqlVOPyhnPRjggu4ILoUhB83ukKTOIp5ZoKJq7f/kwT
+JpS15NDnUVYVp8NDwwqBGXpoZEdTPaHCYxX2Uetm8jPF/6KYlYWvKqjSOqs+Nu5j
+iEoDyWU56KtZZ4OhQYdGkuBxYWhDcg==
+=bamr
+-----END PGP SIGNATURE-----
+
+--R+My9LyyhiUvIEro--
+
+
+--===============3593256947149686187==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3593256947149686187==--
+
