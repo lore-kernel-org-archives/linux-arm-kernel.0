@@ -2,80 +2,135 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.2 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA4A8C282D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:54:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09D0DC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 19:05:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BF68C21902
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:54:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEFA9222D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 19:05:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P9cqDfzj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ag1ilP4n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF68C21902
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YFGghRrz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="OTi6GhZ/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEFA9222D3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OiQExHsjEaiVCeommG7QEFcbF9YOAEnJWdsq1fgaVXM=; b=P9cqDfzjq4Hrae
-	oL5zYImLGbpoUi6lw4Aim4LOmMzWQbuXi4sCb7yQi0eWEFq+EvTArYT70lxdr7UeS30i1w4I62uHG
-	YgjCJPQ9PhDYvmB89GklqIU2k/RI4d0yFRFOZRV7KuhzOSjMjvxYAYXUy38+LPkODjh7FY80K6kXL
-	kMMce4YlZqpmwee0x/57/+OF4oJnLi9zRoveRP94ABboK+RVCMhoqt10TYoHH8QHafSZQOTW+SVHv
-	mQudMX5Vhy90mANtQ++A39VwG5IF++sBHQK/CTAoG+0etzISX2IlZQDW8lBNVu3OpcuA2pcM6Vqlr
-	QxBWTjwLoWenkf8MHRYw==;
+	List-Owner; bh=oqvQuXQabEfDX3HRBzaEvwgIFnsZ1KYpRr9B2YWapqI=; b=YFGghRrzDGEIqx
+	BI2FuJTsb5coX2gXnQcIzf7Ol/Bi1iqRiUn36SAuhgihHXbfiUawbGiyxn2rLpUAuqrrTsE+8EqKm
+	4FZGeH5/MTGG7h/6m9Gjj2pEzeq41Oiuj2XR+opj6jN4gidKbsm8g/0p8KgNKafymvae7/cC4AmdK
+	5l94FMkvx+951qsaCXkzU8amoEGxZrS2DW/WpJtJ2ByDGSpL/Y933pNkyNwLeXW9TYngq0gDAfEBj
+	Fgu8eiYTZK1YNRXFvms0GhhkvkprJ9ZALvBVA1HI7eQIntpBODsBqTJBC9nwYrpXIttk5X1s46Lsc
+	lhKiFm8U1HQypuWzfrUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzfb-0008V9-1F; Wed, 13 Feb 2019 18:54:07 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gtzqZ-0005Ye-26; Wed, 13 Feb 2019 19:05:27 +0000
+Received: from mail-eopbgr30075.outbound.protection.outlook.com ([40.107.3.75]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzfZ-0008V2-PI
- for linux-arm-kernel@bombadil.infradead.org; Wed, 13 Feb 2019 18:54:05 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=EY2Jm+hb93wPVb/zC2IoO0q6HYpZ7+FfGU0VEP3p0RM=; b=ag1ilP4nIjXF7oiyLFio3P0J4
- /xgv1u9uTu1ePX+5g4dMLDutu6cGdBuR+oOWGWlfC/bLFj8fy4mn+enc4dXqUvqXWNFh/cSQh5oOT
- J7ERyU2e8b76ar7ZFtfwBYjdKI23jUhR8zu0zOyN30JsWE0WDe7LHhe4CpHLZuH8liD0qR+BNIGkl
- tiNMK0SYDsCY17ubU+XOCC5CkrQI3BiH73FYRRc+MijdPpzwgUmORI6Mgr04NkdLpJj4u+058c/Ak
- FhejqYFaaPYBWlKdFTQIyLDGQ2Mm8oiE/qQEBINZoUs12ldIh1xNgWKWDfskQKO5FsfwcFgTO+tLB
- BC3b95oLg==;
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzfV-0005LJ-Te; Wed, 13 Feb 2019 18:54:02 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 52976202CEF99; Wed, 13 Feb 2019 19:54:00 +0100 (CET)
-Date: Wed, 13 Feb 2019 19:54:00 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
- in unsafe region
-Message-ID: <20190213185400.GR32534@hirez.programming.kicks-ass.net>
-References: <20190211135159.GC32511@hirez.programming.kicks-ass.net>
- <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
- <20190213103553.GO32494@hirez.programming.kicks-ass.net>
- <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
- <20190213131720.GU32494@hirez.programming.kicks-ass.net>
- <20190213140025.GB6346@brain-police>
- <20190213142524.GW32494@hirez.programming.kicks-ass.net>
- <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
- <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ id 1gtzqQ-0005PC-5q
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 19:05:19 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=7Rw71WWwyLVXH8o3lP2EgYZdWVGz5uiXKCDWt0BtHBk=;
+ b=OTi6GhZ/Q97f7eZvXpB57gA26iRHY0hoMaLmqHQq3F4acv+RkbRHgDtVewKkT8uwKVe0/eJhX8NH0ITo6ee4z5oz6Ewefi5HGw3brEhsSKitg/QMlJ5imwM2SuslnRMbpiyQhqffqWYsoOeiaSKYAL+CkOzLDmMpHIoztXvnWa8=
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
+ AM0PR04MB5012.eurprd04.prod.outlook.com (20.176.214.139) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.16; Wed, 13 Feb 2019 19:05:14 +0000
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
+ 19:05:14 +0000
+From: Abel Vesa <abel.vesa@nxp.com>
+To: Rob Herring <robh@kernel.org>, Stephen Boyd <sboyd@kernel.org>, Mark
+ Rutland <mark.rutland@arm.com>, Mike Turquette <mturquette@baylibre.com>,
+ Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <kernel@pengutronix.de>, Lucas
+ Stach <l.stach@pengutronix.de>, Angus Ainslie <angus.ainslie@puri.sm>, Anson
+ Huang <anson.huang@nxp.com>
+Subject: [RFC 2/5] dt-bindings: imx8mq-clock: Add the missing ARM clock
+Thread-Topic: [RFC 2/5] dt-bindings: imx8mq-clock: Add the missing ARM clock
+Thread-Index: AQHUw88MHS8LHxaqrEeZDFZsxI5zZg==
+Date: Wed, 13 Feb 2019 19:05:14 +0000
+Message-ID: <1550084693-9797-3-git-send-email-abel.vesa@nxp.com>
+References: <1550084693-9797-1-git-send-email-abel.vesa@nxp.com>
+In-Reply-To: <1550084693-9797-1-git-send-email-abel.vesa@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: AM5PR0701CA0058.eurprd07.prod.outlook.com
+ (2603:10a6:203:2::20) To AM0PR04MB5779.eurprd04.prod.outlook.com
+ (2603:10a6:208:131::23)
+x-originating-ip: [95.76.156.53]
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=abel.vesa@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.7.4
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 89a88e86-d699-4cd6-3adb-08d691e62ed2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5012; 
+x-ms-traffictypediagnostic: AM0PR04MB5012:
+x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM0PR04MB5012;
+ 23:bsj4AxI1fEGaU4zJ9uphxOsUSzua56pw2IfoN1a?=
+ =?iso-8859-1?Q?ePw3fjrjaIaI2hQ4lRXRKmVrW0lG04Mj0EGvPfPj1aq9cY6pCWcspn7K6X?=
+ =?iso-8859-1?Q?eSOzHyYVhRSxRC5NQmgOe3Ulrrk6R7uof/Jco7VaG3CUtaVVwReOYrG+vj?=
+ =?iso-8859-1?Q?umhsGwLn9eQRGBvE6dy91zpaXe0UAGzHTtbD7YVObS9EHUYkWuGw3xHBcM?=
+ =?iso-8859-1?Q?BX6T3Hf23qP8yNCz9bZUaRsURESAF/Vfs7rrddtstnnYTetmqqby2o6Png?=
+ =?iso-8859-1?Q?VIgoXivrIwtYnB2VLqbnLhNgc9W7NbjxdUtgAZD2HMvD6BATKWi9FkEBVO?=
+ =?iso-8859-1?Q?BJbXiGSLn88rhFAmHj3C7fjSohWsXt1lpW/oiijWCXfYCQLOaX+9glDfQ8?=
+ =?iso-8859-1?Q?Fhf9uGygEfjnO4OAL1tw0qO1HEiWz6nC5OKESryO6Jbw09c9SFwHbC4OTj?=
+ =?iso-8859-1?Q?FFQNZ/R83ihfouq7Bf/sEGbmStYt7m8nmN8iiCMbt66NXZlpL6eHBwpYaO?=
+ =?iso-8859-1?Q?T31g8Ethypy44x/fS1tO4LufqaCgP8qZw430r1ILwUFlda1bXDg1Vh1sAB?=
+ =?iso-8859-1?Q?aUwUdaNLaGq2pPuQlIwfxyMDKsUWh1DQuwgex23JePqLHLzL2efLTWCKkE?=
+ =?iso-8859-1?Q?yquz+Me6Co8oiZe6th4l0qUisAsd/u7hk8pXZaOsurD2RkLeWoeRxKNJX9?=
+ =?iso-8859-1?Q?tAI8mwDLpLVTf8oSytbr9q0fWU9Gxap0gJ/lvmKHuTZ+NfCQAkcpy4mtv4?=
+ =?iso-8859-1?Q?+ycidCS68AUglEny+sQBu1TAOQYLzVarEMuRl+Ld/PrTC/8tHxHtu0bfIa?=
+ =?iso-8859-1?Q?AOf8maUtRHDwxZAOYdHHkFD5yEgnuRVmmmrQSI0qcWFWs4ZBqX14R1OoMq?=
+ =?iso-8859-1?Q?/w9Qkf+lNAupG5c6yvP70aB/qV/ux0qNJJU0wK/RoG8DoJuByGPOerfON7?=
+ =?iso-8859-1?Q?BXhJ6ecpp+iUkoEuWmS89ucXiUgAIjrCi2gefNB+2+BOeVijOnWrI1GBg3?=
+ =?iso-8859-1?Q?oyk8pg4qnmWS/9d/hv52TeCpl7MFgBvNRzq7Y1nV61eroS2sO8ARx1Md/h?=
+ =?iso-8859-1?Q?aMqXQdvGUyoiY4ZEbo/7wXc9qhezLz0d0UKx+whhGgLr6eGs9V3Kf6HSAj?=
+ =?iso-8859-1?Q?sMEu3XKuIY52/fbsBizy5efu6XHWiQXIZ59tEAsBGIF1571O5A69epaxrD?=
+ =?iso-8859-1?Q?ewdBJP/zwqJjQbw3/mu/Ctx913aq10dh949WBf0K59wPQ8HCrRPhDKkVHm?=
+ =?iso-8859-1?Q?SXEEO2a832w5H+PVr0C56ADQddfahuKxijyG7eQvYtEve3+V4JIa8rwvHj?=
+ =?iso-8859-1?Q?F2ln5YiUJpc0P4Dztspe+WH?=
+x-microsoft-antispam-prvs: <AM0PR04MB5012F8C15A37E65B7CD2BA75F6660@AM0PR04MB5012.eurprd04.prod.outlook.com>
+x-forefront-prvs: 094700CA91
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(346002)(366004)(376002)(396003)(136003)(199004)(189003)(36756003)(186003)(68736007)(6116002)(76176011)(3846002)(54906003)(66066001)(52116002)(4744005)(25786009)(4326008)(6512007)(476003)(106356001)(26005)(53936002)(110136005)(105586002)(256004)(446003)(6436002)(14444005)(2616005)(486006)(11346002)(86362001)(44832011)(2906002)(71190400001)(81156014)(8936002)(6486002)(7736002)(81166006)(7416002)(102836004)(316002)(478600001)(99286004)(14454004)(50226002)(71200400001)(386003)(6506007)(6636002)(97736004)(305945005)(8676002)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5012;
+ H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: /273hiyxNPb/UXJRWdO1EuZcWkej2Pb6dC6dMAa3UU/xJF5umRfV+IOMkDR2A72D8SpHbYh3WerDe252BqVZGBhlJBVRQhshP9HGt2kg4nz4fFnJ0SQ4vo8/sujh2X84QVC0RFKKqCDxyzf9nNFnlT5HWX9fcb0qVUGimXUUehqM9JxrNplbL4P7lkoByRsP14wq8Erf955Xnd86A8EiRRoneFrqKjn44wClE05a3zZ5yskOhc4qI2vramnGHk2olCb7HMqJe73IExwCpfCwfpUy27FdFUjlBVd+gEqxbt3r6/E7XxCtJ7E8G7f13kGqb7tLuzFpaFgz8KzRh9lKWe6dLualaAZTolsnTx+jl89YZIk4qF94pgufq+18sza/PkaAMqNAml1DyKFI+bOrHBv00yleTRCShPYcuwGiuqI=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 89a88e86-d699-4cd6-3adb-08d691e62ed2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 19:05:12.6574 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5012
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190213_110518_216309_8BDC0416 
+X-CRM114-Status: GOOD (  11.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,133 +142,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, brgerst@gmail.com, catalin.marinas@arm.com,
- jpoimboe@redhat.com, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, valentin.schneider@arm.com, mingo@redhat.com,
- james.morse@arm.com, luto@kernel.org, hpa@zytor.com, bp@alien8.de,
- tglx@linutronix.de, torvalds@linux-foundation.org,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Abel Vesa <abel.vesa@nxp.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 04:45:32PM +0100, Peter Zijlstra wrote:
-> On Wed, Feb 13, 2019 at 03:41:45PM +0100, Peter Zijlstra wrote:
-> > On Wed, Feb 13, 2019 at 02:39:22PM +0000, Julien Thierry wrote:
-> > > Hi Peter,
-> > > 
-> > > On 13/02/2019 14:25, Peter Zijlstra wrote:
-> > > > On Wed, Feb 13, 2019 at 02:00:26PM +0000, Will Deacon wrote:
-> > > >> The difference is because getting preempted in the sequence above is
-> > > >> triggered off the back of an interrupt. On arm64, and I think also on x86,
-> > > >> the user access state (SMAP or PAN) is saved and restored across exceptions
-> > > >> but not across context switch.
-> > > > 
-> > > > A quick reading of the SDM seems to suggest the SMAP state is part of
-> > > > EFLAGS, which is context switched just fine AFAIK.
-> > > > 
-> > > I fail to see where this is happening when looking at the switch_to()
-> > > logic in x86_64.
-> > 
-> > Yeah, me too.. we obviously preserve EFLAGS for user context, but for
-> > kernel-kernel switches we do not seem to preserve it :-(
-> 
-> So I dug around the context switch code a little, and I think we lost it
-> here:
-> 
->   0100301bfdf5 ("sched/x86: Rewrite the switch_to() code")
-> 
-> Before that, x86_64 switch_to() read like (much simplified):
-> 
-> 	asm volatile ( /* do RSP twiddle */
-> 	  : /* output */
-> 	  : /* input */
-> 	  : "memory", "cc", .... "flags");
-> 
-> (see __EXTRA_CLOBBER)
-> 
-> Which I suppose means that GCC generates the PUSHF/POPF to preserve the
-> EFLAGS, since we mark those explicitly clobbered.
-> 
-> Before that:
-> 
->   f05e798ad4c0 ("Disintegrate asm/system.h for X86")
-> 
-> We had explicit PUSHF / POPF in SAVE_CONTEXT / RESTORE_CONTEXT resp.
-> 
-> Now I cannot see how the current code preserves EFLAGS (if indeed it
-> does), and the changelog doesn't mention this change _AT_ALL_.
-> 
-> 
-> For a little bit of context; it turns out that user_access_begin() /
-> user_access_end() sets EFLAGS.AC and scheduling in between there wrecks
-> that because we're apparently not saving that anymore.
-> 
-> Now, I'm tempted to add the PUSHF / POPF right back because of this, but
-> first I suppose we need to figure out if that change was on purpose and
-> why that went missing from the Changelog.
+Add the missing ARM clock which will be used by cpufreq
 
-Just for giggles; the below patch seems to boot.
-
+Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
 ---
- arch/x86/entry/entry_32.S        | 2 ++
- arch/x86/entry/entry_64.S        | 2 ++
- arch/x86/include/asm/switch_to.h | 1 +
- 3 files changed, 5 insertions(+)
+ include/dt-bindings/clock/imx8mq-clock.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/entry/entry_32.S b/arch/x86/entry/entry_32.S
-index d309f30cf7af..5fc76b755510 100644
---- a/arch/x86/entry/entry_32.S
-+++ b/arch/x86/entry/entry_32.S
-@@ -650,6 +650,7 @@ ENTRY(__switch_to_asm)
- 	pushl	%ebx
- 	pushl	%edi
- 	pushl	%esi
-+	pushfl
+diff --git a/include/dt-bindings/clock/imx8mq-clock.h b/include/dt-bindings/clock/imx8mq-clock.h
+index 04f7ac3..47c790c 100644
+--- a/include/dt-bindings/clock/imx8mq-clock.h
++++ b/include/dt-bindings/clock/imx8mq-clock.h
+@@ -391,5 +391,7 @@
  
- 	/* switch stack */
- 	movl	%esp, TASK_threadsp(%eax)
-@@ -672,6 +673,7 @@ ENTRY(__switch_to_asm)
- #endif
+ #define IMX8MQ_CLK_NAND_USDHC_BUS_RAWNAND_CLK	267
  
- 	/* restore callee-saved registers */
-+	popfl
- 	popl	%esi
- 	popl	%edi
- 	popl	%ebx
-diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
-index 1f0efdb7b629..4fe27b67d7e2 100644
---- a/arch/x86/entry/entry_64.S
-+++ b/arch/x86/entry/entry_64.S
-@@ -291,6 +291,7 @@ ENTRY(__switch_to_asm)
- 	pushq	%r13
- 	pushq	%r14
- 	pushq	%r15
-+	pushfq
- 
- 	/* switch stack */
- 	movq	%rsp, TASK_threadsp(%rdi)
-@@ -313,6 +314,7 @@ ENTRY(__switch_to_asm)
- #endif
- 
- 	/* restore callee-saved registers */
-+	popfq
- 	popq	%r15
- 	popq	%r14
- 	popq	%r13
-diff --git a/arch/x86/include/asm/switch_to.h b/arch/x86/include/asm/switch_to.h
-index 7cf1a270d891..157149d4129c 100644
---- a/arch/x86/include/asm/switch_to.h
-+++ b/arch/x86/include/asm/switch_to.h
-@@ -40,6 +40,7 @@ asmlinkage void ret_from_fork(void);
-  * order of the fields must match the code in __switch_to_asm().
-  */
- struct inactive_task_frame {
-+	unsigned long flags;
- #ifdef CONFIG_X86_64
- 	unsigned long r15;
- 	unsigned long r14;
+-#define IMX8MQ_CLK_END				268
++#define IMX8MQ_CLK_ARM				268
++
++#define IMX8MQ_CLK_END				269
+ #endif /* __DT_BINDINGS_CLOCK_IMX8MQ_H */
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
