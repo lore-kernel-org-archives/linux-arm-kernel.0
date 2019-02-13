@@ -2,64 +2,145 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07E20C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:36:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CA6EBC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:38:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C6D18206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:36:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 96451206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:38:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WF9R72ng"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6D18206C0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BRVPAT0y";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="hP1JxaYY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96451206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2isNvQ2VotC4na4AWIYgc+XhNXbOyAM4M+FNM9NLZGA=; b=WF9R72nguBKEid
-	vCeWXoXl/XEsAYVvZhZqMg77zxbeJWhwB9phnEwD1kfK0j8d+1zyRl68P/jlFrY6mJENa9Nq+ORGH
-	f5y69obUTBA1cmxsTtnOtklTO4oNFTMiARI6aHRSHF/eq+wbIuj0XwlLpxMxmK0H8+B+dapRgdpU8
-	2kFzKQ91vuyl3OhVrMEN8rWnguSef/RUdd/w4Frg7hmNKt6pnjIZ7XvKRwp1COMHH6af0y8VbQzoK
-	BRPdJ4dMT6U04R5gtRm5xlD0fRoklUJN2JyzbZh70ozBJYcGQ9T03IWiK3OwgMXsIW+JgfevMzzru
-	lj8M5AclhevZ1OZwDLjQ==;
+	List-Owner; bh=szrBaq1vkAmXXGCAaAV110kvJYHpFYy5mvP/kxXtIks=; b=BRVPAT0y3eXDkU
+	TgmOvWH+icfmpipQ58hC8It1QnPwLUj3D3CQGFs7D4G5nrSz+NLXEe5E8mWyZejNgfaubWi486+0X
+	T7hv7b1jUDL0pbVvjDZJjPJP5qAvUUzrMe3BNW8iCtHzJxrMzM3BFNeri7x9L6wHVc9ZeNY6v5sus
+	w3HuYgJLaBOvnUp/+3E6NJtKViPI4DaMrV7YSON58VJrw3/6X6kiExUgjWKgcafFLnXWTcAI5LnuR
+	ODvF959yumK2YGXU/wY7P3/OjvPWgGI6DqwwKZjIX2qz7OPTdYxsDsaORWT8ZzVPbzCYt63GUXT5i
+	/oPqGYaj1dk/5qRUYAuA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtwaU-0003bl-Kx; Wed, 13 Feb 2019 15:36:38 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtwaR-0003bN-D9
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:36:37 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 605C6A78;
- Wed, 13 Feb 2019 07:36:34 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D979D3F575;
- Wed, 13 Feb 2019 07:36:32 -0800 (PST)
-Date: Wed, 13 Feb 2019 15:36:30 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-Subject: Re: [RFC PATCH] arm64/fpsimd: Don't disable softirq when touching
- FPSIMD/SVE state
-Message-ID: <20190213153630.GK3567@e103592.cambridge.arm.com>
-References: <20190208165513.8435-1-julien.grall@arm.com>
- <20190213143029.ad2kzg7vtuo3zpjk@linutronix.de>
+	id 1gtwbr-0003uT-E1; Wed, 13 Feb 2019 15:38:03 +0000
+Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtwbn-0003ta-HF
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:38:01 +0000
+X-IronPort-AV: E=Sophos;i="5.58,365,1544511600"; d="scan'208";a="26491894"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 13 Feb 2019 08:37:41 -0700
+Received: from NAM01-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Wed, 13 Feb 2019 08:37:40 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=WhzqqUO0n2i3lSSWyUNYxrnOP/yuy3RkAw4MoWqLu3c=;
+ b=hP1JxaYYlks87yzwUnuE+aGPvUO0/qWsRY5PqKAPsjcurTTFCYO9PXaFvRo7/GlcIihJMW9QGMe76tT/eWtsEtjwXnBfXI4GLaq3GElMJZq8ajEFZlugFKpPotRVRDvojNHeXlUi7zarBG4D86tIrbWbO1Cvc0vN/Wi3yTu1uOY=
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
+ MWHPR11MB1918.namprd11.prod.outlook.com (10.175.54.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.16; Wed, 13 Feb 2019 15:37:14 +0000
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::d917:8496:9d53:1f55]) by MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::d917:8496:9d53:1f55%9]) with mapi id 15.20.1622.016; Wed, 13 Feb 2019
+ 15:37:14 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <thierry.reding@gmail.com>, <u.kleine-koenig@pengutronix.de>
+Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
+Thread-Topic: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
+Thread-Index: AQHUo2hjF9SHYVC+/UyvQjeBLKSGN6WhLe0AgDDVQoCADBnwAA==
+Date: Wed, 13 Feb 2019 15:37:14 +0000
+Message-ID: <213f33f4-319f-46ec-61b8-e42067725e51@microchip.com>
+References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
+ <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
+ <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
+ <20190205224906.GD1372@mithrandir>
+In-Reply-To: <20190205224906.GD1372@mithrandir>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1P195CA0067.EURP195.PROD.OUTLOOK.COM
+ (2603:10a6:802:59::20) To MWHPR11MB1920.namprd11.prod.outlook.com
+ (2603:10b6:300:110::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-tagtoolbar-keys: D20190213173704088
+x-originating-ip: [213.233.103.70]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 464a0540-c395-47e5-8e6d-08d691c920a9
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1918; 
+x-ms-traffictypediagnostic: MWHPR11MB1918:
+x-ms-exchange-purlcount: 2
+x-microsoft-exchange-diagnostics: =?Windows-1252?Q?1; MWHPR11MB1918;
+ 23:UqLbNOTDO+mDmxoxke5kdhy7QyCgoJGhgRFgh?=
+ =?Windows-1252?Q?GLKA8qAgHD6cuxb+PoT1FKaCRWBXajrGeLnfRKEeS3FRgF1VZhW0MHCC?=
+ =?Windows-1252?Q?6XsMFAZBoVSP1n3v7DFfTPrpyt5pc4O+SFgcvnUtY+5yCPFWU8pgjXUK?=
+ =?Windows-1252?Q?eoL8FBbWMFPAtYm++i7f9DP8Ji4QDbc4sii1ckewtRy+OrTgSZdTpROr?=
+ =?Windows-1252?Q?VlNDMl128moB8s6YTOL58rOSmcw8ktGcXIt6nXMI6NwPlTHdGZat5RVM?=
+ =?Windows-1252?Q?qYAWynfF+36tW6Zsm+Hdw/mTkOvwIajz3y8D1LLgJ4mPp2cU+UZZsDw7?=
+ =?Windows-1252?Q?oWmo75EGXCobRrvf1xLTQwEupSxl9jsG79g/0s6rumT0sg/k+T8LCReg?=
+ =?Windows-1252?Q?vrr7RhyzIr8sOv3jjQ2YCMQUNIwR9DKN04TZW0Aev+2H5Or+UyNDMdEZ?=
+ =?Windows-1252?Q?4RY56dKu7g1kpSz2CjO4V1PgnelF8fej71qdfZ2NJVowY/eglj27jajC?=
+ =?Windows-1252?Q?Z1Bb1jySi6hFpsvmyQxc+c7gq3sMZZshlwmB82aHC3kploB/x5twWOof?=
+ =?Windows-1252?Q?P/wierghKpotxnKMXyCh5YkcPwvVCU2AqSJYTTaXsLy/gLeGfnj2mkLo?=
+ =?Windows-1252?Q?pEywuHw/QuS2P1uJ+SkznI/jV/MPpKqcVLauxaLURlv3Q5TAYsV0nC/6?=
+ =?Windows-1252?Q?4bIc7dOfozYZRuHphZGR98JFmggfLRgEwKwSyjELCCUxWLxknrVOgZuz?=
+ =?Windows-1252?Q?ik0w9FpIoBO9hjwDHBp3ihhC104g7+nyjs/MVKv5hPLc7ErGX5a1ZUQu?=
+ =?Windows-1252?Q?vAxu+J9eH/h9mZl9iGslHUw9QRp91vUM9y3W+7ybcaoJUHfQb5AmAEnN?=
+ =?Windows-1252?Q?XPz9FuJXH7qIQVRu0gaa7ujj46UbBcw3di17FcarThEn8LycM+M3RqMJ?=
+ =?Windows-1252?Q?SR8D7sZ6/kbL06ueTK5jg5O2GJv6LKh6+rd7ZbiOYCJP7KCO/6usZhjz?=
+ =?Windows-1252?Q?whAsGTK0z7jRu80Ed9fRL3ivx0TkVqBJhAE2c4Hyz+4h0V4lAVpOPvOz?=
+ =?Windows-1252?Q?i1lCNMqlut/5HoV0W6be124/fG6osVQ6682qW1UU0jX8n9DJlIaAglbL?=
+ =?Windows-1252?Q?FNuEAZqOktzRpQ3j1AEh/uKAF9onPdIMvWr7fQM6c/kdT6kHQ/2IGDMs?=
+ =?Windows-1252?Q?PvIKzueKs5Y3zPb5JzDWVdvMtWrkmVLG/O0yci/lWGbtyd35mH+19e6Q?=
+ =?Windows-1252?Q?Ttqe8pjr9Z+d8iX2ZPDpB/zm40OucBqyOb6VQ/P2zFaHWoW2xQ6f4Fn5?=
+ =?Windows-1252?Q?7PQQXqFSBFLqg2HP3hsO6DyXMCY+IwDqBY2S8Q1SGELUsEkVAFIbzAx4?=
+ =?Windows-1252?Q?7lLNUj4fUm7G6FjmOf1aSVE/VDVKRrdX5xpZqpDB1ZoGtHSzjF7vtmjA?=
+ =?Windows-1252?Q?Ss6wnjX8V61k3FJWkENWoVjK9vJ4VZECsBfDLBeS6m4viwnEKQVQ/SoB?=
+ =?Windows-1252?Q?7qhXzM=3D?=
+x-microsoft-antispam-prvs: <MWHPR11MB191850576658B6A7017AC48487660@MWHPR11MB1918.namprd11.prod.outlook.com>
+x-forefront-prvs: 094700CA91
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(39860400002)(396003)(366004)(376002)(346002)(51444003)(189003)(199004)(316002)(6512007)(6246003)(6436002)(93886005)(6486002)(2616005)(71190400001)(71200400001)(36756003)(4326008)(229853002)(26005)(25786009)(476003)(486006)(110136005)(11346002)(97736004)(186003)(54906003)(6306002)(446003)(105586002)(66066001)(106356001)(53936002)(86362001)(99286004)(31686004)(53546011)(6506007)(386003)(81156014)(81166006)(8936002)(14454004)(6116002)(3846002)(66574012)(76176011)(52116002)(8676002)(72206003)(102836004)(966005)(7736002)(478600001)(305945005)(68736007)(2906002)(256004)(14444005)(31696002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1918;
+ H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: CDXmumnyo/+a568uUfGkmJcReG+Mk6Cn61BYHKXH1WSZSoQDN0Kyt1Rxqo5JXtkW5WO4Hm2LcJ1HHYbf9JcIT7FTxw5jKVT31e+bF38qlviJUTSUPwZZNVALMeT6Zmis7Wye8TTiilKiqpCUnDUjno6vXPtTYoUXmDXyA53dw3TpdvqETDhMAnTAHegfsmXIEntB3ljSkXsSUqVpmqan5bcZi2PAwzXFESUqZmXCD9M0nCZlAFGVhKtH4ivClgTvSpkKaBfKBxCXK5ZmuUPeVKvlD9Zr9GtPPqKT4lb22syTwOUV26BTB0hAXTTS7hMj8SVVQc1cmUFFymQo0wj8oWjHW8HbuuJfWrgp04HqJPjBexHDCqtgWWt86cNywKZR5bHsC78mVRbVfq8mVX6nkZSHHGfBVcfrkbH5LYF5d1g=
+Content-ID: <FB59CEC9DEC16749BDCB6CA623E254FD@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190213143029.ad2kzg7vtuo3zpjk@linutronix.de>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 464a0540-c395-47e5-8e6d-08d691c920a9
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 15:37:10.7723 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1918
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_073635_466650_E0B6B04E 
-X-CRM114-Status: GOOD (  35.14  )
+X-CRM114-CacheID: sfid-20190213_073759_693693_FA5780B9 
+X-CRM114-Status: GOOD (  28.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,115 +152,165 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rt-users@vger.kernel.org, ard.biesheuvel@linaro.org,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- Julien Grall <julien.grall@arm.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com,
+ linux-doc@vger.kernel.org, corbet@lwn.net, linux-kernel@vger.kernel.org,
+ Ludovic.Desroches@microchip.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="windows-1252"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 03:30:29PM +0100, Sebastian Andrzej Siewior wrote:
-> On 2019-02-08 16:55:13 [+0000], Julien Grall wrote:
-> > When the kernel is compiled with CONFIG_KERNEL_MODE_NEON, some part of
-> > the kernel may be able to use FPSIMD/SVE. This is for instance the case
-> > for crypto code.
-> > 
-> > Any use of FPSIMD/SVE in the kernel are clearly marked by using the
-> > function kernel_neon_{begin, end}. Furthermore, this can only be used
-> > when may_use_simd() returns true.
-> 
-> This is equal what x86 is currently doing. The naming is slightly
-> different, there is irq_fpu_usable().
 
-Yes, I think it's basically the same idea.
 
-It's been evolving a bit on both sides, but is quite similar now.
+On 06.02.2019 00:49, Thierry Reding wrote:
+> On Sat, Jan 05, 2019 at 10:05:22PM +0100, Uwe Kleine-K=F6nig wrote:
+>> Hello,
+>>
+>> On Thu, Jan 03, 2019 at 01:29:44PM +0000, Claudiu.Beznea@microchip.com w=
+rote:
+>>> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+>>>
+>>> Add basic PWM modes: normal and complementary. These modes should
+>>> differentiate the single output PWM channels from two outputs PWM
+>>> channels. These modes could be set as follow:
+>>> 1. PWM channels with one output per channel:
+>>> - normal mode
+>>> 2. PWM channels with two outputs per channel:
+>>> - normal mode
+>>> - complementary mode
+>>> Since users could use a PWM channel with two output as one output PWM
+>>> channel, the PWM normal mode is allowed to be set for PWM channels with
+>>> two outputs; in fact PWM normal mode should be supported by all PWMs.
+>>
+>> I still think that my suggestion that I sent in reply to your v5 using
+>> .alt_duty_cycle and .alt_offset is the better one as it is more generic.
+>> A word about that from Thierry before putting the mode into the pwm API
+>> would be great.
+>>
+>> I don't repeat what I wrote there assuming you still remember or are
+>> willing to look it up at
+>> e.g. https://www.spinics.net/lists/linux-pwm/msg08174.html (in the 2nd h=
+alf
+>> of my mail).
+> =
 
-> > The current implementation of may_use_simd() allows softirq to use
-> > FPSIMD/SVE unless it is currently in used (i.e kernel_neon_busy is true).
-> > When in used, softirqs usually fallback to a software method.
-> > 
-> > At the moment, as a softirq may use FPSIMD/SVE, softirqs are disabled
-> > when touching the FPSIMD/SVE context. This has the drawback to disable
-> > all softirqs even if they are not using FPSIMD/SVE.
-> 
-> Is this bad? This means also that your crypto code will not be
-> interrupted by a softirq. Also if you would get rid of it, you could
-> avoid the software fallback in case may_use_simd() says false.
+> The problem I see with .alt_duty_cycle and .alt_offset is that they
+> provide too much flexibility in my opinion. There may be some variance
+> in how the values are computed for the different modes and that just
+> leads to additional code required in drivers to figure out what exactly
+> the user wanted.
 
-Masking softirqs during kernel_neon_begin()..._end() is unlikely to be a
-huge problem, but currently we block softirq during all context switch
-operations that act on the CPU vector registers.
+This is also my feeling. And I don't know how many controllers support
+having this. E.g. on the IP I'm working on (the Atmel one) the dead times
+have limited values, so that it cannot model all the possible delays b/w
+outputs.
 
-The reasons for this are somewhat historical, and IIRC predated the
-requirement for softirq users of kernel-mode NEON to include the
-may_use_simd() check and implement a fallback path on arm64.
+> =
 
-Now that softirq code is required to work around kernel-mode NEON being
-temporarily unusable, masking softirqs completely during context switch
-etc. should no longer be necessary.
+> If we only provide the user with a means to say which mode they want to
+> operate the PWM in they can just tell us and the driver doesn't have to
+> guess which one was meant.
+> =
 
-> > As a softirq should not rely on been able to use simd at a given time,
-> > there are limited reason to keep softirq disabled when touching the
-> > FPSIMD/SVE context. Instead, we can only disable preemption and tell
-> > the NEON unit is currently in use.
-> > 
-> > This patch introduces two new helpers kernel_neon_{disable, enable} to
-> > mark the area using FPSIMD/SVE context and use them in replacement of
-> > local_bh_{disable, enable}. The functions kernel_neon_{begin, end} are
-> > also re-implemented to use the new helpers.
-> > 
-> > Signed-off-by: Julien Grall <julien.grall@arm.com>
-> > 
-> > ---
-> > 
-> > I have been exploring this solution as an alternative approach to the RT
-> > patch "arm64: fpsimd: use preemp_disable in addition to local_bh_disable()".
-> > 
-> > So far, the patch has only been lightly tested.
-> > 
-> > For RT-linux, it might be possible to use migrate_{enable, disable}. I
-> > am quite new with RT and have some trouble to understand the semantics
-> > of migrate_{enable, disable}. So far, I am still unsure if it is possible
-> > to run another userspace task on the same CPU while getting preempted
-> > when the migration is disabled.
-> 
-> In RT:
-> - preemt_disable() is the same as !RT. A thread can not be suspend. An
->   interrupt may interrupt. However on RT we have threaded interrupts so
->   the interrupt is limited to the first-level handler (not the threaded
->   handler).
-> 
-> - migrate_disable() means that the thread can not be moved to another
->   CPU. It can be suspended.
-> 
-> - local_bh_disable() disables the BH: No softirq can run. In RT
->   local_bh_disable() does not inherit preempt_disable(). Two different
->   softirqs can be executed in parallel.
->   The BH is usually invoked at the end of the threaded interrupt
->   (because the threaded interrupt handler raises the softirq). It can
->   also run in the ksoftirqd.
-> 
-> Usually you should not get preempted in a migrate_disable() section. A
-> SCHED_OTHER task should not interrupt another SCHED_OTHER task in a
-> migrate_disable() section. A task with a higher priority (a RT/DL task)
-> will. Since threaded interrupts run with a RT priority of 50, they will
-> interrupt your task in a migrate_disable() section.
+> It also makes validation easier. We can check for capabilites upfront by
+> just comparing a list of supported modes. With .alt_duty_cycle and
+> .alt_offset we'd actually need to run code to figure out whether or not
+> the given set of values corresponds to a supported configuration.
+> =
 
-"Usually" is probably not good enough if another task can run: if the
-preempting task enters userspace then the vector registers are needed
-for its use, which is tricky to arrange if the registers are currently
-in use by context switch logic running in the first task.
+>> Also I think that if the capabilities function is the way forward adding
+>> support to detect availability of polarity inversion should be
+>> considered. This would also be an opportunity to split the introduction
+>> of the capabilities function and the introduction of complementary mode.
+>> (But my personal preference would be to just let .apply fail when an
+>> unsupported configuration is requested.)
+>>
+>>> +static int pwm_get_default_caps(struct pwm_caps *caps)
+>>> +{
+>>> +	static const struct pwm_caps default_caps =3D {
+>>> +		.modes_msk =3D PWM_MODE_BIT(NORMAL),
+>>> +	};
+>>> +
+>>> +	if (!caps)
+>>> +		return -EINVAL;
+>>> +
+>>> +	*caps =3D default_caps;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/**
+>>> + * pwm_get_caps() - get PWM capabilities of a PWM device
+>>> + * @pwm: PWM device to get the capabilities for
+>>> + * @caps: returned capabilities
+>>> + *
+>>> + * Returns: 0 on success or a negative error code on failure
+>>> + */
+>>> +int pwm_get_caps(const struct pwm_device *pwm, struct pwm_caps *caps)
+>>> +{
+>>> +	if (!pwm || !caps)
+>>> +		return -EINVAL;
+>>> +
+>>> +	if (pwm->chip->ops->get_caps)
+>>> +		return pwm->chip->ops->get_caps(pwm->chip, pwm, caps);
+>>> +
+>>> +	return pwm_get_default_caps(caps);
+>>
+>> I'd drop pwm_get_default_caps (unless you introduce some more callers
+>> later) and fold its implementation into pwm_get_caps.
+> =
 
-My current feeling is that we probably have to stick with
-preempt_disable() here, but hopefully we can get rid of
-local_bh_disable() (as proposed) with no ill effects...
+> I think Claudiu and I may have talked past one another here. What I was
+> suggesting was to make pwm_get_default_caps() an exported symbol so that
+> drivers could use it if they didn't have extra capabilities. However, it
+> seems like just handling that in pwm_get_caps() if ops->get_caps =3D=3D N=
+ULL
+> works just as well. I don't think it needs to be a different function in
+> this case, but I don't mind if it is.
+> =
 
-Does that sound sensible?
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(pwm_get_caps);
+>>> [...]
+>>> @@ -53,12 +75,14 @@ enum {
+>>>   * @period: PWM period (in nanoseconds)
+>>>   * @duty_cycle: PWM duty cycle (in nanoseconds)
+>>>   * @polarity: PWM polarity
+>>> + * @modebit: PWM mode bit
+>>>   * @enabled: PWM enabled status
+>>>   */
+>>>  struct pwm_state {
+>>>  	unsigned int period;
+>>>  	unsigned int duty_cycle;
+>>>  	enum pwm_polarity polarity;
+>>> +	unsigned long modebit;
+>>
+>> I fail to see the upside of storing the mode as 2^mode instead of a
+>> plain enum pwm_mode. Given that struct pwm_state is visible for pwm
+>> users a plain pwm_mode would at least be more intuitive.
+> =
 
-Cheers
----Dave
+> Agreed, we should have only the specific mode in the state and let the
+> core deal with masks where necessary.
+
+Good, I will rework this.
+
+Thank you,
+Claudiu Beznea
+
+> =
+
+> Thierry
+> =
+
+> =
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> =
+
 
 _______________________________________________
 linux-arm-kernel mailing list
