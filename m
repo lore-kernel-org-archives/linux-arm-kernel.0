@@ -2,148 +2,61 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26399C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:26:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48BA4C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:27:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E94C1222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:26:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16ABD2190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:27:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sox9+h4n";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="CRtWfBig"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E94C1222B2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MHaiH07D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16ABD2190A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=P6G+CjLariFhQfFi20XHAdj+W819kKzJWzRP6uP/2dQ=; b=sox9+h4nQyoVFX
-	uGOuzc/Pq7MXEiuxrMs8oHikV98sPjYgUNZffhijDmAyR/gwSB8CwKqwrOPwqMQxSplgH+UgXBlTV
-	DpuAL7KVhSb2AIjVhofCqZ2kXLBwPf3XETguEXsJ0hIRdHv3KqtryabYGg3LSmkQiVjhZLy9bxFgV
-	gre6uTiciOOclu0W8TLErDP4JFVoDl9F7mfNLRMPlqmDNpdYxiH7+9YUWSwZPoCfnMb6MIKX+Q7CE
-	B71Wr/LLRyX9lD307SFAforUpSht4AGhvJwHzKiCiw+FieGz7N8g5EEiCb1ewXU4g4WXubkTvJNM+
-	WTi9RBLF65d1adSc4j5g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=4YKAdMh7xlL8KYODHJLDWTcuTKf/9BAGQIr8rKU1YCw=; b=MHaiH07DmBWVyo
+	1gG81725AAaFbj9AFH9L0jR6Lu0oJmG6wWT0x2fQ8IEpZlVbQ7MWPsHFK03tQReAFdsG3nGWiJKi5
+	PkL9s0Siinh3hsJvhV9iC1WUoiIz7clU0ChPDqXmWgoGex64M6x+S6QqPLMp8mydXHhXNjJlDwbgH
+	ZBiuZQtzde4onsvxUNDtsu1fE/YVhM8fmLwo8HW57LluGQ4kaZ/3vaSBiA4yK/yI990b9vDCKGdkH
+	04SxVHUHW3GMs0aZ3Lqf0LyS0vhRlU6yGes8rNp6y3SpmKDLXLHgDjBw4COQUdR5w8goT7n1xLnCj
+	2F6DVN33ATeXDI/eaE5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtvUE-0002k8-Ib; Wed, 13 Feb 2019 14:26:06 +0000
-Received: from mail-eopbgr690055.outbound.protection.outlook.com
- ([40.107.69.55] helo=NAM04-CO1-obe.outbound.protection.outlook.com)
+	id 1gtvVF-00032R-3B; Wed, 13 Feb 2019 14:27:09 +0000
+Received: from relay10.mail.gandi.net ([217.70.178.230])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtvUA-0002jS-Nk
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:26:04 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=3NZT4xX8DocpGW7VTFVffzaL1hJvBCxlUcjGaAtBSyQ=;
- b=CRtWfBigAw4A80nPie5WxDs4Tpd7p8lFENokUlymlMz4IULJxzovzKY02P75Czyv0TvZZLQdgfhKIAOMx8AmadtnYP8MqepkQjC2WQuPW6JaNVpwT7WFhIiwq9afcGqDBxp3FrAujuf1fk+17Y/W3g3U/HJfFalijjQQmZqcULc=
-Received: from BN6PR02CA0043.namprd02.prod.outlook.com (2603:10b6:404:5f::29)
- by BN6PR02MB2644.namprd02.prod.outlook.com (2603:10b6:404:54::20)
- with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1601.24; Wed, 13 Feb
- 2019 14:25:58 +0000
-Received: from CY1NAM02FT055.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::200) by BN6PR02CA0043.outlook.office365.com
- (2603:10b6:404:5f::29) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1622.16 via Frontend
- Transport; Wed, 13 Feb 2019 14:25:58 +0000
-Authentication-Results: spf=pass (sender IP is 149.199.60.83)
- smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
- header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
- header.from=xilinx.com;
-Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
- 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
- client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
-Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- CY1NAM02FT055.mail.protection.outlook.com (10.152.74.80) with Microsoft SMTP
- Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1580.10
- via Frontend Transport; Wed, 13 Feb 2019 14:25:57 +0000
-Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
- by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
- (envelope-from <bharat.kumar.gogada@xilinx.com>)
- id 1gtvU5-0006ad-ER; Wed, 13 Feb 2019 06:25:57 -0800
-Received: from [127.0.0.1] (helo=localhost)
- by xsj-pvapsmtp01 with smtp (Exim 4.63)
- (envelope-from <bharat.kumar.gogada@xilinx.com>)
- id 1gtvU0-0005jV-AP; Wed, 13 Feb 2019 06:25:52 -0800
-Received: from xsj-pvapsmtp01 (smtp2.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1DEPiUE029165; 
- Wed, 13 Feb 2019 06:25:44 -0800
-Received: from [172.23.37.224] (helo=xhdbharatku40.xilinx.com)
- by xsj-pvapsmtp01 with esmtp (Exim 4.63)
- (envelope-from <bharat.kumar.gogada@xilinx.com>)
- id 1gtvTs-0005hw-07; Wed, 13 Feb 2019 06:25:44 -0800
-From: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-To: <bhelgaas@google.com>, <lorenzo.pieralisi@arm.com>
-Subject: [PATCH] PCI: xilinx-nwl: Fix Multi MSI data programming
-Date: Wed, 13 Feb 2019 19:55:39 +0530
-Message-ID: <1550067939-9859-1-git-send-email-bharat.kumar.gogada@xilinx.com>
-X-Mailer: git-send-email 2.7.4
-X-RCIS-Action: ALLOW
-X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
-X-TM-AS-User-Approved-Sender: Yes;Yes
-X-EOPAttributedMessage: 0
-X-MS-Office365-Filtering-HT: Tenant
-X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
- SFV:NSPM;
- SFS:(10009020)(346002)(39860400002)(396003)(376002)(136003)(2980300002)(199004)(189003)(6666004)(478600001)(356004)(36386004)(107886003)(63266004)(14444005)(106466001)(50226002)(36756003)(51416003)(7696005)(476003)(47776003)(81166006)(81156014)(426003)(26005)(2906002)(77096007)(186003)(8676002)(126002)(110136005)(486006)(2616005)(4326008)(316002)(50466002)(16586007)(48376002)(4744005)(305945005)(106002)(54906003)(9786002)(8936002)(336012)(107986001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR02MB2644; H:xsj-pvapsmtpgw01; FPR:;
- SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
-X-Microsoft-Exchange-Diagnostics: 1; CY1NAM02FT055;
- 1:wgIse9XV477tgp2/+hjF+N18qgJ6GG7WF2GUc5qeOYJ5ad13pb0iYF0rlTiXyPcYO6ojR1OnWgx0EZ4vNHEhR8vQX+IgbGDbXM/ERnth98rJRmgEgqi0VmHQ6AccgN3HzLtCmRoXZxC8ECGGncjrDQ==
+ id 1gtvVA-00031v-Lt
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:27:07 +0000
+Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
+ [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
+ by relay10.mail.gandi.net (Postfix) with ESMTPSA id 082BD240014;
+ Wed, 13 Feb 2019 14:26:50 +0000 (UTC)
+Message-ID: <25f4beadd3088b3fbb2751f120e4216969301136.camel@bootlin.com>
+Subject: Re: [PATCH v3 8/8] drm/panel: Add Ronbo RB070D30 panel
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
+ <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
+Date: Wed, 13 Feb 2019 15:26:45 +0100
+In-Reply-To: <2663d767bffbc83f84f9086e614b0ec1dd343ced.1549896081.git-series.maxime.ripard@bootlin.com>
+References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+ <2663d767bffbc83f84f9086e614b0ec1dd343ced.1549896081.git-series.maxime.ripard@bootlin.com>
+Organization: Bootlin
+User-Agent: Evolution 3.30.5 
 MIME-Version: 1.0
-X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: b7f03ae3-dade-4d22-ff88-08d691bf2c0f
-X-Microsoft-Antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4608076)(4709027)(2017052603328)(7153060);
- SRVR:BN6PR02MB2644; 
-X-MS-TrafficTypeDiagnostic: BN6PR02MB2644:
-X-LD-Processed: 657af505-d5df-48d0-8300-c31994686c5c,ExtAddr
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Exchange-Diagnostics: 1; BN6PR02MB2644;
- 20:2WpWqhVG+3n3KTiGycZ2quod5iIlLt9M9qpO7kBsbnv+dMLHv/MA0sdPEbkbjXlswIOSsHGp2+rBKhBkE+zforaevju0wPKeZ7jOLcaPX6M7rY8n2Ch5tN73UAdMWcIb80w9rmkYr7bvOTkkjZZnIslIC1Oj+jpGDOnbl6rzuX8RgzJQ2aOyB6OA1YSk9etqJKsZt2jsF+YvwqTVBx9urjPqyn7gWxAwnzoxf+rdGeOvC8/w66/33xFKVXZh98/9CrDSTTMVsqYkmJfry0y/IwqSyGWBJGQDxlhJ95j4giTmOjFQ6Mjg3QEbG0aIn7P55fCZEqReoCoLmMHaZqklyu8FbO9eVwNOIvxr1wkBBbStJsW8pv8JBI6yeU4M4YXHVwwQr4RrD5zLKOuFnbPczLI7JS7zCcNZKpiG39RaAmafrSSkfsblrpE8DmjHWr8WT4lpK/M0KtyhVyh6w0my80DPY2aLTq3pTFGBrcx9KArbcdOdBbJhPNM7UjtgGKCW
-X-Microsoft-Antispam-PRVS: <BN6PR02MB2644FFD8E0AD7F346A887510A5660@BN6PR02MB2644.namprd02.prod.outlook.com>
-X-Forefront-PRVS: 094700CA91
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; BN6PR02MB2644;
- 23:MtMO9DkXQ3PXfBIL2qFBb5Tdh6c3qA+fvCWAMdY8M?=
- =?us-ascii?Q?Vft9cL8Zlhfmc7sOV1cH+/vxINzq6T9zgbunMWXdnSLRVayWg3G9JeM1fVS5?=
- =?us-ascii?Q?GGKC/SHKmK9B9g4o794ekSoSMp/WSwwUUZkIZlQf8eY78A/Mug67aZheNl94?=
- =?us-ascii?Q?LKau6QOpEMbyB/ZoDZm3yiox7h03ZjgFPgUBKTi9VSYmBPuoZ+OAIRT0P4GF?=
- =?us-ascii?Q?Ta+JWwIy4qmRfyUKo2c0/jPJR1YKTtBKiSFsswdQVd9AMMhSAs6XIMJXd7kT?=
- =?us-ascii?Q?qJtRpzGGeK/Lmn8V0C3XfHnHurnsB/rCk98+q+8pPuqFe7t3jIBUImYxEwzL?=
- =?us-ascii?Q?4r5vSwAoVttwoHprQ8YxtMg5dN382JF7z9qPAjlsjK1frIEiVSCoxowYb6kr?=
- =?us-ascii?Q?UtbJLacdVhjnVIIy3xZl11nmPY+ro6ABlfs+b2DpqZo38r18asCGda1p3ShA?=
- =?us-ascii?Q?DlDMzwXtT/ztQL82JUDlPELOqhtm+RN3hX1g6nSYkyGb2BpjArSRwhpdxHyz?=
- =?us-ascii?Q?p5zM2zi3UvqAQFxrXbiKIWtjcf2rjwGNzkAfqDWwU989GWhHSmxoyOc0VPgi?=
- =?us-ascii?Q?ki50cl8BxetF5iPM178RIGiYr3FSNOAwBlDI3URFatQUIhRzutymc7mVyubM?=
- =?us-ascii?Q?d22MBIMLlnaUYb+t5sRmCnxReLwag/MUp5H+PVD4BVo11TeSuAO01DoCmdDI?=
- =?us-ascii?Q?WZr29jtLml2avZ9C1jqb6fKvH26JH5kSsLKNlQveXz3EtgbqkoYY01KGDKR1?=
- =?us-ascii?Q?Olm+Jy13c0Jp//Q/0iJOh7BSk5Iqmq99cE6ulQwOUxdf12mfjiKcJi6Czpy1?=
- =?us-ascii?Q?atvlOOem28InV5CsxYleWyAx4j0PCAlFTS93Jqn8HtDHqDu/llESxJ1jCE6p?=
- =?us-ascii?Q?ddojWxwSqrCBJBi+Np6vsmKUl9O6IFKPgsulWWta1nHoCF9Rn7PRh9YZ1Oaz?=
- =?us-ascii?Q?AVbMBnKlcdpIZxQwjpfasT56KmLH8XWPKO5wQEV5PLVUnjjw81/9DCY8AfKc?=
- =?us-ascii?Q?rdmg5L5EP50YImilSep/rRfnL2sQjpFIVlUislcj8LwLA=3D=3D?=
-X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: ztwc/x8fzHX84tYlRCagHGq2IlGw0aZUCkjmfvo2R4w0WabxHb7rPTUeJb1z4RR2wIUP88z4BQ3elVADG/kV7l5g2s9n+Bo1n09xT3FoQSiTaQ+ttekaZJivqyqiIWKAyTrauBv7YrTkn6jBnIswT76cwsZIiRnpLgku+8Lesctq1FkBiKmVK0EJedmhL+q/ljP9uhiGq4EX4MatmWvwOVDtjYVycWNMyHsjAhEnXMgzlVZWVLAf8Kkarg2B7NuLf1y/8dmyiphlsR+R/H9VYNbMbV19uiSmejpGRwGnd5p/7BSaVOpyfxNrpq3Bq1LccK+5mZS0SkGCwHThoTynmiVGWYUKh30sGD9Pw5DiViyZWQbSfz7mA7rXrO+1X0fQ699zlljQ86KwmgcxGECxEnDmNjoFtM+NoUKbl4Sdt2M=
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 13 Feb 2019 14:25:57.9607 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: b7f03ae3-dade-4d22-ff88-08d691bf2c0f
-X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
- Helo=[xsj-pvapsmtpgw01]
-X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR02MB2644
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_062602_827819_ED11815F 
-X-CRM114-Status: GOOD (  10.37  )
+X-CRM114-CacheID: sfid-20190213_062705_021361_77CCEE9C 
+X-CRM114-Status: GOOD (  21.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -155,39 +68,350 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Konstantin Sudakov <k.sudakov@integrasources.com>, bbrezillon@kernel.org,
+ Sam Ravnborg <sam@ravnborg.org>, dri-devel@lists.freedesktop.org,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The current Multi MSI data programming fails if a
-end point is connected with switch.
+Hi,
 
-Fix Multi MSI data, by programming data with required alignment.
+On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
+> From: Konstantin Sudakov <k.sudakov@integrasources.com>
+> 
+> The Ronbo RB070D30 panel is a MIPI-DSI panel based on a Fitipower EK79007
+> controller and a 1024x600 panel.
+> 
+> Reviewed-by: Sam Ravnborg <sam@ravnborg.org>
+> Signed-off-by: Konstantin Sudakov <k.sudakov@integrasources.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/gpu/drm/panel/Kconfig                |   9 +-
+>  drivers/gpu/drm/panel/Makefile               |   1 +-
+>  drivers/gpu/drm/panel/panel-ronbo-rb070d30.c | 262 ++++++++++++++++++++-
 
-Signed-off-by: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
----
- drivers/pci/controller/pcie-xilinx-nwl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Looks like no bindings documentation is introduced for this panel.
+Shouldn't that be the case? The vendor also seems to be missing from
+vendor-prefixes.txt.
 
-diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c b/drivers/pci/controller/pcie-xilinx-nwl.c
-index 81538d7..36669c5 100644
---- a/drivers/pci/controller/pcie-xilinx-nwl.c
-+++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-@@ -484,7 +484,7 @@ static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 
- 	mutex_lock(&msi->lock);
- 	bit = bitmap_find_next_zero_area(msi->bitmap, INT_PCI_MSI_NR, 0,
--					 nr_irqs, 0);
-+					 nr_irqs, nr_irqs - 1);
- 	if (bit >= INT_PCI_MSI_NR) {
- 		mutex_unlock(&msi->lock);
- 		return -ENOSPC;
+For the driver itself:
+
+Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+
+Cheers,
+
+Paul
+
+>  3 files changed, 272 insertions(+)
+>  create mode 100644 drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+> 
+> diff --git a/drivers/gpu/drm/panel/Kconfig b/drivers/gpu/drm/panel/Kconfig
+> index 3f3537719beb..870dcdbf2601 100644
+> --- a/drivers/gpu/drm/panel/Kconfig
+> +++ b/drivers/gpu/drm/panel/Kconfig
+> @@ -138,6 +138,15 @@ config DRM_PANEL_RAYDIUM_RM68200
+>  	  Say Y here if you want to enable support for Raydium RM68200
+>  	  720x1280 DSI video mode panel.
+>  
+> +config DRM_PANEL_RONBO_RB070D30
+> +	tristate "Ronbo Electronics RB070D30 panel"
+> +	depends on OF
+> +	depends on DRM_MIPI_DSI
+> +	depends on BACKLIGHT_CLASS_DEVICE
+> +	help
+> +	  Say Y here if you want to enable support for Ronbo Electronics
+> +	  RB070D30 1024x600 DSI panel.
+> +
+>  config DRM_PANEL_SAMSUNG_S6D16D0
+>  	tristate "Samsung S6D16D0 DSI video mode panel"
+>  	depends on OF
+> diff --git a/drivers/gpu/drm/panel/Makefile b/drivers/gpu/drm/panel/Makefile
+> index 4396658a7996..4a103d346809 100644
+> --- a/drivers/gpu/drm/panel/Makefile
+> +++ b/drivers/gpu/drm/panel/Makefile
+> @@ -12,6 +12,7 @@ obj-$(CONFIG_DRM_PANEL_ORISETECH_OTM8009A) += panel-orisetech-otm8009a.o
+>  obj-$(CONFIG_DRM_PANEL_PANASONIC_VVX10F034N00) += panel-panasonic-vvx10f034n00.o
+>  obj-$(CONFIG_DRM_PANEL_RASPBERRYPI_TOUCHSCREEN) += panel-raspberrypi-touchscreen.o
+>  obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM68200) += panel-raydium-rm68200.o
+> +obj-$(CONFIG_DRM_PANEL_RONBO_RB070D30) += panel-ronbo-rb070d30.o
+>  obj-$(CONFIG_DRM_PANEL_SAMSUNG_LD9040) += panel-samsung-ld9040.o
+>  obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6D16D0) += panel-samsung-s6d16d0.o
+>  obj-$(CONFIG_DRM_PANEL_SAMSUNG_S6E3HA2) += panel-samsung-s6e3ha2.o
+> diff --git a/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+> new file mode 100644
+> index 000000000000..cb4f99252aa0
+> --- /dev/null
+> +++ b/drivers/gpu/drm/panel/panel-ronbo-rb070d30.c
+> @@ -0,0 +1,262 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright (C) 2018-2019, Bridge Systems BV
+> + * Copyright (C) 2018-2019, Bootlin
+> + * Copyright (C) 2017, Free Electrons
+> + *
+> + * This file based on panel-ilitek-ili9881c.c
+> + */
+> +
+> +#include <linux/backlight.h>
+> +#include <linux/delay.h>
+> +#include <linux/device.h>
+> +#include <linux/err.h>
+> +#include <linux/errno.h>
+> +#include <linux/fb.h>
+> +#include <linux/kernel.h>
+> +#include <linux/media-bus-format.h>
+> +#include <linux/module.h>
+> +
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#include <drm/drm_mipi_dsi.h>
+> +#include <drm/drm_modes.h>
+> +#include <drm/drm_panel.h>
+> +#include <drm/drm_print.h>
+> +
+> +#include <video/mipi_display.h>
+> +#include <video/of_display_timing.h>
+> +#include <video/videomode.h>
+> +
+> +struct rb070d30_panel {
+> +	struct drm_panel panel;
+> +	struct mipi_dsi_device *dsi;
+> +	struct backlight_device *backlight;
+> +	struct regulator *supply;
+> +
+> +	struct {
+> +		struct gpio_desc *power;
+> +		struct gpio_desc *reset;
+> +		struct gpio_desc *updn;
+> +		struct gpio_desc *shlr;
+> +	} gpios;
+> +};
+> +
+> +static inline struct rb070d30_panel *panel_to_rb070d30_panel(struct drm_panel *panel)
+> +{
+> +	return container_of(panel, struct rb070d30_panel, panel);
+> +}
+> +
+> +static int rb070d30_panel_prepare(struct drm_panel *panel)
+> +{
+> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+> +	int ret;
+> +
+> +	ret = regulator_enable(ctx->supply);
+> +	if (ret < 0) {
+> +		DRM_DEV_ERROR(&ctx->dsi->dev, "Failed to enable supply: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	/* Reset */
+> +	msleep(20);
+> +	gpiod_set_value(ctx->gpios.power, 1);
+> +	msleep(20);
+> +	gpiod_set_value(ctx->gpios.reset, 1);
+> +	msleep(20);
+> +	return 0;
+> +}
+> +
+> +static int rb070d30_panel_unprepare(struct drm_panel *panel)
+> +{
+> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+> +
+> +	gpiod_set_value(ctx->gpios.reset, 0);
+> +	gpiod_set_value(ctx->gpios.power, 0);
+> +	regulator_disable(ctx->supply);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rb070d30_panel_enable(struct drm_panel *panel)
+> +{
+> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+> +	int ret;
+> +
+> +	ret = mipi_dsi_dcs_exit_sleep_mode(ctx->dsi);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = backlight_enable(ctx->backlight);
+> +	if (ret)
+> +		goto out;
+> +
+> +	return 0;
+> +
+> +out:
+> +	mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
+> +	return ret;
+> +}
+> +
+> +static int rb070d30_panel_disable(struct drm_panel *panel)
+> +{
+> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+> +
+> +	backlight_disable(ctx->backlight);
+> +	return mipi_dsi_dcs_enter_sleep_mode(ctx->dsi);
+> +}
+> +
+> +/* Default timings */
+> +static const struct drm_display_mode default_mode = {
+> +	.clock		= 51206,
+> +	.hdisplay	= 1024,
+> +	.hsync_start	= 1024 + 160,
+> +	.hsync_end	= 1024 + 160 + 80,
+> +	.htotal		= 1024 + 160 + 80 + 80,
+> +	.vdisplay	= 600,
+> +	.vsync_start	= 600 + 12,
+> +	.vsync_end	= 600 + 12 + 10,
+> +	.vtotal		= 600 + 12 + 10 + 13,
+> +	.vrefresh	= 60,
+> +
+> +	.width_mm	= 154,
+> +	.height_mm	= 85,
+> +};
+> +
+> +static int rb070d30_panel_get_modes(struct drm_panel *panel)
+> +{
+> +	struct drm_connector *connector = panel->connector;
+> +	struct rb070d30_panel *ctx = panel_to_rb070d30_panel(panel);
+> +	struct drm_display_mode *mode;
+> +	static const u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+> +
+> +	mode = drm_mode_duplicate(panel->drm, &default_mode);
+> +	if (!mode) {
+> +		DRM_DEV_ERROR(&ctx->dsi->dev,
+> +			      "Failed to add mode " DRM_MODE_FMT "\n",
+> +			      DRM_MODE_ARG(&default_mode));
+> +		return -EINVAL;
+> +	}
+> +
+> +	drm_mode_set_name(mode);
+> +
+> +	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
+> +	drm_mode_probed_add(connector, mode);
+> +
+> +	panel->connector->display_info.bpc = 8;
+> +	panel->connector->display_info.width_mm = mode->width_mm;
+> +	panel->connector->display_info.height_mm = mode->height_mm;
+> +	drm_display_info_set_bus_formats(&connector->display_info,
+> +					 &bus_format, 1);
+> +
+> +	return 1;
+> +}
+> +
+> +static const struct drm_panel_funcs rb070d30_panel_funcs = {
+> +	.get_modes	= rb070d30_panel_get_modes,
+> +	.prepare	= rb070d30_panel_prepare,
+> +	.enable		= rb070d30_panel_enable,
+> +	.disable	= rb070d30_panel_disable,
+> +	.unprepare	= rb070d30_panel_unprepare,
+> +};
+> +
+> +static int rb070d30_panel_dsi_probe(struct mipi_dsi_device *dsi)
+> +{
+> +	struct rb070d30_panel *ctx;
+> +	int ret;
+> +
+> +	ctx = devm_kzalloc(&dsi->dev, sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx)
+> +		return -ENOMEM;
+> +
+> +	ctx->supply = devm_regulator_get(&dsi->dev, "vcc-lcd");
+> +	if (IS_ERR(ctx->supply))
+> +		return PTR_ERR(ctx->supply);
+> +
+> +	mipi_dsi_set_drvdata(dsi, ctx);
+> +	ctx->dsi = dsi;
+> +
+> +	drm_panel_init(&ctx->panel);
+> +	ctx->panel.dev = &dsi->dev;
+> +	ctx->panel.funcs = &rb070d30_panel_funcs;
+> +
+> +	ctx->gpios.reset = devm_gpiod_get(&dsi->dev, "reset", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->gpios.reset)) {
+> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our reset GPIO\n");
+> +		return PTR_ERR(ctx->gpios.reset);
+> +	}
+> +
+> +	ctx->gpios.power = devm_gpiod_get(&dsi->dev, "power", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->gpios.power)) {
+> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our power GPIO\n");
+> +		return PTR_ERR(ctx->gpios.power);
+> +	}
+> +
+> +	/*
+> +	 * We don't change the state of that GPIO later on but we need
+> +	 * to force it into a low state.
+> +	 */
+> +	ctx->gpios.updn = devm_gpiod_get(&dsi->dev, "updn", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->gpios.updn)) {
+> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our updn GPIO\n");
+> +		return PTR_ERR(ctx->gpios.updn);
+> +	}
+> +
+> +	/*
+> +	 * We don't change the state of that GPIO later on but we need
+> +	 * to force it into a low state.
+> +	 */
+> +	ctx->gpios.shlr = devm_gpiod_get(&dsi->dev, "shlr", GPIOD_OUT_LOW);
+> +	if (IS_ERR(ctx->gpios.shlr)) {
+> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our shlr GPIO\n");
+> +		return PTR_ERR(ctx->gpios.shlr);
+> +	}
+> +
+> +	ctx->backlight = devm_of_find_backlight(&dsi->dev);
+> +	if (IS_ERR(ctx->backlight)) {
+> +		DRM_DEV_ERROR(&dsi->dev, "Couldn't get our backlight\n");
+> +		return PTR_ERR(ctx->backlight);
+> +	}
+> +
+> +	ret = drm_panel_add(&ctx->panel);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	dsi->mode_flags = MIPI_DSI_MODE_VIDEO | MIPI_DSI_MODE_VIDEO_BURST | MIPI_DSI_MODE_LPM;
+> +	dsi->format = MIPI_DSI_FMT_RGB888;
+> +	dsi->lanes = 4;
+> +
+> +	return mipi_dsi_attach(dsi);
+> +}
+> +
+> +static int rb070d30_panel_dsi_remove(struct mipi_dsi_device *dsi)
+> +{
+> +	struct rb070d30_panel *ctx = mipi_dsi_get_drvdata(dsi);
+> +
+> +	mipi_dsi_detach(dsi);
+> +	drm_panel_remove(&ctx->panel);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id rb070d30_panel_of_match[] = {
+> +	{ .compatible = "ronbo,rb070d30" },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, rb070d30_panel_of_match);
+> +
+> +static struct mipi_dsi_driver rb070d30_panel_driver = {
+> +	.probe = rb070d30_panel_dsi_probe,
+> +	.remove = rb070d30_panel_dsi_remove,
+> +	.driver = {
+> +		.name = "panel-ronbo-rb070d30",
+> +		.of_match_table	= rb070d30_panel_of_match,
+> +	},
+> +};
+> +module_mipi_dsi_driver(rb070d30_panel_driver);
+> +
+> +MODULE_AUTHOR("Boris Brezillon <boris.brezillon@bootlin.com>");
+> +MODULE_AUTHOR("Konstantin Sudakov <k.sudakov@integrasources.com>");
+> +MODULE_DESCRIPTION("Ronbo RB070D30 Panel Driver");
+> +MODULE_LICENSE("GPL");
 -- 
-2.7.4
+Paul Kocialkowski, Bootlin
+Embedded Linux and kernel engineering
+https://bootlin.com
 
 
 _______________________________________________
