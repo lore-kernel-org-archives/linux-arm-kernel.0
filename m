@@ -2,51 +2,69 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39B0FC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:47:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A10E6C282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:48:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0A5862086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:47:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 760E12086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 17:48:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eOxbnuo4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A5862086C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YVFOsZll";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="OZtVXEWt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 760E12086C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:From:References:Message-ID:Subject
+	:In-Reply-To:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LVtqicpxyCljIRtH1FGlQOH8f1DOJeUx+0LRBpeNkWQ=; b=eOxbnuo4poCBnz
-	9eQwCDcrJmNPKYFtxJJat3plMxCGosYbor0Jo3vrKxdHaQDUmryxQt6G+YmK+s3x0iv62xIqNDfd9
-	A+Pt96uVaXLb7vKGtICGQjnINE8ZOKA88ZtolVn38CeY5JXU75PVZWsIga2y1oDnCw5FxKuhfPffA
-	Yv/7VzqZuTdPmt/fhiKkDYE/G/DyoIJ98PA5Za39XkfbbkCKbp4bvKSZRRZgNPulPpTD6iB8cIsUk
-	EaNNcb1xXtfmTVLSHHyQwAa17JfSfMEyDTTAAJC7fsoB58LNMtoEJHZAp4fM5bQodiuQaV8XIHhJE
-	FCbyTYbdR8qHV/Sff7rw==;
+	List-Owner; bh=s7egsVPZkDoN9HLM+WrjUAu0URCviwERL5zQLQS5hgs=; b=YVFOsZllFcMWXp
+	pV/PG0F1fyN9EvO5wbWx1IpeFtUaEgKvOJSklJhGGHe+6BwUgM8qlITZ1rIpkxR84M4DgWefv06Fd
+	szdqksLOmNsvr6C3NmUox38/s5ttIScE2B30M+2ZenntwAlLXSIUuf2kklQXV87Ka40iDhQgRESTV
+	aLrhmpAIsDJ+IlqNl/SWyTzIo94JLtN/qi3bLqd6Phq17msuTArs0C2r6OocY5908XMwvwjpNUma/
+	Tjt6EVvvfDJ3BZJ8qsax5BEfEa1cInJxZJzjg0b1NPIb8IuPnWudze4EpDHagg3nbCBSL7mfzvdTJ
+	Ay+KFkbqSCKgTkla4wwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtydV-0008SJ-N7; Wed, 13 Feb 2019 17:47:53 +0000
-Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtycI-0006qw-Pn; Wed, 13 Feb 2019 17:46:39 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH 7/8] initramfs: proide a generic free_initrd_mem implementation
-Date: Wed, 13 Feb 2019 18:46:20 +0100
-Message-Id: <20190213174621.29297-8-hch@lst.de>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190213174621.29297-1-hch@lst.de>
-References: <20190213174621.29297-1-hch@lst.de>
+	id 1gtye2-0000WR-60; Wed, 13 Feb 2019 17:48:26 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtydp-0000SU-Ch
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 17:48:23 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id F0DD82086C;
+ Wed, 13 Feb 2019 17:48:12 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550080093;
+ bh=LoGu4ZFpYnInUrsS0hVTMhsGX33lNGrwKZApfVSsGoQ=;
+ h=To:In-Reply-To:Subject:References:Cc:From:Date:From;
+ b=OZtVXEWthhNHNzk3YJ4HfieZLR7ZZmoreYaYOlnQx/uUCofvgJPajcFKISoAMcv7S
+ w5BWbL8clOEhf8ZmfCbNMAVgF989LF70mDAnjpLCw9cae+Oa1lxOJOhM0BDa734+Rx
+ rzjBTv5rI7vP2V1Wf3geijEcxn5TgA2jx8D/Ol1M=
 MIME-Version: 1.0
+To: Alexandre Torgue <alexandre.torgue@st.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ Michael Turquette <mturquette@baylibre.com>, gabriel.fernandez@st.com
+In-Reply-To: <20190212135154.2733-4-gabriel.fernandez@st.com>
+User-Agent: alot/0.8
+Subject: Re: [PATCH 3/7] clk: stm32mp1: set ck_csi as critical clock
+Message-ID: <155008009213.115909.12905657780692674136@swboyd.mtv.corp.google.com>
+References: <20190212135154.2733-1-gabriel.fernandez@st.com>
+ <20190212135154.2733-4-gabriel.fernandez@st.com>
+From: Stephen Boyd <sboyd@kernel.org>
+Date: Wed, 13 Feb 2019 09:48:12 -0800
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190213_094813_581806_35E29307 
+X-CRM114-Status: GOOD (  12.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -58,296 +76,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
- linux-kernel@vger.kernel.org, linux-mm@kvack.org,
- Alexander Viro <viro@zeniv.linux.org.uk>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org
+Cc: Gabriel Fernandez <gabriel.fernandez@st.com>, linux-kernel@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-stm32@st-md-mailman.stormreply.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-For most architectures free_initrd_mem just expands to the same
-free_reserved_area call.  Provide that as a generic implementation
-marked __weak.
+Quoting gabriel.fernandez@st.com (2019-02-12 05:51:50)
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> ck_csi is used for IO compensation so it should be
+> considered as "always-on" and kept on.
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  drivers/clk/clk-stm32mp1.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/clk-stm32mp1.c b/drivers/clk/clk-stm32mp1.c
+> index e72079de83f4..5b30e4eeca2c 100644
+> --- a/drivers/clk/clk-stm32mp1.c
+> +++ b/drivers/clk/clk-stm32mp1.c
+> @@ -1661,7 +1661,8 @@ static const struct clock_config stm32mp1_clock_cfg[] = {
+>  
+>         /*  External / Internal Oscillators */
+>         GATE_MP1(CK_HSE, "ck_hse", "clk-hse", 0, RCC_OCENSETR, 8, 0),
+> -       GATE_MP1(CK_CSI, "ck_csi", "clk-csi", 0, RCC_OCENSETR, 4, 0),
+> +       GATE_MP1(CK_CSI, "ck_csi", "clk-csi", CLK_IS_CRITICAL,
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- arch/alpha/mm/init.c      | 8 --------
- arch/arc/mm/init.c        | 7 -------
- arch/c6x/mm/init.c        | 7 -------
- arch/h8300/mm/init.c      | 8 --------
- arch/m68k/mm/init.c       | 7 -------
- arch/microblaze/mm/init.c | 7 -------
- arch/nds32/mm/init.c      | 7 -------
- arch/nios2/mm/init.c      | 7 -------
- arch/openrisc/mm/init.c   | 7 -------
- arch/parisc/mm/init.c     | 7 -------
- arch/powerpc/mm/mem.c     | 7 -------
- arch/sh/mm/init.c         | 7 -------
- arch/um/kernel/mem.c      | 7 -------
- arch/unicore32/mm/init.c  | 7 -------
- init/initramfs.c          | 5 +++++
- 15 files changed, 5 insertions(+), 100 deletions(-)
-
-diff --git a/arch/alpha/mm/init.c b/arch/alpha/mm/init.c
-index a42fc5c4db89..97f4940f11e3 100644
---- a/arch/alpha/mm/init.c
-+++ b/arch/alpha/mm/init.c
-@@ -291,11 +291,3 @@ free_initmem(void)
- {
- 	free_initmem_default(-1);
- }
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void
--free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
-diff --git a/arch/arc/mm/init.c b/arch/arc/mm/init.c
-index e1ab2d7f1d64..c357a3bd1532 100644
---- a/arch/arc/mm/init.c
-+++ b/arch/arc/mm/init.c
-@@ -214,10 +214,3 @@ void __ref free_initmem(void)
- {
- 	free_initmem_default(-1);
- }
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void __init free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
-diff --git a/arch/c6x/mm/init.c b/arch/c6x/mm/init.c
-index af5ada0520be..5504b71254f6 100644
---- a/arch/c6x/mm/init.c
-+++ b/arch/c6x/mm/init.c
-@@ -67,13 +67,6 @@ void __init mem_init(void)
- 	mem_init_print_info(NULL);
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void __init free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void __init free_initmem(void)
- {
- 	free_initmem_default(-1);
-diff --git a/arch/h8300/mm/init.c b/arch/h8300/mm/init.c
-index 6519252ac4db..2eff00de2b78 100644
---- a/arch/h8300/mm/init.c
-+++ b/arch/h8300/mm/init.c
-@@ -101,14 +101,6 @@ void __init mem_init(void)
- 	mem_init_print_info(NULL);
- }
- 
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void
- free_initmem(void)
- {
-diff --git a/arch/m68k/mm/init.c b/arch/m68k/mm/init.c
-index 933c33e76a48..c62e41563bb9 100644
---- a/arch/m68k/mm/init.c
-+++ b/arch/m68k/mm/init.c
-@@ -144,10 +144,3 @@ void __init mem_init(void)
- 	init_pointer_tables();
- 	mem_init_print_info(NULL);
- }
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
-diff --git a/arch/microblaze/mm/init.c b/arch/microblaze/mm/init.c
-index b17fd8aafd64..3bd32de46abb 100644
---- a/arch/microblaze/mm/init.c
-+++ b/arch/microblaze/mm/init.c
-@@ -186,13 +186,6 @@ void __init setup_memory(void)
- 	paging_init();
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void free_initmem(void)
- {
- 	free_initmem_default(-1);
-diff --git a/arch/nds32/mm/init.c b/arch/nds32/mm/init.c
-index 253f79fc7196..c02e10ac5e76 100644
---- a/arch/nds32/mm/init.c
-+++ b/arch/nds32/mm/init.c
-@@ -249,13 +249,6 @@ void free_initmem(void)
- 	free_initmem_default(-1);
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void __set_fixmap(enum fixed_addresses idx,
- 			       phys_addr_t phys, pgprot_t flags)
- {
-diff --git a/arch/nios2/mm/init.c b/arch/nios2/mm/init.c
-index 16cea5776b87..60736a725883 100644
---- a/arch/nios2/mm/init.c
-+++ b/arch/nios2/mm/init.c
-@@ -82,13 +82,6 @@ void __init mmu_init(void)
- 	flush_tlb_all();
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void __init free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void __ref free_initmem(void)
- {
- 	free_initmem_default(-1);
-diff --git a/arch/openrisc/mm/init.c b/arch/openrisc/mm/init.c
-index d157310eb377..d0d94a4391d4 100644
---- a/arch/openrisc/mm/init.c
-+++ b/arch/openrisc/mm/init.c
-@@ -221,13 +221,6 @@ void __init mem_init(void)
- 	return;
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- void free_initmem(void)
- {
- 	free_initmem_default(-1);
-diff --git a/arch/parisc/mm/init.c b/arch/parisc/mm/init.c
-index 059187a3ded7..1b445e206ca8 100644
---- a/arch/parisc/mm/init.c
-+++ b/arch/parisc/mm/init.c
-@@ -935,10 +935,3 @@ void flush_tlb_all(void)
- 	spin_unlock(&sid_lock);
- }
- #endif
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
-diff --git a/arch/powerpc/mm/mem.c b/arch/powerpc/mm/mem.c
-index 33cc6f676fa6..976c706a64e2 100644
---- a/arch/powerpc/mm/mem.c
-+++ b/arch/powerpc/mm/mem.c
-@@ -388,13 +388,6 @@ void free_initmem(void)
- 	free_initmem_default(POISON_FREE_INITMEM);
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void __init free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- /*
-  * This is called when a page has been modified by the kernel.
-  * It just marks the page as not i-cache clean.  We do the i-cache
-diff --git a/arch/sh/mm/init.c b/arch/sh/mm/init.c
-index a8e5c0e00fca..2fa824336ec2 100644
---- a/arch/sh/mm/init.c
-+++ b/arch/sh/mm/init.c
-@@ -410,13 +410,6 @@ void free_initmem(void)
- 	free_initmem_default(-1);
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- #ifdef CONFIG_MEMORY_HOTPLUG
- int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
- 		bool want_memblock)
-diff --git a/arch/um/kernel/mem.c b/arch/um/kernel/mem.c
-index 799b571a8f88..48b24b63b10d 100644
---- a/arch/um/kernel/mem.c
-+++ b/arch/um/kernel/mem.c
-@@ -172,13 +172,6 @@ void free_initmem(void)
- {
- }
- 
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
--
- /* Allocate and free page tables. */
- 
- pgd_t *pgd_alloc(struct mm_struct *mm)
-diff --git a/arch/unicore32/mm/init.c b/arch/unicore32/mm/init.c
-index e3f4f791e10a..01271ce52ef9 100644
---- a/arch/unicore32/mm/init.c
-+++ b/arch/unicore32/mm/init.c
-@@ -316,10 +316,3 @@ void free_initmem(void)
- {
- 	free_initmem_default(-1);
- }
--
--#ifdef CONFIG_BLK_DEV_INITRD
--void free_initrd_mem(unsigned long start, unsigned long end)
--{
--	free_reserved_area((void *)start, (void *)end, -1, "initrd");
--}
--#endif
-diff --git a/init/initramfs.c b/init/initramfs.c
-index cf8bf014873f..f3aaa58ac63d 100644
---- a/init/initramfs.c
-+++ b/init/initramfs.c
-@@ -527,6 +527,11 @@ extern unsigned long __initramfs_size;
- #include <linux/initrd.h>
- #include <linux/kexec.h>
- 
-+void __weak free_initrd_mem(unsigned long start, unsigned long end)
-+{
-+	free_reserved_area((void *)start, (void *)end, -1, "initrd");
-+}
-+
- #ifdef CONFIG_KEXEC_CORE
- static bool kexec_free_initrd(void)
- {
--- 
-2.20.1
+Please add a comment to the code indicating this so we know why critical
+is here without reading git history.
 
 
 _______________________________________________
