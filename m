@@ -7,51 +7,51 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B6F76C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03320C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 806702075D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C397C2075D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 13:32:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JQ6PY4Hs";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="iXAPXXK6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 806702075D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QwHnbBxm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="O16oOpSy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C397C2075D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=u4cwJRZh8ECypTiiZcPw+/lNPoyWA0OB+gQQP08dVhU=; b=JQ6PY4HsAASo7r
-	FB+WAvDbxwBddver8MLF0dD11F7KVVqF67NGZcll5VFaOQCkFbR0iSiz1Emx1HxNrotAEvkQfyvAb
-	MNnyl/a3xS2GFY3groSn9V3qm/g+ri3ShYAbHc0Vuz420S4KsSZeAOKN6q8ceXdlfoGhhUyOb6a2i
-	kJiWYnmyTwRS55+MyJU64dnt82NRiVGXL2GnYAUNqBOwfDcHEmxn33QEh9nE6Vk1EhYINwDIyEyZU
-	7AGgQzPGiGTiofn9cI4juHhi5Q4MkwczKGCJr8Yxo36t+aRK+m1UXIOZHCymnkfhtpcTJ2pRC0l2C
-	AOtd6jklyb/qFis2qcgQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lBHalVuUAlBZoMDxHaPVnT4joopd0bWwkoFin6oNfZs=; b=QwHnbBxm82DKbb
+	IAUcEybs/ArWeOihPG0VwAKj+Kw+SvDaIfGbTJyOKOawoB9eDnHPfhVKfrFnDH9Ixb+SWhRCErCNr
+	xskHFae/UdJ9yy9+iSfTYuX0CHSxxQ+n3VwVxZOcgzqpHObrwpcEX8e7nbp9vVMk8ILpGKCobQvqY
+	7LcDu5pPQSrbtlS+eXzziuRWJsUtqpRdPRRymZUHY5ekpWwN94yTecWQq/ttc3jbvobrCRF4yRqRy
+	qthbv5yuMG20r9jRhDrFPi2e1n5tgDbciIHV/yF0LaqHskS+v8DkdWPLc+QL8LGxS2aN+C3IaXwFF
+	Of1b0fU1IDlLDx1c4r2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtueR-0001Aj-9V; Wed, 13 Feb 2019 13:32:35 +0000
+	id 1gtuea-0001M0-Eg; Wed, 13 Feb 2019 13:32:44 +0000
 Received: from mail-eopbgr70047.outbound.protection.outlook.com ([40.107.7.47]
  helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtueN-0001AA-4a
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:32:33 +0000
+ id 1gtueQ-0001AA-AZ
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 13:32:36 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=bnBsWXN8cRyqzWI7BjB9+N/yYL+mv7luZ+JlIn1qYfg=;
- b=iXAPXXK6tBm5lUkJuMSE1CKIEmx5nbcssVP1KEvInEiZSBgjVUc6HJoTGDXt2L8FrsT4t2EoC0y+8iP5fxddRgjGrh+AEtwaDpxrRCQ4xgLQWJZ0dJlfh2XPgrstapqu9cPgfX5It42KFMPj31dUVln6mt5CbuvI7XkxmQ08Nac=
+ bh=0oPvs3Oa7jwLZ2aU642zhPKnBvU6t2mEAjVTLCR56rE=;
+ b=O16oOpSyFe/rrGWl1WstPyLYsRbJ+qiNweNuSxBFIEWBWqaVLsCxztCsqmFh6y9RJIgQ4Dhh1ewCSQtyBGStFDARQhIQpeseXHTwAxzgeXoe/nRXuYvz5LhWHPGTfC3XzH7yOxm/C7ndKL56cP/8Vpd+/okUsBGsR0pq6yoWHKI=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
  DB3PR0402MB3657.eurprd04.prod.outlook.com (52.134.69.142) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Wed, 13 Feb 2019 13:32:23 +0000
+ 15.20.1601.21; Wed, 13 Feb 2019 13:32:29 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Wed, 13 Feb 2019
- 13:32:23 +0000
+ 13:32:29 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -65,11 +65,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
  <linux-clk@vger.kernel.org>, "viresh.kumar@linaro.org"
  <viresh.kumar@linaro.org>
-Subject: [PATCH V2 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Topic: [PATCH V2 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Index: AQHUw6CMS+2RedgPGkSlnUsit+2mig==
-Date: Wed, 13 Feb 2019 13:32:22 +0000
-Message-ID: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
+Thread-Topic: [PATCH V2 2/2] clk: imx: scu: add cpu frequency scaling support
+Thread-Index: AQHUw6CQ13JKnp8jt0O33OXV5gABVA==
+Date: Wed, 13 Feb 2019 13:32:28 +0000
+Message-ID: <1550064410-28417-2-git-send-email-Anson.Huang@nxp.com>
+References: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1550064410-28417-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -83,57 +85,58 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 008f6d53-a053-4309-f0fb-08d691b7abe8
+x-ms-office365-filtering-correlation-id: 4c8bd59f-a6a4-492c-4587-08d691b7b2c3
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:DB3PR0402MB3657; 
 x-ms-traffictypediagnostic: DB3PR0402MB3657:
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3657;
- 23:FfA1vrrxaj8UHKp83DMQEyeW+myqZBixz+483?=
- =?iso-8859-1?Q?A4oeEFoZBQ/RX6z68PBWVF9Nk6NZzH9OjQ93bTq8BFSFpCh+UUa8XTVB35?=
- =?iso-8859-1?Q?ZpQCo2vyytYmamGCBwj6bleG9KCdobzcnPyu3JNrKThuuQL4QAR0CMJ76s?=
- =?iso-8859-1?Q?MwEcoS7BOv+jGQLGrNe5DS83pMSFSyEn+6Ey2Ij0Jm/lBC84bqm5MYPlYu?=
- =?iso-8859-1?Q?k4ZDAg8U+Qr6YOuayOesOhCKToXMjjnODRAm1/8sVqKQlyCTlAmt7VWB/7?=
- =?iso-8859-1?Q?uu4HjvH7AXiwmpSqD5geQW/jOQOwCwKUevK9nSrrWo3rQZi1HFzhOWApzJ?=
- =?iso-8859-1?Q?ZSUMK6UH4O3g7EtrmqZruB8cKnfjam/qKph6REoML8nCLIgqMWVQaxsYKN?=
- =?iso-8859-1?Q?N00sWnMXAOv1HTvJ9jQ+B2CQnac/loKigg81b9VXnFZZ5YB98fIVMxHvtr?=
- =?iso-8859-1?Q?5GmTbk5gBSZannXc9f92wnshdRhNisv7g58t5V9R9da9w54LCUznn+NQyH?=
- =?iso-8859-1?Q?v7hWwWcuvEzySk2WHCafBcNHH9OYQyy0HOCLuro+mRjsvsnSlVmi/+yhY9?=
- =?iso-8859-1?Q?YBJThUO4eYpYG8NpevmJdhK4LAOqaj4eEHVw7mj8qPVDY6id3JMlbiGTWc?=
- =?iso-8859-1?Q?ewY7QTqovrwMVlpJ9joDSC0aRNWtGm0f4tW1ZkHKHXjQTS41EPzetvuvWP?=
- =?iso-8859-1?Q?qIdF/cgAEJzdHKrh6I5LtIOdqLD4JmL3dFkJqw1WZkaSgg5IE3yX1Pzut1?=
- =?iso-8859-1?Q?aTdgwE4DMAZLZDGz6gRzQUI1smiAJkdsZsExl1FC4SyWkqDnHTlonZ1N1x?=
- =?iso-8859-1?Q?JNocFoZtU+NmwndBPikwhI/T1Fy4eDBz+dybdiNwmTeQn8LsxOiNr1L8WQ?=
- =?iso-8859-1?Q?NfHf/FeRjzaxVyve1JK+XxKBGIdMN3cSCta2+pLSTJ2vqt6Qyp2EBIRsF/?=
- =?iso-8859-1?Q?wUl0F1vljmhVy1+63o5XdgegrFUhaeVAS4sEaEa/8MmCLPpRpOoqtTKl5O?=
- =?iso-8859-1?Q?FhfgSridtWmOHigN+8vgmdv4eQEwT058U2OwnFBPW8+NypwLEyj2SpQikd?=
- =?iso-8859-1?Q?3Mg6LUIy15xvrVy69jIDLeTAxePbXGZsNbfq81YqHsHNCecf7h+sMeyae8?=
- =?iso-8859-1?Q?d65XJi1rTFtSelpXz0P43baT3TdJuaEILqdCvEcEU9ir0aLWRj40FhsHFw?=
- =?iso-8859-1?Q?S4s4ZsFW+YHoK+0zkG0+IwvvZVGWUVy/g7J8oCb/aL5J5JmW9SShx6zfGA?=
- =?iso-8859-1?Q?L3nMgbNR1oPp2aKZT6De7bamX+jpjj/0FUXkfSwqw=3D=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3657D7B3FC1D63D7AE8B05B9F5660@DB3PR0402MB3657.eurprd04.prod.outlook.com>
+ 23:TXB9KQigjDGIl53PnMYTzjuJ0APKhK+77nl38?=
+ =?iso-8859-1?Q?fLfUb81CFHQDrbPACxxdS1A/gwaBzjmRyf6A3/3+4bVnspNB9uhkY1ZqoV?=
+ =?iso-8859-1?Q?vxXwrAvKVywQDA2PCDuz/plyrJ7pQcGXNoC/V831EqatMaFMiwmxMMlnk6?=
+ =?iso-8859-1?Q?cTLaW3lt0jLEJv+vvcMU/u66nPQ9Hsvv1YC70ktOlxEdNF3txBZ36MKdtS?=
+ =?iso-8859-1?Q?zgPW3dSNCJnm15eOGl9jFuNPO3vaJliVEFkf8qBxXB0ubGadVEA5Qswv+Q?=
+ =?iso-8859-1?Q?4ybhzK4lIRL2aVS6dVuapPixhYf2CxEWAOPw/3Mi/ZW1m/+gzJz4SQEJh7?=
+ =?iso-8859-1?Q?Es+VTsyYxAXV3lXeS7Bzev2MpwmIHZTMKUIrdn6eTMkCF9jQ2XhVhqttzu?=
+ =?iso-8859-1?Q?zoqa/ZvUULMaYhkrzdayRjyrNEvo8WVD168vvNmGcGfXafeK67v23aWTDl?=
+ =?iso-8859-1?Q?BWExYj/xsZqA9rgkU3TwNeEz3YsGEGkj5P17NSXc0vSglZKOowz9iQLDKT?=
+ =?iso-8859-1?Q?F3/Ln6szxO2VWW7SGI4EH9BO+7zN+IReP49dZv3OAHkmMwwLPwMoqAaI7X?=
+ =?iso-8859-1?Q?e2tervJH4F+fk4XYSUVm5bdh0BKM+u1O9o4M7y6Dj9PdarMkGgKMm7GPTD?=
+ =?iso-8859-1?Q?Mg13pFzItrnNTJWlRyKkZZAAaxlnoGmyK40OnOC93P6ir6ATvXNXUSqfVL?=
+ =?iso-8859-1?Q?4ZeWSeBDa6QvbI8Y4zzC5+iYTM5UfnzS9wsgnWPHnNprHyMoMIbI/lc6nm?=
+ =?iso-8859-1?Q?j+a6iAxvUFvcO6LR/dMEbQGntfmOca4IfhK295bbQdivX7FWXUx+P29w0r?=
+ =?iso-8859-1?Q?6M6u03r6px5bvnU+thg0hizfOmDONsg8oWjJXTntpfW9aEgHAJAVH4IUgB?=
+ =?iso-8859-1?Q?a23Zy6YDoPtGUpGoVmRX8S9KY+ZetVEbOsWdmk3hQErbstxyVVMWdFsfi2?=
+ =?iso-8859-1?Q?FwCOpLhkuqyp941fUByewcptbwEmAsA+kNU5Vb/FVBAglP30fcZJRflFOn?=
+ =?iso-8859-1?Q?p4aPdQlLF3dMr4YYZHfD+RBKQFSYS2f5qWeGtljK6NO0bU6cSGv5YJJHSY?=
+ =?iso-8859-1?Q?W+Z/s9w0xR8EAEYL/PyH0zNzWF56fnKCuRV6nv1FGUnM7xeQXvFl7gCdIn?=
+ =?iso-8859-1?Q?mJifvzFQ1KX0OekqNOjoJBvmTkJ+PapHvzN72Xe39S31PVZvDuayoHSszI?=
+ =?iso-8859-1?Q?EXbXzXyHL/nODX/2wHwwR4/0zOT3IbGhPxuosO+bmDVG5jmRdhYTVApLPV?=
+ =?iso-8859-1?Q?2rZgttBHlTeXtdEuVk1n/i27l//9HEk0njjZJd58o3ZKYwcOkDyvW+pNwt?=
+ =?iso-8859-1?Q?kczqFJRAdtxCq5tI/8kqvvYOD?=
+x-microsoft-antispam-prvs: <DB3PR0402MB36578C92C0DAD613461FA755F5660@DB3PR0402MB3657.eurprd04.prod.outlook.com>
 x-forefront-prvs: 094700CA91
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(376002)(366004)(346002)(396003)(39860400002)(199004)(189003)(54534003)(6436002)(486006)(6486002)(106356001)(478600001)(2616005)(53936002)(476003)(26005)(25786009)(52116002)(105586002)(14454004)(2201001)(4326008)(186003)(8676002)(8936002)(50226002)(99286004)(256004)(81166006)(110136005)(86362001)(14444005)(81156014)(316002)(305945005)(7736002)(68736007)(6512007)(6116002)(3846002)(386003)(71190400001)(102836004)(6506007)(71200400001)(2906002)(36756003)(7416002)(66066001)(97736004)(2501003)(921003)(32563001)(1121003);
+ SFS:(10009020)(136003)(376002)(366004)(346002)(396003)(39860400002)(199004)(189003)(54534003)(6436002)(486006)(6486002)(106356001)(11346002)(478600001)(2616005)(53936002)(476003)(26005)(25786009)(52116002)(76176011)(105586002)(14454004)(2201001)(4326008)(186003)(8676002)(8936002)(446003)(50226002)(99286004)(256004)(81166006)(110136005)(86362001)(14444005)(81156014)(316002)(305945005)(7736002)(68736007)(6512007)(6116002)(3846002)(386003)(71190400001)(102836004)(6506007)(71200400001)(2906002)(36756003)(7416002)(66066001)(97736004)(2501003)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3657;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: KpSThe+fNZCcDME3xmBUCBzymDHUVUVMFxeSRwEmMDiabD0pm3p9fV2v2If7wj4V4Qnv2nvGibd9gDeukdw7bZwPuYTHSjAuwNDoA2RttOiDf9JY7FCJaTRny687RAd6gZftvnW3JEbys466Irwwb/7qRQjrP7BKJf1suhr0iVnjfq0z0+Dg140B18i5Txyr2//HAsP85lUQiw6ru/1Q6ORCMQUzH6fdPwovCMzL/CkIwAv4jI7YX+sYD1jDRPmHsNWHss5yZ3NAPW2Evh/4TyGxkwdi1hyAXEJzPlJYO5pA6ag2I4HuW1zC4BDAenmv0dbWvxD14iv6pVT3g4JUkdPXeOJRIWMHR0a2eRQ/tuL5Fx8qo2BaX4QjDDh78T2Ge91PZbA9G/UuVwRQgqVik3ou/mjRrD2E4Zgo2WrCAaY=
+x-microsoft-antispam-message-info: LM2E0vnlZQZa3cuG08jUrq1fyU+V2XiB8y/SRdkhflWCIpFpmFSUCQPRpbcgyHu+pMX2+r5LumzjMoJwaCfHH2laCVycVkKEwbTtpnEUc54KRa9HcrViaCMvSSW4SXtm6EQFgsbI700Rxj8SUhyLwOSOpRZQrEYyOFyl1/pOBdZ7R8Z0bGYcDXiWBpHLOgZjEIvLLdKmL4C/ryDeYC4yLqCw9HqTp3DeosmoyVyIdbzgYbJYzOsuR6fMH7RUM5nkE1bMJv/eHrwja9mImnnWn+zj32xVdouLBS6kdk6TZSsaPtMShBLOQLCOGxxVDeSB+Io/MlQfgUkaS3jvCRh7XxLzvIGjrdfNs/YjZrqKyG2r7n8fgAs6n5UNl4vmg4tJQ/K8JLxRdK9d/QA/W32YSR3b9LBqLXnDpDt+1IkSp6Y=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 008f6d53-a053-4309-f0fb-08d691b7abe8
-X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 13:32:11.8080 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 4c8bd59f-a6a4-492c-4587-08d691b7b2c3
+X-MS-Exchange-CrossTenant-originalarrivaltime: 13 Feb 2019 13:32:23.3272 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3657
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_053232_193766_432D1EFD 
-X-CRM114-Status: GOOD (  10.32  )
+X-CRM114-CacheID: sfid-20190213_053234_880258_E65A070B 
+X-CRM114-Status: GOOD (  17.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,80 +154,98 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add i.MX8QXP CPU opp table to support cpufreq.
+On NXP's i.MX SoCs with system controller inside, CPU frequency
+scaling can ONLY be done by system controller firmware, and it
+can ONLY be requested from secure mode, so Linux kernel has to
+call ARM SMC to trap to ARM-Trusted-Firmware to request system
+controller firmware to do CPU frequency scaling.
+
+This patch adds i.MX system controller CPU frequency scaling support,
+it reuses cpufreq-dt driver and implement the CPU frequency scaling
+inside SCU clock driver.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
 ChangeLog since V1:
-	use operating-points-v2 for OPP table to better fit cpufreq-dt driver;
+	- reuse cpufreq-dt driver for CPU frequency scaling and implement the CPU
+	  frequency scaling inside SCU clock driver.
 ---
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ drivers/clk/imx/clk-scu.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 4c3dd95..1e08387 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -34,6 +34,10 @@
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			clock-latency = <61036>;
-+			#cooling-cells = <2>;
-+			operating-points-v2 = <&a35_0_opp_table>;
- 		};
+diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c
+index 7ccf7ed..65fb63c 100644
+--- a/drivers/clk/imx/clk-scu.c
++++ b/drivers/clk/imx/clk-scu.c
+@@ -4,14 +4,32 @@
+  *   Dong Aisheng <aisheng.dong@nxp.com>
+  */
  
- 		A35_1: cpu@1 {
-@@ -42,6 +46,7 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			operating-points-v2 = <&a35_0_opp_table>;
- 		};
++#include <linux/arm-smccc.h>
+ #include <linux/clk-provider.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
  
- 		A35_2: cpu@2 {
-@@ -50,6 +55,7 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			operating-points-v2 = <&a35_0_opp_table>;
- 		};
+ #include "clk-scu.h"
  
- 		A35_3: cpu@3 {
-@@ -58,6 +64,7 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			operating-points-v2 = <&a35_0_opp_table>;
- 		};
- 
- 		A35_L2: l2-cache0 {
-@@ -65,6 +72,24 @@
- 		};
- 	};
- 
-+	a35_0_opp_table: opp-table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
++#ifdef CONFIG_CPUFREQ_DT
++#define IMX_SIP_CPUFREQ			0xC2000001
++#define IMX_SIP_SET_CPUFREQ		0x00
 +
-+		opp-900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <150000>;
-+		};
+ static struct imx_sc_ipc *ccm_ipc_handle;
+ 
++struct imx_sc_cpufreq {
++	const char *clk_name;
++	u32 cluster_id;
++};
 +
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <150000>;
-+			opp-suspend;
-+		};
-+	};
++static const struct imx_sc_cpufreq imx_sc_cpufreq_data[] = {
++	{
++		.clk_name = "a35_clk",
++		.cluster_id = 0,
++	},
++};
++#endif
 +
- 	gic: interrupt-controller@51a00000 {
- 		compatible = "arm,gic-v3";
- 		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
+ /*
+  * struct clk_scu - Description of one SCU clock
+  * @hw: the common clk_hw
+@@ -161,6 +179,35 @@ static int clk_scu_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct imx_sc_msg_req_set_clock_rate msg;
+ 	struct imx_sc_rpc_msg *hdr = &msg.hdr;
+ 
++#ifdef CONFIG_CPUFREQ_DT
++	/* CPU clock can ONLY be done by TF-A */
++	if (clk->clk_type == IMX_SC_PM_CLK_CPU) {
++		struct arm_smccc_res res;
++		unsigned int cluster_id;
++		int i;
++
++		for (i = 0; i < ARRAY_SIZE(imx_sc_cpufreq_data); i++) {
++			if (!strcmp(clk_hw_get_name(hw),
++				imx_sc_cpufreq_data[i].clk_name)) {
++				cluster_id = imx_sc_cpufreq_data[i].cluster_id;
++				break;
++			}
++		}
++
++		/*
++		 * As some other clock types have same value as
++		 * IMX_SC_PM_CLK_CPU, so we need to double check
++		 * the clock being scaled is indeed CPU clock which
++		 * matches the table we define.
++		 */
++		if (i < ARRAY_SIZE(imx_sc_cpufreq_data)) {
++			arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
++				cluster_id, rate, 0, 0, 0, 0, &res);
++			return 0;
++		}
++	}
++#endif
++
+ 	hdr->ver = IMX_SC_RPC_VERSION;
+ 	hdr->svc = IMX_SC_RPC_SVC_PM;
+ 	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_RATE;
 -- 
 2.7.4
 
