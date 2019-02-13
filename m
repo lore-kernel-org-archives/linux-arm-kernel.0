@@ -2,69 +2,67 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB981C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:03:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 956BBC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:11:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C82820842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:03:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63ECF222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 11:11:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uoG8KIjq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C82820842
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="frUJLvJr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63ECF222B2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=o4BMmBxXTa0NesG1OJk6Q4OKhnglZldr2o1cBKUu32k=; b=uoG8KIjqFxgOpDTqUnjQXL2POR
-	Zafkv38mBRq1s2Z67ifxuQqeqn9lRzKDhAVp9/l0KIx/qLkL0AuRHJGJgo0Dcj2SgiQ93jAUN9FX/
-	Sl2L0bISGa+30nN2xHteNIP3yrI33ZW6AUeYAMPTD8i4AudlnV81fxc/JEjtDEJmegutOSGrfyL+G
-	vcln1slg0a0rBHcFA+3GE0HKqtUlRyVMixbS39lPI8GS9SX3oWEoKKnZZVNpiI1S9v86wNdtnbTq+
-	XxPqHS5KIonfD38xrQZtVFwcv52K1ooAqYKIm/dh/StgCPW1iFl733kZi7Go8Hw76fGoqRpXC8SsF
-	CxQJH5pQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=G4I/Y65AxBAiZhvVw1Ixt12KNhNVra6/XPzxI5uxOfo=; b=frUJLvJrc0xAap
+	5008FnbMh8BmGvkSqrCgiOQc2hOhUVmAb07ESy0G1D2fuRN7IO5kkn+DTJDY+3oqRLz2MD0ipgDoW
+	J5EBeGCKca/dpWEKTgMIwEBk1NXMjX5h37cFQqjLNcmszJXbzEZDKsqd3B/wIBOjA9RTz2W9OktVH
+	mnPRD+xLTVxG20W9+Um+Cxwyoc0KjZJi50VDmhC5gDCvhyRoZsQcG4bUWxtZD6YnYTs5KD5WAVGKr
+	aCuVP1m8E3n1d9JiIDCgBdLce8gahfeNb8e/I9eQfgRPZBX9NpcTiI1I4U6iujlIrfnOn89gQ/kh6
+	ztoUulSE3jICobEoER5Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtsJi-0001Zs-Pi; Wed, 13 Feb 2019 11:03:02 +0000
-Received: from inva020.nxp.com ([92.121.34.13])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtsJC-0000mZ-4W
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:02:36 +0000
-Received: from inva020.nxp.com (localhost [127.0.0.1])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 28DC11A00FD;
- Wed, 13 Feb 2019 12:02:26 +0100 (CET)
-Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
- [134.27.226.22])
- by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 1C9A81A0018;
- Wed, 13 Feb 2019 12:02:26 +0100 (CET)
-Received: from fsr-ub1664-016.ea.freescale.net
- (fsr-ub1664-016.ea.freescale.net [10.171.71.216])
- by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id B621F2060A;
- Wed, 13 Feb 2019 12:02:25 +0100 (CET)
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
-To: Shawn Guo <shawnguo@kernel.org>, Li Yang <leoyang.li@nxp.com>,
- "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH net-next 1/3] arm64: dts: fsl: ls1028a: Add PCI IERC node and
- ENETC endpoints
-Date: Wed, 13 Feb 2019 13:02:21 +0200
-Message-Id: <1550055743-15542-2-git-send-email-claudiu.manoil@nxp.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1550055743-15542-1-git-send-email-claudiu.manoil@nxp.com>
-References: <1550055743-15542-1-git-send-email-claudiu.manoil@nxp.com>
-X-Virus-Scanned: ClamAV using ClamSMTP
+	id 1gtsRe-0005mZ-5q; Wed, 13 Feb 2019 11:11:14 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gtsRb-0005lr-MC
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 11:11:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F58BA78;
+ Wed, 13 Feb 2019 03:11:11 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 176FB3F557;
+ Wed, 13 Feb 2019 03:11:06 -0800 (PST)
+Subject: Re: [PATCH v8 0/5] arm64: ftrace with regs
+To: Torsten Duwe <duwe@lst.de>, Mark Rutland <mark.rutland@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Catalin Marinas
+ <catalin.marinas@arm.com>, Steven Rostedt <rostedt@goodmis.org>,
+ Josh Poimboeuf <jpoimboe@redhat.com>, Ingo Molnar <mingo@redhat.com>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, Arnd Bergmann <arnd@arndb.de>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>
+References: <20190208150826.44EBC68DD2@newverein.lst.de>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <0f8d2e77-7e51-fba8-b179-102318d9ff84@arm.com>
+Date: Wed, 13 Feb 2019 11:11:04 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
+MIME-Version: 1.0
+In-Reply-To: <20190208150826.44EBC68DD2@newverein.lst.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_030230_452752_55B7D727 
-X-CRM114-Status: UNSURE (   9.95  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190213_031111_731311_56AC9DB8 
+X-CRM114-Status: GOOD (  16.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,84 +74,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, alexandru.marginean@nxp.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- netdev@vger.kernel.org
-MIME-Version: 1.0
+Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The LS1028A SoC features a PCI Integrated Endpoint Root Complex
-(IERC) defining several integrated PCI devices, including the ENETC
-ethernet controller integrated endpoints (IEPs). The IERC implements
-ECAM (Enhanced Configuration Access Mechanism) to provide access
-to the PCIe config space of the IEPs. This means the the IEPs
-(including ENETC) do not support the standard PCIe BARs, instead
-the Enhanced Allocation (EA) capability structures in the ECAM space
-are used to fix the base addresses in the system, and the PCI
-subsystem uses these structures for device enumeration and discovery.
-The "ranges" entries contain basic information from these EA capabily
-structures required by the kernel for device enumeration.
+Hi Torsten,
 
-The current patch also enables the first 2 ENETC PFs (Physiscal
-Functions) and the associated VFs (Virtual Functions), 2 VFs for
-each PF.  Each of these ENETC PFs has an external ethernet port
-on the LS1028A SoC.
+On 08/02/2019 15:08, Torsten Duwe wrote:
+> Patch series v8, as discussed.
+> The whole series applies cleanly on 5.0-rc5
+> 
 
-Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
-Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi | 33 ++++++++++++++++++++++++++
- 1 file changed, 33 insertions(+)
+For this series:
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi
-index a8cf92a..7f5a8e6 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi
-@@ -335,5 +335,38 @@
- 				     <GIC_SPI 206 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 207 IRQ_TYPE_LEVEL_HIGH>,
- 				     <GIC_SPI 208 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
- 		};
-+
-+		pcie@1f0000000 { /* Integrated Endpoint Root Complex */
-+			compatible = "pci-host-ecam-generic";
-+			reg = <0x01 0xf0000000 0x0 0x100000>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			#interrupt-cells = <1>;
-+			msi-parent = <&its>;
-+			device_type = "pci";
-+			bus-range = <0x0 0x0>;
-+			dma-coherent;
-+			msi-map = <0 &its 0x17 0xe>;
-+			iommu-map = <0 &smmu 0x17 0xe>;
-+				  /* PF0-6 BAR0 - non-prefetchable memory */
-+			ranges = <0x82000000 0x0 0x00000000  0x1 0xf8000000  0x0 0x160000
-+				  /* PF0-6 BAR2 - prefetchable memory */
-+				  0xc2000000 0x0 0x00000000  0x1 0xf8160000  0x0 0x070000
-+				  /* PF0: VF0-1 BAR0 - non-prefetchable memory */
-+				  0x82000000 0x0 0x00000000  0x1 0xf81d0000  0x0 0x020000
-+				  /* PF0: VF0-1 BAR2 - prefetchable memory */
-+				  0xc2000000 0x0 0x00000000  0x1 0xf81f0000  0x0 0x020000
-+				  /* PF1: VF0-1 BAR0 - non-prefetchable memory */
-+				  0x82000000 0x0 0x00000000  0x1 0xf8210000  0x0 0x020000
-+				  /* PF1: VF0-1 BAR2 - prefetchable memory */
-+				  0xc2000000 0x0 0x00000000  0x1 0xf8230000  0x0 0x020000>;
-+
-+			enetc_port0: pci@0,0 {
-+				reg = <0x000000 0 0 0 0>;
-+			};
-+			enetc_port1: pci@0,1 {
-+				reg = <0x000100 0 0 0 0>;
-+			};
-+		};
- 	};
- };
+Tested-by: Julien Thierry <julien.thierry@arm.com>
+
+> ---
+>  arch/arm64/Kconfig                    |    4 +
+>  arch/arm64/Makefile                   |   10 ++
+>  arch/arm64/include/asm/ftrace.h       |   16 ++++
+>  arch/arm64/include/asm/module.h       |    3 
+>  arch/arm64/kernel/Makefile            |   12 +--
+>  arch/arm64/kernel/entry-ftrace.S      |  125 ++++++++++++++++++++++++++++++++--
+>  arch/arm64/kernel/ftrace.c            |  117 ++++++++++++++++++++++++-------
+>  arch/arm64/kernel/module-plts.c       |    3 
+>  arch/arm64/kernel/module.c            |    2 
+>  arch/arm64/lib/Makefile               |    4 -
+>  drivers/firmware/efi/libstub/Makefile |   12 +--
+>  include/asm-generic/vmlinux.lds.h     |    2 
+>  include/linux/compiler_types.h        |    4 +
+>  kernel/module.c                       |   14 +++
+>  mm/kasan/Makefile                     |    8 +-
+>  15 files changed, 281 insertions(+), 55 deletions(-)
+> ---
+> changes since v7:
+> 
+> * -pg -> $(CC_FLAGS_FTRACE) cleanup now split according to subtree
+>   maintainership.
+> 
+> * REC_IP_BRANCH_OFFSET is gone, the functionality went into
+>   ftrace_call_adjust(), where it belongs.
+> 
+> * MOV_X9_X30 macro is gone (why did we argue about its name anyway?);
+>   it is only used once now in the initial ftrace_make_nop new helper
+>   function ftrace_setup_lr_saver(), suggested by Julien.
+> 
+> * call site processing was missing for modules. Fixed.
+> 
+> changes since v6:
+> 
+> * change the stack layout once more; I hope I have it the "standard" way now.
+>   And yes, it looks simpler and cleaner; thanks, Mark, for nagging.
+> 
+> * split out the independent Kconfig and Makefile changes
+> 
+> * fixed style issues
+> 
+> * s/fp/x29/g
+> 
+> * MCOUNT_ADDR is now merely a 64-bit magic, as this is totally sufficient.
+> 
+> * QUICK_LR_SAVE renamed back to MOV_X9_X30.
+> 
+> * place MOV_X9_X30 insns on bootup, and only flip b <-> nop at runtime
+> 
+> * graph tracer "ifdeffery" reshuffle
+> 
+> 	Torsten
+>   
+> 
+
 -- 
-2.7.4
-
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
