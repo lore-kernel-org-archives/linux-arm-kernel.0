@@ -2,48 +2,51 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 236CCC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 42D39C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E33662086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B0D32086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:31:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shNeDowc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E33662086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F/kmMYF6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B0D32086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=SzXNhhzIX2CoMEQdVwBhRLnwCrrzkB7oTXIliaChWfs=; b=shNeDowcsXnZnk
-	sjY9CGTTY/CuRwmcjPnUGUEkB52fPNfZD0wOOV/WsaLL2yC1lIHFjqvSfpIpNCMXuB+DdssXuZ/8p
-	6qr9oVdveCA1tyMdcDehou17v85ERFWH9/IJB39S3GIRvab/kwrzDmxdCofGEQGbwyMKiZdv+iDSB
-	M4bLwMvulEjefNVWnWe79CKJKO7kNnYsYk53VvxRb1g2pJbvlOKeQTrCzTx6yKfKkUE0psX58U0cq
-	GpTq1+62K3Lj9POVMTt8srmGwC74IPoiOaY17BawMnJ3dB2sdWL/1ud2QGdlZ5O0RluxjFbk8dPU8
-	/t528/iyOusi1cZH46iQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=S0xKhq5z69Pm+GKuPHXL/G3UsYkNE9TAjVV34ulSVyA=; b=F/kmMYF6eG+E2U
+	PVYDKbuFVSGE7OvH6LxyD/fJe3kUSMU3saYzpqinbIkE4iusQtw4gbz6zAeniTLAY/15StvmljVee
+	ba5ICph5KR2xtkBol788oQjNFlaNTXd2CBwj7eCKQavwKrJjgdF7xj5KzKCT4Dmua+aX0UFtO+SyL
+	9Q4Qlp5LG6qC4JpZCuNxvxBrRRmWWtQ6cxmodAzZ8JpcdGBcvua+XwahVfAqReRr9bKTBb+ZAh7Cg
+	mxtcfZW7GOyvLk9vlyFLK0pAudusKCAZMc9W4scgmEukbj3tvmPhZzx5C5tzeDWjxbQEh9sRWnxVA
+	1KOJDSsyamP3dFn8KRWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzJC-0002eZ-DJ; Wed, 13 Feb 2019 18:30:58 +0000
+	id 1gtzJN-0002uy-9s; Wed, 13 Feb 2019 18:31:09 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzHc-0007a5-N4; Wed, 13 Feb 2019 18:29:21 +0000
+ id 1gtzHf-0007gD-Tq; Wed, 13 Feb 2019 18:29:24 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: implement generic dma_map_ops for IOMMUs v2
-Date: Wed, 13 Feb 2019 19:28:59 +0100
-Message-Id: <20190213182920.16764-1-hch@lst.de>
+Subject: [PATCH 01/21] arm64/iommu: handle non-remapped addresses in ->mmap
+ and ->get_sgtable
+Date: Wed, 13 Feb 2019 19:29:00 +0100
+Message-Id: <20190213182920.16764-2-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190213182920.16764-1-hch@lst.de>
+References: <20190213182920.16764-1-hch@lst.de>
 MIME-Version: 1.0
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -65,29 +68,52 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Robin,
+DMA allocations that can't sleep may return non-remapped addresses, but
+we do not properly handle them in the mmap and get_sgtable methods.
+Resolve non-vmalloc addresses using virt_to_page to handle this corner
+case.
 
-please take a look at this series, which implements a completely generic
-set of dma_map_ops for IOMMU drivers.  This is done by taking the
-existing arm64 code, moving it to drivers/iommu and then massaging it
-so that it can also work for architectures with DMA remapping.  This
-should help future ports to support IOMMUs more easily, and also allow
-to remove various custom IOMMU dma_map_ops implementations, like Tom
-was planning to for the AMD one.
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ arch/arm64/mm/dma-mapping.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-A git tree is also available at:
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 78c0a72f822c..be88beb2e377 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -249,6 +249,11 @@ static int __iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 	if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
+ 		return ret;
+ 
++	if (!is_vmalloc_addr(cpu_addr)) {
++		unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++		return __swiotlb_mmap_pfn(vma, pfn, size);
++	}
++
+ 	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+ 		/*
+ 		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
+@@ -272,10 +277,15 @@ static int __iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	struct vm_struct *area = find_vm_area(cpu_addr);
+ 
++	if (!is_vmalloc_addr(cpu_addr)) {
++		struct page *page = virt_to_page(cpu_addr);
++		return __swiotlb_get_sgtable_page(sgt, page, size);
++	}
++
+ 	if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+ 		/*
+ 		 * DMA_ATTR_FORCE_CONTIGUOUS allocations are always remapped,
+-		 * hence in the vmalloc space.
++		 *  hence in the vmalloc space.
+ 		 */
+ 		struct page *page = vmalloc_to_page(cpu_addr);
+ 		return __swiotlb_get_sgtable_page(sgt, page, size);
+-- 
+2.20.1
 
-    git://git.infradead.org/users/hch/misc.git dma-iommu-ops.2
-
-Gitweb:
-
-    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-iommu-ops.2
-
-Changes since v1:
- - only include other headers in dma-iommu.h if CONFIG_DMA_IOMMU is enabled
- - keep using a scatterlist in iommu_dma_alloc
- - split out mmap/sgtable fixes and move them early in the series
- - updated a few commit logs
 
 _______________________________________________
 linux-arm-kernel mailing list
