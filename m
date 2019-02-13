@@ -4,18 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86CDCC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:26:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A300C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:32:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5227C222CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:26:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68F062190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 15:32:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GZa1WBww"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5227C222CD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lh4rUHv+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68F062190A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,39 +24,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6PTkoCOSypm4Y3W2lJkKLZiAgtQcH9Q+yzLzmKo23Xs=; b=GZa1WBwwsjbQ67
-	nFeDuTLEY9Dkku7YNN/oF4hq3j3onVYmyZvushIs8j0SegiL1ZLc5cEzzdj8zI5o5s0X0BN4/Z5mS
-	KR769SwNY1Rix1Hy63+HPb0LifCjVreTq7SQRXj7+9hF6ErJG4cN0ZkTOyaFMGwyKDN3CXGUyAi8p
-	VXSgcbTlkdGXvSOa5PeNCkH63W93S4ED4ww0j26O+Bwl9B1ktbaqHHRaO0PtL2RqSwylIg2Hvf+UG
-	C7mP8ExXszuGk4eBCKKig6rP7JzUeI+8UBNoiYCgMcDrWiD2AvDWFvwGrufsVXUWNgzQ7gDZoll7h
-	jGUPOMmI8OCn7P8HkHxg==;
+	List-Owner; bh=z6N+ZSsAdB3NuqnUvhZTsZ4rVWWAJrEhNvTIdz7p8TE=; b=lh4rUHv+5wueQC
+	m1mnqT1jfgOWAjIj2jYK9otcX3bqTutPyHihw4W1gagA9xncwsmew8NplkGyKQFppzQJLAEq4/9Vx
+	LJDa2qJ/pxuGKdtqAofTviL7WVM8S0lIjR7dInm8wpS39ZvZSAWCNxThtxNdaRfIhC4Z/QlxWbMBm
+	InBfgWlD0kv93gEraROsNny15IY03EUTeMZ8VCsfJfyZdl+31v4alvFS7ET9hvnuMGAmj9EbgDEou
+	a/2saC3DN31lJ3DcWR0UDVxMZ7TCHbhSYJWcdm6oFqdZXSFKeyICXlB24xMSNaJAk7D73qF4/4qI/
+	yWw1cOzZc+ZyjSjHNXkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtwQe-0007mF-Ju; Wed, 13 Feb 2019 15:26:28 +0000
+	id 1gtwWP-0001iB-IT; Wed, 13 Feb 2019 15:32:25 +0000
 Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtwQb-0007lU-Js
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:26:27 +0000
+ id 1gtwWK-0001h0-ME
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 15:32:23 +0000
 Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 4A62480AE;
- Wed, 13 Feb 2019 15:26:33 +0000 (UTC)
-Date: Wed, 13 Feb 2019 07:26:20 -0800
+ by muru.com (Postfix) with ESMTPS id A361080AE;
+ Wed, 13 Feb 2019 15:32:28 +0000 (UTC)
+Date: Wed, 13 Feb 2019 07:32:15 -0800
 From: Tony Lindgren <tony@atomide.com>
 To: Lokesh Vutla <lokeshvutla@ti.com>
 Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
  router bindings
-Message-ID: <20190213152620.GS5720@atomide.com>
+Message-ID: <20190213153215.GT5720@atomide.com>
 References: <20190212074237.2875-1-lokeshvutla@ti.com>
  <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
+ <20190212163018.GL5720@atomide.com>
+ <5b5d86b9-2aa7-718c-c1da-70bbf9bf589e@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
+In-Reply-To: <5b5d86b9-2aa7-718c-c1da-70bbf9bf589e@ti.com>
 User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_072625_686445_F4E2A7E2 
-X-CRM114-Status: GOOD (  16.66  )
+X-CRM114-CacheID: sfid-20190213_073221_158554_FC766DBD 
+X-CRM114-Status: GOOD (  18.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,46 +80,72 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190213 04:26]:
+* Lokesh Vutla <lokeshvutla@ti.com> [190213 04:23]:
 > Hi Tony,
 > 
-> On 12/02/19 9:52 PM, Tony Lindgren wrote:
+> On 12/02/19 10:00 PM, Tony Lindgren wrote:
 > > Hi,
 > > 
 > > * Lokesh Vutla <lokeshvutla@ti.com> [190212 07:43]:
-> >> +Example:
-> >> +--------
-> >> +The following example demonstrates both interrupt router node and the consumer
-> >> +node(main gpio) on the AM654 SoC:
+> >> +The Interrupt Router (INTR) module provides a mechanism to route M
+> >> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+> >> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+> >> +controls the selection.
 > >> +
-> >> +main_intr: interrupt-controller0 {
-> >> +	compatible = "ti,sci-intr";
-> >> +	interrupt-controller;
-> >> +	interrupt-parent = <&gic500>;
-> >> +	#interrupt-cells = <4>;
-> >> +	ti,sci = <&dmsc>;
-> >> +	ti,sci-dst-id = <56>;
-> >> +	ti,sci-rm-range-girq = <0x1>;
-> >> +};
+> >> +
+> >> +                                 Interrupt Router
+> >> +                             +----------------------+
+> >> +                             |  Inputs     Outputs  |
+> >> +        +-------+            | +------+             |
+> >> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+> >> +        +-------+            | +------+             |      controller
+> >> +                             |    .        +-----+  |      +-------+
+> >> +        +-------+            |    .        |  0  |  |----->|  IRQ  |
+> >> +        | INTA  |----------->|    .        +-----+  |      +-------+
+> >> +        +-------+            |    .          .      |
+> >> +                             | +------+      .      |
+> >> +                             | | irqM |    +-----+  |
+> >> +                             | +------+    |  N  |  |
+> >> +                             |             +-----+  |
+> >> +                             +----------------------+
 > > 
-> > Can you describe a bit what the "ti,sci-dst-id" is above?
-> > 
-> > These IDs seem to be listed at at [0] below, but is it really a property
-> > of the hardware? Or is it some enumeration of SoC devices in the firmware?
+> > Is this always one-to-one mapping or can the same interrupt be routed to
+> > multiple targets like to the SoC and some coprocessor?
 > 
-> This is the way that sysfw describes the hardware. In this case it is GIC and it
-> is identified by this ID.
+> Yes, it is always one-to-one. Output of INTR can only be attached to one of the
+> processor.
 
-If this ID is an enumeration in the sysfw rather than an actual
-hardware property it should not be in the device tree. If so,
-the device driver should request the id from the sysfw based
-on a name. That is, if no struct device or device phandle can
-be used.
+OK
 
-The problem with using enumeration in the dts is that it
-requires maintaining the dts, driver(s) and possibly firmware
-in sync. And that might change between SoCs variants when new
-devices get added and removed.
+> >> +Configuration of these MUXCNTL_N registers is done by a system controller
+> >> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+> >> +controller will keep track of the used and unused registers within the Router.
+> >> +Driver should request the system controller to get the range of GIC IRQs
+> >> +assigned to the requesting hosts. It is the drivers responsibility to keep
+> >> +track of Host IRQs.
+> >> +
+> >> +Communication between the host processor running an OS and the system
+> >> +controller happens through a protocol called TI System Control Interface
+> >> +(TISCI protocol). For more details refer:
+> >> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+> > 
+> > Care to describe a bit why the interrupts need to be routed by a system
+> > controller?
+> 
+> K3 architecture defines a heterogeneous system where multiple heterogeneous
+> cores are serving its own usecases. Given that there are multiple ways in which
+> a device IRQ can be routed using INTR, like either it can be routed to HLOS
+> core(A53 int this case) or it can be routed to any other coprocessor available
+> in the system(like R5). If every sw running in each co-processor is allowed to
+> program this INTR then there is a high probability that one sw executing on one
+> core can damage other heterogeneous core.  Mainly to avoid this damage the
+> configuration of all the INTRs and INTAs are done in a centralized place(sysfw).
+> Any user for programming its IRQ route should send a message to sysfw with the
+> parameters. These parameters are policed by sysfw and does the configuration.
+
+OK so maybe update the description along those lines saying it's
+a shared piece of hardware between various independent SoC
+clusters which may or may not be running Linux.
 
 Regards,
 
