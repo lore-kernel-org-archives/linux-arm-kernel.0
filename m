@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2280CC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D896C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:37:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EDD942086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:33:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 72B42222D5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 18:37:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ae8ZKPB7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDD942086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="djId8t+7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72B42222D5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aZC+SQubtVrs1nqxApobYJlEDCIkxG8JMeSqzG2De/w=; b=ae8ZKPB7VyDmcH
-	eGeZCtFBxxT0Fxs3bz/SIn/UNUu7m0216qHcdo4jldUvGRbPXv0Y766DoakkgusA2u3M+8WVyUnbp
-	Rld7rfTMuOPtDqOGF4IKH65ibeFkyo0H+Pd3ABaf/U4Uk6nwjtnarOPuYhdY6wcgoaBY5neKF+Fss
-	4v3yyEDNPhtDbxj64xfFQ2tKshWJuyrWcPYCfBAq+MjrwGHPJLeOzvQrnMRqWVqedJdS+orEoK1pK
-	Sx8HEIyaajuglo9brE4ZYv29wd7eblaHu6SacNeRSdec+J82O59On9FZpxasJ6nlRWxmBFHD1a7bV
-	0G5Z88y6fA2+Q18pQiAA==;
+	List-Owner; bh=LgOUOethb/eH8DlxDaBjElX1s42F16jPYG363eWGlZ4=; b=djId8t+7gScwA5
+	DFD7/zeJyGC3jv60ZUCgUikulBsdNgcggVUCCfg1VQ7yhckTBJB0K1YCY4/1uXjdlbtTp5lzd5/Zl
+	bk11tmiobM4K+lDS1yx0ejuHh0ZWaHnhpKL2WGOoGzPwNxw47/02asxCWICn1hPy6i5Nx2Q0zfGSw
+	IaV2JgvLk3LYm0EJyV2yegbnKKJ03y9XqWQnBCt56arM5xywce+82742NuOxlCBFEXF1Ir3Ud4ZMu
+	WOGkQHEF74dct1gSikd+aihrxrdnunrPktgI8U/NMj2L9s6Ha573miYjuhDIAJpAh6h1Ktkl1bX5O
+	oe5qjv7UZxLH/LgjCAqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtzLq-0006Hg-AU; Wed, 13 Feb 2019 18:33:42 +0000
+	id 1gtzPG-0008Jq-TO; Wed, 13 Feb 2019 18:37:14 +0000
 Received: from 089144210182.atnat0019.highway.a1.net ([89.144.210.182]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtzIW-0001M0-Fq; Wed, 13 Feb 2019 18:30:16 +0000
+ id 1gtzHq-0007wP-4z; Wed, 13 Feb 2019 18:29:34 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: Robin Murphy <robin.murphy@arm.com>
-Subject: [PATCH 21/21] arm64: trim includes in dma-mapping.c
-Date: Wed, 13 Feb 2019 19:29:20 +0100
-Message-Id: <20190213182920.16764-22-hch@lst.de>
+Subject: [PATCH 05/21] dma-iommu: remove the flush_page callback
+Date: Wed, 13 Feb 2019 19:29:04 +0100
+Message-Id: <20190213182920.16764-6-hch@lst.de>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190213182920.16764-1-hch@lst.de>
 References: <20190213182920.16764-1-hch@lst.de>
@@ -67,39 +67,97 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-With most of the previous functionality now elsewhere a lot of the
-headers included in this file are not needed.
+We now have a arch_dma_prep_coherent architecture hook that is used
+for the generic DMA remap allocator, and we should use the same
+interface for the dma-iommu code.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm64/mm/dma-mapping.c | 11 -----------
- 1 file changed, 11 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 8 +-------
+ drivers/iommu/dma-iommu.c   | 8 +++-----
+ include/linux/dma-iommu.h   | 3 +--
+ 3 files changed, 5 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index ad46594b3799..cfa084bca3ea 100644
+index e54288921e72..54787a3d4ad9 100644
 --- a/arch/arm64/mm/dma-mapping.c
 +++ b/arch/arm64/mm/dma-mapping.c
-@@ -5,20 +5,9 @@
-  */
+@@ -94,12 +94,6 @@ arch_initcall(arm64_dma_init);
+ #include <linux/platform_device.h>
+ #include <linux/amba/bus.h>
  
- #include <linux/gfp.h>
--#include <linux/acpi.h>
--#include <linux/memblock.h>
- #include <linux/cache.h>
--#include <linux/export.h>
--#include <linux/slab.h>
--#include <linux/genalloc.h>
--#include <linux/dma-direct.h>
- #include <linux/dma-noncoherent.h>
--#include <linux/dma-contiguous.h>
- #include <linux/dma-iommu.h>
--#include <linux/vmalloc.h>
--#include <linux/swiotlb.h>
--#include <linux/pci.h>
+-/* Thankfully, all cache ops are by VA so we can ignore phys here */
+-static void flush_page(struct device *dev, const void *virt, phys_addr_t phys)
+-{
+-	__dma_flush_area(virt, PAGE_SIZE);
+-}
 -
- #include <asm/cacheflush.h>
+ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 				 dma_addr_t *handle, gfp_t gfp,
+ 				 unsigned long attrs)
+@@ -176,7 +170,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 		struct page **pages;
  
- pgprot_t arch_dma_mmap_pgprot(struct device *dev, pgprot_t prot,
+ 		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
+-					handle, flush_page);
++					handle);
+ 		if (!pages)
+ 			return NULL;
+ 
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index d19f3d6b43c1..af8a39861b8f 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -22,6 +22,7 @@
+ #include <linux/acpi_iort.h>
+ #include <linux/device.h>
+ #include <linux/dma-iommu.h>
++#include <linux/dma-noncoherent.h>
+ #include <linux/gfp.h>
+ #include <linux/huge_mm.h>
+ #include <linux/iommu.h>
+@@ -532,8 +533,6 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+  * @attrs: DMA attributes for this allocation
+  * @prot: IOMMU mapping flags
+  * @handle: Out argument for allocated DMA handle
+- * @flush_page: Arch callback which must ensure PAGE_SIZE bytes from the
+- *		given VA/PA are visible to the given non-coherent device.
+  *
+  * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
+  * but an IOMMU which supports smaller pages might not map the whole thing.
+@@ -542,8 +541,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+  *	   or NULL on failure.
+  */
+ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+-		unsigned long attrs, int prot, dma_addr_t *handle,
+-		void (*flush_page)(struct device *, const void *, phys_addr_t))
++		unsigned long attrs, int prot, dma_addr_t *handle)
+ {
+ 	struct iommu_domain *domain = iommu_get_dma_domain(dev);
+ 	struct iommu_dma_cookie *cookie = domain->iova_cookie;
+@@ -587,7 +585,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 		 */
+ 		sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
+ 		while (sg_miter_next(&miter))
+-			flush_page(dev, miter.addr, page_to_phys(miter.page));
++			arch_dma_prep_coherent(miter.page, PAGE_SIZE);
+ 		sg_miter_stop(&miter);
+ 	}
+ 
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 3e206f4ee173..10ef708a605c 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -45,8 +45,7 @@ int dma_info_to_prot(enum dma_data_direction dir, bool coherent,
+  * the arch code to take care of attributes and cache maintenance
+  */
+ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+-		unsigned long attrs, int prot, dma_addr_t *handle,
+-		void (*flush_page)(struct device *, const void *, phys_addr_t));
++		unsigned long attrs, int prot, dma_addr_t *handle);
+ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+ 		dma_addr_t *handle);
+ 
 -- 
 2.20.1
 
