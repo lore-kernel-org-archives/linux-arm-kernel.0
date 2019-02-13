@@ -1,95 +1,95 @@
 Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Level: *
+X-Spam-Status: No, score=1.4 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,FSL_HELO_FAKE,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E75EC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:07:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74D11C282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:22:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D32A4222B5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:07:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 40350222BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 08:22:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AW9EDEgK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="UOBXau6B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D32A4222B5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rLHOcRbD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="C+RTdKtV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40350222BB
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=4GN1Y8w35NW7YRkuy/npZOlYUx0jOIwY6iws5Z94YFY=; b=AW9EDEgKj3QeTXcClLOOIAtCe
-	EDTv8kfc5WSgeFb+2Fw8EFJ0YH/R7JBysx+behloqKR04azKdD1VNniulZl5eoLQs4xkh9Yoc7bB8
-	rL8m0qeq4u9L05kr436WgI3ex6dQ/JLiUCf0+UCdr+mAhvqSpnejuAFjZfu12OuLLiSNTQBOWXxwP
-	E/O+PYwhncR6xcKtV9p3q4hEHy84kKVKBuH5R6UnMKHPYr3UoEM4ICV2WAydBoSmKwKmr9tRLBaqP
-	RwcSKNa1gqz2nOsKKtTOdi4uR4IhVLOCPju/qwdOX0Ltnsq/+YTPW0zhvxxnAYxY8JKPFcwz9TL49
-	ze55RiY4g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KeXkLCvNMWWuyTPQUdwZTpPOlzGQQXkXSBH9c1cgz+M=; b=rLHOcRbDc+estQ
+	nGKJUxiUgM/at8FeF6Z8q2f06RbQRdjSCbQhrA1HkaKZcne9LzJlrwOetBvlwHaeUZQuMcF62twL7
+	DqshVVhBNayE0qXC3D776LAZo2klsO+lJQgkVUwCHZA8iA3qiSrQwWZCI58gHq8vSQ+BOvt6ePJAp
+	x4xOvT9jopSF8AmmDcmFlHfZ0qC3KKCdrtzjuFXzF7D3MS+uCy2g8eOvEalh0AfV50jjbj4vp1DwH
+	AB5B5wRlWx6Jy9dWZ12FFsdIb+QDoJa73LkH5GFGqMvdTd5XFJPa4hbDKTWUSu5Q4IWfuylQWGTJ2
+	zBvmTtrTPH2v2ze/WfIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtpZx-0000al-Bk; Wed, 13 Feb 2019 08:07:37 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gtpnq-0005h9-Bd; Wed, 13 Feb 2019 08:21:58 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtpZu-0000XW-B4
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 08:07:35 +0000
-Received: by mail-lf1-x142.google.com with SMTP id e27so1048037lfj.8
+ id 1gtpnn-0005gU-7l
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 08:21:56 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so1421075wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 00:07:33 -0800 (PST)
+ Wed, 13 Feb 2019 00:21:55 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=fHcGxz3V88oGQhykUNeVVZN70O0EhRcnJWcib7mocSQ=;
- b=UOBXau6BHAsTofr53bBkRVeGAvV1PEfVNhteIEGtw+aslAiL+Jf9oxf2HHlT/OEU2q
- NACA9f4jjzyFACtO0GRcnMgSH3/QzQtivCAN4zcYuNCFD5IY7DYfIS+FcMYuA/6bUERy
- Gyfqn+vRGIPJISsXCPKtNi7hR/6/T5D4hrA/xBwDd3810fGzFlxM4TpyLh771uMx+47G
- A2MBaeTU7SKAiZHuFt8zw2dBElWQMp3PEBA3mDL74dIZ9n4H/SnpjyKvPmCCw+oC7+hX
- E6zY94HLyWD+xXQVSo6EMTVKCzdlo7C2buQbS56+YxE84/UAS6+COxst8znFGJUY33XW
- NSog==
+ h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=OP1OccV571tuh3QSGB4f69ZRaeS/Vq+cIRqqhx3Knhw=;
+ b=C+RTdKtVwJW4ufQjVmHZ5hACH3WjYlv8ZEJ3kGThVSgx+bQMCls+gLCCKQXGzW+GZH
+ ZJF/FPkHLiwlNVx0MFxF/tpoZcHxcYxkJ+IsGEzZ1KSJlDvK37KIq28q4H0wlrTakH97
+ /2gnj65LEO8975uU22MmlOlCKR9xgGsVtXIJKA0YxyjL9d8senBOPpvj671y0eZBVlOq
+ 1hsyE0CbDWhsnexGmiXGaqASJHph3Y+pdYSVEw9K3P9b+wKrsgkYQUW9IwU3UBeNqHFN
+ AlCL1Zc2i9CZCG13tpaTv2K2+/jCNrwgk/6C0OBchboI5cOnUxVlAJTRMTANXhAYLEdP
+ NGdw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=fHcGxz3V88oGQhykUNeVVZN70O0EhRcnJWcib7mocSQ=;
- b=VvyCj+5SOq9cpaNiBEKR0XaFaCWnSayd6HZ5Nm3PCgp1khvnj5mtXrtHq2BHRsl3r4
- 2paYO6A0JBL2+XkUsXSn5pqNGd10VxgbqFYm81aXlpa+dVZ1lHHbLmr1rj/qrDzVAD6L
- gdyJ46A7qcmff418FbdN5qLUzhSGOOpm0QcV4nKp63UFP+/fHFCjbSq3/4+f1GBzpwM/
- qy73qw4SP77Drzohh3d1XgZVp7y2Fj5rftQvY5LgZAQof5FPEL2mfth9i/5BQ93K4Jn2
- ycOS8SZIwZ0WpV+X+XfX5SiRa1o+nhxN1ZFuF0YetGKx49MpVIkwv75YNfwkY4PpCoIG
- qnRA==
-X-Gm-Message-State: AHQUAuaKequBDAVOEymR+eihqi1HLmygqIho5GCxOStBlmpCr42lGeF2
- ZyP/lid7yKoY7qx3w06a5kA=
-X-Google-Smtp-Source: AHgI3IboGuxbtt9iiv1hzDd81tncWimgZmURt+jqYk3xvLsEz6vypmyIEokNA4W9pziLbtUOepP2yQ==
-X-Received: by 2002:a19:914c:: with SMTP id y12mr870894lfj.55.1550045251623;
- Wed, 13 Feb 2019 00:07:31 -0800 (PST)
-Received: from elitebook.lan (ip-194-187-74-233.konfederacka.maverick.com.pl.
- [194.187.74.233])
- by smtp.googlemail.com with ESMTPSA id z17sm3902977lfh.9.2019.02.13.00.07.30
- (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
- Wed, 13 Feb 2019 00:07:30 -0800 (PST)
-Subject: Re: [PATCH] ARM: dts: BCM5301X: Change Ethernet switch management port
-To: Florian Fainelli <f.fainelli@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-References: <20190213042600.27729-1-f.fainelli@gmail.com>
-From: =?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?= <zajec5@gmail.com>
-Message-ID: <43f75739-b592-35d3-e711-13f05218133d@gmail.com>
-Date: Wed, 13 Feb 2019 09:07:29 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=OP1OccV571tuh3QSGB4f69ZRaeS/Vq+cIRqqhx3Knhw=;
+ b=f4J4xbZUTra9b7a8XwUyK4Bl15NCLo0ZvWrJA3GBGNlKBE8v5KWY7+U96Elb7gt4mP
+ fDW7CN61YAMlSQC1Czl8HmWBK0h73k7cgPnJ4P4BvzRVEW4umhDJLIQHu+3W2S6Ixzur
+ jwvQy5R9iP4VuTYFy7YAK1zXYIzcmEDq8w5Rsb8RTSK/pZe9xyDGOaLkXrx9faQt8Rh0
+ L0MsgNTGJ4SUX9TCvYDtB8FljWdxovHEA/f3SS8Fe9q9SODh0gzab6dq4WHyZW1RESBX
+ FPRFyB0XQ1bZTy4UWn3xdGb8dKuqxUvWLWiJP1g6X/8tdAmF9iM4/KXvDYL9dIpMEuIj
+ nzpQ==
+X-Gm-Message-State: AHQUAubslvuqdM+QIWn83kGFnykW10kRcmE+01JuvPkeahxOZCEw4ftm
+ ANJ7v6ZX5m2eiGcAY8SKkj8=
+X-Google-Smtp-Source: AHgI3IYXEgkxWzm0pHd6UslqLXP0PacBc7qfraB4ipE7T2v2FPgavLd+ZmYzew/bsu1YYAVUVjXpPg==
+X-Received: by 2002:adf:f4c8:: with SMTP id h8mr6458431wrp.6.1550046113810;
+ Wed, 13 Feb 2019 00:21:53 -0800 (PST)
+Received: from gmail.com (2E8B0CD5.catv.pool.telekom.hu. [46.139.12.213])
+ by smtp.gmail.com with ESMTPSA id x18sm11372256wrw.61.2019.02.13.00.21.52
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Wed, 13 Feb 2019 00:21:53 -0800 (PST)
+Date: Wed, 13 Feb 2019 09:21:50 +0100
+From: Ingo Molnar <mingo@kernel.org>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
+ in unsafe region
+Message-ID: <20190213082150.GA57916@gmail.com>
+References: <1547560709-56207-1-git-send-email-julien.thierry@arm.com>
+ <1547560709-56207-4-git-send-email-julien.thierry@arm.com>
+ <20190211134527.GA121589@gmail.com>
+ <20190211135159.GC32511@hirez.programming.kicks-ass.net>
+ <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20190213042600.27729-1-f.fainelli@gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_000734_423026_E69688D1 
-X-CRM114-Status: GOOD (  20.58  )
+X-CRM114-CacheID: sfid-20190213_002155_311220_E4E517BB 
+X-CRM114-Status: UNSURE (   7.82  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,58 +101,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Hauke Mehrtens <hauke@hauke-m.de>,
- open list <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- "maintainer:BROADCOM BCM5301X ARM ARCHITECTURE"
- <bcm-kernel-feedback-list@broadcom.com>
+Cc: Peter Zijlstra <peterz@infradead.org>, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, mingo@redhat.com,
+ james.morse@arm.com, hpa@zytor.com, valentin.schneider@arm.com,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 13.02.2019 05:25, Florian Fainelli wrote:
-> BCM5301X has 3 Ethernet controllers: GMAC0, 1, 2 which map to ports 5, 7
-> and 8 respectively of the internal switch. Future changes will turn on
-> management mode in the Ethernet switch driver (b53) which will require
-> us to use port 8.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->   arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 11 ++++++++---
->   1 file changed, 8 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> index 3fced3b7f1a8..affa9cc7422d 100644
-> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
-> @@ -150,10 +150,15 @@
->   			label = "wan";
->   		};
->   
-> -		port@5 {
-> -			reg = <5>;
-> +		port@8 {
-> +			reg = <8>;
->   			label = "cpu";
-> -			ethernet = <&gmac0>;
-> +			ethernet = <&gmac2>;
-> +
-> +			fixed-link {
-> +				speed = <1000>;
-> +				full-duplex;
-> +			};
->   		};
->   	};
->   };
 
-I'm not exactly sure how Linux switch driver works, but from DT
-perspective I think we should rather have *hardware* described instead
-of a common Linux case.
+* Julien Thierry <julien.thierry@arm.com> wrote:
 
-If I'm right, we should rather have all 3 switch ports described (5, 7,
-8) and have Linux just use the one it needs.
+> I guess I'll drop the might_resched() part of this patch if that sounds
+> alright.
+
+That sounds perfect - that bit was pretty much the only problem I had 
+with the series.
+
+Thanks,
+
+	Ingo
 
 _______________________________________________
 linux-arm-kernel mailing list
