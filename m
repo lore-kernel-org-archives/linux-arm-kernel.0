@@ -2,78 +2,101 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5843C00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:33:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF693C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:49:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A49F7222CF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:33:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE77621924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 22:49:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YEu3TX5X"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A49F7222CF
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pjcf3L56";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=amacapital-net.20150623.gappssmtp.com header.i=@amacapital-net.20150623.gappssmtp.com header.b="kGoDZyDJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE77621924
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amacapital.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HMDXYtP/o6Uo8JVs9MxCa0FnMcOD0Ab3oeR0Ikx3y2g=; b=YEu3TX5XUagZ+f
-	kqKqlxGAJWHCiVhU4y26YsYa//2lsz6fc+DbPPuFtYHdLM880xQg3nUblelWICkIyB10XkX787hZ2
-	1unRhxB8CjIyc51mkw7WZOtYbHMhkVKwk2S0TXrkfrOVcgia3r+RzGLqiBzB4eE+S4w0woh1W8+vB
-	7zExXkK8tyn/0Gyt65U2GQDXpf49cSc3x08vUdqKjg/VPQGpTyoSr5CmIRitB7RnpsrkXKL2pBNs+
-	zPYc2ALqJI4NcUbh/eA3bZRJoEl6j8+3k7+x4O/dEMDXRsamMb4OY7cE5AxTBdnV+WSTyVMj+NWXr
-	tGUF5cm4jinvqET21cjA==;
+	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
+	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Szk2/0S2rltmFbNCktSwTUsavqua1IVxOFaTKJeyeUM=; b=Pjcf3L56wqYS2Y
+	SwbAbinh8en+qtgvrmvZUFWquZGrcLfWEIB1aPMtG3GRci4M5DGsEbXWkRyT7TwMIcjZ3z5Tzw7io
+	Sn1UminSXK0Tdb0UPYbZMPOdNZEv6BNVcTZ5j53biC9g07MDR7gDkYT19co9Epfc57FiXtwA/2fmn
+	jH0qgBDp10Ld6Bhuv3vU+uLg9NFqileTAScfxYJFtHUkPUvda3OOgz+bwFTQ0HSJ0DbIRNZ5utFpz
+	3t5y5Dr3biNZoULwrBiu7vWFbiPa545oxIfUoy5+mkqbd/6CwRJdWbkKfqXYRAyEHhqNXgMVrx+ge
+	3MffnMpVpGJOEo/32e8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu35n-0002Xe-2b; Wed, 13 Feb 2019 22:33:23 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1gu3Lm-0007oR-O8; Wed, 13 Feb 2019 22:49:54 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu35i-0002WS-T1; Wed, 13 Feb 2019 22:33:20 +0000
-Received: from oxbaltgw00.schlund.de ([172.19.246.6]) by
- mrelayeu.kundenserver.de (mreue109 [213.165.67.113]) with ESMTPSA (Nemesis)
- id 1N95mL-1h6vJ11dcl-0169yT; Wed, 13 Feb 2019 23:33:12 +0100
-Date: Wed, 13 Feb 2019 23:33:11 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: Eric Anholt <eric@anholt.net>, Florian Fainelli <f.fainelli@gmail.com>
-Message-ID: <1278623750.602548.1550097191567@email.ionos.de>
-In-Reply-To: <87tvh7v8yd.fsf@anholt.net>
-References: <20190213003324.15224-1-eric@anholt.net>
- <20190213003324.15224-2-eric@anholt.net>
- <648bbc3e-6690-9b05-cae5-bf81edbec74a@i2se.com> <87tvh7v8yd.fsf@anholt.net>
-Subject: Re: [PATCH 2/2] soc: bcm: bcm2835-pm: Fix error paths of
- initialization.
-MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:DqYO30DjaNHimC3rWe2Bs3YBnZMLZYdE4l/CtepfnpKTvvQIVcz
- Uz/VxVAUshlJDI90DG1qTZBQB2EHTpnrR/dyNY6jcdMPp2Nm0GsmyBGUlixi0YVYYkYSGfl
- AUPU9v+HiBdg+82ec/s40HjcK2CYJCL4imcCHraDb7VfB+p4afplTrzfkckYCDnRotnMj31
- +Zxq8YbGTN8r24gx5Wilg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:lkLhe2+p65M=:zN8LflAYN4T935rhvTqBlb
- B3IqtSknE9nmtNxVbNAdqSDL48yTeo6PATztadycIpFgjW6E1UxvinNLbz8YQCcd7QuyuZok4
- AykWOPqaSFyLT4IuWUt2IwOs7AoNxS4XZ7zhz0vdzyBg/dSseciB9PYvzDua1rE2giJuJUX/I
- oRAz22jtrheafDRwycE85E9pDQ6NZZHj22cjDqp3VKEl+xcQOSSMV5CwHkDMspQUCorug+mZK
- +BDrMBlp6gcMWXISTGbZ6D0+XOfhdS4VJXIg2qytox1v0Y6G2da2VJGAdmq9zLM5oY1Px8ScW
- NIQzni/cdWPDbnsFxTDJRMoTpMNEvt77t/snjAIXfrwOwEZ+RwsbSKcMD+m79dNSpR9CCrxDb
- /cZR7xQ2ou+prjhaBPIHa5/KpPN8RdpdZkWdncHH+o79uIVO9/zmbnhpdmOTPLKgMixFBoh7I
- LZtSGIma8NwpM8onebowleAGp4bkBESVDUtDw5RMkey66vxJoBGkDlNiDCNHmH8aXGnOg93wv
- YHyJClQuzXCSPxTQjG7AAETGlqPJjXkLrD5A7FRj4eL5iNZSTJlYC26+e4GrHVX5AQIO2ZmbY
- x4BZP8sB+DO8V0yehrSRaqVTQ6vH/lEd7gwmKvY2eAxAbPYZ7ntBf/SkNZ2a7fMWL3KwWppUt
- J5imzIZp7SHrsniS4RbE8WZcX5P7OJnWCXl7ki9ic/H6pTl2Qxsc8RGzu7oDSXSgaYmv/MVIw
- wYciWO9dG9r0xrS+E2jGIQ1D3pYRsE8YtJXX0DBMUOC0x+uf4D0LZTXTmTE=
+ id 1gu3Lj-0007nj-Kc
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 22:49:53 +0000
+Received: by mail-pf1-x444.google.com with SMTP id h1so1897770pfo.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 13 Feb 2019 14:49:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amacapital-net.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:subject:from:in-reply-to:date:cc
+ :content-transfer-encoding:message-id:references:to;
+ bh=ZHYGGSpla4tBLzpH0Y4QcBdq3Osj4l3L8zG3EvPTVMc=;
+ b=kGoDZyDJyazs+QIzo5XzszueRAdEwVjqm8boq63Evusu8ziGfHe7RjyBKiGE7HGIqB
+ H5q4+8NLjc1RdvEFvfxx6cl7VjMPZcD4SPhxGyi1UbUohzdHA0BDKWSjPM3GnF+mxQzB
+ UETATjKBHqULZCD8M7SxjyzbqOX7GnMNWD10UgBvIXerWf2PyFMu9Q4pcyWqS00zbf4o
+ mSRip3p0dFKZL2vTH8ysV+WrRFchxYqAVMEq0Cpciclv0u1n/CzGImDoGR0b7NmpfQoz
+ u7luQXfTEqmdRdbvd5QBPI4Lzccy0ZrQbkHWBxqF0Ok7ex6/cSY/UmKDvmItE8wMK1/V
+ ajwA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:subject:from:in-reply-to:date:cc
+ :content-transfer-encoding:message-id:references:to;
+ bh=ZHYGGSpla4tBLzpH0Y4QcBdq3Osj4l3L8zG3EvPTVMc=;
+ b=FRSV02S2+9ZlNVtXIIhaFtxNimcwkO8bTrIA3HJ3nRNGDMPYmVH6JQ51yym6upY2jg
+ C3VdHlXKUVW53N71cfPNdUR/iyJK2D0X/mKb73CmicaAOdvs17dYgqkpmVALnxGwwB9h
+ DARsNu7tbojEQeSIGvAMdeg73vhfqzC9rJ7f1E2HMmiK3MkgNwQBulkmGmn04wMebx2G
+ hfczgwX5FhcTyMou86wT7iUE4BzG0QsEHBvrediOIUH+UbNyg0f/sC1ig1Zhd1MkJWcj
+ sVytBH2UO3zRF1I9lVmwOr4c/5XjrWzF2t8Z1rLncaE2PA/jeXr+Dzwj8XTwl429OrAM
+ kShg==
+X-Gm-Message-State: AHQUAubiiH/vkueHQ09x0GKq8kgUPtR/YKx4h5kBbTTyaw3UM2B+aYQG
+ 3S8RwWI2wCOVErnlie1yHJJUEg==
+X-Google-Smtp-Source: AHgI3IbR2LTfvgiGExkXUXTo8hYv78YRUa5KtFBV+Qe/YlkmN7Y84BZu9fVDh5e59DEiq5iPSGICzQ==
+X-Received: by 2002:aa7:83c6:: with SMTP id j6mr562853pfn.91.1550098190715;
+ Wed, 13 Feb 2019 14:49:50 -0800 (PST)
+Received: from ?IPv6:2600:1010:b069:6503:80f2:745d:51b7:a174?
+ ([2600:1010:b069:6503:80f2:745d:51b7:a174])
+ by smtp.gmail.com with ESMTPSA id g6sm433348pgq.18.2019.02.13.14.49.49
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 13 Feb 2019 14:49:49 -0800 (PST)
+Mime-Version: 1.0 (1.0)
+Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
+ in unsafe region
+From: Andy Lutomirski <luto@amacapital.net>
+X-Mailer: iPhone Mail (16C101)
+In-Reply-To: <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+Date: Wed, 13 Feb 2019 14:49:47 -0800
+Message-Id: <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+References: <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
+ <20190213103553.GO32494@hirez.programming.kicks-ass.net>
+ <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
+ <20190213131720.GU32494@hirez.programming.kicks-ass.net>
+ <20190213140025.GB6346@brain-police>
+ <20190213142524.GW32494@hirez.programming.kicks-ass.net>
+ <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
+ <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+To: Peter Zijlstra <peterz@infradead.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_143319_232963_88796853 
-X-CRM114-Status: GOOD (  17.94  )
+X-CRM114-CacheID: sfid-20190213_144951_813285_2773693B 
+X-CRM114-Status: GOOD (  16.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,68 +108,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bcm-kernel-feedback-list@broadcom.com, linux-rpi-kernel@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: dvlasenk@redhat.com, brgerst@gmail.com,
+ Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ jpoimboe@redhat.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, valentin.schneider@arm.com, mingo@redhat.com,
+ james.morse@arm.com, luto@kernel.org, hpa@zytor.com, bp@alien8.de,
+ tglx@linutronix.de, torvalds@linux-foundation.org,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-> Eric Anholt <eric@anholt.net> hat am 13. Februar 2019 um 19:28 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > Hi Eric,
-> >
-> > Am 13.02.19 um 01:33 schrieb Eric Anholt:
-> >> The clock driver may probe after ours and so we need to pass the
-> >> -EPROBE_DEFER out.  Fix the other error path while we're here.
-> >>
-> >> Signed-off-by: Eric Anholt <eric@anholt.net>
-> >> Fixes: 670c672608a1 ("soc: bcm: bcm2835-pm: Add support for power domains under a new binding.")
-> >> ---
-> >>  drivers/soc/bcm/bcm2835-power.c | 30 +++++++++++++++++++++++++-----
-> >>  1 file changed, 25 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/soc/bcm/bcm2835-power.c b/drivers/soc/bcm/bcm2835-power.c
-> >> index 4a1b99b773c0..11f9469423f7 100644
-> >> --- a/drivers/soc/bcm/bcm2835-power.c
-> >> +++ b/drivers/soc/bcm/bcm2835-power.c
-> >> @@ -485,7 +485,7 @@ static int bcm2835_power_pd_power_off(struct generic_pm_domain *domain)
-> >>  	}
-> >>  }
-> >>  
-> >> -static void
-> >> +static int
-> >>  bcm2835_init_power_domain(struct bcm2835_power *power,
-> >>  			  int pd_xlate_index, const char *name)
-> >>  {
-> >> @@ -493,6 +493,12 @@ bcm2835_init_power_domain(struct bcm2835_power *power,
-> >>  	struct bcm2835_power_domain *dom = &power->domains[pd_xlate_index];
-> >>  
-> >>  	dom->clk = devm_clk_get(dev->parent, name);
-> >> +	if (IS_ERR(dom->clk)) {
-> >> +		int ret = PTR_ERR(dom->clk);
-> >> +
-> >> +		if (ret == -EPROBE_DEFER)
-> >> +			return ret;
-> > is it safe to proceed in the other error cases?
-> > Even it would be more consistent with clk_prepare_enable() to print an
-> > error here.
-> 
-> Yes, not all domains have a clk, so we want to ignore the other error.
-
-But shouldn't we set dom->clk to NULL instead of keeping the error pointer? AFAIK clk_prepare_enable is aware of NULL instead of error pointer.
-
-> And we shouldn't print for defers, generally.
-
-Sure, i wanted to refer to all the other error cases.
-
-Stefan
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cgo+IE9uIEZlYiAxMywgMjAxOSwgYXQgMjoyMSBQTSwgUGV0ZXIgWmlqbHN0cmEgPHBldGVyekBp
+bmZyYWRlYWQub3JnPiB3cm90ZToKPiAKPiBPbiBXZWQsIEZlYiAxMywgMjAxOSBhdCAxMDo1MToy
+NEFNIC0wODAwLCBBbmR5IEx1dG9taXJza2kgd3JvdGU6Cj4+PiBPbiBGZWIgMTMsIDIwMTksIGF0
+IDc6NDUgQU0sIFBldGVyIFppamxzdHJhIDxwZXRlcnpAaW5mcmFkZWFkLm9yZz4gd3JvdGU6Cj4g
+Cj4+PiBXaGljaCBJIHN1cHBvc2UgbWVhbnMgdGhhdCBHQ0MgZ2VuZXJhdGVzIHRoZSBQVVNIRi9Q
+T1BGIHRvIHByZXNlcnZlIHRoZQo+Pj4gRUZMQUdTLCBzaW5jZSB3ZSBtYXJrIHRob3NlIGV4cGxp
+Y2l0bHkgY2xvYmJlcmVkLgo+Pj4gCj4+IAo+PiBOb3QgcXVpdGUuICBBIGZsYWdzIGNsb2JiZXIg
+ZG9lc27igJl0IHNhdmUgdGhlIGNvbnRyb2wgYml0cyBsaWtlIEFDCj4+IGV4Y2VwdCBvbiBjZXJ0
+YWluIHJhdGhlciBidWdneSBsbHZtIGNvbXBpbGVycy4gVGhlIGNoYW5nZSB5b3XigJlyZQo+PiBs
+b29raW5nIGZvciBpczoKPj4gCj4+IGh0dHA6Ly9naXQua2VybmVsLm9yZy90aXAvMmM3NTc3YTc1
+ODM3NDdjOWI3MWYyNmRjZWQ3ZjY5NmI3MzlkYTc0NQo+IAo+IEluZGVlZCwgZmFpbGVkIHRvIGZp
+bmQgdGhhdC4KPiAKPj4+IEZvciBhIGxpdHRsZSBiaXQgb2YgY29udGV4dDsgaXQgdHVybnMgb3V0
+IHRoYXQgdXNlcl9hY2Nlc3NfYmVnaW4oKSAvCj4+PiB1c2VyX2FjY2Vzc19lbmQoKSBzZXRzIEVG
+TEFHUy5BQyBhbmQgc2NoZWR1bGluZyBpbiBiZXR3ZWVuIHRoZXJlIHdyZWNrcwo+Pj4gdGhhdCBi
+ZWNhdXNlIHdlJ3JlIGFwcGFyZW50bHkgbm90IHNhdmluZyB0aGF0IGFueW1vcmUuCj4+IAo+PiBC
+dXQgb25seSBleHBsaWNpdCBzY2hlZHVsaW5nIOKAlCBwcmVlbXB0aW9uIGFuZCBzbGVlcHkgcGFn
+ZSBmYXVsdHMgYXJlCj4+IGZpbmUgYmVjYXVzZSB0aGUgaW50ZXJydXB0IGZyYW1lIHNhdmVzIGZs
+YWdzLgo+IAo+IE5vLCBsaWtlIHBvaW50ZWQgb3V0IGVsc2V3aGVyZSBpbiB0aGlzIHRocmVhZCwg
+YW55dGhpbmcgdGhhdCBkb2VzCj4gcHJlZW1wdF9kaXNhYmxlKCkgaXMgdXR0ZXJseSBicm9rZW4g
+d2l0aCB0aGlzLgo+IAo+IEJlY2F1c2UgYXQgdGhhdCBwb2ludCB0aGUgSVJRIHJldHVybiBwYXRo
+IGRvZXNuJ3QgcmVzY2hlZHVsZSBidXQKPiBwcmVlbXB0X2VuYWJsZSgpIHdpbGwsIGFuZCB0aGF0
+IGRvZXNuJ3QgcHJlc2VydmUgRUZMQUdTIGFnYWluLgo+IAo+Pj4gTm93LCBJJ20gdGVtcHRlZCB0
+byBhZGQgdGhlIFBVU0hGIC8gUE9QRiByaWdodCBiYWNrIGJlY2F1c2Ugb2YgdGhpcywgYnV0Cj4+
+PiBmaXJzdCBJIHN1cHBvc2Ugd2UgbmVlZCB0byBmaWd1cmUgb3V0IGlmIHRoYXQgY2hhbmdlIHdh
+cyBvbiBwdXJwb3NlIGFuZAo+Pj4gd2h5IHRoYXQgd2VudCBtaXNzaW5nIGZyb20gdGhlIENoYW5n
+ZWxvZy4KPj4gCj4+IFRoYXTigJlzIGNlcnRhaW5seSB0aGUgZWFzeSBzb2x1dGlvbi4gT3Igd2Ug
+Y291bGQgdGVhY2ggdGhlIG1pZ2h0X3NsZWVwCj4+IGNoZWNrcyBhYm91dCB0aGlzLCBidXQgdGhh
+dCBjb3VsZCBiZSBhIG1lc3MuCj4gCj4gVGhhdCdzIG5vdCBlbm91Z2gsIHdlJ2QgaGF2ZSB0byB0
+ZWFjaCBwcmVlbXB0X2Rpc2FibGUoKSwgYnV0IHdvcnNlLAo+IHByZWVtcHRfZGlzYWJsZV9ub3Ry
+YWNlKCkuCj4gCj4gQW55dGhpbmcgdGhhdCBsYW5kcyBpbiBmdHJhY2UsIHdoaWNoIF93aWxsXyB1
+c2UKPiBwcmVlbXB0X2Rpc2FibGVfbm90cmFjZSgpLCB3aWxsIHNjcmV3IHRoaXMgdGhpbmcgdXAu
+CgpVZ2guICBDb25zaWRlciB5b3VyIHBhdGNoIGFja2VkLiAgRG8gd2UgbmVlZCB0byBiYWNrcG9y
+dCB0aGlzIHRoaW5nPyAgVGhlIHByb2JsZW0gY2Fu4oCZdCBiZSB0b28gd2lkZXNwcmVhZCBvciB3
+ZSB3b3VsZCBoYXZlIGhlYXJkIG9mIGl0IGJlZm9yZS4KX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGlu
+dXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQu
+b3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
