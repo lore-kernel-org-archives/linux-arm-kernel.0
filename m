@@ -2,72 +2,60 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55923C282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:32:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C96FC282C2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:33:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 23C4B222B2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:32:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E024F222B2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 14:33:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DJTlEIGj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 23C4B222B2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f8F4/p1Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E024F222B2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UPgTwplK7Wc8Jqat8X3nJe+qZnOcc88BRw4SI16nQOk=; b=DJTlEIGjPED2hN
-	ardG4XUz8544i+Ohsf6FmXnGPyR5YmeNgSU4avW2tDxpzUyn8QQIcLRW61FRJOLNG6K9QJLov9X4e
-	ZvTjLcMh8VlS+2wWS24yBrUXMj+ohCHISZ75ulCRM3dMEiwU7uvwJa+76ji+30mUGVIExXDKG43Dj
-	7DQXcQQgXsTJ5cdgR+9LtGwtzBveRFAe8fArNL672LZzSkBZlumXcL8J0PV8a9s4R+ZWIcsB4eGXG
-	l4MjVf3wSlzYdS6dKof9dgHl1bKZa2Pry6N79toVZaaPwCJ0puzWtPsi3xaCeIUvoaDIxxr561qTA
-	ZgtVZnMVK+3QYQ9bxJgw==;
+	List-Owner; bh=U719t4jmbW0dGG6oDiVOFCQi4x7rfVtPbxZfc4UJnSI=; b=f8F4/p1QVQLw2k
+	TGxieHidFCTUMFy7ub/pKqs6SMJn7+3cghz6r29WCa4PFIy4mmggns8G6g8dsj73xIXjtwMqun4n1
+	waCf5sopLhKkXvuf9fgWt03MakYrRuC8CKM5vRitz0Fp90jEWoJEAOmJwwiQn8UDIymz7X3Xbf4RD
+	B8JacPjOQfyB2AVIGJwz2pM54pF/htkqNS40dAV/NcYGvzCMT7mpgV+5Lt6P1+dXW4akH/SwtMFrY
+	yaH0ihkMwYhDBrUhxq/jTKOlcwyEtlkkVJ5I/mw9dghYpmcHP/Yvh5vU2FblLe/7m9+96wLqQDOYr
+	X7zqsi1mP3R/vK1yv2qA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtvaA-0005vt-Pt; Wed, 13 Feb 2019 14:32:14 +0000
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
+	id 1gtvbe-0006T6-V0; Wed, 13 Feb 2019 14:33:46 +0000
+Received: from relay10.mail.gandi.net ([217.70.178.230])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtva2-0005jg-5f
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:32:08 +0000
-Received: by mail-qt1-f195.google.com with SMTP id 2so2751458qtb.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 06:32:05 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=yQjmZowm/ZKBxge9W+Z0hhgJKB8GgrmSu4tCCYAjf2o=;
- b=mgOqGDaHxbYFioqhF7czTbqq8999rNbem+nBZcCUmgKkORyhxzgjrt1GEwKe9l5VF0
- dNwP7nIxhGdETzDhhQ3LpwrGGW3T4ltOFFgNZ3HwTN9+k6c8wvCGalU8n7po37PFWRMY
- U2awUYUinAkvfXOIApIVY7jni7qpqMhus4F6FWJka/9KxPwjTvpGIQ1lCLLjNxah8UOl
- wwQvqHZ1KaIMTaEusb4Ox/cw/JzqsFPOY1h0sCTqhKwtQqWIpWx6xi3ucTYi1eKYFf1/
- 4ecHFU3bJDbz61NliUNhN0+YykQQg9ChT4vhXC2uNuPTZLjadbKbawgJnk2hLs77xsCZ
- kdLw==
-X-Gm-Message-State: AHQUAuZWCMY+Drg01AOeXXIT2tXuduhpEerBC18JXx1RcYHi19vXxvBA
- F6HaoSBiyVSKP8fXajC42sylAgIDk77vNzKUvB4=
-X-Google-Smtp-Source: AHgI3IbBDEPON02dOFX651H6FLMPKtV3GSRs3pPWsKyjo0nsyKsTGsVP1M9c7PuPbLx6Ic4qJnXnSiMwE1XB+F7pj2w=
-X-Received: by 2002:a0c:81ee:: with SMTP id 43mr594004qve.180.1550068324570;
- Wed, 13 Feb 2019 06:32:04 -0800 (PST)
+ id 1gtvbb-0006Sf-2R
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 14:33:44 +0000
+Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
+ [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
+ by relay10.mail.gandi.net (Postfix) with ESMTPSA id 39D7C240025;
+ Wed, 13 Feb 2019 14:33:39 +0000 (UTC)
+Message-ID: <a170e16bed016b0ba79b4f0a1181639598c7b205.camel@bootlin.com>
+Subject: Re: [PATCH v3 5/8] drm/sun4i: dsi: Fix DRQ calculation
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
+ <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
+Date: Wed, 13 Feb 2019 15:33:38 +0100
+In-Reply-To: <e858ff6509e0d3f657fd9229b28f4ac177a04a76.1549896081.git-series.maxime.ripard@bootlin.com>
+References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+ <e858ff6509e0d3f657fd9229b28f4ac177a04a76.1549896081.git-series.maxime.ripard@bootlin.com>
+Organization: Bootlin
+User-Agent: Evolution 3.30.5 
 MIME-Version: 1.0
-References: <cover.1550060543.git.baolin.wang@linaro.org>
- <f34970a034946bacda19202e2ce9973ca732c925.1550060544.git.baolin.wang@linaro.org>
-In-Reply-To: <f34970a034946bacda19202e2ce9973ca732c925.1550060544.git.baolin.wang@linaro.org>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 13 Feb 2019 15:31:47 +0100
-Message-ID: <CAK8P3a38=4JZvqPi8f8Mpup2P70c+_xsM48-b35BVRYWGeHp9w@mail.gmail.com>
-Subject: Re: [PATCH v2 5/5] arm64: dts: sprd: Remove wildcard compatible string
-To: Baolin Wang <baolin.wang@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_063206_360924_BE90B7B2 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20190213_063343_260871_04C3B38B 
+X-CRM114-Status: GOOD (  15.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,33 +67,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- arm-soc <arm@kernel.org>, Lyra Zhang <zhang.lyra@gmail.com>,
- Mark Brown <broonie@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
- Orson Zhai <orsonzhai@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: bbrezillon@kernel.org, dri-devel@lists.freedesktop.org,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 1:34 PM Baolin Wang <baolin.wang@linaro.org> wrote:
->
-> Remove wildcard compatible string.
->
-> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+Hi,
 
+On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
+> The DRQ calculation code in the Allwinner BSP uses the vertical front
+> porch value as the condition, but we're using the video back porch.
+> 
+> Since I always confuse the two, and I'm the original author of that code, I
+> guess I deserved a brown paper bag.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Looks good to me. It does break using the new dtb file on older kernels,
-but I suppose this is not a case we care much about yet on your
-platform, given that both the dts file sand the drivers in the
-kernel are still  work in progress.
+Assuming that the BSP's hbp is referring to the back porch only, then
+calculating ht - x - hbp does give us the front porch + hsync length.
 
-I had started the other reply I just sent before I saw this new mail.
+Well, let's guess that this about the front porch only until we know
+better. It's certainly better than using the back porch anyway :)
 
-    Arnd
+Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+
+Cheers,
+
+Paul
+
+> ---
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index 2518a0d7567c..8e6392831e9d 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -372,9 +372,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+>  	struct mipi_dsi_device *device = dsi->device;
+>  	u32 val = 0;
+>  
+> -	if ((mode->hsync_end - mode->hdisplay) > 20) {
+> +	if ((mode->hsync_start - mode->hdisplay) > 20) {
+>  		/* Maaaaaagic */
+> -		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
+> +		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+>  
+>  		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+>  		drq /= 32;
+-- 
+Paul Kocialkowski, Bootlin
+Embedded Linux and kernel engineering
+https://bootlin.com
+
 
 _______________________________________________
 linux-arm-kernel mailing list
