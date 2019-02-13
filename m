@@ -2,65 +2,72 @@ Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E862FC282C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:33:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67EFDC282CA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B79E92190A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:33:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 37A2A2190A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 10:34:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RTuKaqR6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="RIN3LL9T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B79E92190A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uOnO06Ok"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A2A2190A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=+uGdMi60d3/+jlfMxDeFC7sS5xwwVoCkzZBFV+B04w4=; b=RTu
-	KaqR6xIw4WwaXf3Jjj0SgbyrAmCmN9qBWAbzUqZhk33wG7dMjsLAq+vWBwjJYNUwi2apZPFg28Lui
-	z3MawEotEWhgrnHVVqplgrEBHyUCYhqhOxr4MTycMNWx9F/duz72y0GG87oA549raF8adc7BEzPYq
-	FYZzbg9TiKAd2Eq9F7euMPlhNln3rx5SgTNzfaRILrEZhMUByqa9m+LjR/QdOYhv7uwgwAZ/TwWcv
-	S7xJvQ4h9dQuVHoVtq2QeTOxdbtBTK4rBrr/HgNGSWStIurctQ7UG5UEAvtdYf/0RrgiFCzc+QVKI
-	GGUC03wN0X6ylUBki5CcOIU7kIPZbhw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=+dOh9FDfvFIK7mNqoFqcJxjLnsxhBmQOJms7ok8ql6U=; b=uOnO06Oksld81By84bLsbC/Tq
+	B4V3bfz591Khn09WRhcLX3WkDXBvPOvKMhzD0WzV7xhOzrw65CqfvEt06rBUe5sXEdP7RtTdHpQ8d
+	X0Rs1RD8aU6T0JTIT54gC7LyiLaZQ/iTfj0inxbCoEH18jwbUfSL4hp0r4VeoIuRaHqrNVqBuSnto
+	/bvTIUVCL6NN939LieTtXZBIHaVhLhd7/p57fF8WOLf7nhMLCdBWR1rn1SmkoXmEatCHInEG5vfao
+	WmNUOnZt9fQdyVJ3QFYOdO9k69xctSMNdx001g97w7k7NwjQfJOK1OEHrGyI/Qp/Gl/IOlV5ZjVGB
+	6ZnbmdOQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gtrqs-00082P-36; Wed, 13 Feb 2019 10:33:14 +0000
-Received: from kirsty.vergenet.net ([202.4.237.240])
+	id 1gtrrm-0008Jh-F0; Wed, 13 Feb 2019 10:34:10 +0000
+Received: from mx.socionext.com ([202.248.49.38])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gtrqo-00081x-R5
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 10:33:12 +0000
-Received: from reginn.horms.nl (watermunt.horms.nl [80.127.179.77])
- by kirsty.vergenet.net (Postfix) with ESMTPA id AB03125BE34;
- Wed, 13 Feb 2019 21:33:05 +1100 (AEDT)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1550053985; bh=swDuxpMPf2iGMdMXiuRnN++eM8qPXGjWku44J0GdQBA=;
- h=From:To:Cc:Subject:Date:From;
- b=RIN3LL9TLKWzaXa7giloykhG/VbVLXaAU0u1PuwhBo7PYbMag5tFLwgYy/iVlgmhO
- D6DdZd6maxJrjr3wwpqM0HhUK/SFWcYBcKvCIwFGE/fwcW/5uMlA72WjC9G8GnWmMV
- t8r1xoznGxJS5P3gyX2sJiqxPYzdq8mf0U1LNE9k=
-Received: by reginn.horms.nl (Postfix, from userid 7100)
- id F0BEC944500; Wed, 13 Feb 2019 11:33:03 +0100 (CET)
-From: Simon Horman <horms+renesas@verge.net.au>
-To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77995: draak: Fix EthernetAVB phy
- mode to rgmii
-Date: Wed, 13 Feb 2019 11:32:55 +0100
-Message-Id: <20190213103255.1265-1-horms+renesas@verge.net.au>
-X-Mailer: git-send-email 2.11.0
+ id 1gtrri-0008Iu-6H
+ for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 10:34:08 +0000
+Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
+ by mx.socionext.com with ESMTP; 13 Feb 2019 19:34:02 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by kinkan-ex.css.socionext.com (Postfix) with ESMTP id 07F4018009B;
+ Wed, 13 Feb 2019 19:34:03 +0900 (JST)
+Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
+ Wed, 13 Feb 2019 19:34:02 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by kinkan.css.socionext.com (Postfix) with ESMTP id ACA021A04E1;
+ Wed, 13 Feb 2019 19:34:02 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 97922121B6C;
+ Wed, 13 Feb 2019 19:34:02 +0900 (JST)
+Subject: Re: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce
+ timer for Milbeaut SoCs
+To: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org, 
+ linux-arm-kernel@lists.infradead.org
+References: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
+ <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <c6fd5a9d-17df-a13d-7634-4c54d3e65f9c@socionext.com>
+Date: Wed, 13 Feb 2019 19:34:01 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
+MIME-Version: 1.0
+In-Reply-To: <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_023311_357600_F0AB3660 
-X-CRM114-Status: UNSURE (   8.70  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190213_023406_661302_42886929 
+X-CRM114-Status: GOOD (  25.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,47 +79,245 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Horman <horms+renesas@verge.net.au>,
- Takeshi Kihara <takeshi.kihara.df@renesas.com>,
- Magnus Damm <magnus.damm@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Hi,
 
-According to the R-Car Gen3 Hardware Manual Errata for Rev 1.00 of
-August 24, 2018, the TX clock internal Delay mode does'nt support
-on R-Car D3. This patch fixes EthernetAVB phy mode to rgmii.
+On 2019/02/12 18:06, Daniel Lezcano wrote:
+> On 08/02/2019 13:26, Sugaya Taichi wrote:
+>> Add timer driver for Milbeaut SoCs series.
+>>
+>> The timer has two 32-bit width down counters, one of which is configured
+>> as a clockevent device and the other is configured as a clock source.
+>>
+>> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+> 
+> Do want me to take it through my tree?
+>
 
-This is achieved by simply dropping the phy-mode property from
-r8a77995-draak.dts as the default property for this for r8a77995,
-as set in r8a77995.dtsi, is "rgmii".
+Yes, please.
 
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77995-draak.dts | 1 -
- 1 file changed, 1 deletion(-)
+By the way, the patch series includes other sub-system drivers, so 
+should it be splitted into each driver patch ?
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-index db2bed1751b8..bfa260c9f78c 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77995-draak.dts
-@@ -168,7 +168,6 @@
- 	pinctrl-names = "default";
- 	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
--	phy-mode = "rgmii-txid";
- 	status = "okay";
- 
- 	phy0: ethernet-phy@0 {
--- 
-2.11.0
+Thanks,
+Sugaya Taichi
+
+>> ---
+>>   drivers/clocksource/Kconfig          |   9 ++
+>>   drivers/clocksource/Makefile         |   1 +
+>>   drivers/clocksource/timer-milbeaut.c | 161 +++++++++++++++++++++++++++++++++++
+>>   3 files changed, 171 insertions(+)
+>>   create mode 100644 drivers/clocksource/timer-milbeaut.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index a9e26f6..9101b8f 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -634,4 +634,13 @@ config GX6605S_TIMER
+>>   	help
+>>   	  This option enables support for gx6605s SOC's timer.
+>>   
+>> +config MILBEAUT_TIMER
+>> +	bool "Milbeaut timer driver" if COMPILE_TEST
+>> +	depends on OF
+>> +	depends on ARM
+>> +	select TIMER_OF
+>> +	select CLKSRC_MMIO
+>> +	help
+>> +	  Enables the support for Milbeaut timer driver.
+>> +
+>>   endmenu
+>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>> index cdd210f..6f2543b 100644
+>> --- a/drivers/clocksource/Makefile
+>> +++ b/drivers/clocksource/Makefile
+>> @@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
+>>   obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
+>>   obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
+>>   obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
+>> +obj-$(CONFIG_MILBEAUT_TIMER)	+= timer-milbeaut.o
+>>   obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
+>>   obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
+>>   obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
+>> diff --git a/drivers/clocksource/timer-milbeaut.c b/drivers/clocksource/timer-milbeaut.c
+>> new file mode 100644
+>> index 0000000..f2019a8
+>> --- /dev/null
+>> +++ b/drivers/clocksource/timer-milbeaut.c
+>> @@ -0,0 +1,161 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (C) 2018 Socionext Inc.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/irqreturn.h>
+>> +#include <linux/sched_clock.h>
+>> +#include "timer-of.h"
+>> +
+>> +#define MLB_TMR_TMCSR_OFS	0x0
+>> +#define MLB_TMR_TMR_OFS		0x4
+>> +#define MLB_TMR_TMRLR1_OFS	0x8
+>> +#define MLB_TMR_TMRLR2_OFS	0xc
+>> +#define MLB_TMR_REGSZPCH	0x10
+>> +
+>> +#define MLB_TMR_TMCSR_OUTL	BIT(5)
+>> +#define MLB_TMR_TMCSR_RELD	BIT(4)
+>> +#define MLB_TMR_TMCSR_INTE	BIT(3)
+>> +#define MLB_TMR_TMCSR_UF	BIT(2)
+>> +#define MLB_TMR_TMCSR_CNTE	BIT(1)
+>> +#define MLB_TMR_TMCSR_TRG	BIT(0)
+>> +
+>> +#define MLB_TMR_TMCSR_CSL_DIV2	0
+>> +#define MLB_TMR_DIV_CNT		2
+>> +
+>> +#define MLB_TMR_SRC_CH  (1)
+>> +#define MLB_TMR_EVT_CH  (0)
+>> +
+>> +#define MLB_TMR_SRC_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_SRC_CH)
+>> +#define MLB_TMR_EVT_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_EVT_CH)
+>> +
+>> +#define MLB_TMR_SRC_TMCSR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMCSR_OFS)
+>> +#define MLB_TMR_SRC_TMR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMR_OFS)
+>> +#define MLB_TMR_SRC_TMRLR1_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR1_OFS)
+>> +#define MLB_TMR_SRC_TMRLR2_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR2_OFS)
+>> +
+>> +#define MLB_TMR_EVT_TMCSR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMCSR_OFS)
+>> +#define MLB_TMR_EVT_TMR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMR_OFS)
+>> +#define MLB_TMR_EVT_TMRLR1_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR1_OFS)
+>> +#define MLB_TMR_EVT_TMRLR2_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR2_OFS)
+>> +
+>> +#define MLB_TIMER_RATING	500
+>> +
+>> +static irqreturn_t mlb_timer_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct clock_event_device *clk = dev_id;
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val;
+>> +
+>> +	val = readl_relaxed(timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	val &= ~MLB_TMR_TMCSR_UF;
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +
+>> +	clk->event_handler(clk);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int mlb_set_state_periodic(struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
+>> +
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +
+>> +	writel_relaxed(to->of_clk.period, timer_of_base(to) +
+>> +				MLB_TMR_EVT_TMRLR1_OFS);
+>> +	val |= MLB_TMR_TMCSR_RELD | MLB_TMR_TMCSR_CNTE |
+>> +		MLB_TMR_TMCSR_TRG | MLB_TMR_TMCSR_INTE;
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_set_state_oneshot(struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
+>> +
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_clkevt_next_event(unsigned long event,
+>> +				   struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +
+>> +	writel_relaxed(event, timer_of_base(to) + MLB_TMR_EVT_TMRLR1_OFS);
+>> +	writel_relaxed(MLB_TMR_TMCSR_CSL_DIV2 |
+>> +			MLB_TMR_TMCSR_CNTE | MLB_TMR_TMCSR_INTE |
+>> +			MLB_TMR_TMCSR_TRG, timer_of_base(to) +
+>> +			MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_config_clock_source(struct timer_of *to)
+>> +{
+>> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_SRC_TMCSR_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMR_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR1_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR2_OFS);
+>> +	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
+>> +		MLB_TMR_SRC_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_config_clock_event(struct timer_of *to)
+>> +{
+>> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static struct timer_of to = {
+>> +	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
+>> +
+>> +	.clkevt = {
+>> +		.name = "mlb-clkevt",
+>> +		.rating = MLB_TIMER_RATING,
+>> +		.cpumask = cpu_possible_mask,
+>> +		.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT,
+>> +		.set_state_oneshot = mlb_set_state_oneshot,
+>> +		.set_state_periodic = mlb_set_state_periodic,
+>> +		.set_next_event = mlb_clkevt_next_event,
+>> +	},
+>> +
+>> +	.of_irq = {
+>> +		.flags = IRQF_TIMER | IRQF_IRQPOLL,
+>> +		.handler = mlb_timer_interrupt,
+>> +	},
+>> +};
+>> +
+>> +static u64 notrace mlb_timer_sched_read(void)
+>> +{
+>> +	return ~readl_relaxed(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS);
+>> +}
+>> +
+>> +static int __init mlb_timer_init(struct device_node *node)
+>> +{
+>> +	int ret;
+>> +	unsigned long rate;
+>> +
+>> +	ret = timer_of_init(node, &to);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	rate = timer_of_rate(&to) / MLB_TMR_DIV_CNT;
+>> +	mlb_config_clock_source(&to);
+>> +	clocksource_mmio_init(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS,
+>> +		node->name, rate, MLB_TIMER_RATING, 32,
+>> +		clocksource_mmio_readl_down);
+>> +	sched_clock_register(mlb_timer_sched_read, 32, rate);
+>> +	mlb_config_clock_event(&to);
+>> +	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to), 15,
+>> +		0xffffffff);
+>> +	return 0;
+>> +}
+>> +TIMER_OF_DECLARE(mlb_peritimer, "socionext,milbeaut-timer",
+>> +		mlb_timer_init);
+>>
+> 
+> 
 
 
 _______________________________________________
