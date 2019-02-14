@@ -2,62 +2,90 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79C2AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 09:42:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 655E0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 09:42:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4946A222A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 09:42:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3439F222A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 09:42:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uTSsqeEi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4946A222A4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y+0RKWA7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="S7YSI7RT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3439F222A4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=0+6bZo3ILpqftAMeM8bz4WCsnzVpb3Ou3+gn4QBLtAE=; b=uTSsqeEiHC6wdQY3TXYoKEiuK
-	sf4a9NaC0Wc1s10f0MRMbgf6aT6nohpa7fNC2n1M4om50vGLOrP/o+HyJm2bObtJfLZJTiMeDyK6P
-	1EiBirSzQrY4piB1kgQj+lTyyS51qsJzOlC4yUvGGvnPewAQF3JfldX4zGQrysPJvxn8S9saaNjj3
-	eE/1ssU4HwEWF80r6KJdCW/xP2dFiqtt56gSaPWw3QatHQzBppa8FukoD9rKssVo8B5u8EQAP0c5g
-	mS0gU9G5CZdVbIlQSQaXNHW9AueL4XL4OBxgbnyqQkzX/AmKFr1BqLzcnisOjVQlzkbLE4J1HPkMN
-	DYz/92NAA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AEAB8vXAyR9IrpoLBgDX3cS/UBUMNfdCGkn9WG8RsTM=; b=Y+0RKWA7VstocX
+	O+t0mISkNYeuWhnZWgwacGxePy80rZj8DYx6KlCmbaG7OBl4Wpg4hsaBsFuTzprJN2f1uV9G2dEqA
+	HA/6Q/MUq/N9fj1j/YF2nwveKWWCWHXaTTHDsNPItQtboFnMVd/92MTmUd8aQOjjQn/STgLIejRwo
+	5S9coY0goho7sVaT2UksWnMFKflNWQzUmEbJurCmN5LCFrfpmT5dxZUGOhhr33JQNhoT6tPORCMqM
+	MfTtscEHzwl1gQIKMr3LNkscx/0DRWI1+bGOenRiqsePeH6bb1G+ceDMeDqv4Z6QcYW5K8ROga1KV
+	eFYCrhoqj98onqEmljxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guDDf-0007Mr-Jw; Thu, 14 Feb 2019 09:22:11 +0000
-Received: from relay4-d.mail.gandi.net ([217.70.183.196])
+	id 1guD86-0003kO-FP; Thu, 14 Feb 2019 09:16:26 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guDDX-0007Db-LD
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:22:05 +0000
-X-Originating-IP: 90.88.30.68
-Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 3EB39E0010;
- Thu, 14 Feb 2019 09:21:49 +0000 (UTC)
-Date: Thu, 14 Feb 2019 10:21:48 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH v3 3/8] drm/sun4i: dsi: Enforce boundaries on the start
- delay
-Message-ID: <20190214092148.3jhtp5i5crl632wd@flea>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <c9889cf5f7a3d101ef380905900b45a182596f56.1549896081.git-series.maxime.ripard@bootlin.com>
- <bf6176bef13d471a1fb829f918dbbe38de909e21.camel@bootlin.com>
+ id 1guD82-0003ic-Fk
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:16:23 +0000
+Received: by mail-wr1-x442.google.com with SMTP id v13so5597410wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 01:16:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=AChgX3u3Rli6twGz1yDeQumcH7RThDK+xOVT4nhaEk0=;
+ b=S7YSI7RT+QeFtmoWOc0H9M+zv+kJMxO0dN/OJefKd/4MAkbxvYwZ2mUHN0/pqOITzO
+ /6PJkViy215KipNT9sPTsNr1Fu3jd55tockcdaxQXZ9bC4ctH2zmHNiB4doYUt9AsOrA
+ SP9L24p19/ASbgn2eQkFAfn/3H4aUqWlSB7hDuvbDR37M4UNBc5KopNRYBhMErIpWO/H
+ pVWgNuuHKEV7Z2NmBCxrhFaaH4WEh0fERz+V/TsXFC4JY9Y0Y34ZobgaMUbUtMqJrNDA
+ FPrKfexQsN0bFoqBy4BK4XaDkiZfTPM6J8cJsFapSHoN10/s4YbbTXpeR+KXTvcfh4k0
+ 16MA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=AChgX3u3Rli6twGz1yDeQumcH7RThDK+xOVT4nhaEk0=;
+ b=t1NoB3+yJ6wC5Cu/Fw0nxd6BaDjsdDDDWweE8GjbXcFk/KY1btYY50R3qVPxJ3KoyC
+ +kHpICtjV99GLbobZ/0yhmrVoLUQkiFAwuQ7pplBiWFs+HupyqQjn3mpCpIKD/KPhGOx
+ 2JESPu4NgWbQqv/stTJi9juuHhjzPp+2MJtNygu1yXTuBZQMPfRcD/hEPy+fWw6D6f80
+ RV0iYom03Ns4vlkmsuLXwkPcoeY9MaKC4AtqXDOsaC8zmkLXhOAYBQ40CDpqxLNqJYh1
+ 3J5xw1GoChKmK4qa80okPMKFYAzXySwJgbDevT1TeZL19RxFTOuIz6yRP1PCZuidiDRY
+ jTBQ==
+X-Gm-Message-State: AHQUAubKTVqWmcZSnMjvXjFm/WMR/naYnwpn2Vdoj/gdvX3ClyuBp/Z7
+ UVgSKg9Epf1RPXhoToGcBVmRRw==
+X-Google-Smtp-Source: AHgI3IYlx/M/oeBxbZiwZg7WFni1Q+g76oFfBJrj8fS3lwhC4EFx9lrwu3PXz7bRyMyHY0vk8Tbtxg==
+X-Received: by 2002:adf:fc49:: with SMTP id e9mr2078906wrs.2.1550135780206;
+ Thu, 14 Feb 2019 01:16:20 -0800 (PST)
+Received: from dell ([2a01:4c8:c:28c9:4c60:37da:d7a:230])
+ by smtp.gmail.com with ESMTPSA id h1sm2264525wmb.0.2019.02.14.01.16.18
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 14 Feb 2019 01:16:19 -0800 (PST)
+Date: Thu, 14 Feb 2019 09:16:17 +0000
+From: Lee Jones <lee.jones@linaro.org>
+To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
+Subject: Re: [PATCH] mfd: mxs-lradc: Mark expected switch fall-through
+Message-ID: <20190214091617.GC13737@dell>
+References: <20190211224827.GA28902@embeddedor>
 MIME-Version: 1.0
-In-Reply-To: <bf6176bef13d471a1fb829f918dbbe38de909e21.camel@bootlin.com>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <20190211224827.GA28902@embeddedor>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_012203_953652_D7B7E51E 
-X-CRM114-Status: GOOD (  18.80  )
+X-CRM114-CacheID: sfid-20190214_011622_523951_9391F261 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,110 +97,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- dri-devel@lists.freedesktop.org, Chen-Yu Tsai <wens@csie.org>,
- Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============5922336248753042845=="
+Cc: Kees Cook <keescook@chromium.org>, Shawn Guo <shawnguo@kernel.org>,
+ Sascha Hauer <s.hauer@pengutronix.de>, linux-kernel@vger.kernel.org,
+ NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <festevam@gmail.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============5922336248753042845==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="moug3onooorq2334"
-Content-Disposition: inline
-
-
---moug3onooorq2334
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-hi,
-
-On Tue, Feb 12, 2019 at 04:30:33PM +0100, Paul Kocialkowski wrote:
-> Hi,
->=20
-> On Mon, 2019-02-11 at 15:41 +0100, Maxime Ripard wrote:
-> > The Allwinner BSP makes sure that we don't end up with a null start del=
-ay
-> > or with a delay larger than vtotal.
-> >=20
-> > The former condition is likely to happen now with the reworked start de=
-lay,
-> > so make sure we enforce the same boundaries.
-> >=20
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->=20
-> Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-
-Thanks!
-
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
-> >=20
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/s=
-un4i/sun6i_mipi_dsi.c
-> > index 9471fa695ec7..506f2e8cf454 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -358,8 +358,12 @@ static u16 sun6i_dsi_get_video_start_delay(struct =
-sun6i_dsi *dsi,
-> >  					   struct drm_display_mode *mode)
-> >  {
-> >  	u16 start =3D clamp(mode->vtotal - mode->vdisplay - 10, 8, 100);
-> > +	u16 delay =3D mode->vtotal - (mode->vsync_end - mode->vdisplay) + sta=
-rt;
-> > =20
-> > -	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + start;
-> > +	if (delay > mode->vtotal)
-> > +		delay =3D delay % mode->vtotal;
->=20
-> I wonder whether delay =3D=3D mode->vtotal would make sense at all. If no=
-t,
-> then we can just apply the modulo unconditionally. But in doubt, let's
-> keep things this way.
-
-I guess that situation can happen, especially with the start clamping.
-
-But even without it, it can happen when mode->vtotal - mode->vsync_end
-(so the backporch) is equal to 10.
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---moug3onooorq2334
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGUzLAAKCRDj7w1vZxhR
-xeD/AP93+BXVH4dU5N7/el2SXR6+kHkHrCiBSeZBXFrUoa2/kwEAwiZD6fnQ8wXk
-KJ+w7dROnazKTKsmZS2b4x+l951qZgc=
-=Oqs4
------END PGP SIGNATURE-----
-
---moug3onooorq2334--
-
-
---===============5922336248753042845==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5922336248753042845==--
-
+T24gTW9uLCAxMSBGZWIgMjAxOSwgR3VzdGF2byBBLiBSLiBTaWx2YSB3cm90ZToKCj4gSW4gcHJl
+cGFyYXRpb24gdG8gZW5hYmxpbmcgLVdpbXBsaWNpdC1mYWxsdGhyb3VnaCwgbWFyayBzd2l0Y2gK
+PiBjYXNlcyB3aGVyZSB3ZSBhcmUgZXhwZWN0aW5nIHRvIGZhbGwgdGhyb3VnaC4KPiAKPiBUaGlz
+IHBhdGNoIGZpeGVzIHRoZSBmb2xsb3dpbmcgd2FybmluZzoKPiAKPiBkcml2ZXJzL21mZC9teHMt
+bHJhZGMuYzogSW4gZnVuY3Rpb24g4oCYbXhzX2xyYWRjX3Byb2Jl4oCZOgo+IGRyaXZlcnMvbWZk
+L214cy1scmFkYy5jOjE3OTo3OiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVudCBtYXkgZmFsbCB0aHJv
+dWdoIFstV2ltcGxpY2l0LWZhbGx0aHJvdWdoPV0KPiAgICAgaWYgKGxyYWRjLT5zb2MgPT0gSU1Y
+MjhfTFJBREMpIHsKPiAgICAgICAgXgo+IGRyaXZlcnMvbWZkL214cy1scmFkYy5jOjE4NTozOiBu
+b3RlOiBoZXJlCj4gICAgZGVmYXVsdDoKPiAgICBefn5+fn5+Cj4gCj4gV2FybmluZyBsZXZlbCAz
+IHdhcyB1c2VkOiAtV2ltcGxpY2l0LWZhbGx0aHJvdWdoPTMKPiAKPiBOb3RpY2UgdGhhdCwgaW4g
+dGhpcyBwYXJ0aWN1bGFyIGNhc2UsIHRoZSBjb2RlIGNvbW1lbnQgaXMgbW9kaWZpZWQKPiBpbiBh
+Y2NvcmRhbmNlIHdpdGggd2hhdCBHQ0MgaXMgZXhwZWN0aW5nIHRvIGZpbmQuCj4gCj4gVGhpcyBw
+YXRjaCBpcyBwYXJ0IG9mIHRoZSBvbmdvaW5nIGVmZm9ydHMgdG8gZW5hYmxlCj4gLVdpbXBsaWNp
+dC1mYWxsdGhyb3VnaC4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBHdXN0YXZvIEEuIFIuIFNpbHZhIDxn
+dXN0YXZvQGVtYmVkZGVkb3IuY29tPgo+IC0tLQo+ICBkcml2ZXJzL21mZC9teHMtbHJhZGMuYyB8
+IDIgKy0KPiAgMSBmaWxlIGNoYW5nZWQsIDEgaW5zZXJ0aW9uKCspLCAxIGRlbGV0aW9uKC0pCgpB
+cHBsaWVkLCB0aGFua3MuCgotLSAKTGVlIEpvbmVzIFvmnY7nkLzmlq9dCkxpbmFybyBTZXJ2aWNl
+cyBUZWNobmljYWwgTGVhZApMaW5hcm8ub3JnIOKUgiBPcGVuIHNvdXJjZSBzb2Z0d2FyZSBmb3Ig
+QVJNIFNvQ3MKRm9sbG93IExpbmFybzogRmFjZWJvb2sgfCBUd2l0dGVyIHwgQmxvZwoKX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
+bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
+Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
