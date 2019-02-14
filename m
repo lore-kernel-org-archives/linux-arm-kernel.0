@@ -2,22 +2,21 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BC76C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 05:55:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A88BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:02:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B8E7222A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 05:55:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDFCD21934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:02:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tmNEypHZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="JXMwGF6s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B8E7222A4
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PyIbOW1+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="htdykzQ6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDFCD21934
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NrTdZruqFqrrXjhoWA+0PpJ16ZkLF7ITKAjHnx7Vn/E=; b=tmNEypHZDc2n8f
-	WR27oLNq8chme5WMuvaj4JCbQZQleRis2nbJXGTbqZFU5aYoopL8gg+zCmqamfAp/52htDY2btJeD
-	X3Otsfm9xVgTDPBY7Zk1+eGEylRKUNDX6idut4YWKHSD6FpQ/q64waNJiiOkzZGs4imERQeKCaDs0
-	sO9XpIdZnNP+JC35UUKuFoA5RrLN6qDjfySvSVqSESovQAeOBrqj5KB7ib+p5k+NxoNlrr0Gvg0mF
-	1jLS870WHrrFHNgdIwQiKboqyiiWgSZbwjLRB5iyqgek/InNGeERq4P5kkcPgpWdNBQ/xdGg73K7I
-	SWEscfTgKG8e0RFz0/Yg==;
+	List-Owner; bh=aO4Pih9ww3HwzuZS/Xh6grXljLO9pV1zYZKU+gOTMro=; b=PyIbOW1+O4DIVo
+	1VpwhycAsNwqXJIclObdOE9LRB2sltdC5rVcqD8O05aDdBfmzuOzh6+hOGcm+30ljJtwm+O79Iw9A
+	pD/pN6lfYHgWf4zHAFeadGeCuDFHPMHgY/YBPhOZ9QmO2byjrkr65THIapeFEt1Ac8PYxebyVF3Z0
+	Yj/fGGpiUMggBthCzIVQz4XgiVh1wn5pjEVj5ngdJ2ddotZyxtxhRhdUECjp7gWFJxHvI08uVwEND
+	k3+BsXW3E7aIWUhHJjsFkRDeD4cLXEQrIfW+hK6SR0wgzsyPlqZRKH+AAIG6PYK/oxwWRJxLFdanK
+	z6MotLdBWVWS7qgQsAHQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu9zB-0000vR-Tt; Thu, 14 Feb 2019 05:55:01 +0000
-Received: from mail-qk1-x741.google.com ([2607:f8b0:4864:20::741])
+	id 1guA6a-0004DV-Rf; Thu, 14 Feb 2019 06:02:40 +0000
+Received: from mail-qk1-x744.google.com ([2607:f8b0:4864:20::744])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu9z7-0000u5-62
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 05:54:58 +0000
-Received: by mail-qk1-x741.google.com with SMTP id w204so2945180qka.2
+ id 1guA6W-0004CK-Rz
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 06:02:38 +0000
+Received: by mail-qk1-x744.google.com with SMTP id p15so2936890qkl.5
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 21:54:56 -0800 (PST)
+ Wed, 13 Feb 2019 22:02:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8ZZPTehRx0gCVAGAwGZLdRCyaQhXE0OghMtcZbWUN1k=;
- b=JXMwGF6sgy9y+WcZoNA2AWmObRpexqFbDrMQ/02+r6JQUTug17v90SxKPvh43Sr7wa
- 0hHMJEDUNY2SA1ROLXAkc9lPs+Ei3Oqs5uXsXotW9nFwFYglLShE17cEyYFVz77CYfYv
- c71lTWzB4N8yWi0R+J9rta160kzE4DyOq1Zpk=
+ :cc; bh=fjYk8M+ZpYBHIdl3SpuI+eMPnvXJ1FTwPx90gKG5ags=;
+ b=htdykzQ6xRtqzlK300swdx4zlf+eSRWKvGd++NszWWrVAyevn5sSGjQoFRgg53bRt3
+ ODwpAL2JsbRsFvSlgHHkg4s1+qIX1HzXzHJtKmgzuGWqNgc29TKbBAlgmPc2Dxr6XWi5
+ cLo/mQsXn0b4UBcivhHQG1LMWDCEvVM+hQOUQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=8ZZPTehRx0gCVAGAwGZLdRCyaQhXE0OghMtcZbWUN1k=;
- b=eVNuHpLROgRu7ygwG2s9Bnr3wpPIZC/9qIz5WL+r/hKkiXxB22PJ3ylBnhjcQztrrU
- MH4h1DnBaL86UsfyIzyuDIZS/NyO1s0awUchNFbxl+33j10tm0xEkR2YWC9d7DmBRbhn
- 031p19B2YssVSfd8Gl8gF35bsAVhqV5ySyK1F1KCv+AdJ+HE7Anw7VafFcbZZDMOA9uO
- vO7ThHKPO6tTWLm+vtesad1MSHUQmIbEVKIE5G3nEXrAoa1hjH6Uv3rMW51T697doSPQ
- UZG4a2bsVcGZcUaFSXaBHBUlHGEzuOTY8zA2O4UNDABvV4rlYvHgZb6OdSx5BqWpcBny
- DClQ==
-X-Gm-Message-State: AHQUAuaJNOUdxldVU4j2zMmLNI6VyIQcaibZ6XSy4NHXi6H/EjGusfz1
- O7aS5jXlQm/vT+uK/g1fLlFT+DGxnyo1U2rHP0GW5Q==
-X-Google-Smtp-Source: AHgI3IamlS+2WnAogCdsL8ldHcyBN+PQiVASgbQh23/ApFCz870ErGq5WVsz2xgBC5rjuMBV8/5v3d6CFP3v4QEbJq4=
-X-Received: by 2002:a37:7885:: with SMTP id t127mr1465362qkc.323.1550123695704; 
- Wed, 13 Feb 2019 21:54:55 -0800 (PST)
+ bh=fjYk8M+ZpYBHIdl3SpuI+eMPnvXJ1FTwPx90gKG5ags=;
+ b=D/05M0OnjQV79+oOFTrZ21r9JfIMctlkS4KshstxAN9Koxu4XXHz8sepV1dUsQ6T2D
+ YMCmof8P8JxgyhS3vt7Ux4OpZm+VuR59dPb6JyN56vMDDqvXxgT5ez03ygnoytkwY4Nd
+ 0wEyzks82e2Z8ceLNSeP7YXYxhsXjh9vsS4cGvKX8A09c5Q8uznzFcmk68VATLdCUkH2
+ Vy7TMqNeonkZK8Tm8n3J8y3JFmQpdRfxvITGowJA7uGjN8Bby1Y4+thUGNpfLhkGJlpS
+ 2ceq493gfH7CQPfVeViISymevqiEnvi0cteJPfU3ew2RboKwo/Hc5xQ6oQlRtNdKwI8J
+ I0OQ==
+X-Gm-Message-State: AHQUAuYaGoar9VDvTGRo5puP49SvszWWiHLjxeWRiv3wpOaxt6DIw+I8
+ w7F+nLLd3NaUaI4mH8FalWo130Xpc+BgYKYxGPP8nQ==
+X-Google-Smtp-Source: AHgI3Iby8fhzCIwktkWL4Ujf0oyJahj4kZsiZDwr2lsB2cT0Yffc5bVfRKg2O4WsTWc1D/2jb9WkzHFYqVAoonPJNDw=
+X-Received: by 2002:a37:4d57:: with SMTP id a84mr1433821qkb.288.1550124152382; 
+ Wed, 13 Feb 2019 22:02:32 -0800 (PST)
 MIME-Version: 1.0
 References: <20190214044243.129920-1-jitao.shi@mediatek.com>
- <20190214044243.129920-3-jitao.shi@mediatek.com>
-In-Reply-To: <20190214044243.129920-3-jitao.shi@mediatek.com>
+In-Reply-To: <20190214044243.129920-1-jitao.shi@mediatek.com>
 From: Nicolas Boichat <drinkcat@chromium.org>
-Date: Thu, 14 Feb 2019 13:54:44 +0800
-Message-ID: <CANMq1KBR-CpjAtj6qTEjK8PA2DUW3w_-OP_EyE7uoaojGLoGLg@mail.gmail.com>
-Subject: Re: [PATCH 3/3] drm/mediatek: add mt8183 dsi driver support
+Date: Thu, 14 Feb 2019 14:02:21 +0800
+Message-ID: <CANMq1KC+ga-Sjxj6eD51nLmq_54Y-gpJR_8qOLQee5gAy7ypkQ@mail.gmail.com>
+Subject: Re: [PATCH 1/3] drm/mediatek: move mipi_dsi_host_register to probe
 To: Jitao Shi <jitao.shi@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_215457_250985_B378DB48 
-X-CRM114-Status: GOOD (  19.31  )
+X-CRM114-CacheID: sfid-20190213_220236_951479_AD852AA4 
+X-CRM114-Status: GOOD (  21.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,102 +108,173 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 12:43 PM Jitao Shi <jitao.shi@mediatek.com> wrote:
+Just some comments on the error path, I'm not sure about the change itself.
+
+On Thu, Feb 14, 2019 at 12:42 PM Jitao Shi <jitao.shi@mediatek.com> wrote:
 >
-> MT8183 dsi has two changes with mt8173.
-> 1. Add the register double buffer control, but we no need it, So make
->    it default off.
-
-Can you describe a little bit more what this is about? That's shadow
-registers, right?
-
-> 2. Add picture size control.
+> DSI panel driver need attach function which is inculde in
+> mipi_dsi_host_ops.
+>
+> If mipi_dsi_host_register is not in probe, dsi panel will
+> probe fail or more delay.
+>
+> So move the mipi_dsi_host_register to probe from bind.
 >
 > Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
 > ---
->  drivers/gpu/drm/mediatek/mtk_dsi.c | 20 +++++++++++++++++++-
->  1 file changed, 19 insertions(+), 1 deletion(-)
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 49 ++++++++++++++++++------------
+>  1 file changed, 30 insertions(+), 19 deletions(-)
 >
 > diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 80db02a25cb0..20cb53f05d42 100644
+> index 27b507eb4a99..93fa255b4aad 100644
 > --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
 > +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -78,6 +78,7 @@
->  #define DSI_VBP_NL             0x24
->  #define DSI_VFP_NL             0x28
->  #define DSI_VACT_NL            0x2C
-> +#define DSI_SIZE_CON           0x38
->  #define DSI_HSA_WC             0x50
->  #define DSI_HBP_WC             0x54
->  #define DSI_HFP_WC             0x58
-> @@ -131,7 +132,10 @@
->  #define VM_CMD_EN                      BIT(0)
->  #define TS_VFP_EN                      BIT(5)
->
-> -#define DSI_CMDQ0              0x180
-
-As I said earlier, move this to 2/3.
-
-> +#define DSI_SHADOW_DEBUG       0x190U
-> +#define FORCE_COMMIT           BIT(0)
-> +#define BYPASS_SHADOW          BIT(1)
-> +
->  #define CONFIG                         (0xff << 0)
->  #define SHORT_PACKET                   0
->  #define LONG_PACKET                    2
-> @@ -158,6 +162,7 @@ struct phy;
->
->  struct mtk_dsi_driver_data {
->         const u32 reg_cmdq_off;
-> +       bool has_size_ctl;
->  };
->
->  struct mtk_dsi {
-> @@ -426,6 +431,9 @@ static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
->         writel(vm->vfront_porch, dsi->regs + DSI_VFP_NL);
->         writel(vm->vactive, dsi->regs + DSI_VACT_NL);
->
-> +       if (dsi->driver_data->has_size_ctl)
-> +               writel(vm->vactive << 16 | vm->hactive, dsi->regs + DSI_SIZE_CON);
-> +
->         horizontal_sync_active_byte = (vm->hsync_len * dsi_tmp_buf_bpp - 10);
->
->         if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)
-> @@ -595,6 +603,9 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+> @@ -1045,12 +1045,6 @@ static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
+>                 return ret;
 >         }
 >
->         mtk_dsi_enable(dsi);
+> -       ret = mipi_dsi_host_register(&dsi->host);
+> -       if (ret < 0) {
+> -               dev_err(dev, "failed to register DSI host: %d\n", ret);
+> -               goto err_ddp_comp_unregister;
+> -       }
+> -
+>         ret = mtk_dsi_create_conn_enc(drm, dsi);
+>         if (ret) {
+>                 DRM_ERROR("Encoder create failed with %d\n", ret);
+> @@ -1060,8 +1054,6 @@ static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
+>         return 0;
+>
+>  err_unregister:
+> -       mipi_dsi_host_unregister(&dsi->host);
+> -err_ddp_comp_unregister:
+>         mtk_ddp_comp_unregister(drm, &dsi->ddp_comp);
+>         return ret;
+>  }
+> @@ -1097,31 +1089,37 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+>
+>         dsi->host.ops = &mtk_dsi_ops;
+>         dsi->host.dev = dev;
+> +       dsi->dev = dev;
+> +       ret = mipi_dsi_host_register(&dsi->host);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to register DSI host: %d\n", ret);
+> +               return -EPROBE_DEFER;
+
+return ret
+
+> +       }
+>
+>         ret = drm_of_find_panel_or_bridge(dev->of_node, 0, 0,
+>                                           &dsi->panel, &dsi->bridge);
+>         if (ret)
+> -               return ret;
+> +               goto err_unregister_host;
+>
+>         dsi->engine_clk = devm_clk_get(dev, "engine");
+>         if (IS_ERR(dsi->engine_clk)) {
+>                 ret = PTR_ERR(dsi->engine_clk);
+>                 dev_err(dev, "Failed to get engine clock: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         dsi->digital_clk = devm_clk_get(dev, "digital");
+>         if (IS_ERR(dsi->digital_clk)) {
+>                 ret = PTR_ERR(dsi->digital_clk);
+>                 dev_err(dev, "Failed to get digital clock: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         dsi->hs_clk = devm_clk_get(dev, "hs");
+>         if (IS_ERR(dsi->hs_clk)) {
+>                 ret = PTR_ERR(dsi->hs_clk);
+>                 dev_err(dev, "Failed to get hs clock: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> @@ -1129,33 +1127,35 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+>         if (IS_ERR(dsi->regs)) {
+>                 ret = PTR_ERR(dsi->regs);
+>                 dev_err(dev, "Failed to ioremap memory: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         dsi->phy = devm_phy_get(dev, "dphy");
+>         if (IS_ERR(dsi->phy)) {
+>                 ret = PTR_ERR(dsi->phy);
+>                 dev_err(dev, "Failed to get MIPI-DPHY: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         comp_id = mtk_ddp_comp_get_id(dev->of_node, MTK_DSI);
+>         if (comp_id < 0) {
+>                 dev_err(dev, "Failed to identify by alias: %d\n", comp_id);
+> -               return comp_id;
+> +               ret = comp_id;
+> +               goto err_unregister_host;
+>         }
+>
+>         ret = mtk_ddp_comp_init(dev, dev->of_node, &dsi->ddp_comp, comp_id,
+>                                 &mtk_dsi_funcs);
+>         if (ret) {
+>                 dev_err(dev, "Failed to initialize component: %d\n", ret);
+> -               return ret;
+> +               goto err_unregister_host;
+>         }
+>
+>         irq_num = platform_get_irq(pdev, 0);
+>         if (irq_num < 0) {
+>                 dev_err(&pdev->dev, "failed to request dsi irq resource\n");
+> -               return -EPROBE_DEFER;
+> +               ret = -EPROBE_DEFER;
+
+I think you need to do ret = irq_num here, too (and yes, it was
+probably wrong before?)
+
+> +               goto err_unregister_host;
+>         }
+>
+>         irq_set_status_flags(irq_num, IRQ_TYPE_LEVEL_LOW);
+> @@ -1163,14 +1163,25 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+>                                IRQF_TRIGGER_LOW, dev_name(&pdev->dev), dsi);
+>         if (ret) {
+>                 dev_err(&pdev->dev, "failed to request mediatek dsi irq\n");
+> -               return -EPROBE_DEFER;
+> +               ret = -EPROBE_DEFER;
+
+Ditto, I'd not reassign ret.
+
+> +               goto err_unregister_host;
+>         }
+>
+>         init_waitqueue_head(&dsi->irq_wait_queue);
+>
+>         platform_set_drvdata(pdev, dsi);
+>
+> -       return component_add(&pdev->dev, &mtk_dsi_component_ops);
+> +       ret = component_add(&pdev->dev, &mtk_dsi_component_ops);
+> +       if (ret) {
+> +               ret = -EPROBE_DEFER;
+
+Ditto (this one _was_ right before).
+
+> +               goto err_unregister_host;
+> +       }
 > +
-> +       /* DSI no need this double buffer, disable it when writing register */
-
-"DSI does not need double buffering, disable it when writing register"
-
-> +       writel(FORCE_COMMIT | BYPASS_SHADOW, dsi->regs + DSI_SHADOW_DEBUG);
-
-So you do this on all MT* variants, is that ok?
-
->         mtk_dsi_reset_engine(dsi);
->         mtk_dsi_phy_timconfig(dsi);
->
-> @@ -1090,11 +1101,18 @@ static const struct mtk_dsi_driver_data mt2701_dsi_driver_data = {
->         .reg_cmdq_off = 0x180,
->  };
->
-> +static const struct mtk_dsi_driver_data mt8183_dsi_driver_data = {
-> +       .reg_cmdq_off = 0x200,
-> +       .has_size_ctl = true,
-> +};
+> +       return 0;
 > +
->  static const struct of_device_id mtk_dsi_of_match[] = {
->         { .compatible = "mediatek,mt2701-dsi",
->           .data = &mt2701_dsi_driver_data },
->         { .compatible = "mediatek,mt8173-dsi",
->           .data = &mt8173_dsi_driver_data },
-> +       { .compatible = "mediatek,mt8183-dsi",
-> +         .data = &mt8183_dsi_driver_data },
->         { },
->  };
+> +err_unregister_host:
+> +       mipi_dsi_host_unregister(&dsi->host);
+> +       return ret;
+>  }
 >
+>  static int mtk_dsi_remove(struct platform_device *pdev)
 > --
 > 2.20.1
 >
