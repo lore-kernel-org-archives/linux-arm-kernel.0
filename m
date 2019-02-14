@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DDFD8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:57:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46791C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:57:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A88CA222C9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:57:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16CA2222C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:57:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V1RIzeIx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="UNscNnPl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A88CA222C9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GyLq3oRy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="uUog+D/o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16CA2222C9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Z3TXJyyJ0MDIV3EbX8MIQKmHLCWIVI28NbNeoo+gbiM=; b=V1RIzeIx/N7Sjp
-	nrWWpZypf1ALKA2bYausS2yxKKN3W4v7pK8FkZnBPgxopMsrCmrNq/N0ahqoY2Yyz/fUsNbOlHIWR
-	Gm1S+GpHKBMry8N9Z/aSVjEUCDG4MNA/TBO6cUSlZs4oYRWkHmJPRW1fhkcvqjXl7E8o+hKA2hNCa
-	3c9y+78PRbQNCm8xyfbfuU5a2tHsMms2yPR4PHh/WWN3h0aU62xRNHIKqQZYKD3bdwUZEoSIQQebY
-	SPO36nb2t+r+fqmoOnlFtQg2bxh43qrCtrtdTP8cYCoD38bIdXCikEf0TSVHx0CiHFQwBsZvoE6fV
-	uHhZbeFqNhjRCXNWse3g==;
+	List-Owner; bh=HGx0B5nxvZy4gup3G+6LvnI5E5BYlKNgHn2Ux8JbM20=; b=GyLq3oRyKuRiWg
+	LuWe983eYQQuqhhJpu7x/SIWpSJd8Ag0QwbjhrrIxBUdUdzLjzX6Pzy0g27go4uINCejXDiiMjfQs
+	ULzZHomjgmBZOW7ipmc7ay2V6hfmsOETw+RcWABfTrwgp2xzSePajS83LQP6oi4+6jeAO8qocSwg0
+	GcEqBqiIexfJOKx2I1LCZ1mBPeoSAhUoQxJMYd3/oV37i5Po49l17ilFycQhpsK83vjZUy1brWlaY
+	+i1e5D4ND3DXfj0OH01dgl+yGs4zwCat90ZC2IRYNRmGlWp3m4FdsGD/uqeUICuKr+ChAQPwVjS29
+	g95P6zPD43Sv4cHIlH7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guIS5-0002zs-7s; Thu, 14 Feb 2019 14:57:25 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1guISF-0003FS-Mi; Thu, 14 Feb 2019 14:57:35 +0000
+Received: from mail-wr1-f68.google.com ([209.85.221.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guIOE-0005gP-Qm
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:48 +0000
-Received: by mail-wr1-x444.google.com with SMTP id q18so6770705wrx.9
+ id 1guIO5-0005T8-Rs
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:40 +0000
+Received: by mail-wr1-f68.google.com with SMTP id i12so6838288wrw.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:53:26 -0800 (PST)
+ Thu, 14 Feb 2019 06:53:17 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=E2oKCm2aHyIkLmsWfLt1xuMZ3si46gMPXE7rlXDV4Gg=;
- b=UNscNnPlrgcXoGxsJEYm01lSN0yJLLFm0GKtpsMXWouEYqJXiOZtRUYYgathqO//sk
- 3QBr4X5zKrLFLX6pqtR2NtDZRieN9WPtjkNBZOFl446tyDHt8LpGDkGkIjqnzLBdRy+Z
- 2xz4Xop024coud5XXL4FOfzioLddxUGC4jnjHQRsMolZ/3VTT14WFGI9sZafD+Uka26y
- SCOYLai9LUCurqQQ2Sx7nK8PFhGHfwFnbWeGjBJOICFIZm+XhN2J9Eavsrj1aqN1QEHP
- Byu9Vw9adPoVma272hPCJCHrTemIoD+0Q76LHyD5rm/cGzstsit3jq0Eyr0ApXcfaTsb
- 4uMA==
+ bh=8q3N9QJP0kKocjZRYLcTGHxt0dwwrAq7qRa8kv+RaP8=;
+ b=uUog+D/oKttVDMLhRi9vrj67h8wdr6KEtDiMBxibvbdVOe1mGbls+moY9aNn0KD9yd
+ vjecMk9hIgSEAulXrDIFFM9LhtqTfG9TfAn5AuwmBHOAE9VijCXzvSO/oYZzLvJ6S3Gd
+ vhaLS9aJOyrOe44LtW3hWuaxtZljlVOK8irVyXF/SF+FGubzm6p4Iw3VS3pht56BGop6
+ ceUOcbXah87x/Dc7NJueioqHEf375EpEP3Sg/2FBkLJrdP5nvKvZ85z7r27wBs/IZv6e
+ cerMyu0rQSS01gl1iip6o/n+vOVfDy7iPfnntvugkqnlf9LTFrAoiUjVomf6Zg/EenFB
+ wTiA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=E2oKCm2aHyIkLmsWfLt1xuMZ3si46gMPXE7rlXDV4Gg=;
- b=odZDEGY0J2HxXYWQOJpHUwJU6/tkVJIIGyemFmU2hGHJesaHJSSrdlQfSvoHj8lv18
- 14ou+y4z/lo93ZqTx28RUnPtdLr+6JEi3E7+ffi69Azbp0ThQMZNmOgoBEl0uBI8bLN6
- 1Z86zSdNrTlroaR9n6OzePkn4aP01ujp1Xe8LMvi+sh+6Ge3IkJzsgu9gA/L+sj2qouE
- rvCRNYH7J+VmgHvs5R6YvKdQGkOP71daR073DyLQE7zNdvyl9eHdZjRO+Zcgjlo+pTbZ
- t5pIBIcsxP3zRq1HLts1XlBHYI2UyQCVvSQa3eOTiDECVtdyiITmEjA2D9yfP71AQbT4
- qycA==
-X-Gm-Message-State: AHQUAuYXtaJg1+VZCvQXyPRc7NXW3AclxK4GLBnCRLG6HZdz6cwH5Y1V
- Fx1dTa3TDYMdb3OtrKMfhYd6X5l3IgQ=
-X-Google-Smtp-Source: AHgI3Ibb+h9421u1Wyqrp+JwYOUIT4hN8FdxvnOYDQFApEni1QXjQhwq8c25l059pxwiiIKGh/uQpQ==
-X-Received: by 2002:a5d:49cf:: with SMTP id t15mr2990704wrs.94.1550156005545; 
- Thu, 14 Feb 2019 06:53:25 -0800 (PST)
+ bh=8q3N9QJP0kKocjZRYLcTGHxt0dwwrAq7qRa8kv+RaP8=;
+ b=KdvGSglMfhKkZpSt/dbnOZdtKuDYZh6iMYng63lOD6EaBUbfJAImiyls4H326oAfhi
+ 5s8KeNDkwk+xR8Lhk/6B1n5uU3bk/Dm0I+fWI5o6LaBL05SzvHplh3U7hK7kvRrYxeys
+ at8LCT+2CUR0F9SICtOSteVH9TWiKA8sPyIu4TRgbicbdvxGnAVNw8X799whXIjdS6wI
+ g3y8dijnyQlqiLT8aTf+f+iU7xUs2UFTptKwJ6UZUMeNUiLGySn+15xVYaO6eh0W7sA1
+ 1/TIfH5DRpbV2yRsPcXHq7g8EM59no7vX5riKMxzQP4AsMyBySNgcwDjTxRMhUQoLT43
+ +Whg==
+X-Gm-Message-State: AHQUAuZ4JVgmjkt4GGoIDbMQRpQTrBoKNj/erzh73HOFlrTpyvKVlbPc
+ esryz8XCIPSLoFUdJu1oNVhaRA==
+X-Google-Smtp-Source: AHgI3Ib5IY/5ytavfRpr2jYwXScL14+R1vz3cHJ6ITvL0P1j40cSPlrCaqhcGCab0WXDuqZaqnVAWQ==
+X-Received: by 2002:a05:6000:128f:: with SMTP id
+ f15mr3063733wrx.74.1550155996229; 
+ Thu, 14 Feb 2019 06:53:16 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id y20sm4181005wra.51.2019.02.14.06.53.24
+ by smtp.gmail.com with ESMTPSA id y20sm4181005wra.51.2019.02.14.06.53.15
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 06:53:24 -0800 (PST)
+ Thu, 14 Feb 2019 06:53:15 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Dmitry Torokhov <dmitry.torokhov@gmail.com>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
  David Lechner <david@lechnology.com>
-Subject: [PATCH v4 36/37] irqchip: davinci-cp-intc: move the driver to
- drivers/irqchip
-Date: Thu, 14 Feb 2019 15:52:30 +0100
-Message-Id: <20190214145231.8750-37-brgl@bgdev.pl>
+Subject: [PATCH v4 28/37] ARM: davinci: cp-intc: convert all hex numbers to
+ lowercase
+Date: Thu, 14 Feb 2019 15:52:22 +0100
+Message-Id: <20190214145231.8750-29-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190214145231.8750-1-brgl@bgdev.pl>
 References: <20190214145231.8750-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_065327_410465_235F02A8 
-X-CRM114-Status: GOOD (  12.08  )
+X-CRM114-CacheID: sfid-20190214_065318_552704_6578C1EE 
+X-CRM114-Status: GOOD (  11.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,96 +110,43 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-The cp-intc driver has now been cleaned up. Move it to drivers/irqchip
-where it belongs.
+Use lowercase letters in hexadecimal numbers in the cp-intc driver as
+is done in most of the kernel code base.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/Kconfig                             | 8 ++------
- arch/arm/mach-davinci/Makefile                            | 2 --
- drivers/irqchip/Kconfig                                   | 5 +++++
- drivers/irqchip/Makefile                                  | 1 +
- .../cp_intc.c => drivers/irqchip/irq-davinci-cp-intc.c    | 0
- 5 files changed, 8 insertions(+), 8 deletions(-)
- rename arch/arm/mach-davinci/cp_intc.c => drivers/irqchip/irq-davinci-cp-intc.c (100%)
+ arch/arm/mach-davinci/cp_intc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/Kconfig b/arch/arm/mach-davinci/Kconfig
-index 71a4d875dd39..5a59cebc7d0a 100644
---- a/arch/arm/mach-davinci/Kconfig
-+++ b/arch/arm/mach-davinci/Kconfig
-@@ -1,10 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- if ARCH_DAVINCI
+diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
+index bf77b6950273..dcd43b067a6a 100644
+--- a/arch/arm/mach-davinci/cp_intc.c
++++ b/arch/arm/mach-davinci/cp_intc.c
+@@ -23,19 +23,19 @@
+ #include <mach/common.h>
  
--config CP_INTC
--	bool
--	select IRQ_DOMAIN
--
- config ARCH_DAVINCI_DMx
- 	bool
- 
-@@ -33,13 +29,13 @@ config ARCH_DAVINCI_DA830
- 	select ARCH_DAVINCI_DA8XX
- 	# needed on silicon revs 1.0, 1.1:
- 	select CPU_DCACHE_WRITETHROUGH if !CPU_DCACHE_DISABLE
--	select CP_INTC
-+	select DAVINCI_CP_INTC
- 
- config ARCH_DAVINCI_DA850
- 	bool "DA850/OMAP-L138/AM18x based system"
- 	depends on !ARCH_DAVINCI_DMx || (AUTO_ZRELADDR && ARM_PATCH_PHYS_VIRT)
- 	select ARCH_DAVINCI_DA8XX
--	select CP_INTC
-+	select DAVINCI_CP_INTC
- 
- config ARCH_DAVINCI_DA8XX
- 	bool
-diff --git a/arch/arm/mach-davinci/Makefile b/arch/arm/mach-davinci/Makefile
-index 983865a99616..f76a8482784f 100644
---- a/arch/arm/mach-davinci/Makefile
-+++ b/arch/arm/mach-davinci/Makefile
-@@ -18,8 +18,6 @@ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o
- obj-$(CONFIG_ARCH_DAVINCI_DA830)	+= da830.o devices-da8xx.o usb-da8xx.o
- obj-$(CONFIG_ARCH_DAVINCI_DA850)	+= da850.o devices-da8xx.o usb-da8xx.o
- 
--obj-$(CONFIG_CP_INTC)			+= cp_intc.o
--
- # Board specific
- obj-$(CONFIG_MACH_DA8XX_DT)		+= da8xx-dt.o pdata-quirks.o
- obj-$(CONFIG_MACH_DAVINCI_EVM)  	+= board-dm644x-evm.o
-diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-index ea0eb82bf1d2..48fc5024c073 100644
---- a/drivers/irqchip/Kconfig
-+++ b/drivers/irqchip/Kconfig
-@@ -134,6 +134,11 @@ config DAVINCI_AINTC
- 	select GENERIC_IRQ_CHIP
- 	select IRQ_DOMAIN
- 
-+config DAVINCI_CP_INTC
-+	bool
-+	select GENERIC_IRQ_CHIP
-+	select IRQ_DOMAIN
-+
- config DW_APB_ICTL
- 	bool
- 	select GENERIC_IRQ_CHIP
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 623e0ec5f9d0..e6cd0c98eff2 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -7,6 +7,7 @@ obj-$(CONFIG_ATH79)			+= irq-ath79-misc.o
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2836.o
- obj-$(CONFIG_DAVINCI_AINTC)		+= irq-davinci-aintc.o
-+obj-$(CONFIG_DAVINCI_CP_INTC)		+= irq-davinci-cp-intc.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_FARADAY_FTINTC010)		+= irq-ftintc010.o
- obj-$(CONFIG_ARCH_HIP04)		+= irq-hip04.o
-diff --git a/arch/arm/mach-davinci/cp_intc.c b/drivers/irqchip/irq-davinci-cp-intc.c
-similarity index 100%
-rename from arch/arm/mach-davinci/cp_intc.c
-rename to drivers/irqchip/irq-davinci-cp-intc.c
+ #define DAVINCI_CP_INTC_CTRL			0x04
+-#define DAVINCI_CP_INTC_HOST_CTRL		0x0C
++#define DAVINCI_CP_INTC_HOST_CTRL		0x0c
+ #define DAVINCI_CP_INTC_GLOBAL_ENABLE		0x10
+ #define DAVINCI_CP_INTC_SYS_STAT_IDX_CLR	0x24
+ #define DAVINCI_CP_INTC_SYS_ENABLE_IDX_SET	0x28
+-#define DAVINCI_CP_INTC_SYS_ENABLE_IDX_CLR	0x2C
++#define DAVINCI_CP_INTC_SYS_ENABLE_IDX_CLR	0x2c
+ #define DAVINCI_CP_INTC_HOST_ENABLE_IDX_SET	0x34
+ #define DAVINCI_CP_INTC_HOST_ENABLE_IDX_CLR	0x38
+ #define DAVINCI_CP_INTC_PRIO_IDX		0x80
+ #define DAVINCI_CP_INTC_SYS_STAT_CLR(n)		(0x0280 + (n << 2))
+ #define DAVINCI_CP_INTC_SYS_ENABLE_CLR(n)	(0x0380 + (n << 2))
+ #define DAVINCI_CP_INTC_CHAN_MAP(n)		(0x0400 + (n << 2))
+-#define DAVINCI_CP_INTC_SYS_POLARITY(n)		(0x0D00 + (n << 2))
+-#define DAVINCI_CP_INTC_SYS_TYPE(n)		(0x0D80 + (n << 2))
++#define DAVINCI_CP_INTC_SYS_POLARITY(n)		(0x0d00 + (n << 2))
++#define DAVINCI_CP_INTC_SYS_TYPE(n)		(0x0d80 + (n << 2))
+ #define DAVINCI_CP_INTC_HOST_ENABLE(n)		(0x1500 + (n << 2))
+ #define DAVINCI_CP_INTC_PRI_INDX_MASK		GENMASK(9, 0)
+ #define DAVINCI_CP_INTC_GPIR_NONE		BIT(31)
 -- 
 2.20.1
 
