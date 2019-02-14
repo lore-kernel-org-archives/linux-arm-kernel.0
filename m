@@ -2,107 +2,88 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B0C00C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:58:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DF01C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:17:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7D48D2080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:58:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AD3F218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:17:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lr6AEpWD";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="pYKEgMD1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="W5Zu1Dm3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D48D2080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="llOj1nBp";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="haog/nuW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AD3F218FF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jUQmWCsTtpVwV9IYnjL/PfEPEnuF4dNzDu6zj0pyHZU=; b=Lr6AEpWD7w/vjc
-	IPrawFdQTt4pePmwYyxGK4s8CFzHonY38iP4yTzdlwfYmltPZRE9SO1QcfHlYVCMv/kxnCkBpktkK
-	bditr/O+BwJuEL1W6rqna822m79QXpDpvf83Dg3U+RT2ecMocokw8iMwMo8N5NVBdL82xQ39mVqOO
-	6p2Hj6fm1pHs2xStC5k9eGvCt7zN628WX55bkuzEFRd0oQyuIMo2LNcBNAAyZzTbxtwYarlrWZehN
-	vkhdym4xPkaUOwCIm2LG6HkgUdBQPWRGaFbVb/u8iyIL3Bl7NrF7pHpsuRsTCDtgXmdK3DDg3qWbO
-	EB25+2y00IsSemCSPdjw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=5tKehTVHt9j8M2nRdjLECcOqR94ZEV4TidvZFUUX4uc=; b=llOj1nBp6Pv/9a
+	8FU90X9RLUhMMR0Ewb5RCxC1NQOsk+QANP+zGloTm/Hm3HJiGPNeZeNi7YLNQsV8hvRU/R7K7muz0
+	kt6/KvbTAxVlSiiwigJujgsAG0+G1aMqnI6f2qX+6uzEXdYBW2cGLqVoSte1HXCw1E+GZeTpYyE5s
+	gTTO7iTYv9lpHWH9TcTLSf28cBlAjwcyf+kPan9EGm6+6JWomWlVBQjV8EUoMEYjwfj6qg2Z2bYSV
+	FFtpjLTNGWIT1cDf8ykxB0BxPR8dq84rppNHlAEORRl0s84zM7Ril9YuzdUdbaTNkNAe7xz1+c9Zs
+	DkO9hL49DLxBsoj4LB2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guO5H-0002bL-9A; Thu, 14 Feb 2019 20:58:15 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1guONR-0001Ao-OL; Thu, 14 Feb 2019 21:17:01 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guO5F-0002T9-Ab
- for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 20:58:13 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Type:Content-Transfer-Encoding:
- MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=; b=pYKEgMD16EBkcUlRobsFT4BAzz
- GMd+QxbBBUhvq9WsSSw14CVQRtyl0myb6wiKCTFsRA49QrQDbSH2soc8nzKx+dMTrfL1+ZHRqLF//
- F0M3ADCWPLkGw6Vpmx5wwY0el9XAcfyaKdudAJt/b9gaErlammQykhD5MXfKisSm65AjX5EQT+Uru
- kDIsd/e1SB6GyGrpN+jnTUFp4YaRKnRr9Ndno5aVRMxM4RWQWnh7Tv+anYkNOrFpoqdCnuWkfeGM8
- bpXJCccFYc/cqULnRBN5JYr+VAUYzbEFIdKckO+kXToRrprEnNMyJSGDBTlyFBQf+t0Evu/Gdu6ty
- 1RKm8OgQ==;
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guNqQ-0006OW-Br
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 20:42:56 +0000
-Received: by mail-wr1-x444.google.com with SMTP id c8so7988511wrs.4
+ id 1guONO-00019S-O9
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 21:17:00 +0000
+Received: by mail-it1-x144.google.com with SMTP id l15so5297038iti.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 12:42:53 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=;
- b=W5Zu1Dm3N/SF0jPCo4zSxBzKRJQcz0tUaKuj2Nlf29c2vSwnEK0qOZGcOqpIqQvJZk
- QcIt8rh3fDLvu0Q6e7Sqeqv+8BkrgUiERAtTXL9pyzbag1aGtOxX9OIObPCm8gjvDo/0
- idAHIua0oXF/a9Xpb42K9oshi40lSO75uZ/FHCt3puyGzC/gSMYpqzGNkv3lEVYg7oF3
- RLs2nZpn+vWLPxX3rA2ZDt5z2XA8JD18UtLz+zBv+g5imLsIkYqAGa9SP5bnK9Y0SK26
- Jm1xS7rnLCWGp/c2IHQ89fJsl0oOSf3xEqy0ZGKulBsL6m8DOM2vX0TQogCyk3HeKIiI
- 11wQ==
+ Thu, 14 Feb 2019 13:16:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=GvPYFe28/mAoQO+bY6nMt8BakmTEWjcsUcqZny6LKyY=;
+ b=haog/nuWNwVzMoU13+bJ0VOVleco8VrScsofzKVQriJp/kpIegpS08FgzPJW6MCcMM
+ umb1am7jn04ZVfp/yOI5y2yZNIPu/vejkxNHZoUsN71HWLQEH7YIx7zv4pBqIcXovU3w
+ JPZM6QRRB7y782DQnTFoAEKXvcAWCZ+X6byTykTsL+dfSL7xz/fpbcUiIBhrukUyvjLi
+ g4eVuY6/2Kdj7uMouqF364Lq2Wvvx9u7FnZJDVv0fv6MtPkEGYCwZRV4qimeeXmvzRZw
+ 7OEpCUNx91DhVAacamw53xKewe0hTNal7SlZMnIezgIODwSu4C+aoijN+x+caBgPcoxZ
+ /odw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=;
- b=a5Ik9mpvwJ+OhXwoF6pZQn3StgtDjH8dEOnrG63bfWlwhzw/KweoU2dumguCEYR1LW
- fRJI5Ehi5dNZ6uFjGIfvGHoDxUA5s5JlW0Zhjoqliwvt6pW6/2RCNaSMjc6aw5qc11cH
- TYNqUPtQhevrs7IqSmTUdYWRTGEcrVBMfiq1vO1q3wlhkuP16FP5R5MDL6UoF9ky/MHT
- aCDX+jKujINF5/0qcdDmbhk4LHxkDJSdXpQWRRpmklCa2n/bKedbjd2bGbNa7Vzsbk6E
- k2I/5XnEG2YqoTio0pdK6alUmZC83Y9//YxcPHsMxbF6YDmYt/VI3pEB/mluo016Pn7Z
- y7nQ==
-X-Gm-Message-State: AHQUAuYfRyX6Np59hFuXq8Z03mat8o1oMpUcNJuuG0lxQ35dFuY8VV5w
- lQY2TUxCtOkwXgxd7RkRWYM=
-X-Google-Smtp-Source: AHgI3IazXwuDqTmlaPB+165w9Jelia/AJS/1GvzTX1UwflXCqrqWQYpHsKY9EfCO3doE1od3peWYcg==
-X-Received: by 2002:a5d:548f:: with SMTP id h15mr4157477wrv.238.1550176972719; 
- Thu, 14 Feb 2019 12:42:52 -0800 (PST)
-Received: from jernej-laptop.localnet (cpe1-6-175.cable.triera.net.
- [213.161.6.175])
- by smtp.gmail.com with ESMTPSA id c9sm3063410wrs.84.2019.02.14.12.42.50
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 14 Feb 2019 12:42:51 -0800 (PST)
-From: Jernej =?utf-8?B?xaBrcmFiZWM=?= <jernej.skrabec@gmail.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH v3 2/2] media: cedrus: Add H264 decoding support
-Date: Thu, 14 Feb 2019 21:42:49 +0100
-Message-ID: <21530997.5t1HIVrtlz@jernej-laptop>
-In-Reply-To: <4c00e1ab1e70adb1d94db59c37393250ca3791c5.1549895062.git-series.maxime.ripard@bootlin.com>
-References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
- <4c00e1ab1e70adb1d94db59c37393250ca3791c5.1549895062.git-series.maxime.ripard@bootlin.com>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=GvPYFe28/mAoQO+bY6nMt8BakmTEWjcsUcqZny6LKyY=;
+ b=FGeU7dNM39Kn3eFpbaLJwRCs2abEkeHmOahIFD/MQDRxdrnaSeCe+aCcH0EGNKSoLQ
+ IdMcCJGTBk1XU5l/ECvibNSPg3xGyScSYApY/PnKX4yCz4zgAWbelZ3ZjUVFt0Kb7G5m
+ WGidhVa65WDEBq+Zv4Ysi+8HRjNms1SLb20JSNMVAdI/11b0IAsGAr8JpDarBqD3tMyR
+ c1ol5+EU5ilcpAPCQW3cpux66aUTfftrHdYEJwQy/LalEqkml01TvXpI5iMqIbZ5NhSs
+ 2JGH3RmyjQh/rht3BF9ueM8IzTswgMn4s1c1QEQ0DeNEoqHUMo7CMhlUVXLTRvXaB7oG
+ O8OA==
+X-Gm-Message-State: AHQUAuavFaxVE+Mbb9ZtoNgLX5E9/eYfHzVGtaeAdbmzC2MlEZN71HEE
+ kYiV8hMsugJ91mZkpoxvDNGAhA==
+X-Google-Smtp-Source: AHgI3IYCX5V8B/n/JHfBn5gh5KmKCeTbBeku15y0Wkk318G3E77K2o5/6CJ6L2HV9dr2oRQlrIFuFg==
+X-Received: by 2002:a24:9a84:: with SMTP id l126mr3836833ite.77.1550179014078; 
+ Thu, 14 Feb 2019 13:16:54 -0800 (PST)
+Received: from yuzhao.bld.corp.google.com
+ ([2620:15c:183:0:a0c3:519e:9276:fc96])
+ by smtp.gmail.com with ESMTPSA id h2sm1491498itk.0.2019.02.14.13.16.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 13:16:53 -0800 (PST)
+From: Yu Zhao <yuzhao@google.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] arm64: mm: enable per pmd page table lock
+Date: Thu, 14 Feb 2019 14:16:42 -0700
+Message-Id: <20190214211642.2200-1-yuzhao@google.com>
+X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_204254_513025_80505A40 
-X-CRM114-Status: GOOD (  23.03  )
+X-CRM114-CacheID: sfid-20190214_131658_782326_EB63756E 
+X-CRM114-Status: GOOD (  14.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,222 +95,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
- jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
- linux-kernel@vger.kernel.org, tfiga@chromium.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, hans.verkuil@cisco.com,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- sakari.ailus@linux.intel.com, nicolas.dufresne@collabora.com,
- ezequiel@collabora.com, posciak@chromium.org, linux-media@vger.kernel.org
+Cc: linux-arch@vger.kernel.org, Yu Zhao <yuzhao@google.com>,
+ Peter Zijlstra <peterz@infradead.org>, linux-kernel@vger.kernel.org,
+ Nick Piggin <npiggin@gmail.com>, linux-mm@kvack.org,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
+ Joel Fernandes <joel@joelfernandes.org>,
+ "Kirill A . Shutemov" <kirill@shutemov.name>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Dne ponedeljek, 11. februar 2019 ob 15:39:03 CET je Maxime Ripard napisal(a):
-> Introduce some basic H264 decoding support in cedrus. So far, only the
-> baseline profile videos have been tested, and some more advanced features
-> used in higher profiles are not even implemented.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/staging/media/sunxi/cedrus/Makefile       |   3 +-
->  drivers/staging/media/sunxi/cedrus/cedrus.c       |  31 +-
->  drivers/staging/media/sunxi/cedrus/cedrus.h       |  38 +-
->  drivers/staging/media/sunxi/cedrus/cedrus_dec.c   |  15 +-
->  drivers/staging/media/sunxi/cedrus/cedrus_h264.c  | 589 +++++++++++++++-
->  drivers/staging/media/sunxi/cedrus/cedrus_hw.c    |   4 +-
->  drivers/staging/media/sunxi/cedrus/cedrus_regs.h  |  91 ++-
->  drivers/staging/media/sunxi/cedrus/cedrus_video.c |   9 +-
->  8 files changed, 778 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_h264.c
-> 
-> diff --git a/drivers/staging/media/sunxi/cedrus/Makefile
-> b/drivers/staging/media/sunxi/cedrus/Makefile index
-> e9dc68b7bcb6..aaf141fc58b6 100644
-> --- a/drivers/staging/media/sunxi/cedrus/Makefile
-> +++ b/drivers/staging/media/sunxi/cedrus/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_VIDEO_SUNXI_CEDRUS) += sunxi-cedrus.o
-> 
-> -sunxi-cedrus-y = cedrus.o cedrus_video.o cedrus_hw.o cedrus_dec.o
-> cedrus_mpeg2.o +sunxi-cedrus-y = cedrus.o cedrus_video.o cedrus_hw.o
-> cedrus_dec.o \ +		 cedrus_mpeg2.o cedrus_h264.o
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c
-> b/drivers/staging/media/sunxi/cedrus/cedrus.c index
-> ff11cbeba205..b275607b8111 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus.c
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
-> @@ -40,6 +40,36 @@ static const struct cedrus_control cedrus_controls[] = {
->  		.codec		= CEDRUS_CODEC_MPEG2,
->  		.required	= false,
->  	},
-> +	{
-> +		.id		= 
-V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS,
-> +		.elem_size	= sizeof(struct 
-v4l2_ctrl_h264_decode_param),
-> +		.codec		= CEDRUS_CODEC_H264,
-> +		.required	= true,
-> +	},
-> +	{
-> +		.id		= 
-V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS,
-> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_slice_param),
-> +		.codec		= CEDRUS_CODEC_H264,
-> +		.required	= true,
-> +	},
-> +	{
-> +		.id		= V4L2_CID_MPEG_VIDEO_H264_SPS,
-> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_sps),
-> +		.codec		= CEDRUS_CODEC_H264,
-> +		.required	= true,
-> +	},
-> +	{
-> +		.id		= V4L2_CID_MPEG_VIDEO_H264_PPS,
-> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_pps),
-> +		.codec		= CEDRUS_CODEC_H264,
-> +		.required	= true,
-> +	},
-> +	{
-> +		.id		= 
-V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX,
-> +		.elem_size	= sizeof(struct 
-v4l2_ctrl_h264_scaling_matrix),
-> +		.codec		= CEDRUS_CODEC_H264,
-> +		.required	= true,
-> +	},
->  };
-> 
->  #define CEDRUS_CONTROLS_COUNT	ARRAY_SIZE(cedrus_controls)
-> @@ -278,6 +308,7 @@ static int cedrus_probe(struct platform_device *pdev)
->  	}
-> 
->  	dev->dec_ops[CEDRUS_CODEC_MPEG2] = &cedrus_dec_ops_mpeg2;
-> +	dev->dec_ops[CEDRUS_CODEC_H264] = &cedrus_dec_ops_h264;
-> 
->  	mutex_init(&dev->dev_mutex);
-> 
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.h
-> b/drivers/staging/media/sunxi/cedrus/cedrus.h index
-> 4aedd24a9848..8c64f9a27e9d 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus.h
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.h
-> @@ -30,7 +30,7 @@
-> 
->  enum cedrus_codec {
->  	CEDRUS_CODEC_MPEG2,
-> -
-> +	CEDRUS_CODEC_H264,
->  	CEDRUS_CODEC_LAST,
->  };
-> 
-> @@ -40,6 +40,12 @@ enum cedrus_irq_status {
->  	CEDRUS_IRQ_OK,
->  };
-> 
-> +enum cedrus_h264_pic_type {
-> +	CEDRUS_H264_PIC_TYPE_FRAME	= 0,
-> +	CEDRUS_H264_PIC_TYPE_FIELD,
-> +	CEDRUS_H264_PIC_TYPE_MBAFF,
-> +};
-> +
->  struct cedrus_control {
->  	u32			id;
->  	u32			elem_size;
-> @@ -47,6 +53,14 @@ struct cedrus_control {
->  	unsigned char		required:1;
->  };
-> 
-> +struct cedrus_h264_run {
-> +	const struct v4l2_ctrl_h264_decode_param	*decode_param;
-> +	const struct v4l2_ctrl_h264_pps			*pps;
-> +	const struct v4l2_ctrl_h264_scaling_matrix	*scaling_matrix;
-> +	const struct v4l2_ctrl_h264_slice_param		*slice_param;
-> +	const struct v4l2_ctrl_h264_sps			*sps;
-> +};
-> +
->  struct cedrus_mpeg2_run {
->  	const struct v4l2_ctrl_mpeg2_slice_params	*slice_params;
->  	const struct v4l2_ctrl_mpeg2_quantization	*quantization;
-> @@ -57,12 +71,20 @@ struct cedrus_run {
->  	struct vb2_v4l2_buffer	*dst;
-> 
->  	union {
-> +		struct cedrus_h264_run	h264;
->  		struct cedrus_mpeg2_run	mpeg2;
->  	};
->  };
-> 
->  struct cedrus_buffer {
->  	struct v4l2_m2m_buffer          m2m_buf;
-> +
-> +	union {
-> +		struct {
-> +			unsigned int			position;
-> +			enum cedrus_h264_pic_type	pic_type;
-> +		} h264;
-> +	} codec;
->  };
-> 
->  struct cedrus_ctx {
-> @@ -77,6 +99,19 @@ struct cedrus_ctx {
->  	struct v4l2_ctrl		**ctrls;
-> 
->  	struct vb2_buffer		*dst_bufs[VIDEO_MAX_FRAME];
-> +
-> +	union {
-> +		struct {
-> +			void		*mv_col_buf;
-> +			dma_addr_t	mv_col_buf_dma;
-> +			ssize_t		mv_col_buf_field_size;
-> +			ssize_t		mv_col_buf_size;
-> +			void		*pic_info_buf;
-> +			dma_addr_t	pic_info_buf_dma;
-> +			void		*neighbor_info_buf;
-> +			dma_addr_t	neighbor_info_buf_dma;
-> +		} h264;
-> +	} codec;
->  };
-> 
->  struct cedrus_dec_ops {
-> @@ -118,6 +153,7 @@ struct cedrus_dev {
->  };
-> 
->  extern struct cedrus_dec_ops cedrus_dec_ops_mpeg2;
-> +extern struct cedrus_dec_ops cedrus_dec_ops_h264;
-> 
->  static inline void cedrus_write(struct cedrus_dev *dev, u32 reg, u32 val)
->  {
-> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c index
-> 443fb037e1cf..4c33e3b1283f 100644
-> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-> @@ -46,6 +46,21 @@ void cedrus_device_run(void *priv)
->  			V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION);
->  		break;
-> 
-> +	case V4L2_PIX_FMT_H264_SLICE:
-> +		run.h264.decode_param = cedrus_find_control_data(ctx,
-> +			V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS);
-> +		run.h264.pps = cedrus_find_control_data(ctx,
-> +			V4L2_CID_MPEG_VIDEO_H264_PPS);
-> +		run.h264.scaling_matrix = cedrus_find_control_data(ctx,
-> +			V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX);
-> +		run.h264.slice_param = cedrus_find_control_data(ctx,
-> +			V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS);
-> +		run.h264.scaling_matrix = cedrus_find_control_data(ctx,
-> +			V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX);
+Switch from per mm_struct to per pmd page table lock by enabling
+ARCH_ENABLE_SPLIT_PMD_PTLOCK. This provides better granularity for
+large system.
 
-You already assigned scaling_matrix few lines above.
+I'm not sure if there is contention on mm->page_table_lock. Given
+the option comes at no cost (apart from initializing more spin
+locks), why not enable it now.
 
-Best regards,
-Jernej
+Signed-off-by: Yu Zhao <yuzhao@google.com>
+---
+ arch/arm64/Kconfig               |  3 +++
+ arch/arm64/include/asm/pgalloc.h | 12 +++++++++++-
+ arch/arm64/include/asm/tlb.h     |  5 ++++-
+ 3 files changed, 18 insertions(+), 2 deletions(-)
 
-
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..104325a1ffc3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -872,6 +872,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
+ config ARCH_HAS_CACHE_LINE_SIZE
+ 	def_bool y
+ 
++config ARCH_ENABLE_SPLIT_PMD_PTLOCK
++	def_bool y
++
+ config SECCOMP
+ 	bool "Enable seccomp to safely compute untrusted bytecode"
+ 	---help---
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index 52fa47c73bf0..dabba4b2c61f 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -33,12 +33,22 @@
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
+-	return (pmd_t *)__get_free_page(PGALLOC_GFP);
++	struct page *page;
++
++	page = alloc_page(PGALLOC_GFP);
++	if (!page)
++		return NULL;
++	if (!pgtable_pmd_page_ctor(page)) {
++		__free_page(page);
++		return NULL;
++	}
++	return page_address(page);
+ }
+ 
+ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
+ {
+ 	BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
++	pgtable_pmd_page_dtor(virt_to_page(pmdp));
+ 	free_page((unsigned long)pmdp);
+ }
+ 
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 106fdc951b6e..4e3becfed387 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -62,7 +62,10 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 				  unsigned long addr)
+ {
+-	tlb_remove_table(tlb, virt_to_page(pmdp));
++	struct page *page = virt_to_page(pmdp);
++
++	pgtable_pmd_page_dtor(page);
++	tlb_remove_table(tlb, page);
+ }
+ #endif
+ 
+-- 
+2.21.0.rc0.258.g878e2cd30e-goog
 
 
 _______________________________________________
