@@ -2,101 +2,131 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1FA7EC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:11:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 453A8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:11:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DF884218FF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:11:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF52A218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:11:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y7r5GU+a";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="pCKFqDbe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="UL/T0oQC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF884218FF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nZiOVU/u";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="pMvrinwg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF52A218FF
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mm6wfL1ndrC8wQj3uEomyOn7YNTMpZilrWbz4bxFpp8=; b=Y7r5GU+a5dGGcI
-	3RHcHeIUZb58PZAxf5nxnbRHruMJx4jdt5VPdjOyUkYyD/6qDhMs4gwYJX0Ex8ZJAh570/b1TeiiI
-	Oj0cKBRkUCgIb1QcBsZdh9Y+vIjuFzCI3gl2FS7LsTRm8x5wE48qbR6zXxH7i40R5ezbnWgzwmNwR
-	gkvcs/XeAALRrCv3BhYzig9Hgt13Aj1jBZWnHuAE8yC2IGSlge6nr2mcLYbuQz2WRKhIl/4Tpr/fh
-	+a2te0DZAopg1UEyyzflWiTlK3GdHFi1eOPc1t/YTK8Osm9uThEUvF51laOsw2FBs9GwvhPvK/J2X
-	inqFXsLJjK5AmhDWLn+A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=yGKzKlptOiVaUQL9ghIdq3HS8btVMi2zP8rkDV2+ut8=; b=nZiOVU/uBDkF0W
+	WmVeTD5LaG+hLmnuoTK01XSpC/kmnQYbjJwku/iVkCeSd5o7acAAc1PNkZM2QZm5sNKdDc8l+4ZUT
+	uNiztpV3ta85KbI8Ni2oKMsn8kjUNVtZKi4Y2wz2YO1ol+Aq3oPwc+i2fnDsfKpOmDEFKhkcxNujN
+	puFD6xn1XCWxJhgQWf6w6U3UdvM8x3FB1Nt5NtAc5I4s0U72bj98w1beDyNM+GCudrLPb7V7yf0hR
+	sVNusFELklAmRD+JuSzI2LSuYLmmUyz0Cfbt14RnmEEz9cMIZbSngGgYGn0wyxulknnHxUURNF0Kf
+	CJXd3Ytir+guMacsf8Hg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guIfR-0003Tt-AA; Thu, 14 Feb 2019 15:11:13 +0000
+	id 1guIfd-0003jb-3C; Thu, 14 Feb 2019 15:11:25 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guIez-0002yt-GN
- for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 15:10:45 +0000
+ id 1guIf1-0002yt-62
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 15:10:47 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
- Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=fOPW6Mt+59GqhiXIWQYxkAJiix/xK3/ru9QOvlEjTHQ=; b=pCKFqDbe8KcjugT94bL4e3PV4
- yZ5qm00EUjXYQxF0fmHeiuxaIcA6vbw6v6qccoYqM3SeWkZoGKtJPih/fgh4w8lI6ut7eehpvPJVb
- QcxocnpXNq3n2gVB2dZKywwf96rm20tX5S2tx7u7K4NxWSL73EEJq1ZCt+k+hWBSksg2n8IJ47ojo
- qV0Tvzh36gDcnQlRfA5MQBEGwkFWb7rTAlgQKzu2nz/JFMh2a0vyzQXa4sjCEi/YHo7F5XEUqysrA
- 15TD84JuuCG9SMi5NtLUEPozvPRw0Lfm9WXj8Hxfze1vN3d2lWRL4DF6oHs41KJZyT09EL//L1z2J
- wOktKZ0Cw==;
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+ d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=VJ9LJ3m3g9O+ZU468NVPZIXHQPfCP/lfFuCWTwF5EJk=; b=pMvrinwgM8oMuWcHKdwPMVFrAA
+ VxApJz0NDREZTS3ca+kz8+Qw+SaKpPJvLrFHuyxiWIfEYeGxdcvuP93CstOZKY4uWkqkjne42eDO/
+ B/Tzq30yeDM8tdh5GQik7WlXudYgxRH8R4Xls+QYBGhpi66Jfi1xe825PbgjZENh2Sl3sn53oYf8y
+ uWvxPuuZHQH0Mo1gUXwSk7laMFTYYL+y8s2Ci9jxIbOTh8ZoW4oHaklGSzJf25NlxDSqQIsdSAkD9
+ fu5jVnQaMlYFa5EUJwgcrYre8ODpzM5soN3ybLaAZau3fkQpQlIvs2grRb/ocyFjn7gBG+RZaxDN2
+ Z83t2GWA==;
+Received: from mx1.redhat.com ([209.132.183.28])
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guISV-0006I6-Ax
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:57:53 +0000
-Received: by mail-it1-x144.google.com with SMTP id y184so15652014itc.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:57:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=fOPW6Mt+59GqhiXIWQYxkAJiix/xK3/ru9QOvlEjTHQ=;
- b=UL/T0oQCqgKvCW5nPoiBM7Y8F7aSSEpxcfUDxAo0vQC1OvFGRsdq38fuaiFmK2zJBo
- 2Y48ArB40B2ckdZDZFdqfMOvPz4DJVWDAVcmt0Ls+wEfe0Ut0/1eluLcGVf9vAc7nuCd
- JL8XMGFeUS7k9t9hmJ+DpgOZSZOAIwiyssmX1DGDTnLLSLZMPy4NGfewXLM43B9udyOY
- ojAmtLxGnIQ7AKcuw/VJJtiRvR+zqQeAqox3TuGMTqwgFXM6CazXz5rYraCH1odEQ0tA
- HfDnBDU+AZJ5RPryWbwaBhn9+fu3QuGq7gf2FtBbZeKz+ECR15yZW43jqKWItcJ9Pzn5
- 40Xw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=fOPW6Mt+59GqhiXIWQYxkAJiix/xK3/ru9QOvlEjTHQ=;
- b=ub8/HzJsYL3L+u55Mtm1XRwoTJUgs4sbwEOOnJTlNdihqVxZt/d/O8BNgzGXIS90aQ
- zhZq08kynnWz3J/9R1Z/AJ1RYuA7BRjyzydNnolSbtbpvA9bE3BqZgeVMVNtvn7xPhe/
- uO0egm0GUK4JdP3ITUa2WItVeSJovTnlPj3DSWlWxBroUvAXA1/bG+U3C24nzdh4hCFW
- ERxUesExqyVRhb0jMII8Jsucf217OQH4jo0vyQd6fK9kmlH/2JgMKUq+9ljnB1SG21tC
- Q35lIbGtzV+kqq0mLZCEhjbfVGozqlmiYv1uNchzqPDETokqjEhwZ9Gl0TiBwT5JwTGA
- lCRQ==
-X-Gm-Message-State: AHQUAuYvOnAgBdxno6D57PToqG8toU96W9kBtKNXF8thuhc9z+EnY4Uz
- F+LBX+8EbMkLuPjU3cbDs7eUIhOKxYkZq+bErgnt/lWJ
-X-Google-Smtp-Source: AHgI3IZ+2b2BblXqrKvEkrJCR5O+CXFYXnxdZh01OqgqyL/HdORirJm2pPC+jw+AhflBBycYC/+F6UDZm9csI+MDKZ8=
-X-Received: by 2002:a24:c3c4:: with SMTP id s187mr2541264itg.158.1550156267008; 
- Thu, 14 Feb 2019 06:57:47 -0800 (PST)
+ id 1guIOB-00061O-Is
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:25 +0000
+Received: from smtp.corp.redhat.com (int-mx01.intmail.prod.int.phx2.redhat.com
+ [10.5.11.11])
+ (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
+ (No client certificate requested)
+ by mx1.redhat.com (Postfix) with ESMTPS id 73A98C049D67;
+ Thu, 14 Feb 2019 14:53:15 +0000 (UTC)
+Received: from llong.remote.csb (dhcp-17-59.bos.redhat.com [10.18.17.59])
+ by smtp.corp.redhat.com (Postfix) with ESMTP id 41521600C4;
+ Thu, 14 Feb 2019 14:53:13 +0000 (UTC)
+Subject: Re: [PATCH v3 2/2] locking/rwsem: Optimize down_read_trylock()
+To: Peter Zijlstra <peterz@infradead.org>
+References: <1550089932-6888-1-git-send-email-longman@redhat.com>
+ <1550089932-6888-3-git-send-email-longman@redhat.com>
+ <20190214103333.GH32494@hirez.programming.kicks-ass.net>
+From: Waiman Long <longman@redhat.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
+ 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
+ weim8xU=
+Organization: Red Hat
+Message-ID: <9e01d4ef-56df-7af8-a0f5-b49644e298bf@redhat.com>
+Date: Thu, 14 Feb 2019 09:53:12 -0500
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-References: <20190213132738.10294-1-ard.biesheuvel@linaro.org>
- <20190213132738.10294-2-ard.biesheuvel@linaro.org>
- <20190214083350.GA9063@rapoport-lnx>
-In-Reply-To: <20190214083350.GA9063@rapoport-lnx>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 14 Feb 2019 15:57:35 +0100
-Message-ID: <CAKv+Gu8ZvMgS3VgkGVQthh-QWWoAmjxEDhj-pp98_BG4-810Wg@mail.gmail.com>
-Subject: Re: [PATCH 1/2] arm64: account for GICv3 LPI tables in static
- memblock reserve table
-To: Mike Rapoport <rppt@linux.ibm.com>
+In-Reply-To: <20190214103333.GH32494@hirez.programming.kicks-ass.net>
+Content-Language: en-US
+X-Scanned-By: MIMEDefang 2.79 on 10.5.11.11
+X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
+ (mx1.redhat.com [10.5.110.31]); Thu, 14 Feb 2019 14:53:16 +0000 (UTC)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_095751_487233_4FF4DE73 
-X-CRM114-Status: GOOD (  34.93  )
+X-CRM114-CacheID: sfid-20190214_095323_848504_31FEB24D 
+X-CRM114-Status: GOOD (  19.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,145 +138,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-efi <linux-efi@vger.kernel.org>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Linux-MM <linux-mm@kvack.org>, James Morse <james.morse@arm.com>,
+Cc: linux-arch@vger.kernel.org, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ linux-sh@vger.kernel.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H. Peter Anvin" <hpa@zytor.com>,
+ linux-alpha@vger.kernel.org, sparclinux@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, linuxppc-dev@lists.ozlabs.org,
  Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 14 Feb 2019 at 09:34, Mike Rapoport <rppt@linux.ibm.com> wrote:
+On 02/14/2019 05:33 AM, Peter Zijlstra wrote:
+> On Wed, Feb 13, 2019 at 03:32:12PM -0500, Waiman Long wrote:
+>> Modify __down_read_trylock() to optimize for an unlocked rwsem and make
+>> it generate slightly better code.
+>>
+>> Before this patch, down_read_trylock:
+>>
+>>    0x0000000000000000 <+0>:     callq  0x5 <down_read_trylock+5>
+>>    0x0000000000000005 <+5>:     jmp    0x18 <down_read_trylock+24>
+>>    0x0000000000000007 <+7>:     lea    0x1(%rdx),%rcx
+>>    0x000000000000000b <+11>:    mov    %rdx,%rax
+>>    0x000000000000000e <+14>:    lock cmpxchg %rcx,(%rdi)
+>>    0x0000000000000013 <+19>:    cmp    %rax,%rdx
+>>    0x0000000000000016 <+22>:    je     0x23 <down_read_trylock+35>
+>>    0x0000000000000018 <+24>:    mov    (%rdi),%rdx
+>>    0x000000000000001b <+27>:    test   %rdx,%rdx
+>>    0x000000000000001e <+30>:    jns    0x7 <down_read_trylock+7>
+>>    0x0000000000000020 <+32>:    xor    %eax,%eax
+>>    0x0000000000000022 <+34>:    retq
+>>    0x0000000000000023 <+35>:    mov    %gs:0x0,%rax
+>>    0x000000000000002c <+44>:    or     $0x3,%rax
+>>    0x0000000000000030 <+48>:    mov    %rax,0x20(%rdi)
+>>    0x0000000000000034 <+52>:    mov    $0x1,%eax
+>>    0x0000000000000039 <+57>:    retq
+>>
+>> After patch, down_read_trylock:
+>>
+>>    0x0000000000000000 <+0>:	callq  0x5 <down_read_trylock+5>
+>>    0x0000000000000005 <+5>:	xor    %eax,%eax
+>>    0x0000000000000007 <+7>:	lea    0x1(%rax),%rdx
+>>    0x000000000000000b <+11>:	lock cmpxchg %rdx,(%rdi)
+>>    0x0000000000000010 <+16>:	jne    0x29 <down_read_trylock+41>
+>>    0x0000000000000012 <+18>:	mov    %gs:0x0,%rax
+>>    0x000000000000001b <+27>:	or     $0x3,%rax
+>>    0x000000000000001f <+31>:	mov    %rax,0x20(%rdi)
+>>    0x0000000000000023 <+35>:	mov    $0x1,%eax
+>>    0x0000000000000028 <+40>:	retq
+>>    0x0000000000000029 <+41>:	test   %rax,%rax
+>>    0x000000000000002c <+44>:	jns    0x7 <down_read_trylock+7>
+>>    0x000000000000002e <+46>:	xor    %eax,%eax
+>>    0x0000000000000030 <+48>:	retq
+>>
+>> By using a rwsem microbenchmark, the down_read_trylock() rate (with a
+>> load of 10 to lengthen the lock critical section) on a x86-64 system
+>> before and after the patch were:
+>>
+>>                  Before Patch    After Patch
+>>    # of Threads     rlock           rlock
+>>    ------------     -----           -----
+>>         1           14,496          14,716
+>>         2            8,644           8,453
+>> 	4            6,799           6,983
+>> 	8            5,664           7,190
+>>
+>> On a ARM64 system, the performance results were:
+>>
+>>                  Before Patch    After Patch
+>>    # of Threads     rlock           rlock
+>>    ------------     -----           -----
+>>         1           23,676          24,488
+>>         2            7,697           9,502
+>>         4            4,945           3,440
+>>         8            2,641           1,603
+> Urgh, yes LL/SC is the obvious exception that can actually do better
+> here :/
 >
-> On Wed, Feb 13, 2019 at 02:27:37PM +0100, Ard Biesheuvel wrote:
-> > In the irqchip and EFI code, we have what basically amounts to a quirk
-> > to work around a peculiarity in the GICv3 architecture, which permits
-> > the system memory address of LPI tables to be programmable only once
-> > after a CPU reset. This means kexec kernels must use the same memory
-> > as the first kernel, and thus ensure that this memory has not been
-> > given out for other purposes by the time the ITS init code runs, which
-> > is not very early for secondary CPUs.
-> >
-> > On systems with many CPUs, these reservations could overflow the
-> > memblock reservation table, and this was addressed in commit
-> > eff896288872 ("efi/arm: Defer persistent reservations until after
-> > paging_init()"). However, this turns out to have made things worse,
-> > since the allocation of page tables and heap space for the resized
-> > memblock reservation table itself may overwrite the regions we are
-> > attempting to reserve, which may cause all kinds of corruption,
-> > also considering that the ITS will still be poking bits into that
-> > memory in response to incoming MSIs.
-> >
-> > So instead, let's grow the static memblock reservation table on such
-> > systems so it can accommodate these reservations at an earlier time.
-> > This will permit us to revert the above commit in a subsequent patch.
-> >
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/memory.h | 11 +++++++++++
-> >  include/linux/memblock.h        |  3 ---
-> >  mm/memblock.c                   | 10 ++++++++--
-> >  3 files changed, 19 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> > index e1ec947e7c0c..7e2b13cdd970 100644
-> > --- a/arch/arm64/include/asm/memory.h
-> > +++ b/arch/arm64/include/asm/memory.h
-> > @@ -332,6 +332,17 @@ static inline void *phys_to_virt(phys_addr_t x)
-> >  #define virt_addr_valid(kaddr)               \
-> >       (_virt_addr_is_linear(kaddr) && _virt_addr_valid(kaddr))
-> >
-> > +/*
-> > + * Given that the GIC architecture permits ITS implementations that can only be
-> > + * configured with a LPI table address once, GICv3 systems with many CPUs may
-> > + * end up reserving a lot of different regions after a kexec for their LPI
-> > + * tables, as we are forced to reuse the same memory after kexec (and thus
-> > + * reserve it persistently with EFI beforehand)
-> > + */
-> > +#if defined(CONFIG_EFI) && defined(CONFIG_ARM_GIC_V3_ITS)
-> > +#define INIT_MEMBLOCK_RESERVED_REGIONS       (INIT_MEMBLOCK_REGIONS + 2 * NR_CPUS)
-> > +#endif
-> > +
-> >  #include <asm-generic/memory_model.h>
-> >
-> >  #endif
-> > diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> > index 64c41cf45590..859b55b66db2 100644
-> > --- a/include/linux/memblock.h
-> > +++ b/include/linux/memblock.h
-> > @@ -29,9 +29,6 @@ extern unsigned long max_pfn;
-> >   */
-> >  extern unsigned long long max_possible_pfn;
-> >
-> > -#define INIT_MEMBLOCK_REGIONS        128
-> > -#define INIT_PHYSMEM_REGIONS 4
-> > -
-> >  /**
-> >   * enum memblock_flags - definition of memory region attributes
-> >   * @MEMBLOCK_NONE: no special request
-> > diff --git a/mm/memblock.c b/mm/memblock.c
-> > index 022d4cbb3618..a526c3ab8390 100644
-> > --- a/mm/memblock.c
-> > +++ b/mm/memblock.c
-> > @@ -26,6 +26,12 @@
-> >
-> >  #include "internal.h"
-> >
-> > +#define INIT_MEMBLOCK_REGIONS                128
-> > +#define INIT_PHYSMEM_REGIONS         4
-> > +#ifndef INIT_MEMBLOCK_RESERVED_REGIONS
-> > +#define INIT_MEMBLOCK_RESERVED_REGIONS       INIT_MEMBLOCK_REGIONS
-> > +#endif
-> > +
->
-> I'd suggest
->
-> s/INIT_MEMBLOCK_REGIONS/INIT_MEMORY_REGIONS
-> s/INIT_MEMBLOCK_RESERVED_REGIONS/INIT_RESERVED_REGIONS
->
+> Will, what say you?
 
-Well, I'd prefer to keep MEMBLOCK in the identifier, given that we are
-setting it from an arch header file as well.
+The ARM64 result is what I would have expected given that the change was
+to optimize for the uncontended case. The x86-64 result is kind of an
+anomaly to me, but I haven't bothered to dig into that.
 
-> Except that,
->
-> Acked-by: Mike Rapoport <rppt@linux.ibm.com>
->
+Cheers,
+Longman
 
-Thanks
-
-
-> >  /**
-> >   * DOC: memblock overview
-> >   *
-> > @@ -92,7 +98,7 @@ unsigned long max_pfn;
-> >  unsigned long long max_possible_pfn;
-> >
-> >  static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
-> > -static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
-> > +static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
-> >  #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
-> >  static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS] __initdata_memblock;
-> >  #endif
-> > @@ -105,7 +111,7 @@ struct memblock memblock __initdata_memblock = {
-> >
-> >       .reserved.regions       = memblock_reserved_init_regions,
-> >       .reserved.cnt           = 1,    /* empty dummy entry */
-> > -     .reserved.max           = INIT_MEMBLOCK_REGIONS,
-> > +     .reserved.max           = INIT_MEMBLOCK_RESERVED_REGIONS,
-> >       .reserved.name          = "reserved",
-> >
-> >  #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
-> > --
-> > 2.20.1
-> >
->
-> --
-> Sincerely yours,
-> Mike.
->
 
 _______________________________________________
 linux-arm-kernel mailing list
