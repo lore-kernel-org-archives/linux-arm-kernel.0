@@ -2,63 +2,91 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64855C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:17:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E1FEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:21:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32568222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:17:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F40E9222A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:21:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AAF7Jd6i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32568222A1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NhW2PON+";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="yRy3zGKR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F40E9222A1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=2D/plTrTTym9URn0g4fZ/UB+uZcPjeoaFJWt/ObMeRY=; b=AAF7Jd6io0354nkp5slz4sYyM
-	sytJWJNjIT83G71wNvgCqa1fbLJUcHsS5e9QbbfHs6nN3yx3Kqe1DjqaGRLR+T0Aw57PvDMjtrOJR
-	pcJmuzMGiK6CCwKILrE+Jh0olA1dXxDuPE0BnTWAKZK1Cg3fPFNoyevCSkgFCHS/I1O7hJURX0lDH
-	PQFVbq6NuOMZEQqqYDsMnL89RyKrQczOglScQbzbfp4EijmM4av2TY7ALb/JhqoRrSD2YvevMJC1L
-	M0X4xzQS93SZUyIOEKj8362QWYaSDZwvT4QkTv+z7cemvK77WL1DZYXo54kOibCtKaInUlXnu+xnv
-	//rhrMIKw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=dS2OpcS/pCIJa++63Oyzllu3FgYFd8SdjBLC1e1qcqk=; b=NhW2PON+KhRm3h
+	LsT3ich/8HJ3DABJKgciboy+oZUXyjIC4qGd7nZ6ypYkMkdrHAOFK5iiFYDkE8rckTcpsdo+P4+BL
+	DMld8WlB3WUgZU4VIayVmMchsjx2lFCspB+iJfU+umI0HbCIzsB8tP5R7eclvTpddD8jZ3l7PAn1T
+	6YBt1bCGI3TIQqdk4hzWz3RX5ANC1ceTVLP4VOh2LrFvC7coVXxCVr1pJ1V11Gh0FToOZu9BV9o5Z
+	g00RndDlsjj9tbwEvF9TBOsVfpmJBVn3jRqfx6I/kV0X0GH8bxYKZUdd0WPqB2cj2WAph9RPvjb5k
+	Th68AURuLeoVDc5L6n7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guE58-0001Yq-Js; Thu, 14 Feb 2019 10:17:26 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guE4g-00018x-Og
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 10:17:14 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 42128EBD;
- Thu, 14 Feb 2019 02:16:58 -0800 (PST)
-Received: from [10.162.0.144] (a075553-lin.blr.arm.com [10.162.0.144])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6CCC53F575;
- Thu, 14 Feb 2019 02:16:55 -0800 (PST)
-Subject: Re: [PATCH v5 3/5] arm64/kvm: context-switch ptrauth register
-To: James Morse <james.morse@arm.com>
-References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-4-git-send-email-amit.kachhap@arm.com>
- <d862316b-5b2e-8187-04e0-c0be350c1624@arm.com>
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Message-ID: <6982dfea-8dad-f293-8193-39eb0ca789c3@arm.com>
-Date: Thu, 14 Feb 2019 15:46:53 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guE8W-0003W2-GY; Thu, 14 Feb 2019 10:20:56 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guE8S-0003VK-OU
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 10:20:55 +0000
+Received: by mail-pf1-x444.google.com with SMTP id n22so2885531pfa.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 02:20:52 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=mJzmhAM1KCaDn3qCEzGBUzKFpMm/FqdTAEQEBba9WuU=;
+ b=yRy3zGKRhefQGEI45kJzX0CQ0FHy3th966wa8kA5ybqpteqik9foOkZMUnJzktjGl8
+ Z2RzVnByybh6/ptEQCjHrsNZMs8IG4ysPbnuAlnL2X0axVRXLIlaz+FxUhw8+dF/Qn1s
+ x6JaLP5I+mzTUiD7tt+bfyHxGIljO92FSZIgfAokdZXoBmxO27F9zjoKS0aZoNoHtoUD
+ m02bWjnIMQADXjx0O+iLZCrniyxJUcxijwakKoTdQ5Th6e2K/lQjuDGwvWxM/bMnbER/
+ i2uQgWsz1WY8N7EovgTIJeB2+a9R+KMMaauJKrjD/8yy5IttUZZB7fOUnxKTf3ZWPno1
+ 2quw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=mJzmhAM1KCaDn3qCEzGBUzKFpMm/FqdTAEQEBba9WuU=;
+ b=W+8HyaLdcEPCfFsiqAkSsGDG+qXfxBRDQmrGtP/EjYECZoJvkxjd6A026GN3zgPfVa
+ kRZwTn5wTCUKZvR4DmZIh2l1+BgVT66XtxNfDErQ5jGR7uPaYJ6+bm807p7vDf+bthhV
+ nVTxWVEQdNFejQYPMzIp145VljHIy4TM4/UZ2jEMebI5pW+dsy1BJNdeTpk7DMkthCJz
+ FmEQ2J4EOoWmnemGKCJ+xDdc9A+1mHaTmtCxiBsm/YiKcChWLRraS8GsphddwEzdZLqN
+ 5Q14Q/Nz2MzBOBTrzT3T2BnZf9iaK0aI9GSwSzSuTa7Zt6TuxyIBqLGhYocppTY4XL1i
+ 1xdg==
+X-Gm-Message-State: AHQUAuacwI1b1YRI7rgOe5EwuQ+EV8+x4Wr/babuWNPRzV27TyTMO1Wa
+ 1aFJfTHYBHu/CEJzs3FYnrY/ag==
+X-Google-Smtp-Source: AHgI3Ia4kTM8Lwc2qum7Ad7f9UewW+plRXqPk5ErxDmeO3cNbGl0oMiH1p46WjbMjlZPwhRIL8B9zg==
+X-Received: by 2002:a63:be0a:: with SMTP id l10mr3030321pgf.292.1550139651606; 
+ Thu, 14 Feb 2019 02:20:51 -0800 (PST)
+Received: from localhost ([122.172.102.63])
+ by smtp.gmail.com with ESMTPSA id h15sm2616261pfn.9.2019.02.14.02.20.49
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 02:20:50 -0800 (PST)
+Date: Thu, 14 Feb 2019 15:50:47 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Anson Huang <anson.huang@nxp.com>
+Subject: Re: [PATCH V5 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
+Message-ID: <20190214102047.giu5lwxw7dtyfdqy@vireshk-i7>
+References: <1550131046-2069-1-git-send-email-Anson.Huang@nxp.com>
+ <20190214083419.slnuolyy5xhz4szy@vireshk-i7>
+ <DB3PR0402MB39163EE75B512102C5FE19E9F5670@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-In-Reply-To: <d862316b-5b2e-8187-04e0-c0be350c1624@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <DB3PR0402MB39163EE75B512102C5FE19E9F5670@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_021659_113407_6E59F6F8 
-X-CRM114-Status: GOOD (  36.98  )
+X-CRM114-CacheID: sfid-20190214_022052_825748_76EE867B 
+X-CRM114-Status: UNSURE (   8.15  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,230 +98,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Kristina Martsenko <kristina.martsenko@arm.com>,
- Dave Martin <Dave.Martin@arm.com>,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "sboyd@kernel.org" <sboyd@kernel.org>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Daniel Baluta <daniel.baluta@nxp.com>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James,
+On 14-02-19, 09:47, Anson Huang wrote:
+> Although all CPUs share same clock and opp table, but OK, I will add clock to
+> all CPUs.
 
-On 1/31/19 9:55 PM, James Morse wrote:
-> Hi Amit,
-> 
-> On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
->> When pointer authentication is supported, a guest may wish to use it.
->> This patch adds the necessary KVM infrastructure for this to work, with
->> a semi-lazy context switch of the pointer auth state.
->>
->> Pointer authentication feature is only enabled when VHE is built
->> into the kernel and present into CPU implementation so only VHE code
-> 
-> ~s/into/in the/?
-> 
->> paths are modified.
->>
->> When we schedule a vcpu, we disable guest usage of pointer
->> authentication instructions and accesses to the keys. While these are
->> disabled, we avoid context-switching the keys. When we trap the guest
->> trying to use pointer authentication functionality, we change to eagerly
->> context-switching the keys, and enable the feature. The next time the
->> vcpu is scheduled out/in, we start again.
-> 
->> Pointer authentication consists of address authentication and generic
->> authentication, and CPUs in a system might have varied support for
->> either. Where support for either feature is not uniform, it is hidden
->> from guests via ID register emulation, as a result of the cpufeature
->> framework in the host.
-> 
-> 
->> Unfortunately, address authentication and generic authentication cannot
->> be trapped separately, as the architecture provides a single EL2 trap
->> covering both. If we wish to expose one without the other, we cannot
->> prevent a (badly-written) guest from intermittently using a feature
->> which is not uniformly supported (when scheduled on a physical CPU which
->> supports the relevant feature). When the guest is scheduled on a
->> physical CPU lacking the feature, these attempts will result in an UNDEF
->> being taken by the guest.
-> 
-> This won't be fun. Can't KVM check that both are supported on all CPUs to avoid
-> this? ...
-The above message is confusing as both checks actually present. I will 
-update.
-> 
-> 
->> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->> index dfcfba7..e1bf2a5 100644
->> --- a/arch/arm64/include/asm/cpufeature.h
->> +++ b/arch/arm64/include/asm/cpufeature.h
->> @@ -612,6 +612,11 @@ static inline bool system_supports_generic_auth(void)
->>   		 cpus_have_const_cap(ARM64_HAS_GENERIC_AUTH_IMP_DEF));
->>   }
->>   
->> +static inline bool kvm_supports_ptrauth(void)
->> +{
->> +	return system_supports_address_auth() && system_supports_generic_auth();
->> +}
-> 
-> ... oh you do check. Could you cover this in the commit message? (to avoid an
-> UNDEF being taken by the guest we ... )
-> 
-> cpufeature.h is a strange place to put this, there are no other kvm symbols in
-> there. But there are users of system_supports_foo() in kvm_host.h.
-ok will check.
-> 
-> 
->> diff --git a/arch/arm64/kvm/hyp/ptrauth-sr.c b/arch/arm64/kvm/hyp/ptrauth-sr.c
->> new file mode 100644
->> index 0000000..0576c01
->> --- /dev/null
->> +++ b/arch/arm64/kvm/hyp/ptrauth-sr.c
->> @@ -0,0 +1,44 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * arch/arm64/kvm/hyp/ptrauth-sr.c: Guest/host ptrauth save/restore
->> + *
->> + * Copyright 2018 Arm Limited
->> + * Author: Mark Rutland <mark.rutland@arm.com>
->> + *         Amit Daniel Kachhap <amit.kachhap@arm.com>
->> + */
->> +#include <linux/compiler.h>
->> +#include <linux/kvm_host.h>
->> +
->> +#include <asm/cpucaps.h>
->> +#include <asm/cpufeature.h>
->> +#include <asm/kvm_asm.h>
->> +#include <asm/kvm_hyp.h>
->> +#include <asm/pointer_auth.h>
->> +
->> +static __always_inline bool __hyp_text __ptrauth_is_enabled(struct kvm_vcpu *vcpu)
-> 
-> Why __always_inline? Doesn't the compiler decide for 'static' symbols in C files?
-This is to make the function pointer authentication safe. Although it 
-placed before key switch so may not be required.
-> 
-> 
->> +{
->> +	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
->> +			vcpu->arch.ctxt.hcr_el2 & (HCR_API | HCR_APK);
->> +}
->> +
->> +void __no_ptrauth __hyp_text __ptrauth_switch_to_guest(struct kvm_vcpu *vcpu,
->> +					  struct kvm_cpu_context *host_ctxt,
->> +					  struct kvm_cpu_context *guest_ctxt)
->> +{
->> +	if (!__ptrauth_is_enabled(vcpu))
->> +		return;
->> +
-> 
->> +	ptrauth_keys_store((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
-> 
-> We can't cast part of an array to a structure like this. What happens if the
-> compiler inserts padding in struct-ptrauth_keys, or the struct randomization
-> thing gets hold of it: https://lwn.net/Articles/722293/
-Yes this has got issue.
-> 
-> If we want to use the helpers that take a struct-ptrauth_keys, we need to keep
-> the keys in a struct-ptrauth_keys. To do this we'd need to provide accessors so
-> that GET_ONE_REG() of APIAKEYLO_EL1 comes from the struct-ptrauth_keys, instead
-> of the sys_reg array.
-ok.
-> 
-> 
-> Wouldn't the host keys be available somewhere else? (they must get transfer to
-> secondary CPUs somehow). Can we skip the save step when switching from the host?
-Yes Host save can be done during vcpu_load and it works fine. However it 
-does not work during hypervisor configuration stage(i.e where HCR_EL2 is 
-saved/restored now) as keys are different.
-> 
->> +	ptrauth_keys_switch((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
->> +}
-> 
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 1f2d237..c798d0c 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -439,6 +451,18 @@ static inline bool kvm_arch_requires_vhe(void)
->>   	return false;
->>   }
->>
->> +void kvm_arm_vcpu_ptrauth_enable(struct kvm_vcpu *vcpu);
->> +void kvm_arm_vcpu_ptrauth_disable(struct kvm_vcpu *vcpu);
->> +
->> +static inline void kvm_arm_vcpu_ptrauth_reset(struct kvm_vcpu *vcpu)
->> +{
->> +	/* Disable ptrauth and use it in a lazy context via traps */
->> +	if (has_vhe() && kvm_supports_ptrauth())
->> +		kvm_arm_vcpu_ptrauth_disable(vcpu);
->> +}
-> 
-> (Could you move 'has_vhe()' into kvm_supports_ptrauth()? It fits with testing
-> the other cpufeatures, and makes this a little more readable when you add
-> 'allowed' to it later.)
-yes.
-> 
-> 
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 03b36f1..301d332 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -483,6 +483,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->>   	sysreg_restore_guest_state_vhe(guest_ctxt);
->>   	__debug_switch_to_guest(vcpu);
->>   
->> +	__ptrauth_switch_to_guest(vcpu, host_ctxt, guest_ctxt);
->> +
->>   	__set_guest_arch_workaround_state(vcpu);
->>   
->>   	do {
->> @@ -494,6 +496,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->>   
->>   	__set_host_arch_workaround_state(vcpu);
->>   
->> +	__ptrauth_switch_to_host(vcpu, host_ctxt, guest_ctxt);
->> +
->>   	sysreg_save_guest_state_vhe(guest_ctxt);
->>   
->>   	__deactivate_traps(vcpu);
-> 
-> ...This makes me nervous...
-> 
-> __guest_enter() is a function that (might) change the keys, then we change them
-> again here. We can't have any signed return address between these two points. I
-> don't trust the compiler not to generate any.
-> 
-> ~
-> 
-> I had a chat with some friendly compiler folk... because there are two identical
-> sequences in kvm_vcpu_run_vhe() and __kvm_vcpu_run_nvhe(), the compiler could
-> move the common code to a function it then calls. Apparently this is called
-> 'function outlining'.
-> 
-> If the compiler does this, and the guest changes the keys, I think we would fail
-> the return address check.
-> 
-> Painting the whole thing with no_prauth would solve this, but this code then
-> becomes a target.
-> Because the compiler can't anticipate the keys changing, we ought to treat them
-> the same way we do the callee saved registers, stack-pointer etc, and
-> save/restore them in the __guest_enter() assembly code.
-> 
-> (we can still keep the save/restore in C, but call it from assembly so we know
-> nothing new is going on the stack).
-I checked this and it seems easy to put inside guest_enter/guest_exit.
+Right, but still these must be present for all CPUs as on certain
+occasions a CPU other than CPU0 can be used to bring up the cupfreq
+policy.
 
-//Amit D
-> 
-> 
-> Thanks,
-> 
-> James
-> 
+-- 
+viresh
 
 _______________________________________________
 linux-arm-kernel mailing list
