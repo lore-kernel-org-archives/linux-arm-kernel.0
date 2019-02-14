@@ -2,72 +2,85 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY autolearn=unavailable autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F2D7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:30:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80A8FC10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:32:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D0FD82229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:30:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 509792229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:32:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mIDcJQ0Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D0FD82229F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W79k41VN";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="xhR0xAQp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 509792229F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KgvvVe4og2OzvC3kpxiGRotu69ZKqUkkVJQarugr1mQ=; b=mIDcJQ0Yg7IN+1
-	7o3nlCu1jvSWrIWd1ay33QoA/iYG1n+8gUbIn1tOmEw0FFlmiOTlkN2iCGwanmNN1sjwfmufMSyMY
-	7b521f8yg9hogaifOR8m4BTuKYPaa29Phi+XG4nxjCBoWY7JVoEm+QZoneqgu7XGedeGpK+itP+Yd
-	Yo9Q0Uc3tdEhexD3j1r7HXa+HU7QaJvl+7wje8Pg1yJf3EKVs16xEL88pnus2zqug94Bse63lc1Tx
-	DLaI0BqelpfJ/tA2KY5gKLcp+QeDA72IYyXR+dlNY+4XZdmO3j9gh3IJLkBORXeSbSd8mstpoZDsF
-	fEkVHJuy/eDDPiMSSNOw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=W44mwjABtLq/Em90ZhdE81xa0TVdz51oLSY/iTjYhoY=; b=W79
+	k41VNhnMxnVnOeyT187iCzDlD35+uzAoexo0K772UK/cmGU69B6gWO8tZ2zipksuBE3ewEJv7M4rp
+	QqSCQPZUqndbBpGfvP/I2qgG4UwZM3Yt+k3WA6ErPeJnRVDcUilJwCPPZHuwnIsWSJqtXLWfaETOX
+	0fWYcjtQlZ6Byo3071RhU3iXfV4/W8WjrcDczCTAeVCCIMS28e405snWFlRnhzXDKDeIagvsrtv+c
+	6HCShNWCZEikwDx9vIi6OkVYBiRP2J6/PdGFB8EKWvEGy3K496OAJ1uvVBAS8e6ip8RVepZ7TLQdI
+	BznChE7FbYKMfamiSe5DxloQFaVgrmg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guCPn-0000tM-1V; Thu, 14 Feb 2019 08:30:39 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1guCQz-0001Sh-EW; Thu, 14 Feb 2019 08:31:53 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guCPi-0000rq-VQ; Thu, 14 Feb 2019 08:30:36 +0000
-X-UUID: 5a215f85fe214bd39f89e76f51c68835-20190214
-X-UUID: 5a215f85fe214bd39f89e76f51c68835-20190214
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1896081573; Thu, 14 Feb 2019 00:30:21 -0800
-Received: from MTKMBS31N1.mediatek.inc (172.27.4.69) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 14 Feb 2019 00:30:19 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N1.mediatek.inc
- (172.27.4.69) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Thu, 14 Feb 2019 16:30:17 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Thu, 14 Feb 2019 16:30:16 +0800
-Message-ID: <1550133016.12020.13.camel@mhfsdcap03>
-Subject: Re: [PATCH v4 1/6] dt-bindings: usb: musb: Add support for MediaTek
- musb controller
-From: Min Guo <min.guo@mediatek.com>
-To: Rob Herring <robh@kernel.org>
-Date: Thu, 14 Feb 2019 16:30:16 +0800
-In-Reply-To: <1548382046.4433.304.camel@mhfsdcap03>
-References: <1548073351-13739-1-git-send-email-min.guo@mediatek.com>
- <1548073351-13739-2-git-send-email-min.guo@mediatek.com>
- <20190121151417.GA19238@bogus> <1548149773.4433.284.camel@mhfsdcap03>
- <20190122143348.GF30080@uda0271908> <1548382046.4433.304.camel@mhfsdcap03>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
-MIME-Version: 1.0
-X-MTK: N
+ id 1guCQv-0001Rn-DM
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 08:31:50 +0000
+Received: by mail-wm1-x341.google.com with SMTP id m1so5308368wml.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 00:31:48 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=QJEStO10BrnZ2B24LMVFy4GfmZeL/MrbI49P/PhmFYM=;
+ b=xhR0xAQp6wqm1ZAu2R5vhtGuvhol4tTj9QxqAsvATX43QHImZafXW4utCoHqIzBO1p
+ 0Bvml6q+r+axr3EmRwgayNPntvwSX1aNw3etZUGiyDL5F+E8ICqzZfaio11gPhk2KJw6
+ nmUSSkvrTRUVyg4NFkQadMgeIfQ/C/ukLVkB0foMhB4wA5MVzNIu95QRzsyIj00QrIdl
+ /yzgheq8D1YRKJV5Xy/bZ8tl118z1PIA89KS4MdGUMSaMWRPqBMHmACC1rd/CknAYSyx
+ TgYfXwp2nbnhgel0KRFbJq7B4gG1Z/rvzmojZMCExBckkIds0HL2NkQDeCNPSD+LBbcJ
+ uLFg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=QJEStO10BrnZ2B24LMVFy4GfmZeL/MrbI49P/PhmFYM=;
+ b=Yy6DsinqmJLCsBeJeBWBd9lcOYvIdWs0BOD4Ur3ZE8x6Yr337gQfOAonH4+dXXGsXl
+ 4LDpuLzeButpbM9FJbbSJosYJqzOr8bcL3JyL2GryYclXKpKVsM8Gu5sJnN6nCjfxzhI
+ QO2YPs505f8eVXrFPOPROCceXBJSPM2njwEsuvjvdzEPzyHz/vvDEHBNs814LpdzwmWh
+ Gb1FwV5wQtFrZrxLwso8dEmTeIJrL7BNpRBDcA6kQn8rDYB7b/dV53E+VpfCVJN8r9KK
+ msp+OJHAdv4+OvIKbL8HwMQhOyafjJS3QehqtNNBeTN/OrUrw+t9dexC0LfZpcKRkMIA
+ IjaQ==
+X-Gm-Message-State: AHQUAubFiJsQNTv35CyIkfmQbufNep6VptpjlBObHXBbeGWfcoBni9W1
+ r26MB/Nureq3w0O0kf3bYbp9ubCwVTc=
+X-Google-Smtp-Source: AHgI3IZ5jqE8J2z5X3FrSGajwzhMwb9UGCvVdSlAcAyG42tLFy9ZOCEZqmei5K2EW2wto16CJq57lA==
+X-Received: by 2002:a1c:7510:: with SMTP id o16mr1704122wmc.38.1550133107624; 
+ Thu, 14 Feb 2019 00:31:47 -0800 (PST)
+Received: from lmecxl0911.lme.st.com ([2a04:cec0:104b:51c7:1dcf:5141:50b9:8a8])
+ by smtp.gmail.com with ESMTPSA id q6sm944673wmq.4.2019.02.14.00.31.46
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Thu, 14 Feb 2019 00:31:47 -0800 (PST)
+From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+To: linux@armlinux.org.uk,
+	arnd@arndb.de,
+	alexandre.torgue@st.com
+Subject: [PATCH v2 0/2] ARM errata 814220
+Date: Thu, 14 Feb 2019 09:31:43 +0100
+Message-Id: <20190214083145.15148-1-benjamin.gaignard@linaro.org>
+X-Mailer: git-send-email 2.15.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_003035_022454_D70F1483 
-X-CRM114-Status: GOOD (  19.71  )
+X-CRM114-CacheID: sfid-20190214_003149_455556_95BE304D 
+X-CRM114-Status: UNSURE (   9.72  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,109 +92,37 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- tony@atomide.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, hdegoede@redhat.com,
- chunfeng.yun@mediatek.com, Alan Stern <stern@rowland.harvard.edu>,
- Matthias Brugger <matthias.bgg@gmail.com>, linux-mediatek@lists.infradead.org,
- Bin Liu <b-liu@ti.com>, linux-arm-kernel@lists.infradead.org
+Cc: benjamin.gaignard@linaro.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-stm32@st-md-mailman.stormreply.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Rob,
+Implement ARM errata 814220 for Cortex A7.
 
-Sorry to bother you again.
-Can I describe usb-connector in usb node like this?
+This patch has been wroten by Jason Liu years ago but never send upstream.
+I have tried to contact the author on multiple email addresses but I haven't
+found any valid one...
+I have keep Jason's sign-off and just rebase the patch on to v5-rc6.
 
-usb2: usb@11200000 {
-   compatible = "mediatek,mt2701-musb";
-                "mediatek,mtk-musb";
-   reg = <0 0x11200000 0 0x1000>;
-   ...
-   usb_connector: musb_connector {
-       compatible = "usb-b-connector";
-       label = "micro-USB";
-       type = "micro";
-       extcon = <&extcon_usb>;
-       vbus-supply = <&usb_vbus>;
-   };
-};
+version 2:
+- limite help lines to 80 columns.
+- Add  Arnd Bergmann acks.
+  
+Benjamin Gaignard (2):
+  ARM: errata 814220-B-Cache maintenance by set/way operations can
+    execute out of order.
+  ARM: stm32: select ARM errata 814220
 
-Regards,
-Min.
+ arch/arm/Kconfig            | 12 ++++++++++++
+ arch/arm/mach-stm32/Kconfig |  1 +
+ arch/arm/mm/cache-v7.S      |  3 +++
+ 3 files changed, 16 insertions(+)
 
-
-On Fri, 2019-01-25 at 10:07 +0800, Min Guo wrote:
-> Hi Bin,
-> 
-> Thanks for your help.
-> 
-> Hi Rob,
-> 
-> I find that Samsung describes the usb-connector attribute in DTS, and
-> uses a private driver.
-> And try to write DTS as following:
-> 
-> usb-connector node:
-> musb_con: musb_connector{
->     compatible = "linux,extcon-usb-gpio","usb-b-connector";
->     lable = "micro-USB";
->     type = "micro";
->     id-gpio = <&pio 44 GPIO_ACTIVE_HIGH>
->     vbus-supply = <&usb_vbus>;
->     port {
->         usb_to_connector: endpoint {
->             remote-endpoint = <&connector_to_usb>;
->         };
->     };
-> };
-> 
-> usb node:
-> &usb2{
->     status = "okay";
->     port {
->         connector_to_usb: endpoint {
->             remote-endpoint = <&usb_to_connector>;
->         };
->     };
-> }
-> 
-> Can I describe usb-connector like this? Or can you give me some advices?
-> 
-> Regards,
-> Min.
-> 
-> On Tue, 2019-01-22 at 08:33 -0600, Bin Liu wrote:
-> > Hi Min,
-> > 
-> > On Tue, Jan 22, 2019 at 05:36:13PM +0800, Min Guo wrote:
-> > > Hi Bin,
-> > > 
-> > > Sorry to bother you again, I encounter a problem about the extcon
-> > > property.
-> > > 
-> > > I don't find a common driver describing the usb-connector. Is
-> > > there any driver that I can refer to, specially the way to switch MUSB
-> > > controller between host and device mode? 
-> > > If it needs to implement by myself, is it possible to emulate an
-> > > usb-connector driver by extcon-usb-gpio, and also use the notifier
-> > > mechanism or can you give me some advices?
-> > 
-> > I am afraid I am unable to help you on this. I wasn't really pay
-> > attention when usb-connector was introduced and not sure how it can
-> > replace extcon. Now after read usb-connector.txt, it seems the binding
-> > only defines a/b/c-connector, but not ab-connector, and there is no
-> > enough information (at least for me) explaining how VBUS and ID fix into
-> > this usb-connector binding.
-> > 
-> > Maybe Rob can provide some hint.
-> > 
-> > Regards,
-> > -Bin.
-> 
-
+-- 
+2.15.0
 
 
 _______________________________________________
