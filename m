@@ -2,64 +2,85 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D32BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:23:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FAAAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:35:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C28621927
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:23:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B8D621B68
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:35:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JOw3KeID"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C28621927
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="comkNp4v";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="NnHKDAoP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B8D621B68
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X6LMa2RcOMbrB6Hajjyss6tsUb5rtGYbAHP65faRXq4=; b=JOw3KeID0QJIcv
-	XxDoahowT3uXSqUNANnKv1vg7zb84WcANk0XcKxgDpZS84VnyRPf5oBQLd3xT2nEOaoSUHC1vAPvU
-	FpnqQoNRgSRiPtt9AOJRJMAhVOa8la9EOwnk8y+sEbg0HxPJjZqKtCAoIX58l0eGiXFp/51Dc3aIc
-	jfI8Klw7u+s896mGh2T4Opoqa4h0qeyMgMy1gCTixU4STZEozIkmIV5uljiqFQgTw7evtuZLXSBAV
-	jrnqNwR0KTz75vH98lp5t/gXv93WoWCtk0AjROzRGz+ERER6+W0a73ATRQhP0Ify2oufvJud2T5vd
-	e/e5fsmPZ6SxjQdpEHtw==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=VbZAI+qsc+WBnPY3KfzoX16m7OCrSFN4vZO8jHJI4IQ=; b=comkNp4vwfbTzq
+	wdOsAubSLzcwb1QK6pDIbAmAvHsBFhEDodwMkpuPmVeHtI5w7XWTplaKTq9mUJPmNus6jVlFwv6Gn
+	isvsIWNZWASgbVAjb9dxFP6KOZXmgkzuytL8knlsNMeDZUEyDjXjVOFM6k9Py/57PjuwOBOn4dv3p
+	fvDNxjm99lV5a0SJY54qj9d0hiiieMGn0xlj5BSkAxiAzj0HRD4heHQz31MYMUya9uhKc5dX6/cai
+	twxy0NhkaEoLbdKURUNFguElSJF+BLEgRZf9PoutaVFVKE/cb4h7EmPoNwwbFQDBDjUVU/TXXy6S4
+	FBVgsboFYmA5af3fT4VA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guLf2-0003pI-FH; Thu, 14 Feb 2019 18:23:00 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guLey-0003oA-MG
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:22:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2204CEBD;
- Thu, 14 Feb 2019 10:22:54 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DDA703F557;
- Thu, 14 Feb 2019 10:22:52 -0800 (PST)
-From: James Morse <james.morse@arm.com>
-Subject: Re: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
-To: Mark Rutland <mark.rutland@arm.com>, "Zhang, Lei"
- <zhang.lei@jp.fujitsu.com>
-References: <8898674D84E3B24BA3A2D289B872026A6A311EAE@G01JPEXMBKW03>
- <20190214155605.GC27547@lakrids.cambridge.arm.com>
-Message-ID: <90347cf4-4d7b-d553-d4db-1bacd000ff75@arm.com>
-Date: Thu, 14 Feb 2019 18:22:50 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guLqp-00008g-6q; Thu, 14 Feb 2019 18:35:11 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guLql-0007s3-Ci
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:35:09 +0000
+Received: by mail-ot1-x341.google.com with SMTP id i20so12270786otl.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 10:35:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=fUnkOqkP+lBT8YabWNtqwczvSIOggUSareKuDeSX5K4=;
+ b=NnHKDAoPXq2QSP0cf5oPksTx0TTuMaoP5XYkS573P3BMwiEqHQ5/y6pj6hLK8/4w4u
+ 8LWW5wJgysrtqWAYX9WvDhtkAE9glFVfu2XD2s6wcbxdKv3c5HG6B7HlEPofkiiYnZYi
+ t8f+ignWuPKpeRFCjX8pAmn0j5iiQVIhhPpqIW5WzxM7DT3508r5JpMvpiYSjLZk+wNo
+ B5ibyod+gvMwe82LAUR/mYBt0T3eZydP6dcSKQ65U7JXaITNIifp2PRdFWBeUpQbGDsy
+ UyZCdUVVGp0LSRQjov6hpUtuHYLAbOt8U4/pBIsqEr+mSWMgUJ8hs6pzSfYvIJpno4ae
+ oWyg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=fUnkOqkP+lBT8YabWNtqwczvSIOggUSareKuDeSX5K4=;
+ b=kfZuq1MxGzlOC/wdKq+2cMq3krj6nVulD/rbH41wE6ZfEk+juIqlUbJJAZJSH+beDJ
+ cYiGNIZhxblweZNS+HD4rSM+p0xPZiTEDqPJz/Sk2rN1ylTufsMeXbQyV7ZMo8GxDVeU
+ RsRoayu+hkrBktUbZsR0xTrGX7wMLJhkGIaRFX59sdkW9yAqIz9m9s2yohVsjcl3iZDd
+ LrP3PSom516748oy41+oTzU+8PIYPz60KU6DBGiGvQy0GUSQJycs3+CciKk+h+gvZ5qz
+ 1txtIYt3uIkQb8gjqDFxPKE0QdAESNue8R0IeprOneD1M3FzlH+qhZuGmF7pwNAUFwlY
+ d0ZA==
+X-Gm-Message-State: AHQUAuZn7F5UhhRSipab/oxcuAA1DOVk3R3mKotUG0i+Q/3pVXrG6fBm
+ pp7ePKFyAzZ55wSfyIVwrwm6I2EvQ6bDvyqFOz0=
+X-Google-Smtp-Source: AHgI3IYXQd3PGXNPZvIN87V3A9BR1tXWrPdV6xnCmMCkSjzrNSsblc2fK6l0BKQtSNUjE/XTTlIn8a9WrLfFi7zcFm4=
+X-Received: by 2002:a9d:c61:: with SMTP id 88mr3302161otr.335.1550169304636;
+ Thu, 14 Feb 2019 10:35:04 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190214155605.GC27547@lakrids.cambridge.arm.com>
-Content-Language: en-GB
+References: <20190213214052.2427-1-linux.amoon@gmail.com>
+ <20190213214052.2427-2-linux.amoon@gmail.com>
+ <CAJKOXPeyFmKUGwqS1sgf_k2WSx9i0AETjpOLXtsmLFupTpgqnw@mail.gmail.com>
+In-Reply-To: <CAJKOXPeyFmKUGwqS1sgf_k2WSx9i0AETjpOLXtsmLFupTpgqnw@mail.gmail.com>
+From: Anand Moon <linux.amoon@gmail.com>
+Date: Fri, 15 Feb 2019 00:04:54 +0530
+Message-ID: <CANAwSgQB-=iwX1L0m6N=dbe6jbfUMYyjgna_QMmJyggj6rxzwQ@mail.gmail.com>
+Subject: Re: [RFC 1/2] ARM: dts: exynos: Add proper regulator states for
+ suspend-to-mem for odroid-u3
+To: Krzysztof Kozlowski <krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_102256_738308_6ACB9364 
-X-CRM114-Status: GOOD (  37.35  )
+X-CRM114-CacheID: sfid-20190214_103507_476522_46C541A9 
+X-CRM114-Status: GOOD (  24.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,383 +92,336 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: 'Catalin Marinas' <catalin.marinas@arm.com>,
- 'Will Deacon' <will.deacon@arm.com>,
- "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
- "'linux-arm-kernel@lists.infradead.org'"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree <devicetree@vger.kernel.org>,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ Pankaj Dubey <pankaj.dubey@samsung.com>,
+ Linux Kernel <linux-kernel@vger.kernel.org>,
+ Tomasz Figa <tomasz.figa@gmail.com>, Chanwoo Choi <cw00.choi@samsung.com>,
+ Rob Herring <robh+dt@kernel.org>, Kukjin Kim <kgene@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi guys,
+hi Krzysztof,
 
-On 14/02/2019 15:56, Mark Rutland wrote:
-> On Thu, Feb 14, 2019 at 07:26:24AM +0000, Zhang, Lei wrote:
->> On the Fujitsu-A64FX cores ver(1.0, 1.1), memory access may
->> cause an undefined fault (Data abort, DFSC=0b111111).
->> This fault occurs under a specific hardware condition when a
->> load/store instruction performs an address translation.
->> Any load/store instruction, except non-fault access
->> including Armv8 and SVE might cause this undefined fault.
->>
->> Since this erratum occurs only when TCR_ELx.NFD1=1,
->> I keep TCR_ELx.NFD1=0 during EL1/EL2.
->>
->> By doing above, the erratum occurs only in EL0.
->> I deal with this erratum in EL0 by a new fault handler
->> which ignores this undefined fault.
+Thanks fro your review comments.
 
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index a4168d3..7c76c66 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -643,6 +643,29 @@ config QCOM_FALKOR_ERRATUM_E1041
->>  
->>  	  If unsure, say Y.
->>  
->> +config FUJITSU_ERRATUM_010001
->> +	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
->> +        depends on RANDOMIZE_BASE
->> +        default RANDOMIZE_BASE
->> +	help
->> +	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
->> +	  On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1), memory accesses
->> +	  may cause undefined fault (Data abort, DFSC=0b111111).
->> +	  This fault occurs under a specific hardware condition when a load/store
->> +          instruction performs an address translation using:
->> +	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
->> +	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
->> +	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
->> +	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
->> +
->> +	  The workaround is to set '0' to TCR_ELx.NFD1 at kernel-entry,
->> +	  to set '1' at kernel-exit. And also replace the fault handler
->> +	  for Data abort DFSC=0b111111 with a new fault handler to ignore this
->> +	  undefined fault.
->> +	  The workaround only affect the Fujitsu-A64FX.
-> 
-> I think that per Will's last comment, the expectation was that NFD1
-> would be configured once in C code, rather than in the entry assembly.
-> 
-> Your code seems to expect KPTI is enabled, and if that's the case, NFD1
-> doesn't provide much security benefit,
+On Thu, 14 Feb 2019 at 18:11, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+> Hi Anand,
+>
+> Thanks for the patch. See comments below.
+>
+> On Wed, 13 Feb 2019 at 22:41, Anand Moon <linux.amoon@gmail.com> wrote:
+> >
+> > Add suspend-to-mem node to regulator core to be enabled or disabled
+> > during system suspend and also support changing the regulator operating
+> > mode during runtime and when the system enter sleep mode.
+> >
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Cc: Krzysztof Kozlowski <krzk@kernel.org>
+> > Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > ---
+> >
+> > Changes from previos patch
+> > [0] https://patchwork.kernel.org/patch/10712549/
+> >
+> > Set all the WAKEUP source regulator in suspend-on state.
+> > LD04, LD012, LD015, LD020, LD022
+> > Set all the non used regulator in suspend-odd state
+> > LD02, LD03, LD05, LD06, LD07, LD011, LD013, LDO14, LD016
+> >
+> > BUCK5, BUCK6, BUCK7 and not confirable as per driver max77686-regulator
+> >
+> > Tested on microSD card and it resumes correcly after suspend.
+> > eMMC is not able to resume after entering into suspend state,
+> > which need to be investigated and how to debug more.
+> > ---
+> >  .../boot/dts/exynos4412-odroid-common.dtsi    | 63 +++++++++++++++++++
+> >  arch/arm/boot/dts/exynos4412-odroidu3.dts     |  3 +
+> >  2 files changed, 66 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> > index 08d3a0a7b4eb..e984461c37d9 100644
+> > --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> > +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> > @@ -288,6 +288,9 @@
+> >                                 regulator-min-microvolt = <1800000>;
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+>
+> I see my comment from previous patch was not addressed.
 
-We only set NFD1 when KASLR is in use, which would also enable KPTI if
-CONFIG_UNMAP_KERNEL_AT_EL0 is compiled in. Details in e03e61c3173 ("arm64: kaslr: Set
-TCR_EL1.NFD1 when CONFIG_RANDOMIZE_BASE=y")
+I left this unchanged since this regulator is not active linked and used.
+Ok I will change this to regulator-on-in-suspend,
 
+From documentation device tree binding regulator.txt
+"- regulator-always-on: boolean, regulator should never be disabled"
 
-> and it would be vastly simpler to set this in a cpufeature callback.
+But some regulator switches to a low power mode under light current loads
+and the device automatically switches back to a fast response mode as the
+output load increases.
 
-A64FX needs it to be unset unless you can handle the spurious fault. The
-cpufeature callback would need to run for un-affected CPUs to set the TCR bit.
+>
+> >                         };
+> >
+> >                         ldo3_reg: LDO3 {
+> > @@ -295,6 +298,9 @@
+> >                                 regulator-min-microvolt = <1800000>;
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+>
+> The same...
 
+Ok I will change this to regulator-on-in-suspend,
 
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 0ec0c46..34a4f44 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -940,6 +940,14 @@ alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
->>  	dsb	nsh
->>  alternative_else_nop_endif
->>  #endif /* CONFIG_QCOM_FALKOR_ERRATUM_1003 */
->> +#ifdef CONFIG_FUJITSU_CPU_PART_A64FX
->> +alternative_if ARM64_WORKAROUND_FUJITSU_A64FX_0100001
->> +	mrs	\tmp, tcr_el1
->> +	and	\tmp, \tmp, #0xffbfffffffffffff
-> 
-> If this has to be written in assembly, it would be better as:
-> 
-> 	bic	\tmp, \tmp, #TCR_NFD1
-> 	
->> +	msr	tcr_el1,\tmp
->> +	isb
->> +alternative_else_nop_endif
->> +#endif /* CONFIG_FUJITSU_CPU_PART_A64FX */
->>  	.endm
+>
+> >                         };
+> >
+> >                         ldo4_reg: LDO4 {
+> > @@ -302,6 +308,9 @@
+> >                                 regulator-min-microvolt = <2800000>;
+> >                                 regulator-max-microvolt = <2800000>;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo5_reg: LDO5 {
+> > @@ -310,6 +319,9 @@
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo6_reg: LDO6 {
+> > @@ -317,6 +329,9 @@
+> >                                 regulator-min-microvolt = <1000000>;
+> >                                 regulator-max-microvolt = <1000000>;
+> >                                 regulator-always-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo7_reg: LDO7 {
+> > @@ -324,18 +339,27 @@
+> >                                 regulator-min-microvolt = <1000000>;
+> >                                 regulator-max-microvolt = <1000000>;
+> >                                 regulator-always-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo8_reg: LDO8 {
+> >                                 regulator-name = "VDD10_HDMI_1.0V";
+> >                                 regulator-min-microvolt = <1000000>;
+> >                                 regulator-max-microvolt = <1000000>;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo10_reg: LDO10 {
+> >                                 regulator-name = "VDDQ_MIPIHSI_1.8V";
+> >                                 regulator-min-microvolt = <1800000>;
+> >                                 regulator-max-microvolt = <1800000>;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo11_reg: LDO11 {
+> > @@ -343,6 +367,9 @@
+> >                                 regulator-min-microvolt = <1800000>;
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo12_reg: LDO12 {
+> > @@ -351,6 +378,9 @@
+> >                                 regulator-max-microvolt = <3300000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo13_reg: LDO13 {
+> > @@ -359,6 +389,9 @@
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo14_reg: LDO14 {
+> > @@ -367,6 +400,9 @@
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo15_reg: LDO15 {
+> > @@ -375,6 +411,9 @@
+> >                                 regulator-max-microvolt = <1000000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo16_reg: LDO16 {
+> > @@ -383,6 +422,9 @@
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo20_reg: LDO20 {
+> > @@ -396,6 +438,9 @@
+> >                                 regulator-min-microvolt = <2800000>;
+> >                                 regulator-max-microvolt = <2800000>;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+>
+>
+> The same... any comments?
 
-This TCR swivel has to be done before we make any memory accesses. If we ever
-need another register in the trampoline we're going to be in trouble.
+I left this on for mshc_0 (emmc) regulator,
+since I could not get suspend resume working on eMMc
 
+>
+> >                         };
+> >
+> >                         ldo22_reg: LDO22 {
+> > @@ -405,6 +450,9 @@
+> >                                  */
+> >                                 regulator-name = "LDO22";
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         ldo25_reg: LDO25 {
+> > @@ -413,6 +461,9 @@
+> >                                 regulator-max-microvolt = <1800000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         buck1_reg: BUCK1 {
+> > @@ -421,6 +472,9 @@
+> >                                 regulator-max-microvolt = <1100000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+>
+> Again, you did not address my comments.
+>
 
->>  	.macro tramp_unmap_kernel, tmp
->> @@ -952,6 +960,14 @@ alternative_else_nop_endif
->>  	 * it's only needed by Cavium ThunderX, which requires KPTI to be
->>  	 * disabled.
->>  	 */
->> +#ifdef CONFIG_FUJITSU_CPU_PART_A64FX
->> +alternative_if ARM64_WORKAROUND_FUJITSU_A64FX_0100001
->> +	mrs	\tmp, tcr_el1
->> +	orr	\tmp, \tmp, #0x40000000000000
-> 
-> Likewise:
-> 	
-> 	orr	\tmp, \tmp, #TCR_NFD1
-> 
->> +	msr	tcr_el1,\tmp
->> +	isb
->> +alternative_else_nop_endif
->> +#endif /* CONFIG_FUJITSU_CPU_PART_A64FX */
->>  	.endm
->>  
->>  	.macro tramp_ventry, regsize = 64
+Buck1 support entering into LPM setting,
+But I will set this to regulator-on-in-suspend; in next patch.
 
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index efb7b2c..1bf0377 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -666,6 +666,20 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>  	return 0;
->>  }
->>  
->> +static int do_bad_unknown_63(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->> +{
->> +	/*
->> +	 * On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1),
->> +	 * memory accesses may spuriously trigger data aborts with
->> +	 * DFSC=0b111111.
->> +	 */
->> +	if (IS_ENABLED(CONFIG_FUJITSU_ERRATUM_010001) &&
->> +		cpus_have_cap(ARM64_WORKAROUND_FUJITSU_A64FX_0100001))
->> +			return 0;
->> +	return do_bad(addr, esr, regs);
->> +}
-> 
-> If we always left NFD1 clear on A64FX, we would not need this exception
-> handler, as this should never occur.
+> > +                               };
+> >                         };
+> >
+> >                         buck2_reg: BUCK2 {
+> > @@ -429,6 +483,9 @@
+> >                                 regulator-max-microvolt = <1350000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-on-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         buck3_reg: BUCK3 {
+> > @@ -437,6 +494,9 @@
+> >                                 regulator-max-microvolt = <1050000>;
+> >                                 regulator-always-on;
+> >                                 regulator-boot-on;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+>
+> The same...
 
-I think we should do this: never set NFDx on A64FX. I don't think we can maintain the TCR
-swivel before any memory access in the KPTI trampoline. (It already uses the FAR as a
-scratch register!)
+Buck3 support entering into LPM setting,
+But I will set this to regulator-on-in-suspend; in next patch.
 
-The errata means we can't use these bits. Its simpler than trying to work around the symptoms.
+>
+> >                         };
+> >
+> >                         buck4_reg: BUCK4 {
+> > @@ -444,6 +504,9 @@
+> >                                 regulator-min-microvolt = <900000>;
+> >                                 regulator-max-microvolt = <1100000>;
+> >                                 regulator-microvolt-offset = <50000>;
+> > +                               regulator-state-mem {
+> > +                                       regulator-off-in-suspend;
+> > +                               };
+> >                         };
+> >
+> >                         buck5_reg: BUCK5 {
+> > diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> > index 2bdf899df436..4ebde09fc51d 100644
+> > --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> > +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+> > @@ -82,6 +82,9 @@
+> >         regulator-name = "LDO22_VDDQ_MMC4_2.8V";
+> >         regulator-min-microvolt = <2800000>;
+> >         regulator-max-microvolt = <2800000>;
+> > +       regulator-state-mem {
+> > +               regulator-on-in-suspend;
+>
+> Why?
+>
 
+I chose not to disable mshc_0 (emmc) regulator,
+since I could not get suspend resume working on eMMC.
 
->> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
->> index 73886a5..75f7d99 100644
->> --- a/arch/arm64/mm/proc.S
->> +++ b/arch/arm64/mm/proc.S
->> @@ -453,9 +453,29 @@ ENTRY(__cpu_setup)
->>  	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
->>  	 * both user and kernel.
->>  	 */
->> +#ifdef CONFIG_FUJITSU_ERRATUM_010001
->>  	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
->>  			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
->>  			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
->> +	/* Can use x19/x20/x5 */
->> +	mrs     x19, midr_el1
->> +	/* ERRATA_MIDR_RANGE(MIDR_FUJITSU_A64FX, 0, 0, 1, 0) */
->> +	mov	w20, #0x10	//#16
->> +	movk	w20, #0x460f, lsl #16
->> +	mov	w5, #0xffefffff
+> Best regards,
+> Krzysztof
 
-Hmmm.... this is masking out the least-significant variant bit, to make it match
-your 1.0 and 1.1. This could be much more readable with some pre-processor trickery.
+Best Regards
 
-We should also move it out to a macro so the average reader of __cpu_setup() doesn't need
-to parse it.
-
-
-> Please do this detection and reconfiguration of TCR in C code, rather
-> than in the __cpu_setup code.
-> 
-> In proc.S you can have:
-> 
-> #if defined(CONFIG_RANDOMIZE_BASE) && !defined(CONFIG_FUJITSU_ERRATUM_010001)
-> #define KASLR_FLAGS	TCR_NFD1
-> #else
-> #define KASLR_FLAGS	0
-> #endif
-> 
-> ... and in cpu_errata.c you can enable NFD1 on any CPU which is not
-> A64FX.
-
-I think having an errata callback that runs on unaffected cores is tricky. ("CPU
-feature: Not affected by E010001").
-As a halfway house, I have the below[0] simplified version of Zhang Lei's patch. It
-doesn't do the TCR swivel in C, just masks out the TCR values on affected CPUs. I
-obviously haven't tested this on an affected platform.
-
-
-Thanks,
-
-James
-
---------------------%<--------------------
-From 41543072930af63f3229a5384061fe3bc1efd19a Mon Sep 17 00:00:00 2001
-From: Zhang Lei <zhang.lei@jp.fujitsu.com>
-Date: Thu, 14 Feb 2019 07:26:24 +0000
-Subject: [PATCH] arm64: Add workaround for Fujitsu A64FX erratum 010001
-
-On the Fujitsu-A64FX cores ver(1.0, 1.1), memory access may cause
-an undefined fault (Data abort, DFSC=0b111111). This fault occurs under
-a specific hardware condition when a load/store instruction performs an
-address translation. Any load/store instruction, except non-fault access
-including Armv8 and SVE might cause this undefined fault.
-
-The TCR_ELx.NFD1 bit is used by the kernel when CONFIG_RANDOMIZE_BASE
-is enabled to mitigate timing attacks against KASLR where the kernel
-address space could be probed using the FFR and suppressed fault on
-SVE loads.
-
-Since this erratum causes spurious exceptions, which may overwrite
-the exception registers, we clear the TCR_ELx.NFDx=1 bits when
-booting on an affected CPU.
-
-Signed-off-by: Zhang Lei <zhang.lei@jp.fujitsu.com>
-[Generated MIDR value/mask for __cpu_setup(), removed spurious-fault handler
- and always disabled the NFDx bits on affected CPUs]
-Signed-off-by: James Morse <james.morse@arm.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 19 +++++++++++++++++++
- arch/arm64/include/asm/assembler.h     | 20 ++++++++++++++++++++
- arch/arm64/include/asm/cputype.h       |  9 +++++++++
- arch/arm64/include/asm/pgtable-hwdef.h |  1 +
- arch/arm64/mm/proc.S                   |  1 +
- 6 files changed, 51 insertions(+)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 1f09d043d086..26d64e9f3a35 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -80,3 +80,4 @@ stable kernels.
- | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
- | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
- | Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
-+| Fujitsu        | A64FX           | E#010001        | FUJITSU_ERRATUM_010001      |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a4168d366127..b0b7f1c4e816 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -643,6 +643,25 @@ config QCOM_FALKOR_ERRATUM_E1041
-
- 	  If unsure, say Y.
-
-+config FUJITSU_ERRATUM_010001
-+	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
-+	default y
-+	help
-+	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
-+	  On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1), memory
-+	  accesses may cause undefined fault (Data abort, DFSC=0b111111).
-+	  This fault occurs under a specific hardware condition when a
-+	  load/store instruction performs an address translation using:
-+	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
-+	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
-+	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
-+	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
-+
-+	  The workaround is to ensure these bits are clear in TCR_ELx.
-+	  The workaround only affect the Fujitsu-A64FX.
-+
-+	  If unsure, say Y.
-+
- endmenu
-
-
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 4feb6119c3c9..128d0fbfcb24 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -27,6 +27,7 @@
-
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-+#include <asm/cputype.h>
- #include <asm/debug-monitors.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
-@@ -604,6 +605,25 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
- #endif
- 	.endm
-
-+/*
-+ * tcr_clear_errata_bits - Clear TCR bits that trigger an errata on this CPU.
-+ */
-+	.macro	tcr_clear_errata_bits, tcr, tmp1, tmp2
-+#ifdef CONFIG_FUJITSU_ERRATUM_010001
-+	mrs	\tmp1, midr_el1
-+
-+	mov_q	\tmp2, MIDR_FUJITSU_ERRATUM_010001_MASK
-+	and	\tmp1, \tmp1, \tmp2
-+	mov_q	\tmp2, MIDR_FUJITSU_ERRATUM_010001
-+	cmp	\tmp1, \tmp2
-+	b.ne	10f
-+
-+	mov_q	\tmp2, TCR_CLEAR_FUJITSU_ERRATUM_010001
-+	bic	\tcr, \tcr, \tmp2
-+10:
-+#endif /* CONFIG_FUJITSU_ERRATUM_010001 */
-+	.endm
-+
- /**
-  * Errata workaround prior to disable MMU. Insert an ISB immediately prior
-  * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 951ed1a4e5c9..c6c6b4de0688 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -76,6 +76,7 @@
- #define ARM_CPU_IMP_BRCM		0x42
- #define ARM_CPU_IMP_QCOM		0x51
- #define ARM_CPU_IMP_NVIDIA		0x4E
-+#define ARM_CPU_IMP_FUJITSU		0x46
-
- #define ARM_CPU_PART_AEM_V8		0xD0F
- #define ARM_CPU_PART_FOUNDATION		0xD00
-@@ -104,6 +105,8 @@
- #define NVIDIA_CPU_PART_DENVER		0x003
- #define NVIDIA_CPU_PART_CARMEL		0x004
-
-+#define FUJITSU_CPU_PART_A64FX		0x001
-+
- #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
- #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
- #define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
-@@ -122,6 +125,12 @@
- #define MIDR_QCOM_KRYO MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_KRYO)
- #define MIDR_NVIDIA_DENVER MIDR_CPU_MODEL(ARM_CPU_IMP_NVIDIA, NVIDIA_CPU_PART_DENVER)
- #define MIDR_NVIDIA_CARMEL MIDR_CPU_MODEL(ARM_CPU_IMP_NVIDIA, NVIDIA_CPU_PART_CARMEL)
-+#define MIDR_FUJITSU_A64FX MIDR_CPU_MODEL(ARM_CPU_IMP_FUJITSU, FUJITSU_CPU_PART_A64FX)
-+
-+/* Fujitsu Erratum 010001 affects A64FX 1.0 and 1.1, (v0r0 and v1r0) */
-+#define MIDR_FUJITSU_ERRATUM_010001		MIDR_FUJITSU_A64FX
-+#define MIDR_FUJITSU_ERRATUM_010001_MASK	~MIDR_VARIANT(1);
-+#define TCR_CLEAR_FUJITSU_ERRATUM_010001	(TCR_NFD1 | TCR_NFD0)
-
- #ifndef __ASSEMBLY__
-
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index e9b0a7d75184..a69259cc1f16 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -302,6 +302,7 @@
- #define TCR_TBI1		(UL(1) << 38)
- #define TCR_HA			(UL(1) << 39)
- #define TCR_HD			(UL(1) << 40)
-+#define TCR_NFD0		(UL(1) << 53)
- #define TCR_NFD1		(UL(1) << 54)
-
- /*
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 73886a5f1f30..750e9f0500db 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -456,6 +456,7 @@ ENTRY(__cpu_setup)
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
- 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
- 			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
-+	tcr_clear_errata_bits x10, x9, x5
-
- #ifdef CONFIG_ARM64_USER_VA_BITS_52
- 	ldr_l		x9, vabits_user
--- 
-2.20.1
---------------------%<--------------------
+-Anand
 
 _______________________________________________
 linux-arm-kernel mailing list
