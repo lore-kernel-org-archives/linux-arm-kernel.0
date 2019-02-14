@@ -2,22 +2,21 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BCA29C10F05
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:39:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53FC3C10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:40:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8FDB42229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:39:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2395F222A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 08:40:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YirzTZdO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="M4MFfF/9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FDB42229F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bAClj9Km";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="DjkuF2Ud"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2395F222A4
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,64 +25,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kjDylHbOtdbK07nCPfBjywCAhAa7lhaWOvU1vXzpofI=; b=YirzTZdO3XEUge
-	HpKLmrUNp4YuDEYhwD0T+RqEKpCg1b2uKDdFfoIt/r4c0pBU+ZyuWXsMyZoDuA1XBKIX2dp1bY184
-	DaipzwDzhQEzDZnuMDw0Dhn517dbCd6v54WDpMNU/s4ScxP8U7KqgvSw/WN32/bPsK2lFNYSsQfc0
-	/9tzcRh+xGwIevqFDbSfavATqJvyaqUqOBULxAb385RnCfvIdSywPJpdBxX0c+MVsnHBd79v2Fxlb
-	d8g1iegra8KBBc+072gZxyuSEsGVSS8yOPU/+mQO8lQLXsvqRT1oO3OOsuMw5OgSze5X2zRsxXWTG
-	Pus8ACXIgyTwhq5NVnuQ==;
+	List-Owner; bh=nhkIII6IM4iggaj9GqPAq7tj2ALfHl1kvreYLitQX8c=; b=bAClj9KmoFFt7V
+	Ya9pq5/jDsjB57XipWY1ERhKjkdvsbvhPmQnKjFUJ1NfEvz22M05L4vMAAV1102fjV5o796c6//ql
+	R1QQWMUdiJD9JfsCprivYM2w5nMJ8Vm/4A/DMMoBXi5v7tY1U9eqroU2Cp8XRNYewFbB8MjNHaT4/
+	MxzFP0M+ionFHJn0Q4gVFO8aCsx4+n6fp7JKcxlQ7eMXO8g517Hqa9YGf/kGyOg1hL1etaDoDV9vA
+	F4/710/NUyplFKLLnf6Y0iNLpec8H1R+yLhoMy3ZDzmeLrmeZAVHfL+RT30zIoskTpONfEAyXFZHT
+	0fC6Hoo/kVB1SPM1NvZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guCYZ-0004mY-3T; Thu, 14 Feb 2019 08:39:43 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1guCZX-00077m-9K; Thu, 14 Feb 2019 08:40:43 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guCYV-0004mC-CS
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 08:39:41 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1E8dG7B092055;
- Thu, 14 Feb 2019 02:39:16 -0600
+ id 1guCZT-00077Q-Un
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 08:40:41 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1E8ePRS094247;
+ Thu, 14 Feb 2019 02:40:25 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550133556;
- bh=aYULI0iXlOgPt2an+UlTIJ6OxjZrdY1jzXjZERo92xY=;
+ s=ti-com-17Q1; t=1550133625;
+ bh=NW4c19zx3PI1ivdE5Py3m92KABYodHBo/I/ghYD5QYs=;
  h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=M4MFfF/9frkpywEePNCkvxiOiB9xr6DVCH4+IvvHJpBJQsXulnqOwzq6nMNnKoayn
- Dxlb64c+gUiEZYIitW2ip458K44vZcCqRTl3nlyUSXhFZ69OMO6EV4mpmzaS8kpKix
- tlfmTyE4PJD/csMcpowMtuXnIhN+vdHgSo6odRik=
-Received: from DFLE100.ent.ti.com (dfle100.ent.ti.com [10.64.6.21])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1E8dGCL017296
+ b=DjkuF2UdBF2kskcihjZrr9tFQd9KzJ89qIDjaHifSX8QfwUFNnRmBoI4Jx9SN1zbq
+ GOUgysLOREM83yH3SIqUmGTxod/vutO+VHHc+KJ/ZwCG21kGuFoOp1FzzjOUIWOW5/
+ 2W9+9xUVzG32fqk2iGZCPEPmMPUZEcYprMvyrs9A=
+Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1E8ePgl068034
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 14 Feb 2019 02:39:16 -0600
-Received: from DFLE111.ent.ti.com (10.64.6.32) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_2,
+ Thu, 14 Feb 2019 02:40:25 -0600
+Received: from DLEE112.ent.ti.com (157.170.170.23) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 14
- Feb 2019 02:39:15 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE111.ent.ti.com
- (10.64.6.32) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 02:40:24 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE112.ent.ti.com
+ (157.170.170.23) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 14 Feb 2019 02:39:15 -0600
+ Thu, 14 Feb 2019 02:40:24 -0600
 Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1E8dBwD024488;
- Thu, 14 Feb 2019 02:39:12 -0600
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1E8eKr3026130;
+ Thu, 14 Feb 2019 02:40:21 -0600
 Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
  router bindings
 To: Tony Lindgren <tony@atomide.com>
 References: <20190212074237.2875-1-lokeshvutla@ti.com>
  <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
+ <20190212163018.GL5720@atomide.com>
+ <5b5d86b9-2aa7-718c-c1da-70bbf9bf589e@ti.com>
+ <20190213153215.GT5720@atomide.com>
 From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
-Date: Thu, 14 Feb 2019 14:08:54 +0530
+Message-ID: <821ab540-469a-2166-9346-9cc0dec8ffbe@ti.com>
+Date: Thu, 14 Feb 2019 14:10:02 +0530
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190213152620.GS5720@atomide.com>
+In-Reply-To: <20190213153215.GT5720@atomide.com>
 Content-Language: en-US
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_003939_527877_4743159D 
-X-CRM114-Status: GOOD (  23.43  )
+X-CRM114-CacheID: sfid-20190214_004040_076619_11FCA305 
+X-CRM114-Status: GOOD (  17.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,67 +106,78 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
 
-On 13/02/19 8:56 PM, Tony Lindgren wrote:
-> * Lokesh Vutla <lokeshvutla@ti.com> [190213 04:26]:
+
+On 13/02/19 9:02 PM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [190213 04:23]:
 >> Hi Tony,
->> 
->> On 12/02/19 9:52 PM, Tony Lindgren wrote:
+>>
+>> On 12/02/19 10:00 PM, Tony Lindgren wrote:
 >>> Hi,
->>> 
+>>>
 >>> * Lokesh Vutla <lokeshvutla@ti.com> [190212 07:43]:
->>>> +Example: +-------- +The following example demonstrates both interrupt 
->>>> router node and the consumer +node(main gpio) on the AM654 SoC: + 
->>>> +main_intr: interrupt-controller0 { +	compatible = "ti,sci-intr"; + 
->>>> interrupt-controller; +	interrupt-parent = <&gic500>; + 
->>>> #interrupt-cells = <4>; +	ti,sci = <&dmsc>; +	ti,sci-dst-id = <56>; + 
->>>> ti,sci-rm-range-girq = <0x1>; +};
->>> 
->>> Can you describe a bit what the "ti,sci-dst-id" is above?
->>> 
->>> These IDs seem to be listed at at [0] below, but is it really a property
->>>  of the hardware? Or is it some enumeration of SoC devices in the 
->>> firmware?
->> 
->> This is the way that sysfw describes the hardware. In this case it is GIC 
->> and it is identified by this ID.
+>>>> +The Interrupt Router (INTR) module provides a mechanism to route M
+>>>> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+>>>> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+>>>> +controls the selection.
+>>>> +
+>>>> +
+>>>> +                                 Interrupt Router
+>>>> +                             +----------------------+
+>>>> +                             |  Inputs     Outputs  |
+>>>> +        +-------+            | +------+             |
+>>>> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+>>>> +        +-------+            | +------+             |      controller
+>>>> +                             |    .        +-----+  |      +-------+
+>>>> +        +-------+            |    .        |  0  |  |----->|  IRQ  |
+>>>> +        | INTA  |----------->|    .        +-----+  |      +-------+
+>>>> +        +-------+            |    .          .      |
+>>>> +                             | +------+      .      |
+>>>> +                             | | irqM |    +-----+  |
+>>>> +                             | +------+    |  N  |  |
+>>>> +                             |             +-----+  |
+>>>> +                             +----------------------+
+>>>
+>>> Is this always one-to-one mapping or can the same interrupt be routed to
+>>> multiple targets like to the SoC and some coprocessor?
+>>
+>> Yes, it is always one-to-one. Output of INTR can only be attached to one of the
+>> processor.
 > 
-> If this ID is an enumeration in the sysfw rather than an actual hardware 
-> property it should not be in the device tree. If so,
-
-Devicetree-specification-v0.2[1] "Section 1.1 Purpose and Scope" mentions that
-devicetree specification provides a complete boot program to client program
-interface definition. Where boot program here is the sysfw and client program is
-Linux. In this case we are describing the id which is the destination interrupt
-controller to which the irqs are supposed to be attached.
-
-> the device driver should request the id from the sysfw based on a name. That 
-> is, if no struct device or device phandle can
-
-From a scalability perspective using a name to get a device id might worsen
-things.  There are hundreds of devices within the SoC and standardizing a name
-for each device and making sure using the same name across all future SoCs might
-be a bit pain. If there are more than one instance of the same device then name
-that should be requested is different with in the same driver.
-
-IMHO, device ids are something which can be used in DT. There are many other
-things like the interrupt ranges etc.. which are discoverable from sysfw and we
-are implementing it.
-
-> be used.
-> > The problem with using enumeration in the dts is that it requires
-> maintaining the dts, driver(s) and possibly firmware in sync. And that might
-
-The idea here is device ids are not going to change for a SoC. For new SoCs
-within the same architecture ids will change and we will have new dts or this
-new SoC.
-
-> change between SoCs variants when new devices get added and removed.
+> OK
 > 
+>>>> +Configuration of these MUXCNTL_N registers is done by a system controller
+>>>> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+>>>> +controller will keep track of the used and unused registers within the Router.
+>>>> +Driver should request the system controller to get the range of GIC IRQs
+>>>> +assigned to the requesting hosts. It is the drivers responsibility to keep
+>>>> +track of Host IRQs.
+>>>> +
+>>>> +Communication between the host processor running an OS and the system
+>>>> +controller happens through a protocol called TI System Control Interface
+>>>> +(TISCI protocol). For more details refer:
+>>>> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
+>>>
+>>> Care to describe a bit why the interrupts need to be routed by a system
+>>> controller?
+>>
+>> K3 architecture defines a heterogeneous system where multiple heterogeneous
+>> cores are serving its own usecases. Given that there are multiple ways in which
+>> a device IRQ can be routed using INTR, like either it can be routed to HLOS
+>> core(A53 int this case) or it can be routed to any other coprocessor available
+>> in the system(like R5). If every sw running in each co-processor is allowed to
+>> program this INTR then there is a high probability that one sw executing on one
+>> core can damage other heterogeneous core.  Mainly to avoid this damage the
+>> configuration of all the INTRs and INTAs are done in a centralized place(sysfw).
+>> Any user for programming its IRQ route should send a message to sysfw with the
+>> parameters. These parameters are policed by sysfw and does the configuration.
+> 
+> OK so maybe update the description along those lines saying it's
+> a shared piece of hardware between various independent SoC
+> clusters which may or may not be running Linux.
 
-[1]
-https://github.com/devicetree-org/devicetree-specification/releases/download/v0.2/devicetree-specification-v0.2.pdf
+IMHO, SoC integration is out of scope of this document. If you insist I can add
+the details.
 
 Thanks and regards,
 Lokesh
