@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A1C9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:32:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A37CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:32:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B3D8222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:32:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF4C6222E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:32:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pqE0WLD0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="T8bZfAGX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B3D8222DA
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e5I51gNk";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZkGopDZr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF4C6222E0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=yUSMp+fiYaH1gQTzKofZr3cZ0hu9+K1JeWNJmUpdtHE=; b=pqE0WLD0FKLp9g
-	pqs2g1piQo8nOcZBseNxcgcbl6QLB+2p1Cdo/+dB9mxRvMK4AVSeZ3bP+/PwujkMDCmVFVw4H2fA2
-	bkHTjNFLaIWm8A9oWwOnJY588rl2V7bSjWiBB6MPjxLu48mNaQUTf89PWABKBZ0E5AD//FjoWGX4Q
-	Ip0HfrLpiph9nhTeTvGTijPm/b3yQsTCxpJlYeMuymEHWMtofqFZ6NrU6UF8xT3UEsZjh2JrdqxTl
-	xulO/n6VFSvKB6yjLr+USkWDbTFrlOJHtVNo2GOWLgBer/Gsm/QrFawVBMKQhzAqkMlAHRWxek9U2
-	q5hNhT8Py2pzJQOadtnA==;
+	List-Owner; bh=pPlsWh0LAcqTT7bi9g1+7EJoQZ89Ov4Qix752z8td5w=; b=e5I51gNkdUh59x
+	LxpV0GG0j0KekrAz5KHe3XppBlWHg+0rW4q60iJolMYPlZ6iLDuMEcVSGJtRVPp4l3joMIctNPKVQ
+	puEiXgwTIIMNxFfiWjx3J26UtXgbn8a4FLV/e1smr6z4bP2/m5qU14ATXqG9GVfudsDU7V5Voe1uD
+	I83Mrty/PLYEIBXp3D/syCKVse/vGuTqJThaIABgp6mYcnXdZ6g5RbebZhBZ0D/+lCuaLGb4rrUqt
+	SGBcPNGncVtaYt45nIOOdPISTsfdJDU2HdUqQz/S4R0h2YQBlzDp/URala/mUlp4lGA2lCoBXsQ1o
+	Ezer1P/c1gDW+OgavfdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guJw3-0002rs-Cy; Thu, 14 Feb 2019 16:32:27 +0000
+	id 1guJwF-000381-JY; Thu, 14 Feb 2019 16:32:39 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guJw0-0002rX-IX; Thu, 14 Feb 2019 16:32:25 +0000
+ id 1guJwB-000344-Jg; Thu, 14 Feb 2019 16:32:37 +0000
 Received: from ziggy.de (unknown [37.223.146.9])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 18F5F222DA;
- Thu, 14 Feb 2019 16:32:21 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 5A637222DA;
+ Thu, 14 Feb 2019 16:32:33 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550161944;
- bh=GbMzRensU03GT9hjWsSQCVuqqG+tPntmwIoS4ac4+Fg=;
+ s=default; t=1550161955;
+ bh=es46TivW9Kpxp/jDOK1Lil3w0c11Tvpf4AabeEtZPO4=;
  h=From:To:Cc:Subject:Date:From;
- b=T8bZfAGXAiMXSF3lC2oWdTr9u+o2hGATuJby8133xEJI8cPF6Gw4Dmd3pJRfYtDwv
- NZFtu/Bck1UYCQvphugUn81DUnpe9ZKOgD0klfqEyi5+1kQah2NrZ+ctGG815FVDLh
- JRPCBBgM6m0/Hdu7R+uAdXAdkFXmiY60b0iKQREM=
+ b=ZkGopDZrRtdv7IYtksHgIvCdA9juJGcDX7uNQ+8Mm6VXScZkCq88sEk7zLHDQf2nG
+ 2DBJh3JQa6QAC/Jb3IyVgtF9/NXcbgCiJroyuI8amcREsHC067GYxjWF5FRXwRpvMk
+ rIpLwxxc/5Ii+1m+ZGTHxc2oGUfkq6sjWkmWOSKw=
 From: matthias.bgg@kernel.org
 To: mturquette@baylibre.com, sboyd@kernel.org, kevin-cw.chen@mediatek.com,
  mars.cheng@mediatek.com
-Subject: [PATCH v4 1/3] clk: mediatek: Add MUX_FLAGS macro
-Date: Thu, 14 Feb 2019 17:32:18 +0100
-Message-Id: <20190214163218.26148-1-matthias.bgg@kernel.org>
+Subject: [PATCH v4 2/3] clk: mediatek: Add flags to mtk_gate
+Date: Thu, 14 Feb 2019 17:32:30 +0100
+Message-Id: <20190214163230.26203-1-matthias.bgg@kernel.org>
 X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_083224_628118_18692B70 
-X-CRM114-Status: UNSURE (   8.37  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190214_083235_786587_6EE7D263 
+X-CRM114-Status: GOOD (  10.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,41 +82,78 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Jasper Mattsson <jasu@njomotys.info>
 
-This is required to mark outputs of certain MUXes as CLK_IS_CRITICAL.
+This is required to mark gates as CLK_IS_CRITICAL.
 
 Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
 Acked-by: Mars Cheng <mars.cheng@mediatek.com>
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- drivers/clk/mediatek/clk-mtk.h | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/clk/mediatek/clk-gate.c | 4 +++-
+ drivers/clk/mediatek/clk-gate.h | 3 ++-
+ drivers/clk/mediatek/clk-mtk.c  | 2 +-
+ drivers/clk/mediatek/clk-mtk.h  | 1 +
+ 4 files changed, 7 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 934bf0e45e26..9628d4e7690b 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -157,7 +157,8 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops)
++		const struct clk_ops *ops,
++		unsigned long flags)
+ {
+ 	struct mtk_clk_gate *cg;
+ 	struct clk *clk;
+@@ -172,6 +173,7 @@ struct clk *mtk_clk_register_gate(
+ 	init.parent_names = parent_name ? &parent_name : NULL;
+ 	init.num_parents = parent_name ? 1 : 0;
+ 	init.ops = ops;
++	init.flags = flags;
+ 
+ 	cg->regmap = regmap;
+ 	cg->set_ofs = set_ofs;
+diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+index 72ef89b3ad7b..9f766dfe1d57 100644
+--- a/drivers/clk/mediatek/clk-gate.h
++++ b/drivers/clk/mediatek/clk-gate.h
+@@ -47,6 +47,7 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops);
++		const struct clk_ops *ops,
++		unsigned long flags);
+ 
+ #endif /* __DRV_CLK_GATE_H */
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 9c0ae4278a94..ef410413bb0b 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -130,7 +130,7 @@ int mtk_clk_register_gates(struct device_node *node,
+ 				gate->regs->set_ofs,
+ 				gate->regs->clr_ofs,
+ 				gate->regs->sta_ofs,
+-				gate->shift, gate->ops);
++				gate->shift, gate->ops, gate->flags);
+ 
+ 		if (IS_ERR(clk)) {
+ 			pr_err("Failed to register clk %s: %ld\n",
 diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index f83c2bbb677e..daab6ee94788 100644
+index daab6ee94788..987ff2855249 100644
 --- a/drivers/clk/mediatek/clk-mtk.h
 +++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -111,7 +111,11 @@ struct mtk_composite {
- 	MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
- 		_gate, CLK_SET_RATE_PARENT)
+@@ -162,6 +162,7 @@ struct mtk_gate {
+ 	const struct mtk_gate_regs *regs;
+ 	int shift;
+ 	const struct clk_ops *ops;
++	unsigned long flags;
+ };
  
--#define MUX(_id, _name, _parents, _reg, _shift, _width) {		\
-+#define MUX(_id, _name, _parents, _reg, _shift, _width)			\
-+	MUX_FLAGS(_id, _name, _parents, _reg,				\
-+		  _shift, _width, CLK_SET_RATE_PARENT)
-+
-+#define MUX_FLAGS(_id, _name, _parents, _reg, _shift, _width, _flags) {	\
- 		.id = _id,						\
- 		.name = _name,						\
- 		.mux_reg = _reg,					\
-@@ -121,7 +125,7 @@ struct mtk_composite {
- 		.divider_shift = -1,					\
- 		.parent_names = _parents,				\
- 		.num_parents = ARRAY_SIZE(_parents),			\
--		.flags = CLK_SET_RATE_PARENT,				\
-+		.flags = _flags,				\
- 	}
- 
- #define DIV_GATE(_id, _name, _parent, _gate_reg, _gate_shift, _div_reg,	\
+ int mtk_clk_register_gates(struct device_node *node,
 -- 
 2.20.1
 
