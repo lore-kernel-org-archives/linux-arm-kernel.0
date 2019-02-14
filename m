@@ -2,68 +2,91 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C0EEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:52:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A03E3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:52:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B29D222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:52:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6CB0F222DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:52:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CYLsF5fz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B29D222DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E5TVLg0Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CB0F222DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GIrxqwak/RD1gKo1FFnS3wNNwY6heqgmYKSon/cQyTw=; b=CYLsF5fzCgViw8
-	CFBTDg12LGSw+EXy2sKuzNr91rja4GCQ8vOcmyLpwVsnacL3eHJASqF1qKJ7adKxMY67M9sqMsuc3
-	STb0zVUxv0a+NlSk24acWvpKIjEZLPsnk2blyfavbw/hKhl37L8YxNWWQFVwMqCECH8WzWB5M0pfU
-	o/R5dqHCy3m/amR5IftfyB4IueVM/DRCBbllQJXAuVmqV2QHA3PO9H4/OAR9Z2zFmI0QUr0VtFLcu
-	E016AtSMBm69GtugFw9XSe7XrIRbC6854UxgiTG8jrbnCB4Zxei3AdfJaNamiEbCv79L3smMbxHHc
-	3P2ADYjWZmt1hR1K9u+A==;
+	List-Owner; bh=O/YFGCGFor7dpVfKzi8RtEETSBTO0JIpBP031CDaNmA=; b=E5TVLg0YSzN2F8
+	FcKbkKoVqXZV8jvwS/v5B1MmbDsJjTwurzRGUeH1xa3OH5WAHQPrU3VwuESmRadM6JYo1PXTFxGVb
+	op8NscBTkSVRwIbD9usvtHBHfgjlEYk0+wGrhyHgdHsfFUcOesK5ujGwMrNMC+TWUe7zHb5AbVmRg
+	E7pjmsQVlKcqm1F6ekHV05twIdeDUgRT26K/zcb7401TaMolFSAbpUjpmQ0QyOb0dX3S3ein/JDnp
+	qWD0SBC4qs/GrHOWO5yx2jKAE41dZGFsWYWteUpi2/62WO+Zin//ygppWncP+2C8nI/GC0M/mq+0j
+	za5T7w5IbD164dc4Hm2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guJIs-0004f1-Ik; Thu, 14 Feb 2019 15:51:58 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1guJJ9-0004yj-ET; Thu, 14 Feb 2019 15:52:15 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guJIo-0004bL-K7
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:51:56 +0000
-Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
- by metis.ext.pengutronix.de with esmtp (Exim 4.89)
- (envelope-from <l.stach@pengutronix.de>)
- id 1guJIg-0004RD-Sd; Thu, 14 Feb 2019 16:51:46 +0100
-Message-ID: <1550159506.2546.42.camel@pengutronix.de>
-Subject: Re: [RFC 2/5] dt-bindings: imx8mq-clock: Add the missing ARM clock
-From: Lucas Stach <l.stach@pengutronix.de>
-To: Abel Vesa <abel.vesa@nxp.com>, Rob Herring <robh@kernel.org>, Stephen
- Boyd <sboyd@kernel.org>, Mark Rutland <mark.rutland@arm.com>, Mike
- Turquette <mturquette@baylibre.com>, Shawn Guo <shawnguo@kernel.org>,
- Sascha Hauer <kernel@pengutronix.de>, Angus Ainslie
- <angus.ainslie@puri.sm>, Anson Huang <anson.huang@nxp.com>
-Date: Thu, 14 Feb 2019 16:51:46 +0100
-In-Reply-To: <1550084693-9797-3-git-send-email-abel.vesa@nxp.com>
-References: <1550084693-9797-1-git-send-email-abel.vesa@nxp.com>
- <1550084693-9797-3-git-send-email-abel.vesa@nxp.com>
-X-Mailer: Evolution 3.22.6-1+deb9u1 
-Mime-Version: 1.0
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
-X-SA-Exim-Mail-From: l.stach@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+ id 1guJIv-0004h1-4J
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:52:06 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1EFUdm8018329; Thu, 14 Feb 2019 16:51:51 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2qmwsum8ty-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 14 Feb 2019 16:51:51 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 386E738;
+ Thu, 14 Feb 2019 15:51:50 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag4node3.st.com [10.75.127.12])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 041AF587B;
+ Thu, 14 Feb 2019 15:51:50 +0000 (GMT)
+Received: from SFHDAG5NODE3.st.com (10.75.127.15) by SFHDAG4NODE3.st.com
+ (10.75.127.12) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 14 Feb
+ 2019 16:51:49 +0100
+Received: from SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47]) by
+ SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47%20]) with mapi id
+ 15.00.1347.000; Thu, 14 Feb 2019 16:51:49 +0100
+From: Christophe ROULLIER <christophe.roullier@st.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: Re: [PATCH 2/8] net: ethernet: stmmac: update to support all PHY
+ config for stm32mp157c.
+Thread-Topic: [PATCH 2/8] net: ethernet: stmmac: update to support all PHY
+ config for stm32mp157c.
+Thread-Index: AQHUxHYStTBKTIMizUiYISVPutO8+6XfVpoAgAAKGoA=
+Date: Thu, 14 Feb 2019 15:51:49 +0000
+Message-ID: <66e5d183-6952-44a2-926a-91f4ff363024@st.com>
+References: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
+ <1550126763-22669-3-git-send-email-christophe.roullier@st.com>
+ <20190214134040.GA5699@lunn.ch> <02cd7773-899f-b28a-ff61-849b17cbe82d@st.com>
+ <20190214151540.GG708@lunn.ch>
+In-Reply-To: <20190214151540.GG708@lunn.ch>
+Accept-Language: fr-FR, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.75.127.51]
+Content-ID: <9E112A135F78B34A8FB7B9DA49282314@st.com>
+MIME-Version: 1.0
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-14_07:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_075154_835750_F81D5120 
-X-CRM114-Status: GOOD (  12.41  )
+X-CRM114-CacheID: sfid-20190214_075201_798933_622D6C0B 
+X-CRM114-Status: GOOD (  11.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,31 +98,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ Alexandre TORGUE <alexandre.torgue@st.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-stm32@st-md-mailman.stormreply.com"
+ <linux-stm32@st-md-mailman.stormreply.com>,
+ "joabreu@synopsys.com" <joabreu@synopsys.com>,
+ "mcoquelin.stm32@gmail.com" <mcoquelin.stm32@gmail.com>,
+ Peppe CAVALLARO <peppe.cavallaro@st.com>,
+ "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QW0gTWl0dHdvY2gsIGRlbiAxMy4wMi4yMDE5LCAxOTowNSArMDAwMCBzY2hyaWViIEFiZWwgVmVz
-YToKPiBBZGQgdGhlIG1pc3NpbmcgQVJNIGNsb2NrIHdoaWNoIHdpbGwgYmUgdXNlZCBieSBjcHVm
-cmVxCj4gCj4gU2lnbmVkLW9mZi1ieTogQWJlbCBWZXNhIDxhYmVsLnZlc2FAbnhwLmNvbT4KClJl
-dmlld2VkLWJ5OiBMdWNhcyBTdGFjaCA8bC5zdGFjaEBwZW5ndXRyb25peC5kZT4KCj4gLS0tCj4g
-wqBpbmNsdWRlL2R0LWJpbmRpbmdzL2Nsb2NrL2lteDhtcS1jbG9jay5oIHwgNCArKystCj4gwqAx
-IGZpbGUgY2hhbmdlZCwgMyBpbnNlcnRpb25zKCspLCAxIGRlbGV0aW9uKC0pCj4gCj4gZGlmZiAt
-LWdpdCBhL2luY2x1ZGUvZHQtYmluZGluZ3MvY2xvY2svaW14OG1xLWNsb2NrLmggYi9pbmNsdWRl
-L2R0LQo+IGJpbmRpbmdzL2Nsb2NrL2lteDhtcS1jbG9jay5oCj4gaW5kZXggMDRmN2FjMy4uNDdj
-NzkwYyAxMDA2NDQKPiAtLS0gYS9pbmNsdWRlL2R0LWJpbmRpbmdzL2Nsb2NrL2lteDhtcS1jbG9j
-ay5oCj4gKysrIGIvaW5jbHVkZS9kdC1iaW5kaW5ncy9jbG9jay9pbXg4bXEtY2xvY2suaAo+IEBA
-IC0zOTEsNSArMzkxLDcgQEAKPiDCoAo+IMKgI2RlZmluZSBJTVg4TVFfQ0xLX05BTkRfVVNESENf
-QlVTX1JBV05BTkRfQ0xLCTI2Nwo+IMKgCj4gLSNkZWZpbmUgSU1YOE1RX0NMS19FTkQJCQkJMjY4
-Cj4gKyNkZWZpbmUgSU1YOE1RX0NMS19BUk0JCQkJMjY4Cj4gKwo+ICsjZGVmaW5lIElNWDhNUV9D
-TEtfRU5ECQkJCTI2OQo+IMKgI2VuZGlmIC8qIF9fRFRfQklORElOR1NfQ0xPQ0tfSU1YOE1RX0gg
-Ki8KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
-LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
-Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
-bS1rZXJuZWwK
+On 2/14/19 4:15 PM, Andrew Lunn wrote:
+>> Sorry, I've misunderstood your question ;-)
+>>
+>> And you spoke about :
+>>
+>> case PHY_INTERFACE_MODE_RGMII:
+>> case PHY_INTERFACE_MODE_RGMII_ID:
+>> case PHY_INTERFACE_MODE_RGMII_RXID:
+>> case PHY_INTERFACE_MODE_RGMII_TXID:
+>>
+>> So in my setup I've only RGMII interface, so I've never tested 3 others
+>> interfaces (_ID, _RXID, _TXID).
+>>
+>> So do I need to add cases in my driver ?
+> 
+> Yes. They all indicate the MAC should be using RGMII.
+> 
+> This appears to be an old issue, but now would be a good time to fix
+> it.
+> 
+>       Andrew
+> 
+Ok Andrew, I will update with these
+
+Thanks
+
+Christophe
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
