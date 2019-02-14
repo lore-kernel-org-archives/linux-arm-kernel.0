@@ -2,87 +2,90 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BB8CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:37:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8447EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:42:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38B5721B1C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:37:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DAF0222D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:42:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A/3z1xki";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="Ug/rn53s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38B5721B1C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VlpUytQK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LItd5cMq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DAF0222D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ghiti.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HQVpoDn/zdlcTmriFwQe0kk0siHrYn97dhEsSNqtLt4=; b=A/3z1xkizmWJXn
-	z9RahAqSEML7fX3gu0BjublfR6+3mr0Kgy1nWrALTn1+wd+BKWF0u+Jz9g233qpAl3G00+5+xO/Th
-	y+050Hx0SdbTJy1mrTeasLkbpGTVUeTGW/f0uAS7AFWr0N9PAjsZwoQt+97u4Q9EVWXhjDK+HPbPS
-	9fkAF6Bi8YbaJ3ZnVbNau8fTCaGu63REEutAFCbabRsE5DpJviNhsRa8wW8+NBo3m2Y+nSgixRjRq
-	dzx273yOtbjUbCG+4KlE6AVenMkw+Mz7kh9dINOts/TYf3Rqivz1cUl5t18Oe9QU+sq+fHU5P933C
-	U/13mTAXVXH06IuBUceA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=aTpCGFBbsiYyIitPFDRnKJKoUiEhaia+ddXhIMt6jcs=; b=VlpUytQKgoWiUS
+	uImVpKbMA3UlAfx0IGLjwofgqnOsfMXtPnW1Ebcqcgc+LDTDFVkHXm6BIIMcPkIGhvZ1UCiNl/eYy
+	MyqzRDZphor2dWI4EfvK5RhwpPAHKmk4DdsVi5Mmcv711pavs2Z57UyTT/iLTuyFu1fRArIJYe6f1
+	DnUKdzr5mnsS7W+YSwS89RrtX1DuAyE77C3+yDhBJUv1fE6xc1GIpYTgR49PMyQnm5iSx9R3fFjzH
+	kKKhxc5nDRe0Y6MbIaAWelMuEN0mh/+9i44edDIJ03Jn2tLy6JkKBvykdTIRhskIsYqUHMriFvUQz
+	wrftC05t5kMzCBksTTMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guMp0-0001Y7-Ru; Thu, 14 Feb 2019 19:37:22 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1guMuJ-00045P-Pb; Thu, 14 Feb 2019 19:42:51 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guMl5-00063U-IZ
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:33:40 +0000
-Received: by mail-pg1-x541.google.com with SMTP id i130so3573082pgd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 11:33:19 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=WDmxxzjCCLiFJpoIHfbvmHM+WtyBWfZzHa7paSm6QGI=;
- b=Ug/rn53seStgQKetu4l86Pn/tP9IzrtjSHXmCu80yJ1G1X6MyRj2q1Z97To2fADWUb
- UMU6Ys1oMlbxj29Ym154Q5OFolUXgLX/bDGyMWfZyy+TnugXqjjo3m0znsESaDeJAl3F
- SD4751gvEryqZ6Ld7JGzgHZmV6xBRjnwPCOzo=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=WDmxxzjCCLiFJpoIHfbvmHM+WtyBWfZzHa7paSm6QGI=;
- b=SFkJbty0NsQoBKleL9YPfN2//+Nn2YOCQS1AHoKR/xgv1TpEp5owtaokMjAJXH+E2l
- xe7lRCkx2VVTbmx5jccDg4xt+Btb5TF129tyU1ZJ535bST2Vc3YdqLp0tjSmXgPRRbEj
- ps2cNI6nkWH3KACfHeuPiy8cnUpVx7UR4FfPOyVNP0xk5lnlo/Tn7uJuLbm4A/iP3BzY
- b2ACQYDNYPDJ2QSOsojqn4mEKu48QL/ouoYObnMGtr4bKV98G+zeBK+SzbvcKz2dX79O
- L5DvHmFYSpZe6T1Tbkv6/viUn1fVuproZupeW/Y+y/MmhVjz0LgpYfe2g9gb0caxD0TQ
- EiKw==
-X-Gm-Message-State: AHQUAuZo69S9wvZbcUmTKnTD+9yfCoh9pTOPEefOkbQurF2cjY5bBdBK
- vcMoqf6PhcCdMhs0QtS1pTS3rA==
-X-Google-Smtp-Source: AHgI3IY4y1me3baq2nOd8mvboYHGJlofzAkb/9sc4TzbmT1NCoVHXusfBNijz/AatZ4iaxqzKpXmEA==
-X-Received: by 2002:a63:1105:: with SMTP id g5mr5356652pgl.322.1550172798908; 
- Thu, 14 Feb 2019 11:33:18 -0800 (PST)
-Received: from localhost.localdomain ([115.97.184.151])
- by smtp.gmail.com with ESMTPSA id o23sm10808832pfa.140.2019.02.14.11.33.15
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 11:33:18 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
- Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
-Subject: [PATCH v8 08/10] drm/sun4i: sun6i_mipi_dsi: Setup burst mode
-Date: Fri, 15 Feb 2019 01:02:35 +0530
-Message-Id: <20190214193236.7504-9-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190214193236.7504-1-jagan@amarulasolutions.com>
-References: <20190214193236.7504-1-jagan@amarulasolutions.com>
+ id 1guMuH-00043a-0U
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 19:42:49 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=3ZM9K3eY7LfXKiO/mq1eDFNwRhIIwxFrIzBDH8EFaIc=; b=LItd5cMqmerPKxNLiPcPoalvbF
+ QXz4uBz8vSuG+1aKl78q8OUUyvMUyy6Rpj5ujPvLwXT3UL8VnNwzkl0YQ/wRM7wdunBTLO5vF/ABI
+ 45g4RM4psfS9WgjqmNl8fewUGMSNpwWxxQ5W7QtIggBAvJ0HG1vxBt0VWStknvDE4fxVWTSaZAtaw
+ qsb0WyYDEfv6soxGdqE/nWzwqiYm6fL/Jb5p1neONrycGlf9L1i0iUac8KycKhpTj88G5lFdj4Jlg
+ i1z/kgxfOvxGTvVBnjGwb2IRPwg5DwbamhalgyNyv4zAf1tlmLXMBokPB8afm5hoEzoVc2ymtW24g
+ brzqN/Zw==;
+Received: from relay5-d.mail.gandi.net ([217.70.183.197])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guMjS-0004A0-NG
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:31:40 +0000
+X-Originating-IP: 79.86.19.127
+Received: from alex.numericable.fr (127.19.86.79.rev.sfr.net [79.86.19.127])
+ (Authenticated sender: alex@ghiti.fr)
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id BD1741C0009;
+ Thu, 14 Feb 2019 19:31:02 +0000 (UTC)
+From: Alexandre Ghiti <alex@ghiti.fr>
+To: Vlastimil Babka <vbabka@suse.cz>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ x86@kernel.org, Dave Hansen <dave.hansen@linux.intel.com>,
+ Andy Lutomirski <luto@kernel.org>, Peter Zijlstra <peterz@infradead.org>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Mike Kravetz <mike.kravetz@oracle.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
+ linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
+Subject: [PATCH v3] hugetlb: allow to free gigantic pages regardless of the
+ configuration
+Date: Thu, 14 Feb 2019 14:31:00 -0500
+Message-Id: <20190214193100.3529-1-alex@ghiti.fr>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_113320_029831_B296CE51 
-X-CRM114-Status: GOOD (  15.00  )
+X-CRM114-CacheID: sfid-20190214_193138_792427_E313B4BF 
+X-CRM114-Status: GOOD (  28.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,152 +97,381 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
- Jagan Teki <jagan@amarulasolutions.com>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-arm-kernel@lists.infradead.org
+Cc: Alexandre Ghiti <alex@ghiti.fr>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Burst mode in DSI would require separate setup initialization
-with respect to conventional video mode.
+On systems without CMA or (MEMORY_ISOLATION && COMPACTION) activated but
+that support gigantic pages, boottime reserved gigantic pages can not be
+freed at all. This patch simply enables the possibility to hand back
+those pages to memory allocator.
 
-Allwinner DSI controller would need below sequence to setup the
-burst mode.
-1) configure the burst drq.
-2) configure the burst line.
-3) finally enable mode.
+This patch also renames:
 
-- To configure burst drq, controller would require to compute the
-  edge0, edge1 and fill into burst mode register.
+- the triplet CMA or (MEMORY_ISOLATION && COMPACTION) into CONTIG_ALLOC,
+and gets rid of all use of it in architecture specific code (and then
+removes ARCH_HAS_GIGANTIC_PAGE config).
+- gigantic_page_supported to make it more accurate: this value being false
+does not mean that the system cannot use gigantic pages, it just means that
+runtime allocation of gigantic pages is not supported, one can still
+allocate boottime gigantic pages if the architecture supports it.
 
-- To configure burst line, controller would require to compute the
-  line, sync values and fill into burst line register.
-
-- Enable burst mode, would require to enable burst mode bit in DSI
-  control register.
-
-Since there is no direct documentation for these computations
-the edge and line formulas are taken from BSP code (from linux-sunxi/
-drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-
-line_num = panel->lcd_ht*dsi_pixel_bits[panel->lcd_dsi_format]/
-	  (8*panel->lcd_dsi_lane);
-edge1 = sync_point+(panel->lcd_x+panel->lcd_hbp+20)*
-	dsi_pixel_bits[panel->lcd_dsi_format] /(8*panel->lcd_dsi_lane);
-edge1 = (edge1>line_num)?line_num:edge1;
-edge0 = edge1+(panel->lcd_x+40)*tcon_div/8;
-edge0 = (edge0>line_num)?(edge0-line_num):1;
-
-Note: edge0 computation would require tcon0 divider and it's value is
-always 4 in Allwinner BSP. This patch find out the divider value at
-runtime by reading tcon clocks.
-
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Tested-by: Merlijn Wajer <merlijn@wizzup.org>
+Signed-off-by: Alexandre Ghiti <alex@ghiti.fr>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 70 ++++++++++++++++++++++++--
- 1 file changed, 67 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 62b4c822bf18..63b83b47cf0d 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -356,6 +356,41 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- 		     SUN6I_DSI_INST_JUMP_CFG_NUM(1));
- };
+Changes in v3 as suggested by Vlastimil Babka and Dave Hansen:
+- config definition was wrong and is now in mm/Kconfig
+- COMPACTION_CORE was renamed in CONTIG_ALLOC
+
+Changes in v2 as suggested by Vlastimil Babka:
+- Get rid of ARCH_HAS_GIGANTIC_PAGE
+- Get rid of architecture specific gigantic_page_supported
+- Factorize CMA or (MEMORY_ISOLATION && COMPACTION) into COMPACTION_CORE
+
+Compiles on all arches and validated on riscv
+
+ arch/arm64/Kconfig                           |  1 -
+ arch/arm64/include/asm/hugetlb.h             |  4 --
+ arch/powerpc/include/asm/book3s/64/hugetlb.h |  7 ----
+ arch/powerpc/platforms/Kconfig.cputype       |  1 -
+ arch/s390/Kconfig                            |  1 -
+ arch/s390/include/asm/hugetlb.h              |  3 --
+ arch/x86/Kconfig                             |  1 -
+ arch/x86/include/asm/hugetlb.h               |  4 --
+ arch/x86/mm/hugetlbpage.c                    |  2 +-
+ fs/Kconfig                                   |  3 --
+ include/linux/gfp.h                          |  4 +-
+ mm/Kconfig                                   |  5 +++
+ mm/hugetlb.c                                 | 44 +++++++++++---------
+ mm/page_alloc.c                              |  7 ++--
+ 14 files changed, 35 insertions(+), 52 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..6c778046b9f7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -18,7 +18,6 @@ config ARM64
+ 	select ARCH_HAS_FAST_MULTIPLIER
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_MEMBARRIER_SYNC_CORE
+ 	select ARCH_HAS_PTE_SPECIAL
+diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+index fb6609875455..59893e766824 100644
+--- a/arch/arm64/include/asm/hugetlb.h
++++ b/arch/arm64/include/asm/hugetlb.h
+@@ -65,8 +65,4 @@ extern void set_huge_swap_pte_at(struct mm_struct *mm, unsigned long addr,
  
-+static u32 sun6i_dsi_get_edge1(struct sun6i_dsi *dsi,
-+			       struct drm_display_mode *mode, u32 sync_point)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+	unsigned int bpp = mipi_dsi_pixel_format_to_bpp(device->format);
-+	u32 hact_sync_bp;
-+
-+	/* Horizontal timings duration excluding front porch */
-+	hact_sync_bp = (mode->hdisplay + mode->htotal - mode->hsync_start);
-+
-+	return (sync_point + ((hact_sync_bp + 20) * bpp / (8 * device->lanes)));
-+}
-+
-+static u32 sun6i_dsi_get_edge0(struct sun6i_dsi *dsi,
-+			       struct drm_display_mode *mode, u32 edge1)
-+{
-+	struct sun4i_tcon *tcon = dsi->tcon;
-+	unsigned long dclk_rate, dclk_parent_rate, tcon0_div;
-+
-+	dclk_rate = clk_get_rate(tcon->dclk);
-+	dclk_parent_rate = clk_get_rate(clk_get_parent(tcon->dclk));
-+	tcon0_div = dclk_parent_rate / dclk_rate;
-+
-+	return (edge1 + (mode->hdisplay + 40) * tcon0_div / 8);
-+}
-+
-+static u32 sun6i_dsi_get_line_num(struct sun6i_dsi *dsi,
-+				  struct drm_display_mode *mode)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+	unsigned int bpp = mipi_dsi_pixel_format_to_bpp(device->format);
-+
-+	return (mode->htotal * bpp / (8 * device->lanes));
-+}
-+
- static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
- 			      struct drm_display_mode *mode)
- {
-@@ -422,8 +457,32 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 				  struct drm_display_mode *mode)
- {
--	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
--		     sun6i_dsi_get_drq(dsi, mode));
-+	struct mipi_dsi_device *device = dsi->device;
-+	u32 sync_point = 40;
-+	u32 line_num = sun6i_dsi_get_line_num(dsi, mode);
-+	u32 edge1 = sun6i_dsi_get_edge1(dsi, mode, sync_point);
-+	u32 edge0 = sun6i_dsi_get_edge0(dsi, mode, edge1);
-+	u32 val;
-+
-+	if (edge1 > line_num)
-+		edge1 = line_num;
-+
-+	if (edge0 > line_num)
-+		edge0 -= line_num;
-+	else
-+		edge0 = 1;
-+
-+	regmap_write(dsi->regs, SUN6I_DSI_BURST_DRQ_REG,
-+		     SUN6I_DSI_BURST_DRQ_EDGE1(edge1) |
-+		     SUN6I_DSI_BURST_DRQ_EDGE0(edge0));
-+	regmap_write(dsi->regs, SUN6I_DSI_BURST_LINE_REG,
-+		     SUN6I_DSI_BURST_LINE_NUM(line_num) |
-+		     SUN6I_DSI_BURST_LINE_SYNC_POINT(sync_point));
-+
-+	/* enable burst mode */
-+	regmap_read(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, &val);
-+	val |= SUN6I_DSI_BASIC_CTL_VIDEO_BURST;
-+	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, val);
+ #include <asm-generic/hugetlb.h>
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
+-#endif
+-
+ #endif /* __ASM_HUGETLB_H */
+diff --git a/arch/powerpc/include/asm/book3s/64/hugetlb.h b/arch/powerpc/include/asm/book3s/64/hugetlb.h
+index 5b0177733994..d04a0bcc2f1c 100644
+--- a/arch/powerpc/include/asm/book3s/64/hugetlb.h
++++ b/arch/powerpc/include/asm/book3s/64/hugetlb.h
+@@ -32,13 +32,6 @@ static inline int hstate_get_psize(struct hstate *hstate)
+ 	}
  }
  
- static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
-@@ -708,7 +767,12 @@ static void sun6i_dsi_encoder_enable(struct drm_encoder *encoder)
- 		     SUN6I_DSI_BASIC_CTL1_VIDEO_PRECISION |
- 		     SUN6I_DSI_BASIC_CTL1_VIDEO_MODE);
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void)
+-{
+-	return true;
+-}
+-#endif
+-
+ /* hugepd entry valid bit */
+ #define HUGEPD_VAL_BITS		(0x8000000000000000UL)
  
--	sun6i_dsi_setup_burst(dsi, mode);
-+	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
-+		     sun6i_dsi_get_drq(dsi, mode));
+diff --git a/arch/powerpc/platforms/Kconfig.cputype b/arch/powerpc/platforms/Kconfig.cputype
+index 8c7464c3f27f..3e629dfb5efa 100644
+--- a/arch/powerpc/platforms/Kconfig.cputype
++++ b/arch/powerpc/platforms/Kconfig.cputype
+@@ -319,7 +319,6 @@ config ARCH_ENABLE_SPLIT_PMD_PTLOCK
+ config PPC_RADIX_MMU
+ 	bool "Radix MMU Support"
+ 	depends on PPC_BOOK3S_64
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	default y
+ 	help
+ 	  Enable support for the Power ISA 3.0 Radix style MMU. Currently this
+diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
+index ed554b09eb3f..556860f290e9 100644
+--- a/arch/s390/Kconfig
++++ b/arch/s390/Kconfig
+@@ -69,7 +69,6 @@ config S390
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_FORTIFY_SOURCE
+ 	select ARCH_HAS_GCOV_PROFILE_ALL
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_HAS_KCOV
+ 	select ARCH_HAS_PTE_SPECIAL
+ 	select ARCH_HAS_SET_MEMORY
+diff --git a/arch/s390/include/asm/hugetlb.h b/arch/s390/include/asm/hugetlb.h
+index 2d1afa58a4b6..bd191560efcf 100644
+--- a/arch/s390/include/asm/hugetlb.h
++++ b/arch/s390/include/asm/hugetlb.h
+@@ -116,7 +116,4 @@ static inline pte_t huge_pte_modify(pte_t pte, pgprot_t newprot)
+ 	return pte_modify(pte, newprot);
+ }
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
+-#endif
+ #endif /* _ASM_S390_HUGETLB_H */
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 68261430fe6e..2fd983e2b2f6 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -23,7 +23,6 @@ config X86_64
+ 	def_bool y
+ 	depends on 64BIT
+ 	# Options that are inherently 64-bit kernel only:
+-	select ARCH_HAS_GIGANTIC_PAGE if (MEMORY_ISOLATION && COMPACTION) || CMA
+ 	select ARCH_SUPPORTS_INT128
+ 	select ARCH_USE_CMPXCHG_LOCKREF
+ 	select HAVE_ARCH_SOFT_DIRTY
+diff --git a/arch/x86/include/asm/hugetlb.h b/arch/x86/include/asm/hugetlb.h
+index 7469d321f072..f65cfb48cfdd 100644
+--- a/arch/x86/include/asm/hugetlb.h
++++ b/arch/x86/include/asm/hugetlb.h
+@@ -17,8 +17,4 @@ static inline void arch_clear_hugepage_flags(struct page *page)
+ {
+ }
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+-static inline bool gigantic_page_supported(void) { return true; }
+-#endif
+-
+ #endif /* _ASM_X86_HUGETLB_H */
+diff --git a/arch/x86/mm/hugetlbpage.c b/arch/x86/mm/hugetlbpage.c
+index 92e4c4b85bba..fab095362c50 100644
+--- a/arch/x86/mm/hugetlbpage.c
++++ b/arch/x86/mm/hugetlbpage.c
+@@ -203,7 +203,7 @@ static __init int setup_hugepagesz(char *opt)
+ }
+ __setup("hugepagesz=", setup_hugepagesz);
+ 
+-#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
++#ifdef CONFIG_CONTIG_ALLOC
+ static __init int gigantic_pages_init(void)
+ {
+ 	/* With compaction or CMA we can allocate gigantic pages at runtime */
+diff --git a/fs/Kconfig b/fs/Kconfig
+index ac474a61be37..e76ebc71af7b 100644
+--- a/fs/Kconfig
++++ b/fs/Kconfig
+@@ -207,9 +207,6 @@ config HUGETLB_PAGE
+ config MEMFD_CREATE
+ 	def_bool TMPFS || HUGETLBFS
+ 
+-config ARCH_HAS_GIGANTIC_PAGE
+-	bool
+-
+ source "fs/configfs/Kconfig"
+ source "fs/efivarfs/Kconfig"
+ 
+diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+index 5f5e25fd6149..58ea44bf75de 100644
+--- a/include/linux/gfp.h
++++ b/include/linux/gfp.h
+@@ -585,12 +585,12 @@ static inline bool pm_suspended_storage(void)
+ }
+ #endif /* CONFIG_PM_SLEEP */
+ 
+-#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
++#ifdef CONFIG_CONTIG_ALLOC
+ /* The below functions must be run on a range from a single zone. */
+ extern int alloc_contig_range(unsigned long start, unsigned long end,
+ 			      unsigned migratetype, gfp_t gfp_mask);
+-extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
+ #endif
++extern void free_contig_range(unsigned long pfn, unsigned int nr_pages);
+ 
+ #ifdef CONFIG_CMA
+ /* CMA stuff */
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 25c71eb8a7db..138a8df9b813 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -252,12 +252,17 @@ config MIGRATION
+ 	  pages as migration can relocate pages to satisfy a huge page
+ 	  allocation instead of reclaiming.
+ 
 +
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+		sun6i_dsi_setup_burst(dsi, mode);
+ config ARCH_ENABLE_HUGEPAGE_MIGRATION
+ 	bool
+ 
+ config ARCH_ENABLE_THP_MIGRATION
+ 	bool
+ 
++config CONTIG_ALLOC
++	def_bool y
++	depends on (MEMORY_ISOLATION && COMPACTION) || CMA
 +
- 	sun6i_dsi_setup_inst_loop(dsi, mode);
- 	sun6i_dsi_setup_format(dsi, mode);
- 	sun6i_dsi_setup_timings(dsi, mode);
+ config PHYS_ADDR_T_64BIT
+ 	def_bool 64BIT
+ 
+diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+index afef61656c1e..e686c92212e9 100644
+--- a/mm/hugetlb.c
++++ b/mm/hugetlb.c
+@@ -1035,7 +1035,6 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
+ 		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
+ 		nr_nodes--)
+ 
+-#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+ static void destroy_compound_gigantic_page(struct page *page,
+ 					unsigned int order)
+ {
+@@ -1058,6 +1057,12 @@ static void free_gigantic_page(struct page *page, unsigned int order)
+ 	free_contig_range(page_to_pfn(page), 1 << order);
+ }
+ 
++static inline bool gigantic_page_runtime_allocation_supported(void)
++{
++	return IS_ENABLED(CONFIG_CONTIG_ALLOC);
++}
++
++#ifdef CONFIG_CONTIG_ALLOC
+ static int __alloc_gigantic_page(unsigned long start_pfn,
+ 				unsigned long nr_pages, gfp_t gfp_mask)
+ {
+@@ -1143,22 +1148,15 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+ static void prep_new_huge_page(struct hstate *h, struct page *page, int nid);
+ static void prep_compound_gigantic_page(struct page *page, unsigned int order);
+ 
+-#else /* !CONFIG_ARCH_HAS_GIGANTIC_PAGE */
+-static inline bool gigantic_page_supported(void) { return false; }
++#else /* !CONFIG_CONTIG_ALLOC */
+ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+ 		int nid, nodemask_t *nodemask) { return NULL; }
+-static inline void free_gigantic_page(struct page *page, unsigned int order) { }
+-static inline void destroy_compound_gigantic_page(struct page *page,
+-						unsigned int order) { }
+ #endif
+ 
+ static void update_and_free_page(struct hstate *h, struct page *page)
+ {
+ 	int i;
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+-		return;
+-
+ 	h->nr_huge_pages--;
+ 	h->nr_huge_pages_node[page_to_nid(page)]--;
+ 	for (i = 0; i < pages_per_huge_page(h); i++) {
+@@ -2276,13 +2274,20 @@ static int adjust_pool_surplus(struct hstate *h, nodemask_t *nodes_allowed,
+ }
+ 
+ #define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
+-static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
++static int set_max_huge_pages(struct hstate *h, unsigned long count,
+ 						nodemask_t *nodes_allowed)
+ {
+ 	unsigned long min_count, ret;
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+-		return h->max_huge_pages;
++	if (hstate_is_gigantic(h) &&
++		!gigantic_page_runtime_allocation_supported()) {
++		spin_lock(&hugetlb_lock);
++		if (count > persistent_huge_pages(h)) {
++			spin_unlock(&hugetlb_lock);
++			return -EINVAL;
++		}
++		goto decrease_pool;
++	}
+ 
+ 	/*
+ 	 * Increase the pool size
+@@ -2322,6 +2327,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+ 			goto out;
+ 	}
+ 
++decrease_pool:
+ 	/*
+ 	 * Decrease the pool size
+ 	 * First return free pages to the buddy allocator (being careful
+@@ -2350,9 +2356,10 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+ 			break;
+ 	}
+ out:
+-	ret = persistent_huge_pages(h);
++	h->max_huge_pages = persistent_huge_pages(h);
+ 	spin_unlock(&hugetlb_lock);
+-	return ret;
++
++	return 0;
+ }
+ 
+ #define HSTATE_ATTR_RO(_name) \
+@@ -2404,11 +2411,6 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
+ 	int err;
+ 	NODEMASK_ALLOC(nodemask_t, nodes_allowed, GFP_KERNEL | __GFP_NORETRY);
+ 
+-	if (hstate_is_gigantic(h) && !gigantic_page_supported()) {
+-		err = -EINVAL;
+-		goto out;
+-	}
+-
+ 	if (nid == NUMA_NO_NODE) {
+ 		/*
+ 		 * global hstate attribute
+@@ -2428,7 +2430,9 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
+ 	} else
+ 		nodes_allowed = &node_states[N_MEMORY];
+ 
+-	h->max_huge_pages = set_max_huge_pages(h, count, nodes_allowed);
++	err = set_max_huge_pages(h, count, nodes_allowed);
++	if (err)
++		goto out;
+ 
+ 	if (nodes_allowed != &node_states[N_MEMORY])
+ 		NODEMASK_FREE(nodes_allowed);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 35fdde041f5c..8ce96c59e446 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -8024,8 +8024,7 @@ bool has_unmovable_pages(struct zone *zone, struct page *page, int count,
+ 	return true;
+ }
+ 
+-#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
+-
++#ifdef CONFIG_CONTIG_ALLOC
+ static unsigned long pfn_max_align_down(unsigned long pfn)
+ {
+ 	return pfn & ~(max_t(unsigned long, MAX_ORDER_NR_PAGES,
+@@ -8235,8 +8234,9 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+ 				pfn_max_align_up(end), migratetype);
+ 	return ret;
+ }
++#endif
+ 
+-void free_contig_range(unsigned long pfn, unsigned nr_pages)
++void free_contig_range(unsigned long pfn, unsigned int nr_pages)
+ {
+ 	unsigned int count = 0;
+ 
+@@ -8248,7 +8248,6 @@ void free_contig_range(unsigned long pfn, unsigned nr_pages)
+ 	}
+ 	WARN(count != 0, "%d pages are still in use!\n", count);
+ }
+-#endif
+ 
+ #ifdef CONFIG_MEMORY_HOTPLUG
+ /*
 -- 
-2.18.0.321.gffc6fa0e3
+2.20.1
 
 
 _______________________________________________
