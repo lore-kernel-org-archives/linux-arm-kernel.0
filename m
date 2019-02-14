@@ -2,75 +2,77 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0467C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:12:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64196C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:13:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A0A2E2177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:12:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2254F222D2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:13:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Baok6VIB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A0A2E2177E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t7cK3N21"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2254F222D2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=slgIzHlfxFWty1k5nmib6gIdgxqygnQLguojlVwIOhE=; b=Baok6VIBDNVlRD
-	3yKosxL7ye5KY33hiADteHQwqaYV9URMZjqBwO443pMayT8ud+bGPj9ijNd1eBu4eVg4EB6EGX0zC
-	Gu4ac5ywBVRaPJBfz5m+yuigouAwoXBZ9F9WDxgj50YRL17r+149z9sWktmdSQiCKmaNkqp5ARLzB
-	WGcJAf9MWo4w+plMYqZJnf0it44P9KhLfpa7dlkp6o9cfaXR2FYGzT+gai+kt2lsoz05xsIjU2NOX
-	+WNZ4eT+KvV/DeiLB5qPrK+7cj2rbV1tFmU832IVjizN8wMJMaQA+hilkIGmEtZ1YKi5emm1QNy7d
-	lVRum1WzfjQKCfIvziag==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=gNKhR8XMX7NIQMDtrmWIY/NzQG6E6h/E6Z0K9CL/jd0=; b=t7cK3N21ePVQDpFUtCIHcp3+tm
+	E5wl4X67bbIszJyj6W1ntewdO2MsNvthqXX0wP9nP63pTHopV5MwB/eQTPwtDDgOALwS+4B/KxKhC
+	FJrrKjg7x+VeKexrlJMVALFimSA+dclbPh9FrnRWBRR/kR8kzIcfJ8ZMBT1Fyv8GQFVPFtnZwiLdr
+	OUSDZqrMxcqQEUEIo8lf/YpIwgwSc1+NY7apvl054YCtzbBpRqoBdeKQho9AqWTWthTsxFpe47AwB
+	spG0o298yuS2GDMXb1HhUvaXjGdd32hQiAJvHyooCoBQNveKbr6cW/PaibweErhEk8D0HL8MnA+62
+	HueE+G2g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guDdj-0000IR-Iv; Thu, 14 Feb 2019 09:49:07 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1guDgj-0006xS-WC; Thu, 14 Feb 2019 09:52:14 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guDdg-0000HU-1k
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:49:05 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1guDdX-0002QE-8N; Thu, 14 Feb 2019 10:48:55 +0100
-Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1guDdV-0007aa-Qi; Thu, 14 Feb 2019 10:48:53 +0100
-Date: Thu, 14 Feb 2019 10:48:53 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Claudiu.Beznea@microchip.com
-Subject: Re: [PATCH v8 1/6] pwm: extend PWM framework with PWM modes
-Message-ID: <20190214094853.zs45m5k27hgtvyxt@pengutronix.de>
-References: <1546522081-23659-1-git-send-email-claudiu.beznea@microchip.com>
- <1546522081-23659-2-git-send-email-claudiu.beznea@microchip.com>
- <20190105210522.ho2o2a4gc7r7ijeq@pengutronix.de>
- <67e881c5-0ea7-3d2f-5910-534729097d11@microchip.com>
- <20190107221040.uos5qlnkjmcayv73@pengutronix.de>
- <20190205230125.GE1372@mithrandir>
- <20190206082432.6imbcuwlxhtsw4s4@pengutronix.de>
- <de382486-e8da-b000-7846-39fd6710cc89@microchip.com>
+ id 1guDgg-0006mb-2J
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:52:11 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id 2349EADF1;
+ Thu, 14 Feb 2019 09:52:08 +0000 (UTC)
+Subject: Re: [PATCH v2] hugetlb: allow to free gigantic pages regardless of
+ the configuration
+To: Dave Hansen <dave.hansen@intel.com>, Alexandre Ghiti <alex@ghiti.fr>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ x86@kernel.org, Dave Hansen <dave.hansen@linux.intel.com>,
+ Andy Lutomirski <luto@kernel.org>, Peter Zijlstra <peterz@infradead.org>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Mike Kravetz <mike.kravetz@oracle.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
+ linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
+References: <20190213192610.17265-1-alex@ghiti.fr>
+ <d367b5c7-eb05-6d0b-f9bf-5b3fc3f392a9@intel.com>
+From: Vlastimil Babka <vbabka@suse.cz>
+Openpgp: preference=signencrypt
+Message-ID: <bcffa37e-22cd-f0d7-ee85-769c0d54520a@suse.cz>
+Date: Thu, 14 Feb 2019 10:52:06 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <de382486-e8da-b000-7846-39fd6710cc89@microchip.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+In-Reply-To: <d367b5c7-eb05-6d0b-f9bf-5b3fc3f392a9@intel.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_014904_244643_E956FA35 
-X-CRM114-Status: GOOD (  24.99  )
+X-CRM114-CacheID: sfid-20190214_015210_263486_92062787 
+X-CRM114-Status: GOOD (  16.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,183 +84,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-pwm@vger.kernel.org, alexandre.belloni@bootlin.com,
- linux-doc@vger.kernel.org, corbet@lwn.net, linux-kernel@vger.kernel.org,
- Ludovic.Desroches@microchip.com, thierry.reding@gmail.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+On 2/13/19 8:30 PM, Dave Hansen wrote:
+>> -#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
+>> +#ifdef CONFIG_COMPACTION_CORE
+>>  static __init int gigantic_pages_init(void)
+>>  {
+>>  	/* With compaction or CMA we can allocate gigantic pages at runtime */
+>> diff --git a/fs/Kconfig b/fs/Kconfig
+>> index ac474a61be37..8fecd3ea5563 100644
+>> --- a/fs/Kconfig
+>> +++ b/fs/Kconfig
+>> @@ -207,8 +207,9 @@ config HUGETLB_PAGE
+>>  config MEMFD_CREATE
+>>  	def_bool TMPFS || HUGETLBFS
+>>  
+>> -config ARCH_HAS_GIGANTIC_PAGE
+>> +config COMPACTION_CORE
+>>  	bool
+>> +	default y if (MEMORY_ISOLATION && MIGRATION) || CMA
+> 
+> This takes a hard dependency (#if) and turns it into a Kconfig *default*
+> that can be overridden.  That seems like trouble.
+> 
+> Shouldn't it be:
+> 
+> config COMPACTION_CORE
+> 	def_bool y
+> 	depends on (MEMORY_ISOLATION && MIGRATION) || CMA
 
-On Wed, Feb 13, 2019 at 03:38:46PM +0000, Claudiu.Beznea@microchip.com wrot=
-e:
-> On 06.02.2019 10:24, Uwe Kleine-K=F6nig wrote:
-> > On Wed, Feb 06, 2019 at 12:01:26AM +0100, Thierry Reding wrote:
-> >> But I really don't see the point in having consumers jump through hoops
-> >> to set one of the standard modes just to have the driver jump through
-> >> more hoops to determine which mode was meant.
-> > =
+Agreed. Also I noticed that it now depends on MIGRATION instead of
+COMPACTION. That intention is correct IMHO, but will fail to
+compile/link when both COMPACTION and CMA are disabled, and would need
+more changes in mm/internal.h and mm/compaction.c (possibly just
+replacing CMA in all "if defined CONFIG_COMPACTION || defined
+CONFIG_CMA" instances with COMPACTION_CORE, but there might be more
+problems, wanna try? :)
 
-> > I think my approach is more natural and not more complicated at all. In
-> > all modes where this secondary output makes sense both outputs share the
-> > period length. In all modes both outputs have a falling and a raising
-> > edge each. Let's assume we support
-> > =
+Also, I realized that COMPACTION_CORE is a wrong name, sorry about that.
+What the config really provides is alloc_contig_range(), so it should be
+named either CONFIG_CMA_CORE (as it provides contiguous memory
+allocation, but not the related reservation and accounting), or
+something like CONFIG_CONTIG_ALLOC. I would also move it from fs/Kconfig
+to mm/Kconfig.
 
-> >  - normal mode (one output, secondary (if available) inactive)
-> >  - complementary mode (secondary output is the inverse of primary
-> >    output)
-> >  - push-pull mode (primary output only does every second active phase,
-> >    the secondy output does the ones that are skiped by the primary one)
-> >  - complementary mode with deadtime (like above but there is a pause
-> >    where both signals are inactive at the switch points, so the active
-> >    phase of the secondary output is $deadtime_pre + $deadtime_post
-> >    shorter than the primary output's inactive phase).
-> > =
-
-> > To describe these modes we need with the approach suggested by Claudiu
-> > the following defines:
-> > =
-
-> >  enum mode {
-> >  	NORMAL,
-> > 	COMPLEMENTARY,
-> > 	PUSH_PULL
-> > 	PUSH_PULL_WITH_DEADTIME
-
-Here I made a mistake, I should have written about
-COMPLEMENTARY_WITH_DEADTIME, not PUSH_PULL_WITH_DEADTIME. The
-argumentation is analogous however. PUSH_PULL_WITH_DEADTIME is
-completely unintuitive when thinking about the needed parameters, I'll
-skip talking about this.
- =
-
-> I see push-pull mode as a particular mode of complementary mode with
-> dead-times equal to a half of a period.
-
-<pedantic>It's not half a period that you need to use as dead-time, but
-period/2 - duty_cycle.</pedantic>
-
-This means that we could model "complementary" and "push pull" (and even
-"push pull with deadtime") if we only had "complementary with deadtime".
-So the latter seems to be the universal we should implement, right?
-(Otherwise a driver for a hardware that is flexible enough to actually
-do it has to implement three or so different ways to yield requested
-waveforms when a single one would be enough.)
-
-The parameters for that are:
-
-	- period length
-	- duty_cycle
-	- pre_deadtime
-	- post_deadtime
-
-. The expressiveness is identical to my suggestion (with alt_duty_cycle
-and alt_offset), just that this uses more artificial and unintuitive
-characteristics of the wave to describe it. (An indication is that you
-got it wrong above, see my pedantic note.)
-
-I'd say only abstract using "modes" if they are really orthonal which
-you seem to agree isn't the case here. In fact we only need a single
-mode that driver authors need to grasp and if there are two or more
-different ways to describe the same waves we're only make it harder for
-them.
-
-The argument "But not all hardware has the flexibility to implement
-all wave forms that are decribable with any of these abstractions."
-isn't really a problem. We already have now the situation with only
-.period, .duty_cycle and .polarity that not all drivers can implement
-everything. So there has to be a mechanism to handle inability to
-implement a given request anyhow.
-
-> I don't get the meaning of push-pull with dead-times, there is already
-> there a deadtime pre, post value equal with 1/2 of period.
-
-FTR: in my argumentation COMPLEMENTARY is just what you defined it to
-be. I.e. it doesn't have deadtimes. But as shown above this doesn't
-really matter. Both COMPLEMENTARY with deadtimes and my suggestion have
-the same expressive power, just use different characteristics to
-describe a wave form. To summarize, requesting the following wave:
-
-
-                     ______                ______
-secondary __________/      \______________/      \____
-             __                    __
-primary   __/  \__________________/  \________________
-            ^                     ^
-A           `--'					.duty_cycle
-B           `-------'      				.alt_offset
-C                   `------'				.alt_duty_cycle
-D              `----'					.pre_dead_time
-E                          `------'			.post_dead_time
-
-You need apart from the period length which is needed for all:
-
- - With my suggestion you need to pass A, B and C; and
- - with COMPLEMENTARY and deadtimes you need to provide A, D and E.
-
-Isn't A, B and C the most intuitive set, given that when describing only
-only the primary output you need A and for the secondary output you need
-only C?
-
-Also note that for PUSH_PULL with deadtime the deadtimes might be
-negative. The boundary checks for my approach are:
-
-	0 <=3D .duty_cycle <=3D .period (as we already have today)
-	0 <=3D .alt_duty_cycle <=3D .period (which is analogous to the above line)
-	0 <=3D .alt_offset < .period
-
-With COMPLEMENTARY and deadtimes it is harder, as there are conditions
-that have to speak about both .pre_dead_time and .post_dead_time.
-
-> >  struct pwm_state {
-> >  	unsigned int period;
-> > 	unsigned int duty_cycle;
-> > 	enum pwm_polarity polarity;
-> > 	bool enabled;
-> > 	enum mode mode;
-> > 	unsigned int deadtime_pre;
-> > 	unsigned int deadtime_post;
-> >  }
-> > =
-
-> > This has the following downsides:
-> > =
-
-> >  - The period in push-pull mode is somehow wrong because the signal
-> >    combination repeats only every 2x $period ns. (I guess this is an
-> >    implementation detail of the atmel hardware that leaks into the API
-> >    here.)
-> =
-
-> As far as I'm concern of the PWM push-pull mode it is a specific PWM
-> working mode, not related to Atmel, which can be used to drive half-bridge
-> converters.
-
-This is not what I meant. The point I wanted to make here is, that I
-would consider it more natural to define the period length of the
-following wave form pair as the time between the two carets, not half of
-it as you suggested in your patch.
-
-                  __                    __
-    _____________/  \__________________/  \_____
-       __                    __
-    __/  \__________________/  \________________
-      ^                     ^
-
-That's because then for all wave forms the period of both outputs matches
-the period variable.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks!
 
 _______________________________________________
 linux-arm-kernel mailing list
