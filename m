@@ -2,85 +2,87 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4E45C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:07:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C857DC10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:10:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FFDA2229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:07:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98AE921927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:10:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lP9vaxft";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DibK3K1I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FFDA2229F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UMJjgCdN";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="b3U0MEN5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98AE921927
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TqaAa/svbyjpAn2gPc1aie2cRo4DV6Q/AXeQ0VVds7k=; b=lP9vaxftG/Z6+n
-	D5bnVF3rryfwaEWA2hrhZtMZZoRSrMIwyKTm+ScVGryF86MxjIpHlZNyQOAZJM/zMIjfBeXzHQWz0
-	eTUrjOUe5r2OlO+Jz9Rf4ral5tBF1il8/scjNKNBbIARe65zqvuBtveE0mDhyL1nilLU+IU0T1Jbq
-	zTcikDL7L03KJ0EIj2lk5+ph/mnEus12xxpFtXSoKYE4Tnkg+BqW/MC+Iqd/Mo6uhVEloTXQTOXIh
-	xzydsXVzzp1NSrMdO9HH+lhUEeSNdJFesC/ZrSObFJfodSO0SmPuJxAjjbfg7wPpc/M9H3Miqi0Lj
-	rNsYbB+DOaUR9OPuV/SA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7qrrTBaBaFk6MDFOy9rgK0yzBOiEyEuobDNtt+hlHpc=; b=UMJjgCdNODEaIj
+	U8sfpUrLdJAjJgCzlj6Gec9OZpkbH3GR1K/AtO5We7TsjGk9Pp4pEJqjVjhKxCCY3qLXdn2+/i+Gi
+	NxrKLa3bXChBg+BEn3ZLdhRQPmAX3+sqHR/B24ld3KAHWfHiajXqncVhtXA62nTym8Ldov5up2xBb
+	qylzUE4X00j9tIrs2h7sPNggJZV/KSlmApOpd/qep5eD0wnioqAtPKxQyUHxJ+IM2gxTJ8i366ikL
+	Tff4y9slO4d59A0Qe5lM5N0r2CSRvZ/Eju0CSzbyzaEgVg7n69n2+/RGSmhnC8W6EIuP8xrYFUc4G
+	WgQUymOvXoaDXDFzll2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guHfY-0002uj-UA; Thu, 14 Feb 2019 14:07:16 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1guHj4-0004c2-Cg; Thu, 14 Feb 2019 14:10:54 +0000
+Received: from lelv0143.ext.ti.com ([198.47.23.248])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guHfV-0002uK-H2
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:07:15 +0000
-Received: by mail-it1-x144.google.com with SMTP id z131so4825233itf.5
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:07:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=SDweC0/rM/7wIRwhhNBqenxhLevIilMXlbaDUD5AX3E=;
- b=DibK3K1IFnn644i1VQI7ocdSTjWbrqbJqhhpBYf87UCghvxQJvSL/QRz0l6XsbRfai
- tL3xomjENcO1ZP1Ujhz4yHkjJBEWzWlgXEsV31SkMIQ8/SxVPr5kmInv58sf/ufGHTDY
- DjMV1YQxjdIXCbNZrlt21mGX8aOTnLrcZ3QDO/PWdT6wPtZPKYilMNrPzviXWg96/hvp
- IJBG/INd91/Q21fe71wu+bz29cISE8QP1IsgQ6/BUcO+7oFXyAZjny7dL09/ZvFxciEq
- MBPU7GmEaRrMJLcGypHEhk6/iON/zLWpmxSgKP0PX5EWF3434mGTOQdaXjAjitvLYdjC
- GRVQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=SDweC0/rM/7wIRwhhNBqenxhLevIilMXlbaDUD5AX3E=;
- b=qMUbG+fTKLz3n7RVqSy9IOJ2iz8WIrQeVZ7AZaBVw6XPcRt+3Dt5/OupAZRu88vhOP
- f1ScGmW3VbVDy3/FXI6SzH69RnGJ3Cor2IqN4POqIN/KpxtBzua6Aqkua/Q++jv0Kp9u
- iuF0sVoaQgRAHlHJoZIqYs0WcA7f87BkYConIOPvwXUiwFtIKXyrzyXJRvjJk3RlJvjO
- ceJytwo6/PUAfzq7mXtNpMGyUvP/FdgqECQiKPBT5edXM9L+MuVj7KXFwa60OgJMZRBT
- QuXvXjhXJZ0dCn6fzwqyxPxSbge4o1ZhFarkrBC2UeyO8MCnKAh+qeibO6Z4/GTA0Muc
- 0YKg==
-X-Gm-Message-State: AHQUAuYZ5ZmLU617H+Q+rt4tcL7BudBUUVbTzk8NNSuEI+g8Gi55cgRF
- VikMRUfHjeHzrwmurGqN2zgLPrtQyWta9qV9ofs=
-X-Google-Smtp-Source: AHgI3IY482eIDUsLvvnmnYjMDQ6H105S0ndyX92l+wfORvgTXxOMNkbjXleDkW0FOaETGIoSce0V0/r6K2WP8z1eTFM=
-X-Received: by 2002:a02:b885:: with SMTP id p5mr2157236jam.60.1550153232531;
- Thu, 14 Feb 2019 06:07:12 -0800 (PST)
+ id 1guHiz-0004bE-8Y
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:10:52 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1EE9ftD083829;
+ Thu, 14 Feb 2019 08:09:41 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550153381;
+ bh=zAnODo8dan1Tq3vxAiXyvXop/CnoTloqocY1b7KMDYQ=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=b3U0MEN5sK5uZvW3sFmoUA9kwNXT0FFz3qP+OoXy+qQ6nSGlt1FYvWUNzaVva60ld
+ DTzn2WTnQRQWwup/o01IsGTfR0Pm7LRdEF8AyCPIzlF2AChMYZNbwLypZs/mEOAzN2
+ eRVmitoCUT3sPLoUg5jdsl0K/Q84bOG29E/ktHx0=
+Received: from DLEE107.ent.ti.com (dlee107.ent.ti.com [157.170.170.37])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1EE9fAL067306
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Thu, 14 Feb 2019 08:09:41 -0600
+Received: from DLEE114.ent.ti.com (157.170.170.25) by DLEE107.ent.ti.com
+ (157.170.170.37) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 14
+ Feb 2019 08:09:40 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE114.ent.ti.com
+ (157.170.170.25) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Thu, 14 Feb 2019 08:09:40 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1EE9aKc006201;
+ Thu, 14 Feb 2019 08:09:37 -0600
+Subject: Re: [PATCH v3 01/37] input: davinci_keyscan: remove unnecessary
+ includes
+To: Bartosz Golaszewski <brgl@bgdev.pl>, Kevin Hilman <khilman@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>, David Lechner <david@lechnology.com>
+References: <20190212103835.7768-1-brgl@bgdev.pl>
+ <20190212103835.7768-2-brgl@bgdev.pl>
+From: Sekhar Nori <nsekhar@ti.com>
+Message-ID: <5ece9908-86e1-c96e-f6fb-a08261b7f419@ti.com>
+Date: Thu, 14 Feb 2019 19:39:36 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190214130910.9201-1-tiny.windzz@gmail.com>
- <20190214130910.9201-2-tiny.windzz@gmail.com>
- <20190214134617.b44pa7onf3brmhhj@flea>
-In-Reply-To: <20190214134617.b44pa7onf3brmhhj@flea>
-From: Frank Lee <tiny.windzz@gmail.com>
-Date: Thu, 14 Feb 2019 22:07:02 +0800
-Message-ID: <CAEExFWvG4Vz2KsDnHJ6BL72nD6x=Lp+Hzj+q7LfggzFtzrgRow@mail.gmail.com>
-Subject: Re: [PATCH 1/4] arm64: dts: allwinner: h6: orangepi: Add CPU supply
- regulator
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+In-Reply-To: <20190212103835.7768-2-brgl@bgdev.pl>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_060713_566991_B2F29570 
-X-CRM114-Status: GOOD (  20.37  )
+X-CRM114-CacheID: sfid-20190214_061051_105285_459C9752 
+X-CRM114-Status: GOOD (  16.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,64 +94,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Chen-Yu Tsai <wens@csie.org>, robh+dt@kernel.org,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 9:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> Hi!
->
-> Thanks for your patches
->
-> On Thu, Feb 14, 2019 at 08:09:07AM -0500, Yangtao Li wrote:
-> > The original orangepi use the dcdca to supply the CPU cores. According
-> > to the axp805 spec, the range of dcdca is 0.6 to 1.1v, 1.12 to 1.52v.
-> > In order to support more CPU frequency, slightly increase the voltage
-> > maximum and minimum.
-> >
-> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi | 8 ++++++--
-> >  1 file changed, 6 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-> > index b2526dac2fcf..e7aebaf91ede 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-> > @@ -159,8 +159,8 @@
-> >
-> >                       reg_dcdca: dcdca {
-> >                               regulator-always-on;
-> > -                             regulator-min-microvolt = <810000>;
-> > -                             regulator-max-microvolt = <1080000>;
-> > +                             regulator-min-microvolt = <800000>;
-> > +                             regulator-max-microvolt = <1160000>;
->
-> This violates the minimum and maximum recommended voltages in the H6
-> datasheet. Could you clarify why you are doing so (ideally in the
-> commit log)?
-In fact, in sunxi's sdk, the actual minimum and maximum voltage of the
-cpu is smaller or larger than the datasheet.
++ Dmitry for his ack
 
-For some better quality ic, the minimum voltage can be smaller.
-For some poor quality ic, the maximum voltage needs to be increased a little.
+On 12/02/19 4:07 PM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> The mach/ and asm/ includes are not needed in davinci_keyscan, but they
+> will cause build problems once we make mach/irqs.h a private header for
+> mach-davinci.
+> 
+> Remove all unused header includes.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/input/keyboard/davinci_keyscan.c | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/drivers/input/keyboard/davinci_keyscan.c b/drivers/input/keyboard/davinci_keyscan.c
+> index b20a5d044caa..b4db72f833ca 100644
+> --- a/drivers/input/keyboard/davinci_keyscan.c
+> +++ b/drivers/input/keyboard/davinci_keyscan.c
+> @@ -32,10 +32,6 @@
+>  #include <linux/errno.h>
+>  #include <linux/slab.h>
+>  
+> -#include <asm/irq.h>
+> -
+> -#include <mach/hardware.h>
+> -#include <mach/irqs.h>
+>  #include <linux/platform_data/keyscan-davinci.h>
+>  
+>  /* Key scan registers */
+> -- 
+> 2.20.1
+> 
 
-MBR,
-Yangtao
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
