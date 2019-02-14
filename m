@@ -2,90 +2,80 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 299BAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:19:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C0FDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:24:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E85B8222D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:19:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D842C222D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:24:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TCyrYgqG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=synopsys.com header.i=@synopsys.com header.b="MmIgHR9z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E85B8222D4
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=synopsys.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qXKcVKTF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vDtFvFc8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D842C222D7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2iA6VKJE+3IhapiVLRLul9bKiDhfhuUqIOw1xQN7gJs=; b=TCyrYgqGod0XSK
-	Rc0bq4FS8qaKpYx9kEeRBmfRhGxWwH5AbyS4DL0kB6y+qMHcIKlYymeKqv38RhD8CCCB/8ddeGULO
-	3wuUzog9QZ1k8sylYXLkTOS/MteMF9zLoupHjhOUuInlFpHlmJmFoDV9ib8Fe/ibXFGsUZi3NvSGv
-	iEp4VY4h8zN9kHHXJ+5pjrH9OWyp7ZyXt5kAaoVXgBEye0fhZmhq28AFvXcz5v6y9gmnryg2OwPv5
-	jZinbpsw+bDvJ4pmTai2JiKR1ISC93viT0THj+eHhgfbYbzsiXGC+6fOb0R1xRD/2fH6yUds5kzUu
-	nN4tqurMcR8I7JsYvAqg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TZD5Q/Jso87iav+L7wnZs2qHND+Fj2qnTcyYmCKqQ5E=; b=qXKcVKTFS8hITf
+	/tLGpIdl/hMzlmkADTq3XtDBqDK3FLdL74tniNJ+F7EpIyCDC+MbSKTlUBHzLu5N5o8LKVztQqQfm
+	Mw6nI8x8BXwSEpUA3X+3CctuYP8DY3TRwdsupQxK56Kq2riQVA9uLaYiiCgyjDsstu0vxeft/BF6Z
+	KokprsOWyeT34rvvNHKV65XUyQwjUV6Q2DFNYQX4ChEfiE+5IdiEuVGNvJ17T7KULMuxvo4D+h6hG
+	HG5yyO+zezeJ4BopWSUh+eRIoC4ekK2zo3tX6DQuLeD2bCa24B9a/RnHmPCwHVdj002pFUoNzcD1X
+	7JgGRZzlzwuekUn4ypRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guHrc-0007Lb-DT; Thu, 14 Feb 2019 14:19:44 +0000
-Received: from smtprelay.synopsys.com ([198.182.60.111])
+	id 1guHw6-0000j4-VY; Thu, 14 Feb 2019 14:24:22 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guHrZ-0007Ko-44
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:19:42 +0000
-Received: from mailhost.synopsys.com (dc2-mailhost2.synopsys.com
- [10.12.135.162])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ id 1guHw3-0000ih-MM
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:24:21 +0000
+Received: from mail-qt1-f171.google.com (mail-qt1-f171.google.com
+ [209.85.160.171])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by smtprelay.synopsys.com (Postfix) with ESMTPS id 32F2D10C1477;
- Thu, 14 Feb 2019 06:19:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=synopsys.com; s=mail;
- t=1550153977; bh=x7inVug3nWx9VUVjq+5f0/T6Kr35IEx3nZCt6HCe/do=;
- h=Subject:To:CC:References:From:Date:In-Reply-To:From;
- b=MmIgHR9zpE9fNCOUPSjJru99/k5QgZr2ESRCNRyAyd+HmNDon27Yjpaxt+SCntfO1
- tS0I2b7AgrCZcihRyMQRJJD6bL/cA7elGyHRWYm154tMZUYGinyZGUmuoiicuRabnT
- fevQ1ZqJy0nNEKK12gE5+3xgNOZ+CLtrMBMP+VGI74/Pdo0aUU0VDGB5GbeZq60jwu
- HG0xfU2LxpRtCbbOluw/U1jc2fpHCqIAkiG9g18s47+HPX/jTTIVfxi03W+1InNCPD
- N99w/XlqQoIzI1jdeuXMObPZCc5og8C19SJBDL08Dd02oiwqbCvCcCWLn/A0svLH8G
- fZU1N/Xp2XevQ==
-Received: from US01WXQAHTC1.internal.synopsys.com
- (us01wxqahtc1.internal.synopsys.com [10.12.238.230])
- (using TLSv1.2 with cipher AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- by mailhost.synopsys.com (Postfix) with ESMTPS id 714EDA0090;
- Thu, 14 Feb 2019 14:19:36 +0000 (UTC)
-Received: from DE02WEHTCB.internal.synopsys.com (10.225.19.94) by
- US01WXQAHTC1.internal.synopsys.com (10.12.238.230) with Microsoft SMTP Server
- (TLS) id 14.3.408.0; Thu, 14 Feb 2019 06:18:06 -0800
-Received: from DE02WEHTCA.internal.synopsys.com (10.225.19.92) by
- DE02WEHTCB.internal.synopsys.com (10.225.19.94) with Microsoft SMTP Server
- (TLS) id 14.3.408.0; Thu, 14 Feb 2019 15:18:04 +0100
-Received: from [10.107.19.176] (10.107.19.176) by
- DE02WEHTCA.internal.synopsys.com (10.225.19.80) with Microsoft SMTP Server
- (TLS) id 14.3.408.0; Thu, 14 Feb 2019 15:18:04 +0100
-Subject: Re: [net-next, PATCH] net: stmmac: use correct define to get rx
- timestamp on GMAC4
-To: Alexandre Torgue <alexandre.torgue@st.com>,
- Giuseppe Cavallaro <peppe.cavallaro@st.com>,
- Jose Abreu <jose.abreu@synopsys.com>, <davem@davemloft.net>
-References: <1550153571-14404-1-git-send-email-alexandre.torgue@st.com>
-From: Jose Abreu <jose.abreu@synopsys.com>
-Message-ID: <7c03dff4-5185-dbd2-eeb4-867972512f2b@synopsys.com>
-Date: Thu, 14 Feb 2019 14:18:02 +0000
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ by mail.kernel.org (Postfix) with ESMTPSA id 46BC4222D7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 14:24:19 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550154259;
+ bh=ZviCB4UK+yPmuMDh7PuGrRRgjNrg+f4+Z5wYwmTpiVU=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=vDtFvFc83qDStPyHEZLUlwUrpwWXv74xEIrNY/2b3RNdd2MhFRWIdFWRFtahgoUFc
+ i3L0Ezh0zr18lZflRFlepGVeddLxITeJVwKNL0IHH+XswCSQG8vNQnJhxTnxbyUzX9
+ pH0HivZPJZ4QmNa/jhgJP2KbHnD14XeC5nOXKn0c=
+Received: by mail-qt1-f171.google.com with SMTP id v10so6982653qtp.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 06:24:19 -0800 (PST)
+X-Gm-Message-State: AHQUAua16lkAVxAZs4VpTrvk99riGxJl9LwJGLwdTkILYHNKL8CIA+LR
+ rDR0UvzLbdWjxPkHEJF7P3s23lPHXL/shZp1pA==
+X-Google-Smtp-Source: AHgI3IaAqyV0Bi9f8MwikDZm6bMdc94+avjRW4HSg1PgsYazr6lpxXVkrHs76nh+5S5uNjuJQGCucf7rkxY5jC/iQnc=
+X-Received: by 2002:ac8:4548:: with SMTP id z8mr3116552qtn.257.1550154258491; 
+ Thu, 14 Feb 2019 06:24:18 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1550153571-14404-1-git-send-email-alexandre.torgue@st.com>
-Content-Language: en-US
-X-Originating-IP: [10.107.19.176]
+References: <20181205195050.4759-6-robh@kernel.org>
+ <CGME20190213161024epcas3p3acc5c074714ad1d44fb90ab3f21cfcff@epcas3p3.samsung.com>
+ <CAL_Jsq+xpRPvj=UcSo+jQKX1pB=9B3SV9jB5ZVhaVsKvOqtoOg@mail.gmail.com>
+ <5cc4b5a3-c4ad-46a9-2856-3ed67c6755d3@samsung.com>
+In-Reply-To: <5cc4b5a3-c4ad-46a9-2856-3ed67c6755d3@samsung.com>
+From: Rob Herring <robh@kernel.org>
+Date: Thu, 14 Feb 2019 08:24:07 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+hoRE5UG3+Z9OKDc3xmkJbGgQpUF+M4pzXJ_BSjj0kfg@mail.gmail.com>
+Message-ID: <CAL_Jsq+hoRE5UG3+Z9OKDc3xmkJbGgQpUF+M4pzXJ_BSjj0kfg@mail.gmail.com>
+Subject: Re: [PATCH] devfreq: Use of_node_name_eq for node name comparisons
+To: Chanwoo Choi <cw00.choi@samsung.com>,
+ MyungJoo Ham <myungjoo.ham@samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_061941_174772_9FED2DBB 
-X-CRM114-Status: GOOD (  16.87  )
+X-CRM114-CacheID: sfid-20190214_062419_749638_9B40AB73 
+X-CRM114-Status: GOOD (  17.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,45 +87,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org,
+ linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Krzysztof Kozlowski <krzk@kernel.org>,
+ Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Alexandre,
-
-On 2/14/2019 2:12 PM, Alexandre Torgue wrote:
-> In dwmac4_wrback_get_rx_timestamp_status we looking for a RX timestamp.
-> For that receive descriptors are handled and so we should use defines
-> related to receive descriptors. It'll no change the functional behavior
-> as RDES3_RDES1_VALID=TDES3_RS1V=BIT(26) but it makes code easier to read.
-> 
-> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-> 
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
-> index 20299f6..9f062b3 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
-> @@ -268,7 +268,7 @@ static int dwmac4_wrback_get_rx_timestamp_status(void *desc, void *next_desc,
->  	int ret = -EINVAL;
->  
->  	/* Get the status from normal w/b descriptor */
-> -	if (likely(p->des3 & TDES3_RS1V)) {
-> +	if (likely(p->des3 & RDES3_RDES1_VALID)) {
-
-Shouldn't this also use le32_to_cpu() like bellow ?
-
-Thanks,
-Jose Miguel Abreu
-
->  		if (likely(le32_to_cpu(p->des1) & RDES1_TIMESTAMP_AVAILABLE)) {
->  			int i = 0;
->  
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBGZWIgMTMsIDIwMTkgYXQgOTo0OSBQTSBDaGFud29vIENob2kgPGN3MDAuY2hvaUBz
+YW1zdW5nLmNvbT4gd3JvdGU6Cj4KPiBIaSBSb2IsCj4KPiBPbiAxOS4gMi4gMTQuIOyYpOyghCAx
+OjA5LCBSb2IgSGVycmluZyB3cm90ZToKPiA+IE9uIFdlZCwgRGVjIDUsIDIwMTggYXQgMTo1MCBQ
+TSBSb2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPiB3cm90ZToKPiA+Pgo+ID4+IENvbnZlcnQg
+c3RyaW5nIGNvbXBhcmVzIG9mIERUIG5vZGUgbmFtZXMgdG8gdXNlIG9mX25vZGVfbmFtZV9lcSBo
+ZWxwZXIKPiA+PiBpbnN0ZWFkLiBUaGlzIHJlbW92ZXMgZGlyZWN0IGFjY2VzcyB0byB0aGUgbm9k
+ZSBuYW1lIHBvaW50ZXIuCj4gPj4KPiA+PiBGb3IgaW5zdGFuY2VzIHVzaW5nIG9mX25vZGVfY21w
+LCB0aGlzIGhhcyB0aGUgc2lkZSBlZmZlY3Qgb2Ygbm93IHVzaW5nCj4gPj4gY2FzZSBzZW5zaXRp
+dmUgY29tcGFyaXNvbnMuIFRoaXMgc2hvdWxkIG5vdCBtYXR0ZXIgZm9yIGFueSBGRFQgYmFzZWQK
+PiA+PiBzeXN0ZW0gd2hpY2ggYWxsIG9mIHRoZXNlIGFyZS4KPiA+Pgo+ID4+IENjOiBDaGFud29v
+IENob2kgPGN3MDAuY2hvaUBzYW1zdW5nLmNvbT4KPiA+PiBDYzogTXl1bmdKb28gSGFtIDxteXVu
+Z2pvby5oYW1Ac2Ftc3VuZy5jb20+Cj4gPj4gQ2M6IEt5dW5nbWluIFBhcmsgPGt5dW5nbWluLnBh
+cmtAc2Ftc3VuZy5jb20+Cj4gPj4gQ2M6IEt1a2ppbiBLaW0gPGtnZW5lQGtlcm5lbC5vcmc+Cj4g
+Pj4gQ2M6IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2VybmVsLm9yZz4KPiA+PiBDYzogbGlu
+dXgtcG1Admdlci5rZXJuZWwub3JnCj4gPj4gQ2M6IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
+cmFkZWFkLm9yZwo+ID4+IENjOiBsaW51eC1zYW1zdW5nLXNvY0B2Z2VyLmtlcm5lbC5vcmcKPiA+
+PiBTaWduZWQtb2ZmLWJ5OiBSb2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPgo+ID4+IC0tLQo+
+ID4+ICBkcml2ZXJzL2RldmZyZXEvZGV2ZnJlcS1ldmVudC5jICAgICB8IDIgKy0KPiA+PiAgZHJp
+dmVycy9kZXZmcmVxL2V2ZW50L2V4eW5vcy1wcG11LmMgfCAyICstCj4gPj4gIDIgZmlsZXMgY2hh
+bmdlZCwgMiBpbnNlcnRpb25zKCspLCAyIGRlbGV0aW9ucygtKQo+ID4KPiA+IENhbiBzb21lb25l
+IGFwcGx5IHRoaXMgcGxlYXNlLgo+Cj4gTXl1bmdqb28gcGlja2VkIHVwIHRoaXMgcGF0Y2hbMV0g
+b24gZGV2ZnJlcS5naXQKPiBidXQgaGFzIG5vdCB5ZXQgc2VudCB0aGUgcHVsbCByZXF1ZXN0LgoK
+T2theSwgdGhhbmtzLgoKUGxlYXNlIGFkZCB0aGF0IHRyZWUgdG8gbGludXgtbmV4dCBvciByZXBs
+eSB0byBwYXRjaGVzIHdoZW4gdGhleSd2ZQpiZWVuIGFwcGxpZWQsIHNvIHN1Ym1pdHRlcnMgaGF2
+ZSBzb21lIHdheSB0byBrbm93IHdoZW4gdGhlaXIgcGF0Y2ggaXMKYWNjZXB0ZWQuCgpSb2IKCl9f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
+ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
+dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
+ZWwK
