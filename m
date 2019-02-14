@@ -1,103 +1,97 @@
-Return-Path: <SRS0=x1Tr=QU=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 131FFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 23:19:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE9BEC4151A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:02:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D0EF62146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 13 Feb 2019 23:19:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD8F0222CE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:02:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AqGw5Lh8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="dXnxlHiw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D0EF62146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CIuXwZYZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="clQp5FLl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD8F0222CE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yXlFWunD0B26ntqQTYbhhn/KCwwN9FFw98P/jqgC5NE=; b=AqGw5Lh8DpC3ah
-	WNerXzncxwZ1FBLdCZrVo4J0fRhTBswCePHN7KuQVTwKd833bsI0KCdITpWB/8BMXId9OQhaEJIbp
-	Pf4wiW8x19Ppe5harqYVj9wm62rBDb0KrVlowzNcoL5QcfPkIqPoL4iJDXUEX54Wdy8YK8mwq2aBN
-	D9PCjGDWHS37X1CbQ0hh1ZCljjkFNocHmK1yd7RTR2/6rsuOokZX+7+sFdh1+C/uNvz8LzfhY8Xh5
-	yl/sDKxcFipWJm40eX70ygc97jXoTC0RCtlIj5m+EHrAP1iTAFvoR0dDLpNdLcWdX8MbRT85NeYgC
-	3ZKkVRL8JOs7ilRmB2yA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=9jKrZ0h+8f7mzqmP0jBw7RmXoE+6Wy5X/RjRLAOZKbw=; b=CIuXwZYZY+pOZqp6Y65B+acCV9
+	zhlcRgiSH/U1/SOk+pIuJaUUalF9ipCvgDdy9Po/9R3C3fZRXx7ds9wvn7Qa9ATLv/AmpaCTk9LxF
+	1YTNKYvXpm2SkNenhN7Fg4E3VHQQ9oLcILsWCYNfVQMOfoVA5D8eCSAIU4GQdaNEPTES9rtmoOdmT
+	yu56aS35Qqzjw2QWSJPuFmBKkP/7g7jFLgcW0lctd97TfFX5ICemF5jqjJ+dLjVmeexlb03XfZtRw
+	OkPdY4kQYJuudv/1zgTHRGb6Q0GWmUPkuKjWVSVI6ewVWcRVq4lBi8IfP/5veTHkk/D6325RYzyk+
+	s7724iuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu3oW-0001m3-QK; Wed, 13 Feb 2019 23:19:36 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gu4UN-000767-8z; Thu, 14 Feb 2019 00:02:51 +0000
+Received: from aserp2130.oracle.com ([141.146.126.79])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu3oT-0001le-0m
- for linux-arm-kernel@lists.infradead.org; Wed, 13 Feb 2019 23:19:34 +0000
-Received: by mail-lf1-x142.google.com with SMTP id g2so3091934lfh.11
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 15:19:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linux-foundation.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=WgVsJUTMnnCaCQDHvEM6XpYkBOEcgxFKcSfGDRa84GY=;
- b=dXnxlHiw2i/q9AM8vmhwbkVle9HbCuDxTJD/8szwNtgM5LWwooWFjbaCwLz+oZXAqJ
- Av4s6GLuP9JdrJKrMKI8Ez3MSvPbvQGZbiFqlPwvNMTDRBD6PJlmYLqYWC5HeeIvOK+b
- gRTPxAWAdlF1buqHitCwXrupsytDHVGxyf+pg=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=WgVsJUTMnnCaCQDHvEM6XpYkBOEcgxFKcSfGDRa84GY=;
- b=O6YQn1vUYgQrO0Mf2yIcEIaJUNhocuF+ZsDmQk+vvlA9DTRzAZRPPl5MNnw1czeNXS
- aj7ASF7UEOh03DG1S3IB2aSPLKAlMnx+Ua3jqPfOQJFU76G53MedD2grAIOK8PXL2tdd
- 5URmlCmJyOjj1GJSzaQR1SLta68JE9iZTPVMoMqF18CNYLlkZiFmKs6yxUBkBGy2wa6S
- S3wezSomwo3Y9UXPXajK03HLiiySImPg1H4bvRYvqz2AmeJSim2FD6Y+a/2GyDW82+rq
- V/cDwJcCE0n8QgazkSMZ8t3txekuus4OEkmq53alE+au6M9k5XGFd8rXAq6+D328ZOpG
- vWkw==
-X-Gm-Message-State: AHQUAuZun2otjUxDkGtVfBKl93fVOIiWrEh1muRvdnd9s4oN6tOnfTcR
- d17X/DcjENc4ZwnRO/FMDBS7wJCjTOk=
-X-Google-Smtp-Source: AHgI3Ia3zG9Jh/C+bjnANTwvgBNgf0g2o6MSMEkWQTcFyYdbh5p7Xv/SSSp8yuqddJDaXyqhShmGjA==
-X-Received: by 2002:a19:4851:: with SMTP id v78mr376803lfa.98.1550099968979;
- Wed, 13 Feb 2019 15:19:28 -0800 (PST)
-Received: from mail-lf1-f53.google.com (mail-lf1-f53.google.com.
- [209.85.167.53])
- by smtp.gmail.com with ESMTPSA id y12sm125164lfh.32.2019.02.13.15.19.26
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 13 Feb 2019 15:19:27 -0800 (PST)
-Received: by mail-lf1-f53.google.com with SMTP id n15so3122265lfe.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 13 Feb 2019 15:19:26 -0800 (PST)
-X-Received: by 2002:a19:ab09:: with SMTP id u9mr338489lfe.149.1550099966013;
- Wed, 13 Feb 2019 15:19:26 -0800 (PST)
-MIME-Version: 1.0
-References: <20190211134527.GA121589@gmail.com>
- <20190211135159.GC32511@hirez.programming.kicks-ass.net>
- <a23fdd84-8c4b-0c1f-d877-24d946cff6d0@arm.com>
- <20190213103553.GO32494@hirez.programming.kicks-ass.net>
- <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
- <20190213131720.GU32494@hirez.programming.kicks-ass.net>
- <20190213140025.GB6346@brain-police>
- <20190213142524.GW32494@hirez.programming.kicks-ass.net>
- <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
- <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
-In-Reply-To: <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
-From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Wed, 13 Feb 2019 15:19:10 -0800
-X-Gmail-Original-Message-ID: <CAHk-=wiSqQtuudpKSa9RwEGALw-Yw7v+YFonAEcNPEbY_-0m+g@mail.gmail.com>
-Message-ID: <CAHk-=wiSqQtuudpKSa9RwEGALw-Yw7v+YFonAEcNPEbY_-0m+g@mail.gmail.com>
-Subject: Re: [PATCH v3 3/4] uaccess: Check no rescheduling function is called
- in unsafe region
-To: Peter Zijlstra <peterz@infradead.org>
+ id 1gu4UJ-00074j-Tq
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 00:02:49 +0000
+Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
+ by aserp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1DNxBx3100713;
+ Thu, 14 Feb 2019 00:02:18 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=from : to : cc :
+ subject : date : message-id : in-reply-to : references : in-reply-to :
+ references; s=corp-2018-07-02;
+ bh=fEQ1MfpMn+jTbXDbToNZqpIPh0CEmp2s2jsy7mZAXXk=;
+ b=clQp5FLlv6dBK7nLgBvO7z0XrNUeRlDkeSjrUlTYTSJbuNRLfOKl0R1BT5sDq21QFYX8
+ pSz8w5lOqXzP3bUCNpXzkHLjNtdbGgLEsSSt8Eua3YWbfcZEEcQkzBiGSUl4yar1bvHp
+ q8fCHDNP/V5TBUNkjrEFGj4gq1sOoXWLJD0C9kdSdRCeEl+8pLBspnYCQCdJcqUzk5J3
+ M9AXZQEMVtI8t9Hvrz9GDsGdYXEpQKo1Pp1JwtMth2sBZOvx6EWbBElqk6cR1/ggkzPa
+ cINSZoMWJK2sX83UednZi/f2IJhDrqSJBRYcN3DKtOMSwLUXe+sR+ATtY0MHyLaEGXWX Aw== 
+Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
+ by aserp2130.oracle.com with ESMTP id 2qhre5n3v6-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 00:02:17 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1E02CAr025949
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 00:02:12 GMT
+Received: from abhmp0003.oracle.com (abhmp0003.oracle.com [141.146.116.9])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1E02C7V001627;
+ Thu, 14 Feb 2019 00:02:12 GMT
+Received: from concerto.internal (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Wed, 13 Feb 2019 16:02:11 -0800
+From: Khalid Aziz <khalid.aziz@oracle.com>
+To: juergh@gmail.com, tycho@tycho.ws, jsteckli@amazon.de, ak@linux.intel.com, 
+ torvalds@linux-foundation.org, liran.alon@oracle.com,
+ keescook@google.com, akpm@linux-foundation.org, mhocko@suse.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, jmorris@namei.org,
+ konrad.wilk@oracle.com
+Subject: [RFC PATCH v8 07/14] arm64/mm, xpfo: temporarily map dcache regions
+Date: Wed, 13 Feb 2019 17:01:30 -0700
+Message-Id: <ea50404604bdbe1547601b6ea0af89e3da8886b0.1550088114.git.khalid.aziz@oracle.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <cover.1550088114.git.khalid.aziz@oracle.com>
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+In-Reply-To: <cover.1550088114.git.khalid.aziz@oracle.com>
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9166
+ signatures=668683
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
+ priorityscore=1501 malwarescore=0
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1015
+ lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=559 adultscore=0
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
+ definitions=main-1902130157
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_151933_073660_51AC5AEE 
-X-CRM114-Status: GOOD (  16.05  )
+X-CRM114-CacheID: sfid-20190213_160248_050863_BA13F773 
+X-CRM114-Status: GOOD (  13.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,72 +103,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, brgerst@gmail.com,
- Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Josh Poimboeuf <jpoimboe@redhat.com>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- valentin.schneider@arm.com, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- Peter Anvin <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
+Cc: tglx@linutronix.de, kernel-hardening@lists.openwall.com,
+ peterz@infradead.org, dave.hansen@intel.com, deepa.srinivasan@oracle.com,
+ steven.sistare@oracle.com, Tycho Andersen <tycho@docker.com>, hch@lst.de,
+ x86@kernel.org, kanth.ghatraju@oracle.com, labbott@redhat.com,
+ pradeep.vincent@oracle.com, jcm@redhat.com, luto@kernel.org,
+ boris.ostrovsky@oracle.com, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, linux-mm@kvack.org,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, Juerg Haefliger <juerg.haefliger@canonical.com>,
+ oao.m.martins@oracle.com, dwmw@amazon.co.uk, kirill.shutemov@linux.intel.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 7:45 AM Peter Zijlstra <peterz@infradead.org> wrote:
->
-> Before that, x86_64 switch_to() read like (much simplified):
->
->         asm volatile ( /* do RSP twiddle */
->           : /* output */
->           : /* input */
->           : "memory", "cc", .... "flags");
->
-> (see __EXTRA_CLOBBER)
->
-> Which I suppose means that GCC generates the PUSHF/POPF to preserve the
-> EFLAGS, since we mark those explicitly clobbered.
+From: Juerg Haefliger <juerg.haefliger@canonical.com>
 
-No, it only means that gcc won't keep conditionals in the flags over
-the asm. It doesn't make gcc save anything.
+If the page is unmapped by XPFO, a data cache flush results in a fatal
+page fault, so let's temporarily map the region, flush the cache, and then
+unmap it.
 
-The push/pop got removed elsewhere as Andy says.
+v6: actually flush in the face of xpfo, and temporarily map the underlying
+    memory so it can be flushed correctly
 
-That said, I do agree that it's probably a good idea to save/restore
-flags anyway when scheduling. It's not just AC, actually, now that I
-look at it again I worry a bit about DF too.
+CC: linux-arm-kernel@lists.infradead.org
+Signed-off-by: Juerg Haefliger <juerg.haefliger@canonical.com>
+Signed-off-by: Tycho Andersen <tycho@docker.com>
+---
+ arch/arm64/mm/flush.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-We have the rule that we run with DF clear in the kernel, and all the
-kernel entry points do clear it properly (so that memcpy etc don't
-need to). But there are a few places that set DF temporarily because
-they do something odd (backwards memmove), and those atcually have the
-*exact* same issue as stac/clac has: it's ok to take a trap or
-interrupt, and schedule due to that (because the trap/irq will clear
-DF), but it would be a horrible bug to have a synchronous scheduling
-point there.
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index 30695a868107..fad09aafd9d5 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -20,6 +20,7 @@
+ #include <linux/export.h>
+ #include <linux/mm.h>
+ #include <linux/pagemap.h>
++#include <linux/xpfo.h>
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cache.h>
+@@ -28,9 +29,15 @@
+ void sync_icache_aliases(void *kaddr, unsigned long len)
+ {
+ 	unsigned long addr = (unsigned long)kaddr;
++	unsigned long num_pages = XPFO_NUM_PAGES(addr, len);
++	void *mapping[num_pages];
+ 
+ 	if (icache_is_aliasing()) {
++		xpfo_temp_map(kaddr, len, mapping,
++			      sizeof(mapping[0]) * num_pages);
+ 		__clean_dcache_area_pou(kaddr, len);
++		xpfo_temp_unmap(kaddr, len, mapping,
++				sizeof(mapping[0]) * num_pages);
+ 		__flush_icache_all();
+ 	} else {
+ 		flush_icache_range(addr, addr + len);
+-- 
+2.17.1
 
-Arguably the DF issue really isn't even remotely likely to actually be
-a real issue (the code that sets DF really is very special and should
-never do any kind of preemption), but it's conceptually quite
-similar..
-
-Of course, if DF is ever set, and we end up calling any C code at all,
-I guess it would already be a huge problem. If the C code then does
-memcpy or something, it would corrupt things quite badly.
-
-So I guess save/restore isn't going to save us wrt DF. If we get
-anywhere close to the scheduler with the DF bit set, we've already
-lost.
-
-But I still do kind of prefer saving flags. We have other sticky state
-in there too, although none of it matters in the kernel currently (eg
-iopl etc - only matters in user space, and user space will always
-reload eflags on return).
-
-                 Linus
 
 _______________________________________________
 linux-arm-kernel mailing list
