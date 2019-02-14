@@ -2,69 +2,74 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69079C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:14:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4AC5AC10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:16:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 373E9222DD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:14:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0BBBE2077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:16:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qonyPKEJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 373E9222DD
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MlG6tcRB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="X9N2wtn6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0BBBE2077B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iHqaS7ifBw9ZtyEnSmRiA6WjRV02fjCv8nJKpgi2Mhw=; b=qonyPKEJHoAhq1
-	Furh3D2xE9pW5mFfU0hWe8b67NgBbWm4IFCrTnX8BwC/z3ag+Kb7p0pb3pAwplFqHs8DFxX3xoD4z
-	Z2pEBIIShVoeCvGJqYPO4JG33JhaX3fNvyRIxL/HCsCSi4dzTxVMCStxyToe2/cVK2HTe0ET5dBFj
-	XrGgDNfRF8Kvl+DR2YVJx1WVFr8dOCav8/IeJGAeFLQDcYSyp5t+NS4iXwPew3S8ISNpf0UuSWkh6
-	ISyxIFFzAEKs1M1Qywn4XFZBcDXk5zz0e34m/JsFwKRyvi0EVzHau+n2GeowYnRaxWcToiSEHgjxI
-	g9xMQ8Et8xtULMvXfxRA==;
+	List-Owner; bh=KMnPdB4YHB0p5/ZtTnHNg+vkAtvdgpn0YACK+y2ctc0=; b=MlG6tcRBaAZEXO
+	lD+/ndfF5gmTRwnaiB7h8UshVH5O+ASA3oeI9+Jx2RfpOs/+nQkgzwPTc47dRYWQ55r2gQL/vIsSk
+	QWs1r0Nsp18qdyXu4YQ1+oOMmqJoWViutDP3xGTKYJHWAXsVCkuNGP/pbUBlHg9q8T+FoKtHmvm8I
+	1tmlqc2BtFkop8oT0NFFxQok/hMvUMas8jICWIGiDiXGrHB2wNOHDMNWrudAVXYyZ7jZAAXu7ZW0X
+	FJ5UIj4cl0aUXJmxToVw3RQNwt9JBJVobRAltkSkVRGStx7PDHY6UglBKGwHvo+tsEjRIoQQraENY
+	cNUkJH5vSukMQzShU+lg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guJeB-0001np-M0; Thu, 14 Feb 2019 16:13:59 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1guJgH-0003ad-VC; Thu, 14 Feb 2019 16:16:09 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guJe8-0001nE-65; Thu, 14 Feb 2019 16:13:57 +0000
-X-UUID: dc37d0dcc3494fb4bda98f26d532ffc1-20190214
-X-UUID: dc37d0dcc3494fb4bda98f26d532ffc1-20190214
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <ck.hu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 205229822; Thu, 14 Feb 2019 08:13:46 -0800
-Received: from MTKMBS33N1.mediatek.inc (172.27.4.75) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Thu, 14 Feb 2019 08:13:45 -0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- MTKMBS33N1.mediatek.inc (172.27.4.75) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Fri, 15 Feb 2019 00:13:42 +0800
-Received: from [172.21.77.4] (172.21.77.4) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 15 Feb 2019 00:13:29 +0800
-Message-ID: <1550160809.6862.13.camel@mtksdaap41>
-Subject: Re: [PATCH] drm/mediatek: add mt8183 dpi support
-From: CK Hu <ck.hu@mediatek.com>
-To: Jitao Shi <jitao.shi@mediatek.com>
-Date: Fri, 15 Feb 2019 00:13:29 +0800
-In-Reply-To: <20190211045059.11821-1-jitao.shi@mediatek.com>
-References: <20190211045059.11821-1-jitao.shi@mediatek.com>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1guJgC-0003Zc-Fr
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:16:07 +0000
+Received: from zn.tnic (p200300EC2BCDFC001CE8649D49136343.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bcd:fc00:1ce8:649d:4913:6343])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 11D161EC0253;
+ Thu, 14 Feb 2019 17:15:57 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1550160957;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=nRzGo2WdRGVlfCrR5IW3r6niSjb+gE5vLdPAiNJgD2c=;
+ b=X9N2wtn6f0+HrkqlYxsrPU1T4BUJXTu6UuzwxZwPNn+jFGABVXEN4BN5WClF+wGi1DxAQq
+ E/Rvm4hnd4jV3rJSqgqbAXFSHNsWcXRoVTe1Ju+cvwu5Lugv3hoDPrpvlrXJiHO4y4eoFV
+ P1NBzIFEoRdA87/zavwJ2qWiX1cCQrQ=
+Date: Thu, 14 Feb 2019 17:15:52 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: Peter Zijlstra <peterz@infradead.org>
+Subject: Re: [RFC PATCH v8 03/14] mm, x86: Add support for eXclusive Page
+ Frame Ownership (XPFO)
+Message-ID: <20190214161552.GF4423@zn.tnic>
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+ <8275de2a7e6b72d19b1cd2ec5d71a42c2c7dd6c5.1550088114.git.khalid.aziz@oracle.com>
+ <20190214105631.GJ32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <20190214105631.GJ32494@hirez.programming.kicks-ass.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_081356_223965_E4DFD407 
-X-CRM114-Status: GOOD (  15.29  )
+X-CRM114-CacheID: sfid-20190214_081604_683628_6B599D28 
+X-CRM114-Status: UNSURE (   7.66  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,121 +81,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, stonea168@163.com,
- dri-devel@lists.freedesktop.org, yingjoe.chen@mediatek.com, Ajay
- Kumar <ajaykumar.rs@samsung.com>, Vincent Palatin <vpalatin@chromium.org>,
- cawa.cheng@mediatek.com, bibby.hsieh@mediatek.com,
- Russell King <rmk+kernel@arm.linux.org.uk>,
- Thierry Reding <treding@nvidia.com>, linux-pwm@vger.kernel.org,
- Sascha Hauer <kernel@pengutronix.de>, Pawel Moll <pawel.moll@arm.com>,
- Ian Campbell <ijc+devicetree@hellion.org.uk>, Inki Dae <inki.dae@samsung.com>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- Andy Yan <andy.yan@rock-chips.com>, Matthias
- Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org, Rahul
- Sharma <rahul.sharma@samsung.com>, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, Philipp Zabel <p.zabel@pengutronix.de>,
- Kumar Gala <galak@codeaurora.org>, Sean Paul <seanpaul@chromium.org>
+Cc: mhocko@suse.com, Tycho Andersen <tycho@docker.com>,
+ kernel-hardening@lists.openwall.com, catalin.marinas@arm.com,
+ will.deacon@arm.com, dave.hansen@intel.com,
+ Khalid Aziz <khalid.aziz@oracle.com>, deepa.srinivasan@oracle.com,
+ steven.sistare@oracle.com, tglx@linutronix.de, tycho@tycho.ws,
+ ak@linux.intel.com, kirill.shutemov@linux.intel.com, x86@kernel.org,
+ jmorris@namei.org, hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de,
+ labbott@redhat.com, pradeep.vincent@oracle.com, konrad.wilk@oracle.com,
+ jcm@redhat.com, liran.alon@oracle.com, luto@kernel.org,
+ boris.ostrovsky@oracle.com, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com,
+ Marco Benatto <marco.antonio.780@gmail.com>, linux-mm@kvack.org,
+ juergh@gmail.com, andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org,
+ tyhicks@canonical.com, john.haxby@oracle.com,
+ Juerg Haefliger <juerg.haefliger@canonical.com>, oao.m.martins@oracle.com,
+ keescook@google.com, akpm@linux-foundation.org, torvalds@linux-foundation.org,
+ dwmw@amazon.co.uk
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Jitao:
-
-On Mon, 2019-02-11 at 12:50 +0800, Jitao Shi wrote:
-> MT8183 sample on rising and falling edge. It can reduce half data io.
+On Thu, Feb 14, 2019 at 11:56:31AM +0100, Peter Zijlstra wrote:
+> > +EXPORT_SYMBOL(xpfo_kunmap);
 > 
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_dpi.c | 29 +++++++++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> index 62a9d47df948..610c23334047 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> @@ -117,6 +117,7 @@ struct mtk_dpi_conf {
->  	unsigned int (*cal_factor)(int clock);
->  	u32 reg_h_fre_con;
->  	bool edge_sel_en;
-> +	bool dual_edge;
->  };
->  
->  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
-> @@ -353,6 +354,13 @@ static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
->  		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
->  }
->  
-> +static void mtk_dpi_enable_dual_edge(struct mtk_dpi *dpi)
-> +{
-> +	mtk_dpi_mask(dpi, DPI_DDR_SETTING, DDR_EN | DDR_4PHASE,
-> +		     DDR_EN | DDR_4PHASE);
-> +	mtk_dpi_mask(dpi, DPI_OUTPUT_SETTING, EDGE_SEL, EDGE_SEL);
-> +}
+> And these here things are most definitely not IRQ-safe.
 
-All these register exist in MT8173, if you do the same setting in
-MT8173, could it also sample on rising edge and falling edge?
+Should also be EXPORT_SYMBOL_GPL.
 
-Regards,
-CK
+-- 
+Regards/Gruss,
+    Boris.
 
-> +
->  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
->  					enum mtk_dpi_out_color_format format)
->  {
-> @@ -509,6 +517,8 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
->  	mtk_dpi_config_color_format(dpi, dpi->color_format);
->  	mtk_dpi_config_2n_h_fre(dpi);
->  	mtk_dpi_config_disable_edge(dpi);
-> +	if (dpi->conf->dual_edge)
-> +		mtk_dpi_enable_dual_edge(dpi);
->  	mtk_dpi_sw_reset(dpi, false);
->  
->  	return 0;
-> @@ -671,6 +681,16 @@ static unsigned int mt2701_calculate_factor(int clock)
->  		return 2;
->  }
->  
-> +static unsigned int mt8183_calculate_factor(int clock)
-> +{
-> +	if (clock <= 27000)
-> +		return 8;
-> +	else if (clock <= 167000)
-> +		return 4;
-> +	else
-> +		return 2;
-> +}
-> +
->  static const struct mtk_dpi_conf mt8173_conf = {
->  	.cal_factor = mt8173_calculate_factor,
->  	.reg_h_fre_con = 0xe0,
-> @@ -682,6 +702,12 @@ static const struct mtk_dpi_conf mt2701_conf = {
->  	.edge_sel_en = true,
->  };
->  
-> +static const struct mtk_dpi_conf mt8183_conf = {
-> +	.cal_factor = mt8183_calculate_factor,
-> +	.reg_h_fre_con = 0xe0,
-> +	.dual_edge = true,
-> +};
-> +
->  static int mtk_dpi_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -777,6 +803,9 @@ static const struct of_device_id mtk_dpi_of_ids[] = {
->  	{ .compatible = "mediatek,mt8173-dpi",
->  	  .data = &mt8173_conf,
->  	},
-> +	{ .compatible = "mediatek,mt8183-dpi",
-> +	  .data = &mt8183_conf,
-> +	},
->  	{ },
->  };
->  
-
-
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
