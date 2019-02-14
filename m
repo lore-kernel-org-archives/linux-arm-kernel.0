@@ -2,23 +2,23 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CFEB9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:10:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE49AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:10:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C8D6218FF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:10:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9960B218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:10:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bvo4ylfC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="QUeOU85x";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="w3nTqgmd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C8D6218FF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dJruHet5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="TBkUuiqV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="0658j7AC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9960B218FF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,85 +27,85 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=a31z/nPoIOQfh69z+7a8/uvkTJx8K4AcSfEODimaTNs=; b=bvo4ylfC3VgHIV
-	25e8Ow4V6QuUnq0yqKtvBZKg9vN+Er9v8YGa9m6h49zaIlIHC5DyvFreWzKfmgWqgsPHuhVVTHjSa
-	4G++oupryLpmUrhHyKBhOH6Pg5QGg47OvmEBaRj9BZ0tsNUj1KidmxAPvin5o6Hr3CMJvdojhdkFi
-	5I/sU9KCWjagDt5379OtzT7EQJhJXLj49wxBy9hjiEkHcNjc//7q3Vm4ajAQoB1FbZBRZeJL2mOzD
-	/QyPRswpM2bmCJA9ZdLVV3brJkKEUqlBOoGi9PpEIHfxZqE61S7SCxvaXTxd97IaWLn2G7YhxwuIU
-	7bDvHSytcNR+mrt+epcA==;
+	List-Owner; bh=D/VsbZlS+NuOUEmnTdJcul9/VTfqoREkD3n8L3OKLNQ=; b=dJruHet5jBwTOz
+	oNe80jPu3fzfyBS3vtN3coswzzwBufl7jli2eiYPKyLAosDJxobyAk6m/HvmaaqIRzq+dH61EAK13
+	HjK/qqX3kCXDa/3iZ4DCWOeTyN53i4hMXOqFI/jKzi90veX94NIJ96dmF3XvM/hSNdSCHHpxEZIYJ
+	ji0kQRIYgpW4ufK70Dc5f4EvV6Jfxc3wIVghpe6ja2Z6whxZr6A4DRv9h7RIrwm3Y85FLVSCyN0i5
+	dkUf2gSJKkc5ZgNmK3yb7DsQDUVgXhpADKFCYwP6TFdZRGNmlNvOzgC8xsLtyjpQacblLKxeC3aUi
+	ZzeHAceV4/zfU+0wv8PA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guIeK-00016q-Ds; Thu, 14 Feb 2019 15:10:04 +0000
+	id 1guIeW-0002Fe-5A; Thu, 14 Feb 2019 15:10:16 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guIeH-0000So-GX
- for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 15:10:01 +0000
+ id 1guIeI-0000b5-Ar
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 15:10:02 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=PMy9rdFNcyWXXu44/4C8YruieLUK6NzC/y/3EwozU68=; b=QUeOU85xqqUyKdDd4xW85Rz6hA
- fp7355rkoPOy0a/lvQ1Z7tn159oi/3GKR4NFIj2zEZfp25/jS0ygj63SfWjeRX0mDgQI76LMg7pi0
- mL9CF1vV0z9y+5DeeFjWqvY40VcvbuANtCIiKSAmCAgDnFOUG7CvP+6rXg29W42BF27VwFGTwfEqz
- meozf8Z9B6vGRi/Zc1amh8B8E+ofaZqdf0hE2CTwYIddu43XtBP905Y70YOAhOqh+PKyrgwOcTCzl
- gQbR87pqbYMM02jgXb9aJNNrzy09Mc3C0LkQ5bqtXYJsQrq5XBKz26COsrNXhgmTCQvwTf+ImOEgf
- XDnsWRgg==;
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+ bh=uTYZ0vXP8sAs8gifFLvRMBmuXz5Fy14EY7Zl2hW8P1E=; b=TBkUuiqVZvy7/GgyC743RFPg4q
+ g37BVw2v4FtgVGiUKqIMMPFQc5fV4F76ud4wsAC3Ju16RmRE0SlbWmDH+doUkvFK3hIi4FycBzD/R
+ XvHeM9IgwkW8iD4IovTM7/aASEwu91tkr5OwGembYn7necyAZbWjNdL6gHnX0i60PWKp2cYsPXOSX
+ nfz1f/R0frL6v5PACnqyclFhsgvoiQFgIrUy/OyBzazr0kWeAg7SmIBA3Ur17hx+UOBtW/VKGGoKr
+ zMkNs9VUEjaIn+V3D3CSRamnNSAsFA1WFY9U1cfcZ3LWeXAxnezFTtpBZVr52v8OYEM0lKfBHQXiM
+ mHjVeNoA==;
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guIOD-0007pX-N6
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:27 +0000
-Received: by mail-wr1-x443.google.com with SMTP id l5so5705933wrw.6
+ id 1guIO8-0007ov-Mb
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:22 +0000
+Received: by mail-wr1-x441.google.com with SMTP id i12so6838500wrw.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:53:25 -0800 (PST)
+ Thu, 14 Feb 2019 06:53:20 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=PMy9rdFNcyWXXu44/4C8YruieLUK6NzC/y/3EwozU68=;
- b=w3nTqgmdVjXLMVjYsM0ujnlUSdoziCTXEeTKsG1sLi3x3U9fAjBmmJ3fb5ppf/Hf2V
- COf+NPBhV+IchdXWPqXhj4/3/dU5HTX3GcH0bWx1s/c5wGLfxoZx+thegvmB+TWASbiT
- aCwvrKIr4KG6oamd41jYZy1TF8t0g0P+qP0yvmuxaOZPp23j97Nl2DaKCsegTSBBM6+K
- mTwBfsj1EXFaCqk215G36FSmw8KxhIgOwx/1ant2EizrshZvSGnlUR/LRqx020iZq3yq
- ALoG16BPwVpg0nW5zn6lhoVs7+rZ5n4WBxIyH8h1SWTVss9FhZ/SZMvoLPbR7SWESKwT
- 9nAw==
+ bh=uTYZ0vXP8sAs8gifFLvRMBmuXz5Fy14EY7Zl2hW8P1E=;
+ b=0658j7ACh1agWR//z8BaobHFmL7RX/R2bpEHD2W4/W00SBxksiZqRb2RgYchwsQFUA
+ 2h8vnzEkbY21CvZIqmLIfpim5mSmwiAiVqIcbl4aXTxO/JgiNBSln91Sn+cM6oF9NR8L
+ d1brm9EWaiRdgopV6BA2tgxKRvZhcdS79YIYn2gPOUbzOHrxe2W4olXUEOSSAijRssnD
+ 9aPZnuA+xj+8X7IU5MWNtxMqTSFjF0WTn6pquyIwqLWwoBAbPTkA7vM6jqN6GOs3EqQ3
+ wSpvfc/QAlkxI4JLEzHGxZzk9Sn8S/YKjDjPNQy0hPY4BoBK5F7ebGtskEibZJ6+MODr
+ XNPQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=PMy9rdFNcyWXXu44/4C8YruieLUK6NzC/y/3EwozU68=;
- b=GHr+1FGOCXSPsJBOwdvEYOJWilYWzkdK+FAWpiqP/av5cbSd0kP0OTsKzsJwVoqpvU
- tL3d5LByMZbqScppDoxlzAXkgctullHcxgVztcukQmpj4UcqZStIXWouvDcv4nr76gUQ
- e/xlp617VHZE/S46hxpIeEwkxfbNOtEd/wnk/0KqN08PSoOcJzUVq5cdh2vB6Q4Z1N1v
- Fb5xw+QgTwSoe4FLNEzBH/EXmZjpznMsPaLmUa9aTaISVM8rYaD46zwpYeWbdJl/TwMn
- Bpn9of/Wk/YGYeANVobnA1N3zBK8O+xeOUeFASZj+A36ljtTR8IX/Jm0BX/u6F/OocG/
- OjbQ==
-X-Gm-Message-State: AHQUAuZgEwx4HDqf5TwNs7yK5Zc8TZ6ZkV49R2sJ7qYBGrlst2gibNNo
- QBYZcqYVLE2N/lHeGuLbjPL3oQ==
-X-Google-Smtp-Source: AHgI3IZ69LEUTwcyKTMiUGEw39TftmUZE/9/jTDns23doIfGX5NHvKq9oO90uRQVPmHfbx9jrhMt4g==
-X-Received: by 2002:a05:6000:128f:: with SMTP id
- f15mr3064136wrx.74.1550156004389; 
- Thu, 14 Feb 2019 06:53:24 -0800 (PST)
+ bh=uTYZ0vXP8sAs8gifFLvRMBmuXz5Fy14EY7Zl2hW8P1E=;
+ b=K27ITf+SSXWU87fpnphC5t9Axa26avCGDTqakttPJ3AZRLme73DQCrIB55lk2xQp25
+ yGF+pBUKFFFxlxCTIm/8xd5OhRqVbki7kcoaD4lgMsw/Zn4rovVurbyG9ePNcJ1H2DhY
+ QqjtRyfxTBTMGTAy2Xkh6lwm/k7n3nOTmebFWjsgZpOfmJVVe0QMzR7IQ0lBHFo2gNbV
+ FFYgKtRWZKP9Hwb9LkEbEf+E/vqYOMWcJ04sG7Y0C5v1kUmxFfpE9QzYjoyJLiU4oEMc
+ fQhzWgMmrGVjYt4TFRC1tdkGOUpif+a0klxLwKaNNW99ESaT9/JvuvFmbHXHcbnfI0dH
+ HZeA==
+X-Gm-Message-State: AHQUAuaVWB2JeWaby+PVgmd1NZWl60Iz+cciODkoLP0qDet02pVFJTC6
+ MG47X2RMHh19v2K+4hREM/g7Bw==
+X-Google-Smtp-Source: AHgI3IaGxONeSlkBAe1qKfY/jtNqvQRmQcAkuYpWf9t1xu0vttrkNAtLX7HNJCKNs5a5TK+Wp7yliw==
+X-Received: by 2002:a05:6000:1110:: with SMTP id
+ z16mr3267768wrw.28.1550155999778; 
+ Thu, 14 Feb 2019 06:53:19 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id y20sm4181005wra.51.2019.02.14.06.53.23
+ by smtp.gmail.com with ESMTPSA id y20sm4181005wra.51.2019.02.14.06.53.18
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 06:53:23 -0800 (PST)
+ Thu, 14 Feb 2019 06:53:19 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Dmitry Torokhov <dmitry.torokhov@gmail.com>, Sekhar Nori <nsekhar@ti.com>,
  Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
  Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
  David Lechner <david@lechnology.com>
-Subject: [PATCH v4 35/37] ARM: davinci: cp-intc: remove redundant comments
-Date: Thu, 14 Feb 2019 15:52:29 +0100
-Message-Id: <20190214145231.8750-36-brgl@bgdev.pl>
+Subject: [PATCH v4 31/37] ARM: davinci: cp-intc: improve coding style
+Date: Thu, 14 Feb 2019 15:52:25 +0100
+Message-Id: <20190214145231.8750-32-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190214145231.8750-1-brgl@bgdev.pl>
 References: <20190214145231.8750-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_145325_830073_A6A31345 
-X-CRM114-Status: GOOD (  11.84  )
+X-CRM114-CacheID: sfid-20190214_145320_750453_4E708EC4 
+X-CRM114-Status: GOOD (  15.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -126,42 +126,45 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We don't need comments explaining what functions with obvious names do.
+Drop tabs from variable initialization. Arrange variables in reverse
+christmas-tree order. Add a newline before a return.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Reviewed-by: David Lechner <david@lechnology.com>
 ---
- arch/arm/mach-davinci/cp_intc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-davinci/cp_intc.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm/mach-davinci/cp_intc.c b/arch/arm/mach-davinci/cp_intc.c
-index eeb3351016f0..276da2772e7f 100644
+index 6ab56af3be6b..25221dfe8a20 100644
 --- a/arch/arm/mach-davinci/cp_intc.c
 +++ b/arch/arm/mach-davinci/cp_intc.c
-@@ -57,7 +57,6 @@ static void davinci_cp_intc_ack_irq(struct irq_data *d)
- 	davinci_cp_intc_write(d->hwirq, DAVINCI_CP_INTC_SYS_STAT_IDX_CLR);
+@@ -77,12 +77,12 @@ static void davinci_cp_intc_unmask_irq(struct irq_data *d)
+ static int davinci_cp_intc_set_irq_type(struct irq_data *d,
+ 					unsigned int flow_type)
+ {
+-	unsigned reg		= BIT_WORD(d->hwirq);
+-	unsigned mask		= BIT_MASK(d->hwirq);
+-	unsigned polarity	= davinci_cp_intc_read(
+-					DAVINCI_CP_INTC_SYS_POLARITY(reg));
+-	unsigned type		= davinci_cp_intc_read(
+-					DAVINCI_CP_INTC_SYS_TYPE(reg));
++	unsigned int reg, mask, polarity, type;
++
++	reg = BIT_WORD(d->hwirq);
++	mask = BIT_MASK(d->hwirq);
++	polarity = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_POLARITY(reg));
++	type = davinci_cp_intc_read(DAVINCI_CP_INTC_SYS_TYPE(reg));
+ 
+ 	switch (flow_type) {
+ 	case IRQ_TYPE_EDGE_RISING:
+@@ -150,6 +150,7 @@ static int davinci_cp_intc_host_map(struct irq_domain *h, unsigned int virq,
+ 	irq_set_chip(virq, &davinci_cp_intc_irq_chip);
+ 	irq_set_probe(virq);
+ 	irq_set_handler(virq, handle_edge_irq);
++
+ 	return 0;
  }
  
--/* Disable interrupt */
- static void davinci_cp_intc_mask_irq(struct irq_data *d)
- {
- 	/* XXX don't know why we need to disable nIRQ here... */
-@@ -66,7 +65,6 @@ static void davinci_cp_intc_mask_irq(struct irq_data *d)
- 	davinci_cp_intc_write(1, DAVINCI_CP_INTC_HOST_ENABLE_IDX_SET);
- }
- 
--/* Enable interrupt */
- static void davinci_cp_intc_unmask_irq(struct irq_data *d)
- {
- 	davinci_cp_intc_write(d->hwirq, DAVINCI_CP_INTC_SYS_ENABLE_IDX_SET);
-@@ -215,7 +213,6 @@ davinci_cp_intc_do_init(const struct davinci_cp_intc_config *config,
- 		return irq_base;
- 	}
- 
--	/* create a legacy host */
- 	davinci_cp_intc_irq_domain = irq_domain_add_legacy(
- 					node, config->num_irqs, irq_base, 0,
- 					&davinci_cp_intc_irq_domain_ops, NULL);
 -- 
 2.20.1
 
