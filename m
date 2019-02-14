@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80B4DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:48:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E3ADC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:52:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3816D2229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:48:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6866A2229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:52:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UP3adqkq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3816D2229F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iLzyxfo2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6866A2229F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rU5j5x89StGrC/RnoMMfWAj8aaxOsjd2q2lNxxptl/c=; b=UP3adqkqpRMqMV
-	FrxgWecEQKXSbROoOe+I+CvSrJCOF1oVxdG+uB7RxaBmEs5pkNqDgew0JAHom/6q4GS3oFWHI4uQe
-	dhE/EK6xsif44MPne5NCdteRjaNu2MRV02gilWzIpc0ee+FOm49CrmDkKQRUGWsSzHSkiY99Dgasz
-	qukB0iZvTAYJIREjaZMp2bcvJO/mbhqtb8mfRrxU4ErBaASxD9URdh34IuvHGH/obQxTfmSAl+2sA
-	zyp8+89uISiaETikAFxaMkcWMMR4HuhKEPNCLZY2mj5Sjxh+Al47FZtkO4hxD6wonokQXyv/cunAt
-	85Uv9juXCjhW68BWLQcg==;
+	List-Owner; bh=ObAsI4zpTT/zKgwXi2lvdLZZwXaORfCP81n91XYzrZU=; b=iLzyxfo2CWgI8a
+	FkuMxWhqL0mB1PnyoSwMvI5BTaDrLBa4+gCjf4333wEKjALhxbojCF5PTpjT28poX2Eq0/NlYsgI+
+	Lg7AmkAo8MDgWeGUPYFcypbH1hcbPm1OnUMb+qG+oRVOX5erXikvoCJ0iI1g7qgxtoV7Gv3hsvZ2H
+	yyhkzcj5qO6U2hRrsi6NFKhbezGZ89wrPkuNBZB2YK5VeyHGc4Jumikoi8lYTwnCwnN3rIfLKW8IR
+	NAtjdUaZEGfQcRKC6JnORzpoclEm0L+7IeQ+ZiriWsuuXVtAU0UBOFsJfUoHJue1qFYPBa8t+H0pR
+	aG1cWraIl4zmOorVbzHA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guAp0-00037v-PW; Thu, 14 Feb 2019 06:48:34 +0000
+	id 1guAsc-0004r9-3p; Thu, 14 Feb 2019 06:52:18 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guAnT-0001Qr-CJ
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 06:47:04 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ id 1guAnR-0001MG-GW
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 06:47:01 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1E6a35J013987; Thu, 14 Feb 2019 07:46:52 +0100
+ x1E6a8rn025862; Thu, 14 Feb 2019 07:46:46 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qn0jwrqbe-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qmy1n94a7-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Thu, 14 Feb 2019 07:46:52 +0100
+ Thu, 14 Feb 2019 07:46:46 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E646C38;
- Thu, 14 Feb 2019 06:46:51 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 273D131;
+ Thu, 14 Feb 2019 06:46:46 +0000 (GMT)
 Received: from Webmail-eu.st.com (Safex1hubcas23.st.com [10.75.90.46])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A75D62431;
- Thu, 14 Feb 2019 06:46:51 +0000 (GMT)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id EABF32432;
+ Thu, 14 Feb 2019 06:46:45 +0000 (GMT)
 Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS23.st.com
  (10.75.90.46) with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb
- 2019 07:46:51 +0100
+ 2019 07:46:45 +0100
 Received: from localhost (10.201.23.166) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb 2019 07:46:51
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb 2019 07:46:45
  +0100
 From: Christophe Roullier <christophe.roullier@st.com>
 To: <robh@kernel.org>, <davem@davemloft.net>, <joabreu@synopsys.com>,
  <mark.rutland@arm.com>, <mcoquelin.stm32@gmail.com>,
  <alexandre.torgue@st.com>, <peppe.cavallaro@st.com>
-Subject: [PATCH 7/8] ARM: dts: stm32: Add Ethernet support on stm32h7 SOC and
- activate it for eval and disco boards
-Date: Thu, 14 Feb 2019 07:46:02 +0100
-Message-ID: <1550126763-22669-8-git-send-email-christophe.roullier@st.com>
+Subject: [PATCH 2/8] net: ethernet: stmmac: update to support all PHY config
+ for stm32mp157c.
+Date: Thu, 14 Feb 2019 07:45:57 +0100
+Message-ID: <1550126763-22669-3-git-send-email-christophe.roullier@st.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
 References: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
@@ -73,8 +73,8 @@ X-Originating-IP: [10.201.23.166]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-14_04:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_224659_708515_AFB9EACE 
-X-CRM114-Status: GOOD (  11.23  )
+X-CRM114-CacheID: sfid-20190213_224657_845669_83A7017E 
+X-CRM114-Status: GOOD (  17.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,129 +94,217 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Synopsys GMAC 4.10 is used. And Phy mode for eval and disco is RMII
-with PHY SMSC LAN8742
+Update glue codes to support all PHY config on stm32mp157c
+ PHY_MODE	(MII,GMII, RMII, RGMII) and in normal, PHY wo crystal (25Mhz),
+PHY wo crystal (50Mhz), No 125Mhz from PHY config.
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/stm32h743.dtsi         | 19 +++++++++++++++++++
- arch/arm/boot/dts/stm32h743i-disco.dts   | 17 +++++++++++++++++
- arch/arm/boot/dts/stm32h743i-eval.dts    | 17 +++++++++++++++++
- 4 files changed, 68 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c | 102 +++++++++++++++++-----
+ 1 file changed, 82 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-index 24be8e6..980b276 100644
---- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-@@ -173,6 +173,21 @@
- 				};
- 			};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+index d1cf145..cee59e8 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+@@ -25,9 +25,24 @@
  
-+			ethernet_rmii: rmii@0 {
-+				pins {
-+					pinmux = <STM32_PINMUX('G', 11, AF11)>,
-+						 <STM32_PINMUX('G', 13, AF11)>,
-+						 <STM32_PINMUX('G', 12, AF11)>,
-+						 <STM32_PINMUX('C', 4, AF11)>,
-+						 <STM32_PINMUX('C', 5, AF11)>,
-+						 <STM32_PINMUX('A', 7, AF11)>,
-+						 <STM32_PINMUX('C', 1, AF11)>,
-+						 <STM32_PINMUX('A', 2, AF11)>,
-+						 <STM32_PINMUX('A', 1, AF11)>;
-+					slew-rate = <2>;
-+				};
-+			};
-+
- 			usart1_pins: usart1@0 {
- 				pins1 {
- 					pinmux = <STM32_PINMUX('B', 14, AF4)>; /* USART1_TX */
-diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-index cbdd69c..f6384af 100644
---- a/arch/arm/boot/dts/stm32h743.dtsi
-+++ b/arch/arm/boot/dts/stm32h743.dtsi
-@@ -511,6 +511,25 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		syscfg: system-config@58000400 {
-+			compatible = "syscon";
-+			reg = <0x58000400 0x400>;
-+		};
-+
-+		mac: ethernet@40028000 {
-+			compatible = "st,stm32-dwmac", "snps,dwmac-4.10a";
-+			reg = <0x40028000 0x8000>;
-+			reg-names = "stmmaceth";
-+			interrupts = <61>;
-+			interrupt-names = "macirq";
-+			clock-names = "stmmaceth", "mac-clk-tx", "mac-clk-rx",
-+			"syscfg-clk";
-+			clocks = <&rcc ETH1MAC_CK>, <&rcc ETH1TX_CK>, <&rcc ETH1RX_CK>, <&rcc SYSCFG_CK>;
-+			st,syscon = <&syscfg 0x4>;
-+			snps,pbl = <8>;
-+			status = "disabled";
-+		};
- 	};
- };
+ #define SYSCFG_MCU_ETH_MASK		BIT(23)
+ #define SYSCFG_MP1_ETH_MASK		GENMASK(23, 16)
++#define SYSCFG_PMCCLRR_OFFSET		0x40
  
-diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
-index 45e088c..0f738d0 100644
---- a/arch/arm/boot/dts/stm32h743i-disco.dts
-+++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-@@ -66,6 +66,23 @@
- 	clock-frequency = <25000000>;
- };
+ #define SYSCFG_PMCR_ETH_CLK_SEL		BIT(16)
+ #define SYSCFG_PMCR_ETH_REF_CLK_SEL	BIT(17)
++
++/*  Ethernet PHY interface selection in register SYSCFG Configuration
++ *------------------------------------------
++ * src	 |BIT(23)| BIT(22)| BIT(21)|BIT(20)|
++ *------------------------------------------
++ * MII   |   0	 |   0	  |   0    |   1   |
++ *------------------------------------------
++ * GMII  |   0	 |   0	  |   0    |   0   |
++ *------------------------------------------
++ * RGMII |   0	 |   0	  |   1	   |  n/a  |
++ *------------------------------------------
++ * RMII  |   1	 |   0	  |   0	   |  n/a  |
++ *------------------------------------------
++ */
+ #define SYSCFG_PMCR_ETH_SEL_MII		BIT(20)
+ #define SYSCFG_PMCR_ETH_SEL_RGMII	BIT(21)
+ #define SYSCFG_PMCR_ETH_SEL_RMII	BIT(23)
+@@ -35,15 +50,54 @@
+ #define SYSCFG_MCU_ETH_SEL_MII		0
+ #define SYSCFG_MCU_ETH_SEL_RMII		1
  
-+&mac {
-+	status = "okay";
-+	pinctrl-0	= <&ethernet_rmii>;
-+	pinctrl-names	= "default";
-+	phy-mode	= "rmii";
-+	phy-handle	= <&phy1>;
++/* STM32MP1 register definitions
++ *
++ * Below table summarizes the clock requirement and clock sources for
++ * supported phy interface modes.
++ * __________________________________________________________________________
++ *|PHY_MODE | Normal | PHY wo crystal|   PHY wo crystal   |No 125Mhz from PHY|
++ *|         |        |      25MHz    |        50MHz       |                  |
++ * ---------------------------------------------------------------------------
++ *|  MII    |	 -   |     eth-ck    |	      n/a	  |	  n/a        |
++ *|         |        |		     |                    |		     |
++ * ---------------------------------------------------------------------------
++ *|  GMII   |	 -   |     eth-ck    |	      n/a	  |	  n/a        |
++ *|         |        |               |                    |		     |
++ * ---------------------------------------------------------------------------
++ *| RGMII   |	 -   |     eth-ck    |	      n/a	  |  eth-ck (no pin) |
++ *|         |        |               |                    |  st,eth_clk_sel  |
++ * ---------------------------------------------------------------------------
++ *| RMII    |	 -   |     eth-ck    |	    eth-ck        |	  n/a        |
++ *|         |        |		     | st,eth_ref_clk_sel |		     |
++ * ---------------------------------------------------------------------------
++ *
++ * BIT(17) : set this bit in RMII mode when you have PHY without crystal 50MHz
++ * BIT(16) : set this bit in GMII/RGMII PHY when you do not want use 125Mhz
++ * from PHY
++ *-----------------------------------------------------
++ * src	 |         BIT(17)       |       BIT(16)      |
++ *-----------------------------------------------------
++ * MII   |           n/a	 |         n/a        |
++ *-----------------------------------------------------
++ * GMII  |           n/a         |   st,eth_clk_sel   |
++ *-----------------------------------------------------
++ * RGMII |           n/a         |   st,eth_clk_sel   |
++ *-----------------------------------------------------
++ * RMII  |   st,eth_ref_clk_sel	 |         n/a        |
++ *-----------------------------------------------------
++ *
++ */
 +
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy1: ethernet-phy@1 {
-+			reg = <0>;
-+		};
-+	};
-+};
-+
- &usart2 {
- 	pinctrl-0 = <&usart2_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts b/arch/arm/boot/dts/stm32h743i-eval.dts
-index 3f8e0c4..44997ba 100644
---- a/arch/arm/boot/dts/stm32h743i-eval.dts
-+++ b/arch/arm/boot/dts/stm32h743i-eval.dts
-@@ -104,6 +104,23 @@
- 	status = "okay";
- };
+ struct stm32_dwmac {
+ 	struct clk *clk_tx;
+ 	struct clk *clk_rx;
+ 	struct clk *clk_eth_ck;
+ 	struct clk *clk_ethstp;
+ 	struct clk *syscfg_clk;
+-	bool int_phyclk;	/* Clock from RCC to drive PHY */
++	int eth_clk_sel_reg;
++	int eth_ref_clk_sel_reg;
+ 	int irq_pwr_wakeup;
+-	u32 mode_reg;		/* MAC glue-logic mode register */
++	u32 mode_reg;		 /* MAC glue-logic mode register */
+ 	struct regmap *regmap;
+ 	u32 speed;
+ 	const struct stm32_ops *ops;
+@@ -103,7 +157,7 @@ static int stm32mp1_clk_prepare(struct stm32_dwmac *dwmac, bool prepare)
+ 		if (ret)
+ 			return ret;
  
-+&mac {
-+	status = "okay";
-+	pinctrl-0	= <&ethernet_rmii>;
-+	pinctrl-names	= "default";
-+	phy-mode	= "rmii";
-+	phy-handle	= <&phy1>;
+-		if (dwmac->int_phyclk) {
++		if (dwmac->clk_eth_ck) {
+ 			ret = clk_prepare_enable(dwmac->clk_eth_ck);
+ 			if (ret) {
+ 				clk_disable_unprepare(dwmac->syscfg_clk);
+@@ -112,7 +166,7 @@ static int stm32mp1_clk_prepare(struct stm32_dwmac *dwmac, bool prepare)
+ 		}
+ 	} else {
+ 		clk_disable_unprepare(dwmac->syscfg_clk);
+-		if (dwmac->int_phyclk)
++		if (dwmac->clk_eth_ck)
+ 			clk_disable_unprepare(dwmac->clk_eth_ck);
+ 	}
+ 	return ret;
+@@ -122,7 +176,7 @@ static int stm32mp1_set_mode(struct plat_stmmacenet_data *plat_dat)
+ {
+ 	struct stm32_dwmac *dwmac = plat_dat->bsp_priv;
+ 	u32 reg = dwmac->mode_reg;
+-	int val;
++	int val, ret;
+ 
+ 	switch (plat_dat->interface) {
+ 	case PHY_INTERFACE_MODE_MII:
+@@ -131,19 +185,19 @@ static int stm32mp1_set_mode(struct plat_stmmacenet_data *plat_dat)
+ 		break;
+ 	case PHY_INTERFACE_MODE_GMII:
+ 		val = SYSCFG_PMCR_ETH_SEL_GMII;
+-		if (dwmac->int_phyclk)
++		if (dwmac->eth_clk_sel_reg)
+ 			val |= SYSCFG_PMCR_ETH_CLK_SEL;
+ 		pr_debug("SYSCFG init : PHY_INTERFACE_MODE_GMII\n");
+ 		break;
+ 	case PHY_INTERFACE_MODE_RMII:
+ 		val = SYSCFG_PMCR_ETH_SEL_RMII;
+-		if (dwmac->int_phyclk)
++		if (dwmac->eth_ref_clk_sel_reg)
+ 			val |= SYSCFG_PMCR_ETH_REF_CLK_SEL;
+ 		pr_debug("SYSCFG init : PHY_INTERFACE_MODE_RMII\n");
+ 		break;
+ 	case PHY_INTERFACE_MODE_RGMII:
+ 		val = SYSCFG_PMCR_ETH_SEL_RGMII;
+-		if (dwmac->int_phyclk)
++		if (dwmac->eth_clk_sel_reg)
+ 			val |= SYSCFG_PMCR_ETH_CLK_SEL;
+ 		pr_debug("SYSCFG init : PHY_INTERFACE_MODE_RGMII\n");
+ 		break;
+@@ -154,6 +208,11 @@ static int stm32mp1_set_mode(struct plat_stmmacenet_data *plat_dat)
+ 		return -EINVAL;
+ 	}
+ 
++	/* Need to update PMCCLRR (clear register) */
++	ret = regmap_write(dwmac->regmap, reg + SYSCFG_PMCCLRR_OFFSET,
++			   dwmac->ops->syscfg_eth_mask);
 +
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy1: ethernet-phy@1 {
-+			reg = <0>;
-+		};
-+	};
-+};
++	/* Update PMCSETR (set register) */
+ 	return regmap_update_bits(dwmac->regmap, reg,
+ 				 dwmac->ops->syscfg_eth_mask, val);
+ }
+@@ -237,22 +296,25 @@ static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
+ 	struct device_node *np = dev->of_node;
+ 	int err = 0;
+ 
+-	dwmac->int_phyclk = of_property_read_bool(np, "st,int-phyclk");
++	/* Gigabit Ethernet 125MHz clock selection. */
++	dwmac->eth_clk_sel_reg = of_property_read_bool(np, "st,eth_clk_sel");
+ 
+-	/* Check if internal clk from RCC selected */
+-	if (dwmac->int_phyclk) {
+-		/*  Get ETH_CLK clocks */
+-		dwmac->clk_eth_ck = devm_clk_get(dev, "eth-ck");
+-		if (IS_ERR(dwmac->clk_eth_ck)) {
+-			dev_err(dev, "No ETH CK clock provided...\n");
+-			return PTR_ERR(dwmac->clk_eth_ck);
+-		}
++	/* Ethernet 50Mhz RMII clock selection */
++	dwmac->eth_ref_clk_sel_reg =
++		of_property_read_bool(np, "st,eth_ref_clk_sel");
 +
- &usart1 {
- 	pinctrl-0 = <&usart1_pins>;
- 	pinctrl-names = "default";
++	/*  Get ETH_CLK clocks */
++	dwmac->clk_eth_ck = devm_clk_get(dev, "eth-ck");
++	if (IS_ERR(dwmac->clk_eth_ck)) {
++		dev_warn(dev, "No phy clock provided...\n");
++		dwmac->clk_eth_ck = NULL;
+ 	}
+ 
+ 	/*  Clock used for low power mode */
+ 	dwmac->clk_ethstp = devm_clk_get(dev, "ethstp");
+ 	if (IS_ERR(dwmac->clk_ethstp)) {
+-		dev_err(dev, "No ETH peripheral clock provided for CStop mode ...\n");
++		dev_err(dev,
++			"No ETH peripheral clock provided for CStop mode ...\n");
+ 		return PTR_ERR(dwmac->clk_ethstp);
+ 	}
+ 
+@@ -268,7 +330,7 @@ static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
+ 	 */
+ 	dwmac->irq_pwr_wakeup = platform_get_irq_byname(pdev,
+ 							"stm32_pwr_wakeup");
+-	if (!dwmac->int_phyclk && dwmac->irq_pwr_wakeup >= 0) {
++	if (!dwmac->clk_eth_ck && dwmac->irq_pwr_wakeup >= 0) {
+ 		err = device_init_wakeup(&pdev->dev, true);
+ 		if (err) {
+ 			dev_err(&pdev->dev, "Failed to init wake up irq\n");
+@@ -370,7 +432,7 @@ static int stm32mp1_suspend(struct stm32_dwmac *dwmac)
+ 
+ 	clk_disable_unprepare(dwmac->clk_tx);
+ 	clk_disable_unprepare(dwmac->syscfg_clk);
+-	if (dwmac->int_phyclk)
++	if (dwmac->clk_eth_ck)
+ 		clk_disable_unprepare(dwmac->clk_eth_ck);
+ 
+ 	return ret;
 -- 
 2.7.4
 
