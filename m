@@ -2,80 +2,69 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 906AEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:36:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67DFDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:37:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E757222D2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:36:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 38C4B2229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:37:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GP+S/9/C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E757222D2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gk53SqT4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="fx1rpYHB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38C4B2229F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mngiPS101XHv5yRn5P83fyrrEvty95MFGIXBAAnjUBo=; b=GP+S/9/CHszKj1
-	tBnntjtxhLBoE2ThqiIZS4VXqvMBbxuWoZRYaJhBtaE668QISpzH53rYMmI5kUuhgI4N2WXNlzXj0
-	LYa2XWcDRXg005J18F2G4MGIAJIcuxhzzEO8pJK1w5YJCAmw8mAhj7viivQLg4E5XoHiRpet0nPtL
-	95oM2Bj+bJlWFkTdjrdxeuvaEbbq4NP8Zvh/4MeYrfNQAd4RddzKMOF1fKoO0icm/DNwXF46hcnqb
-	qAprVbImttue74PBZygEbsiAgpZXvxh49lTg+jHpAwLNnRMaNiaqEJsMC9b7qVWEsS1HBt0dqrGsn
-	Wad1jqmiY0rCdkrRc+fQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=L1RZvNpNmYNgItvuOG3lCne3bJroGTsE0pTD2TQlxN4=; b=gk53SqT43fd0Ud
+	hAAsPD9fwwI489ZB3dYSB4OHF2aM7HuVlM7EhZ+QanIo4LeEjrUV2lzpNj7a/ii1QlfaDda7CAPZs
+	DV8roIPqVNsmFW5px09L2rZjc5Zk+t3cCAeP9EsVLw0FYMOMbFokrYmBV48htBUePyF6q9NESZ8NS
+	O89rPpqkfo9B7ZxSsZz20ppAC1oGRxBaKgYcPi4NXnSN0KDzvZYJEeCisU1Gxn430ojX6jz/XmASo
+	ZZ5BIyqTRjhmI/q2FcBBpjgZ6sP+vitMCTaapNs+NQuAdP9r9Qe7Cfvi0WgbuRqVGzcdHmRwf3hLJ
+	38/DtO8lPZ5adGbLdA7w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guENS-00077Q-N1; Thu, 14 Feb 2019 10:36:22 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1guEOV-0007Pc-Ld; Thu, 14 Feb 2019 10:37:27 +0000
+Received: from merlin.infradead.org ([205.233.59.134])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guENQ-00076j-1p
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 10:36:21 +0000
-Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1EAa0rA026763; Thu, 14 Feb 2019 11:36:13 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qmwsujqr4-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Thu, 14 Feb 2019 11:36:13 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 364CC31;
- Thu, 14 Feb 2019 10:36:13 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 11EB74EA2;
- Thu, 14 Feb 2019 10:36:13 +0000 (GMT)
-Received: from [10.48.0.167] (10.75.127.46) by SFHDAG5NODE3.st.com
- (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 14 Feb
- 2019 11:36:11 +0100
-Subject: Re: [PATCH 0/4] Add nvmem support on STM32
-To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>, <robh+dt@kernel.org>,
- <alexandre.torgue@st.com>
-References: <1548866336-14765-1-git-send-email-fabrice.gasnier@st.com>
- <4aaa83b2-35a6-e2c2-a3f4-6579b5d67038@st.com>
- <46a59513-a322-1e14-41b5-ecbd4c478286@linaro.org>
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-Message-ID: <46ae9e00-1cf6-0ac9-eb9d-540eae7c621b@st.com>
-Date: Thu, 14 Feb 2019 11:36:11 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1guEOU-0007PO-9w; Thu, 14 Feb 2019 10:37:26 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=7yZM4QttJ1fb4ZQ7Mabo7VnLkRDJj+lx0G2X8XXS/q0=; b=fx1rpYHBqJrLjmSSs1gePTKzK
+ Ni/DauvFgKLMitkNhK5aW9m4wpH6Xo6Rn7SO+LZool3ojYYBe0dsltLVAgUPMw9zlAWx39NxZLo3n
+ e7DTq12YagL1S9+b1JtJSmTbkuZ8pcAUfrr6AY/BHVxNPrLBYwQWW8NdefDr6gS8H9Lxxkbitnu0Q
+ VupOqNRJPsPjHUuNI2y93XB8buCKOfO0sxZXubBWy8FtYbq0u2cn9KdQp9/Ttih4UzYwFrsFhla9R
+ iOdEi8vQQJ+6bmKp3FVg9Z+ptgbw3Znx9sxvKOfICpLgcc4ogCklFEcHlZZiG0A4rWpwJEP7Iq8N6
+ uxvBePSeQ==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guEOK-00014P-W4; Thu, 14 Feb 2019 10:37:17 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id BFC8020298375; Thu, 14 Feb 2019 11:37:15 +0100 (CET)
+Date: Thu, 14 Feb 2019 11:37:15 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH v4 0/3] locking/rwsem: Rwsem rearchitecture part 0
+Message-ID: <20190214103715.GI32494@hirez.programming.kicks-ass.net>
+References: <1550095217-12047-1-git-send-email-longman@redhat.com>
 MIME-Version: 1.0
-In-Reply-To: <46a59513-a322-1e14-41b5-ecbd4c478286@linaro.org>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.46]
-X-ClientProxiedBy: SFHDAG6NODE2.st.com (10.75.127.17) To SFHDAG5NODE3.st.com
- (10.75.127.15)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-14_07:, , signatures=0
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_023620_373558_82CD8D8F 
-X-CRM114-Status: GOOD (  13.77  )
+Content-Disposition: inline
+In-Reply-To: <1550095217-12047-1-git-send-email-longman@redhat.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,46 +76,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, lionel.debieve@st.com, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, mcoquelin.stm32@gmail.com,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-mips@vger.kernel.org,
+ "H. Peter Anvin" <hpa@zytor.com>, sparclinux@vger.kernel.org,
+ linux-riscv@lists.infradead.org, linux-arch@vger.kernel.org,
+ linux-s390@vger.kernel.org, Davidlohr Bueso <dave@stgolabs.net>,
+ linux-c6x-dev@linux-c6x.org, linux-hexagon@vger.kernel.org, x86@kernel.org,
+ Ingo Molnar <mingo@redhat.com>, uclinux-h8-devel@lists.sourceforge.jp,
+ linux-xtensa@linux-xtensa.org, Arnd Bergmann <arnd@arndb.de>,
+ linux-um@lists.infradead.org, linux-m68k@lists.linux-m68k.org,
+ openrisc@lists.librecores.org, Borislav Petkov <bp@alien8.de>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, linux-parisc@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, linux-kernel@vger.kernel.org,
+ linux-alpha@vger.kernel.org, nios2-dev@lists.rocketboards.org,
+ Andrew Morton <akpm@linux-foundation.org>, linuxppc-dev@lists.ozlabs.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi8xMy8xOSAxMTozNCBBTSwgU3Jpbml2YXMgS2FuZGFnYXRsYSB3cm90ZToKPiAKPiAKPiBP
-biAxMy8wMi8yMDE5IDEwOjE1LCBGYWJyaWNlIEdhc25pZXIgd3JvdGU6Cj4+IE9uIDEvMzAvMTkg
-NTozOCBQTSwgRmFicmljZSBHYXNuaWVyIHdyb3RlOgo+Pj4gTm9uIHZvbGF0aWxlIG1lbW9yeSBh
-cmVhIGlzIGF2YWlsYWJsZSBvbiBTVE0zMi4gSXQgY29udGFpbnMgdmFyaW91cwo+Pj4gZmFjdG9y
-eSBwcm9ncmFtbWVkIGluZm9ybWF0aW9uIHN1Y2ggYXMgdW5pcXVlIGRldmljZSBJRCwgYW5hbG9n
-Cj4+PiBjYWxpYnJhdGlvbi4uLgo+Pj4gVGhpcyBwYXRjaHNldCBhZGRzIE5WTUVNIHN1cHBvcnQg
-dG8gYWNjZXNzIHRoZXNlIGRhdGEuCj4+Cj4+IEhlbGxvLAo+Pgo+PiBHZW50bGUgcmVtaW5kZXIg
-Zm9yIHRoaXMgbmV3IGRyaXZlciByZXZpZXcKPiBOdm1lbSBwcm92aWRlciBkcml2ZXIgaXRzZWxm
-IGxvb2tzIGZpbmUgZm9yIG1lLCBidXQgSSBhbSB1bmFibGUgdG8gdGFrZQo+IHRoaXMgYXMgNS4x
-IG1hdGVyaWFsLCBhcyBJIG5vcm1hbGx5IHRha2UgbnZtZW0gcGF0Y2hlcyB3aGljaCBhcmUKPiBy
-ZXZpZXdlZCBhbmQgcmVhZHkgYmVmb3JlIHJjNS4KPiAKCkhpIFNyaW5pLApUaGFua3MgZm9yIHRo
-ZSBmZWVkYmFjay4KCj4gZHQgYmluZGluZ3MgcGF0Y2ggbmVlZHMgYW4gYWNrIGZyb20gRFQgbWFp
-bnRhaW5lcnMuCgpJIGhvcGUgUm9iIGNhbnQgdGFrZSBhIGxvb2sgYXQgaXQuCgpCZXN0IFJlZ2Fy
-ZHMsCkZhYnJpY2UKCj4gCj4gVGhhbmtzLAo+IHNyaW5pCj4+Cj4+IEJlc3QgUmVnYXJkcywKPj4g
-RmFicmljZQo+Pgo+Pj4KPj4+IEZhYnJpY2UgR2FzbmllciAoNCk6Cj4+PiDCoMKgIGR0LWJpbmRp
-bmdzOiBudm1lbTogQWRkIFNUTTMyIGZhY3RvcnktcHJvZ3JhbW1lZCByb21lbQo+Pj4gwqDCoCBu
-dm1lbTogQWRkIGRyaXZlciBmb3IgU1RNMzIgZmFjdG9yeS1wcm9ncmFtbWVkIHJlYWQgb25seSBt
-ZW0KPj4+IMKgwqAgbnZtZW06IHN0bTMyOiBhZGQgc3VwcG9ydCBmb3IgU1RNMzJNUDE1IEJTRUMg
-dG8gY29udHJvbCBPVFAgZGF0YQo+Pj4gwqDCoCBBUk06IGR0czogc3RtMzI6IEFkZCByb21lbSBh
-bmQgdGVtcGVyYXR1cmUgY2FsaWJyYXRpb24gb24gc3RtMzJtcDE1N2MKPj4+Cj4+PiDCoCAuLi4v
-ZGV2aWNldHJlZS9iaW5kaW5ncy9udm1lbS9zdCxzdG0zMi1yb21lbS50eHTCoMKgIHzCoCAzMSAr
-KysrCj4+PiDCoCBhcmNoL2FybS9ib290L2R0cy9zdG0zMm1wMTU3Yy5kdHNpwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqAgfMKgIDEzICsrCj4+PiDCoCBkcml2ZXJzL252bWVtL0tjb25m
-aWfCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgIHzCoCAxMCArCj4+PiDCoCBkcml2ZXJzL252bWVtL01ha2VmaWxlwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgfMKgwqAgMiArCj4+PiDC
-oCBkcml2ZXJzL252bWVtL3N0bTMyLXJvbWVtLmPCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgIHwgMjAyCj4+PiArKysrKysrKysrKysrKysrKysrKysKPj4+IMKg
-IDUgZmlsZXMgY2hhbmdlZCwgMjU4IGluc2VydGlvbnMoKykKPj4+IMKgIGNyZWF0ZSBtb2RlIDEw
-MDY0NAo+Pj4gRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL252bWVtL3N0LHN0bTMy
-LXJvbWVtLnR4dAo+Pj4gwqAgY3JlYXRlIG1vZGUgMTAwNjQ0IGRyaXZlcnMvbnZtZW0vc3RtMzIt
-cm9tZW0uYwo+Pj4KCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMu
-aW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZv
-L2xpbnV4LWFybS1rZXJuZWwK
+On Wed, Feb 13, 2019 at 05:00:14PM -0500, Waiman Long wrote:
+> v4:
+>  - Remove rwsem-spinlock.c and make all archs use rwsem-xadd.c.
+> 
+> v3:
+>  - Optimize __down_read_trylock() for the uncontended case as suggested
+>    by Linus.
+> 
+> v2:
+>  - Add patch 2 to optimize __down_read_trylock() as suggested by PeterZ.
+>  - Update performance test data in patch 1.
+> 
+> The goal of this patchset is to remove the architecture specific files
+> for rwsem-xadd to make it easer to add enhancements in the later rwsem
+> patches. It also removes the legacy rwsem-spinlock.c file and make all
+> the architectures use one single implementation of rwsem - rwsem-xadd.c.
+> 
+> Waiman Long (3):
+>   locking/rwsem: Remove arch specific rwsem files
+>   locking/rwsem: Remove rwsem-spinlock.c & use rwsem-xadd.c for all
+>     archs
+>   locking/rwsem: Optimize down_read_trylock()
+
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+
+with the caveat that I'm happy to exchange patch 3 back to my earlier
+suggestion in case Will expesses concerns wrt the ARM64 performance of
+Linus' suggestion.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
