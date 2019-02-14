@@ -2,91 +2,65 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F47EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:03:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DDEFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:04:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D03862089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:03:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 18F3520836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:04:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KSYNhNNH";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="UmPLlVjL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D03862089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HzLXh1KY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18F3520836
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LthhtNIjOySzRpAAwXHO6tBp7s+0HbpZuqBFFV9JVyM=; b=KSYNhNNHjMuT3h
-	WKotrFFyMAA8o0/2DHg3iiMUolHE2QzlP5hQWuTk1wodbBydQkYVhUZjd9oHFxu1KMA1ZbZq2JVqt
-	2D7rp2OENkBifH/Z83tFmQwdJDdcRlZikyEsommdig5u7tnPrzfCGZvZEU5BRgZ0CXV3kuZwwOn51
-	NSb+3bcsHi21JK/7nsWcYj8l9gv+qpoKbLMxkfPHliEuXDQnHghW7Yf7aYxP49CLIscol/yb5hrg4
-	IY/T2nIy11WozSLGE3YQtUq94bgM6n8JgnPFiLEFrtbEia/zLsbra3esrVZvSETyRWXkrJWlABQCF
-	RAx8QQOopL7txwjOvD/Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=X3APtSG3SZUcpIPD8XLkSrGGIE0iIhkXpHnMVt+CvgE=; b=HzLXh1KYVfo8Xe4jfZ4VcLYvh
+	lBC6cVfU3SnlmAXS5JDoj6yOsueRyBw1vXw69RnwOvKQU/zZJi5C0ufjaGwduokyqb42fWb1M24w/
+	Tixmcm6bfw3Ei4LgAz0HAUgD89jPJzuhC42ok/FBvrtcG4LFG8U0L/lEXOZph3aTqoqI+1xyA6Hj7
+	v4QfPynXxEk+gYVDYB6ChCReaR/7WU8zWWH8iqlam/TrN8yJ+JrgbcI+Wy+/hHCm3nCBnftOUymqN
+	T5KeYerv/YatyJuk0R6T5D1b4VlnzjN4cfFRJafweXo/qteJTi6CA0gTQmyrRHsRRx4FkWvZJ0XpO
+	8Be6E8RcA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guLLs-0004Kl-Lc; Thu, 14 Feb 2019 18:03:12 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guLLo-0004KH-HJ
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:03:10 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1EI2lYe056926;
- Thu, 14 Feb 2019 12:02:47 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550167367;
- bh=TyeFhSeiB4gBSfF4UAN/KmwNu1tdEGuwbrCrHcFDv50=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=UmPLlVjL87IB7ScVdeoaXCx6gH7AOhEeJzlDjYIdf0XuJo+yHaHEjV+DUS/U3YU6E
- q4RQmsj/M/nX1eMrkANBBoF1tXVGPGIHiF/hTEYx7OG6WAAWPqwJc0canaL8aUQ7dr
- K2lyfXQfwBrXG9ob9xDOnt8DBgWPP/nsgQ/Ypi8I=
-Received: from DFLE109.ent.ti.com (dfle109.ent.ti.com [10.64.6.30])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1EI2ltF031838
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 14 Feb 2019 12:02:47 -0600
-Received: from DFLE105.ent.ti.com (10.64.6.26) by DFLE109.ent.ti.com
- (10.64.6.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 14
- Feb 2019 12:02:47 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE105.ent.ti.com
- (10.64.6.26) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 14 Feb 2019 12:02:47 -0600
-Received: from [172.22.218.10] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1EI2g69012059;
- Thu, 14 Feb 2019 12:02:43 -0600
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-To: Tony Lindgren <tony@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
-Date: Thu, 14 Feb 2019 23:32:41 +0530
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1guLMi-0004cD-HT; Thu, 14 Feb 2019 18:04:04 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guLMf-0004bf-Am
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:04:02 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 59119EBD;
+ Thu, 14 Feb 2019 10:03:59 -0800 (PST)
+Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AE9EF3F589;
+ Thu, 14 Feb 2019 10:03:58 -0800 (PST)
+Subject: Re: [RFC 2/3] arm_pmu: acpi: spe: Add initial MADT/SPE probing
+To: Will Deacon <will.deacon@arm.com>
+References: <20190209004718.3292087-1-jeremy.linton@arm.com>
+ <20190209004718.3292087-3-jeremy.linton@arm.com>
+ <20190214171125.GG2475@fuggles.cambridge.arm.com>
+From: Jeremy Linton <jeremy.linton@arm.com>
+Message-ID: <c740a06e-d5d3-3e42-d19b-fbfea02ac0e7@arm.com>
+Date: Thu, 14 Feb 2019 12:03:57 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190214174612.GF5720@atomide.com>
+In-Reply-To: <20190214171125.GG2475@fuggles.cambridge.arm.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_100308_670408_F3130F4A 
-X-CRM114-Status: GOOD (  19.25  )
+X-CRM114-CacheID: sfid-20190214_100401_377047_F4E37C81 
+X-CRM114-Status: GOOD (  23.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,80 +72,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: mark.rutland@arm.com, catalin.marinas@arm.com, rafael.j.wysocki@intel.com,
+ linux-kernel@vger.kernel.org, robert.moore@intel.com,
+ linux-acpi@vger.kernel.org, lenb@kernel.org, erik.schmauss@intel.com,
+ linux-arm-kernel@lists.infradead.org, devel@acpica.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On 2/14/2019 11:16 PM, Tony Lindgren wrote:
-> * Lokesh Vutla <lokeshvutla@ti.com> [190214 17:32]:
->> Hi Tony,
->> 	Please do not snip the on going discussion.
+Thanks for taking a look at this..
+
+On 2/14/19 11:11 AM, Will Deacon wrote:
+> Hi Jeremy,
+> 
+> On Fri, Feb 08, 2019 at 06:47:17PM -0600, Jeremy Linton wrote:
+>> ACPI 6.3 adds additional fields to the MADT GICC
+>> structure to describe SPE PPI's. We pick these out
+>> of the cached reference to the madt_gicc structure
+>> similarly to the core PMU code. We then create a platform
+>> device referring to the IRQ and let the user/module loader
+>> decide whether to load the SPE driver.
 >>
->> On 2/14/2019 9:11 PM, Tony Lindgren wrote:
->>> * Lokesh Vutla <lokeshvutla@ti.com> [190214 08:39]:
->>>> IMHO, device ids are something which can be used in DT. There are many other
->>>> things like the interrupt ranges etc.. which are discoverable from sysfw and we
->>>> are implementing it.
->>>
->>> We need to describe hardware in the device tree, not firmware.
->>>
->>> If you have something discoverable from the firmware, you should
->>> have the device driver query it from sysfw based on a hardware
->>> property, not based on some invented enumeration in the firmware.
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> ---
+>>   arch/arm64/include/asm/acpi.h |  3 ++
+>>   drivers/perf/arm_pmu_acpi.c   | 67 +++++++++++++++++++++++++++++++++++
+>>   2 files changed, 70 insertions(+)
 >>
->> Yes we are already querying sysfw for all the irq ranges that can be
->> discoverable. The topic of discussion here is about the parent interrupt
->> controller id. I am not sure how you are expecting an id be discoverable
->> from system firmware especially with a name.
+>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>> index 2def77ec14be..f9f9f2eb5d54 100644
+>> --- a/arch/arm64/include/asm/acpi.h
+>> +++ b/arch/arm64/include/asm/acpi.h
+>> @@ -40,6 +40,9 @@
+>>   	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
+>>   	(unsigned long)(entry) + (entry)->header.length > (end))
+>>   
+>> +#define ACPI_MADT_GICC_SPE  (ACPI_OFFSET(struct acpi_madt_generic_interrupt, \
+>> +	spe_overflow_interrupt) + sizeof(u16))
+>> +
+>>   /* Basic configuration for ACPI */
+>>   #ifdef	CONFIG_ACPI
+>>   pgprot_t __acpi_get_mem_attribute(phys_addr_t addr);
+>> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+>> index 0f197516d708..725d413b47dc 100644
+>> --- a/drivers/perf/arm_pmu_acpi.c
+>> +++ b/drivers/perf/arm_pmu_acpi.c
+>> @@ -74,6 +74,71 @@ static void arm_pmu_acpi_unregister_irq(int cpu)
+>>   	acpi_unregister_gsi(gsi);
+>>   }
+>>   
+>> +static struct resource spe_resources[] = {
+>> +	{
+>> +		/* irq */
+>> +		.flags          = IORESOURCE_IRQ,
+>> +	}
+>> +};
+>> +
+>> +static struct platform_device spe_dev = {
+>> +	.name = "arm,spe-v1",
+>> +	.id = -1,
+>> +	.resource = spe_resources,
+>> +	.num_resources = ARRAY_SIZE(spe_resources)
+>> +};
+>> +
+>> +/*
+>> + * For lack of a better place, hook the normal PMU MADT walk
+>> + * and create a SPE device if we detect a recent MADT with
+>> + * a homogeneous PPI mapping.
+>> + */
+>> +static int arm_spe_acpi_parse_irqs(void)
+>> +{
+>> +	int cpu, ret, irq;
+>> +	u16 gsi = 0;
+>> +	bool first = true;
+>> +
+>> +	struct acpi_madt_generic_interrupt *gicc;
+>> +
+>> +	/*
+>> +	 * sanity check all the GICC tables for the same interrupt number
+>> +	 * for now we only support homogeneous ACPI/SPE machines.
+>> +	 */
+>> +	for_each_possible_cpu(cpu) {
+>> +		gicc = acpi_cpu_get_madt_gicc(cpu);
+>> +
+>> +		if (gicc->header.length < ACPI_MADT_GICC_SPE)
+>> +			return -ENODEV;
+>> +
+>> +		if (first) {
+>> +			gsi = gicc->spe_overflow_interrupt;
+>> +			if (!gsi)
+>> +				return -ENODEV;
+>> +			first = false;
+>> +		} else if (gsi != gicc->spe_overflow_interrupt) {
+>> +			pr_warn("ACPI: SPE must have homogeneous interrupts\n");
+>> +			return -EINVAL;
+>> +		}
 > 
-> Well names are quite standard in dts (but should be used with
-> the phandle + offset). Think for example interrupt-names and
-> reg-names :)
-> 
->>> If there is some device to firmware translation needed, hide that
->>> into the device driver and keep it out of the device tree.
->>
->> If preferred this can be moved to of_match_data attached to each
->> compatible property. Then for each SoC a new compatible needs to be created.
-> 
-> Hiding the ID into the device driver and compatible property
-> makes sense to me if the id is based on SoC + firmware.
-> 
-> But I'd rather have a proper hardware based phandle + index
-> type mapping in the dts if possible though.
+> Unfortunately, I don't think this is sufficient to detect a homogeneous
+> system: we'll have to check the MIDRs instead, which is nasty. I would
+> personally be in favour of enforcing homogeneity for ACPI systems when we
+> bring up secondary CPUs, but I suspect others would disagree.
 
-The idea about sysfw here is that Linux is not aware of anything about
-this device(Interrupt Router). It cannot even access any of its
-registers. As a user Linux should know who is the parent to which the
-Interrut router output should be configured. Then query sysfw about the
-range of gic irqs allocated to it. Now for configuration, Linux should
-pass the the input to interrupt router, gic irq no, and gic id(by which
-sysfw uniquely identifies GIC interrupt controller with the SoC).  Based
-on these parameters Interrupt Router registers gets configured.
+Given that all the SPE capable machines i'm aware of at the moment are 
+homogeneous, are we ok with just doing an online CPU MIDR check for now, 
+and cleaning that up if/when someone builds a machine and complains?
 
-So for the above configuration we need the gic_id for which the dt
-property "ti,sci-dst-id" is used.
+Thanks,
 
-Thanks and regards,
-Lokesh
 
-> 
-> What does this id really consist of?
-> 
-> Regards,
-> 
-> Tony
-> 
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
