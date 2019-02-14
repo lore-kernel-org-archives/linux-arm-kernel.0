@@ -2,89 +2,84 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C58AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:30:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 126EEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:32:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35A6D222D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:30:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D6040222D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:32:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rd8WFfLS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35A6D222D4
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N9POxvRv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="LXix7LMm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6040222D4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=1wROOBe8SfB1fCmM7LIWxIkQ6Fg6+oKOHjft/STP8WQ=; b=rd8WFfLS4lan19JFpgihcW2tt
-	Aq08IOoYWd0u1aXiEc+cASYypQP7WUjQ1FOYDiLaqD/Cap7Kf7hzatu3asoSO17nJzbH0LCDDgFhU
-	4uL60njnGM/hz5DbpvHX3DEc3GnY2f3KmjC8qA/HVAqsK2Cs8O20AVz5oOBCB5Ld4/TQP9ZG/adgU
-	rY+fQFQGRidqOvP2BxbQtJ5EyqQhQqVl/r+yBTyxSiXi6SsImuF4Z1rSgyTS6tW4O9uaDYtNBHfCO
-	PfHD0/oQDDRxBj8jyDFiMNItSMJ3PDaNAQuWLaKO9a8ze61Xpq7kpEyzI0qXh+P+9qPx0LjBm5USH
-	JmT24l2EQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=JsTaIk4evN+K2amLPfChncoOPv6nl+NO67UMFOP4x/o=; b=N9POxvRv3q1JUv
+	ei7TQ5v09h3VaBIzwhH0FTNBGn7q5GNCkOfdvDCld1jj2fnVAtwVjNJt7FKm3FLt0s482+y3oeVrS
+	akAMaC/O4HipoBypuCFq6NlDeusVLXjjB7eWBeupIc2lOiIMP4svTo8YxMVoQ+Hm4liS8wB9IejXn
+	y0bSSQcXXVZki7ClCE+fQZoVLPJv+UJ2wWTuyQG7VP490Se+Idpo2PEjvpxIG9/AXOh0oUGH7N10w
+	mnagayuRa7h/oEovBXivr4tZ5HYg5H6vsxFmzcwitkYd2+wvXGM+ARxjXicx7acle2LDawkbH++d+
+	pK0+UmcG2vSZo4cKQsaw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guMiG-0004t3-VH; Thu, 14 Feb 2019 19:30:24 +0000
-Received: from mail-pl1-f196.google.com ([209.85.214.196])
+	id 1guMkg-0005Vu-NS; Thu, 14 Feb 2019 19:32:54 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guMiC-0004sB-CS
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:30:22 +0000
-Received: by mail-pl1-f196.google.com with SMTP id y10so3679404plp.0
+ id 1guMkd-0005Vb-KC
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:32:53 +0000
+Received: by mail-pg1-x544.google.com with SMTP id s198so3568047pgs.2
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 11:30:18 -0800 (PST)
+ Thu, 14 Feb 2019 11:32:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=BZL+CSDR6gHJLSLkIhVG72Bv6twb5BsbEPP+vcprd2o=;
+ b=LXix7LMmfq5hGoeLnzxUxHoG533C7LuIgqDL7NApe5c+M+1Uc1ynmH6s5H3b+AQ195
+ oWYIeUgb4+PqwiXn+BkH+KNlznPKqcf5brlcsdNswCUyT2Gqw/9GnNk2aO2u1KeI9u8/
+ jNZAyNDEioj/JaQ+u2v2/0nf0s5qw5UuBq9ZA=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=VYV11D70hLPbey9V6iEfOy5Kduqs39wA6jV0TE4/ujM=;
- b=HPl+v/N4H/QiAzdRyTv3dZcjsFVNUYOuIIaSUKDfj9uAsGmN8dJMYegA7zhg/J7GsJ
- +TIFH2iWgtARWuOMxrIx0N+FAng0lU+aTZ2rfCbPfvn9J+aVAnCbQyES4nZT2rMP/Yev
- qzHcmbXk2pol4hK0CxEjI1N5/t5xfq3uIy8v6JMebSdpcGtLVC//bAtggi1Oqv0q5VCo
- pNcdBktOrrXBncUWnDbquBQZZBi26oQRNzy6VIcd9tJhRs3xAtI42D6Ns55vYiC7qAZM
- hAieL9rKsS3wj9CTCsbCPwKiNcdVIPQHTiGMRr8WbIecbWvw2nhX2DTnQlbo7xVbKKls
- rDfg==
-X-Gm-Message-State: AHQUAubeG4JS/yFRFJ25qZLQoWtx44tycGGpHKAN+7+KTdGkSvy9CPP6
- xfqxM7sfDMd1TbNyp02MtFMc+A==
-X-Google-Smtp-Source: AHgI3Ian7pGM9eErCWZSNUEXSyACBpuKet5zjsX5bUa1ll9cMfUqe3aO42oGMf86vr68F90AwwjYLA==
-X-Received: by 2002:a17:902:7c8a:: with SMTP id
- y10mr5775628pll.71.1550172618113; 
- Thu, 14 Feb 2019 11:30:18 -0800 (PST)
-Received: from localhost.localdomain ([122.177.141.105])
- by smtp.gmail.com with ESMTPSA id x6sm4991497pfb.183.2019.02.14.11.30.11
+ bh=BZL+CSDR6gHJLSLkIhVG72Bv6twb5BsbEPP+vcprd2o=;
+ b=pR3ON1ajrsuM8ixELMMavUIgmkkoGwM3XN3Gn8VJEm1d7IlmkLUWpBihd8r6WDNKXg
+ ZJ7+7ZO7Vlvz/qZsKwLApDrIsb3u28MMChSFu1jHZodC9jHWEh75hHWio5uu3SwFpNEC
+ OUxkT0/yqCmssFmF6hVMaRkf/ZQdfP7Lj+bjas7Q531OXX/1r5dTOPch+xHRIrr8+pHi
+ LdGSrt3YZjGWd4Uhba/Z/FdoEX9/ByDLUDW28SBBKNpzRbfmHYV+l/HFS3c1hDlEjLM8
+ Bky6X/BurEV0xIwZqIbAfBlTP5X8YUzq8wiTvnx+gbfAE+j5zre0c5wJOsMEym9Nhgzr
+ PAsQ==
+X-Gm-Message-State: AHQUAuYB2Erh77OZkhh9g3Z65juuWiCTNVlTT6wbNIvBA3sCkq4cTS4X
+ szhtD01+mDncQPwlAxRIfTknBw==
+X-Google-Smtp-Source: AHgI3IbV+bc8nAxVayJcVao6/02seww1jKGdVVMBFBYG8yi7ZxWKrnPjnOexYpCyI6YSZIosvpTPHg==
+X-Received: by 2002:a63:2e06:: with SMTP id u6mr1471903pgu.71.1550172771021;
+ Thu, 14 Feb 2019 11:32:51 -0800 (PST)
+Received: from localhost.localdomain ([115.97.184.151])
+ by smtp.gmail.com with ESMTPSA id o23sm10808832pfa.140.2019.02.14.11.32.47
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 11:30:17 -0800 (PST)
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-To: James Morse <james.morse@arm.com>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
- <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
- <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
- <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
- <20190213111552.GA8265@dhcp-128-65.nay.redhat.com>
- <bed51e6e-3dcb-8e07-1d31-9d81bfca20e5@arm.com>
-From: Bhupesh Sharma <bhsharma@redhat.com>
-Message-ID: <7694f082-aa85-714a-b709-ea3414864daf@redhat.com>
-Date: Fri, 15 Feb 2019 01:00:09 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ Thu, 14 Feb 2019 11:32:50 -0800 (PST)
+From: Jagan Teki <jagan@amarulasolutions.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
+ Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
+Subject: [PATCH v8 00/10] drm/sun4i: Allwinner MIPI-DSI Burst mode support 
+Date: Fri, 15 Feb 2019 01:02:27 +0530
+Message-Id: <20190214193236.7504-1-jagan@amarulasolutions.com>
+X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 MIME-Version: 1.0
-In-Reply-To: <bed51e6e-3dcb-8e07-1d31-9d81bfca20e5@arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_113020_430916_C6FFE134 
-X-CRM114-Status: GOOD (  33.95  )
+X-CRM114-CacheID: sfid-20190214_113251_665969_D0533D9A 
+X-CRM114-Status: GOOD (  10.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,346 +91,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kazuhito Hagio <k-hagio@ab.jp.nec.com>,
- "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>, anderson@redhat.com,
- Borislav Petkov <bp@alien8.de>, Dave Young <dyoung@redhat.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-kernel@vger.kernel.org, dri-devel@lists.freedesktop.org,
+ Jagan Teki <jagan@amarulasolutions.com>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James,
+This is next version changes for Allwinner MIPI-DSI Burst mode support.
 
-On 02/13/2019 11:52 PM, James Morse wrote:
-> Hi guys,
-> 
-> On 13/02/2019 11:15, Dave Young wrote:
->> On 02/12/19 at 11:03pm, Kazuhito Hagio wrote:
->>> On 2/12/2019 2:59 PM, Bhupesh Sharma wrote:
->>>> BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
->>>> (which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
->>>> mentioned that the changes look necessary.
->>>>
->>>> [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
->>>
->>>>>> The increased 'PTRS_PER_PGD' value for such cases needs to be then
->>>>>> calculated as is done by the underlying kernel
-> 
-> Aha! Nothing to do with which-bits-are-pfn in the tables...
-> 
-> You need to know if the top level PGD is 512bytes or bigger. As we use a
-> kmem-cache the adjacent data could be some else's page tables.
-> 
-> Is this really a problem though? You can't pull the user-space pgd pointers out
-> of no-where, you must have walked some task_struct and struct_mm's to find them.
-> In which case you would have the VMAs on hand to tell you if its in the mapped
-> user range.
-> 
-> It would be good to avoid putting something arch-specific in here if we can at
-> all help it.
-> 
-> 
->>>>>> (see
->>>>>> 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
->>>>>>
->>>>>> #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
->>>
->>> Yes, this is the reason why makedumpfile needs the MAX_USER_VA_BITS.
->>> It is used for pgd_index() also in makedumpfile to walk page tables.
->>>
->>> /* to find an entry in a page-table-directory */
->>> #define pgd_index(addr)         (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
->>
->> Since Dave mentioned crash tool does not need it, but crash should also
->> travel the pg tables.
->>
->> If this is really necessary it would be good to describe what will
->> happen without the patch, eg. some user visible error from an actual test etc.
-> 
-> Yes please, it would really help if there was a specific example we could discuss.
+All these changes are grabbed from previous versions[1][2] and grouped
+it in a proper order so-that it can help to review and merge easy.
 
-Sure. Here are two use-cases/regressions reported and which I have been 
-able to reproduce. Note that I tested them both on a CPU which does not 
-support ARMv8.2-LPA/LVA and on ARMv8 FVP model (which supports ARMv8.2 
-extensions).
+Changes for v8:
+- rebase on master
+- rework on commit messages
+- include drq changes from previous version
+Changes for v7:
+- rebase on master
+- collect Merlijn Wajer Tested-by credits.
+Changes for v6:
+- fixed all burst mode patches as per previous version comments
+- rebase on master
+- update proper commit message
+- dropped unneeded comments
+- order the patches that make review easy
+Changes for v5, v4, v3, v2:
+- use proper return value for tcon0 probe
+- add logic to get tcon0 divider values
+- simplify timings code to support burst mode
+- fix drq computation return values
+- update proper commit messages
+- rebase on master
 
-Environment:
-------------
-Latest Upstream kernel: sha-id: 1f947a7a011fcceb14cb912f5481a53b18f1879a 
-("Merge branch 'akpm' (patches from Andrew)")
+[1] https://patchwork.kernel.org/cover/10792981/
+[2] https://patchwork.kernel.org/cover/10686655/
 
-Latest makedumpfile code: (git://git.code.sf.net/p/makedumpfile/code , 
-branch: devel)
+Any inputs?
+Jagan.
 
-crash-utility code: (https://github.com/crash-utility/crash.git, sha-id: 
-e082c372c7f1a782b058ec359dfbbbee0f0b6aad)
+Jagan Teki (10):
+  drm/sun4i: sun6i_mipi_dsi: Compute burst mode loop N1 instruction
+    delay
+  drm/sun4i: sun6i_mipi_dsi: Support instruction loop selection
+  drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
+  drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
+  drm/sun4i: sun6i_mipi_dsi: Simplify drq to support all modes
+  drm/sun4i: tcon: Export get tcon0 routine
+  drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during dsi_bind
+  drm/sun4i: sun6i_mipi_dsi: Setup burst mode
+  drm/sun4i: sun6i_mipi_dsi: Enable trail_inv and trail_fill controls
+  drm/sun4i: sun6i_mipi_dsi: Enable HBP, HSA_HSE for burst mode
 
-Note that Dave A. has since fixed crash-utility by using a hardcoded 
-value of 'MAX_PHYSMEM_BITS' (via sha id: 
-ac5a7889d31bb37aa0687110ecea08837f8a66a8) and determining 'vabits_user' 
-value via vmlinux (via sha id: 8618ddd817621c40c1f44f0ab6df7c7805234416)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     |   3 +-
+ drivers/gpu/drm/sun4i/sun4i_tcon.h     |   1 +
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 149 ++++++++++++++++++++++---
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |   1 +
+ 4 files changed, 138 insertions(+), 16 deletions(-)
 
-(1). Regression Case 1 (ARMv8.2-LPA enabled kernel):
-
-- Upstream makedumpfile and crash-utility (with sha-id 
-e082c372c7f1a782b058ec359dfbbbee0f0b6aad) are broken on following kind 
-of platforms:
-
-a. Upstream Kernel 5.0.0-rc6+ with the following kernel configuration:
-
-CONFIG_ARM64_64K_PAGES=y
-# CONFIG_ARM64_VA_BITS_42 is not set
-CONFIG_ARM64_VA_BITS_48=y
-# CONFIG_ARM64_USER_VA_BITS_52 is not set
-CONFIG_ARM64_VA_BITS=48
-# CONFIG_ARM64_PA_BITS_48 is not set
-CONFIG_ARM64_PA_BITS_52=y
-CONFIG_ARM64_PA_BITS=52
-
-b. Both on CPUs which don't support ARMv8.2 LPA extension and on ARMv8 
-FVP model with ARMv8.2 LPA extensions.
-
-- Error message from makedumpfile:
-
-$ makedumpfile -f --mem-usage /proc/kcore -D
-max_mapnr    : a00000
-kimage_voffset   : fffeffff80000000
-max_physmem_bits : 30
-section_size_bits: 1e
-vaddr_to_paddr_arm64: pgda=90d70000, pudv.pgd=ffffff80ffffffd0
-vaddr_to_paddr_arm64: puda=90d70000, pudv.pgd=9fffff0003
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0003
-vaddr_to_paddr_arm64: paddr=911a962c
-va_bits      : 48
-page_offset  : ffff800000000000
-vaddr_to_paddr_arm64: pgda=90d70000, pudv.pgd=41a474
-vaddr_to_paddr_arm64: puda=90d70000, pudv.pgd=9fffff0003
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0003
-vaddr_to_paddr_arm64: paddr=911a1320
-num of NODEs : 1
-Memory type  : SPARSEMEM
-
-vaddr_to_paddr_arm64: pgda=90d70100, pudv.pgd=a657470206461
-vaddr_to_paddr_arm64: puda=90d70100, pudv.pgd=9ffffd0003
-vaddr_to_paddr_arm64: pmda=9ffffd27d8, pmdv.pud=9ffeee0003
-vaddr_to_paddr_arm64: paddr=9ffeedc600
-vaddr_to_paddr_arm64: pgda=90d70100, pudv.pgd=ffff97d98224
-vaddr_to_paddr_arm64: puda=90d70100, pudv.pgd=9ffffd0003
-vaddr_to_paddr_arm64: pmda=9ffffd27d8, pmdv.pud=9ffeee0003
-vaddr_to_paddr_arm64: paddr=9ffeedc600
-get_mm_sparsemem: Can't get the address of mem_section.
-
-c. Root Cause Analysis -
-
-- After the PA_BITS changes in arm64 kernel we set:
-#define MAX_PHYSMEM_BITS	CONFIG_ARM64_PA_BITS
-
-- For SPARSEMEM, this value is used to calculate the bits space required 
-to store a section:
-#define SECTIONS_SHIFT	(MAX_PHYSMEM_BITS - SECTION_SIZE_BITS)
-#define NR_MEM_SECTIONS		(1UL << SECTIONS_SHIFT)
-
-- User-space tools use a similar mechanism to determine the SPARSEMEM 
-type (extreme or not) using the 'NR_MEM_SECTIONS' value (an example from 
-makedumpfile code):
-
-int
-is_sparsemem_extreme(void)
-{
-	if ((ARRAY_LENGTH(mem_section)
-	     == divideup(NR_MEM_SECTIONS(), _SECTIONS_PER_ROOT_EXTREME()))
-	    || (ARRAY_LENGTH(mem_section) == NOT_FOUND_STRUCTURE))
-		return TRUE;
-	else
-		return FALSE;
-}
-
-- Since MAX_PHYSMEM_BITS are 48 bits for normal cases and are 52 bits 
-for extended PA address space, the memory type is incorrectly calculated 
-as SPARSEMEM rather than SPARSEMEM_EX in above case.
-
-- Exporting correct 'MAX_PHYSMEM_BITS' via vmcoreinfo for 52-bit PA 
-case, fixes the above mentioned issue:
-
-$ makedumpfile -f --mem-usage /proc/kcore -D
-
-<..snip..>
-  NUMBER(MAX_PHYSMEM_BITS)=52
-
-<..snip..>
-max_mapnr    : a00000
-kimage_voffset   : fffeffff80000000
-max_physmem_bits : 30
-section_size_bits: 1e
-vaddr_to_paddr_arm64: pgda=90d70000, pudv.pgd=ffffff80ffffffd0
-vaddr_to_paddr_arm64: puda=90d70000, pudv.pgd=9fffff0003
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0003
-vaddr_to_paddr_arm64: paddr=911a962c
-va_bits      : 48
-page_offset  : ffff800000000000
-vaddr_to_paddr_arm64: pgda=90d70000, pudv.pgd=41a474
-vaddr_to_paddr_arm64: puda=90d70000, pudv.pgd=9fffff0003
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0003
-vaddr_to_paddr_arm64: paddr=911a1320
-num of NODEs : 1
-Memory type  : SPARSEMEM_EX
-<..snip..>
-
-TYPE		PAGES			EXCLUDABLE	DESCRIPTION
-----------------------------------------------------------------------
-ZERO		2626            	yes		Pages filled with zero
-NON_PRI_CACHE	569             	yes		Cache pages without private flag
-PRI_CACHE	5446            	yes		Cache pages with private flag
-USER		3213            	yes		User process pages
-FREE		2048971         	yes		Free pages
-KERN_DATA	19034           	no		Dumpable kernel data
-
-page size:		65536
-Total pages on system:	2079859
-Total size on system:	136305639424     Byte
-
-(2). Regression Case 2 (ARMv8.2-LPA + LVA [52-bit user-space VA] enabled 
-kernel):
-
-- Upstream makedumpfile and crash-utility (with sha-id 
-e082c372c7f1a782b058ec359dfbbbee0f0b6aad) are broken on following kind 
-of platforms:
-
-a. Upstream Kernel 5.0.0-rc6+ with the following kernel configuration:
-
-CONFIG_ARM64_64K_PAGES=y
-# CONFIG_ARM64_VA_BITS_42 is not set
-# CONFIG_ARM64_VA_BITS_48 is not set
-CONFIG_ARM64_USER_VA_BITS_52=y
-CONFIG_ARM64_VA_BITS=48
-# CONFIG_ARM64_PA_BITS_48 is not set
-CONFIG_ARM64_PA_BITS_52=y
-CONFIG_ARM64_PA_BITS=52
-
-b. Both on CPUs which don't support ARMv8.2 extensions and on ARMv8 FVP 
-model with  ARMv8.2 extensions.
-
-- Error message from makedumpfile:
-
-$ makedumpfile -f --mem-usage /proc/kcore -D
-max_mapnr    : a00000
-kimage_voffset   : fffeffff78000000
-max_physmem_bits : 30
-section_size_bits: 1e
-vaddr_to_paddr_arm64: pgda=90f30000, pudv.pgd=ffffff80ffffffd0
-vaddr_to_paddr_arm64: puda=90f30000, pudv.pgd=0
-readpage_elf: Attempt to read non-existent page at 0x0.
-readmem: type_addr: 1, addr:0, size:8
-vaddr_to_paddr_arm64: Can't read pmd
-readmem: Can't convert a virtual address(ffff0000093c576c) to physical 
-address.
-readmem: type_addr: 0, addr:ffff0000093c576c, size:390
-check_release: Can't get the address of system_utsname.
-
-c. Root Cause Analysis -
-
-- After the 52-bit user-space VA_BIT changes in arm64 kernel we set:
-#define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
-
-- User-space tools like makedumpfile and crash use the 'PTRS_PER_PGD' 
-value to calculate the 'pgd_index()' of a vaddr:
-
-#define pgd_index(vaddr) 		(((vaddr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
-
-- Since the kernel now defines 'MAX_USER_VA_BITS' as:
-#ifdef CONFIG_ARM64_USER_VA_BITS_52
-#define MAX_USER_VA_BITS	52
-#else
-#define MAX_USER_VA_BITS	VA_BITS
-#endif
-
-so, the user-space also needs this value to calculate the 'PTRS_PER_PGD' 
-and hence 'pgd_index()' correctly.
-
-- Exporting correct 'MAX_USER_VA_BITS' via vmcoreinfo for the above 
-case, fixes the above mentioned issue:
-
-$ makedumpfile -f --mem-usage /proc/kcore -D
-
-<..snip..>
-max_mapnr    : a00000
-pa_bits    : 52
-va_bits    : 48 (vmcoreinfo)
-max_user_va_bits : 52 (vmcoreinfo)
-kimage_voffset   : fffeffff78000000
-max_physmem_bits : 52
-section_size_bits: 30
-vaddr_to_paddr_arm64: pgda=90f31e00, pudv.pgd=ffffff80ffffffd0
-vaddr_to_paddr_arm64: puda=90f31e00, pudv.pgd=9fffff0803
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0803
-vaddr_to_paddr_arm64: paddr=913c576c
-page_offset  : ffff800000000000
-vaddr_to_paddr_arm64: pgda=90f31e00, pudv.pgd=16e28e8bed294900
-vaddr_to_paddr_arm64: puda=90f31e00, pudv.pgd=9fffff0803
-vaddr_to_paddr_arm64: pmda=9fffff0000, pmdv.pud=9ffffe0803
-vaddr_to_paddr_arm64: paddr=913bd2f8
-num of NODEs : 1
-Memory type  : SPARSEMEM_EX
-<..snip..>
-
-Other important notes
----------------------
-
-1. I have quoted only one makedumpfile use-case failure above (i.e. 
-calculating --mem-usage on the primary kernel). Other use-cases like 
-creating a dumpfile using /proc/vmcore or post-processing a vmcore are 
-also broken similarly and get fixed when a kernel which exports 
-'MAX_USER_VA_BITS' and 'MAX_PHYSMEM_BITS' to vmcoreinfo is used along 
-with a modified user-space which can read this information from the 
-vmcoreinfo.
-
-2. I was also going through some of the suggestions on earlier threads 
-about the PTE calculations for the 52-bit LPA case and discussed them 
-with some partner arm64 SoC enggs.
-
-The suggestions to convert a page table entry to a physical address 
-without awareness of 52-bit (with an assumption of 64k page size) can be 
-risky.
-
-With 64k page and older non-52-bit kernels, while it looks like in the 
-current checks that bits [15:12] are zero, and we can move the zeros to 
-bits [51:48] (because the zeros don't affect the overall PA) to generate 
-the overall 52-bit PA. However, this can cause IMPLEMENTATION SPECIFIC 
-issues on different platforms while generating a PA and IPA.
-
-Lets see what the ARMv8 architecture reference manual says about the 
-Bits [15:12] for a 64KB page size:
-
-"Bits [15:12] of each valid translation table descriptor hold Bits 
-[51:48] of the output address, or of the address
-of the translation table to be used for the initial lookup at the next 
-level of translation. If the implementation
-does not support 52-bit physical addresses, then it is IMPLEMENTATION 
-DEFINED whether non-zero values for
-these bits generate an Address size fault. In this case, not generating 
-an Address Size Fault is deprecated."
-
-As per the vendors, we should not assume that hardware (which does not 
-support 52-bit physical addresses) would generate an Address size fault 
-for non-zero values of Bits[15:12], so extending them to bits [51:48] 
-always can lead to PA address which might cause UNDEFINED behavior on 
-some SoCs.
-
-Hope the above text clarifies the problem and what I am trying to fix 
-via this patch. Please let me know if something is missing here.
-
-Thanks,
-Bhupesh
-
-
-
-
+-- 
+2.18.0.321.gffc6fa0e3
 
 
 _______________________________________________
