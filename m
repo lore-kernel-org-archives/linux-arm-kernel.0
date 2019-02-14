@@ -2,63 +2,96 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59D86C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:56:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A599AC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:57:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E88B21928
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:56:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 72209222DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:57:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KNWTjDlv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E88B21928
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m6hluFYH";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="CdHRN3Ln"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72209222DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D7Lao0vNGgpBFkVuqHRwwo+dEcHYA9ESzUBjOuQPyPc=; b=KNWTjDlvevGhRD
-	eO4nJnvcIZUxHX/IlFRAzJT0WOuhtOYzaWy2ZD50rVRH2dad01LN5vn66zruDaxV5y2fMGfb9G65q
-	PkBUkxhdyDTjRidPNFEqfKK241YD/31ynQbDV8MWamjfoT4dOp/wCFyCUP2ryl43dW/iaJ2Ywn95z
-	DinuICnxPvOLah+iQnTWnZqPwhODIP2AtXC94Nu0P9/ewSe94QgJZQNgJqu1iS6eaIzEE2MDczGdz
-	bspOiNNcYOL0BqKJzA7Pd4X3J2SkkEd6pq5naOQfDxhpsxVpYormiFSv51sbpbkuJr6/Z1T+s9BnI
-	crqFvMWLQ/cImWtaRHBg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
+	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=XZaGrzciDz4FsyQ6xM7TmvAqoA2pf7jNbk92AXUz/yU=; b=m6hluFYHhWmf0hVAkkUKyaNaG
+	pdFszaXtjSm/yPx92rsAteY+tLpdBxKpoetF31fKkeLTG8WuMK50jSUFyT1ElnSVpQKwh0h+RdEpa
+	nEJql5KIONym1yZQlH0GFwiLuvDWXqp6XLtK4/ZRJnq8M7ScX9lg1f51wNZylU8SC7PI4amUb26Tz
+	35mu0mIRKUjgu/znaFx8Mcrkr68SvO4CRjqACW+yyx99UFDkwXHS8xAaufVN4MgdY7jRm3w8V2kjv
+	fArh3gKMwx8dcysJTBZaaTfA8yvIkxTVhsokg+DOsxi2TWR8P1c2kH0gRigHnLSAURr9d+DRLD3dg
+	ATHMc/CRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guKJh-0005rM-OK; Thu, 14 Feb 2019 16:56:53 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guKJf-0005qw-0P
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:56:52 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C4F6415AB;
- Thu, 14 Feb 2019 08:56:48 -0800 (PST)
-Received: from C02TF0J2HF1T.local (unknown [10.37.12.34])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 684BC3F575;
- Thu, 14 Feb 2019 08:56:46 -0800 (PST)
-Date: Thu, 14 Feb 2019 16:56:43 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
+	id 1guKK8-00068w-EJ; Thu, 14 Feb 2019 16:57:20 +0000
+Received: from userp2120.oracle.com ([156.151.31.85])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guKK5-00068Z-EA
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:57:18 +0000
+Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
+ by userp2120.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1EGmlNw109854;
+ Thu, 14 Feb 2019 16:56:32 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=subject : to : cc :
+ references : from : message-id : date : mime-version : in-reply-to :
+ content-type; s=corp-2018-07-02;
+ bh=MotuX5uwsuODNodXmCNKkBCxOxRxYVbct++kioqcJCk=;
+ b=CdHRN3Lnvj3SIOrf8LqxGj+jFsmhVludo1tNIdornRvlfx3bAnQZ9mvDb7wKbaLiH28H
+ 8bZBksPqAZNeYfTtkQLEB2xabwSZdfl5CtlL6N7L7YLytvr16YXj/blIm9dxBriiLpmd
+ Vb9IjRNLx3V45chjSmynKrhfJhI2D+DoAvYc76ROMkYkQnnbUcyielyKPkwQX8iFZI32
+ s8XojcUGz2U0OQbYH0gbGl5SOdkMK7AvJI6PCdvqb9czEK7b4N5MGclhq/PtsDwjxoMx
+ n2CfcCYMXOK4SCH4taB4qCaig+Tm4g2/2KHn7lQtEby4OnYscvfFAbTBsi2T4OYMIs8W ow== 
+Received: from userv0022.oracle.com (userv0022.oracle.com [156.151.31.74])
+ by userp2120.oracle.com with ESMTP id 2qhree9866-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 16:56:32 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by userv0022.oracle.com (8.14.4/8.14.4) with ESMTP id x1EGuUcR011678
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 16:56:31 GMT
+Received: from abhmp0004.oracle.com (abhmp0004.oracle.com [141.146.116.10])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1EGuSJX027469;
+ Thu, 14 Feb 2019 16:56:28 GMT
+Received: from [192.168.1.16] (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Thu, 14 Feb 2019 08:56:27 -0800
+Subject: Re: [RFC PATCH v8 04/14] swiotlb: Map the buffer if it was unmapped
+ by XPFO
 To: Christoph Hellwig <hch@lst.de>
-Subject: Re: [PATCH 6/8] initramfs: move the legacy keepinitrd parameter to
- core code
-Message-ID: <20190214165642.GB20349@C02TF0J2HF1T.local>
-References: <20190213174621.29297-1-hch@lst.de>
- <20190213174621.29297-7-hch@lst.de>
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+ <b595ffb3231dfef3c6b6c896a8e1cba0e838978c.1550088114.git.khalid.aziz@oracle.com>
+ <20190214074747.GA10666@lst.de>
+From: Khalid Aziz <khalid.aziz@oracle.com>
+Organization: Oracle Corp
+Message-ID: <3c75c46c-2a5a-cd75-83d4-f77d96d22f7d@oracle.com>
+Date: Thu, 14 Feb 2019 09:56:24 -0700
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190213174621.29297-7-hch@lst.de>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <20190214074747.GA10666@lst.de>
+Content-Type: multipart/mixed; boundary="------------4E8F634EF1C80F4AD05A0F4B"
+Content-Language: en-US
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9167
+ signatures=668683
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
+ priorityscore=1501 malwarescore=0
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1015
+ lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=706 adultscore=0
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
+ definitions=main-1902140114
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_085651_051955_2910ED2F 
-X-CRM114-Status: GOOD (  13.93  )
+X-CRM114-CacheID: sfid-20190214_085717_564834_F16BEE33 
+X-CRM114-Status: GOOD (  22.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,37 +103,167 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, linux-kernel@vger.kernel.org,
- linux-mm@kvack.org, Alexander Viro <viro@zeniv.linux.org.uk>,
- Andrew Morton <akpm@linux-foundation.org>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mhocko@suse.com, Tycho Andersen <tycho@docker.com>,
+ kernel-hardening@lists.openwall.com, peterz@infradead.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, dave.hansen@intel.com,
+ deepa.srinivasan@oracle.com, steven.sistare@oracle.com, tglx@linutronix.de,
+ tycho@tycho.ws, ak@linux.intel.com, kirill.shutemov@linux.intel.com,
+ x86@kernel.org, jmorris@namei.org, kanth.ghatraju@oracle.com,
+ jsteckli@amazon.de, labbott@redhat.com, pradeep.vincent@oracle.com,
+ konrad.wilk@oracle.com, jcm@redhat.com, liran.alon@oracle.com, luto@kernel.org,
+ boris.ostrovsky@oracle.com, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, linux-mm@kvack.org,
+ juergh@gmail.com, andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org,
+ tyhicks@canonical.com, john.haxby@oracle.com,
+ Juerg Haefliger <juerg.haefliger@canonical.com>, oao.m.martins@oracle.com,
+ keescook@google.com, akpm@linux-foundation.org, torvalds@linux-foundation.org,
+ dwmw@amazon.co.uk
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 06:46:19PM +0100, Christoph Hellwig wrote:
-> No need to handle the freeing disable in arch code when we already
-> have a core hook (and a different name for the option) for it.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/Kconfig             |  7 +++++++
->  arch/arm/Kconfig         |  1 +
->  arch/arm/mm/init.c       | 25 ++++++-------------------
->  arch/arm64/Kconfig       |  1 +
->  arch/arm64/mm/init.c     | 17 ++---------------
->  arch/unicore32/Kconfig   |  1 +
->  arch/unicore32/mm/init.c | 14 +-------------
->  init/initramfs.c         |  9 +++++++++
->  8 files changed, 28 insertions(+), 47 deletions(-)
+This is a multi-part message in MIME format.
+--------------4E8F634EF1C80F4AD05A0F4B
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
 
-For arm64:
+On 2/14/19 12:47 AM, Christoph Hellwig wrote:
+> On Wed, Feb 13, 2019 at 05:01:27PM -0700, Khalid Aziz wrote:
+>> +++ b/kernel/dma/swiotlb.c
+>> @@ -396,8 +396,9 @@ static void swiotlb_bounce(phys_addr_t orig_addr, =
+phys_addr_t tlb_addr,
+>>  {
+>>  	unsigned long pfn =3D PFN_DOWN(orig_addr);
+>>  	unsigned char *vaddr =3D phys_to_virt(tlb_addr);
+>> +	struct page *page =3D pfn_to_page(pfn);
+>> =20
+>> -	if (PageHighMem(pfn_to_page(pfn))) {
+>> +	if (PageHighMem(page) || xpfo_page_is_unmapped(page)) {
+>=20
+> I think this just wants a page_unmapped or similar helper instead of
+> needing the xpfo_page_is_unmapped check.  We actually have quite
+> a few similar construct in the arch dma mapping code for architectures
+> that require cache flushing.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+As I am not the original author of this patch, I am interpreting the
+original intent. I think xpfo_page_is_unmapped() was added to account
+for kernel build without CONFIG_XPFO. xpfo_page_is_unmapped() has an
+alternate definition to return false if CONFIG_XPFO is not defined.
+xpfo_is_unmapped() is cleaned up further in patch 11 ("xpfo, mm: remove
+dependency on CONFIG_PAGE_EXTENSION") to a one-liner "return
+PageXpfoUnmapped(page);". xpfo_is_unmapped() can be eliminated entirely
+by adding an else clause to the following code added by that patch:
+
+--- a/include/linux/page-flags.h
++++ b/include/linux/page-flags.h
+@@ -398,6 +402,15 @@ TESTCLEARFLAG(Young, young, PF_ANY)
+ PAGEFLAG(Idle, idle, PF_ANY)
+ #endif
+
++#ifdef CONFIG_XPFO
++PAGEFLAG(XpfoUser, xpfo_user, PF_ANY)
++TESTCLEARFLAG(XpfoUser, xpfo_user, PF_ANY)
++TESTSETFLAG(XpfoUser, xpfo_user, PF_ANY)
++PAGEFLAG(XpfoUnmapped, xpfo_unmapped, PF_ANY)
++TESTCLEARFLAG(XpfoUnmapped, xpfo_unmapped, PF_ANY)
++TESTSETFLAG(XpfoUnmapped, xpfo_unmapped, PF_ANY)
++#endif
++
+ /*
+  * On an anonymous page mapped into a user virtual memory area,
+  * page->mapping points to its anon_vma, not to a struct address_space;
+
+
+Adding the following #else to above conditional:
+
+#else
+TESTPAGEFLAG_FALSE(XpfoUser)
+TESTPAGEFLAG_FALSE(XpfoUnmapped)
+
+should allow us to eliminate xpfo_is_unmapped(). Right?
+
+Thanks,
+Khalid
+
+>=20
+>> +bool xpfo_page_is_unmapped(struct page *page)
+>> +{
+>> +	struct xpfo *xpfo;
+>> +
+>> +	if (!static_branch_unlikely(&xpfo_inited))
+>> +		return false;
+>> +
+>> +	xpfo =3D lookup_xpfo(page);
+>> +	if (unlikely(!xpfo) && !xpfo->inited)
+>> +		return false;
+>> +
+>> +	return test_bit(XPFO_PAGE_UNMAPPED, &xpfo->flags);
+>> +}
+>> +EXPORT_SYMBOL(xpfo_page_is_unmapped);
+>=20
+> And at least for swiotlb there is no need to export this helper,
+> as it is always built in.
+>=20
+
+
+--------------4E8F634EF1C80F4AD05A0F4B
+Content-Type: application/pgp-keys;
+ name="pEpkey.asc"
+Content-Transfer-Encoding: quoted-printable
+Content-Disposition: attachment;
+ filename="pEpkey.asc"
+
+-----BEGIN PGP PUBLIC KEY BLOCK-----
+
+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
++Wrj8Rwom6h21PXZRKnlkis7ibQfE+TxqOI7vg=3D=3D
+=3DnPqY
+-----END PGP PUBLIC KEY BLOCK-----
+
+--------------4E8F634EF1C80F4AD05A0F4B
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--------------4E8F634EF1C80F4AD05A0F4B--
+
