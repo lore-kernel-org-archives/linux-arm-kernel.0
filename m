@@ -4,110 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06F95C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:31:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C8482C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:36:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CC1C82229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:31:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99774222D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:36:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rv9ClQd/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="QZegPqan"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC1C82229F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbuL+ckH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99774222D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	Message-id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	In-Reply-To:List-Owner; bh=f6EL+xwPOmxoUabrQat3W3JgbSOV8oCVS98WDriDkNo=; b=Rv
-	9ClQd/91pJGIpAYoo16IwbJ8eUhNQcJ7hol1CyN3IVOq6B8FzXlfCnH9dqTB+Qk+3StCsA61VNqYK
-	l9KcpBVK3Xt9opB74UgyIV3mEyvtdCsA7Zpct5Rqbr0fEWP3DfPKt3ZlUMvAXiklcmJG8qrAknwkZ
-	0W5BXL0B1sJuXRCOv94U6faAfikf+nXpnVZS3wicw7MEaUMLrQSU+AXKvqo5/66BktdIqlwK6wEm6
-	WDMcK8r92NtAtQlcopSLu49XUmWzUTkNc8OOJEnmnMZi7kg5BxXcO04ylIztjbV0Pi88Cq1IMykyu
-	SAiPXj/b0p5GiJmHcnVg7EJiKmu/prGQ==;
+	List-Owner; bh=a61aufKHBc56SkEzvCfmquotr/3hgtyx7lUOfLO2q8M=; b=qbuL+ckHMBOgvg
+	QvVs3zVaki0ZTdINgbHDgIkNFDduLBdSp8K1FKaPRCNNPjN5ksY8Rse9VIENtBfBjE6yKKVdZlnvV
+	DOyNQAMVRww0cAyWKJxcn445ERNke83ihDGWtulyTKhU0bdMFiSn60QzJctF6X69h+NFXiK41T5o7
+	mgkapUAWaZo56RciuZB5fZ3hlPgXbKOXHzexeHRLRbSPCP7/4Ye+/zp9OViCBJCmQthEj58LSAmAF
+	tPlJVvF3wT856HChm7Z9F2gsPlc2vmbdUC5I63WgQZ/DkxdTtxY3UH9ELSxQFiEC8Ro8Spp4FrN4J
+	KzJAnAiYH0bTu9Wh9A+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guI36-0004MA-Fc; Thu, 14 Feb 2019 14:31:36 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1guI7V-0006Zz-EW; Thu, 14 Feb 2019 14:36:09 +0000
+Received: from relay10.mail.gandi.net ([217.70.178.230])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guI31-0004LT-TZ
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:31:34 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190214143127euoutp023cd980b16cf262fd43e5de99123a1999~DQXmmRQ_m3010730107euoutp02H;
- Thu, 14 Feb 2019 14:31:27 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190214143127euoutp023cd980b16cf262fd43e5de99123a1999~DQXmmRQ_m3010730107euoutp02H
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1550154687;
- bh=vlYj+X3X9RwnfDOOKJf/4CgLBXV7Gi+2g7C3ppiBsIM=;
- h=From:To:Cc:Subject:Date:References:From;
- b=QZegPqanX4UlNXLMZ47eTy4aShF+MP0rgHsj0JWPXwawqY+RG0oxeabITwcakdXQH
- MnxdAxCjYEvu/XfGPh/7Sjc4UuP45KBf+3kqNtIR6dPzUvgyvh7NcbouPfnrRtWb2L
- i6vGMARnaybZXu+5n3vu4UOeNdORKAz/EsZqOj7c=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190214143126eucas1p1d1cdb9383f1793632e18628f6136e82e~DQXmG9Faz0421904219eucas1p1x;
- Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 5B.EB.04294.EBB756C5; Thu, 14
- Feb 2019 14:31:26 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d~DQXldHN9N0535005350eucas1p1B;
- Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
-X-AuditID: cbfec7f4-c77a99c0000010c6-52-5c657bbe0303
-Received: from eusync1.samsung.com ( [203.254.199.211]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 7E.EA.04128.EBB756C5; Thu, 14
- Feb 2019 14:31:26 +0000 (GMT)
-Received: from AMDC2765.digital.local ([106.116.147.25]) by
- eusync1.samsung.com (Oracle Communications Messaging Server 7.0.5.31.0 64bit
- (built May  5 2014)) with ESMTPA id <0PMX00KTV706CB50@eusync1.samsung.com>;
- Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] ARM: pm: fix HYP/SVC mode mismatch when MCPM is used
-Date: Thu, 14 Feb 2019 15:31:14 +0100
-Message-id: <20190214143114.24356-1-m.szyprowski@samsung.com>
-X-Mailer: git-send-email 2.17.1
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrKIsWRmVeSWpSXmKPExsWy7djPc7r7qlNjDI63a1lsnLGe1eJn+xYm
- i/PnN7BbbHp8jdXi8q45bBYzzu9jslh75C67xfppP1ktPj37x25xqX8ik8WMyS/ZHLg9Ll+7
- yOzx/kYru8fOWXfZPTat6mTzuHNtD5vH5iX1Hn1bVjF6fN4kF8ARxWWTkpqTWZZapG+XwJWx
- aPNc5oJ2sYq1164yNjCuF+pi5OSQEDCROLeol62LkYtDSGAFo8S0O8cZIZzPjBKLJk9jh6ma
- P2U/VNUyRommhauYIJwGJonTSx6zgVSxCRhKdL3tArNFBNwk/q07BNbBLNDOLPHiyXSwhLCA
- q0Rb501mEJtFQFWia8FOFhCbV8BWonVqKxvEOnmJ1RsOMIM0SwjMYZO4uu4BE0TCReLJjwuM
- ELaMxOXJ3SwQRc2MEu0zZrFDOD2MElvn7IAaZS1x+PhFVhCbWYBPYtK26UBjOYDivBIdbdAg
- 8JDYtmwp2AIhgViJ793vmSYwii9gZFjFKJ5aWpybnlpslJdarlecmFtcmpeul5yfu4kRGJmn
- /x3/soNx15+kQ4wCHIxKPLwrMlJjhFgTy4orcw8xSnAwK4nw+lUChXhTEiurUovy44tKc1KL
- DzFKc7AoifNWMzyIFhJITyxJzU5NLUgtgskycXBKNTBy/pxygYPp3f+ci3sjTlf8nz2F70V7
- /SLeCW5xd57y/F/pn9Ts2N13dQczH0PEo7dpJt02YZFHbi85u0uh8NGjyNoprO8Zd+54rK9s
- ed5Vzfe8lp1O3uNjFzX4T9sHWrwI1LizYea6Dc5lETtuPOEUEF64pHhbYYW/ltbOP741W2Sb
- lIxuOe5TYinOSDTUYi4qTgQAMa8JfMgCAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFprELMWRmVeSWpSXmKPExsVy+t/xy7r7qlNjDA52clpsnLGe1eJn+xYm
- i/PnN7BbbHp8jdXi8q45bBYzzu9jslh75C67xfppP1ktPj37x25xqX8ik8WMyS/ZHLg9Ll+7
- yOzx/kYru8fOWXfZPTat6mTzuHNtD5vH5iX1Hn1bVjF6fN4kF8ARxWWTkpqTWZZapG+XwJWx
- aPNc5oJ2sYq1164yNjCuF+pi5OSQEDCRmD9lP1sXIxeHkMASRonvk1cyQjhNTBIb9v5jBqli
- EzCU6HrbxQZiiwi4Sfxbdwisg1mgk1li3vQ9LCAJYQFXibbOm2ANLAKqEl0LdoLFeQVsJVqn
- trJBrJOXWL3hAPMERq4FjAyrGEVSS4tz03OLjfSKE3OLS/PS9ZLzczcxAkNq27GfW3Ywdr0L
- PsQowMGoxMO7IiM1Rog1say4MvcQowQHs5IIr18lUIg3JbGyKrUoP76oNCe1+BCjNAeLkjjv
- eYPKKCGB9MSS1OzU1ILUIpgsEwenVAOjHFtIS+PUZ3fSv14S+2tSmcGoEPpe3WT3FiW1ZRZi
- M1ev+hm4teBI3cFzp1yVSi9bCc3n7zl7ZOfXxOMdu+w101d8e/xossKksPYuPkMrpjMK89Yx
- HjlmJF4TGWLH8rL4eW1OyLMbSrazPlgF5mb3bas8cXF+tcrE1rfH4vIW+hRsOjib40C1Ektx
- RqKhFnNRcSIAFgIjvyUCAAA=
-X-CMS-MailID: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
-References: <CGME20190214143126eucas1p126506139ef72c1685654c8dac8957b3d@eucas1p1.samsung.com>
+ id 1guI7R-0006Yl-Lq
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:36:07 +0000
+Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
+ [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay10.mail.gandi.net (Postfix) with ESMTPSA id 182E8240005;
+ Thu, 14 Feb 2019 14:35:55 +0000 (UTC)
+Date: Thu, 14 Feb 2019 15:35:55 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Frank Lee <tiny.windzz@gmail.com>
+Subject: Re: [PATCH 1/4] arm64: dts: allwinner: h6: orangepi: Add CPU supply
+ regulator
+Message-ID: <20190214143555.4jago2wp4vojz7rk@flea>
+References: <20190214130910.9201-1-tiny.windzz@gmail.com>
+ <20190214130910.9201-2-tiny.windzz@gmail.com>
+ <20190214134617.b44pa7onf3brmhhj@flea>
+ <CAEExFWvG4Vz2KsDnHJ6BL72nD6x=Lp+Hzj+q7LfggzFtzrgRow@mail.gmail.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAEExFWvG4Vz2KsDnHJ6BL72nD6x=Lp+Hzj+q7LfggzFtzrgRow@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_063132_259454_B8D7F92B 
-X-CRM114-Status: GOOD (  17.24  )
+X-CRM114-CacheID: sfid-20190214_063605_858756_7AC9D902 
+X-CRM114-Status: GOOD (  19.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,102 +70,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, linux-samsung-soc@vger.kernel.org,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Kevin Hilman <khilman@baylibre.com>, Seung-Woo Kim <sw0312.kim@samsung.com>,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Russell King <rmk+kernel@armlinux.org.uk>,
- Marian Mihailescu <mihailescu2m@gmail.com>,
- Marek Szyprowski <m.szyprowski@samsung.com>
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>, robh+dt@kernel.org,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-MCPM does a soft reset of the CPUs and uses common cpu_resume() routine to
-perform low-level platform initialization. This results in a try to install
-HYP stubs for the second time for each CPU and results in false HYP/SVC
-mode mismatch detection. The HYP stubs are already installed at the
-beginning of the kernel initialization on the boot CPU (head.S) or in the
-secondary_startup() for other CPUs. To fix this issue MCPM code should use
-a cpu_resume() routine without HYP stubs installation.
+Hi,
 
-This change fixes HYP/SVC mode mismatch on Samsung Exynos5422-based Odroid
-XU3/XU4/HC1 boards.
+On Thu, Feb 14, 2019 at 10:07:02PM +0800, Frank Lee wrote:
+> On Thu, Feb 14, 2019 at 9:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > Thanks for your patches
+> >
+> > On Thu, Feb 14, 2019 at 08:09:07AM -0500, Yangtao Li wrote:
+> > > The original orangepi use the dcdca to supply the CPU cores. According
+> > > to the axp805 spec, the range of dcdca is 0.6 to 1.1v, 1.12 to 1.52v.
+> > > In order to support more CPU frequency, slightly increase the voltage
+> > > maximum and minimum.
+> > >
+> > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > > ---
+> > >  arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi | 8 ++++++--
+> > >  1 file changed, 6 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
+> > > index b2526dac2fcf..e7aebaf91ede 100644
+> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
+> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
+> > > @@ -159,8 +159,8 @@
+> > >
+> > >                       reg_dcdca: dcdca {
+> > >                               regulator-always-on;
+> > > -                             regulator-min-microvolt = <810000>;
+> > > -                             regulator-max-microvolt = <1080000>;
+> > > +                             regulator-min-microvolt = <800000>;
+> > > +                             regulator-max-microvolt = <1160000>;
+> >
+> > This violates the minimum and maximum recommended voltages in the H6
+> > datasheet. Could you clarify why you are doing so (ideally in the
+> > commit log)?
+>
+> In fact, in sunxi's sdk, the actual minimum and maximum voltage of the
+> cpu is smaller or larger than the datasheet.
+> 
+> For some better quality ic, the minimum voltage can be smaller.
+> For some poor quality ic, the maximum voltage needs to be increased a little.
 
-Fixes: 3721924c8154 ("ARM: 8081/1: MCPM: provide infrastructure to allow for MCPM loopback")
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- arch/arm/common/mcpm_entry.c   |  2 +-
- arch/arm/include/asm/suspend.h |  1 +
- arch/arm/kernel/sleep.S        | 11 +++++++++++
- 3 files changed, 13 insertions(+), 1 deletion(-)
+Ok, that should definitely be part of the commit log then :)
 
-diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
-index ad574d20415c..1b1b82b37ce0 100644
---- a/arch/arm/common/mcpm_entry.c
-+++ b/arch/arm/common/mcpm_entry.c
-@@ -381,7 +381,7 @@ static int __init nocache_trampoline(unsigned long _arg)
- 	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
- 	phys_reset_t phys_reset;
- 
--	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
-+	mcpm_set_entry_vector(cpu, cluster, cpu_resume_no_hyp);
- 	setup_mm_for_reboot();
- 
- 	__mcpm_cpu_going_down(cpu, cluster);
-diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
-index 452bbdcbcc83..506314265c6f 100644
---- a/arch/arm/include/asm/suspend.h
-+++ b/arch/arm/include/asm/suspend.h
-@@ -10,6 +10,7 @@ struct sleep_save_sp {
- };
- 
- extern void cpu_resume(void);
-+extern void cpu_resume_no_hyp(void);
- extern void cpu_resume_arm(void);
- extern int cpu_suspend(unsigned long, int (*)(unsigned long));
- 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index a8257fc9cf2a..b856d183691e 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -122,6 +122,11 @@ ENDPROC(cpu_resume_after_mmu)
- 
- #ifdef CONFIG_MMU
- 	.arm
-+#ifdef CONFIG_MCPM
-+ENTRY(cpu_resume_no_hyp)
-+ARM_BE8(setend be)			@ ensure we are in BE mode
-+	b	0f
-+#endif
- ENTRY(cpu_resume_arm)
-  THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
-  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
-@@ -135,6 +140,9 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
- 	bl	__hyp_stub_install_secondary
- #endif
- 	safe_svcmode_maskall r1
-+#ifdef CONFIG_MCPM
-+0:
-+#endif
- 	mov	r1, #0
- 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
- 	ALT_UP_B(1f)
-@@ -163,6 +171,9 @@ ENDPROC(cpu_resume)
- 
- #ifdef CONFIG_MMU
- ENDPROC(cpu_resume_arm)
-+#endif
-+#ifdef CONFIG_MCPM
-+ENDPROC(cpu_resume_no_hyp)
- #endif
- 
- 	.align 2
+Thanks!
+Maxime
+
 -- 
-2.17.1
-
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
