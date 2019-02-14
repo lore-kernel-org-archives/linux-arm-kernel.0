@@ -3,19 +3,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B651AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:03:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A312FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:06:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 87A4A222B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:03:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7389220838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:06:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AFd0+bvz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87A4A222B6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JS9w/3dK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7389220838
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,43 +24,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=gdaJ0IyLbS6ea1PaRjmG3MZ/gwbK285Gh/SMWAZtsEg=; b=AFd0+bvz0hB0irjtFsmNknPBN
-	pXkI9+53VeAxsf2Sq5vR5SDD4dY/W+/MYzv1xymbDXW0oTGjFX1D4AL6ftmHSR/7/E6ZlKCiI0WIY
-	O6oiw3Gj59U8oiDNawkCAvD46lcp8opVj6P19Ky7DLaOArRnT4WQhIs/2ms4Sj+leb+HBUVQ799Yi
-	O0u7Tfn1ECnFxLV8UjGJ5hhBFTG0ZlvCDURS+4ORkScrozsfgz5dV103rgpQVhldmVbZnlzJ7nw2U
-	3Wj5aSa4ARdT10prQgrFu1PsWFyqFNRxNADAxVQFskFWGbAynW7tjXct9F2PSg1Bi3enGW3v0e3Ug
-	+BP70TPhA==;
+	 bh=OET9ug9JzxjjXW8WPx/yebNf8ryvv8AQp1VxzWbevzY=; b=JS9w/3dKoBFnXylpchzY8EVH7
+	5w0fKfTGsuxQgw636ggoqyj4FCC2PXukt0wS5itkY4X7+gUXKq4lAMBxipRP8f/gohEC5w58u1vcs
+	cRbfJ09sBXY7y3Z86wv1fg/wdKvYcNrpc002SsvLcT6lqXPfsHfmgCG++XrdodA5oazQdDXjmjg6S
+	xsXrvvGLB3mOLNv4NX4146469fTYMrbaDyhuBzGBn8shF/31uKlMaoMYg99BxxAU/i9Z5ABnAlF5/
+	klI70gtDDsNc03mFmpCtx8ShTF54IXw8qQ8VDaTOKHs00XW86srcQs5XFSuivnMB+iL/SlFjyT7dq
+	357IIJpSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guEnj-0006Go-8p; Thu, 14 Feb 2019 11:03:31 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1guEqi-0007pY-NE; Thu, 14 Feb 2019 11:06:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guEnf-0006GQ-Rk
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:03:29 +0000
+ id 1guEqe-0007pE-Uw
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:06:34 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E54D5EBD;
- Thu, 14 Feb 2019 03:03:26 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AEFEFEBD;
+ Thu, 14 Feb 2019 03:06:32 -0800 (PST)
 Received: from [10.162.0.144] (a075553-lin.blr.arm.com [10.162.0.144])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9542B3F575;
- Thu, 14 Feb 2019 03:03:23 -0800 (PST)
-Subject: Re: [PATCH v5 2/5] arm64/kvm: preserve host HCR_EL2/MDCR_EL2 value
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5E4253F575;
+ Thu, 14 Feb 2019 03:06:29 -0800 (PST)
+Subject: Re: [PATCH v5 3/5] arm64/kvm: context-switch ptrauth registers
 To: Kristina Martsenko <kristina.martsenko@arm.com>,
  linux-arm-kernel@lists.infradead.org
 References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-3-git-send-email-amit.kachhap@arm.com>
- <8de32a89-4aa1-bffb-78dd-45feddc9216e@arm.com>
+ <1548658727-14271-4-git-send-email-amit.kachhap@arm.com>
+ <0a2df488-a80d-ef08-6241-7f4695f2a578@arm.com>
 From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Message-ID: <1a2534b9-6d3b-caac-ff05-7795b7a2d725@arm.com>
-Date: Thu, 14 Feb 2019 16:33:21 +0530
+Message-ID: <ee8669f7-5c3d-ada3-49f2-0c9b37559553@arm.com>
+Date: Thu, 14 Feb 2019 16:36:27 +0530
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <8de32a89-4aa1-bffb-78dd-45feddc9216e@arm.com>
+In-Reply-To: <0a2df488-a80d-ef08-6241-7f4695f2a578@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_030327_899881_75E25F19 
-X-CRM114-Status: GOOD (  19.51  )
+X-CRM114-CacheID: sfid-20190214_030633_012074_D66590BE 
+X-CRM114-Status: GOOD (  29.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,42 +85,157 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 Hi,
 
 On 2/13/19 11:04 PM, Kristina Martsenko wrote:
+> Hi Amit,
+> 
+> (Please always Cc: everyone who commented on previous versions of the
+> series.)
+> 
 > On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
->> When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
->> is a constant value. This works today, as the host HCR_EL2 value is
->> always the same, but this will get in the way of supporting extensions
->> that require HCR_EL2 bits to be set conditionally for the host.
+>> When pointer authentication is supported, a guest may wish to use it.
+>> This patch adds the necessary KVM infrastructure for this to work, with
+>> a semi-lazy context switch of the pointer auth state.
 >>
->> To allow such features to work without KVM having to explicitly handle
->> every possible host feature combination, this patch has KVM save/restore
->> the host HCR when switching to/from a guest HCR. The saving of the
->> register is done once during cpu hypervisor initialization state and is
->> just restored after switch from guest.
+>> Pointer authentication feature is only enabled when VHE is built
+>> into the kernel and present into CPU implementation so only VHE code
+>> paths are modified.
+>>
+>> When we schedule a vcpu, we disable guest usage of pointer
+>> authentication instructions and accesses to the keys. While these are
+>> disabled, we avoid context-switching the keys. When we trap the guest
+>> trying to use pointer authentication functionality, we change to eagerly
+>> context-switching the keys, and enable the feature. The next time the
+>> vcpu is scheduled out/in, we start again.
+>>
+>> Pointer authentication consists of address authentication and generic
+>> authentication, and CPUs in a system might have varied support for
+>> either. Where support for either feature is not uniform, it is hidden
+>> from guests via ID register emulation, as a result of the cpufeature
+>> framework in the host.
+>>
+>> Unfortunately, address authentication and generic authentication cannot
+>> be trapped separately, as the architecture provides a single EL2 trap
+>> covering both. If we wish to expose one without the other, we cannot
+>> prevent a (badly-written) guest from intermittently using a feature
+>> which is not uniformly supported (when scheduled on a physical CPU which
+>> supports the relevant feature). When the guest is scheduled on a
+>> physical CPU lacking the feature, these attempts will result in an UNDEF
+>> being taken by the guest.
 > 
-> Why is this patch needed? I couldn't find anything in this series that
-> sets HCR_EL2 conditionally for the host. It seems like the kernel still
-> always sets it to HCR_HOST_VHE_FLAGS/HCR_HOST_NVHE_FLAGS.
-
-This patch is not directly related to pointer authentication but just a 
-helper to optimize save/restore. In this way save may be avoided for 
-each switch and only restore is done. Patch 3 does sets HCR_EL2 in VHE_RUN.
+> [...]
 > 
-> Looking back at v2 of the userspace pointer auth series, it seems that
-> the API/APK bits were set conditionally [1], so this patch would have
-> been needed to preserve HCR_EL2. But as of v3 of that series, the bits
-> have been set unconditionally through HCR_HOST_NVHE_FLAGS [2].
+>>   /*
+>> + * Handle the guest trying to use a ptrauth instruction, or trying to access a
+>> + * ptrauth register.
+>> + */
+>> +void kvm_arm_vcpu_ptrauth_trap(struct kvm_vcpu *vcpu)
+>> +{
+>> +	if (has_vhe() && kvm_supports_ptrauth())
+>> +		kvm_arm_vcpu_ptrauth_enable(vcpu);
+>> +	else
+>> +		kvm_inject_undefined(vcpu);
+>> +}
+>> +
+>> +/*
+>>    * Guest usage of a ptrauth instruction (which the guest EL1 did not turn into
+>> - * a NOP).
+>> + * a NOP), or guest EL1 access to a ptrauth register.
 > 
-> Is there something else I've missed?
-Now HCR_EL2 is modified during switch time and NHVE doesnt support 
-ptrauth so [2] doesn't makes sense.
+> Doesn't guest EL1 access of ptrauth registers go through trap_ptrauth
+> instead?
+Yes you are right.
+> 
+>>    */
+>>   static int kvm_handle_ptrauth(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>   {
+>> -	/*
+>> -	 * We don't currently support ptrauth in a guest, and we mask the ID
+>> -	 * registers to prevent well-behaved guests from trying to make use of
+>> -	 * it.
+>> -	 *
+>> -	 * Inject an UNDEF, as if the feature really isn't present.
+>> -	 */
+>> -	kvm_inject_undefined(vcpu);
+>> +	kvm_arm_vcpu_ptrauth_trap(vcpu);
+>>   	return 1;
+>>   }
+>>   
+> 
+> [...]
+> 
+>> +static __always_inline bool __hyp_text __ptrauth_is_enabled(struct kvm_vcpu *vcpu)
+>> +{
+>> +	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
+>> +			vcpu->arch.ctxt.hcr_el2 & (HCR_API | HCR_APK);
+>> +}
+>> +
+>> +void __no_ptrauth __hyp_text __ptrauth_switch_to_guest(struct kvm_vcpu *vcpu,
+>> +					  struct kvm_cpu_context *host_ctxt,
+>> +					  struct kvm_cpu_context *guest_ctxt)
+>> +{
+>> +	if (!__ptrauth_is_enabled(vcpu))
+>> +		return;
+>> +
+>> +	ptrauth_keys_store((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
+>> +	ptrauth_keys_switch((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
+>> +}
+>> +
+>> +void __no_ptrauth __hyp_text __ptrauth_switch_to_host(struct kvm_vcpu *vcpu,
+> 
+> We don't call this code in the !VHE case anymore, so are the __hyp_text
+> annotations still needed?
+Yes they can be removed.
+> 
+>> +					 struct kvm_cpu_context *host_ctxt,
+>> +					 struct kvm_cpu_context *guest_ctxt)
+>> +{
+>> +	if (!__ptrauth_is_enabled(vcpu))
+>> +		return;
+>> +
+>> +	ptrauth_keys_store((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
+>> +	ptrauth_keys_switch((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
+>> +}
+> 
+> [...]
+> 
+>> @@ -1040,14 +1066,6 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
+>>   			kvm_debug("SVE unsupported for guests, suppressing\n");
+>>   
+>>   		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
+>> -	} else if (id == SYS_ID_AA64ISAR1_EL1) {
+>> -		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
+>> -					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
+>> -					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
+>> -					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
+>> -		if (val & ptrauth_mask)
+>> -			kvm_debug("ptrauth unsupported for guests, suppressing\n");
+>> -		val &= ~ptrauth_mask;
+> 
+> If all CPUs support address authentication, but no CPUs support generic
+> authentication, then I think the guest will still see address auth in
+> the ID register and try to use it, but since kvm_supports_ptrauth() ==
+> false, then kvm will enable trapping and inject an undef. So I think we
+> still need to zero the ID register bits here if !kvm_supports_ptrauth().
+Yes even James Morse suggested same thing.
+> 
+> In the following patch, I think we also need to zero the bits if
+> !kvm_arm_vcpu_ptrauth_allowed(), as done in v4 [1], because otherwise
+> the guest will see that ptrauth is available, but will receive an undef
+> when it tries to use it.
+ok.
+> 
+> Regarding the patch in v4, most of the work is passing the vcpu down to
+> read_id_reg(). Dave has a similar patch in his SVE series [2]. I think
+> it might make sense to rebase onto that patch and mention that patch as
+> a dependency in the cover letter.
+Yes it is helpful. Will check it.
 
 //Amit D
 > 
+> [1] https://lore.kernel.org/linux-arm-kernel/1545119810-12182-5-git-send-email-amit.kachhap@arm.com/
+> [2] https://lore.kernel.org/linux-arm-kernel/1547757219-19439-11-git-send-email-Dave.Martin@arm.com/
+> 
 > Thanks,
 > Kristina
-> 
-> [1] https://lore.kernel.org/linux-arm-kernel/20171127163806.31435-6-mark.rutland@arm.com/
-> [2] https://lore.kernel.org/linux-arm-kernel/20180417183735.56985-5-mark.rutland@arm.com/
 > 
 
 _______________________________________________
