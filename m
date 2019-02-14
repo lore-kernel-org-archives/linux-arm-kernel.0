@@ -2,70 +2,62 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 170B7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:14:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E674AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:24:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D9799218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:14:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B474D218EA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:24:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lmiF2iGP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="el4rvheK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9799218EA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nvfx1FmB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B474D218EA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=stgolabs.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=Ki8Q0Ma0GXqb0LdGl/Nyr9DP/ZeSA3D701lVFIG8TTM=; b=lmi
-	F2iGPnjQ3aCMIGi7mBIqf58nz2LIuVPMUj4ivehmsORkMbkgf5ipvhsmySwB9CygzKmzgHcDRi8F1
-	f0gM4NwtXpYK2/U6kLK2BIHDOMVAbp27PMHLZx3+ajA/XBCc4JaoLtCNQKFBqsDjrgyHgMhlKNitl
-	p3+iw8/6Ke7ttjbJqhZIP4IALRrvX8mdlY+s/mlrtxEOzOH52Nut3DDn5p2+lkdLxwqmFkUKnzHUj
-	RcWYb4kzMiWzsF7QSDe+lSPjzn8rMxpvObkRKVnuzJgC1AM5RakzG8ghRj1VeX7gMjqOEO8VrHZxy
-	VuFsSnSVJz/bxDMUFlpLtqRxPTsHyKQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=sRgoJdULrpMf8W/1sW8499+9w8QXYo2xaFTW6txj9Ks=; b=nvfx1FmBTL7r9x3gVcTQSQlsW
+	Zl2ZTSM08THZVjD+5kTlNLdbNu4Ao2leFXKlY4bpPOGvTKX/GBWO+Zcwr95GHLIdLsv4bXeB3Lf4h
+	Ia2qGGfmx+TpV+atfgPOlLJT6BYWkqHI9BMnqQhfahuq+4o9JpnXv9ECMVGbr1RFf2vEjubAm+zhQ
+	8Q2UmGLIM3k4ST5WjFGWAfZYfTpX7oN2MRI2AVbLDlS6o8FQyPJtiq1zI74/K04to8a1LRIruIjKr
+	LMbYY+0qzj6OvQp6MW/VyPecPQReXyALA4cL2+/ALsLUW+ovffkaOXzQeRKk9fya1hQpg52yeT1Ht
+	5hcU/iY0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guGqV-0004Se-2B; Thu, 14 Feb 2019 13:14:31 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1guGzr-0008Ia-9p; Thu, 14 Feb 2019 13:24:11 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guGqR-0004Pw-5H
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 13:14:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=v12/WDwapgDt5T1d8Q0qRnL2R2gbjp5oSCHQXUCZkP8=; b=el4rvheKAVRG
- t/aYoaHx5cdJztKa2AFY2WiWzQc81tb1UNoFvnoJeXEeRFyRsec3/4vQf/VWTfXwnu+mhBViH43eg
- TQgAT4KA0Lml5HjHiraN/5oe+n/UTupE+ItrgIswUzAUTVPBk9O6YCK9d6kr/H6/IWBcuNprWkVZH
- gLt1w=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1guGqG-0004PB-IJ; Thu, 14 Feb 2019 13:14:16 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id E0CB01126F78; Thu, 14 Feb 2019 13:14:15 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Wen Yang <yellowriver2010@hotmail.com>
-Subject: Applied "ASoC: stm32: sai: add missing put_device()" to the asoc tree
-In-Reply-To: <HK0PR02MB36348FCAF73000463738C017B26A0@HK0PR02MB3634.apcprd02.prod.outlook.com>
-X-Patchwork-Hint: ignore
-Message-Id: <20190214131415.E0CB01126F78@debutante.sirena.org.uk>
-Date: Thu, 14 Feb 2019 13:14:15 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+ id 1guGzn-0008Hr-NF
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 13:24:09 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay2.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id 97C44AE8D;
+ Thu, 14 Feb 2019 13:24:04 +0000 (UTC)
+Date: Thu, 14 Feb 2019 05:23:52 -0800
+From: Davidlohr Bueso <dave@stgolabs.net>
+To: Waiman Long <longman@redhat.com>
+Subject: Re: [PATCH-tip 00/22] locking/rwsem: Rework rwsem-xadd & enable new
+ rwsem features
+Message-ID: <20190214132352.wm26r5g632swp34n@linux-r8p5>
+References: <1549566446-27967-1-git-send-email-longman@redhat.com>
+ <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
+ <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
+User-Agent: NeoMutt/20180323
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_051427_351931_6D3AF3FF 
-X-CRM114-Status: GOOD (  14.31  )
+X-CRM114-CacheID: sfid-20190214_052408_051114_397576B1 
+X-CRM114-Status: UNSURE (   8.34  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,97 +69,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, Olivier Moysan <olivier.moysan@st.com>,
- Torgue <alexandre.torgue@st.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Arnaud Pouliquen <arnaud.pouliquen@st.com>, Takashi Iwai <tiwai@suse.com>,
- Liam Girdwood <lgirdwood@gmail.com>, Alexandre@sirena.org.uk,
- Mark Brown <broonie@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Jaroslav Kysela <perex@perex.cz>,
- "linux-stm32@st-md-mailman.stormreply.com"
- <linux-stm32@st-md-mailman.stormreply.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
+ the arch/x86 maintainers <x86@kernel.org>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
+ linuxppc-dev@lists.ozlabs.org, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
+ sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ Linus Torvalds <torvalds@linux-foundation.org>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+On Fri, 08 Feb 2019, Waiman Long wrote:
+>I am planning to run more performance test and post the data sometimes
+>next week. Davidlohr is also going to run some of his rwsem performance
+>test on this patchset.
 
-   ASoC: stm32: sai: add missing put_device()
+So I ran this series on a 40-core IB 2 socket with various worklods in
+mmtests. Below are some of the interesting ones; full numbers and curves
+at https://linux-scalability.org/rwsem-reader-spinner/
 
-has been applied to the asoc tree at
+All workloads are with increasing number of threads.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+-- pagefault timings: pft is an artificial pf benchmark (thus reader stress).
+metric is faults/cpu and faults/sec
+                                       v5.0-rc6                 v5.0-rc6
+                                                                    dirty
+Hmean     faults/cpu-1    624224.9815 (   0.00%)   618847.5201 *  -0.86%*
+Hmean     faults/cpu-4    539550.3509 (   0.00%)   547407.5738 *   1.46%*
+Hmean     faults/cpu-7    401470.3461 (   0.00%)   381157.9830 *  -5.06%*
+Hmean     faults/cpu-12   267617.0353 (   0.00%)   271098.5441 *   1.30%*
+Hmean     faults/cpu-21   176194.4641 (   0.00%)   175151.3256 *  -0.59%*
+Hmean     faults/cpu-30   119927.3862 (   0.00%)   120610.1348 *   0.57%*
+Hmean     faults/cpu-40    91203.6820 (   0.00%)    91832.7489 *   0.69%*
+Hmean     faults/sec-1    623292.3467 (   0.00%)   617992.0795 *  -0.85%*
+Hmean     faults/sec-4   2113364.6898 (   0.00%)  2140254.8238 *   1.27%*
+Hmean     faults/sec-7   2557378.4385 (   0.00%)  2450945.7060 *  -4.16%*
+Hmean     faults/sec-12  2696509.8975 (   0.00%)  2747968.9819 *   1.91%*
+Hmean     faults/sec-21  2902892.5639 (   0.00%)  2905923.3881 *   0.10%*
+Hmean     faults/sec-30  2956696.5793 (   0.00%)  2990583.5147 *   1.15%*
+Hmean     faults/sec-40  3422806.4806 (   0.00%)  3352970.3082 *  -2.04%*
+Stddev    faults/cpu-1      2949.5159 (   0.00%)     2802.2712 (   4.99%)
+Stddev    faults/cpu-4     24165.9454 (   0.00%)    15841.1232 (  34.45%)
+Stddev    faults/cpu-7     20914.8351 (   0.00%)    22744.3294 (  -8.75%)
+Stddev    faults/cpu-12    11274.3490 (   0.00%)    14733.3152 ( -30.68%)
+Stddev    faults/cpu-21     2500.1950 (   0.00%)     2200.9518 (  11.97%)
+Stddev    faults/cpu-30     1599.5346 (   0.00%)     1414.0339 (  11.60%)
+Stddev    faults/cpu-40     1473.0181 (   0.00%)     3004.1209 (-103.94%)
+Stddev    faults/sec-1      2655.2581 (   0.00%)     2405.1625 (   9.42%)
+Stddev    faults/sec-4     84042.7234 (   0.00%)    57996.7158 (  30.99%)
+Stddev    faults/sec-7    123656.7901 (   0.00%)   135591.1087 (  -9.65%)
+Stddev    faults/sec-12    97135.6091 (   0.00%)   127054.4926 ( -30.80%)
+Stddev    faults/sec-21    69564.6264 (   0.00%)    65922.6381 (   5.24%)
+Stddev    faults/sec-30    51524.4027 (   0.00%)    56109.4159 (  -8.90%)
+Stddev    faults/sec-40   101927.5280 (   0.00%)   160117.0093 ( -57.09%)
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+With the exception of the hicup at 7 threads, things are pretty much in
+the noise region for both metrics.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+-- git checkout
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+First metric is total runtime for runs with incremental threads.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+           v5.0-rc6    v5.0-rc6
+                          dirty
+User         218.95      219.07
+System       149.29      146.82
+Elapsed     1574.10     1427.08
+
+In this case there's a non trivial improvement (11%) in overall elapsed time.
+
+-- reaim (which is always succeptible to rwsem changes for both mmap_sem and
+i_mmap)
+                                     v5.0-rc6               v5.0-rc6
+                                                                dirty
+Hmean     compute-1         6674.01 (   0.00%)     6544.28 *  -1.94%*
+Hmean     compute-21       85294.91 (   0.00%)    85524.20 *   0.27%*
+Hmean     compute-41      149674.70 (   0.00%)   149494.58 *  -0.12%*
+Hmean     compute-61      177721.15 (   0.00%)   170507.38 *  -4.06%*
+Hmean     compute-81      181531.07 (   0.00%)   180463.24 *  -0.59%*
+Hmean     compute-101     189024.09 (   0.00%)   187288.86 *  -0.92%*
+Hmean     compute-121     200673.24 (   0.00%)   195327.65 *  -2.66%*
+Hmean     compute-141     213082.29 (   0.00%)   211290.80 *  -0.84%*
+Hmean     compute-161     207764.06 (   0.00%)   204626.68 *  -1.51%*
+
+The 'compute' workload overall takes a small hit.
+
+Hmean     new_dbase-1         60.48 (   0.00%)       60.63 *   0.25%*
+Hmean     new_dbase-21      6590.49 (   0.00%)     6671.81 *   1.23%*
+Hmean     new_dbase-41     14202.91 (   0.00%)    14470.59 *   1.88%*
+Hmean     new_dbase-61     21207.24 (   0.00%)    21067.40 *  -0.66%*
+Hmean     new_dbase-81     25542.40 (   0.00%)    25542.40 *   0.00%*
+Hmean     new_dbase-101    30165.28 (   0.00%)    30046.21 *  -0.39%*
+Hmean     new_dbase-121    33638.33 (   0.00%)    33219.90 *  -1.24%*
+Hmean     new_dbase-141    36723.70 (   0.00%)    37504.52 *   2.13%*
+Hmean     new_dbase-161    42242.51 (   0.00%)    42117.34 *  -0.30%*
+Hmean     shared-1            76.54 (   0.00%)       76.09 *  -0.59%*
+Hmean     shared-21         7535.51 (   0.00%)     5518.75 * -26.76%*
+Hmean     shared-41        17207.81 (   0.00%)    14651.94 * -14.85%*
+Hmean     shared-61        20716.98 (   0.00%)    18667.52 *  -9.89%*
+Hmean     shared-81        27603.83 (   0.00%)    23466.45 * -14.99%*
+Hmean     shared-101       26008.59 (   0.00%)    29536.96 *  13.57%*
+Hmean     shared-121       28354.76 (   0.00%)    43139.39 *  52.14%*
+Hmean     shared-141       38509.25 (   0.00%)    41619.35 *   8.08%*
+Hmean     shared-161       40496.07 (   0.00%)    44303.46 *   9.40%*
+
+Overall there is a small hit (in the noise level but consistent throughout
+many workloads), except git-checkout which does quite well.
 
 Thanks,
-Mark
-
-From 1c3816a194870e7a6622345dab7fb56c7d708613 Mon Sep 17 00:00:00 2001
-From: Wen Yang <yellowriver2010@hotmail.com>
-Date: Sat, 9 Feb 2019 10:41:09 +0000
-Subject: [PATCH] ASoC: stm32: sai: add missing put_device()
-
-The of_find_device_by_node() takes a reference to the underlying device
-structure, we should release that reference.
-
-Fixes: 7dd0d835582f ("ASoC: stm32: sai: simplify sync modes management")
-Signed-off-by: Wen Yang <yellowriver2010@hotmail.com>
-Acked-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_sai.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_sai.c b/sound/soc/stm/stm32_sai.c
-index bcb35cae2a2c..14c9591aae42 100644
---- a/sound/soc/stm/stm32_sai.c
-+++ b/sound/soc/stm/stm32_sai.c
-@@ -112,16 +112,21 @@ static int stm32_sai_set_sync(struct stm32_sai_data *sai_client,
- 	if (!sai_provider) {
- 		dev_err(&sai_client->pdev->dev,
- 			"SAI sync provider data not found\n");
--		return -EINVAL;
-+		ret = -EINVAL;
-+		goto out_put_dev;
- 	}
- 
- 	/* Configure sync client */
- 	ret = stm32_sai_sync_conf_client(sai_client, synci);
- 	if (ret < 0)
--		return ret;
-+		goto out_put_dev;
- 
- 	/* Configure sync provider */
--	return stm32_sai_sync_conf_provider(sai_provider, synco);
-+	ret = stm32_sai_sync_conf_provider(sai_provider, synco);
-+
-+out_put_dev:
-+	put_device(&pdev->dev);
-+	return ret;
- }
- 
- static int stm32_sai_probe(struct platform_device *pdev)
--- 
-2.20.1
-
+Davidlohr
 
 _______________________________________________
 linux-arm-kernel mailing list
