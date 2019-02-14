@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E07D6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:05:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD87EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:05:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC53B222CE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:05:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8B16C218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:05:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qr6a9Oqr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="2PAnanOt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC53B222CE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BDuur3Nw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="mcr+aLBj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8B16C218FF
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,55 +27,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=JRfXiFgnazcRsf4TH/7Uq54U7wHuJjcX/GVS2x9cf7s=; b=qr6a9OqraNTVrV11j0WCElnlZs
-	7OwtjqG7S6+M2C9LjRp8ILzWSngVe7khmN/rxY2ne9I3gIn18IqKjE92VqSHCQN8yORUuNvmDjPVB
-	qJkIAlZ4QM1KGvZZ9ia0gHG491ExC02PLJ+Xui55XrST3IlkUaG9768IcvORjcKZ1O5rK/0ruXqHF
-	Mo7Da4enkb+7gk28eLTWAVnPlQvWScBOc7cGvk3lhm7/mvCKEe5Mj9xM+8P/kh+DNUzy679fg+I6Z
-	NkjYUTXyuGhN4rodBB76fRk9S+Dj7rcgNanTIx5PNoAqPvEv1vG/KQSampJck2WC3HUPMaA3iQ05k
-	GRjhchgw==;
+	bh=nd9vD0q+5oktgFuNgVyifOWk/Bpqp0VgPtRC9Upg0ik=; b=BDuur3NwzWL1YdZl+nRoqAC9ay
+	YSU3TyODhxKcFve3NvI7b9vzeW+CKGufjTOocLcdEKgf5OANNdKl9qrTOwrk+WvCAJrYgnomdH7ox
+	MhLfdstV+5PwHaHtEkW0oXCjS5cKuUDNa3sG0B65CFdACYm0GD02u40mi9epnh1IpLER0XL911MJN
+	ZIzNCnxEsr4W9Vb+H6no0XX6VLO+KtXb0H7FGg6x/mtLQY+Yowg7wmdp6vHCpaLbkezZuaRopvtyJ
+	OxNfHAf2qDX9Iog9uqEgYkKVeM8lLODHOWyad65kbKzLcVVcKkluSMaCYWXyGaRNa+YPbn+cCfEoU
+	gLgplt8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu4WR-00013D-Ht; Thu, 14 Feb 2019 00:04:59 +0000
-Received: from userp2130.oracle.com ([156.151.31.86])
+	id 1gu4Wi-000201-SI; Thu, 14 Feb 2019 00:05:16 +0000
+Received: from aserp2130.oracle.com ([141.146.126.79])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu4Ul-0007ec-B4
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 00:03:20 +0000
-Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
- by userp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1DNx9xx093658;
- Thu, 14 Feb 2019 00:02:20 GMT
+ id 1gu4VF-0008DR-Gq
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 00:04:15 +0000
+Received: from pps.filterd (aserp2130.oracle.com [127.0.0.1])
+ by aserp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1DNwsZ2100568;
+ Thu, 14 Feb 2019 00:01:59 GMT
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
  h=from : to : cc :
  subject : date : message-id : in-reply-to : references : in-reply-to :
  references; s=corp-2018-07-02;
- bh=TQlIsuP1ag8N8cWtIZarXg5qzwt4o6eHPtANA79RWaM=;
- b=2PAnanOtADcxei1cy8BlTb/qU5ZZ7i0wqibFXPa9bnInPG/bvReURBWdV7oqlHHKB04P
- eJe2e67nu+luxcdvC3UBRDtvbK4t0fpRO4v+csDCFP/QjO2HMEGx/ANYI0/HgjyJOXBQ
- A+HhQpvU1Zm+os48RbnhGhjXf13nrybGW9Q+s+JqmKbNdQ6NQ9nWd7faph98x/U5WFsQ
- GP3HR7Iu2pYrMuqLFfE3A+sddb/2CPIRd3PP80otI32ENy8xTiH9Z0CLXt9neXDuvRjw
- swjC9f3y4oeNAID085G4bmwvjmiQzHs2QY3PeVUXmX6gdeHyJcTl0BfB9Kn9iJyjhaP4 ZQ== 
-Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
- by userp2130.oracle.com with ESMTP id 2qhrekn4kv-1
+ bh=BnvBthvqyUR+BETbLnaqcFAixVQhrRUG4KWFDYKw33s=;
+ b=mcr+aLBjXAXSptqDtlz0VxxfWE1bq8ULxWcJo1ATX2NiCgH2AWLADjbr/HqYkpk9odGK
+ ChvFnz1ZxMVxKCJ0jfXdJW5TYWVBwj+Ty3/i6pxWwCEiACxkvV13/+T2YmPTX1CBTwJG
+ UBQhh1BtAVY8KyQ7Wk/NDQM5Umuvxs3VEJF2d3Xv4chhe+jqnXx8PoRI61KUxuMIHH1j
+ hzaCrG4RkCU1W8fxes/FLLMZ7uQSL15sc1ZI1d0I09k3vAa0Q8LpfMdnyskkbMB7yMLc
+ eVkiHdh8fE/ZM3EnxXIAPz7Bn0aTkW7mrmcxMY3krFlvZUEFc5Jyqgv8meeyiWbyIGX9 Lw== 
+Received: from userv0022.oracle.com (userv0022.oracle.com [156.151.31.74])
+ by aserp2130.oracle.com with ESMTP id 2qhre5n3u2-1
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 14 Feb 2019 00:02:20 +0000
-Received: from userv0121.oracle.com (userv0121.oracle.com [156.151.31.72])
- by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1E02I6f026212
+ Thu, 14 Feb 2019 00:01:59 +0000
+Received: from userv0122.oracle.com (userv0122.oracle.com [156.151.31.75])
+ by userv0022.oracle.com (8.14.4/8.14.4) with ESMTP id x1E01wVi031042
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 14 Feb 2019 00:02:19 GMT
+ Thu, 14 Feb 2019 00:01:58 GMT
 Received: from abhmp0003.oracle.com (abhmp0003.oracle.com [141.146.116.9])
- by userv0121.oracle.com (8.14.4/8.13.8) with ESMTP id x1E02Hqw032540;
- Thu, 14 Feb 2019 00:02:17 GMT
+ by userv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1E01tie014301;
+ Thu, 14 Feb 2019 00:01:56 GMT
 Received: from concerto.internal (/24.9.64.241)
  by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Wed, 13 Feb 2019 16:02:16 -0800
+ with ESMTP ; Wed, 13 Feb 2019 16:01:55 -0800
 From: Khalid Aziz <khalid.aziz@oracle.com>
 To: juergh@gmail.com, tycho@tycho.ws, jsteckli@amazon.de, ak@linux.intel.com, 
  torvalds@linux-foundation.org, liran.alon@oracle.com,
  keescook@google.com, akpm@linux-foundation.org, mhocko@suse.com,
  catalin.marinas@arm.com, will.deacon@arm.com, jmorris@namei.org,
  konrad.wilk@oracle.com
-Subject: [RFC PATCH v8 09/14] mm: add a user_virt_to_phys symbol
-Date: Wed, 13 Feb 2019 17:01:32 -0700
-Message-Id: <b96108404af22ac25a0b62b81d338bf511002f63.1550088114.git.khalid.aziz@oracle.com>
+Subject: [RFC PATCH v8 01/14] mm: add MAP_HUGETLB support to vm_mmap
+Date: Wed, 13 Feb 2019 17:01:24 -0700
+Message-Id: <ec8d9101bea98360ef1f4c7cb5bb0450859c213b.1550088114.git.khalid.aziz@oracle.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <cover.1550088114.git.khalid.aziz@oracle.com>
 References: <cover.1550088114.git.khalid.aziz@oracle.com>
@@ -90,8 +90,8 @@ X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
  classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
  definitions=main-1902130157
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_160315_630364_F4E8A105 
-X-CRM114-Status: GOOD (  17.30  )
+X-CRM114-CacheID: sfid-20190213_160345_963356_1B0775D1 
+X-CRM114-Status: GOOD (  17.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,8 +104,7 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Tycho Andersen <tycho@docker.com>, kernel-hardening@lists.openwall.com,
- peterz@infradead.org, dave.hansen@intel.com,
- Khalid Aziz <khalid.aziz@oracle.com>, deepa.srinivasan@oracle.com,
+ peterz@infradead.org, dave.hansen@intel.com, deepa.srinivasan@oracle.com,
  steven.sistare@oracle.com, hch@lst.de, x86@kernel.org,
  kanth.ghatraju@oracle.com, labbott@redhat.com, pradeep.vincent@oracle.com,
  jcm@redhat.com, luto@kernel.org, boris.ostrovsky@oracle.com,
@@ -122,121 +121,112 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Tycho Andersen <tycho@docker.com>
 
-We need someting like this for testing XPFO. Since it's architecture
-specific, putting it in the test code is slightly awkward, so let's make it
-an arch-specific symbol and export it for use in LKDTM.
+vm_mmap is exported, which means kernel modules can use it. In particular,
+for testing XPFO support, we want to use it with the MAP_HUGETLB flag, so
+let's support it via vm_mmap.
 
-CC: linux-arm-kernel@lists.infradead.org
-CC: x86@kernel.org
 Signed-off-by: Tycho Andersen <tycho@docker.com>
 Tested-by: Marco Benatto <marco.antonio.780@gmail.com>
-Signed-off-by: Khalid Aziz <khalid.aziz@oracle.com>
+Tested-by: Khalid Aziz <khalid.aziz@oracle.com>
 ---
-v6: * add a definition of user_virt_to_phys in the !CONFIG_XPFO case
-v7: * make user_virt_to_phys a GPL symbol
+ include/linux/mm.h |  2 ++
+ mm/mmap.c          | 19 +------------------
+ mm/util.c          | 32 ++++++++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+), 18 deletions(-)
 
- arch/x86/mm/xpfo.c   | 57 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/xpfo.h |  8 +++++++
- 2 files changed, 65 insertions(+)
-
-diff --git a/arch/x86/mm/xpfo.c b/arch/x86/mm/xpfo.c
-index 6c7502993351..e13b99019c47 100644
---- a/arch/x86/mm/xpfo.c
-+++ b/arch/x86/mm/xpfo.c
-@@ -117,3 +117,60 @@ inline void xpfo_flush_kernel_tlb(struct page *page, int order)
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 5411de93a363..30bddc7b3c75 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -2361,6 +2361,8 @@ struct vm_unmapped_area_info {
+ extern unsigned long unmapped_area(struct vm_unmapped_area_info *info);
+ extern unsigned long unmapped_area_topdown(struct vm_unmapped_area_info *info);
  
- 	flush_tlb_kernel_range(kaddr, kaddr + (1 << order) * size);
++struct file *map_hugetlb_setup(unsigned long *len, unsigned long flags);
++
+ /*
+  * Search for an unmapped address range.
+  *
+diff --git a/mm/mmap.c b/mm/mmap.c
+index 6c04292e16a7..c668d7d27c2b 100644
+--- a/mm/mmap.c
++++ b/mm/mmap.c
+@@ -1582,24 +1582,7 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
+ 		if (unlikely(flags & MAP_HUGETLB && !is_file_hugepages(file)))
+ 			goto out_fput;
+ 	} else if (flags & MAP_HUGETLB) {
+-		struct user_struct *user = NULL;
+-		struct hstate *hs;
+-
+-		hs = hstate_sizelog((flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK);
+-		if (!hs)
+-			return -EINVAL;
+-
+-		len = ALIGN(len, huge_page_size(hs));
+-		/*
+-		 * VM_NORESERVE is used because the reservations will be
+-		 * taken when vm_ops->mmap() is called
+-		 * A dummy user value is used because we are not locking
+-		 * memory so no accounting is necessary
+-		 */
+-		file = hugetlb_file_setup(HUGETLB_ANON_FILE, len,
+-				VM_NORESERVE,
+-				&user, HUGETLB_ANONHUGE_INODE,
+-				(flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK);
++		file = map_hugetlb_setup(&len, flags);
+ 		if (IS_ERR(file))
+ 			return PTR_ERR(file);
+ 	}
+diff --git a/mm/util.c b/mm/util.c
+index 8bf08b5b5760..536c14cf88ba 100644
+--- a/mm/util.c
++++ b/mm/util.c
+@@ -357,6 +357,29 @@ unsigned long vm_mmap_pgoff(struct file *file, unsigned long addr,
+ 	return ret;
  }
-+
-+/* Convert a user space virtual address to a physical address.
-+ * Shamelessly copied from slow_virt_to_phys() and lookup_address() in
-+ * arch/x86/mm/pageattr.c
-+ */
-+phys_addr_t user_virt_to_phys(unsigned long addr)
+ 
++struct file *map_hugetlb_setup(unsigned long *len, unsigned long flags)
 +{
-+	phys_addr_t phys_addr;
-+	unsigned long offset;
-+	pgd_t *pgd;
-+	p4d_t *p4d;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
++	struct user_struct *user = NULL;
++	struct hstate *hs;
 +
-+	pgd = pgd_offset(current->mm, addr);
-+	if (pgd_none(*pgd))
-+		return 0;
++	hs = hstate_sizelog((flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK);
++	if (!hs)
++		return ERR_PTR(-EINVAL);
 +
-+	p4d = p4d_offset(pgd, addr);
-+	if (p4d_none(*p4d))
-+		return 0;
++	*len = ALIGN(*len, huge_page_size(hs));
 +
-+	if (p4d_large(*p4d) || !p4d_present(*p4d)) {
-+		phys_addr = (unsigned long)p4d_pfn(*p4d) << PAGE_SHIFT;
-+		offset = addr & ~P4D_MASK;
-+		goto out;
-+	}
-+
-+	pud = pud_offset(p4d, addr);
-+	if (pud_none(*pud))
-+		return 0;
-+
-+	if (pud_large(*pud) || !pud_present(*pud)) {
-+		phys_addr = (unsigned long)pud_pfn(*pud) << PAGE_SHIFT;
-+		offset = addr & ~PUD_MASK;
-+		goto out;
-+	}
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return 0;
-+
-+	if (pmd_large(*pmd) || !pmd_present(*pmd)) {
-+		phys_addr = (unsigned long)pmd_pfn(*pmd) << PAGE_SHIFT;
-+		offset = addr & ~PMD_MASK;
-+		goto out;
-+	}
-+
-+	pte =  pte_offset_kernel(pmd, addr);
-+	phys_addr = (phys_addr_t)pte_pfn(*pte) << PAGE_SHIFT;
-+	offset = addr & ~PAGE_MASK;
-+
-+out:
-+	return (phys_addr_t)(phys_addr | offset);
++	/*
++	 * VM_NORESERVE is used because the reservations will be
++	 * taken when vm_ops->mmap() is called
++	 * A dummy user value is used because we are not locking
++	 * memory so no accounting is necessary
++	 */
++	return hugetlb_file_setup(HUGETLB_ANON_FILE, *len,
++			VM_NORESERVE,
++			&user, HUGETLB_ANONHUGE_INODE,
++			(flags >> MAP_HUGE_SHIFT) & MAP_HUGE_MASK);
 +}
-+EXPORT_SYMBOL_GPL(user_virt_to_phys);
-diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
-index 8b029918a958..117869991d5b 100644
---- a/include/linux/xpfo.h
-+++ b/include/linux/xpfo.h
-@@ -24,6 +24,10 @@ struct page;
- 
- #ifdef CONFIG_XPFO
- 
-+#include <linux/dma-mapping.h>
 +
-+#include <linux/types.h>
+ unsigned long vm_mmap(struct file *file, unsigned long addr,
+ 	unsigned long len, unsigned long prot,
+ 	unsigned long flag, unsigned long offset)
+@@ -366,6 +389,15 @@ unsigned long vm_mmap(struct file *file, unsigned long addr,
+ 	if (unlikely(offset_in_page(offset)))
+ 		return -EINVAL;
+ 
++	if (flag & MAP_HUGETLB) {
++		if (file)
++			return -EINVAL;
 +
- extern struct page_ext_operations page_xpfo_ops;
- 
- void set_kpte(void *kaddr, struct page *page, pgprot_t prot);
-@@ -49,6 +53,8 @@ void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
- 
- bool xpfo_enabled(void);
- 
-+phys_addr_t user_virt_to_phys(unsigned long addr);
++		file = map_hugetlb_setup(&len, flag);
++		if (IS_ERR(file))
++			return PTR_ERR(file);
++	}
 +
- #else /* !CONFIG_XPFO */
- 
- static inline void xpfo_kmap(void *kaddr, struct page *page) { }
-@@ -73,6 +79,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
- 
- static inline bool xpfo_enabled(void) { return false; }
- 
-+static inline phys_addr_t user_virt_to_phys(unsigned long addr) { return 0; }
-+
- #endif /* CONFIG_XPFO */
- 
- #endif /* _LINUX_XPFO_H */
+ 	return vm_mmap_pgoff(file, addr, len, prot, flag, offset >> PAGE_SHIFT);
+ }
+ EXPORT_SYMBOL(vm_mmap);
 -- 
 2.17.1
 
