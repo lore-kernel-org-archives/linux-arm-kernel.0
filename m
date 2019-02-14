@@ -2,95 +2,64 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DDCACC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:17:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D32BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:23:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE13321927
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:17:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C28621927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 18:23:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E1cTAWW/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="ZPnbWkIa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE13321927
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JOw3KeID"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C28621927
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vXMLxSC9XSWKUTha8n7AcNEkxAuT0T28xQzKp8CMoo4=; b=E1cTAWW/OqRCSw
-	QdOZYKfINkpQNwgJhABMaT+TzJmMO9Z97+Tk/mL4izrKyPaEwEY9lKwRScIoFUEJWO8Qc+tVtYwun
-	HCMnkgu9BS0K5eZ3dqIDfIN1CoQDaiLZintsKHRA942k8+UePCB6kb/2CQohBpbpzrFRuF3wLP/t0
-	w27fYqHJexCUWJq0k6Y7TEKbuFbZzU+FYESC4+lv8z3G8FB5giOj3VKqJ5sv2Rk49G8cUhUmxeA6r
-	/kblwvP/pX+tI/3qnPHkYaXmz7cyHnjTfg4Yg8dUz5BHHa03ghu4rre00SUjgY/De+DgBiIeeAou+
-	JmmujaPVKFByMjbrkjhQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=X6LMa2RcOMbrB6Hajjyss6tsUb5rtGYbAHP65faRXq4=; b=JOw3KeID0QJIcv
+	XxDoahowT3uXSqUNANnKv1vg7zb84WcANk0XcKxgDpZS84VnyRPf5oBQLd3xT2nEOaoSUHC1vAPvU
+	FpnqQoNRgSRiPtt9AOJRJMAhVOa8la9EOwnk8y+sEbg0HxPJjZqKtCAoIX58l0eGiXFp/51Dc3aIc
+	jfI8Klw7u+s896mGh2T4Opoqa4h0qeyMgMy1gCTixU4STZEozIkmIV5uljiqFQgTw7evtuZLXSBAV
+	jrnqNwR0KTz75vH98lp5t/gXv93WoWCtk0AjROzRGz+ERER6+W0a73ATRQhP0Ify2oufvJud2T5vd
+	e/e5fsmPZ6SxjQdpEHtw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guLZY-00028r-SV; Thu, 14 Feb 2019 18:17:20 +0000
-Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guLZV-00028Y-ES
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:17:18 +0000
-Received: by mail-lf1-x141.google.com with SMTP id h10so5032809lfc.12
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 10:17:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=linux-foundation.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=D9Vj6+WeVlYF1H2fg9mql/6oMEXHu/mgsv8BNTVZHx0=;
- b=ZPnbWkIaLF1fPpbhVu5fqt9VoWAh7zq9mqH5LmbreMaS/dFp/ga9ADBd1bUPfLNZVt
- 9cmIVEyoT/T8O5y3yiREHXO6gcW+3HJveD69ZJigOCRdO+OvsnNK66RwV3oR7F6BHY0m
- nx+fInfaHOtcGNGfeA3vdOANp4vbwtRzlSmX4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=D9Vj6+WeVlYF1H2fg9mql/6oMEXHu/mgsv8BNTVZHx0=;
- b=guHAKst7csuFc//861rlEQOyCzuaflB/VVt6TkJYQU9LBbhgK4OEOgeD5lSVLEG1FE
- Edld/vF6bAMCQP7629MwphwZuTSAfv5ykdCCQwOFz1RBKvcHrBxsOZorZZWALhqzEqDR
- PhT4ygwALt9DqQf7z17n573JCu4gdslfLFIGp1fNb+ugGycSA3kL1A/5z6hI5HY+ciWA
- V4OREq+2d/qV9cwBIVyphXXU75RMhgNzy8DDDnuF3CXO1dLrNM97Jz/oVMFtGlAJ9cMx
- TYbI5eaiy+8dNe/hHfTD8bV2jbyOazuxzuoj8C/kGSM+PqdDIziVQUwEP+lf6EFsEBB9
- 9Bmg==
-X-Gm-Message-State: AHQUAuZIkwRg8vf/R79DL/sOoWOcxJIfQttd4ekJw9bRCp5XHhoA4eXJ
- 6BGUvX6wzJV4EpDA1FmWtZlONfzDrVk=
-X-Google-Smtp-Source: AHgI3IYSls4bug/Urp/SMmjrfR89ToHP78CVgvFRVQS+mam3fZva2jAh+lokM+8rkegxZ3VxVxJW+w==
-X-Received: by 2002:ac2:510e:: with SMTP id q14mr2855286lfb.106.1550168234676; 
- Thu, 14 Feb 2019 10:17:14 -0800 (PST)
-Received: from mail-lj1-f180.google.com (mail-lj1-f180.google.com.
- [209.85.208.180])
- by smtp.gmail.com with ESMTPSA id g68sm592191ljg.53.2019.02.14.10.17.14
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 10:17:14 -0800 (PST)
-Received: by mail-lj1-f180.google.com with SMTP id l7-v6so6081228ljg.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 10:17:14 -0800 (PST)
-X-Received: by 2002:a2e:91c8:: with SMTP id u8mr2287389ljg.185.1550167800344; 
- Thu, 14 Feb 2019 10:10:00 -0800 (PST)
+	id 1guLf2-0003pI-FH; Thu, 14 Feb 2019 18:23:00 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guLey-0003oA-MG
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 18:22:58 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2204CEBD;
+ Thu, 14 Feb 2019 10:22:54 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DDA703F557;
+ Thu, 14 Feb 2019 10:22:52 -0800 (PST)
+From: James Morse <james.morse@arm.com>
+Subject: Re: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
+To: Mark Rutland <mark.rutland@arm.com>, "Zhang, Lei"
+ <zhang.lei@jp.fujitsu.com>
+References: <8898674D84E3B24BA3A2D289B872026A6A311EAE@G01JPEXMBKW03>
+ <20190214155605.GC27547@lakrids.cambridge.arm.com>
+Message-ID: <90347cf4-4d7b-d553-d4db-1bacd000ff75@arm.com>
+Date: Thu, 14 Feb 2019 18:22:50 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <1550089932-6888-1-git-send-email-longman@redhat.com>
- <1550089932-6888-3-git-send-email-longman@redhat.com>
- <20190214103333.GH32494@hirez.programming.kicks-ass.net>
- <9e01d4ef-56df-7af8-a0f5-b49644e298bf@redhat.com>
- <CAHk-=whKmuranma_HUOKBbDJHGmdWZr9MYW-+cmGzsOiJ2N1Sg@mail.gmail.com>
-In-Reply-To: <CAHk-=whKmuranma_HUOKBbDJHGmdWZr9MYW-+cmGzsOiJ2N1Sg@mail.gmail.com>
-From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Thu, 14 Feb 2019 10:09:44 -0800
-X-Gmail-Original-Message-ID: <CAHk-=wi03J1jurebJNHPxGCVss7ARAN+2JuVthEGoEx=qkT4dQ@mail.gmail.com>
-Message-ID: <CAHk-=wi03J1jurebJNHPxGCVss7ARAN+2JuVthEGoEx=qkT4dQ@mail.gmail.com>
-Subject: Re: [PATCH v3 2/2] locking/rwsem: Optimize down_read_trylock()
-To: Waiman Long <longman@redhat.com>
+In-Reply-To: <20190214155605.GC27547@lakrids.cambridge.arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_101717_491268_2768EC2D 
-X-CRM114-Status: GOOD (  15.31  )
+X-CRM114-CacheID: sfid-20190214_102256_738308_6ACB9364 
+X-CRM114-Status: GOOD (  37.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,51 +71,383 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
- the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- "H. Peter Anvin" <hpa@zytor.com>,
- "linux-alpha@vger.kernel.org" <linux-alpha@vger.kernel.org>,
- sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
+Cc: 'Catalin Marinas' <catalin.marinas@arm.com>,
+ 'Will Deacon' <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 9:51 AM Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
->
-> The arm64 numbers scaled horribly even before, and that's because
-> there is too much ping-pong, and it's probably because there is no
-> "stickiness" to the cacheline to the core, and thus adding the extra
-> loop can make the ping-pong issue even worse because now there is more
-> of it.
+Hi guys,
 
-Actually, if it's using the ll/sc, then I don't see why arm64 should
-even change. It doesn't really even change the pattern: the initial
-load of the value is just replaced with a "ll" that gets a non-zero
-value, and then we re-try without even doing the "sc" part.
+On 14/02/2019 15:56, Mark Rutland wrote:
+> On Thu, Feb 14, 2019 at 07:26:24AM +0000, Zhang, Lei wrote:
+>> On the Fujitsu-A64FX cores ver(1.0, 1.1), memory access may
+>> cause an undefined fault (Data abort, DFSC=0b111111).
+>> This fault occurs under a specific hardware condition when a
+>> load/store instruction performs an address translation.
+>> Any load/store instruction, except non-fault access
+>> including Armv8 and SVE might cause this undefined fault.
+>>
+>> Since this erratum occurs only when TCR_ELx.NFD1=1,
+>> I keep TCR_ELx.NFD1=0 during EL1/EL2.
+>>
+>> By doing above, the erratum occurs only in EL0.
+>> I deal with this erratum in EL0 by a new fault handler
+>> which ignores this undefined fault.
 
-End result: exact same "load once, then do ll/sc to update". Just
-using a slightly different instruction pattern.
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index a4168d3..7c76c66 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -643,6 +643,29 @@ config QCOM_FALKOR_ERRATUM_E1041
+>>  
+>>  	  If unsure, say Y.
+>>  
+>> +config FUJITSU_ERRATUM_010001
+>> +	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
+>> +        depends on RANDOMIZE_BASE
+>> +        default RANDOMIZE_BASE
+>> +	help
+>> +	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
+>> +	  On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1), memory accesses
+>> +	  may cause undefined fault (Data abort, DFSC=0b111111).
+>> +	  This fault occurs under a specific hardware condition when a load/store
+>> +          instruction performs an address translation using:
+>> +	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
+>> +	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
+>> +	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
+>> +	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
+>> +
+>> +	  The workaround is to set '0' to TCR_ELx.NFD1 at kernel-entry,
+>> +	  to set '1' at kernel-exit. And also replace the fault handler
+>> +	  for Data abort DFSC=0b111111 with a new fault handler to ignore this
+>> +	  undefined fault.
+>> +	  The workaround only affect the Fujitsu-A64FX.
+> 
+> I think that per Will's last comment, the expectation was that NFD1
+> would be configured once in C code, rather than in the entry assembly.
+> 
+> Your code seems to expect KPTI is enabled, and if that's the case, NFD1
+> doesn't provide much security benefit,
 
-But maybe "ll" does something different to the cacheline than a regular "ld"?
+We only set NFD1 when KASLR is in use, which would also enable KPTI if
+CONFIG_UNMAP_KERNEL_AT_EL0 is compiled in. Details in e03e61c3173 ("arm64: kaslr: Set
+TCR_EL1.NFD1 when CONFIG_RANDOMIZE_BASE=y")
 
-Alternatively, the machine you used is using LSE, and the "swp" thing
-has some horrid behavior when it fails.
 
-So I take it back. I'm actually surprised that arm64 performs worse. I
-don't think it should. But numbers walk, bullshit talks, and it
-clearly does make for worse numbers on arm64.
+> and it would be vastly simpler to set this in a cpufeature callback.
 
-               Linus
+A64FX needs it to be unset unless you can handle the spurious fault. The
+cpufeature callback would need to run for un-affected CPUs to set the TCR bit.
+
+
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 0ec0c46..34a4f44 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -940,6 +940,14 @@ alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+>>  	dsb	nsh
+>>  alternative_else_nop_endif
+>>  #endif /* CONFIG_QCOM_FALKOR_ERRATUM_1003 */
+>> +#ifdef CONFIG_FUJITSU_CPU_PART_A64FX
+>> +alternative_if ARM64_WORKAROUND_FUJITSU_A64FX_0100001
+>> +	mrs	\tmp, tcr_el1
+>> +	and	\tmp, \tmp, #0xffbfffffffffffff
+> 
+> If this has to be written in assembly, it would be better as:
+> 
+> 	bic	\tmp, \tmp, #TCR_NFD1
+> 	
+>> +	msr	tcr_el1,\tmp
+>> +	isb
+>> +alternative_else_nop_endif
+>> +#endif /* CONFIG_FUJITSU_CPU_PART_A64FX */
+>>  	.endm
+
+This TCR swivel has to be done before we make any memory accesses. If we ever
+need another register in the trampoline we're going to be in trouble.
+
+
+>>  	.macro tramp_unmap_kernel, tmp
+>> @@ -952,6 +960,14 @@ alternative_else_nop_endif
+>>  	 * it's only needed by Cavium ThunderX, which requires KPTI to be
+>>  	 * disabled.
+>>  	 */
+>> +#ifdef CONFIG_FUJITSU_CPU_PART_A64FX
+>> +alternative_if ARM64_WORKAROUND_FUJITSU_A64FX_0100001
+>> +	mrs	\tmp, tcr_el1
+>> +	orr	\tmp, \tmp, #0x40000000000000
+> 
+> Likewise:
+> 	
+> 	orr	\tmp, \tmp, #TCR_NFD1
+> 
+>> +	msr	tcr_el1,\tmp
+>> +	isb
+>> +alternative_else_nop_endif
+>> +#endif /* CONFIG_FUJITSU_CPU_PART_A64FX */
+>>  	.endm
+>>  
+>>  	.macro tramp_ventry, regsize = 64
+
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index efb7b2c..1bf0377 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -666,6 +666,20 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>  	return 0;
+>>  }
+>>  
+>> +static int do_bad_unknown_63(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>> +{
+>> +	/*
+>> +	 * On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1),
+>> +	 * memory accesses may spuriously trigger data aborts with
+>> +	 * DFSC=0b111111.
+>> +	 */
+>> +	if (IS_ENABLED(CONFIG_FUJITSU_ERRATUM_010001) &&
+>> +		cpus_have_cap(ARM64_WORKAROUND_FUJITSU_A64FX_0100001))
+>> +			return 0;
+>> +	return do_bad(addr, esr, regs);
+>> +}
+> 
+> If we always left NFD1 clear on A64FX, we would not need this exception
+> handler, as this should never occur.
+
+I think we should do this: never set NFDx on A64FX. I don't think we can maintain the TCR
+swivel before any memory access in the KPTI trampoline. (It already uses the FAR as a
+scratch register!)
+
+The errata means we can't use these bits. Its simpler than trying to work around the symptoms.
+
+
+>> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+>> index 73886a5..75f7d99 100644
+>> --- a/arch/arm64/mm/proc.S
+>> +++ b/arch/arm64/mm/proc.S
+>> @@ -453,9 +453,29 @@ ENTRY(__cpu_setup)
+>>  	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
+>>  	 * both user and kernel.
+>>  	 */
+>> +#ifdef CONFIG_FUJITSU_ERRATUM_010001
+>>  	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+>>  			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
+>>  			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
+>> +	/* Can use x19/x20/x5 */
+>> +	mrs     x19, midr_el1
+>> +	/* ERRATA_MIDR_RANGE(MIDR_FUJITSU_A64FX, 0, 0, 1, 0) */
+>> +	mov	w20, #0x10	//#16
+>> +	movk	w20, #0x460f, lsl #16
+>> +	mov	w5, #0xffefffff
+
+Hmmm.... this is masking out the least-significant variant bit, to make it match
+your 1.0 and 1.1. This could be much more readable with some pre-processor trickery.
+
+We should also move it out to a macro so the average reader of __cpu_setup() doesn't need
+to parse it.
+
+
+> Please do this detection and reconfiguration of TCR in C code, rather
+> than in the __cpu_setup code.
+> 
+> In proc.S you can have:
+> 
+> #if defined(CONFIG_RANDOMIZE_BASE) && !defined(CONFIG_FUJITSU_ERRATUM_010001)
+> #define KASLR_FLAGS	TCR_NFD1
+> #else
+> #define KASLR_FLAGS	0
+> #endif
+> 
+> ... and in cpu_errata.c you can enable NFD1 on any CPU which is not
+> A64FX.
+
+I think having an errata callback that runs on unaffected cores is tricky. ("CPU
+feature: Not affected by E010001").
+As a halfway house, I have the below[0] simplified version of Zhang Lei's patch. It
+doesn't do the TCR swivel in C, just masks out the TCR values on affected CPUs. I
+obviously haven't tested this on an affected platform.
+
+
+Thanks,
+
+James
+
+--------------------%<--------------------
+From 41543072930af63f3229a5384061fe3bc1efd19a Mon Sep 17 00:00:00 2001
+From: Zhang Lei <zhang.lei@jp.fujitsu.com>
+Date: Thu, 14 Feb 2019 07:26:24 +0000
+Subject: [PATCH] arm64: Add workaround for Fujitsu A64FX erratum 010001
+
+On the Fujitsu-A64FX cores ver(1.0, 1.1), memory access may cause
+an undefined fault (Data abort, DFSC=0b111111). This fault occurs under
+a specific hardware condition when a load/store instruction performs an
+address translation. Any load/store instruction, except non-fault access
+including Armv8 and SVE might cause this undefined fault.
+
+The TCR_ELx.NFD1 bit is used by the kernel when CONFIG_RANDOMIZE_BASE
+is enabled to mitigate timing attacks against KASLR where the kernel
+address space could be probed using the FFR and suppressed fault on
+SVE loads.
+
+Since this erratum causes spurious exceptions, which may overwrite
+the exception registers, we clear the TCR_ELx.NFDx=1 bits when
+booting on an affected CPU.
+
+Signed-off-by: Zhang Lei <zhang.lei@jp.fujitsu.com>
+[Generated MIDR value/mask for __cpu_setup(), removed spurious-fault handler
+ and always disabled the NFDx bits on affected CPUs]
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 19 +++++++++++++++++++
+ arch/arm64/include/asm/assembler.h     | 20 ++++++++++++++++++++
+ arch/arm64/include/asm/cputype.h       |  9 +++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  1 +
+ arch/arm64/mm/proc.S                   |  1 +
+ 6 files changed, 51 insertions(+)
+
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 1f09d043d086..26d64e9f3a35 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -80,3 +80,4 @@ stable kernels.
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+ | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
+ | Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
++| Fujitsu        | A64FX           | E#010001        | FUJITSU_ERRATUM_010001      |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..b0b7f1c4e816 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -643,6 +643,25 @@ config QCOM_FALKOR_ERRATUM_E1041
+
+ 	  If unsure, say Y.
+
++config FUJITSU_ERRATUM_010001
++	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
++	default y
++	help
++	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
++	  On some variants of the Fujitsu-A64FX cores ver(1.0, 1.1), memory
++	  accesses may cause undefined fault (Data abort, DFSC=0b111111).
++	  This fault occurs under a specific hardware condition when a
++	  load/store instruction performs an address translation using:
++	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
++	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
++	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
++	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
++
++	  The workaround is to ensure these bits are clear in TCR_ELx.
++	  The workaround only affect the Fujitsu-A64FX.
++
++	  If unsure, say Y.
++
+ endmenu
+
+
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 4feb6119c3c9..128d0fbfcb24 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -27,6 +27,7 @@
+
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
++#include <asm/cputype.h>
+ #include <asm/debug-monitors.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -604,6 +605,25 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
+ #endif
+ 	.endm
+
++/*
++ * tcr_clear_errata_bits - Clear TCR bits that trigger an errata on this CPU.
++ */
++	.macro	tcr_clear_errata_bits, tcr, tmp1, tmp2
++#ifdef CONFIG_FUJITSU_ERRATUM_010001
++	mrs	\tmp1, midr_el1
++
++	mov_q	\tmp2, MIDR_FUJITSU_ERRATUM_010001_MASK
++	and	\tmp1, \tmp1, \tmp2
++	mov_q	\tmp2, MIDR_FUJITSU_ERRATUM_010001
++	cmp	\tmp1, \tmp2
++	b.ne	10f
++
++	mov_q	\tmp2, TCR_CLEAR_FUJITSU_ERRATUM_010001
++	bic	\tcr, \tcr, \tmp2
++10:
++#endif /* CONFIG_FUJITSU_ERRATUM_010001 */
++	.endm
++
+ /**
+  * Errata workaround prior to disable MMU. Insert an ISB immediately prior
+  * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 951ed1a4e5c9..c6c6b4de0688 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -76,6 +76,7 @@
+ #define ARM_CPU_IMP_BRCM		0x42
+ #define ARM_CPU_IMP_QCOM		0x51
+ #define ARM_CPU_IMP_NVIDIA		0x4E
++#define ARM_CPU_IMP_FUJITSU		0x46
+
+ #define ARM_CPU_PART_AEM_V8		0xD0F
+ #define ARM_CPU_PART_FOUNDATION		0xD00
+@@ -104,6 +105,8 @@
+ #define NVIDIA_CPU_PART_DENVER		0x003
+ #define NVIDIA_CPU_PART_CARMEL		0x004
+
++#define FUJITSU_CPU_PART_A64FX		0x001
++
+ #define MIDR_CORTEX_A53 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A53)
+ #define MIDR_CORTEX_A57 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A57)
+ #define MIDR_CORTEX_A72 MIDR_CPU_MODEL(ARM_CPU_IMP_ARM, ARM_CPU_PART_CORTEX_A72)
+@@ -122,6 +125,12 @@
+ #define MIDR_QCOM_KRYO MIDR_CPU_MODEL(ARM_CPU_IMP_QCOM, QCOM_CPU_PART_KRYO)
+ #define MIDR_NVIDIA_DENVER MIDR_CPU_MODEL(ARM_CPU_IMP_NVIDIA, NVIDIA_CPU_PART_DENVER)
+ #define MIDR_NVIDIA_CARMEL MIDR_CPU_MODEL(ARM_CPU_IMP_NVIDIA, NVIDIA_CPU_PART_CARMEL)
++#define MIDR_FUJITSU_A64FX MIDR_CPU_MODEL(ARM_CPU_IMP_FUJITSU, FUJITSU_CPU_PART_A64FX)
++
++/* Fujitsu Erratum 010001 affects A64FX 1.0 and 1.1, (v0r0 and v1r0) */
++#define MIDR_FUJITSU_ERRATUM_010001		MIDR_FUJITSU_A64FX
++#define MIDR_FUJITSU_ERRATUM_010001_MASK	~MIDR_VARIANT(1);
++#define TCR_CLEAR_FUJITSU_ERRATUM_010001	(TCR_NFD1 | TCR_NFD0)
+
+ #ifndef __ASSEMBLY__
+
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index e9b0a7d75184..a69259cc1f16 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -302,6 +302,7 @@
+ #define TCR_TBI1		(UL(1) << 38)
+ #define TCR_HA			(UL(1) << 39)
+ #define TCR_HD			(UL(1) << 40)
++#define TCR_NFD0		(UL(1) << 53)
+ #define TCR_NFD1		(UL(1) << 54)
+
+ /*
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 73886a5f1f30..750e9f0500db 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -456,6 +456,7 @@ ENTRY(__cpu_setup)
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+ 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
+ 			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
++	tcr_clear_errata_bits x10, x9, x5
+
+ #ifdef CONFIG_ARM64_USER_VA_BITS_52
+ 	ldr_l		x9, vabits_user
+-- 
+2.20.1
+--------------------%<--------------------
 
 _______________________________________________
 linux-arm-kernel mailing list
