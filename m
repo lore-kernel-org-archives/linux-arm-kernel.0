@@ -2,58 +2,72 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10E99C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 07:48:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EA138C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 07:55:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D3A00222A4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 07:47:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B991E222A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 07:55:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mEdM6fyZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3A00222A4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mzS5C8NH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B991E222A4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C+dGfaZJZArRmBLDelW/69vtrMtlC1dUzFaV4NjPZkQ=; b=mEdM6fyZQxWYRT
-	LGN/S/ZwvRg966E6mtigs5SbX4lg3cPY9n+h+3/mAObbpIxM5vGyQMo+CYvKO+otWq46aWW+8mQr+
-	e7iebJ8u2mhhYnxQJCnheDR1Rm3aXBI+eZXf5bfzAIaYlwbAcFuhde8yC2pjGQGwPAofE890nZ53B
-	IexyRh7v+47XmUBUa0uIqoIjCKPn4UqCrbv/1TtzT7vLcsaoTqSgpCxkXvAtUNib0IfiRGZeekzSt
-	6UNsDKBNLrQ5Vre5OJzwnDmHjS9nmAh6qVGzSQU/qakT11bKuUYePPg74U2dG3zgMsJv4ATi6UcSz
-	WywQUoZv0q50Oyd/6k+Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ZjsCyVIbnWtbR+d1PHBQY3KqL+zeYVxXU7GLE3U6gjA=; b=mzS5C8NH06CgFq
+	TlCx5Hv58XvuTuvtGFXc1w6/WWVBpsCsDzZEKG3oUrFpGCij7ZkPve0m4KTWIWsI76Lj8Whw3OalH
+	Euhl9bVCUlhjt5LABuVU61ZxztKmkClwdhAjefVz7CAkwxFs9WJn8G652hxLuOChW5j9JF7ODwiQ7
+	MX1SoNKpsZ3l49O8Xi0y2LEAXm0uCfQArCx+PiZLH/yOrcqTPQBBPX48EkvNEXruIBW8GeieNe4Fa
+	iH3NeswP6OiAPSPj6SzxbKJSlkuiuZgcNv2AENwp8IzMLKh7uCKuFQgJlQwzChjksJzTV4MEVD3vC
+	Ec7Vy/vTJ26eBW63ZutA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guBkQ-0001kN-Ms; Thu, 14 Feb 2019 07:47:54 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1guBrR-0004c5-4o; Thu, 14 Feb 2019 07:55:09 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guBkM-0001jb-JR
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 07:47:52 +0000
-Received: by newverein.lst.de (Postfix, from userid 2407)
- id 94CA068CEB; Thu, 14 Feb 2019 08:47:47 +0100 (CET)
-Date: Thu, 14 Feb 2019 08:47:47 +0100
-From: Christoph Hellwig <hch@lst.de>
-To: Khalid Aziz <khalid.aziz@oracle.com>
-Subject: Re: [RFC PATCH v8 04/14] swiotlb: Map the buffer if it was
- unmapped by XPFO
-Message-ID: <20190214074747.GA10666@lst.de>
-References: <cover.1550088114.git.khalid.aziz@oracle.com>
- <b595ffb3231dfef3c6b6c896a8e1cba0e838978c.1550088114.git.khalid.aziz@oracle.com>
+ id 1guBrN-00045D-Js; Thu, 14 Feb 2019 07:55:07 +0000
+X-UUID: 1194e5d3f9344b2cb20bd99ec1a3d85c-20190213
+X-UUID: 1194e5d3f9344b2cb20bd99ec1a3d85c-20190213
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ (envelope-from <shun-chih.yu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 53765274; Wed, 13 Feb 2019 23:55:02 -0800
+Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 13 Feb 2019 23:55:01 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 14 Feb 2019 15:54:53 +0800
+Received: from mtkswgap22.mediatek.inc (172.21.77.33) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Thu, 14 Feb 2019 15:54:53 +0800
+From: <shun-chih.yu@mediatek.com>
+To: Sean Wang <sean.wang@mediatek.com>, Vinod Koul <vkoul@kernel.org>, "Rob
+ Herring" <robh+dt@kernel.org>, Matthias Brugger <matthias.bgg@gmail.com>,
+ "Dan Williams" <dan.j.williams@intel.com>
+Subject: [PATCH v2] dt-bindings: dmaengine: Add MediaTek Command-Queue DMA
+ controller bindings
+Date: Thu, 14 Feb 2019 15:54:51 +0800
+Message-ID: <1550130892-19488-1-git-send-email-shun-chih.yu@mediatek.com>
+X-Mailer: git-send-email 1.7.9.5
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b595ffb3231dfef3c6b6c896a8e1cba0e838978c.1550088114.git.khalid.aziz@oracle.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
+X-TM-SNTS-SMTP: FB56EC497660CD8491731D9B27848AF97D1D5F197E62D3C74844CF4D0CF92F172000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_234750_787939_3CF758DC 
-X-CRM114-Status: GOOD (  11.71  )
+X-CRM114-CacheID: sfid-20190213_235505_675746_A737547A 
+X-CRM114-Status: UNSURE (   3.29  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,59 +79,19 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mhocko@suse.com, Tycho Andersen <tycho@docker.com>,
- kernel-hardening@lists.openwall.com, peterz@infradead.org,
- catalin.marinas@arm.com, will.deacon@arm.com, dave.hansen@intel.com,
- deepa.srinivasan@oracle.com, steven.sistare@oracle.com, tglx@linutronix.de,
- tycho@tycho.ws, ak@linux.intel.com, kirill.shutemov@linux.intel.com,
- x86@kernel.org, jmorris@namei.org, hch@lst.de, kanth.ghatraju@oracle.com,
- jsteckli@amazon.de, labbott@redhat.com, pradeep.vincent@oracle.com,
- konrad.wilk@oracle.com, jcm@redhat.com, liran.alon@oracle.com, luto@kernel.org,
- boris.ostrovsky@oracle.com, chris.hyser@oracle.com,
- linux-arm-kernel@lists.infradead.org, jmattson@google.com, linux-mm@kvack.org,
- juergh@gmail.com, andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org,
- tyhicks@canonical.com, john.haxby@oracle.com,
- Juerg Haefliger <juerg.haefliger@canonical.com>, oao.m.martins@oracle.com,
- keescook@google.com, akpm@linux-foundation.org, torvalds@linux-foundation.org,
- dwmw@amazon.co.uk
+Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
+ srv_wsdupstream@mediatek.com, linux-mediatek@lists.infradead.org,
+ dmaengine@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 05:01:27PM -0700, Khalid Aziz wrote:
-> +++ b/kernel/dma/swiotlb.c
-> @@ -396,8 +396,9 @@ static void swiotlb_bounce(phys_addr_t orig_addr, phys_addr_t tlb_addr,
->  {
->  	unsigned long pfn = PFN_DOWN(orig_addr);
->  	unsigned char *vaddr = phys_to_virt(tlb_addr);
-> +	struct page *page = pfn_to_page(pfn);
->  
-> -	if (PageHighMem(pfn_to_page(pfn))) {
-> +	if (PageHighMem(page) || xpfo_page_is_unmapped(page)) {
+Add document the devicetree bindings for MediaTek Command-Queue DMA controller.
 
-I think this just wants a page_unmapped or similar helper instead of
-needing the xpfo_page_is_unmapped check.  We actually have quite
-a few similar construct in the arch dma mapping code for architectures
-that require cache flushing.
+Changes since v1:
+1. fix wrong description and tags in the earlier patch
 
-> +bool xpfo_page_is_unmapped(struct page *page)
-> +{
-> +	struct xpfo *xpfo;
-> +
-> +	if (!static_branch_unlikely(&xpfo_inited))
-> +		return false;
-> +
-> +	xpfo = lookup_xpfo(page);
-> +	if (unlikely(!xpfo) && !xpfo->inited)
-> +		return false;
-> +
-> +	return test_bit(XPFO_PAGE_UNMAPPED, &xpfo->flags);
-> +}
-> +EXPORT_SYMBOL(xpfo_page_is_unmapped);
-
-And at least for swiotlb there is no need to export this helper,
-as it is always built in.
 
 _______________________________________________
 linux-arm-kernel mailing list
