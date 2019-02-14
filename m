@@ -2,88 +2,56 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.9 required=3.0 tests=DATE_IN_PAST_03_06,
+	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7DF01C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:17:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D20C6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:24:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4AD3F218FF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:17:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C52021900
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 21:24:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="llOj1nBp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="haog/nuW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AD3F218FF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YOe8yEcg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C52021900
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=formelder.dk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=5tKehTVHt9j8M2nRdjLECcOqR94ZEV4TidvZFUUX4uc=; b=llOj1nBp6Pv/9a
-	8FU90X9RLUhMMR0Ewb5RCxC1NQOsk+QANP+zGloTm/Hm3HJiGPNeZeNi7YLNQsV8hvRU/R7K7muz0
-	kt6/KvbTAxVlSiiwigJujgsAG0+G1aMqnI6f2qX+6uzEXdYBW2cGLqVoSte1HXCw1E+GZeTpYyE5s
-	gTTO7iTYv9lpHWH9TcTLSf28cBlAjwcyf+kPan9EGm6+6JWomWlVBQjV8EUoMEYjwfj6qg2Z2bYSV
-	FFtpjLTNGWIT1cDf8ykxB0BxPR8dq84rppNHlAEORRl0s84zM7Ril9YuzdUdbaTNkNAe7xz1+c9Zs
-	DkO9hL49DLxBsoj4LB2Q==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Subject:Date:To:
+	From:Message-Id:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=U20KPDFsbc6biu8NrV1hRHRO0Gkp327TrlFbwH4szdg=; b=YOe
+	8yEcg0gKWlJzLSCFMKufX9sucGjjwZTuR6tGapLIncU+F99CjFkGzl5aS07xx+m2mYWuXEmXTPMC5
+	/akcxlB3XDyj7F1gnn9UGEQN/KY23EFlND6WyePOv+GKC8iL93rA4xrzx9WI861cn3UYEEPEIust+
+	WeOUxggbZpWmfE/95CFa/4VRPLbcPrwWZLQdGvm4N8eVmD4T+jEyCQsX8Hjyp0v1xOQbCJov8TlRD
+	xu4LizTiNLuLeKp/EmopAaK4HGziM/fZgeI65IPfaDgmaiQU1JIQn9pT+njryBnNXo3J7mgGENhzn
+	Nl/M1TGclEfXoyRcFuY5UZPDkX1PjUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guONR-0001Ao-OL; Thu, 14 Feb 2019 21:17:01 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1guOUu-0003I9-K1; Thu, 14 Feb 2019 21:24:44 +0000
+Received: from customer-2a00-7660-0ca7-0000-0000-0000-0000-0b1b.ip6.gigabit.dk
+ ([2a00:7660:ca7::b1b])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guONO-00019S-O9
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 21:17:00 +0000
-Received: by mail-it1-x144.google.com with SMTP id l15so5297038iti.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 13:16:54 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=GvPYFe28/mAoQO+bY6nMt8BakmTEWjcsUcqZny6LKyY=;
- b=haog/nuWNwVzMoU13+bJ0VOVleco8VrScsofzKVQriJp/kpIegpS08FgzPJW6MCcMM
- umb1am7jn04ZVfp/yOI5y2yZNIPu/vejkxNHZoUsN71HWLQEH7YIx7zv4pBqIcXovU3w
- JPZM6QRRB7y782DQnTFoAEKXvcAWCZ+X6byTykTsL+dfSL7xz/fpbcUiIBhrukUyvjLi
- g4eVuY6/2Kdj7uMouqF364Lq2Wvvx9u7FnZJDVv0fv6MtPkEGYCwZRV4qimeeXmvzRZw
- 7OEpCUNx91DhVAacamw53xKewe0hTNal7SlZMnIezgIODwSu4C+aoijN+x+caBgPcoxZ
- /odw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=GvPYFe28/mAoQO+bY6nMt8BakmTEWjcsUcqZny6LKyY=;
- b=FGeU7dNM39Kn3eFpbaLJwRCs2abEkeHmOahIFD/MQDRxdrnaSeCe+aCcH0EGNKSoLQ
- IdMcCJGTBk1XU5l/ECvibNSPg3xGyScSYApY/PnKX4yCz4zgAWbelZ3ZjUVFt0Kb7G5m
- WGidhVa65WDEBq+Zv4Ysi+8HRjNms1SLb20JSNMVAdI/11b0IAsGAr8JpDarBqD3tMyR
- c1ol5+EU5ilcpAPCQW3cpux66aUTfftrHdYEJwQy/LalEqkml01TvXpI5iMqIbZ5NhSs
- 2JGH3RmyjQh/rht3BF9ueM8IzTswgMn4s1c1QEQ0DeNEoqHUMo7CMhlUVXLTRvXaB7oG
- O8OA==
-X-Gm-Message-State: AHQUAuavFaxVE+Mbb9ZtoNgLX5E9/eYfHzVGtaeAdbmzC2MlEZN71HEE
- kYiV8hMsugJ91mZkpoxvDNGAhA==
-X-Google-Smtp-Source: AHgI3IYCX5V8B/n/JHfBn5gh5KmKCeTbBeku15y0Wkk318G3E77K2o5/6CJ6L2HV9dr2oRQlrIFuFg==
-X-Received: by 2002:a24:9a84:: with SMTP id l126mr3836833ite.77.1550179014078; 
- Thu, 14 Feb 2019 13:16:54 -0800 (PST)
-Received: from yuzhao.bld.corp.google.com
- ([2620:15c:183:0:a0c3:519e:9276:fc96])
- by smtp.gmail.com with ESMTPSA id h2sm1491498itk.0.2019.02.14.13.16.52
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 13:16:53 -0800 (PST)
-From: Yu Zhao <yuzhao@google.com>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH] arm64: mm: enable per pmd page table lock
-Date: Thu, 14 Feb 2019 14:16:42 -0700
-Message-Id: <20190214211642.2200-1-yuzhao@google.com>
-X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
-MIME-Version: 1.0
+ id 1guOUr-0003Hj-Ng
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 21:24:43 +0000
+Received: by customer-2a00-7660-0ca7-0000-0000-0000-0000-0b1b.ip6.gigabit.dk
+ (Postfix, from userid 1000)
+ id F21E74AC6E; Thu, 14 Feb 2019 22:24:37 +0100 (CET)
+Message-Id: <641301f26ac895e39b15d62a2ba069b853ab5b09.1550178066.git.rask@formelder.dk>
+From: Rask Ingemann Lambertsen <rask@formelder.dk>
+To: Liam Girdwood <lgirdwood@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>, linux-kernel@vger.kernel.org
+Date: Thu, 14 Feb 2019 16:47:41 +0100
+Subject: [PATCH] regulator: axp20x: Fix AXP806 dcdcb copy/paste bug
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_131658_782326_EB63756E 
-X-CRM114-Status: GOOD (  14.42  )
+X-CRM114-CacheID: sfid-20190214_132441_927804_B9F126C9 
+X-CRM114-Status: UNSURE (   8.58  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,94 +63,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Yu Zhao <yuzhao@google.com>,
- Peter Zijlstra <peterz@infradead.org>, linux-kernel@vger.kernel.org,
- Nick Piggin <npiggin@gmail.com>, linux-mm@kvack.org,
- "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
- Joel Fernandes <joel@joelfernandes.org>,
- "Kirill A . Shutemov" <kirill@shutemov.name>,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Olliver Schinagl <oliver@schinagl.nl>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Switch from per mm_struct to per pmd page table lock by enabling
-ARCH_ENABLE_SPLIT_PMD_PTLOCK. This provides better granularity for
-large system.
+An obvious copy/paste bug was introduced with the conversion to sybolic
+register masks. The result is contradictory output like this:
 
-I'm not sure if there is contention on mm->page_table_lock. Given
-the option comes at no cost (apart from initializing more spin
-locks), why not enable it now.
+vcc-dram: Bringing 1100000uV into 1450000-1450000uV
+vcc-dram: 1450 <--> 1550 mV at 1050 mV
 
-Signed-off-by: Yu Zhao <yuzhao@google.com>
+This patch fixes it:
+
+vcc-dram: 1450 <--> 1550 mV at 1500 mV
+
+Fixes: db4a555f7c4c ("regulator: axp20x: use defines for masks")
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 ---
- arch/arm64/Kconfig               |  3 +++
- arch/arm64/include/asm/pgalloc.h | 12 +++++++++++-
- arch/arm64/include/asm/tlb.h     |  5 ++++-
- 3 files changed, 18 insertions(+), 2 deletions(-)
+ drivers/regulator/axp20x-regulator.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a4168d366127..104325a1ffc3 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -872,6 +872,9 @@ config ARCH_WANT_HUGE_PMD_SHARE
- config ARCH_HAS_CACHE_LINE_SIZE
- 	def_bool y
- 
-+config ARCH_ENABLE_SPLIT_PMD_PTLOCK
-+	def_bool y
-+
- config SECCOMP
- 	bool "Enable seccomp to safely compute untrusted bytecode"
- 	---help---
-diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-index 52fa47c73bf0..dabba4b2c61f 100644
---- a/arch/arm64/include/asm/pgalloc.h
-+++ b/arch/arm64/include/asm/pgalloc.h
-@@ -33,12 +33,22 @@
- 
- static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
- {
--	return (pmd_t *)__get_free_page(PGALLOC_GFP);
-+	struct page *page;
-+
-+	page = alloc_page(PGALLOC_GFP);
-+	if (!page)
-+		return NULL;
-+	if (!pgtable_pmd_page_ctor(page)) {
-+		__free_page(page);
-+		return NULL;
-+	}
-+	return page_address(page);
- }
- 
- static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
- {
- 	BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
-+	pgtable_pmd_page_dtor(virt_to_page(pmdp));
- 	free_page((unsigned long)pmdp);
- }
- 
-diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
-index 106fdc951b6e..4e3becfed387 100644
---- a/arch/arm64/include/asm/tlb.h
-+++ b/arch/arm64/include/asm/tlb.h
-@@ -62,7 +62,10 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- 				  unsigned long addr)
- {
--	tlb_remove_table(tlb, virt_to_page(pmdp));
-+	struct page *page = virt_to_page(pmdp);
-+
-+	pgtable_pmd_page_dtor(page);
-+	tlb_remove_table(tlb, page);
- }
- #endif
- 
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 1b51d557ab55..f03cae440f7f 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -791,7 +791,7 @@ static const struct regulator_desc axp806_regulators[] = {
+ 			AXP806_DCDCA_V_CTRL, AXP806_DCDCA_V_CTRL_MASK,
+ 			AXP806_PWR_OUT_CTRL1, AXP806_PWR_OUT_DCDCA_MASK),
+ 	AXP_DESC(AXP806, DCDCB, "dcdcb", "vinb", 1000, 2550, 50,
+-		 AXP806_DCDCB_V_CTRL, AXP806_DCDCB_V_CTRL,
++		 AXP806_DCDCB_V_CTRL, AXP806_DCDCB_V_CTRL_MASK,
+ 		 AXP806_PWR_OUT_CTRL1, AXP806_PWR_OUT_DCDCB_MASK),
+ 	AXP_DESC_RANGES(AXP806, DCDCC, "dcdcc", "vinc",
+ 			axp806_dcdca_ranges, AXP806_DCDCA_NUM_VOLTAGES,
 -- 
-2.21.0.rc0.258.g878e2cd30e-goog
+2.20.1
 
 
 _______________________________________________
