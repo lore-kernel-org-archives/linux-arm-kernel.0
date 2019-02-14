@@ -2,142 +2,189 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB760C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:15:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF111C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:21:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8848021900
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:15:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9B55821902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:21:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ek9nnb0C";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="3HrhAFuu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8848021900
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J3wojV4u";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="loVje9cO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9B55821902
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dTZsetJr664vYZNdUqgHEZniDhe9feOprYqvA4nVo18=; b=Ek9nnb0C4l8Pib
-	m1jWjoJKci5+UrGzx+3FY3JLzYlOwAN03y/vHDgBcjcTe01dg4dDMcerF8fnnVu+cWzmgsZ9S6SRR
-	eO7yHrA7a9ZA+Rr7UppI2H37qae29jdJL92WRUGNHssSdlqZFW+a5ARpv+Sn6JmIVm+nUPmvsbFnc
-	M2BFsnKqTpDUSrXFPiYjE6qltewB+Y1H8eXOSrh0u6HWfnEzCRBqc7ea72e8IrZ9QASon8ytZUDBt
-	sFL3wc9nThfGyjRms4fHh0HN3ARGgLGzYz4Rr3Uj/j6oEPav607x0u2wie2w9kyDp1q8Q7CK7hOHZ
-	GV5/6nkV4zw2bJ4ee9qA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ysi7qT/C9bhSMM3BD0ide0u55yOkUrbA+XhQTuh8Wvo=; b=J3wojV4u7wQQ9+
+	pCcwi2d0dyLflQqmwxv1CrDt6QnbEkGK5cAPvu3r+ZVeOoU7rVmwgCBdxlzurAwvFi/cTc+miHdIH
+	j4HVE5U2c847Z/N54hzifKTfo5CuQQD5Ce4TZ/fQSgs174/kmfPuO78jLEHl5PWRFI2O+iE49OvCC
+	c49lwhnjlFDknk0ZXwqsGyuNfMsT/ZqBwPJ/5/9KoIFW8sesAWIy5NWQMjq7m9dIitLRl4nXjkC/B
+	QEv5uM+zTQ7AUw5IkkuSFAfjODC0uZnUHNF5fTkURfIdh0HbS7T8D/9gL9JcBUkIp/weSNttonf0g
+	7xCwHiDJKC2Cc2udBRew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guFvE-0002dz-LB; Thu, 14 Feb 2019 12:15:20 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1guG1a-0004jQ-DT; Thu, 14 Feb 2019 12:21:54 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guFuh-0000rB-7E
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 12:14:57 +0000
-X-IronPort-AV: E=Sophos;i="5.58,368,1544511600"; d="scan'208";a="26555765"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 14 Feb 2019 05:14:30 -0700
-Received: from NAM01-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Thu, 14 Feb 2019 05:14:30 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Dodt25BBBfLd4ZQZOR8HaYEIztLbD+qOT5lurzPxLMM=;
- b=3HrhAFuu1xRwzgT3UlvQhqqNj3cE/BT6MAMm3A9o8R2RvhAEyXR927RBiHMEDtPLCKYcW2K8rgd6KyNdf2b2SLFcMRoKU6Yku210fJU2TNwEscSNSxkxHVtQalt/OO3R6VxLbKqEN/UsPfKur+/+/r6vzYWRH3in7/ZMfDrZ8Is=
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
- MWHPR11MB1518.namprd11.prod.outlook.com (10.172.54.10) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.19; Thu, 14 Feb 2019 12:14:28 +0000
-Received: from MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55]) by MWHPR11MB1920.namprd11.prod.outlook.com
- ([fe80::d917:8496:9d53:1f55%9]) with mapi id 15.20.1622.016; Thu, 14 Feb 2019
- 12:14:28 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <mturquette@baylibre.com>, <sboyd@kernel.org>, <robh+dt@kernel.org>,
- <mark.rutland@arm.com>, <Nicolas.Ferre@microchip.com>,
- <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>
-Subject: [PATCH v2 1/3] clk: at91: sckc: add support to specify registers bit
- offsets
-Thread-Topic: [PATCH v2 1/3] clk: at91: sckc: add support to specify registers
- bit offsets
-Thread-Index: AQHUxF7V9nqwlEcieUmVG7K88z/Dxw==
-Date: Thu, 14 Feb 2019 12:14:28 +0000
-Message-ID: <1550146447-1441-2-git-send-email-claudiu.beznea@microchip.com>
-References: <1550146447-1441-1-git-send-email-claudiu.beznea@microchip.com>
-In-Reply-To: <1550146447-1441-1-git-send-email-claudiu.beznea@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR0502CA0024.eurprd05.prod.outlook.com
- (2603:10a6:803:1::37) To MWHPR11MB1920.namprd11.prod.outlook.com
- (2603:10b6:300:110::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-originating-ip: [213.233.85.122]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 29cf747f-2013-4cfa-062c-08d69275f75d
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1518; 
-x-ms-traffictypediagnostic: MWHPR11MB1518:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; MWHPR11MB1518;
- 23:PWfDB9xt2hGoL1O8bVxJ2JLic51vqRF7Lz4t1iJ?=
- =?iso-8859-1?Q?+Ve0vsI05XXdg0mmdkIizyeEAw6p38Gj4SB4KEi9Ss4InghKWGn89hMqEv?=
- =?iso-8859-1?Q?uppYrX9qxF1s94tr1dFt3qOM8EEaOTp1slCSTvoHGMdHC61sRcBl0ObAox?=
- =?iso-8859-1?Q?Pq+z3XZM9xyDUTWp0NMp1XQlcwScoNYOmHAcRzO0dGexHqY33cg2zOzK5X?=
- =?iso-8859-1?Q?kiYWPHroByIjpYfQTbIcjESu9xXUI+dpj9VjSNlfaO9K0reH+2OSpP+NwJ?=
- =?iso-8859-1?Q?Bs5aj9zQwANmu794/sQ9NMv4fxKIe+j6oEuTSpKEQYT3zERGIB6UyLAsQu?=
- =?iso-8859-1?Q?4BXhcaBj4uzh4EeHqWdNyMKCH+QaKB8+JpjiUQDJbV6ZjSyO6CWJknpTI2?=
- =?iso-8859-1?Q?hKIvNNuYHZlDBDkYKqz7BdpMqB3MaHUffm+zoKyamGeUlDlYmG+2NBc2U1?=
- =?iso-8859-1?Q?jo00o8g/RIrPbkuYitZLsnossVZ+1ceMN5Rzf6J3bZI90QqqLd8PNIc5zR?=
- =?iso-8859-1?Q?3rYa3sPeFTZb3SxV1S5FA4Klfz6Grf1KiR87eM9jG2yPpcfrDaIRfccUI/?=
- =?iso-8859-1?Q?vZsUeEnJ58wq7kdQCJck1+B9gK183PI7cidWaMzuEI1Nr4hO+gE1ftcsWP?=
- =?iso-8859-1?Q?TZp1QlnKDWkkdrZ6oeyUAyF7PG2uZszJwN69A5Y6+0YJOQLPVyB/YgA+9o?=
- =?iso-8859-1?Q?q+Tvu+9KVT+Fu/JfMBPrx/x9pcQ8Xtkx1gctqnhC6MQA1nLyCYLfDqN1qK?=
- =?iso-8859-1?Q?FVW+hlVyWL3xt4tP3iyKfquNz/LnkGEK24sW3Bzgikj10f1S05Maxp47NB?=
- =?iso-8859-1?Q?r1PP3xa84dinn7+53Zkn9nrZUbcS6Qx6TKiEBpqTVTr6PaZS+kfULApWin?=
- =?iso-8859-1?Q?/akU9oKvof05wz2T8I978usf41x6MOkpsbAQO/7gXCghbDNMh3j13Z8zmQ?=
- =?iso-8859-1?Q?epJ1SKTkkSflNz3ZMfePE+8bZfr2CMIXn/8NFbGttAItEj6yJ3kKRd7Sn6?=
- =?iso-8859-1?Q?1LVv4UIVFA+tlRwJl3tZQ8Xkgl2MOZSAv9RaSOwgUdreCvBRij+gZJ0jQe?=
- =?iso-8859-1?Q?EmCFILPB6imPCoIByQktMGsF6VVLUKh5jREFJi+DxelB3qV0+4e4uSep4i?=
- =?iso-8859-1?Q?dXqhhEQIY7X4tpAw3WI1Gw8gxgBIY8AZRCvl4THZf27FaFte7vPIKLIxR/?=
- =?iso-8859-1?Q?x0rF062COwrWk/Cf3MEBS7RA2W0B6WV6KNpR5i6Mrk4t1/a+j632YUzo+r?=
- =?iso-8859-1?Q?SsgUMjzY5NPNOHoc1AQevDxnN47nwaWh2ZfEq03ti4qiEAWbxAiMJe+QPh?=
- =?iso-8859-1?Q?K3T+1qT9A0RWQQC1vm5zw7O?=
-x-microsoft-antispam-prvs: <MWHPR11MB1518058A2B935857800C83EC87670@MWHPR11MB1518.namprd11.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(39860400002)(136003)(366004)(346002)(376002)(199004)(189003)(72206003)(11346002)(107886003)(476003)(25786009)(4326008)(52116002)(486006)(6512007)(14454004)(6636002)(478600001)(446003)(36756003)(3846002)(2616005)(6116002)(97736004)(8936002)(76176011)(50226002)(54906003)(110136005)(99286004)(7736002)(256004)(186003)(71200400001)(2501003)(316002)(71190400001)(106356001)(68736007)(26005)(81166006)(105586002)(81156014)(2906002)(305945005)(66066001)(6486002)(53936002)(86362001)(6436002)(386003)(102836004)(30864003)(6506007)(8676002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1518;
- H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: YhK5yjYQ6tBsxAEsMUvvOShwBsKNPsyIQztJ1xcCCgc8+IGYY6Cd4suUzpro/wOZ+sXZOz+Y/Ep/GEcw8eYB2xcBB2E4MtdpSeL5mFIWKhJlQY68n6fZIbYgOLJnoSgdi8VUmCT1paT2LYEtWwkI24ZqgDI+/9Vu/GnEQ8HGCGkZNXWtTx1oUjOtEBCmIKDWCz9+xsLOe+whrXUUf7d5KC4EmR+vQE2ZEAB4rXgj5Fad1QMAjwsx8Bv15MQik7gNIusxChFiOhlURHYr8plE6Mjh0OmttI4YtSTBopGiKLBTHXM/mx8pucndOtclr0l7x661e9VSG8/94mvFbJWde/FnrzwCC5/CwCVwqeB0ywlyiw34tlNsRn/X66MGS4TS4XN1j0/KKgdY5heYmCvos2zsR/eun8aTQe54zZ76Z9U=
+ id 1guG1V-0004iH-SX; Thu, 14 Feb 2019 12:21:52 +0000
+Received: by mail-ed1-x541.google.com with SMTP id b14so4841209edt.6;
+ Thu, 14 Feb 2019 04:21:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=3B6/K7dGMAimpIQUaaNPzu4l6v/s2OW86IGm+mbGhug=;
+ b=loVje9cOZLhGdYD8+4t2b7KLVvadYDXCChSO9rsqDsoX4n3jpi5Cnm2MzoV21KIio/
+ +tgTyOi+4s9IM4p0nLwZUQ91nvsVARp6O9QTKf121idJcGgf/eiBxbBrNtHRkINK5gmd
+ u4PvInlloTWUKG2fLo0SzcnhEuEN1SyPBjFYXVaqqPY417ECAO6DqMX9jBwSdrda5GmZ
+ ttFr8h6fUVv0RbqrCKJCXaInV25GTM6kW8kI8lwpr2aTZKy6USqhUf0broDISYdv4Ol0
+ VOdaucQH35lDBuBzl32pGecbmq/c0nZii5Dt5G4UiO1QiCLQGkzvxscQq8kfg8lWAHRe
+ ikYw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=3B6/K7dGMAimpIQUaaNPzu4l6v/s2OW86IGm+mbGhug=;
+ b=I8gEfsF7PEbmC5TFOI10Vm7NCqHO34ZnfUGv4xg05X8AwZT7OGZFZKonc7V71p4AcH
+ b5vSyZki3eGV8nqKnbVB9kbwQ2YeOXiSnOCgDYUIxFdpXCWeZfTmsta7sV8ZyM1trJjZ
+ uMuU5Aa6C0UvulJsfed4RGo6ZCn5rTnJjkuIeNgSc1/reYk2/xJGeLbxioOaBRBVDp9M
+ /aMdbgRMMvUIC1GnflEphUhBTlM1xutvxccPqmbnz59BOl0cfIMXP0iPY2gI0WCKkLd8
+ F9h7GMkhC9WeHY1OI2T9nGalzKwH4k62wXQPjGelPkkavkhQi9Bk4gY+hUWAp/r2yMcu
+ H0nw==
+X-Gm-Message-State: AHQUAuYU/usglv1MCCCB3ekIT/f7CRt0ypaDebdgKLnj6Dx9gYp5zi5c
+ VHg5MgnIjyJeR6r7sdGf41U=
+X-Google-Smtp-Source: AHgI3IZAzMQvSYUMKmEtbKUtCDjbbl5+Zsxc10mRJWeJIiRludNrPu5KIMxBFY4/j2qhSusV5ZCknw==
+X-Received: by 2002:a50:b847:: with SMTP id k7mr2245645ede.265.1550146904828; 
+ Thu, 14 Feb 2019 04:21:44 -0800 (PST)
+Received: from ziggy.stardust ([37.223.146.9])
+ by smtp.gmail.com with ESMTPSA id a38sm632234edd.44.2019.02.14.04.21.42
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 04:21:44 -0800 (PST)
+Subject: Re: [RESEND PATCH v4, 2/3] arm64: dts: Using standard CCF interface to
+ set vcodec clk
+To: Yunfei Dong <yunfei.dong@mediatek.com>, Hans Verkuil
+ <hverkuil@xs4all.nl>, Tiffany Lin <tiffany.lin@mediatek.com>,
+ Andrew-CT Chen <andrew-ct.chen@mediatek.com>,
+ Rob Herring <robh+dt@kernel.org>
+References: <1550111093-7057-1-git-send-email-yunfei.dong@mediatek.com>
+ <1550111093-7057-2-git-send-email-yunfei.dong@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <ad861017-14a3-4a67-8c56-96b379eeddec@gmail.com>
+Date: Thu, 14 Feb 2019 13:21:41 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.3
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 29cf747f-2013-4cfa-062c-08d69275f75d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 12:14:24.3613 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1518
-X-OriginatorOrg: microchip.com
+In-Reply-To: <1550111093-7057-2-git-send-email-yunfei.dong@mediatek.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_041447_912548_18FCBA4E 
-X-CRM114-Status: GOOD (  13.86  )
+X-CRM114-CacheID: sfid-20190214_042149_948600_1BB42729 
+X-CRM114-Status: GOOD (  14.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -149,373 +196,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Claudiu.Beznea@microchip.com,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ Qianqian Yan <qianqian.yan@mediatek.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Different IPs uses different offsets in registers for the same
-functionality, thus adapt the driver to support this.
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- drivers/clk/at91/sckc.c | 112 +++++++++++++++++++++++++++++++++---------------
- 1 file changed, 77 insertions(+), 35 deletions(-)
+On 14/02/2019 03:24, Yunfei Dong wrote:
+> Using standard CCF interface to set vdec/venc parent clk
+> and clk rate.
+> 
+> Signed-off-by: Yunfei Dong <yunfei.dong@mediatek.com>
+> Signed-off-by: Qianqian Yan <qianqian.yan@mediatek.com>
+> ---
 
-diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-index ab6ecefc49ad..b7163d3a2269 100644
---- a/drivers/clk/at91/sckc.c
-+++ b/drivers/clk/at91/sckc.c
-@@ -22,15 +22,25 @@
- #define SLOWCK_SW_TIME_USEC	((SLOWCK_SW_CYCLES * USEC_PER_SEC) / \
- 				 SLOW_CLOCK_FREQ)
- 
--#define	AT91_SCKC_CR			0x00
--#define		AT91_SCKC_RCEN		(1 << 0)
--#define		AT91_SCKC_OSC32EN	(1 << 1)
--#define		AT91_SCKC_OSC32BYP	(1 << 2)
--#define		AT91_SCKC_OSCSEL	(1 << 3)
-+#define	AT91_SCKC_CR		0x00
-+#define		AT91_SCKC_RCEN(off)	(1 << (off)->cr_rcen)
-+#define		AT91_SCKC_OSC32EN(off)	(1 << (off)->cr_osc32en)
-+#define		AT91_SCKC_OSC32BYP(off)	(1 << (off)->cr_osc32byp)
-+#define		AT91_SCKC_OSCSEL(off)	(1 << (off)->cr_oscsel)
-+
-+#define AT91_SCKC_OFFSET_INVALID        (32)
-+
-+struct clk_slow_offsets {
-+	u8 cr_rcen;
-+	u8 cr_osc32en;
-+	u8 cr_osc32byp;
-+	u8 cr_oscsel;
-+};
- 
- struct clk_slow_osc {
- 	struct clk_hw hw;
- 	void __iomem *sckcr;
-+	const struct clk_slow_offsets *offsets;
- 	unsigned long startup_usec;
- };
- 
-@@ -39,6 +49,7 @@ struct clk_slow_osc {
- struct clk_sama5d4_slow_osc {
- 	struct clk_hw hw;
- 	void __iomem *sckcr;
-+	const struct clk_slow_offsets *offsets;
- 	unsigned long startup_usec;
- 	bool prepared;
- };
-@@ -48,6 +59,7 @@ struct clk_sama5d4_slow_osc {
- struct clk_slow_rc_osc {
- 	struct clk_hw hw;
- 	void __iomem *sckcr;
-+	const struct clk_slow_offsets *offsets;
- 	unsigned long frequency;
- 	unsigned long accuracy;
- 	unsigned long startup_usec;
-@@ -58,6 +70,7 @@ struct clk_slow_rc_osc {
- struct clk_sam9x5_slow {
- 	struct clk_hw hw;
- 	void __iomem *sckcr;
-+	const struct clk_slow_offsets *offsets;
- 	u8 parent;
- };
- 
-@@ -69,10 +82,11 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
- 	void __iomem *sckcr = osc->sckcr;
- 	u32 tmp = readl(sckcr);
- 
--	if (tmp & (AT91_SCKC_OSC32BYP | AT91_SCKC_OSC32EN))
-+	if (tmp & (AT91_SCKC_OSC32BYP(osc->offsets) |
-+		   AT91_SCKC_OSC32EN(osc->offsets)))
- 		return 0;
- 
--	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
-+	writel(tmp | AT91_SCKC_OSC32EN(osc->offsets), sckcr);
- 
- 	usleep_range(osc->startup_usec, osc->startup_usec + 1);
- 
-@@ -85,10 +99,10 @@ static void clk_slow_osc_unprepare(struct clk_hw *hw)
- 	void __iomem *sckcr = osc->sckcr;
- 	u32 tmp = readl(sckcr);
- 
--	if (tmp & AT91_SCKC_OSC32BYP)
-+	if (tmp & AT91_SCKC_OSC32BYP(osc->offsets))
- 		return;
- 
--	writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-+	writel(tmp & ~AT91_SCKC_OSC32EN(osc->offsets), sckcr);
- }
- 
- static int clk_slow_osc_is_prepared(struct clk_hw *hw)
-@@ -97,10 +111,10 @@ static int clk_slow_osc_is_prepared(struct clk_hw *hw)
- 	void __iomem *sckcr = osc->sckcr;
- 	u32 tmp = readl(sckcr);
- 
--	if (tmp & AT91_SCKC_OSC32BYP)
-+	if (tmp & AT91_SCKC_OSC32BYP(osc->offsets))
- 		return 1;
- 
--	return !!(tmp & AT91_SCKC_OSC32EN);
-+	return !!(tmp & AT91_SCKC_OSC32EN(osc->offsets));
- }
- 
- static const struct clk_ops slow_osc_ops = {
-@@ -114,7 +128,8 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
- 			   const char *name,
- 			   const char *parent_name,
- 			   unsigned long startup,
--			   bool bypass)
-+			   bool bypass,
-+			   const struct clk_slow_offsets *offsets)
- {
- 	struct clk_slow_osc *osc;
- 	struct clk_hw *hw;
-@@ -137,9 +152,11 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
- 	osc->hw.init = &init;
- 	osc->sckcr = sckcr;
- 	osc->startup_usec = startup;
-+	osc->offsets = offsets;
- 
- 	if (bypass)
--		writel((readl(sckcr) & ~AT91_SCKC_OSC32EN) | AT91_SCKC_OSC32BYP,
-+		writel((readl(sckcr) & ~AT91_SCKC_OSC32EN(osc->offsets)) |
-+					AT91_SCKC_OSC32BYP(osc->offsets),
- 		       sckcr);
- 
- 	hw = &osc->hw;
-@@ -153,7 +170,8 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
- }
- 
- static void __init
--of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr)
-+of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr,
-+				 const struct clk_slow_offsets *offsets)
- {
- 	struct clk_hw *hw;
- 	const char *parent_name;
-@@ -167,7 +185,7 @@ of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr)
- 	bypass = of_property_read_bool(np, "atmel,osc-bypass");
- 
- 	hw = at91_clk_register_slow_osc(sckcr, name, parent_name, startup,
--					 bypass);
-+					bypass, offsets);
- 	if (IS_ERR(hw))
- 		return;
- 
-@@ -195,7 +213,7 @@ static int clk_slow_rc_osc_prepare(struct clk_hw *hw)
- 	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
- 	void __iomem *sckcr = osc->sckcr;
- 
--	writel(readl(sckcr) | AT91_SCKC_RCEN, sckcr);
-+	writel(readl(sckcr) | AT91_SCKC_RCEN(osc->offsets), sckcr);
- 
- 	usleep_range(osc->startup_usec, osc->startup_usec + 1);
- 
-@@ -207,14 +225,14 @@ static void clk_slow_rc_osc_unprepare(struct clk_hw *hw)
- 	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
- 	void __iomem *sckcr = osc->sckcr;
- 
--	writel(readl(sckcr) & ~AT91_SCKC_RCEN, sckcr);
-+	writel(readl(sckcr) & ~AT91_SCKC_RCEN(osc->offsets), sckcr);
- }
- 
- static int clk_slow_rc_osc_is_prepared(struct clk_hw *hw)
- {
- 	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
- 
--	return !!(readl(osc->sckcr) & AT91_SCKC_RCEN);
-+	return !!(readl(osc->sckcr) & AT91_SCKC_RCEN(osc->offsets));
- }
- 
- static const struct clk_ops slow_rc_osc_ops = {
-@@ -230,7 +248,8 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
- 			      const char *name,
- 			      unsigned long frequency,
- 			      unsigned long accuracy,
--			      unsigned long startup)
-+			      unsigned long startup,
-+			      const struct clk_slow_offsets *offsets)
- {
- 	struct clk_slow_rc_osc *osc;
- 	struct clk_hw *hw;
-@@ -252,6 +271,7 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
- 
- 	osc->hw.init = &init;
- 	osc->sckcr = sckcr;
-+	osc->offsets = offsets;
- 	osc->frequency = frequency;
- 	osc->accuracy = accuracy;
- 	osc->startup_usec = startup;
-@@ -267,7 +287,8 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
- }
- 
- static void __init
--of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr)
-+of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr,
-+				    const struct clk_slow_offsets *offsets)
- {
- 	struct clk_hw *hw;
- 	u32 frequency = 0;
-@@ -281,7 +302,7 @@ of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr)
- 	of_property_read_u32(np, "atmel,startup-time-usec", &startup);
- 
- 	hw = at91_clk_register_slow_rc_osc(sckcr, name, frequency, accuracy,
--					    startup);
-+					   startup, offsets);
- 	if (IS_ERR(hw))
- 		return;
- 
-@@ -299,14 +320,14 @@ static int clk_sam9x5_slow_set_parent(struct clk_hw *hw, u8 index)
- 
- 	tmp = readl(sckcr);
- 
--	if ((!index && !(tmp & AT91_SCKC_OSCSEL)) ||
--	    (index && (tmp & AT91_SCKC_OSCSEL)))
-+	if ((!index && !(tmp & AT91_SCKC_OSCSEL(slowck->offsets))) ||
-+	    (index && (tmp & AT91_SCKC_OSCSEL(slowck->offsets))))
- 		return 0;
- 
- 	if (index)
--		tmp |= AT91_SCKC_OSCSEL;
-+		tmp |= AT91_SCKC_OSCSEL(slowck->offsets);
- 	else
--		tmp &= ~AT91_SCKC_OSCSEL;
-+		tmp &= ~AT91_SCKC_OSCSEL(slowck->offsets);
- 
- 	writel(tmp, sckcr);
- 
-@@ -319,7 +340,7 @@ static u8 clk_sam9x5_slow_get_parent(struct clk_hw *hw)
- {
- 	struct clk_sam9x5_slow *slowck = to_clk_sam9x5_slow(hw);
- 
--	return !!(readl(slowck->sckcr) & AT91_SCKC_OSCSEL);
-+	return !!(readl(slowck->sckcr) & AT91_SCKC_OSCSEL(slowck->offsets));
- }
- 
- static const struct clk_ops sam9x5_slow_ops = {
-@@ -331,7 +352,8 @@ static struct clk_hw * __init
- at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 			      const char *name,
- 			      const char **parent_names,
--			      int num_parents)
-+			      int num_parents,
-+			      const struct clk_slow_offsets *offsets)
- {
- 	struct clk_sam9x5_slow *slowck;
- 	struct clk_hw *hw;
-@@ -353,7 +375,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 
- 	slowck->hw.init = &init;
- 	slowck->sckcr = sckcr;
--	slowck->parent = !!(readl(sckcr) & AT91_SCKC_OSCSEL);
-+	slowck->offsets = offsets;
-+	slowck->parent = !!(readl(sckcr) & AT91_SCKC_OSCSEL(slowck->offsets));
- 
- 	hw = &slowck->hw;
- 	ret = clk_hw_register(NULL, &slowck->hw);
-@@ -366,7 +389,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- }
- 
- static void __init
--of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr)
-+of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr,
-+			     const struct clk_slow_offsets *offsets)
- {
- 	struct clk_hw *hw;
- 	const char *parent_names[2];
-@@ -382,7 +406,7 @@ of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr)
- 	of_property_read_string(np, "clock-output-names", &name);
- 
- 	hw = at91_clk_register_sam9x5_slow(sckcr, name, parent_names,
--					    num_parents);
-+					   num_parents, offsets);
- 	if (IS_ERR(hw))
- 		return;
- 
-@@ -406,10 +430,18 @@ static const struct of_device_id sckc_clk_ids[] __initconst = {
- 	{ /*sentinel*/ }
- };
- 
-+static const struct clk_slow_offsets at91sam9x5_offsets = {
-+	.cr_rcen = 0,
-+	.cr_osc32en = 1,
-+	.cr_osc32byp = 2,
-+	.cr_oscsel = 3,
-+};
-+
- static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
- {
- 	struct device_node *childnp;
--	void (*clk_setup)(struct device_node *, void __iomem *);
-+	void (*clk_setup)(struct device_node *np, void __iomem *io,
-+			  const struct clk_slow_offsets *offsets);
- 	const struct of_device_id *clk_id;
- 	void __iomem *regbase = of_iomap(np, 0);
- 
-@@ -421,7 +453,7 @@ static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
- 		if (!clk_id)
- 			continue;
- 		clk_setup = clk_id->data;
--		clk_setup(childnp, regbase);
-+		clk_setup(childnp, regbase, &at91sam9x5_offsets);
- 	}
- }
- CLK_OF_DECLARE(at91sam9x5_clk_sckc, "atmel,at91sam9x5-sckc",
-@@ -438,7 +470,7 @@ static int clk_sama5d4_slow_osc_prepare(struct clk_hw *hw)
- 	 * Assume that if it has already been selected (for example by the
- 	 * bootloader), enough time has aready passed.
- 	 */
--	if ((readl(osc->sckcr) & AT91_SCKC_OSCSEL)) {
-+	if ((readl(osc->sckcr) & AT91_SCKC_OSCSEL(osc->offsets))) {
- 		osc->prepared = true;
- 		return 0;
- 	}
-@@ -461,6 +493,13 @@ static const struct clk_ops sama5d4_slow_osc_ops = {
- 	.is_prepared = clk_sama5d4_slow_osc_is_prepared,
- };
- 
-+static const struct clk_slow_offsets at91sama5d4_offsets = {
-+	.cr_rcen = AT91_SCKC_OFFSET_INVALID,
-+	.cr_osc32en = AT91_SCKC_OFFSET_INVALID,
-+	.cr_osc32byp = AT91_SCKC_OFFSET_INVALID,
-+	.cr_oscsel = 3,
-+};
-+
- static void __init of_sama5d4_sckc_setup(struct device_node *np)
- {
- 	void __iomem *regbase = of_iomap(np, 0);
-@@ -498,9 +537,11 @@ static void __init of_sama5d4_sckc_setup(struct device_node *np)
- 	osc->hw.init = &init;
- 	osc->sckcr = regbase;
- 	osc->startup_usec = 1200000;
-+	osc->offsets = &at91sama5d4_offsets;
- 
- 	if (bypass)
--		writel((readl(regbase) | AT91_SCKC_OSC32BYP), regbase);
-+		writel((readl(regbase) | AT91_SCKC_OSC32BYP(osc->offsets)),
-+		       regbase);
- 
- 	hw = &osc->hw;
- 	ret = clk_hw_register(NULL, &osc->hw);
-@@ -509,7 +550,8 @@ static void __init of_sama5d4_sckc_setup(struct device_node *np)
- 		return;
- 	}
- 
--	hw = at91_clk_register_sam9x5_slow(regbase, "slowck", parent_names, 2);
-+	hw = at91_clk_register_sam9x5_slow(regbase, "slowck", parent_names, 2,
-+					   &at91sama5d4_offsets);
- 	if (IS_ERR(hw))
- 		return;
- 
--- 
-2.7.4
+now pushed to v5.1-next/dts64
 
+Thanks,
+Matthias
+
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 412ffd4..126d11e 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -1305,6 +1305,15 @@
+>  				      "vencpll",
+>  				      "venc_lt_sel",
+>  				      "vdec_bus_clk_src";
+> +			assigned-clocks = <&topckgen CLK_TOP_VENC_LT_SEL>,
+> +					  <&topckgen CLK_TOP_CCI400_SEL>,
+> +					  <&topckgen CLK_TOP_VDEC_SEL>,
+> +					  <&apmixedsys CLK_APMIXED_VCODECPLL>,
+> +					  <&apmixedsys CLK_APMIXED_VENCPLL>;
+> +			assigned-clock-parents = <&topckgen CLK_TOP_VCODECPLL_370P5>,
+> +						 <&topckgen CLK_TOP_UNIVPLL_D2>,
+> +						 <&topckgen CLK_TOP_VCODECPLL>;
+> +			assigned-clock-rates = <0>, <0>, <0>, <1482000000>, <800000000>;
+>  		};
+>  
+>  		larb1: larb@16010000 {
+> @@ -1370,6 +1379,10 @@
+>  				      "venc_sel",
+>  				      "venc_lt_sel_src",
+>  				      "venc_lt_sel";
+> +			assigned-clocks = <&topckgen CLK_TOP_VENC_SEL>,
+> +					  <&topckgen CLK_TOP_VENC_LT_SEL>;
+> +			assigned-clock-parents = <&topckgen CLK_TOP_VENCPLL_D2>,
+> +						 <&topckgen CLK_TOP_UNIVPLL1_D2>;
+>  		};
+>  
+>  		vencltsys: clock-controller@19000000 {
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
