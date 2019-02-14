@@ -2,93 +2,130 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E121CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:00:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5976C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:00:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B0BFC222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:00:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6645222DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:00:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hz/Srabl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FJctJLWY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0BFC222DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UhiUqSw7";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="hHqhI3ic"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6645222DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tmhW6WmBSd55JuVevDuv/7ChjeLI7LJm6ko5pMtazRQ=; b=Hz/SrablN3/S3a
-	mAZfWeweqCNsOoA10oO4y+mupj3ZiI8Fr7TuHZaNQqXBQ8ZMeEn6/Aiik4PTufx+tuw58ZiXbsaII
-	3UW2wPUrymoHuUCXXHH9sZyfQq0UNgDkLQeX3+Qg+Nm7Fmz7Gq10hEhjh3YVFebxqeUpZg/Hsmvws
-	g7cWDZes4lyMkWcph7qGyhguZLSHhpFXvsd9I3fa1p5xE2ZjKCvF650PMpdMDZy6whVS1VE22SJ6+
-	KS0YcYzTWZVVFC2BGg7HNzCx9ZMSlPY7PTxxgjGd/RA8fz2gEn+t150CcXXxM8Ya/cdqKWABBhBBy
-	bEikuix94k9RPadWzg8g==;
+	List-Owner; bh=DZXvva/gIM71kX0aknBliSCdAFQcbNSnzVtRHRgnSvk=; b=UhiUqSw7IOjq0I
+	mIROy3btamW09MGOjSKN45SDf9pwGnSojuZzQyLWK5UDdG9HxJWjvhoKmJ8+D1QErLN2hmolyyLhw
+	JlWmhP/w4ha5ciNLlzDLAEoH8GRQwXM2OmUaWhiNoaVYbCZh/cvSRoAxVdSPvqULwQnjNXKIyKluH
+	ENtJB0TeFOKcqwBHLav61eDoQv8ZsJzIlpCHrBSmAX8XQKcbHzL+rWzPw38iFYYtdDde2qTYlD9wu
+	Gh5B7OnZtlkrVZxuA+obBR5Y1DGQTPHrxtJWF8JtyafDEcSpIkAHTkUdVilXFrvkN/uHA2EmMCa12
+	ZKPyEmjexleor2cLTdQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guKNN-0008OQ-05; Thu, 14 Feb 2019 17:00:41 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
+	id 1guKNY-0000Ao-QU; Thu, 14 Feb 2019 17:00:52 +0000
+Received: from mail-eopbgr70048.outbound.protection.outlook.com ([40.107.7.48]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guKNJ-0008O4-Th
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:00:39 +0000
-Received: by mail-ed1-x541.google.com with SMTP id b17so5611791eds.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 09:00:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=qKi37h0Ix9JQ40bmp2j0SNPnRS6GvU2wisamH96+cI8=;
- b=FJctJLWYCUVxagY9VrAZ8F35BGaPVly5zZBrufREG8zzfpajV3WAVhPI06+nSoJPsb
- TCgILy1VMSJFICdbluRBcxEiosFkHoV2rO9tN6uJv0nEcqtRxZzc4FrwL/InjLkTVAwR
- E2x8a7wx00Y2BZ7X3okeadtHhmE0sfKstxtY1+HgLDyMGHbDVjbe/T8/PM589SJIhV8o
- RVojC6yeQxO6s/820cgouDZcaoO4pnpJWX2QNMf8dvLJN3oHy9pxbnoFDy8qEyGpXOHi
- DZyB8HDFDkZigWOi0cKcy8+4WdFVu1P8BZJUL7jUGd+/f5bd94NXMo20zPB7pViU8WhG
- rZKQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=qKi37h0Ix9JQ40bmp2j0SNPnRS6GvU2wisamH96+cI8=;
- b=ZtMv+qiQvYfAUGspxEXpyo537QPt9aSzpV8ZVnbIxH/n5dpQlWcE3jicTNgo/dTdmd
- KnQnZbtL+fc/EkgPWvCP/1f5etre73uXGQkwGUBwbZLW5k4E+Yi88CXMkXeYKfQzQgBP
- IGcXYCWail+fXhGyNp9wLBIAuiuDxzep+XyDQEnRIJpwoFmXn6DArcanvnAlQuZUSHnK
- FxHfseO8eckztX3esDlTY6Rs7aYuXgjRWPYBQsMURyxnOSBv3Ru6ClYK1EpaUDKesOhc
- FEtWN6/ZdNwnqblsIrVqMAbYVZGfCY0P5LK5bWVnS3eDC3qLmWWZky/SPposV2mzs1BF
- YkFg==
-X-Gm-Message-State: AHQUAubVVfhCG+oj2zMG/zVQWlIuyBrvb13miYVxqDNGNmWDg29YlCma
- IVkTMYToOyIkOt0I8kIs7Vc=
-X-Google-Smtp-Source: AHgI3IYvP87g3QgU9McriTzbz2room1pOV8pvqMnSrzJ+qoDDZSEj0KZ5/xLkcAo9DEKooKcuPNfKw==
-X-Received: by 2002:a50:ad4b:: with SMTP id z11mr3850148edc.157.1550163635472; 
- Thu, 14 Feb 2019 09:00:35 -0800 (PST)
-Received: from archlinux-ryzen ([2a01:4f9:2a:1fae::2])
- by smtp.gmail.com with ESMTPSA id k20sm640085eja.33.2019.02.14.09.00.33
- (version=TLS1_3 cipher=AEAD-AES256-GCM-SHA384 bits=256/256);
- Thu, 14 Feb 2019 09:00:34 -0800 (PST)
-Date: Thu, 14 Feb 2019 10:00:32 -0700
-From: Nathan Chancellor <natechancellor@gmail.com>
-To: Mark Brown <broonie@kernel.org>
-Subject: Re: [PATCH] arm64: crypto: Disable xor-neon build when using clang
-Message-ID: <20190214170032.GA30494@archlinux-ryzen>
-References: <20190212194645.32504-1-broonie@kernel.org>
- <CAKv+Gu-W2X32ZCqKsJVqSqyJ04UK2eoNCDKp=2OfsO1HhKaCuw@mail.gmail.com>
- <20190213114033.GA7540@sirena.org.uk>
- <CAKwvOdnx-_KtojEEbnWvygDLXec7ckCfciP4iwigPT5Y3bdmxA@mail.gmail.com>
- <20190214163047.GC11988@sirena.org.uk>
+ id 1guKNU-0008VL-0i
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:00:50 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=rqU2QaaCo4DCLN8sf0RDb4h9kStbXwJiwePib+BkoFI=;
+ b=hHqhI3icCocmfK/Td5dpqdeD467soVuD1hBKdItVfSOXcHxR677Me7T9k/XpZuEVXqlkJLseBjNm5JQyNtTyIlc6u0xYoryYU0gxcSzu8mfHPiqwaOJj1c7xCvv+RKZeo7NSNyQrOUSucB6EHipjGoCy+wKCDsUEX3K7ReALc7Y=
+Received: from VI1PR04MB4880.eurprd04.prod.outlook.com (20.177.49.153) by
+ VI1PR04MB4606.eurprd04.prod.outlook.com (20.177.56.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.17; Thu, 14 Feb 2019 17:00:44 +0000
+Received: from VI1PR04MB4880.eurprd04.prod.outlook.com
+ ([fe80::3d48:4560:6982:4c32]) by VI1PR04MB4880.eurprd04.prod.outlook.com
+ ([fe80::3d48:4560:6982:4c32%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
+ 17:00:44 +0000
+From: Claudiu Manoil <claudiu.manoil@nxp.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: RE: [PATCH net-next 2/3] arm64: dts: fsl: ls1028a-rdb: Add ENETC
+ external eth ports for the LS1028A RDB board
+Thread-Topic: [PATCH net-next 2/3] arm64: dts: fsl: ls1028a-rdb: Add ENETC
+ external eth ports for the LS1028A RDB board
+Thread-Index: AQHUw4uiFsOjRsU/BUmhwPza339npKXeCTkAgAFPZ3CAACS4AIAACB8g
+Date: Thu, 14 Feb 2019 17:00:44 +0000
+Message-ID: <VI1PR04MB48800F563F0C76412090459F96670@VI1PR04MB4880.eurprd04.prod.outlook.com>
+References: <1550055743-15542-1-git-send-email-claudiu.manoil@nxp.com>
+ <1550055743-15542-3-git-send-email-claudiu.manoil@nxp.com>
+ <20190213181554.GB708@lunn.ch>
+ <VI1PR04MB4880C9EF6C9EBFCAA2209DD596670@VI1PR04MB4880.eurprd04.prod.outlook.com>
+ <20190214162746.GI708@lunn.ch>
+In-Reply-To: <20190214162746.GI708@lunn.ch>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=claudiu.manoil@nxp.com; 
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: b55bb8fc-4a10-47d5-7e3d-08d6929df572
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4606; 
+x-ms-traffictypediagnostic: VI1PR04MB4606:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; VI1PR04MB4606;
+ 23:KVvULlHW4YbzcePwV9KCuHgfRWOzPaQdVL7uZ0jDa?=
+ =?us-ascii?Q?hlX1/sO/rzkFnmkHp8VF1+Wwxaj0YkxmxL6OyXLrVGe3l9OrudCS0zyedDId?=
+ =?us-ascii?Q?Vy2OR69wUTUqYsO/WhgIm5BjyDc95K/u2yBVzVCtPhaLTNAlsk+JGK0bBBpY?=
+ =?us-ascii?Q?PI5BHd5vY+oSbPPgT/2cVW8CVOguo89AqU/cGnOSiD2PLna7hjTP9xjrmjbv?=
+ =?us-ascii?Q?vzZ1h3GOyLWU4OgAAzyoubLxP73NdCwPwBgwjC14s1vcZovB6YcJpz4Vet5e?=
+ =?us-ascii?Q?OzXHA5m1z+r3v40Re3cuBCu3g64qsrn4vl6i8ycBPBTF9xIiRHxWCo+1Cx8f?=
+ =?us-ascii?Q?2vdi7gq9sLtkcebipeUHVu6I5j7HubYaoNH9wNQmgbf4Eas2jnwfffoOeFAq?=
+ =?us-ascii?Q?whVvRFqD67vFHPOpe3DcU3EHXBc/wC8bFgf5v1okIi/zArY38tpiDpbYTh9E?=
+ =?us-ascii?Q?rYJBpLHmtWe5zrAmFgRD3lbUMBwFkmjB9GNQ0vcsiq72SbUhHKZ7LxtySwyx?=
+ =?us-ascii?Q?TpOfd6sN9ilxOSMO9FUi30x5J8DsSI/5aNQV/3SEpFKqW0S1Tad+4iaeTTGB?=
+ =?us-ascii?Q?MdHWK1T4gayouYAxfPoJ+2ts3sI2W34i8AxJowbcmvmoO9LgCrsOndjgo9x1?=
+ =?us-ascii?Q?mdt3kvdmGyIsLR3Cj88ltRfTjvlqylAbA+nZxCs0cLrUpUBJF2Y0/FAd4F9r?=
+ =?us-ascii?Q?050GXamvRgExUJr82adK0QkDulyR4QsLUIqkfArTEYHfRBUHMzlle6itqga+?=
+ =?us-ascii?Q?oTeBz5dhrNboVFfTrsu9RzjiMjP3/xqsoZa6B6yiqAMM/+wgr/dz/MEWf93D?=
+ =?us-ascii?Q?8QICv7Qzznbau2oO8WffRuu0d4F2oQagycD9M5S5Or8Tw9/wxirZtSaRFqs5?=
+ =?us-ascii?Q?xZUUfTy+s1DHDmrVBKx7/cH/oeu9yCEAOMhsOHpdI/z+Xfa8DvIoVuFfYvGW?=
+ =?us-ascii?Q?giqC9m68CnqRz5XrztcW/tpepnlYO+0pNXi8K13AT1YRk1/+3gJA1jAQvjdL?=
+ =?us-ascii?Q?sUOZdINGhdeks3Mlf+2GYkXJurRMGis178QkPfSW9ig9OkOyMJjXMTjYBKP+?=
+ =?us-ascii?Q?j3Lbz1wPV0W+VbYu6UDkFfmH11v9PN8+tYhLA7U3YvkyLZ07MH3b64iaATKL?=
+ =?us-ascii?Q?9uTpeMt6n4QPscOUeQLmyUVWxS7dz//umujRAcngAwGFYFC/Qpzvzp1BoZSZ?=
+ =?us-ascii?Q?TFmuW15fDqazgRnRMddCjcMrb8jQ0dsT0UHoPRpwtnMhX+ObtHok7q2AY/Sx?=
+ =?us-ascii?Q?M8Zv6fXoIXno9azNjvSROXu71FKjQ4+Zs/9Ekry?=
+x-microsoft-antispam-prvs: <VI1PR04MB460606167CDFA8479F4BCAB696670@VI1PR04MB4606.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09480768F8
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(136003)(376002)(346002)(39860400002)(396003)(13464003)(51914003)(189003)(199004)(93886005)(97736004)(446003)(2906002)(11346002)(186003)(68736007)(4326008)(86362001)(6246003)(256004)(54906003)(8676002)(81156014)(81166006)(25786009)(26005)(74316002)(476003)(316002)(486006)(7736002)(305945005)(66066001)(99286004)(44832011)(8936002)(478600001)(76176011)(53936002)(71190400001)(229853002)(55016002)(6436002)(71200400001)(14454004)(4744005)(6916009)(106356001)(6506007)(3846002)(7696005)(9686003)(105586002)(102836004)(6116002)(33656002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4606;
+ H:VI1PR04MB4880.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 2acsQ4XG54Rqx58FKbjoSY4ABZPm35/2zf3OlfJqGl+UzreK4qP0mlSpfSnsvGdox4rwRrDIDyJNWCDS8p13KzInug6uC/5q0TimZmN7rWd5UX4EWcRx57wmDS5C9/mKycyLDukXS35F3FroZLt0FR+E5PWekLUuuR/9XyTtRDLBxSGjIOCMmssEzngJk5W2jn0grU/nUvQdR/hOqKOw4e+U6Aapa03F3w3E+A16qnB3v5VPmdqzr8365kRXXua5IWofmuhiDSwq0m2EvK6Fxhvw5wXQdPpOH64s4WJTmdNmzk2kLs9j39/GK7lW4wvhv94UFCGJbV5nz8VpGViJmJJQ82jFu/5HnKSW33Ys6fKICL3h0pKerO4ckoux7bjBSGqtcdp+szKTjxD/k5tFYducmpCqvutk8jcUwHNwj3E=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190214163047.GC11988@sirena.org.uk>
-User-Agent: Mutt/1.11.3 (2019-02-01)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b55bb8fc-4a10-47d5-7e3d-08d6929df572
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 17:00:44.3514 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4606
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_090037_960865_22EC2834 
-X-CRM114-Status: GOOD (  11.10  )
+X-CRM114-CacheID: sfid-20190214_090048_500878_B463A0FC 
+X-CRM114-Status: UNSURE (   7.19  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,26 +137,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Jackie Liu <liuyun01@kylinos.cn>,
- Nick Desaulniers <ndesaulniers@google.com>, Will Deacon <will.deacon@arm.com>,
- Stephen Hines <srhines@google.com>, Kevin Hilman <khilman@baylibre.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
+ Alexandru Marginean <alexandru.marginean@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>, "David S .
+ Miller" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 04:30:48PM +0000, Mark Brown wrote:
-> On Wed, Feb 13, 2019 at 01:45:08PM -0800, Nick Desaulniers wrote:
-> 
-> > Nathan's patch [0] is probably ready to go; with Ard's suggested by
-> > tag [1].  Again, I'm not happy about it; but KernelCI coverage is
-> > ultimately more important to the project.
-> 
-> OK, Nathan will you post that?
+>-----Original Message-----
+>From: Andrew Lunn <andrew@lunn.ch>
+>Sent: Thursday, February 14, 2019 6:28 PM
+>To: Claudiu Manoil <claudiu.manoil@nxp.com>
+>Cc: Shawn Guo <shawnguo@kernel.org>; Leo Li <leoyang.li@nxp.com>; David S .
+>Miller <davem@davemloft.net>; devicetree@vger.kernel.org; Alexandru
+>Marginean <alexandru.marginean@nxp.com>; linux-kernel@vger.kernel.org;
+>linux-arm-kernel@lists.infradead.org; netdev@vger.kernel.org
+>Subject: Re: [PATCH net-next 2/3] arm64: dts: fsl: ls1028a-rdb: Add ENETC
+>external eth ports for the LS1028A RDB board
+>
+>> Hi Andrew,
+>>
+>> The extra node for mdio seems to complicate things somewhat.
+>> Just adding this node seems not enough.  How to find out easily if a
+>> child of a enetc port node is a mdio node?
+>
+>You copy somebody else code :-)
+>
 
-Yes, I can do it later today.
+Provided you find the right thing to copy : ) . Thanks for the hint.
 
 _______________________________________________
 linux-arm-kernel mailing list
