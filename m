@@ -2,128 +2,63 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D322EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:31:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E443C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:36:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A245F2070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:31:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2EA2A2082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:36:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ncSAaf3p";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="1Wg2IXvh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A245F2070D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F831nlzW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EA2A2082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u4A6JQ+tsoZlHMPfZpKWGur6GnvAwPYn1JDIqaF74I4=; b=ncSAaf3pCjpvDa
-	f9O3dJbylzqMFdk841com44bicY4v86ydhwKn8JSrzHGSZ8ucVbKJpQBT4w18EJoVi7xLAJZmC+Ye
-	rbMEryz9nwxIb1R90RznCAXAP5GL3HiTc/JmrKy0qp3+tfWEYITyQ33d/VdLq7obF/id1HxB0KM8H
-	ihcIAhoMjm9KUWwVenx9fjtjxGQ09R8sQCGBJxzW+5aVNEMXj0Y7gkYYBIYjoyFsdNX955Wo0TFMb
-	fGYL35ZAAisIEqW7xrJ/sahEE8LLttCxO5lasr49Nd+WYdBxbwtKbbLWj+LHE9xfTG3aDwpPwnom/
-	6PgxkHBH83lPZxTk1V7A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/OEkjRS1nooqKGGO+xI3wAcCr/rzP5DeMRJSHfBF7Vk=; b=F831nlzWAWm+grJL6OrUdN6OQ
+	0yYSlBjIgaj+RJsjk6ZXq4c1Gz0AGbyOr7HgAhH4cNZ/HMggvOG+VVqm0Xx5oaHtHMKue3NKf4gJ6
+	TP0DhmPB0fiCPy4hjSuUWZF5bcQVD5kFbu1oVfsuwZYahUFO35dXq5pBZj7HizeqSvN1tGLUNFBD2
+	dVl51tGse5GxCs3L2xT9exnUIF2eGa3FCukhmPuGvUCLRt8q9adU5/oxtIxoIFCw45KlZ+s+fNIAd
+	Wst2/2JmbLz26TeA28zVTIwYBRpef4RuLeAsuvIvOMMlAE+NcLMlenzC5nmuBSD7O6PYmLEf1lTxT
+	/T9imMzpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guFEO-00018v-OX; Thu, 14 Feb 2019 11:31:04 +0000
-Received: from mail-eopbgr690048.outbound.protection.outlook.com
- ([40.107.69.48] helo=NAM04-CO1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guFEK-00018Q-P5
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:31:02 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=xUvkScEHiGzC/q47CEDhhQIdi43rPfrfzkglwcFPa8Y=;
- b=1Wg2IXvhQO8fO4vCHVZmZ0Q3RKnoKciECWYXo7S3s3Rmcvc0YMpAOlnCGt80svvGUrWKrxNAWwXc7vjkYTRzgIYJc9tq4a4azS8aRhhBCTEmHWtGi0MvNaq9SCz4YYR7XdhG/SxqObzQSQIZlM+6VnXEu7uFeZ3nroXHRZCAHzU=
-Received: from BN6PR02MB2772.namprd02.prod.outlook.com (10.175.96.7) by
- BN6PR02MB2849.namprd02.prod.outlook.com (10.175.96.13) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Thu, 14 Feb 2019 11:30:57 +0000
-Received: from BN6PR02MB2772.namprd02.prod.outlook.com
- ([fe80::963:fc2b:ba8f:c4e7]) by BN6PR02MB2772.namprd02.prod.outlook.com
- ([fe80::963:fc2b:ba8f:c4e7%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 11:30:57 +0000
-From: Bharat Kumar Gogada <bharatku@xilinx.com>
-To: "lorenzo.pieralisi@arm.com" <lorenzo.pieralisi@arm.com>
-Subject: RE: [PATCH] PCI: xilinx-nwl: Fix Multi MSI data programming
-Thread-Topic: [PATCH] PCI: xilinx-nwl: Fix Multi MSI data programming
-Thread-Index: AQHUw6gI/5etm/0omE2gWPjMEG0LpqXd7kyAgAE5zMA=
-Date: Thu, 14 Feb 2019 11:30:56 +0000
-Message-ID: <BN6PR02MB2772BEF7F8644EF9AAF7F23AA5670@BN6PR02MB2772.namprd02.prod.outlook.com>
-References: <1550067939-9859-1-git-send-email-bharat.kumar.gogada@xilinx.com>
- <20190213164019.GD2280@e107981-ln.cambridge.arm.com>
-In-Reply-To: <20190213164019.GD2280@e107981-ln.cambridge.arm.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=bharatku@xilinx.com; 
-x-originating-ip: [149.199.50.133]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: d7c37e5f-bb7c-480b-92ed-08d6926fe33a
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:BN6PR02MB2849; 
-x-ms-traffictypediagnostic: BN6PR02MB2849:
-x-ld-processed: 657af505-d5df-48d0-8300-c31994686c5c,ExtAddr
-x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; BN6PR02MB2849;
- 23:YY+CVjuAVC+Oa5T1bTldQWSljFwKlzLg6xMZQNISs?=
- =?us-ascii?Q?xj07R9SbXdK4OocyFXj48jHwSi0wknU1gnr5OGpAxEYB6vrTowsqmrYD6/2m?=
- =?us-ascii?Q?0cMwrhTb2CmqtGwwuWJtezXaRHTpUPMhhZdG6eiNu5hq9vwNetZ0Y97dYjQW?=
- =?us-ascii?Q?VqXyv3YEzhoXgc4kDTp+WpiQ489cg2GhzIRwiwRkebpArrGUiT7WDjGOvo3J?=
- =?us-ascii?Q?KZIsG0Fa+U8H1wjHAbD73rwwTD4VzgY/95lEW/6FPzztTEHPpNCawbwVDA3b?=
- =?us-ascii?Q?+a+0AkvwUEZ4bmZreVAThX8n13Buf8X+0xS0peedTkH5cLO0sRcyNliFFO90?=
- =?us-ascii?Q?fAln+vLl0o0Fa6AxoOnzZFroH22xXVwGPDPYWD/eAZWWgO86qcXSEsIbI0He?=
- =?us-ascii?Q?nuJ89ouVHqtHjEKDfbNO7HI7CcKIoNFxfO05CEK5XyrLmcL9oOygWh/BKFE1?=
- =?us-ascii?Q?XGywsEXvSAaXmPZL8wtv+pgB+BTHL79NAyV9g72EFGh1jt58x3YXMHgwakZv?=
- =?us-ascii?Q?V+H/4XzKco/jZSjPmd9OYU7tXaLwjWIs4YA/zg5BhMgnAkFz4lj8EigDvFfH?=
- =?us-ascii?Q?IL8paSYhqiwyU/8Sj7EVKgXK6+idRDIW481uKRi/h0SvjLjDbsTY+3LiUj1e?=
- =?us-ascii?Q?kHBvX47nDcI1SEMV6zaSDss61B479CrjEMgXC2SxB2f4FYjdG9QyGFQiy6ja?=
- =?us-ascii?Q?zMgHezTzLX5aPyvQ2tc9UjtJpAIPRo5QkHaPS1I3OLqJQLh1lwBK61PmeNeH?=
- =?us-ascii?Q?GK21pyCI2Eqhz8YxL1bKs08wKEcsqqsMLszTI4LGQDVlClOQ2qdZQ0vmSFXP?=
- =?us-ascii?Q?VhpZF7YcWLvJHuEQdZ+zkDbgvdluNxRXPVtGnlRcRVk2/W+IvbNIbWgAjK+E?=
- =?us-ascii?Q?gjY5WtftaqHKoAY662ClhlTlWtTx8F1eKNi/z392543c3xkJR97o1A1A2zTE?=
- =?us-ascii?Q?rMy377T1frJEtWYocN1hdm+UMUFKeOJWD2qvteAKYlkkwYoKdsMAO4it2QDf?=
- =?us-ascii?Q?5J6V76ElXzDJSINaNAS8gBHZMUvHBam+agBbaezrSCUnwjC9MKFaceskCKZs?=
- =?us-ascii?Q?7RzECFRnIgrbG/5HcHv4st8GLp1aq1VSFTBgb42N50uij+9AOy8MkUWXNuj5?=
- =?us-ascii?Q?8KWMx3cuYL8CrE5h9JnpG7tETWlTzuX15RXT8/l4IAx4RKF6BrlySDK51ZmP?=
- =?us-ascii?Q?bRxqlyvDR/6dODuFPh3BM66nGammpJ/oqsmk+9c1YPRiiX3GTGc2PP0dmZVu?=
- =?us-ascii?Q?crSxC3tHk89Nr1o3IA=3D?=
-x-microsoft-antispam-prvs: <BN6PR02MB2849625203787B6326D9B92AA5670@BN6PR02MB2849.namprd02.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(366004)(39860400002)(396003)(346002)(136003)(189003)(199004)(8936002)(8676002)(106356001)(6916009)(4326008)(316002)(25786009)(305945005)(7736002)(74316002)(2906002)(81166006)(6116002)(3846002)(14454004)(97736004)(66066001)(81156014)(105586002)(2351001)(14444005)(86362001)(478600001)(2501003)(256004)(229853002)(6506007)(6246003)(26005)(9686003)(5640700003)(55016002)(486006)(102836004)(6436002)(53936002)(11346002)(446003)(71200400001)(99286004)(68736007)(76176011)(54906003)(71190400001)(186003)(7696005)(33656002)(476003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:BN6PR02MB2849;
- H:BN6PR02MB2772.namprd02.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: xilinx.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: jXOaZ2yRHfgzwG/O35Lhbp4/PeUwPyypCofruVrjCrnst9XEaSKGeGYEKuKxPQxuNwF2gnRZUa2oyk7Krd9uxvK6fI2WTxTVWmi7Sgxj/CUWq0mPeRXQJplW/fsStj2eWmHhcOjlvdZsArb9HOoVgVFYCrX49Zqzlepwh5uEFqb00MIEMD1ib/NAB72rBqOp1aQetfAYH+bl84mpWR7O9e1l+psh8TQULy+jUqzPdc2soWJzlcOmWxhhfiwuk0QowutRq/A2YsuaIDJmA/4kvaxD8YRaaWfADYzb1WdYTEPxcsaJeO1yGOdLQWS8QNlgxif80pRWokr1pdv2sjgcbCzMKedVBTkQbRMrJ+yXx7vyyL+Mk3swE8K3y8FumG+xkTY2F1/LfRkIsEEpCJGCzsWnLQd21HEjPrHlCqpoGcU=
+	id 1guFJL-0002nU-6Z; Thu, 14 Feb 2019 11:36:11 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guFJH-0002n8-LE
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:36:09 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DECC180D;
+ Thu, 14 Feb 2019 03:36:06 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6458E3F675;
+ Thu, 14 Feb 2019 03:36:05 -0800 (PST)
+Subject: Re: [PATCH v2 4/5] KVM: arm/arm64: lazily create perf events on enable
+To: andrew.murray@arm.com, christoffer.dall@arm.com, marc.zyngier@arm.com
+References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
+ <1549299218-44714-5-git-send-email-andrew.murray@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <bd21facb-4245-f583-e4a0-23399017579d@arm.com>
+Date: Thu, 14 Feb 2019 11:36:02 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d7c37e5f-bb7c-480b-92ed-08d6926fe33a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 11:30:56.9885 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 657af505-d5df-48d0-8300-c31994686c5c
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: BN6PR02MB2849
+In-Reply-To: <1549299218-44714-5-git-send-email-andrew.murray@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_033101_190935_DD36195E 
-X-CRM114-Status: GOOD (  14.72  )
+X-CRM114-CacheID: sfid-20190214_033607_708390_5BB0D2D2 
+X-CRM114-Status: GOOD (  28.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,55 +70,199 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "bhelgaas@google.com" <bhelgaas@google.com>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ julien.thierry@arm.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> Subject: Re: [PATCH] PCI: xilinx-nwl: Fix Multi MSI data programming
-> 
-> On Wed, Feb 13, 2019 at 07:55:39PM +0530, Bharat Kumar Gogada wrote:
-> > The current Multi MSI data programming fails if a end point is
-> > connected with switch.
-> >
-> > Fix Multi MSI data, by programming data with required alignment.
-> 
-> I have no idea what this means. If you are fixing a bug describe it properly
-> and provide a Fixes: tag with the commit you are fixing.
-> 
-Thanks Lorenzo for your time. Will add above details and re send.
+Hi Andrew,
 
-Regards,
-Bharat
+On 04/02/2019 16:53, Andrew Murray wrote:
+> To prevent re-creating perf events everytime the counter registers
+> are changed, let's instead lazily create the event when the event
+> is first enabled and destroy it when it changes.
 > 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>   virt/kvm/arm/pmu.c | 96 ++++++++++++++++++++++++++++++++++++++----------------
+>   1 file changed, 68 insertions(+), 28 deletions(-)
 > 
-> > Signed-off-by: Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com>
-> > ---
-> >  drivers/pci/controller/pcie-xilinx-nwl.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/controller/pcie-xilinx-nwl.c
-> > b/drivers/pci/controller/pcie-xilinx-nwl.c
-> > index 81538d7..36669c5 100644
-> > --- a/drivers/pci/controller/pcie-xilinx-nwl.c
-> > +++ b/drivers/pci/controller/pcie-xilinx-nwl.c
-> > @@ -484,7 +484,7 @@ static int nwl_irq_domain_alloc(struct irq_domain
-> > *domain, unsigned int virq,
-> >
-> >  	mutex_lock(&msi->lock);
-> >  	bit = bitmap_find_next_zero_area(msi->bitmap, INT_PCI_MSI_NR, 0,
-> > -					 nr_irqs, 0);
-> > +					 nr_irqs, nr_irqs - 1);
-> >  	if (bit >= INT_PCI_MSI_NR) {
-> >  		mutex_unlock(&msi->lock);
-> >  		return -ENOSPC;
-> > --
-> > 2.7.4
-> >
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 95d74ec..a64aeb2 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -24,7 +24,10 @@
+>   #include <kvm/arm_pmu.h>
+>   #include <kvm/arm_vgic.h>
+>   
+> +static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu, u64 select_idx);
+>   static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx);
+> +static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
+> +
+>   /**
+>    * kvm_pmu_get_counter_value - get PMU counter value
+>    * @vcpu: The vcpu pointer
+> @@ -59,13 +62,15 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
+>   void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
+>   {
+>   	u64 reg;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+>   
+>   	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
+>   	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
+>   	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
+>   
+> -	/* Recreate the perf event to reflect the updated sample_period */
+> -	kvm_pmu_create_perf_event(vcpu, select_idx);
+> +	kvm_pmu_stop_counter(vcpu, pmc);
+> +	kvm_pmu_sync_counter_enable(vcpu, select_idx);
+>   }
+>   
+>   /**
+> @@ -83,6 +88,7 @@ static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
+>   
+>   /**
+>    * kvm_pmu_stop_counter - stop PMU counter
+> + * @vcpu: The vcpu pointer
+>    * @pmc: The PMU counter pointer
+>    *
+>    * If this counter has been configured to monitor some event, release it here.
+> @@ -143,6 +149,24 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>   }
+>   
+>   /**
+> + * kvm_pmu_enable_counter - create/enable a counter
+> + * @vcpu: The vcpu pointer
+> + * @select_idx: The counter index
+> + */
+> +static void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +
+> +	if (!pmc->perf_event)
+> +		kvm_pmu_create_perf_event(vcpu, select_idx);
+> +
+> +	perf_event_enable(pmc->perf_event);
+> +	if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> +		kvm_debug("failed to enable perf event\n");
+> +}
+> +
+> +/**
+>    * kvm_pmu_enable_counter_mask - enable selected PMU counters
+>    * @vcpu: The vcpu pointer
+>    * @val: the value guest writes to PMCNTENSET register
+> @@ -152,8 +176,6 @@ u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
+>   void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>   {
+>   	int i;
+> -	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> -	struct kvm_pmc *pmc;
+>   
+>   	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) || !val)
+>   		return;
+> @@ -162,16 +184,39 @@ void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>   		if (!(val & BIT(i)))
+>   			continue;
+>   
+> -		pmc = &pmu->pmc[i];
+> -		if (pmc->perf_event) {
+> -			perf_event_enable(pmc->perf_event);
+> -			if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
+> -				kvm_debug("fail to enable perf event\n");
+> -		}
+> +		kvm_pmu_enable_counter(vcpu, i);
+>   	}
+>   }
+>   
+>   /**
+> + * kvm_pmu_sync_counter_enable - reenable a counter if it should be enabled
+> + * @vcpu: The vcpu pointer
+> + * @select_idx: The counter index
+> + */
+> +static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu,
+> +					    u64 select_idx)
+> +{
+> +	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
+> +
+> +	if (set & BIT(select_idx))
+> +		kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
+
+I think there is a problem here. We could be creating an event for a
+counter beyond what is supported by the CPU. i.e, we don't
+seem to validate that the mask we are creating is within the
+kvm_pmu_valid_counter_mask(). The other callers seem to verify this.
+I guess it may be better to add a check for this in the
+kvm_pmu_enable_counter_mask().
+
+minor nit: Feel free to ignore. If we move the check for PMCNTENSET_EL0 to
+pmu_enable_counter_mask() we could get rid of the above function. Anyways,
+we should only be enabling the counters set in PMCNTENSET_EL0.
+
+
+> +}
+> +
+> +/**
+> + * kvm_pmu_disable_counter - disable selected PMU counter
+> + * @vcpu: The vcpu pointer
+> + * @pmc: The counter to disable
+> + */
+> +static void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +
+> +	if (pmc->perf_event)
+> +		perf_event_disable(pmc->perf_event);
+> +}
+> +
+> +/**
+>    * kvm_pmu_disable_counter_mask - disable selected PMU counters
+>    * @vcpu: The vcpu pointer
+>    * @val: the value guest writes to PMCNTENCLR register
+> @@ -181,8 +226,6 @@ void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>   void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>   {
+>   	int i;
+> -	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> -	struct kvm_pmc *pmc;
+>   
+>   	if (!val)
+>   		return;
+> @@ -191,9 +234,7 @@ void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
+>   		if (!(val & BIT(i)))
+>   			continue;
+>   
+> -		pmc = &pmu->pmc[i];
+> -		if (pmc->perf_event)
+> -			perf_event_disable(pmc->perf_event);
+> +		kvm_pmu_disable_counter(vcpu, i);
+>   	}
+>   }
+>   
+> @@ -375,16 +416,9 @@ void kvm_pmu_handle_pmcr(struct kvm_vcpu *vcpu, u64 val)
+>   	}
+>   }
+>   
+> -static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
+> -{
+> -	return (__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
+> -	       (__vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & BIT(select_idx));
+> -}
+> -
+>   /**
+> - * kvm_pmu_create_perf_event - create a perf event for a counter
+> + * kvm_pmu_counter_create_enabled_perf_event - create a perf event for a counter
+
+nit: Name hasn't changed. Also, please could update that, the events are always
+created disabled and they are only enabled lazily.
+
+Reset looks fines.
+
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
