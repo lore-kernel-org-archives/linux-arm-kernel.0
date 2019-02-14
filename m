@@ -2,84 +2,88 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B568C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:26:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EEB96C10F05
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:26:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 29E6621B68
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:26:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB93221B68
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:26:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EDUWWi3S";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="HtJqKpbY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 29E6621B68
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g27gKpqC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="coa3lgKd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB93221B68
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=kQiqL4Xq3wJqLDAS4IiGEozOS2J0t9Cwce1hRw3Zus4=; b=EDUWWi3SCpqjDX
-	HK05Sy6tD2fO+vaMsV930ewWKgNrli/q0ugFYY/2Svo7votqNn6qAvY1LBvE2PG+sDglgu01QZ2Eg
-	QZjYmBESHBfnBTSpeY5l9hV0gAS8IAc7HBnP+NWGIdzMms3ZRqyqh67ZynGxdaJ362MfoqWLLqIBQ
-	HdOQt40VG9qRqfsGi5xFpgy8R9aoQsX1VL6NMy/XHdxZaNkfFJTcwcF81+/pXurZYjEOnPoTL4apW
-	/h2DxVwzlrSh1zUjyPAO1Bo4ClaCd5mBY9K8UhhR7N94G/3rRf59iriOVNF5Ad/q9M3uwqNpSGwtI
-	0w/hQZvoegfQnrr+HjbA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=gSnV0iIlLCxlFNZz1ze0ec3eA7DZ/FCfDUi48IDM4xs=; b=g27gKpqC/t0ey1
+	RiJRB5tIPf17rQAKipHfNN4wddFAmDa2Ep7wIkRv0AOwIU5TUmhaiRRf7ymzJOuzdXd9uRLC4Pxl2
+	TT7B1APU9UPlp2NnpDlCAyE7adY26AvTAw2oNaMYcU2k37xSEe9e/ujlofNZBIxikH6tZOTvjwzdx
+	Zs+/jdxC1RTlkIwyzE2UQGnmgaDWQBUjwcWipnzlEMdBf/ZPWw3JdoR0EchSeixSMZE8g/b4tKSAD
+	VujXbIgGbzG4yWEZL2PmAxwYaReTeZ4UcfAW6vMG9mh6xnzvtshxAPO1rud4YxLGvPwkZfNCQrDKA
+	9d8PjGa68gEcVG6WII2g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guMeB-00019X-8J; Thu, 14 Feb 2019 19:26:11 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1guMeM-0001Qz-4x; Thu, 14 Feb 2019 19:26:22 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guMe6-00018u-AW
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:26:08 +0000
-Received: by mail-pf1-x442.google.com with SMTP id n22so3589846pfa.3
+ id 1guMe9-00019J-Od
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:26:11 +0000
+Received: by mail-pl1-x643.google.com with SMTP id bj4so3653232plb.7
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 11:26:06 -0800 (PST)
+ Thu, 14 Feb 2019 11:26:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=aOWbOJz+q7a7Braxa6vSetV3DpRgUUln38aLV0BLFss=;
- b=HtJqKpbYpg8zKfhZ+PlLnTp/nVesVjTYGFOfafcc8PKPURO/GpUgkl01uMeHQIToDk
- ySlNaTOET+J7KmWBw29ZXEsZSmaE8rJBTwdUeTOhB34kJ/bRp9vwxxtNxwZsyJG54Ur1
- NkRXtan25VfunuZmxfAzgnipZTUUBk0VDIXkU=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=6RPyU9KlTHdOgkAmLOMKP2ZsiLo1+0ZzZXt5rKrY9KQ=;
+ b=coa3lgKd3W2zLu2VziGXiWdi2qk5QxDTrpA2V0L/4d0k8Na1MyZ7VcBMJzkpIOQmTY
+ bwC+BKOOMMfY/oYkT8xYMgTmOvOa7K2+U0iljl8Ngny+htseLtdLPWUMjdqAVh78LcbF
+ /8qvTLIReYhLio93eNCAvCIo8MzRuYbQ4wSts=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=aOWbOJz+q7a7Braxa6vSetV3DpRgUUln38aLV0BLFss=;
- b=J4BEz8z3YEV17UAz6Y3WrJJiKyZD+bTcdkocLWwOXAc9icy91/qP4HbuJzS+sEXVTn
- 1p6k/1HrRh8gYLV8ELbbb8QyrqzJnYhANlNgjov8Fb89VYGo7NHhI/+hsNKC6DPCAGJG
- PLSuexd7jeHdibX/EvwzA9thjuFYXPTnQGZ8yfi0bswy5pZaJuoJh/MuWq8HIUEeNk7k
- /qGMiOHFRL3jEUB3eE6dplSnhnWFqG9VdS9EapVD+O819KHsMrhptqE0HaG81OG40riP
- 0Z1PJec22zeUNojOdmoLh13y2mhjCisNgbWh400WoCVRrSPC0dGbLEQHg5h3/N5Hr66Y
- DmOg==
-X-Gm-Message-State: AHQUAuZi/TB3Ww9RDwG1bmPyRSvQvvOYcmEaFNOaNJfUyF2m3hiy3mtX
- Nx8IctNu1WBAB8gH/sqbhWMRXw==
-X-Google-Smtp-Source: AHgI3IYAFdoACBkxxZtv4EqVv6H5LD9pY1Nr6f8iwpffWOJ3mPN4W0siuDeuZwFJ2BQx1weh11akrA==
-X-Received: by 2002:a62:864c:: with SMTP id x73mr5752695pfd.49.1550172365429; 
- Thu, 14 Feb 2019 11:26:05 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=6RPyU9KlTHdOgkAmLOMKP2ZsiLo1+0ZzZXt5rKrY9KQ=;
+ b=renO6TdfQ4M7Ht/h3OsIPmBxA5A+R7ub/Q2J30cn+oNgNgY8QXXg2SJnA9mWbQbaT4
+ sXVm2j3mIglINRFR5pCSktg8bJIS3XHrKGURCZeVIr+FyFodJuJu/NnM5V3HJpTqIuGn
+ Pr2RNd8uVm8iiweCvQwGXLXn8nJ1h2ahdP5Qz5VHse239NeDBaDJwBBDc4jd7XSXp2/1
+ GDkeTWC6N2eXg5CsVqY2Jkku/UxFqQ6ifVErLfTOiB94qTHgzyianKCuxnCh4L3sgkzc
+ I7Tf0ILihVew0bvAOHme6YzR8rFk+QfbhmHhZyleZFK6z+HSeSFC49054s60rgYF6Zlj
+ 3dwA==
+X-Gm-Message-State: AHQUAuadbMlteaSBvFGz4ihDcFVIdNhBR1Wbklde4+1bbzYEB1ZVB2An
+ Oam2m5qIebzTi/cxIsHSQvcD+A==
+X-Google-Smtp-Source: AHgI3IaiBOPW+CBlLrKkP81yfT4FIZkOlPh6b4UXVprpinR0lR+vBgoOU825d/GhH4kDRSvMHMelvA==
+X-Received: by 2002:a17:902:b087:: with SMTP id
+ p7mr3905888plr.56.1550172368856; 
+ Thu, 14 Feb 2019 11:26:08 -0800 (PST)
 Received: from localhost.localdomain ([115.97.184.151])
- by smtp.gmail.com with ESMTPSA id k71sm8390100pga.44.2019.02.14.11.26.02
+ by smtp.gmail.com with ESMTPSA id k71sm8390100pga.44.2019.02.14.11.26.05
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 11:26:04 -0800 (PST)
+ Thu, 14 Feb 2019 11:26:08 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
-Subject: [PATCH v8 0/8] drm/sun4i: sun6i_mipi_dsi: Random fixes
-Date: Fri, 15 Feb 2019 00:55:36 +0530
-Message-Id: <20190214192544.7314-1-jagan@amarulasolutions.com>
+Subject: [PATCH v8 1/8] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
+Date: Fri, 15 Feb 2019 00:55:37 +0530
+Message-Id: <20190214192544.7314-2-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
+In-Reply-To: <20190214192544.7314-1-jagan@amarulasolutions.com>
+References: <20190214192544.7314-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_112606_842739_5C73A729 
-X-CRM114-Status: GOOD (  10.26  )
+X-CRM114-CacheID: sfid-20190214_112609_797992_42F89894 
+X-CRM114-Status: GOOD (  13.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,52 +104,52 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-These fixes are encounter in Allwinner MIPI-DSI driver while adding new
-SoC support and ofcourse all these are generic with respect to controller.  
+The horizontal and vertical back porch calculation in BSP
+code is simply following the Linux drm comment diagram, in
+include/drm/drm_modes.h which is
 
-All these changes are grabbed from previous versions[1] and grouped it in
-a proper order so-that it can help to review and merge easy.
+[hv]back porch = [hv]total - [hv]sync_end
 
-Changes for v8:
-- rebase on master
-- rework on commit messages
-- rework video start delay
-Changes for v7:
-- rebase on master
-- collect Merlijn Wajer Tested-by credits.
-Changes for v6:
-- fixed all burst mode patches as per previous version comments
-- rebase on master
-- update proper commit message
-- dropped unneeded comments
-- order the patches that make review easy
-Changes for v5, v4, v3, v2:
-- use existing driver code construct for hblk computation
-- create separate function for vblk computation 
-- cleanup commit messages
-- rebase on master
-- fixed checkpatch warnings/errors
+BSP code form BPI-M64-bsp is calculating vertical back porch as
+(from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
 
-[1] https://patchwork.kernel.org/cover/10680247/
-[2] https://patchwork.kernel.org/cover/10680247/
+timmings->ver_sync_time= panel_info->lcd_vspw;
+timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
 
-Any inputs?
-Jagan.
+vbp = panel->lcd_vbp;
+vspw = panel->lcd_vspw;
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
+dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
+=>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
+=>  timmings->ver_back_porch
+=>  mode->vtotal - mode->end
 
-Jagan Teki (8):
-  drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hbp timing value
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hfp timing value
-  drm/sun4i: sun6i_mipi_dsi: Fix DSI hblk timing calculation
-  drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet overhead
-  drm/sun4i: sun6i_mipi_dsi: Set proper vblk timing calculation
-  drm/sun4i: sun6i_mipi_dsi: Refactor vertical video start delay
-  drm/sun4i: sun6i_mipi_dsi: Add DSI Generic short write 2 param
-    transfer
+Which evatually same as mode->vtotal - mode->vsync_end so fix the VBP
+value in SUN6I_DSI_BASIC_SIZE0_VBP
 
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 65 ++++++++++++++++++++------
- 1 file changed, 52 insertions(+), 13 deletions(-)
+On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
+value.
 
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index 318994cd1b85..d70a8c43a4b8 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
+ 		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
+ 					       mode->vsync_start) |
+-		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
+-					       mode->vdisplay));
++		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
++					       mode->vsync_end));
+ 
+ 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE1_REG,
+ 		     SUN6I_DSI_BASIC_SIZE1_VACT(mode->vdisplay) |
 -- 
 2.18.0.321.gffc6fa0e3
 
