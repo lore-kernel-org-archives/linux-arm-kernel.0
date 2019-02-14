@@ -2,144 +2,70 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A08F5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:58:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9178BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 02:14:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C2FA222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:58:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 632F021902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 02:14:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lkI9DVHo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="xCiAy0Xv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C2FA222A1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hDXX5BpP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 632F021902
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/kAmGLqazKXXF8rrETE44empEapKPL9bHDArtFWhUF0=; b=lkI9DVHoDJPseC
-	8w/q2qEYREr4z8McK4t8cZXeQn53XavA+8LFHr1qS63cMRLyidtKfzQ8ynW5R10z0sMtRwepAwRli
-	EFh2TIUn6193A6SH/gZaCRh3LxpSpAhNo3issouxhod16of3/sB0f58Zcul1aZHu7uYZVJldlE3ZC
-	7TmS67qLhSJuL8kz/2s95n5rsdDQyOSbN0DsHv8jSnEZJaHSE/KITPFJbhOiAnvUKCFT13WSCJ7LS
-	yXAufXr6Eo30ceddLIaKBP4rQjSVNdNgII6K66+xukW7espg2rDxlZ/7l+NSD5nSbN2Ng7TxRN0FX
-	kehY0FifVkJqlqwE/PZQ==;
+	List-Owner; bh=zsh9blntlv0wAZe3V+47k7AbR/A15fvSYq+XW0UlDKA=; b=hDXX5BpPb6pMII
+	vhPYRtw3eRYWTgKWm7linmpoc0kbrN8DvgzREUreX08UclrtzXNeaXZpLRMO2RbnkKm8Zs2MNhk7D
+	QcD+dUzbRQ7i/r9eugvOxhfYHDBphhlaMSNGrpuDBWkE5UYdNy2XqeQ58xC5O5RbV5qyzga8exgCH
+	/TnGd4SuOpHrHdPQiiv4EU25odd1NpPzJ716dkWnvk5U4J9Q2w5keaZ0L2WWgvlGIW++3fX+aiEzJ
+	FFv0+OdvPbE3qChQeWZ9zs71u42s4euldKibjqmehM0DAytr9ui5J3s9qjRezwQ02R3HVa634ag1r
+	zK6bz2KFE587lQcwaeqQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu6IQ-0006n5-Ku; Thu, 14 Feb 2019 01:58:38 +0000
-Received: from mail-vi1eur04on060f.outbound.protection.outlook.com
- ([2a01:111:f400:fe0e::60f]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
+	id 1gu6Xv-0003QL-5b; Thu, 14 Feb 2019 02:14:39 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu6IN-0006mH-30
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 01:58:36 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=NfEPbafiW1hSJjNQ3vriLGRd0uFScb3UaNkjdkVYeeo=;
- b=xCiAy0XvhjwTNncHpBggIQY0+pVTYMRPEN3KOMhopbqduWesxoaOLD03Gxt1x4M96mMzvsO4uyuemXVNCu+E/l2Qp5moMsoCl3K8nVUt5aDSlaA37bGphmtMwJ5juBs32LRw64ubpC7nindBdbpxW4ebqu8Cn4si6G9xle4qvyM=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3850.eurprd04.prod.outlook.com (52.134.65.151) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.22; Thu, 14 Feb 2019 01:58:30 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 01:58:30 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: Stephen Boyd <sboyd@kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "festevam@gmail.com" <festevam@gmail.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "mturquette@baylibre.com" <mturquette@baylibre.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>, Aisheng Dong
- <aisheng.dong@nxp.com>, Daniel Baluta <daniel.baluta@nxp.com>
-Subject: RE: [PATCH V3 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Topic: [PATCH V3 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Index: AQHUw7Ub4OqO1UkLH067EH1cbtXa4KXd/7AAgACJOUA=
-Date: Thu, 14 Feb 2019 01:58:30 +0000
-Message-ID: <DB3PR0402MB39161EBE454F4095C275CFF0F5670@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1550073243-11242-1-git-send-email-Anson.Huang@nxp.com>
- <1550073243-11242-2-git-send-email-Anson.Huang@nxp.com>
- <155007977634.115909.4465011219844819801@swboyd.mtv.corp.google.com>
-In-Reply-To: <155007977634.115909.4465011219844819801@swboyd.mtv.corp.google.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-originating-ip: [119.31.174.68]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: f3bc3d09-779e-4f2a-cf5c-08d6921feb16
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3850; 
-x-ms-traffictypediagnostic: DB3PR0402MB3850:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtEQjNQUjA0MDJNQjM4NTA7MjM6UUc2djcyWUh1SFcwOXZlU2hmVlZ2WUhj?=
- =?utf-8?B?Tnc4L1JKNENIWjRPdUc4aFZCVUhIM1B0U3IrZ3l4K3UvRVNlME1GMk5sVFky?=
- =?utf-8?B?WU84bjhnQ0JoQloxY0tIQTJIK2lPZ2NzcUQwdlhnUllUNTJtZjNQMHdaS1BW?=
- =?utf-8?B?S0xPRWNsdloxU2pUSWNRbldGOFN5MHROenQ2Nmh0cnZhN2QvaGtWQmdEUUJ4?=
- =?utf-8?B?aHR3T3hhUGU1aURlMnNPUFd4a3lMTnVCT0ZxRWdGNzMzK1BlYndHTStzSi9I?=
- =?utf-8?B?Q2gvUm9XZ1JrQk01WGtBQUwwT0U5Z2FMREdJK0k2WGV3MENtbTI4YjU5Y3ZY?=
- =?utf-8?B?U0ZyNXJwRzEwdjdjZkJCM3VkSzZDRWNkblh6ZmJWdVpOUGJDMkxEZFRET3d4?=
- =?utf-8?B?MzB4SWZOM0JkdW5xSHZkSWJPUW5zZXl4Si9UbjdXYkRycStSQ2ZwL04zWXNS?=
- =?utf-8?B?K0hZMnJuUjZ3ekVUWVhXTEJhVXFoSC9LQjNnS29QeGgxL0VUUktJOTlHOWhR?=
- =?utf-8?B?UHNkd2txeGNDakRVOTZXb013c2R2K1FoZGxZaGdhSi9iU3FwNU5BZG8reXFS?=
- =?utf-8?B?elBkRVFrKzh5QnlhUTk0YkZWYkxpczVBRWVGc2pNbEh6UlBmZ01kVldSSGJM?=
- =?utf-8?B?OXFTKzBZbXhDSVd3NDhUcHBETmh1anprWGdiTndBUHlTa0xrVjh2VlRJd0Iw?=
- =?utf-8?B?VHNsS1hlaHBQZVMvSXBNQmwybVZrYXRIcWk3TUVHMWI1YlhxcGV6T09VZWZx?=
- =?utf-8?B?aVAySzRzNStIUi9VcHVjcTY2N2FkUHc4alR1UnEvYk9tOEhVYWwyTXdSQTBu?=
- =?utf-8?B?OHFQb0xUd3JGSFp1eVBxa1JjN0F3NmU1dVVzdkhNQkZwV3Y5YXdjYUlzM2Rp?=
- =?utf-8?B?Zk1BUTl0YVdweGNlbzdLazV6RDEwelErQkpGbVBhK0g5bDVSY0lqTXF3Umx3?=
- =?utf-8?B?cWFpb1hjV01idU5iQjlJUmZaUkNJTFpDeXRlazlrK3lEeXlOTm9ydWdZNXpV?=
- =?utf-8?B?UUZJTzczdnQwT1BBRld1Y0pmdHNWYWRZOVE0ZXQrYU8yRENDTDRaTjg0QU51?=
- =?utf-8?B?Z1FPY3pQUkRJZTRHdjU0S2svSUphdFVDU2FOVzNQbituYWlXV3R1aWtWd2F4?=
- =?utf-8?B?SWIzeENWb2JPNTBoY0J1WithK0NsYVg4V3Rpc3p5d3dHUks3V2tGTlVobENm?=
- =?utf-8?B?clVQSU4zakRBQytQTzVRekhBWVJsT0ZCZEVpRTdkbmhUUkt3V3VEYmMvTHNX?=
- =?utf-8?B?VXZjMDU4amllb3ErOHJVb1UrTkNEQTNVTFJpaGxwUFo0akVNOW5EdUs5RDcz?=
- =?utf-8?B?b2J3V3B1dkxMeE1mVjFBLzNWZVdUK0orWDY4QlVjM3Y5ZFNBMGJmWmZTeEFi?=
- =?utf-8?B?bCtndzZuUFAyZGRaT2FuWVJ1R1FGNzh2ZmxjYmNqbHB4VVFobHllMThrb0pI?=
- =?utf-8?B?WGR3cjRhNkhEdThsQnowY1I2Wi8zbmNXZjN4YXZvOHArNW93SGl4bGdreXRt?=
- =?utf-8?B?Qzd6SEo4YURDM1R1clM1eTVtV2p4aVlIU3IyMEVtYUxSTjduY2h6QXQzK2Z3?=
- =?utf-8?B?Y240WkV0am9qdEg3QS9tTUc5djErdXVsWGxzU2pZTEZFTE5xdmtrcWE0QVdv?=
- =?utf-8?B?VVV0NUV1Z3hEVHh3SFl6MW16NG9meEZUN0J4aFlwM05VZXZLbzZLWXdxUStk?=
- =?utf-8?B?V1YxUGRjWk1Jc1Vob3lMZ3g0N1VjbnQ5NDBxV1pRR2F1UkpxcFBBTnA3Zkox?=
- =?utf-8?Q?uqyT5PF7ptmo7uXHbYcZxt0ZYAtv5IGDTfztVy8=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3850C3CB8A694DB9BA782BEDF5670@DB3PR0402MB3850.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(366004)(376002)(39860400002)(396003)(13464003)(199004)(189003)(256004)(71190400001)(76176011)(229853002)(7696005)(6506007)(7416002)(6636002)(99286004)(55016002)(53546011)(9686003)(6436002)(2501003)(4326008)(26005)(71200400001)(14454004)(102836004)(478600001)(305945005)(2906002)(2201001)(105586002)(3846002)(486006)(81166006)(11346002)(476003)(97736004)(66066001)(106356001)(7736002)(86362001)(186003)(8676002)(33656002)(53936002)(74316002)(6246003)(110136005)(44832011)(8936002)(316002)(81156014)(68736007)(446003)(25786009)(6116002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3850;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: +y5b8YYYsdYSbTFQm+kpWabulHvogJpxsJN+GvutDiccnuMX7K8A2KXE7NLTsTRB8YnXHw0Bwtr51toCHk7UjRpzgyrh95RoJv4l6TdCyQ93MBZUGEJc7Kl15x+8cxZXaPsW5yOGW4vYexFDW7/XLiOOH1DProfO8njrsps/eCyZWWOKgG75EGnuuL6OQqgAqws5o6+TJWaeYZxSv6XZS21SNfdkn/zSY0jc4uP9eTG05eJbp3LfxcmXVmul5xDJGnBgU57Y74hWJdIX5RrCD3OgCEfJArxAvmkKTjX+zylN5fiL3d4MFowBBEU5xKoWzmoYbeznW3JosJVPJiSSyr820ZGFg6l8v0ylwHeUEreZUgI6JV3/KT18CDGFNTO3jKMMz+azbpY34qDll+dvGhOKFfI2otLa9329niqqrBw=
+ id 1gu6Xq-0003P4-Es; Thu, 14 Feb 2019 02:14:36 +0000
+X-UUID: 65ff675e02524a3a8c29865eaf7ded4b-20190213
+X-UUID: 65ff675e02524a3a8c29865eaf7ded4b-20190213
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <chaotian.jing@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1082633711; Wed, 13 Feb 2019 18:14:23 -0800
+Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 13 Feb 2019 18:14:21 -0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs03n1.mediatek.inc
+ (172.21.101.181) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 14 Feb 2019 10:14:19 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 14 Feb 2019 10:14:18 +0800
+Message-ID: <1550110458.16070.30.camel@mhfsdcap03>
+Subject: Re: [PATCH v1] mmc: mmc: Fix HS setting in mmc_hs400_to_hs200()
+From: Chaotian Jing <chaotian.jing@mediatek.com>
+To: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Thu, 14 Feb 2019 10:14:18 +0800
+In-Reply-To: <CAPDyKFpNEhXT0dD_p85Ab2H_nHtr5r86BLcvkLVUsdwtYLUs4g@mail.gmail.com>
+References: <1550048812-29068-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFpNEhXT0dD_p85Ab2H_nHtr5r86BLcvkLVUsdwtYLUs4g@mail.gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: f3bc3d09-779e-4f2a-cf5c-08d6921feb16
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 01:58:30.4165 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3850
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_175835_136244_7629F81F 
-X-CRM114-Status: GOOD (  15.86  )
+X-CRM114-CacheID: sfid-20190213_181434_507639_21507D5A 
+X-CRM114-Status: GOOD (  25.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,51 +77,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: srv_heupstream <srv_heupstream@mediatek.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>,
+ "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Adrian Hunter <adrian.hunter@intel.com>, linux-mediatek@lists.infradead.org,
+ Harish Jenny K N <harish_kandiga@mentor.com>,
+ Hongjie Fang <hongjiefang@asrmicro.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Simon Horman <horms+renesas@verge.net.au>, Kyle
+ Roeschley <kyle.roeschley@ni.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-DQoNCkJlc3QgUmVnYXJkcyENCkFuc29uIEh1YW5nDQoNCj4gLS0tLS1PcmlnaW5hbCBNZXNzYWdl
-LS0tLS0NCj4gRnJvbTogU3RlcGhlbiBCb3lkIFttYWlsdG86c2JveWRAa2VybmVsLm9yZ10NCj4g
-U2VudDogMjAxOeW5tDLmnIgxNOaXpSAxOjQzDQo+IFRvOiBkZXZpY2V0cmVlQHZnZXIua2VybmVs
-Lm9yZzsgZmVzdGV2YW1AZ21haWwuY29tOw0KPiBrZXJuZWxAcGVuZ3V0cm9uaXguZGU7IGxpbnV4
-LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZzsgbGludXgtDQo+IGNsa0B2Z2VyLmtlcm5l
-bC5vcmc7IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc7IG1hcmsucnV0bGFuZEBhcm0uY29t
-Ow0KPiBtdHVycXVldHRlQGJheWxpYnJlLmNvbTsgcm9iaCtkdEBrZXJuZWwub3JnOyBzLmhhdWVy
-QHBlbmd1dHJvbml4LmRlOw0KPiBzaGF3bmd1b0BrZXJuZWwub3JnOyB2aXJlc2gua3VtYXJAbGlu
-YXJvLm9yZzsgQWlzaGVuZyBEb25nDQo+IDxhaXNoZW5nLmRvbmdAbnhwLmNvbT47IEFuc29uIEh1
-YW5nIDxhbnNvbi5odWFuZ0BueHAuY29tPjsgRGFuaWVsDQo+IEJhbHV0YSA8ZGFuaWVsLmJhbHV0
-YUBueHAuY29tPg0KPiBDYzogZGwtbGludXgtaW14IDxsaW51eC1pbXhAbnhwLmNvbT4NCj4gU3Vi
-amVjdDogUmU6IFtQQVRDSCBWMyAyLzJdIGNsazogaW14OiBzY3U6IGFkZCBjcHUgZnJlcXVlbmN5
-IHNjYWxpbmcgc3VwcG9ydA0KPiANCj4gUXVvdGluZyBBbnNvbiBIdWFuZyAoMjAxOS0wMi0xMyAw
-Nzo1OTozMikNCj4gPiBAQCAtMTQ1LDYgKzE2MSwzOSBAQCBzdGF0aWMgbG9uZyBjbGtfc2N1X3Jv
-dW5kX3JhdGUoc3RydWN0IGNsa19odyAqaHcsDQo+IHVuc2lnbmVkIGxvbmcgcmF0ZSwNCj4gPiAg
-ICAgICAgIHJldHVybiByYXRlOw0KPiA+ICB9DQo+ID4NCj4gPiArc3RhdGljIGJvb2wgY2xrX3Nj
-dV9hdGZfc2V0X2NwdV9yYXRlKHN0cnVjdCBjbGtfaHcgKmh3LCB1bnNpZ25lZCBsb25nDQo+ID4g
-K3JhdGUpIHsNCj4gPiArICAgICAgIHN0cnVjdCBjbGtfc2N1ICpjbGsgPSB0b19jbGtfc2N1KGh3
-KTsNCj4gPiArICAgICAgIHN0cnVjdCBhcm1fc21jY2NfcmVzIHJlczsNCj4gPiArICAgICAgIHVu
-c2lnbmVkIGludCBjbHVzdGVyX2lkOw0KPiA+ICsgICAgICAgaW50IGk7DQo+ID4gKw0KPiA+ICsg
-ICAgICAgLyogQ1BVIGZyZXF1ZW5jeSBzY2FsaW5nIGNhbiBPTkxZIGJlIGRvbmUgYnkgQVJNLVRy
-dXN0ZWQtRmlybXdhcmUNCj4gKi8NCj4gPiArICAgICAgIGlmIChjbGstPmNsa190eXBlID09IElN
-WF9TQ19QTV9DTEtfQ1BVKSB7DQo+ID4gKyAgICAgICAgICAgICAgIGZvciAoaSA9IDA7IGkgPCBB
-UlJBWV9TSVpFKGlteF9zY19jcHVmcmVxX2RhdGEpOyBpKyspIHsNCj4gPiArICAgICAgICAgICAg
-ICAgICAgICAgICBpZiAoIXN0cmNtcChjbGtfaHdfZ2V0X25hbWUoaHcpLA0KPiA+ICsgICAgICAg
-ICAgICAgICAgICAgICAgICAgICAgICAgaW14X3NjX2NwdWZyZXFfZGF0YVtpXS5jbGtfbmFtZSkp
-IHsNCj4gPiArICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNsdXN0ZXJfaWQgPSBpbXhf
-c2NfY3B1ZnJlcV9kYXRhW2ldLmNsdXN0ZXJfaWQ7DQo+ID4gKyAgICAgICAgICAgICAgICAgICAg
-ICAgICAgICAgICBicmVhazsNCj4gPiArICAgICAgICAgICAgICAgICAgICAgICB9DQo+ID4gKyAg
-ICAgICAgICAgICAgIH0NCj4gDQo+IElzIHRoZXJlIHNvbWUgcmVhc29uIHdoeSB0aGVzZSBjbGtz
-IGNhbid0IGJlIGRldGVybWluZWQgb25jZSBhdCBib290IHRpbWU/DQo+IEl0IHdvdWxkIGJlIGEg
-Z29vZCBpZGVhIHRvIGF2b2lkIGRvaW5nIGFueSBzb3J0IG9mIHN0cmluZyBjb21wYXJpc29uIGhl
-cmUsDQo+IGluc3RlYWQganVzdCBjYWxsaW5nIHRoZSByaWdodCBhcm1fc21jY2Nfc21jIHdpdGgg
-dGhlIHJpZ2h0IGFyZ3VtZW50cyBiYXNlZA0KPiBvbiBjb2RlIHRoYXQgcmVnaXN0ZXJzIHRob3Nl
-IHR5cGVzIG9mIGNsa3MuDQoNCkFncmVlLCBJIGNhbiBhdm9pZCBzdHJpbmcgY29tcGFyaXNvbiBp
-biBydW50aW1lLCBpbiBWNCBwYXRjaCBJIGp1c3Qgc2VudCwgSSBhZGQgYW5vdGhlcg0KY2xrIG9w
-cyBmb3IgQ1BVIGNsb2NrLCBhbmQgdXNlIHJlc291cmNlIElEIHRvIGRldGVybWluZSB0aGUgQ1BV
-IGNsayBvcHMgYW5kIGNsdXN0ZXIgaWQsDQp0aHVzIHdlIGNhbiBzYXZlIHRoZSBydW50aW1lIGNo
-ZWNrIGFuZCBzdHJpbmcgY29tcGFyaXNvbi4NCg0KVGhhbmtzLA0KQW5zb24uDQoNCl9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwg
-bWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8v
-bGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Wed, 2019-02-13 at 13:08 +0100, Ulf Hansson wrote:
+> On Wed, 13 Feb 2019 at 10:07, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+> >
+> > mmc_hs400_to_hs200() begins with the card and host in HS400 mode.
+> > Therefore, any commands sent to the card should use HS400 timing.
+> > reduce clock frequency to 50Mhz but without host timming change
+> > may cause CMD6 response CRC error. because host still running at
+> > hs400 mode, and it's hard to find a suitable setting for all eMMC
+> > cards when clock frequency reduced to 50Mhz but card & host still
+> > in hs400 mode.
+> > this patch refers to mmc_select_hs400(), make the reduce clock frequency
+> > after card timing change.
+> >
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > Fixes: ef3d232245ab ("mmc: mmc: Relax checking for switch errors after HS200 switch")
+> > ---
+> >  drivers/mmc/core/mmc.c | 29 +++++++++++++++++++++++------
+> >  1 file changed, 23 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> > index 09c688f..00adc2d 100644
+> > --- a/drivers/mmc/core/mmc.c
+> > +++ b/drivers/mmc/core/mmc.c
+> > @@ -1239,20 +1239,37 @@ int mmc_hs400_to_hs200(struct mmc_card *card)
+> >         int err;
+> >         u8 val;
+> >
+> > -       /* Reduce frequency to HS */
+> > -       max_dtr = card->ext_csd.hs_max_dtr;
+> > -       mmc_set_clock(host, max_dtr);
+> > -
+> >         /* Switch HS400 to HS DDR */
+> >         val = EXT_CSD_TIMING_HS;
+> >         err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL, EXT_CSD_HS_TIMING,
+> >                            val, card->ext_csd.generic_cmd6_time, 0,
+> >                            true, false, true);
+> > -       if (err)
+> > -               goto out_err;
+> > +       /*
+> > +        * as we are on the way to do re-tune, so if the CMD6 got response CRC
+> > +        * error, do not treat it as error.
+> > +        */
+> > +       if (err) {
+> > +               if (err == -EILSEQ) {
+> > +                       /*
+> > +                        * card will busy after sending out response and host
+> > +                        * driver may not wait busy de-assert when get
+> > +                        * response CRC error. so just wait enough time to
+> > +                        * ensure card leave busy state.
+> > +                        */
+> > +                       mmc_delay(card->ext_csd.generic_cmd6_time);
+> > +                       pr_debug("%s: %s switch to HS got CRC error\n",
+> > +                                mmc_hostname(host), __func__);
+> > +               } else {
+> > +                       goto out_err;
+> > +               }
+> > +       }
+> >
+> >         mmc_set_timing(host, MMC_TIMING_MMC_DDR52);
+> >
+> > +       /* Reduce frequency to HS */
+> > +       max_dtr = card->ext_csd.hs_max_dtr;
+> > +       mmc_set_clock(host, max_dtr);
+> > +
+> 
+> What Adrian suggested was to not to move this part, but instead, only
+> allow CRC errors from the CMD6 as above.
+> 
+> I guess it didn't work for you?
+> 
+It should work for me. another issue is CMD6 will be sent 3 times at max
+ err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
+
+if the first CMD6 got response CRC error, then Host driver must wait
+busy signal de-assert before send the next CMD6.
+
+So that it really make sense to issue CMD6(R1B) for 3 times ? if host
+driver did not handle the first CMD6 response CRC error and send second
+CMD6 directly, then this CMD6 will get timeout due to card still in busy
+state.
+> >         err = mmc_switch_status(card);
+> >         if (err)
+> >                 goto out_err;
+> > --
+> > 1.8.1.1.dirty
+> >
+> 
+> Kind regards
+> Uffe
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
