@@ -2,89 +2,99 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7248CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:51:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C45BFC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:58:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B6FB21916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:51:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C16521B68
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:58:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tKSTZ3iN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="miCxR829"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B6FB21916
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RTFKwAsO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="owg2EAXP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C16521B68
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ji/HwO4a6vNnI4A87nKwMrezSX1ZGdOJHNRrWpl36R8=; b=tKSTZ3iNcwIFUA
-	sxmP99u6yHuYuLWPxksxo5s0stq3QXM34kPpa9027x28KNQoekgCc+ZCi7UblGLvyRQ9U6p+f/Lgj
-	eAqNgvyiSmY9FyjGOkyYZs5mfPnUqr/ZrEI5zOIBde0bLN9byL4cUYOouFPfOfV0evfph5FIl0Be/
-	3UXMMrJeBGG4F/g0sIrMY14udyJ5uArXXhSIjg4sRVdxsE9ZuuWIPcdg8W40zrr34SQWrlNVR+MCQ
-	yrdQzgfX6D/HuRXkQaMoqm/I1pNsrrctZYCaqOxqz8TrNpBtKTPdN3jaHsCdsc6EKsGTl65ITiMMj
-	CJmLmlZ3FWQPFkLa/kmQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tQ6AiAgWQPJ2CyExYPiUqMz/UVRcDkicQr5EgV6mzKk=; b=RTFKwAsOYFflu2
+	HzkZnXI0I3KwCM2zrIE0N2TQ+DYfLgWtmgnX5mvrxwHKpKZf/WJUPDxypOFuCkq6EKwVkhYkuteot
+	zOj5zdX/uKWrukFw0DaWKihGB9nIFb9X+6BxVKsXPCgB+TKf/dm0McmyeAHi1EJqkLGjbiDutv+Wx
+	Km6VzZ3D/r5RsWyPp2/csxAC+rJ8Gv/xJ4yS4nrCqTAb29y+wz/c8xd4YV1dJ4bxg09EfqOFiEGgZ
+	g6IGpd05Kcb3cVOmbhOjNpz/rsg8vycUz8a4RUGv98DUh9yNZRQZd9Tr9TFsTVmwDMwr57z5effgb
+	BjMh62ZpjzqHAYNEXgVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guN2H-00080g-Ik; Thu, 14 Feb 2019 19:51:05 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1guN97-0001bm-0i; Thu, 14 Feb 2019 19:58:09 +0000
+Received: from userp2120.oracle.com ([156.151.31.85])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guN2D-00080G-JE
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:51:03 +0000
-Received: by mail-ot1-x344.google.com with SMTP id i5so12570833oto.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 11:51:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=c0m+49oEvIJ+Kmp5l+wQcjfeTIxBcPLFzmifvZuZyoU=;
- b=miCxR829KHgnO5J/wDqTiZK8w82ax2UGRbPc9Rky4elUyeEIGb0e+HuvfFwXRoEMM9
- Clbm/6h/txfdSM6nRDJrZ3RgEg6fcHVZaRz4nH747T2VDMirvPuuECIujYWVcEGrgLm8
- Tuh6NGVSgjoRytKI/w32YZQhpJExmzXbuAAGkzWMIhu7Crm1whxjSt9Ej6hPlYCZtLiB
- U4bjEJAeuk1bWlCmucAuH/OsI57Q1dRT4XzQWyexeNKDCqjK2mobOtP27BojN24l1ysz
- bfVFGLCodHN7UEaYXiTBHYT6nUQaZqFqwQkzpjjis477XBCAAoKRra9u8kAf3cMYfk+e
- QgfA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=c0m+49oEvIJ+Kmp5l+wQcjfeTIxBcPLFzmifvZuZyoU=;
- b=cHwUrHAUxVc4K3/XaxXTwMcd4lmm/lwVL/sZfw9LBQeRGUVwmeq9upBTT2TgOnIwAC
- OqlLyaXTCwe7mDm6HGrhSiOi4WG2Uv5V8WydTChpYPwWNql0Jhd6NZN36mJA5AEgyC5d
- TiGpyzksopk72/cSJURUlBO7/Z8ChEMuf1JeKC3trc01WGwTADsOb4dQbwMc5n0jGKK3
- 5nK1sTY+9blTFtpeGVySBMYLZ8R6xeM3wttRvu6L94eAeN+17CIsjJL/8HiU2t25O1Of
- OAwamOu/qUY/2abE+9XvSqIlC0IC2aoB2JL3lsc61sPjkSdn4zLOr1T60RYWwosMNlsM
- GI7w==
-X-Gm-Message-State: AHQUAuap/bL/H+m4DFNfSViwVLVUCcg9ODm9g3d3W2xJtHbmOFCXgc/I
- mvSUZZb9iXu/nTLCqRTwTFAcOd74a73jCbW/AuA=
-X-Google-Smtp-Source: AHgI3IbFZTC9rH7XwMfg8x53qR3evcJqSxdDmx5eF62ryz2kvc2KjTqKVVQjv7+W0NvKNBJ29/cASquUftGkPOEnVnE=
-X-Received: by 2002:a9d:6357:: with SMTP id y23mr3433964otk.203.1550173860013; 
- Thu, 14 Feb 2019 11:51:00 -0800 (PST)
+ id 1guN93-0001bT-NS
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:58:07 +0000
+Received: from pps.filterd (userp2120.oracle.com [127.0.0.1])
+ by userp2120.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1EJsITk073232;
+ Thu, 14 Feb 2019 19:57:37 GMT
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
+ h=subject : to : cc :
+ references : from : message-id : date : mime-version : in-reply-to :
+ content-type : content-transfer-encoding; s=corp-2018-07-02;
+ bh=BdK7IaSpJfGdyre7bODL0VtCcEpshJ2Y4O0xLokGeZA=;
+ b=owg2EAXP1djY4nOw3m8VNIzE98O8OriShbmSSMKZ1A19elg+OjugPa4ORsAae1iR/QG+
+ Oo6TItCage0cFqLHvah7MyhhQEJRLw3heZpg0f9FxV8KjBacCmhDbU4A0xmkJ4AE0tW7
+ 7J9JF0zShtWDBE+r9ZN2h7CQ6evngnuEYCI2DcA3CDxWWAikNj2v6M/+F1z0RzJ8PftT
+ w/OicGnyFF60fSAZPPiq1gNdWsq+Jc80DNuUYrKuzTkrqjKuKEtmKgryWLQec1RjtvWO
+ whVfMYxFhwr12ksKkKKbj0LUcJjPeYPtDBVapSvKu0btUzQCxs69XCHlEjHQ3KEkgP2z tg== 
+Received: from aserv0021.oracle.com (aserv0021.oracle.com [141.146.126.233])
+ by userp2120.oracle.com with ESMTP id 2qhreea5de-1
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 19:57:36 +0000
+Received: from aserv0122.oracle.com (aserv0122.oracle.com [141.146.126.236])
+ by aserv0021.oracle.com (8.14.4/8.14.4) with ESMTP id x1EJvZQN015680
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
+ Thu, 14 Feb 2019 19:57:35 GMT
+Received: from abhmp0018.oracle.com (abhmp0018.oracle.com [141.146.116.24])
+ by aserv0122.oracle.com (8.14.4/8.14.4) with ESMTP id x1EJvXGY021984;
+ Thu, 14 Feb 2019 19:57:33 GMT
+Received: from [192.168.1.16] (/24.9.64.241)
+ by default (Oracle Beehive Gateway v4.0)
+ with ESMTP ; Thu, 14 Feb 2019 19:57:33 +0000
+Subject: Re: [RFC PATCH v8 13/14] xpfo, mm: Defer TLB flushes for non-current
+ CPUs (x86 only)
+To: Dave Hansen <dave.hansen@intel.com>, juergh@gmail.com, tycho@tycho.ws,
+ jsteckli@amazon.de, ak@linux.intel.com, torvalds@linux-foundation.org,
+ liran.alon@oracle.com, keescook@google.com, akpm@linux-foundation.org,
+ mhocko@suse.com, catalin.marinas@arm.com, will.deacon@arm.com,
+ jmorris@namei.org, konrad.wilk@oracle.com
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+ <98134cb73e911b2f0b59ffb76243a7777963d218.1550088114.git.khalid.aziz@oracle.com>
+ <a6510fa8-e96d-677b-78df-da9a19c4089b@intel.com>
+From: Khalid Aziz <khalid.aziz@oracle.com>
+Organization: Oracle Corp
+Message-ID: <95fb62d4-1dbc-e420-74c1-ff929c5552e1@oracle.com>
+Date: Thu, 14 Feb 2019 12:57:30 -0700
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo> <20190204094012.GP3271@phenom.ffwll.local>
- <20190204112218.GB10412@ulmo> <20190204155909.GU3271@phenom.ffwll.local>
- <20190204162258.GB25476@ulmo> <20190205085737.GY3271@phenom.ffwll.local>
- <20190205102419.GA591@ulmo> <20190205163649.GG3271@phenom.ffwll.local>
-In-Reply-To: <20190205163649.GG3271@phenom.ffwll.local>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Thu, 14 Feb 2019 11:51:19 -0800
-Message-ID: <CA+E=qVf3DMatwfTUwwMwzOeWVq4z4FZ8irEgvHphkx6V=B0j9g@mail.gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-To: Daniel Vetter <daniel@ffwll.ch>
+In-Reply-To: <a6510fa8-e96d-677b-78df-da9a19c4089b@intel.com>
+Content-Language: en-US
+X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9167
+ signatures=668683
+X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
+ priorityscore=1501 malwarescore=0
+ suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1015
+ lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=999 adultscore=0
+ classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
+ definitions=main-1902140133
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_115101_640492_DC0DE5C5 
-X-CRM114-Status: GOOD (  53.02  )
+X-CRM114-CacheID: sfid-20190214_115805_809742_11468E2C 
+X-CRM114-Status: GOOD (  24.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,186 +106,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, dri-devel <dri-devel@lists.freedesktop.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: kernel-hardening@lists.openwall.com, peterz@infradead.org,
+ linux-mm@kvack.org, deepa.srinivasan@oracle.com, steven.sistare@oracle.com,
+ joao.m.martins@oracle.com, boris.ostrovsky@oracle.com, x86@kernel.org,
+ hch@lst.de, kanth.ghatraju@oracle.com, labbott@redhat.com,
+ pradeep.vincent@oracle.com, jcm@redhat.com, luto@kernel.org,
+ tglx@linutronix.de, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com,
+ andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org, tyhicks@canonical.com,
+ john.haxby@oracle.com, dwmw@amazon.co.uk, kirill.shutemov@linux.intel.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 5, 2019 at 8:36 AM Daniel Vetter <daniel@ffwll.ch> wrote:
->
-> On Tue, Feb 05, 2019 at 11:24:19AM +0100, Thierry Reding wrote:
-> > On Tue, Feb 05, 2019 at 09:57:37AM +0100, Daniel Vetter wrote:
-> > > On Mon, Feb 04, 2019 at 05:22:58PM +0100, Thierry Reding wrote:
-> > > > On Mon, Feb 04, 2019 at 04:59:09PM +0100, Daniel Vetter wrote:
-> > > > > On Mon, Feb 04, 2019 at 12:22:18PM +0100, Thierry Reding wrote:
-> > > > > > On Mon, Feb 04, 2019 at 10:40:12AM +0100, Daniel Vetter wrote:
-> > > > > > > On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
-> > > > > > > > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > > > > > > >
-> > > > > > > > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
-> > > > > > > > > > > width/height or any modes/timings in dts. But this panel still may have
-> > > > > > > > > > > regulator and/or backlight.
-> > > > > > > > > > >
-> > > > > > > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > > > > > > > > ---
-> > > > > > > > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
-> > > > > > > > > > >  1 file changed, 7 insertions(+)
-> > > > > > > > > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
-> > > > > > > > > >
-> > > > > > > > > > Please don't try to make panels look more generic than they really are.
-> > > > > > > > > > You're going to have to provide a compatible string for your device that
-> > > > > > > > > > is more specific than "panel-edp". You claim that you don't need any
-> > > > > > > > > > extra information that is panel specific, but you don't know that now.
-> > > > > > > > > > We have in the past thought that we didn't need things like prepare
-> > > > > > > > > > delay, but then we ran into situations where we did need them.
-> > > > > > > > > >
-> > > > > > > > > > Just do what everybody else does. Provide a specific compatible string
-> > > > > > > > > > and match on that in the panel-simple driver. Even if you can read all
-> > > > > > > > > > the video timings from an EDID EEPROM, you can still provide a mode in
-> > > > > > > > > > the panel descriptor to serve as a fallback if for example the EEPROM
-> > > > > > > > > > is faulty on some device.
-> > > > > > > > >
-> > > > > > > > > Pinebook used several 768p panels that have slightly different timings
-> > > > > > > > > and recent batch uses 1080p panel.
-> > > > > > > > >
-> > > > > > > > > What panel descriptor should I use as fallback?
-> > > > > > > >
-> > > > > > > > You don't use panel descriptors as fallback. The simple-panel driver
-> > > > > > > > will bind to a panel device and use the corresponding descriptor. If
-> > > > > > > > your device tree contains the correct information, the descriptor is
-> > > > > > > > correct for the panel you have.
-> > > > > > > >
-> > > > > > > > In other words you need to ensure that you have the correct panel in
-> > > > > > > > device tree for the board that you're using. This is exactly the same
-> > > > > > > > thing as for other devices.
-> > > > > > > >
-> > > > > > > > One way to to this is to have separate device trees for each variant
-> > > > > > > > of the board that you want to support. Another variant may be to have
-> > > > > > > > a common device tree and then have some early firmware update the DTB
-> > > > > > > > with the correct panel information.
-> > > > > > >
-> > > > > > > This would defeat the point of edp, which is to standardize the mess of
-> > > > > > > panels (at least somewhat) and avoid having to change the DT/ACPI
-> > > > > > > tables/firmware for every board you ship. Also, we do have DP quirking
-> > > > > > > infrastructure already (using the OUI), I think if there's something that
-> > > > > > > doesn't work then we should quirk it there.
-> > > > > >
-> > > > > > The problem is that while the attempt may have been to standardize, it
-> > > > > > failed. It doesn't take into account any of the details such as timing
-> > > > > > between things like powering up the display and enabling the backlight
-> > > > > > or similar. I don't know how you'd want to "quirk" those kinds of
-> > > > > > requirements because they are highly panel specific.
-> > > > >
-> > > > > Hm right, we get these from some firmware tables (and mix them with the
-> > > > > spec one, since some of the firmware values are nonsense). I don't even
-> > > > > know whether we can read the timings over dp aux somehow (you can power up
-> > > > > the panel with some pessimistic values to figure those out, and you only
-> > > > > need dp aux to work, which is much simpler than the entire panel).
-> > > > >
-> > > > > > > What does make sense though imo is if we try not to stuff the edp panel
-> > > > > > > into panel-simple, because it's anything like a simple dumb panel. There's
-> > > > > > > also some integration awkwardness since with this panel you need to do dp
-> > > > > > > aux/i2c transactions to get at the information (edid alone isn't good
-> > > > > > > enough for edp), and I'm not sure how exactly that's supposed to be
-> > > > > > > instantiated. Maybe a special function to instantiate an edp panel, which
-> > > > > > > takes both a DT node and the dp_aux controller would be much better,
-> > > > > > > instead of trying to auto-match against a DT compatible string and load a
-> > > > > > > panel driver which is almost all fake.
-> > > > > > >
-> > > > > > > Or we teach dp_aux to register itself and somehow teach panel-edp how it
-> > > > > > > can get hold of the dp_aux channel it needs.
-> > > > > >
-> > > > > > We already do that. drm_dp_aux registers as an I2C adapter that can be
-> > > > > > used to read EDID EEPROMs using I2C-over-AUX transactions. We already
-> > > > > > use that on some platforms.
-> > > > > >
-> > > > > > Also note that simple-panel already supports getting video timings from
-> > > > > > EDID. If a DDC link is present in DT, the driver will load the modes
-> > > > > > from EDID and use them.
-> > > > >
-> > > > > Could we extend this to dp aux somehow? For edp you need the dp aux (which
-> > > > > then gives you the ddc link automatically).
-> > > >
-> > > > I suppose we could do that. We could introduce a new property that would
-> > > > allow the panel driver to get at the struct drm_dp_aux that can access
-> > > > the panel. I'm not sure how much that would buy us. I suppose the driver
-> > > > could go and use that drm_dp_aux to do I2C-over-AUX and ignore any
-> > > > ddc-bus property in device tree. A drm_dp_aux object could also be used
-> > > > to access DPCD if that's helpful.
-> > > >
-> > > > The driver proposed here doesn't need access to DPCD, so I'm not sure
-> > > > that would immediately help.
-> > >
-> > > You definitely need dp aux to drive edp. That's where a lot of the really
-> > > important stuff is stored, and it sounds like on non-broken panels even
-> > > the timings (we've never implemented that on i915 somehow).
-> >
-> > I'm not sure I understand what you're saying here. I haven't worked with
-> > eDP panels in a while, but my recollection is that you can use DP AUX to
-> > read video timings over EDID. We provide support for that by exporting a
-> > DP AUX controller as I2C adapter (i.e. register with the I2C subsystem)
-> > and then that I2C adapter can be used to read the EDID. I wasn't aware
-> > that eDP panels additionally stored the video timings somewhere else.
->
-> I didn't know either, but understood Vasily's comment that this is
-> possible. Haven't dug around in the specs though.
+On 2/14/19 10:42 AM, Dave Hansen wrote:
+>>  #endif
+>> +
+>> +	/* If there is a pending TLB flush for this CPU due to XPFO
+>> +	 * flush, do it now.
+>> +	 */
+> 
+> Don't forget CodingStyle in all this, please.
 
-It probes link capabilities such as lanes number and rate, see
-drm_dp_link_probe(),
-I'm not sure if it's panel property or not.
+Of course. I will fix that.
 
-> > What I meant above was that aside from the I2C-over-AUX for reading the
-> > EDID, this driver doesn't do anything else with DP AUX in order to turn
-> > the panel on. Looking at the eDP support we have on Tegra, there's a
-> > DPCD register (DP_SET_POWER) that needs to be written in order to take
-> > the sink device (i.e. panel) out of the power saving state. We do that
-> > as part of the connector implementation rather than within the panel
-> > driver. There are also additional registers such as DP_LINK_BW_SET that
-> > need to be programmed. I think this is also relevant to regular DP and
-> > detailed in the specification.
-> >
-> > Given all the above, I'm beginning to think that Rob's right in that
-> > perhaps we shouldn't be treating eDP panels as panels, but rather to
-> > make them look more like DP monitors and make all this code part of the
-> > connector implementation. I think pretty much the only differences to
-> > regular DP are that we might require some lower-level resources that a
-> > DP monitor would usually have built-in (reset or power GPIOs, power
-> > supplies, backlight, ...).
-> >
-> > I'm not sure if that's enough for eDP panels, though. For example the
-> > AUO B133HTN01 panel, used by the exynos5800-peach-pi, seems to be an eDP
-> > panel. But the driver also specifies a couple of additional delays which
-> > suggests that either it violates the eDP specification or that the eDP
-> > specification doesn't define any power sequencing delays that would've
-> > been needed. Or perhaps these delays are specified somewhere and the
-> > driver just doesn't use them?
->
-> I honestly don't know, but gut feeling also goes towards making edp
-> something else than a dumb panel. There's a lot of stuff you need to do
-> that overlaps with normal DP sinks, plus there's a lot of stuff (but not
-> everything, or at least it needs some quirking sometimes) that you're
-> supposed to autodiscover. But I'm not sure what's the best solution really
-> is, since for i915 all the quirking we need is in some i915-specific
-> tables (and I'm not even sure how much of that quirking is really
-> necessary, and how much just convenience for us because the fw already did
-> the hard work of poking the information out of the panel).
-> -Daniel
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+> 
+>> +	if (cpumask_test_and_clear_cpu(cpu, &pending_xpfo_flush)) {
+>> +		count_vm_tlb_event(NR_TLB_REMOTE_FLUSH_RECEIVED);
+>> +		__flush_tlb_all();
+>> +	}
+> 
+> This seems to exist in parallel with all of the cpu_tlbstate
+> infrastructure.  Shouldn't it go in there?
+
+That sounds like a good idea. On the other hand, pending flush needs to
+be kept track of entirely within arch/x86/mm/tlb.c and using a local
+variable with scope limited to just that file feels like a lighter
+weight implementation. I could go either way.
+
+> 
+> Also, if we're doing full flushes like this, it seems a bit wasteful to
+> then go and do later things like invalidate_user_asid() when we *know*
+> that the asid would have been flushed by this operation.  I'm pretty
+> sure this isn't the only __flush_tlb_all() callsite that does this, so
+> it's not really criticism of this patch specifically.  It's more of a
+> structural issue.
+> 
+> 
+
+That is a good point. It is not just wasteful, it is bound to have
+performance impact even if slight.
+
+>> +void xpfo_flush_tlb_kernel_range(unsigned long start, unsigned long end)
+>> +{
+> 
+> This is a bit lightly commented.  Please give this some good
+> descriptions about the logic behind the implementation and the tradeoffs
+> that are in play.
+> 
+> This is doing a local flush, but deferring the flushes on all other
+> processors, right?  Can you explain the logic behind that in a comment
+> here, please?  This also has to be called with preemption disabled, right?
+> 
+>> +	struct cpumask tmp_mask;
+>> +
+>> +	/* Balance as user space task's flush, a bit conservative */
+>> +	if (end == TLB_FLUSH_ALL ||
+>> +	    (end - start) > tlb_single_page_flush_ceiling << PAGE_SHIFT) {
+>> +		do_flush_tlb_all(NULL);
+>> +	} else {
+>> +		struct flush_tlb_info info;
+>> +
+>> +		info.start = start;
+>> +		info.end = end;
+>> +		do_kernel_range_flush(&info);
+>> +	}
+>> +	cpumask_setall(&tmp_mask);
+>> +	cpumask_clear_cpu(smp_processor_id(), &tmp_mask);
+>> +	cpumask_or(&pending_xpfo_flush, &pending_xpfo_flush, &tmp_mask);
+>> +}
+> 
+> Fun.  cpumask_setall() is non-atomic while cpumask_clear_cpu() and
+> cpumask_or() *are* atomic.  The cpumask_clear_cpu() is operating on
+> thread-local storage and doesn't need to be atomic.  Please make it
+> __cpumask_clear_cpu().
+> 
+
+I will fix that. Thanks!
+
+--
+Khalid
+
 
 _______________________________________________
 linux-arm-kernel mailing list
