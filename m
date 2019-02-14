@@ -4,122 +4,80 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51140C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:40:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DE8DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:42:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F5BF222E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:40:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CFFFE222DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:42:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U2Dvklq+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F5BF222E0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XFm2S+25";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="AZ2AEnRk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFFFE222DD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oMUr0UjgX6aKVJa2O8dYD1DCywTuyq+PSle7Mi+V300=; b=U2Dvklq+uduvLo
-	pF9jP84+FMOniwAoDPgvmCBd4jQtYNXffti7IxaDtwEuiPPxzaMAOS/vu/rLzfBfD3WqoQE5LC72t
-	ciLJkS7DnbKR+Skqg/TiRRFDmSPD52+tEVUsHmberT7eBOwU2rUpjlImMd3HAnT1FW0F0MqtZPNN5
-	bDFBUMV7lqYbfI3h8Thln716ZFX0i9HkWC9x2MHadbc11waa6Cs481WVspJyXykAzpc8XdpN5Td6H
-	oHFWBnNWw0qt+KV4NWjgWIpDCs6Jy24UyVCI+2R7afq9s+cIrAmk9D6W7W2Z2QhH49cGMzSK4vb0e
-	czmE59KK6aaLQ44JGR5g==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=R8LxFobtTteOb+2lzGtafmeHpz52Ftxca+En7Iou7OM=; b=XFm2S+25VZ48Bb
+	aJ9cxd0fq0UfrIGC84mAXZ/ZpR1LpzDPI8dViCgB22vgvpTDx4+SkqtORTVm627ZhWaOdQ4085D6u
+	vuxcK7q7w7MANoF/lYEgesW7ebaHe32A3u3Ieg8QD4OSKDJdaUyPIK6y3IZyHT3YmKc1k5+HfVbd4
+	YzNeF+h15fjTHP2cGHVgPAieTohVH1AG76NcHxhq/ZaASqPgRZsYb9wqGmlFpUzEwgc0W8vxQyy85
+	ViUu5llB6doLbjZ5dl8X0CfwjigcyIsfiGesrFUzEM2lH4S5eyDgnH8t94W/GbeCPCfq5V2nqU4Er
+	Ug2fynTvXbWZW083AZ1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guK41-0006x7-NE; Thu, 14 Feb 2019 16:40:41 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1guK5N-0007FN-UD; Thu, 14 Feb 2019 16:42:06 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guK3x-0006wX-VV
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:40:39 +0000
-Received: from smtp.corp.redhat.com (int-mx01.intmail.prod.int.phx2.redhat.com
- [10.5.11.11])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 084F3E6A9D;
- Thu, 14 Feb 2019 16:40:37 +0000 (UTC)
-Received: from [10.36.112.66] (ovpn-112-66.ams2.redhat.com [10.36.112.66])
- by smtp.corp.redhat.com (Postfix) with ESMTPS id 074FC600C4;
- Thu, 14 Feb 2019 16:40:25 +0000 (UTC)
-Subject: Re: [PATCH V2 00/10] X86/KVM/Hyper-V: Add HV ept tlb range list flush
- support in KVM
-To: lantianyu1986@gmail.com
-References: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
-From: Paolo Bonzini <pbonzini@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=pbonzini@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- uUHgL9dKIfvpm+rNXRn9wAwGjk0X/A==
-Message-ID: <3bcfedac-3054-7d5e-24b6-5c98d8171514@redhat.com>
-Date: Thu, 14 Feb 2019 17:40:20 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1guK5F-0007EI-Eo
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:42:00 +0000
+Received: by mail-it1-x144.google.com with SMTP id r11so16550823itc.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 08:41:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=nZUgZrWLpNJNj0dPdhxN5UrwCAJjJPL6QeL3FNwHTLY=;
+ b=AZ2AEnRkD+RYeCzT0pMkFx9U2jKFM4QSzdFcUludDEOIUPYlzxjDaQYx66xU2nDDmK
+ MK1m3GMhYkSc/vR4BkVVnCXt2X8XDCR1zYAdwi59w1cmBQUg8b7nDS44JI9OT6UrdO2p
+ CIP/A8a+Yw5ZMLxsEcmz4PcX4Gojoo5OuhLWU=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nZUgZrWLpNJNj0dPdhxN5UrwCAJjJPL6QeL3FNwHTLY=;
+ b=hNcw1rnMxPZPN+p1GpxY3J0J5A6Tbggfzop8pX4WNjD3PlUw7/2M13OFAz5c71pLOa
+ 5u9X1SY0l7LT57uYxJqWWdwVmzKem8IYl5XdWjEC0NgYhM+TQzaMgR/95Tsrbk0PXerd
+ Rb8bOEd3EfXctTxxp13xOlzdQc3hyh8LuuThCNH02bLZFEwdmZkENpqKOfsSRZO7cJT5
+ 9KMaqzwl6KR3LGdDDi5NqZMpHkNdysiLInXkW77TmL3tXhAki5OOduuSgIIgiGlsIsoH
+ IHpmowSaWqsda+Z0feJ4HqcShJzMTppLVcVVo1EmmdukdHlkWlhFwfrNBUAFsBTjJ6+f
+ cBTA==
+X-Gm-Message-State: AHQUAuajC4Cmti2eunnYL6esUi/oUPJ5I0qICyRvZAA6qboJdEdfUrCx
+ p3Ef4ZT8itUuJFD38URLLJJ1mH41vei7RYwbbrQdYQ==
+X-Google-Smtp-Source: AHgI3IYTDE5K36tVLwuWmVH6OGw3qvS591qoAx4NEc6sbufjXjMzCKSoHrTAxu3WdfuB5KXKey1VAR87bta/KI2izTk=
+X-Received: by 2002:a5d:97c8:: with SMTP id k8mr2930040ios.267.1550162515088; 
+ Thu, 14 Feb 2019 08:41:55 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190202013825.51261-1-Tianyu.Lan@microsoft.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.11
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.38]); Thu, 14 Feb 2019 16:40:37 +0000 (UTC)
+References: <20190201154232.10505-1-jagan@amarulasolutions.com>
+ <CAMty3ZBspvP=qZEK9vaowVq4f5W3Qx2qHkwcuAnCOOjV29=Y_Q@mail.gmail.com>
+ <20190213090308.dlcwgcrhg264k2cu@flea>
+ <CAMty3ZCSMRm-0suApB4Zb+kE1M2sWn3F7ugPBFWaL4ap7cJejQ@mail.gmail.com>
+In-Reply-To: <CAMty3ZCSMRm-0suApB4Zb+kE1M2sWn3F7ugPBFWaL4ap7cJejQ@mail.gmail.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Thu, 14 Feb 2019 22:11:43 +0530
+Message-ID: <CAMty3ZAUL8TWOec=VpJvBzPL1LE13XVMCWj6t-Gycmny38st_A@mail.gmail.com>
+Subject: Re: [PATCH v7 00/23] drm/sun4i: Allwinner A64 MIPI-DSI support
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_084038_059030_62762921 
-X-CRM114-Status: GOOD (  14.90  )
+X-CRM114-CacheID: sfid-20190214_084158_076894_E050B68D 
+X-CRM114-Status: GOOD (  23.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,47 +89,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, benh@kernel.crashing.org,
- will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
- hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
- sashal@kernel.org, sthemmin@microsoft.com, mpe@ellerman.id.au, x86@kernel.org,
- linux@armlinux.org.uk, michael.h.kelley@microsoft.com, mingo@redhat.com,
- catalin.marinas@arm.com, jhogan@kernel.org, linux-mips@vger.kernel.org,
- Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
- haiyangz@microsoft.com, kvm-ppc@vger.kernel.org, bp@alien8.de,
- tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
- devel@linuxdriverproject.org, vkuznets@redhat.com,
- linuxppc-dev@lists.ozlabs.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
+ Michael Turquette <mturquette@baylibre.com>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Daniel Vetter <daniel@ffwll.ch>,
+ Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com, linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/02/19 02:38, lantianyu1986@gmail.com wrote:
-> From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> 
-> This patchset is to introduce hv ept tlb range list flush function
-> support in the KVM MMU component. Flushing ept tlbs of several address
-> range can be done via single hypercall and new list flush function is
-> used in the kvm_mmu_commit_zap_page() and FNAME(sync_page). This patchset
-> also adds more hv ept tlb range flush support in more KVM MMU function.
-> 
-> Change since v1:
->        1) Make flush list as a hlist instead of list in order to 
->        keep struct kvm_mmu_page size.
->        2) Add last_level flag in the struct kvm_mmu_page instead
->        of spte pointer
->        3) Move tlb flush from kvm_mmu_notifier_clear_flush_young() to kvm_age_hva()
->        4) Use range flush in the kvm_vm_ioctl_get/clear_dirty_log()
+On Wed, Feb 13, 2019 at 2:49 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> On Wed, Feb 13, 2019 at 2:33 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Tue, Feb 12, 2019 at 03:16:02PM +0530, Jagan Teki wrote:
+> > > On Fri, Feb 1, 2019 at 9:12 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+> > > >
+> > > > Here is next version changes for Allwinner A64 MIPI-DSI support
+> > > >
+> > > > This series grouped the changes like previous version[1] with different
+> > > > sets to support three different panels types that can fit into the DSI
+> > > > controller.
+> > > >
+> > > > set:1, for 4-lane, burst mode support
+> > > > - patch 0001: 0009, DSI controller changes that support burst mode.
+> > > >
+> > > > set:2, for A64 DSI support
+> > > > - patch 0010: tcon dclk divider computation based on A64 BSP.
+> > > > - patch 0011: 0017, Allwinner A64 DSI controller changes.
+> > > >
+> > > > set:3, enable 4-lane burst mode panel:
+> > > > - patch 0018: Overlay patch that enable Feiyang FY07024DI26A30-D
+> > > >   burst mode panel on Pine64-LTS
+> > > >
+> > > > set:4, enable 4-lane video mode panel:
+> > > > - patch 0019: msg type MIPI_DSI_GENERIC_SHORT_WRITE_2_PARAM support
+> > > > - patch 0020: Overlay patch that enable Bananapi S070WV20-CT16 ICN6211
+> > > >   panel on Bananapi M64
+> > > >
+> > > > set:5, enable 2-lane video mode panel:
+> > > > - patch 0021, 0022: DSI hfp and hbp timings fixes
+> > > > - patch 0023: Enable Techstar TS8550B panel on Amarula A64-Relic
+> > > >
+> > > > Changes for v7:
+> > > > - moved vcc-dsi binding to required filed.
+> > > > - drop quotes on fallback dphy bindings.
+> > > > - drop min_rate clock pll-mipi patches.
+> > > > - introduce dclk divider computation as like A64 BSP.
+> > > > - add A64 DSI quark patches.
+> > > > - fixed A64 DSI pipeline.
+> > > > - add proper commit messages.
+> > > > - collect Merlijn Wajer Tested-by credits.
+> > > > Changes for v6:
+> > > > - dropped unneeded changes, patches
+> > > > - fixed all burst mode patches as per previous version comments
+> > > > - rebase on master
+> > > > - update proper commit message
+> > > > - dropped unneeded comments
+> > > > - order the patches that make review easy
+> > > > Changes for v5:
+> > > > - collect Rob, Acked-by
+> > > > - droped "Fix VBP size calculation" patch
+> > > > - updated vblk timing calculation.
+> > > > - droped techstar, bananapi dsi panel drivers which may require
+> > > >   bridge or other setup. it's under discussion.
+> > > > Changes for v4:
+> > > > - droppoed untested CCU_FEATURE_FIXED_POSTDIV check code in
+> > > >   nkm min, max rate patches
+> > > > - create two patches for "Add Allwinner A64 MIPI DSI support"
+> > > >   one for has_mod_clk quirk and other one for A64 support
+> > > > - use existing driver code construct for hblk computation
+> > > > - dropped "Increase hfp packet overhead" patch [2], though BSP added
+> > > >   this but we have no issues as of now.
+> > > >   (no issues on panel side w/o this change)
+> > > > - create separate function for vblk computation
+> > > > - enable vcc-dsi regulator in dsi_runtime_resume
+> > > > - collect Rob, Acked-by
+> > > > - update MAINTAINERS file for panel drivers
+> > > > - cleanup commit messages
+> > > > - fixed checkpatch warnings/errors
+> > > >
+> > > > [1] https://patchwork.kernel.org/cover/10779893/
+> > > >
+> > > > Any inputs?
+> > > > Jagan.
+> > > >
+> > > > Jagan Teki (23):
+> > > >   drm/sun4i: sun6i_mipi_dsi: Compute burst mode loop N1 instruction
+> > > >     delay
+> > > >   drm/sun4i: sun6i_mipi_dsi: Support instruction loop selection
+> > > >   drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
+> > > >   drm/sun4i: sun6i_mipi_dsi: Simplify drq to support all modes
+> > > >   drm/sun4i: tcon: Export get tcon0 routine
+> > > >   drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during dsi_bind
+> > > >   drm/sun4i: sun6i_mipi_dsi: Setup burst mode
+> > > >   drm/sun4i: sun6i_mipi_dsi: Enable trail_inv and trail_fill controls
+> > > >   drm/sun4i: sun6i_mipi_dsi: Enable HBP, HSA_HSE for burst mode
+> > >
+> > > Can you pick these burst changes which are generic to all SoCs. and
+> > > reset will send once we decide the tcon clock.
+> >
+> > These patches don't implement what we discussed last week, and as I
+> > told you already, most of them really need some work on the commit log
+> > and their explanations.
+>
+> If I'm not wrong, we discussed about tcon_dclk (PLL_MIPI) last week
+> [1] and these burst changes between 01/23 to 09/23 which are generic
+> changes to DSI and not related to clock. Apart from that I made few
+> changes on commit logs between the versions (which I was mentioned on
+> the cover-letter patch). If any issues issues on commit message,
+> please let me know so-that I can rework.
 
-Looks good except for the confusion on sp->last_level (which was mostly
-mine---sorry about that).  I think it can still make 5.1.
-
-However, note that I've never received "KVM/MMU: Use tlb range flush  in
-the kvm_age_hva()".
-
-Paolo
+Look like the same discussion rounding since from months. In fact I
+have grouped all changes by 'sets of patches' in this series which I
+was thinking of having more feasibility to review and merge, but seems
+like it ended-up fusing which patches are more prior and which are
+fixes. So, let me send it by breaking into different series based on
+the issues and generic changes.
 
 _______________________________________________
 linux-arm-kernel mailing list
