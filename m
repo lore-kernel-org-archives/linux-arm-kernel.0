@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 05E65C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:28:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3793C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:28:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ABEC620835
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:28:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A3F6F20835
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:28:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kHj7Vaa1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABEC620835
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rZouW2bf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3F6F20835
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,52 +25,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Kt3x9JyX64E2tMye0f8A9s6FlnC08tvGRqw88Un1EoE=; b=kHj7Vaa1y8+I+H
-	1GojaSiGYTgpIt8803sFZ7ZPTmEudxVrCuU77Gh8tvzDETMdNavbWEJolBd3Vf2+cr6tJDTrJTOFy
-	f+eB0KKM1IMKu4fkD1RhaszCHOTaG/tnqrjY06Vp5+4G479DzqwBtPwp4DoW8r9Y/s1f+YskLtiMu
-	LXk2c7pqRp37jjCCV3lQyd8bgtJkikWqFEg1GCK41AVooBMBs39ujHn6Mbpagh+XjWxR8OhlXxg95
-	5vPwTosVQzWbKgedsfQUEvs0eWNWLGY0TTA8VeaUOI3I2/h1jKjE67ke+Zm6Ag6OZK1xN9wIIiDkQ
-	1lvxwV8oNXKehQ4sUh2w==;
+	List-Owner; bh=M5j2IxfesE4BUKr2ezWVkFg8+ZqRV17kJxEzqVFZfCY=; b=rZouW2bfnn4cJz
+	D0pK+YNICFO1Mg5KfJVq1KfjFvcSRyABmHEGMJ1rcnuGo6I4S2b0DLxZte4xNE8B2HzCtcMmd1n0v
+	C1bnEqsomdrJ3qVQQCw8RpdPgq8rPNuaoABm1dLsUFB02ZVQufIunp3v+dnSjMu9NOJCTFXhQPT1g
+	B+dbG3i3fRWXqZ8oj0UwtXWf1oMtU/32rWdFC8M/YNDlnAwQxp4NTd0WT/D1XMwvX2e++83rhawSr
+	VKRGCgyCnE0xxqL/bCg0hxoExARi6L8jLdAGnw637bCvsSy10OaMGM3ouLLeSgd9o2KwacELvhNkn
+	4jwBCi8vwloKFkMm3CAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guEFI-0001GG-2i; Thu, 14 Feb 2019 10:27:56 +0000
+	id 1guEFg-0001op-CG; Thu, 14 Feb 2019 10:28:20 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guEE2-0007re-0l
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 10:26:41 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ id 1guEE2-0007qh-13
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 10:26:43 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1EAQTCm032128; Thu, 14 Feb 2019 11:26:30 +0100
+ x1EAQRL1011458; Thu, 14 Feb 2019 11:26:30 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qn0jwsvse-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qmy1na9v3-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
  Thu, 14 Feb 2019 11:26:30 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id F095731;
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 49F7438;
  Thu, 14 Feb 2019 10:26:29 +0000 (GMT)
 Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id BB8154E10;
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 19A704E11;
  Thu, 14 Feb 2019 10:26:29 +0000 (GMT)
 Received: from localhost (10.75.127.44) by SFHDAG5NODE3.st.com (10.75.127.15)
  with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Thu, 14 Feb 2019 11:26:28 +0100
+ Thu, 14 Feb 2019 11:26:27 +0100
 From: Fabrice Gasnier <fabrice.gasnier@st.com>
 To: <thierry.reding@gmail.com>, <robh+dt@kernel.org>
-Subject: [PATCH v4 3/3] pwm: core: add consumer device link
-Date: Thu, 14 Feb 2019 11:25:51 +0100
-Message-ID: <1550139951-25788-4-git-send-email-fabrice.gasnier@st.com>
+Subject: [PATCH v4 2/3] pwm: stm32-lp: Add power management support
+Date: Thu, 14 Feb 2019 11:25:50 +0100
+Message-ID: <1550139951-25788-3-git-send-email-fabrice.gasnier@st.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
 References: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
 MIME-Version: 1.0
 X-Originating-IP: [10.75.127.44]
-X-ClientProxiedBy: SFHDAG8NODE2.st.com (10.75.127.23) To SFHDAG5NODE3.st.com
+X-ClientProxiedBy: SFHDAG6NODE2.st.com (10.75.127.17) To SFHDAG5NODE3.st.com
  (10.75.127.15)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-14_07:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_022638_550994_831771DA 
-X-CRM114-Status: GOOD (  19.36  )
+X-CRM114-CacheID: sfid-20190214_022638_648904_2226D7A3 
+X-CRM114-Status: GOOD (  11.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,165 +92,72 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a device link between the PWM consumer and the PWM provider. This
-enforces the PWM user to get suspended before the PWM provider. It
-allows proper synchronization of suspend/resume sequences: the PWM user
-is responsible for properly stopping PWM, before the provider gets
-suspended: see [1]. Add the device link in:
-- of_pwm_get()
-- pwm_get()
-- devm_*pwm_get() variants
-as it requires a reference to the device for the PWM consumer.
-
+Add suspend/resume PM sleep ops. When going to low power, enforce the PWM
+channel isn't active. Let the PWM consumers disable it during their own
+suspend sequence. Only perform a check here, and handle the pinctrl states.
+See [1].
 [1] https://lkml.org/lkml/2019/2/5/770
 
-Suggested-by: Thierry Reding <thierry.reding@gmail.com>
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
-Changes in v4:
-- rework error handling following Thierry's comments
-- turn/split pr_debug() into dev_err()/pr_warn().
-
-Changes in v3:
-- add struct device to of_get_pwm() arguments to handle device link from
-  there as discussed with Uwe.
+Changes in v2:
+- Don't disable PWM channel: let the PWM user disable it. Refuse to
+  suspend in case it's been left enabled.
+- Drop the ifdefs, use __maybe_unused instead.
 ---
- drivers/pwm/core.c  | 50 +++++++++++++++++++++++++++++++++++++++++++++++---
- include/linux/pwm.h |  6 ++++--
- 2 files changed, 51 insertions(+), 5 deletions(-)
+ drivers/pwm/pwm-stm32-lp.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 1581f6a..64e10a6 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -636,8 +636,35 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
- 	return ERR_PTR(-EPROBE_DEFER);
+diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+index 0059b24c..2211a64 100644
+--- a/drivers/pwm/pwm-stm32-lp.c
++++ b/drivers/pwm/pwm-stm32-lp.c
+@@ -13,6 +13,7 @@
+ #include <linux/mfd/stm32-lptimer.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pwm.h>
+ 
+@@ -223,6 +224,29 @@ static int stm32_pwm_lp_remove(struct platform_device *pdev)
+ 	return pwmchip_remove(&priv->chip);
  }
  
-+static struct device_link *pwm_device_link_add(struct device *dev,
-+					       struct pwm_device *pwm)
++static int __maybe_unused stm32_pwm_lp_suspend(struct device *dev)
 +{
-+	struct device_link *dl;
++	struct stm32_pwm_lp *priv = dev_get_drvdata(dev);
++	struct pwm_state state;
 +
-+	if (!dev) {
-+		/*
-+		 * No device for the PWM consumer has been provided. It may
-+		 * impact the PM sequence ordering: the PWM supplier may get
-+		 * suspended before the consumer.
-+		 */
-+		pr_warn("no consumer dev, can't create device link to %s\n",
-+			dev_name(pwm->chip->dev));
-+		return NULL;
++	pwm_get_state(&priv->chip.pwms[0], &state);
++	if (state.enabled) {
++		dev_err(dev, "The consumer didn't stop us (%s)\n",
++			priv->chip.pwms[0].label);
++		return -EBUSY;
 +	}
 +
-+	dl = device_link_add(dev, pwm->chip->dev, DL_FLAG_AUTOREMOVE_CONSUMER);
-+	if (!dl) {
-+		dev_err(dev, "failed to create device link to %s\n",
-+			dev_name(pwm->chip->dev));
-+			return ERR_PTR(-EINVAL);
-+	}
-+
-+	return dl;
++	return pinctrl_pm_select_sleep_state(dev);
 +}
 +
- /**
-  * of_pwm_get() - request a PWM via the PWM framework
-+ * @dev: device for PWM consumer
-  * @np: device node to get the PWM from
-  * @con_id: consumer name
-  *
-@@ -655,10 +682,12 @@ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
-  * Returns: A pointer to the requested PWM device or an ERR_PTR()-encoded
-  * error code on failure.
-  */
--struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
-+struct pwm_device *of_pwm_get(struct device *dev, struct device_node *np,
-+			      const char *con_id)
- {
- 	struct pwm_device *pwm = NULL;
- 	struct of_phandle_args args;
-+	struct device_link *dl;
- 	struct pwm_chip *pc;
- 	int index = 0;
- 	int err;
-@@ -689,6 +718,14 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 	if (IS_ERR(pwm))
- 		goto put;
- 
-+	dl = pwm_device_link_add(dev, pwm);
-+	if (IS_ERR(dl)) {
-+		/* of_xlate ended up calling pwm_request_from_chip() */
-+		pwm_free(pwm);
-+		pwm = ERR_CAST(dl);
-+		goto put;
-+	}
++static int __maybe_unused stm32_pwm_lp_resume(struct device *dev)
++{
++	return pinctrl_pm_select_default_state(dev);
++}
 +
- 	/*
- 	 * If a consumer name was not given, try to look it up from the
- 	 * "pwm-names" property if it exists. Otherwise use the name of
-@@ -764,6 +801,7 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	const char *dev_id = dev ? dev_name(dev) : NULL;
- 	struct pwm_device *pwm;
- 	struct pwm_chip *chip;
-+	struct device_link *dl;
- 	unsigned int best = 0;
- 	struct pwm_lookup *p, *chosen = NULL;
- 	unsigned int match;
-@@ -771,7 +809,7 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 
- 	/* look up via DT first */
- 	if (IS_ENABLED(CONFIG_OF) && dev && dev->of_node)
--		return of_pwm_get(dev->of_node, con_id);
-+		return of_pwm_get(dev, dev->of_node, con_id);
- 
- 	/*
- 	 * We look up the provider in the static table typically provided by
-@@ -848,6 +886,12 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
-+	dl = pwm_device_link_add(dev, pwm);
-+	if (IS_ERR(dl)) {
-+		pwm_free(pwm);
-+		return ERR_CAST(dl);
-+	}
++static SIMPLE_DEV_PM_OPS(stm32_pwm_lp_pm_ops, stm32_pwm_lp_suspend,
++			 stm32_pwm_lp_resume);
 +
- 	pwm->args.period = chosen->period;
- 	pwm->args.polarity = chosen->polarity;
- 
-@@ -939,7 +983,7 @@ struct pwm_device *devm_of_pwm_get(struct device *dev, struct device_node *np,
- 	if (!ptr)
- 		return ERR_PTR(-ENOMEM);
- 
--	pwm = of_pwm_get(np, con_id);
-+	pwm = of_pwm_get(dev, np, con_id);
- 	if (!IS_ERR(pwm)) {
- 		*ptr = pwm;
- 		devres_add(dev, ptr);
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index d5199b5..895e074 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -406,7 +406,8 @@ struct pwm_device *of_pwm_xlate_with_flags(struct pwm_chip *pc,
- 		const struct of_phandle_args *args);
- 
- struct pwm_device *pwm_get(struct device *dev, const char *con_id);
--struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id);
-+struct pwm_device *of_pwm_get(struct device *dev, struct device_node *np,
-+			      const char *con_id);
- void pwm_put(struct pwm_device *pwm);
- 
- struct pwm_device *devm_pwm_get(struct device *dev, const char *con_id);
-@@ -494,7 +495,8 @@ static inline struct pwm_device *pwm_get(struct device *dev,
- 	return ERR_PTR(-ENODEV);
- }
- 
--static inline struct pwm_device *of_pwm_get(struct device_node *np,
-+static inline struct pwm_device *of_pwm_get(struct device *dev,
-+					    struct device_node *np,
- 					    const char *con_id)
- {
- 	return ERR_PTR(-ENODEV);
+ static const struct of_device_id stm32_pwm_lp_of_match[] = {
+ 	{ .compatible = "st,stm32-pwm-lp", },
+ 	{},
+@@ -235,6 +259,7 @@ static int stm32_pwm_lp_remove(struct platform_device *pdev)
+ 	.driver	= {
+ 		.name = "stm32-pwm-lp",
+ 		.of_match_table = of_match_ptr(stm32_pwm_lp_of_match),
++		.pm = &stm32_pwm_lp_pm_ops,
+ 	},
+ };
+ module_platform_driver(stm32_pwm_lp_driver);
 -- 
 1.9.1
 
