@@ -2,127 +2,68 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0F73C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:48:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E3A4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:50:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AFB5C222DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:48:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1EFEB222DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:50:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZXlN3Dso";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="GtYm8Ocb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AFB5C222DB
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WiSFf07/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EFEB222DB
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Zf4A0TNjRRsqbnjym7lroJ3v/FMy0lgU+cLTBLDdF7Y=; b=ZXlN3DsoHH9n+6
-	tCKlT9X16RzhKzHzX/u/t7+SDIgw/OblZhWhYjVUirRrJOL1mc3glmzQxfnkuPDVjExJ6p8Q6yHUN
-	LzQiu0CF6JjLKo1j+pfpGAztJhoXCukR0y/BSL4ENWnALtwV9mao9trLTRbWm7nLg39NeBu9u0l0G
-	ydq0xKdpZH9lBZRcAezk+pOkgjpeFQKpTv+symQN9eUDSRgDZ3FnTdvZkKvlW5pqgwPLi+kVTH/MJ
-	7zLB/zEKSa3/8Z9s9mD9rTfTLfXHTO1vK5Gx3q2JRSszZIXHyZzdMgLZSB/KGdLjVGZiKs9VY4BZp
-	9Y0tkqEwNokA2+SmMWTg==;
+	List-Owner; bh=WvwUndYdRKeyjZE828/XjCzO93w6dv++nMlHJ2Rl8nc=; b=WiSFf07/j7IPTD
+	7aaOE4LGsBQRxGL1DCQTJ0voJYmvU0OdxRlY3aeCXa8HbM4HSjP9/6LuhDiECJ8FHTNqEwORaOaFR
+	Ythi8AwsyIcYIs7vFaCdnAbqa+D2758y5Rf3ZozGJX8nTXdcGylhktmHxKqu4+FvUOSgRryOk9E7t
+	sItzikhJIgLhb3diU2niBvao5SK+zVud5Vc+y00J/q7wWI/gBDK3lG7J0U6TS+ns00JKc9WzwwPzw
+	LFuF7oim2HhRAHrN6rTOkw877sARNr+ggcTtDEtts4Jnuky2hbquzJj2sWd8krgQi2RSS83bWwFz8
+	SfIUgIABGmuKsS4pgyhA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guJFs-0002Zv-LV; Thu, 14 Feb 2019 15:48:52 +0000
-Received: from mail-eopbgr70040.outbound.protection.outlook.com ([40.107.7.40]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1guJHh-00047C-Sa; Thu, 14 Feb 2019 15:50:45 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guJFo-0002ZG-Vm
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:48:50 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=aWo2BZPgKzdoy8iK8BCTcvCFR2LKt6xnOreozBjkilE=;
- b=GtYm8OcbDW807MiRS7xFt9bZivADSQDQCfakI+Zc2a6GZ7/njRxtO9fi1tPEoYkBPkbu8bftfDgaEARH/BAAzVtBBAaV98p7WS79E9mblCi6N9RSx4rpaiIVa7LBTWpJyJ+qS2htMhuEu6ho3M1antCAX7IxbTO26sMEPV1ylJo=
-Received: from VI1PR04MB4880.eurprd04.prod.outlook.com (20.177.49.153) by
- VI1PR04MB1600.eurprd04.prod.outlook.com (10.164.84.146) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.18; Thu, 14 Feb 2019 15:48:45 +0000
-Received: from VI1PR04MB4880.eurprd04.prod.outlook.com
- ([fe80::3d48:4560:6982:4c32]) by VI1PR04MB4880.eurprd04.prod.outlook.com
- ([fe80::3d48:4560:6982:4c32%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 15:48:45 +0000
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
-To: Andrew Lunn <andrew@lunn.ch>
-Subject: RE: [PATCH net-next 3/3] enetc: Add ENETC PF level external MDIO
- support
-Thread-Topic: [PATCH net-next 3/3] enetc: Add ENETC PF level external MDIO
- support
-Thread-Index: AQHUw4ulFN6tcoF1pUCxgbH5xFJWpaXeCIWAgAFlQ9A=
-Date: Thu, 14 Feb 2019 15:48:44 +0000
-Message-ID: <VI1PR04MB4880C8E3E302C7D3856DB68396670@VI1PR04MB4880.eurprd04.prod.outlook.com>
-References: <1550055743-15542-1-git-send-email-claudiu.manoil@nxp.com>
- <1550055743-15542-4-git-send-email-claudiu.manoil@nxp.com>
- <20190213181323.GA708@lunn.ch>
-In-Reply-To: <20190213181323.GA708@lunn.ch>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=claudiu.manoil@nxp.com; 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 5ecb3dac-6db1-476e-4a8a-08d69293e6de
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB1600; 
-x-ms-traffictypediagnostic: VI1PR04MB1600:
-x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; VI1PR04MB1600;
- 23:hdVtDHrzFUbnvThW5AbKZgbOqD7wTvPbSktrHFoKv?=
- =?us-ascii?Q?j2X2Z//q3gloyq2VRkZusX1G98ay5ZY1+543G+K1d8tUmaAqbcMdxQRHk7Aw?=
- =?us-ascii?Q?fWAwrduSqN9OxkIZeeEPNEpLBPDgaeVn/stPkkDAwChcy74oDZc5ZLc3Schd?=
- =?us-ascii?Q?W18ye+6yZDHPN3fDrHFjbYi0E2o4hlBnkBc7dmfX97jOVleP7ds+qGnoyURj?=
- =?us-ascii?Q?Bb6V14rIyPhavd+BSg3WPDD+qx3lo/W8G1dmlepbF0mgo/daKJeYOTs34eUv?=
- =?us-ascii?Q?jqP81Blqt2but7xycW66d+uc7w7w01SpbqDWSIJLPWoCND1d9Wxwi4YaokZ/?=
- =?us-ascii?Q?A3Ur09KT8zdfeyMPQ0ahUZzTd8IhsOB95KofVR4uKGVgNsUwMurmoiz4DuEf?=
- =?us-ascii?Q?wNaBA2FhVOkxeawdkh8rYpJoo2e/O1AG0UcCmNVBnYz6VoH4CuiaP9F+CDvx?=
- =?us-ascii?Q?DMdh9eMSSDW1OEbG508drRhKNH6JyOH2ahRGL91mIS7uSlU4aDQWwsiiGuBf?=
- =?us-ascii?Q?lyGnJvJvccyIiDXLhEs9HWZZ1YZUJ9zpGdWUDPCW+HseugL7gfpAAlj1lrcx?=
- =?us-ascii?Q?Bg4ECLNlS/l6bg8DT8FFNSaLZRq+LxE8k6QpwIfZyvLt8kMLA4fHAmuyj/wW?=
- =?us-ascii?Q?wWqSUyFaYAAmbUD5TFvwPcZ0GtwSXAiM8KUPGSJ2T9MDgn6mjbN9Fp9SS4NK?=
- =?us-ascii?Q?ivX1WIWY3uRpbHrv1S9JIREn0ZvyPvP/MbDjXe0eTq+oHplFlIFCk0qQNCJt?=
- =?us-ascii?Q?eYh/u5O682V9SrpXidWOJlqeXV6BbjtwXk8+j6MnHpAUJ7Jd5NjDWTO+5HY/?=
- =?us-ascii?Q?O5Jyh1rQC8ohu4zjUNCazby3oVp1iLXMMcnWie1MfoordcLDNGRwqQBU4qvN?=
- =?us-ascii?Q?ylVK6vDnOtyy6aaChKem/9enMfSLAtcvjK1xW5+U9g+wNYmc4hHelDQZMtN+?=
- =?us-ascii?Q?letgBtiMI++j6KG6wmUxPLycYHuKDubm+31xfj6yyUuLD0mjwznkX+IrGv1I?=
- =?us-ascii?Q?qxScUGxKBq+c5OUPNXP+SAwPiWv8VDP2CgsUu1niI55LjqwEsODK4Tv1kdch?=
- =?us-ascii?Q?8tz/zS3SeOSUbsvHv2Og1cjnEWvUmyi/acqiZC2CT4NS77QXycDPuf+uavZt?=
- =?us-ascii?Q?zbMulFcHhk7QwDauTi6HwtyNAovGqzGAxDN87SnbLTrj4DW4OeyGVnzBtcLa?=
- =?us-ascii?Q?57y+IAWT2HTKMbqyRpDYZ8b1+YhqVCjo8Bb9aE/qWj/FGwA6BfJaOLFtQ=3D?=
- =?us-ascii?Q?=3D?=
-x-microsoft-antispam-prvs: <VI1PR04MB16006586086E3186DFA5148B96670@VI1PR04MB1600.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(396003)(136003)(376002)(39860400002)(366004)(51914003)(199004)(189003)(13464003)(305945005)(478600001)(6436002)(7696005)(99286004)(105586002)(54906003)(74316002)(55016002)(2906002)(14454004)(9686003)(11346002)(446003)(8936002)(476003)(33656002)(316002)(7736002)(486006)(6916009)(8676002)(81156014)(81166006)(44832011)(97736004)(229853002)(186003)(25786009)(86362001)(66066001)(256004)(4326008)(26005)(71190400001)(71200400001)(6116002)(76176011)(106356001)(53936002)(6506007)(102836004)(68736007)(6246003)(3846002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB1600;
- H:VI1PR04MB4880.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: JHFlQFl/hXZ40vdd077DNnzLoDflXsnT2zB3zAWH6Jf8/9Ts9BrrT5QjhPoz5Zs9jZ0BAYjQfBPJgsGHkLJJ5t3OdXYSdQDIozriF/gxzmHZdC1O4XOTlmDa+yFlNdcA08OYfyPNsLRnrjvGQ211N95/QrW0A0jHD9l1HJsb+ATPO0TlCeyw9z9pH1VHG8KiQovlpw3sAu+TzfyDX0R3odT7UXhhnyxgkoT6OAzXokU0yX+MrlkKZPhh4EjAtomLHEAcuKGDn/03W5kz8wnJYGEEnOxbo1TQLsSdZ75P2H6qzoJXaj2qj/6ffNbC9CAxowibNjtEf695+SSHvPXHJlx5MjFDAcUlWhjV7na/RD+ub3LMcJwPHh/QOnItxOLZo4WAMaExqDmxOK7k2egt/EEe7pQK1Fh9p8ftGBZMsOE=
-MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5ecb3dac-6db1-476e-4a8a-08d69293e6de
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 15:48:44.9558 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB1600
+ id 1guJHe-00046S-58
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:50:43 +0000
+Received: from kresse.hi.pengutronix.de ([2001:67c:670:100:1d::2a])
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <l.stach@pengutronix.de>)
+ id 1guJHR-00048B-AM; Thu, 14 Feb 2019 16:50:29 +0100
+Message-ID: <1550159428.2546.40.camel@pengutronix.de>
+Subject: Re: [RFC 5/5] arm64: dts: imx8mq: Add the opp table and the
+ cpu-supply nodes
+From: Lucas Stach <l.stach@pengutronix.de>
+To: Abel Vesa <abel.vesa@nxp.com>, Rob Herring <robh@kernel.org>, Stephen
+ Boyd <sboyd@kernel.org>, Mark Rutland <mark.rutland@arm.com>, Mike
+ Turquette <mturquette@baylibre.com>, Shawn Guo <shawnguo@kernel.org>,
+ Sascha Hauer <kernel@pengutronix.de>, Angus Ainslie
+ <angus.ainslie@puri.sm>, Anson Huang <anson.huang@nxp.com>
+Date: Thu, 14 Feb 2019 16:50:28 +0100
+In-Reply-To: <1550084693-9797-6-git-send-email-abel.vesa@nxp.com>
+References: <1550084693-9797-1-git-send-email-abel.vesa@nxp.com>
+ <1550084693-9797-6-git-send-email-abel.vesa@nxp.com>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::2a
+X-SA-Exim-Mail-From: l.stach@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_074849_049812_5446B720 
-X-CRM114-Status: GOOD (  11.76  )
+X-CRM114-CacheID: sfid-20190214_075042_354516_8BA8999C 
+X-CRM114-Status: GOOD (  14.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,69 +76,67 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
- Alexandru Marginean <alexandru.marginean@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>, "David S .
- Miller" <davem@davemloft.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
->-----Original Message-----
->From: Andrew Lunn <andrew@lunn.ch>
->Sent: Wednesday, February 13, 2019 8:13 PM
->To: Claudiu Manoil <claudiu.manoil@nxp.com>
->Cc: Shawn Guo <shawnguo@kernel.org>; Leo Li <leoyang.li@nxp.com>; David S .
->Miller <davem@davemloft.net>; devicetree@vger.kernel.org; Alexandru
->Marginean <alexandru.marginean@nxp.com>; linux-kernel@vger.kernel.org;
->linux-arm-kernel@lists.infradead.org; netdev@vger.kernel.org
->Subject: Re: [PATCH net-next 3/3] enetc: Add ENETC PF level external MDIO
->support
->
-[...]
->> +static int enetc_mdio_write(struct mii_bus *bus, int phy_id, int regnum,
->> +			    u16 value)
->> +{
->> +	struct enetc_mdio_regs __iomem *regs = bus_to_enetc_regs(bus);
->> +	u32 mdio_ctl, mdio_cfg;
->> +	u16 dev_addr;
->> +	int ret;
->> +
->> +	mdio_cfg = MDIO_CFG_CLKDIV(ENETC_MDC_DIV) | MDIO_CFG_NEG;
->
->What does MDIO_CFG_NEG mean?
->
-
-I'll add a comment in the code to clarify this define.
-It means the MDIO is driven by master on MDC negative edge, which is how 
-the external mdio busses work on this hardware. For internal MDIO CFG_NEG is 0.
-
- [...]
->
->Maybe MDIO_CFG_ENC could be called MDIO_CFG_C45? Assuming that is what
->it actually means?
->
-You're right, in the hardware manual this bit is actually called "ENC45", so
-I'll change the define name to that.  Should be more clear like this.
-
-[...]
->
->It is a good idea to have an mdio node which contains the list of
->PHYs. You can get into odd situations if you don't do that.
->
-
-Hopefully this doesn't complicate things since these are not platform devices.
-It's not as easy as adding new platform device driver for mdio...
-
-Ok for the rest of the comments too.
-Thanks for the review.
-
-Claudiu
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQWJlbAoKQW0gTWl0dHdvY2gsIGRlbiAxMy4wMi4yMDE5LCAxOTowNSArMDAwMCBzY2hyaWVi
+IEFiZWwgVmVzYToKPiBBZGQgdGhlIG9wcCB0YWJsZSBjb250YWluaW5nIG9ubHkgbm9uIG92ZXIg
+ZHJpdmUgb3Bwcy4KPiBBbHNvIGFkZCB0aGUgY3B1LXN1cHBseSBub2RlcyBmb3IgdGhlIEE1MyBj
+b3JlcyBpbiB0aGUgRVZLIGJvYXJkLgo+IAo+IFNpZ25lZC1vZmYtYnk6IEFiZWwgVmVzYSA8YWJl
+bC52ZXNhQG54cC5jb20+Cj4gLS0tCj4gwqBhcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9p
+bXg4bXEtZXZrLmR0cyB8IDE3ICsrKysrKysrKysrKysrKysrCj4gwqBhcmNoL2FybTY0L2Jvb3Qv
+ZHRzL2ZyZWVzY2FsZS9pbXg4bXEuZHRzacKgwqDCoMKgfCAyMyArKysrKysrKysrKysrKysrKysr
+KysrKwo+IMKgMiBmaWxlcyBjaGFuZ2VkLCA0MCBpbnNlcnRpb25zKCspCj4gCj4gZGlmZiAtLWdp
+dCBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS1ldmsuZHRzCj4gYi9hcmNo
+L2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9pbXg4bXEtZXZrLmR0cwo+IGluZGV4IDU0NzM3YmYu
+LjExNDM1OWUgMTAwNjQ0Cj4gLS0tIGEvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUvaW14
+OG1xLWV2ay5kdHMKPiArKysgYi9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVzY2FsZS9pbXg4bXEt
+ZXZrLmR0cwo+IEBAIC0zMSw2ICszMSwyMyBAQAo+IMKgCQlncGlvID0gPCZncGlvMiAxOSBHUElP
+X0FDVElWRV9ISUdIPjsKPiDCoAkJZW5hYmxlLWFjdGl2ZS1oaWdoOwo+IMKgCX07Cj4gKwo+ICt9
+Owo+ICsKPiArJkE1M18wIHsKPiArCWNwdS1zdXBwbHkgPSA8JnN3MWFfcmVnPjsKPiArfTsKPiAr
+Cj4gKyZBNTNfMSB7Cj4gKwljcHUtc3VwcGx5ID0gPCZzdzFhX3JlZz47Cj4gK307Cj4gKwo+ICsm
+QTUzXzIgewo+ICsJY3B1LXN1cHBseSA9IDwmc3cxYV9yZWc+Owo+ICt9Owo+ICsKPiArJkE1M18z
+IHsKPiArCWNwdS1zdXBwbHkgPSA8JnN3MWFfcmVnPjsKPiDCoH07CgpUaGlzIHNob3VsZCBiZSBh
+IHNlcGFyYXRlIHBhdGNoLgoKQW5kIEFGQUlDUyB0aGlzIGlzIHdyb25nLCBzdzFhIG9uIHRoZSBN
+WDhNLUVWSyBpcyB0aGUgR1BVIHN1cHBseSwgdGhlCkNQVSBpcyBzdXBwbGllZCBieSBhIGRlZGlj
+YXRlZCBzd2l0Y2hlciB0aGF0IGlzIGNvbnRyb2xsZWQgdmlhIGEgR1BJTy4KClJlZ2FyZHMsCkx1
+Y2FzCgo+IMKgJmZlYzEgewo+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2Jvb3QvZHRzL2ZyZWVz
+Y2FsZS9pbXg4bXEuZHRzaQo+IGIvYXJjaC9hcm02NC9ib290L2R0cy9mcmVlc2NhbGUvaW14OG1x
+LmR0c2kKPiBpbmRleCAxYTg5MDYyLi44OWIyZDVmIDEwMDY0NAo+IC0tLSBhL2FyY2gvYXJtNjQv
+Ym9vdC9kdHMvZnJlZXNjYWxlL2lteDhtcS5kdHNpCj4gKysrIGIvYXJjaC9hcm02NC9ib290L2R0
+cy9mcmVlc2NhbGUvaW14OG1xLmR0c2kKPiBAQCAtOTEsNiArOTEsNyBAQAo+IMKgCQkJY2xvY2tz
+ID0gPCZjbGsgSU1YOE1RX0NMS19BUk0+Owo+IMKgCQkJZW5hYmxlLW1ldGhvZCA9ICJwc2NpIjsK
+PiDCoAkJCW5leHQtbGV2ZWwtY2FjaGUgPSA8JkE1M19MMj47Cj4gKwkJCW9wZXJhdGluZy1wb2lu
+dHMtdjIgPSA8JmE1M18wX29wcF90YWJsZT47Cj4gwqAJCX07Cj4gwqAKPiDCoAkJQTUzXzE6IGNw
+dUAxIHsKPiBAQCAtMTAxLDYgKzEwMiw3IEBACj4gwqAJCQljbG9ja3MgPSA8JmNsayBJTVg4TVFf
+Q0xLX0FSTT47Cj4gwqAJCQllbmFibGUtbWV0aG9kID0gInBzY2kiOwo+IMKgCQkJbmV4dC1sZXZl
+bC1jYWNoZSA9IDwmQTUzX0wyPjsKPiArCQkJb3BlcmF0aW5nLXBvaW50cy12MiA9IDwmYTUzXzBf
+b3BwX3RhYmxlPjsKPiDCoAkJfTsKPiDCoAo+IMKgCQlBNTNfMjogY3B1QDIgewo+IEBAIC0xMTEs
+NiArMTEzLDcgQEAKPiDCoAkJCWNsb2NrcyA9IDwmY2xrIElNWDhNUV9DTEtfQVJNPjsKPiDCoAkJ
+CWVuYWJsZS1tZXRob2QgPSAicHNjaSI7Cj4gwqAJCQluZXh0LWxldmVsLWNhY2hlID0gPCZBNTNf
+TDI+Owo+ICsJCQlvcGVyYXRpbmctcG9pbnRzLXYyID0gPCZhNTNfMF9vcHBfdGFibGU+Owo+IMKg
+CQl9Owo+IMKgCj4gwqAJCUE1M18zOiBjcHVAMyB7Cj4gQEAgLTEyMSw2ICsxMjQsNyBAQAo+IMKg
+CQkJY2xvY2tzID0gPCZjbGsgSU1YOE1RX0NMS19BUk0+Owo+IMKgCQkJZW5hYmxlLW1ldGhvZCA9
+ICJwc2NpIjsKPiDCoAkJCW5leHQtbGV2ZWwtY2FjaGUgPSA8JkE1M19MMj47Cj4gKwkJCW9wZXJh
+dGluZy1wb2ludHMtdjIgPSA8JmE1M18wX29wcF90YWJsZT47Cj4gwqAJCX07Cj4gwqAKPiDCoAkJ
+QTUzX0wyOiBsMi1jYWNoZTAgewo+IEBAIC02NjYsNiArNjcwLDI1IEBACj4gwqAJCQlzdGF0dXMg
+PSAiZGlzYWJsZWQiOwo+IMKgCQl9Owo+IMKgCj4gKwo+ICsJCWE1M18wX29wcF90YWJsZTogb3Bw
+LXRhYmxlIHsKPiArCQkJY29tcGF0aWJsZSA9ICJvcGVyYXRpbmctcG9pbnRzLXYyIjsKPiArCQkJ
+b3BwLXNoYXJlZDsKPiArCj4gKwkJCW9wcC04MDAwMDAwMDAgewo+ICsJCQkJb3BwLWh6ID0gL2Jp
+dHMvIDY0IDw4MDAwMDAwMDA+Owo+ICsJCQkJb3BwLW1pY3Jvdm9sdCA9IDw5MDAwMDA+Owo+ICsJ
+CQkJY2xvY2stbGF0ZW5jeS1ucyA9IDwxNTAwMDA+Owo+ICsJCQl9Owo+ICsKPiArCQkJb3BwLTEw
+MDAwMDAwMDAgewo+ICsJCQkJb3BwLWh6ID0gL2JpdHMvIDY0IDwxMDAwMDAwMDAwPjsKPiArCQkJ
+CW9wcC1taWNyb3ZvbHQgPSA8OTAwMDAwPjsKPiArCQkJCWNsb2NrLWxhdGVuY3ktbnMgPSA8MTUw
+MDAwPjsKPiArCQkJCW9wcC1zdXNwZW5kOwo+ICsJCQl9Owo+ICsJCX07Cj4gKwo+IMKgCQlnaWM6
+IGludGVycnVwdC1jb250cm9sbGVyQDM4ODAwMDAwIHsKPiDCoAkJCWNvbXBhdGlibGUgPSAiYXJt
+LGdpYy12MyI7Cj4gwqAJCQlyZWcgPSA8MHgzODgwMDAwMCAweDEwMDAwPiwJLyogR0lDCj4gRGlz
+dCAqLwoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGlu
+dXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRl
+YWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgt
+YXJtLWtlcm5lbAo=
