@@ -2,61 +2,69 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_NEOMUTT autolearn=unavailable autolearn_force=no version=3.4.0
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E674AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:24:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DB91C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:40:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B474D218EA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:24:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF70A2080A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 13:40:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nvfx1FmB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B474D218EA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=stgolabs.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d1qwx5j6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="zQh6uNDh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF70A2080A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=sRgoJdULrpMf8W/1sW8499+9w8QXYo2xaFTW6txj9Ks=; b=nvfx1FmBTL7r9x3gVcTQSQlsW
-	Zl2ZTSM08THZVjD+5kTlNLdbNu4Ao2leFXKlY4bpPOGvTKX/GBWO+Zcwr95GHLIdLsv4bXeB3Lf4h
-	Ia2qGGfmx+TpV+atfgPOlLJT6BYWkqHI9BMnqQhfahuq+4o9JpnXv9ECMVGbr1RFf2vEjubAm+zhQ
-	8Q2UmGLIM3k4ST5WjFGWAfZYfTpX7oN2MRI2AVbLDlS6o8FQyPJtiq1zI74/K04to8a1LRIruIjKr
-	LMbYY+0qzj6OvQp6MW/VyPecPQReXyALA4cL2+/ALsLUW+ovffkaOXzQeRKk9fya1hQpg52yeT1Ht
-	5hcU/iY0Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Hh7TmjpJYR41gpj4RuvpOj8F0uJ4RNdHfAXqbpEbSFE=; b=d1qwx5j65cNmkQ
+	uW9RuPXttn8+eQyf5mrgU95gp0iJ9aaa8LlBoX/UGlXAb9ZKsZMrWTrDCS9P7HrQual7CtoFBuH4c
+	Uliypf91gWHxReVEihjW0LDvaKbOvjRuT8bTKuDZ7Ug2C427DVsWxPJXYthW3nQb2/Y6q3DhEWBRb
+	9bBWqUiTJ/1h0nn1L7XB8ZXocAVS211520xbBUuKvo1GRlAZw0MWPB/SpxoOaubnnJPjkEwAmBmEy
+	iWkMhIq7gn7N8ECpTx8BidwsTcmL+m16fJ/Ia1csq1o4C0noqgCUdF5iEEldySrLZ8sxPHUbdqRtH
+	8GBMRbrB0OEEibfy/nIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guGzr-0008Ia-9p; Thu, 14 Feb 2019 13:24:11 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1guHG3-0000pJ-D1; Thu, 14 Feb 2019 13:40:55 +0000
+Received: from vps0.lunn.ch ([185.16.172.187])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guGzn-0008Hr-NF
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 13:24:09 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay2.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id 97C44AE8D;
- Thu, 14 Feb 2019 13:24:04 +0000 (UTC)
-Date: Thu, 14 Feb 2019 05:23:52 -0800
-From: Davidlohr Bueso <dave@stgolabs.net>
-To: Waiman Long <longman@redhat.com>
-Subject: Re: [PATCH-tip 00/22] locking/rwsem: Rework rwsem-xadd & enable new
- rwsem features
-Message-ID: <20190214132352.wm26r5g632swp34n@linux-r8p5>
-References: <1549566446-27967-1-git-send-email-longman@redhat.com>
- <CAHk-=wjfyrFBjifzmgMVrkrvEePEPaBTDq7D=f2i5kD2E=SqRQ@mail.gmail.com>
- <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
+ id 1guHG0-0000oK-3l
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 13:40:53 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
+ s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
+ Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
+ List-Post:List-Owner:List-Archive;
+ bh=dFkiC3dfv0iwknkOldbJAOIn/enUrVcnD3etEIIX/EQ=; b=zQh6uNDhF/TVBubu+BQxvQRcJ7
+ qp1M14V4unCvoMEatFy6FINQ4eLL2RSRkXNty9wrhg3vfwwYPBKsZqq+x9x+REqhIud1cGKJEVl9V
+ SDd2Ox6W40hitF8COVAHVrdAL/d6LnvCEegO8nQbNwvYdJoW2eldU+8+81/47CBphx4Q=;
+Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
+ (envelope-from <andrew@lunn.ch>)
+ id 1guHFo-0001g1-84; Thu, 14 Feb 2019 14:40:40 +0100
+Date: Thu, 14 Feb 2019 14:40:40 +0100
+From: Andrew Lunn <andrew@lunn.ch>
+To: Christophe Roullier <christophe.roullier@st.com>
+Subject: Re: [PATCH  2/8] net: ethernet: stmmac: update to support all PHY
+ config for stm32mp157c.
+Message-ID: <20190214134040.GA5699@lunn.ch>
+References: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
+ <1550126763-22669-3-git-send-email-christophe.roullier@st.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <d7476dfb-1653-747b-b865-5597ba5fc1c1@redhat.com>
-User-Agent: NeoMutt/20180323
+In-Reply-To: <1550126763-22669-3-git-send-email-christophe.roullier@st.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_052408_051114_397576B1 
-X-CRM114-Status: UNSURE (   8.34  )
+X-CRM114-CacheID: sfid-20190214_054052_302358_3CCC95B2 
+X-CRM114-Status: UNSURE (   8.39  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -69,123 +77,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
- the arch/x86 maintainers <x86@kernel.org>, linux-ia64@vger.kernel.org,
- Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
- Linux-sh list <linux-sh@vger.kernel.org>,
- Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
- linuxppc-dev@lists.ozlabs.org, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- "H. Peter Anvin" <hpa@zytor.com>, linux-alpha@vger.kernel.org,
- sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, robh@kernel.org, alexandre.torgue@st.com,
+ devicetree@vger.kernel.org, netdev@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
+ joabreu@synopsys.com, mcoquelin.stm32@gmail.com, peppe.cavallaro@st.com,
+ davem@davemloft.net, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 08 Feb 2019, Waiman Long wrote:
->I am planning to run more performance test and post the data sometimes
->next week. Davidlohr is also going to run some of his rwsem performance
->test on this patchset.
+ On Thu, Feb 14, 2019 at 07:45:57AM +0100, Christophe Roullier wrote:
+> @@ -131,19 +185,19 @@ static int stm32mp1_set_mode(struct plat_stmmacenet_data *plat_dat)
+>  	case PHY_INTERFACE_MODE_RGMII:
+>  		val = SYSCFG_PMCR_ETH_SEL_RGMII;
+> -		if (dwmac->int_phyclk)
+> +		if (dwmac->eth_clk_sel_reg)
+>  			val |= SYSCFG_PMCR_ETH_CLK_SEL;
+>  		pr_debug("SYSCFG init : PHY_INTERFACE_MODE_RGMII\n");
+>  		break;
 
-So I ran this series on a 40-core IB 2 socket with various worklods in
-mmtests. Below are some of the interesting ones; full numbers and curves
-at https://linux-scalability.org/rwsem-reader-spinner/
+Hi Christophe
 
-All workloads are with increasing number of threads.
+This code should handle all 4 PHY_INTERFACE_MODE_RGMII* values.
 
--- pagefault timings: pft is an artificial pf benchmark (thus reader stress).
-metric is faults/cpu and faults/sec
-                                       v5.0-rc6                 v5.0-rc6
-                                                                    dirty
-Hmean     faults/cpu-1    624224.9815 (   0.00%)   618847.5201 *  -0.86%*
-Hmean     faults/cpu-4    539550.3509 (   0.00%)   547407.5738 *   1.46%*
-Hmean     faults/cpu-7    401470.3461 (   0.00%)   381157.9830 *  -5.06%*
-Hmean     faults/cpu-12   267617.0353 (   0.00%)   271098.5441 *   1.30%*
-Hmean     faults/cpu-21   176194.4641 (   0.00%)   175151.3256 *  -0.59%*
-Hmean     faults/cpu-30   119927.3862 (   0.00%)   120610.1348 *   0.57%*
-Hmean     faults/cpu-40    91203.6820 (   0.00%)    91832.7489 *   0.69%*
-Hmean     faults/sec-1    623292.3467 (   0.00%)   617992.0795 *  -0.85%*
-Hmean     faults/sec-4   2113364.6898 (   0.00%)  2140254.8238 *   1.27%*
-Hmean     faults/sec-7   2557378.4385 (   0.00%)  2450945.7060 *  -4.16%*
-Hmean     faults/sec-12  2696509.8975 (   0.00%)  2747968.9819 *   1.91%*
-Hmean     faults/sec-21  2902892.5639 (   0.00%)  2905923.3881 *   0.10%*
-Hmean     faults/sec-30  2956696.5793 (   0.00%)  2990583.5147 *   1.15%*
-Hmean     faults/sec-40  3422806.4806 (   0.00%)  3352970.3082 *  -2.04%*
-Stddev    faults/cpu-1      2949.5159 (   0.00%)     2802.2712 (   4.99%)
-Stddev    faults/cpu-4     24165.9454 (   0.00%)    15841.1232 (  34.45%)
-Stddev    faults/cpu-7     20914.8351 (   0.00%)    22744.3294 (  -8.75%)
-Stddev    faults/cpu-12    11274.3490 (   0.00%)    14733.3152 ( -30.68%)
-Stddev    faults/cpu-21     2500.1950 (   0.00%)     2200.9518 (  11.97%)
-Stddev    faults/cpu-30     1599.5346 (   0.00%)     1414.0339 (  11.60%)
-Stddev    faults/cpu-40     1473.0181 (   0.00%)     3004.1209 (-103.94%)
-Stddev    faults/sec-1      2655.2581 (   0.00%)     2405.1625 (   9.42%)
-Stddev    faults/sec-4     84042.7234 (   0.00%)    57996.7158 (  30.99%)
-Stddev    faults/sec-7    123656.7901 (   0.00%)   135591.1087 (  -9.65%)
-Stddev    faults/sec-12    97135.6091 (   0.00%)   127054.4926 ( -30.80%)
-Stddev    faults/sec-21    69564.6264 (   0.00%)    65922.6381 (   5.24%)
-Stddev    faults/sec-30    51524.4027 (   0.00%)    56109.4159 (  -8.90%)
-Stddev    faults/sec-40   101927.5280 (   0.00%)   160117.0093 ( -57.09%)
-
-With the exception of the hicup at 7 threads, things are pretty much in
-the noise region for both metrics.
-
--- git checkout
-
-First metric is total runtime for runs with incremental threads.
-
-           v5.0-rc6    v5.0-rc6
-                          dirty
-User         218.95      219.07
-System       149.29      146.82
-Elapsed     1574.10     1427.08
-
-In this case there's a non trivial improvement (11%) in overall elapsed time.
-
--- reaim (which is always succeptible to rwsem changes for both mmap_sem and
-i_mmap)
-                                     v5.0-rc6               v5.0-rc6
-                                                                dirty
-Hmean     compute-1         6674.01 (   0.00%)     6544.28 *  -1.94%*
-Hmean     compute-21       85294.91 (   0.00%)    85524.20 *   0.27%*
-Hmean     compute-41      149674.70 (   0.00%)   149494.58 *  -0.12%*
-Hmean     compute-61      177721.15 (   0.00%)   170507.38 *  -4.06%*
-Hmean     compute-81      181531.07 (   0.00%)   180463.24 *  -0.59%*
-Hmean     compute-101     189024.09 (   0.00%)   187288.86 *  -0.92%*
-Hmean     compute-121     200673.24 (   0.00%)   195327.65 *  -2.66%*
-Hmean     compute-141     213082.29 (   0.00%)   211290.80 *  -0.84%*
-Hmean     compute-161     207764.06 (   0.00%)   204626.68 *  -1.51%*
-
-The 'compute' workload overall takes a small hit.
-
-Hmean     new_dbase-1         60.48 (   0.00%)       60.63 *   0.25%*
-Hmean     new_dbase-21      6590.49 (   0.00%)     6671.81 *   1.23%*
-Hmean     new_dbase-41     14202.91 (   0.00%)    14470.59 *   1.88%*
-Hmean     new_dbase-61     21207.24 (   0.00%)    21067.40 *  -0.66%*
-Hmean     new_dbase-81     25542.40 (   0.00%)    25542.40 *   0.00%*
-Hmean     new_dbase-101    30165.28 (   0.00%)    30046.21 *  -0.39%*
-Hmean     new_dbase-121    33638.33 (   0.00%)    33219.90 *  -1.24%*
-Hmean     new_dbase-141    36723.70 (   0.00%)    37504.52 *   2.13%*
-Hmean     new_dbase-161    42242.51 (   0.00%)    42117.34 *  -0.30%*
-Hmean     shared-1            76.54 (   0.00%)       76.09 *  -0.59%*
-Hmean     shared-21         7535.51 (   0.00%)     5518.75 * -26.76%*
-Hmean     shared-41        17207.81 (   0.00%)    14651.94 * -14.85%*
-Hmean     shared-61        20716.98 (   0.00%)    18667.52 *  -9.89%*
-Hmean     shared-81        27603.83 (   0.00%)    23466.45 * -14.99%*
-Hmean     shared-101       26008.59 (   0.00%)    29536.96 *  13.57%*
-Hmean     shared-121       28354.76 (   0.00%)    43139.39 *  52.14%*
-Hmean     shared-141       38509.25 (   0.00%)    41619.35 *   8.08%*
-Hmean     shared-161       40496.07 (   0.00%)    44303.46 *   9.40%*
-
-Overall there is a small hit (in the noise level but consistent throughout
-many workloads), except git-checkout which does quite well.
-
-Thanks,
-Davidlohr
+     Andrew
 
 _______________________________________________
 linux-arm-kernel mailing list
