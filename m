@@ -6,80 +6,65 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 586CFC10F04
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:45:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 894AFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:47:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 259AF218FF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:45:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59A9A218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 12:47:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SSZgXLB1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="L4jR5B/F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 259AF218FF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J6J8Uc/x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59A9A218FF
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4a/oJf9fZyZ0BNucH/kMy/NZBZ7jf7i+Jik3JaEE72I=; b=SSZgXLB1F0+G1y
-	yksWkIUcx37aet/1VJH95XQ9CZ6foVl+QnCxCjDqdG34Hrr9ZzXsHeLH/r6Qoxcl8tlVddB06S/E5
-	VQ7bSchU45Af/FFogoRb+XA9hwtDtHcgeZ5/0c92xa9YEYmkahNwObiYvWE1voJM47RrRf3evSFOc
-	k1K5WaZxu8yRmVyJM0GY9rBrZrU6IXcAAq5960fjoZXzdhGPGMUzrM6IFM59CEuOxXBRFSG1gBJ14
-	hlXOpJ998iNp1PURe65a9X6dlIxuHD5O2bG/mNXPx/kKCHZN3NqtJHiOPMaXbdOqB4YE/uoEpmDM4
-	b/vw8eJ5POaV7kR6qtxw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UKsN8evyX2QE1rlO5F8zuoIHX40hLOWw7YP/38DmjFU=; b=J6J8Uc/xBKYJQo
+	7JguLgcwbqnwzHR/DM1M3NWret7jEX97xgmb48iggMXc70vS3L7d9qA/9EZNjAbeOiDRqBo6BSUEv
+	ykz7pXhrJtLr2C9itFEen5L+eAR8Hy3RXvV7BSstL6w/jS+dhO3BzGkSN+tiB87/EbEneiuHmZRUw
+	7NLgf3ffMGlEZJI1L3EZA+ct2Wl3n71vT7SxV94yQe5yKEEWVsgpf7V0Pd752N9S5+alxnwsUFgsy
+	9bB5Hko1SnHEUNcBFPxJLySC+9+PYftyEZh6SaZltskN07zjleMdr9KxBpjYJZg3KYSHRxQTa6rr0
+	DN6fox1YkiGkzRpRJLSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guGOg-0005zz-EP; Thu, 14 Feb 2019 12:45:46 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guGOc-0005zd-Jg
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 12:45:44 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1ECiOV8034708;
- Thu, 14 Feb 2019 06:44:24 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550148264;
- bh=+jsMrABFRq3JAYLqDdhLws59CZMHqDNNfRyOQ+yDdr8=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=L4jR5B/FBMo0NvMg0bvTt2wMxzxqKMhIyqD/XpuIRNkGkuSaJ7fMJ8QY+0iy/eboC
- u2+xHTPaWXRwGKWFQ8t+hbtnqtZbqi2UKa+8zPhsuHZZGXkerflJoOt+zK09imiUFm
- UZz1gcChP4tn8tsQF3j05YkI1X3r2mUOam8AnvWA=
-Received: from DLEE106.ent.ti.com (dlee106.ent.ti.com [157.170.170.36])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1ECiOFp097398
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 14 Feb 2019 06:44:24 -0600
-Received: from DLEE112.ent.ti.com (157.170.170.23) by DLEE106.ent.ti.com
- (157.170.170.36) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 14
- Feb 2019 06:44:24 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE112.ent.ti.com
- (157.170.170.23) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 14 Feb 2019 06:44:24 -0600
-Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1ECiKI9009454;
- Thu, 14 Feb 2019 06:44:21 -0600
-Subject: Re: [PATCH v3 20/37] ARM: davinci: aintc: move timer-specific
- irq_set_handler() out of irq.c
-To: Marc Zyngier <marc.zyngier@arm.com>, Bartosz Golaszewski <brgl@bgdev.pl>
-References: <20190212103835.7768-1-brgl@bgdev.pl>
- <20190212103835.7768-21-brgl@bgdev.pl> <86mumyskmg.wl-marc.zyngier@arm.com>
-From: Sekhar Nori <nsekhar@ti.com>
-Message-ID: <28ca2198-ebe9-43b8-fcd6-c6dbd2939987@ti.com>
-Date: Thu, 14 Feb 2019 18:14:19 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <86mumyskmg.wl-marc.zyngier@arm.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+	id 1guGPq-0006Jb-6n; Thu, 14 Feb 2019 12:46:58 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guGPn-0006Ih-3s
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 12:46:56 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8401D80D;
+ Thu, 14 Feb 2019 04:46:54 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F1DCD3F675;
+ Thu, 14 Feb 2019 04:46:51 -0800 (PST)
+Date: Thu, 14 Feb 2019 12:46:49 +0000
+Message-ID: <86ftsqsfk6.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Subject: Re: [PATCH v3 3/9] PCI: keystone: Use hwirq to get the legacy IRQ
+ number offset
+In-Reply-To: <20190214103138.GA24593@e107981-ln.cambridge.arm.com>
+References: <20190213132629.24790-1-kishon@ti.com>
+ <20190213132629.24790-4-kishon@ti.com>
+ <20190213165739.GE2280@e107981-ln.cambridge.arm.com>
+ <8028b0e2-ac32-4e36-c87d-6f4818f34301@ti.com>
+ <20190214103138.GA24593@e107981-ln.cambridge.arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_044542_772767_DC794FCE 
-X-CRM114-Status: GOOD (  20.81  )
+X-CRM114-CacheID: sfid-20190214_044655_163164_94A79D33 
+X-CRM114-Status: GOOD (  25.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,74 +76,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Lechner <david@lechnology.com>, Kevin Hilman <khilman@kernel.org>,
- linux-kernel@vger.kernel.org, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Jason Cooper <jason@lakedaemon.net>
+Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Murali Karicheri <m-karicheri2@ti.com>,
+ linux-pci@vger.kernel.org, Bjorn Helgaas <bhelgaas@google.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 14/02/19 4:27 PM, Marc Zyngier wrote:
-> On Tue, 12 Feb 2019 10:38:18 +0000,
-> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->>
->> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> I've been unable to figure out exactly why, but it seems that the
->> IRQ_TINT1_TINT34 interrupt for timer 1 needs to be handled as a
->> level irq, not edge like all others.
->>
->> Let's move the handler setup out of the aintc driver where it's lived
->> since the beginning and into the dm* SoC-specific files where it
->> belongs.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/dm355.c  | 8 ++++++++
->>  arch/arm/mach-davinci/dm365.c  | 8 ++++++++
->>  arch/arm/mach-davinci/dm644x.c | 8 ++++++++
->>  arch/arm/mach-davinci/dm646x.c | 8 ++++++++
->>  arch/arm/mach-davinci/irq.c    | 3 ---
->>  5 files changed, 32 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
->> index c7cd765114af..a732f2ea1d9a 100644
->> --- a/arch/arm/mach-davinci/dm355.c
->> +++ b/arch/arm/mach-davinci/dm355.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/dma-mapping.h>
->>  #include <linux/dmaengine.h>
->>  #include <linux/init.h>
->> +#include <linux/irq.h>
->>  #include <linux/irqchip/irq-davinci-aintc.h>
->>  #include <linux/platform_data/edma.h>
->>  #include <linux/platform_data/gpio-davinci.h>
->> @@ -744,6 +745,13 @@ void __init dm355_init_time(void)
->>  	psc = ioremap(DAVINCI_PWR_SLEEP_CNTRL_BASE, SZ_4K);
->>  	dm355_psc_init(NULL, psc);
->>  
->> +	/*
->> +	 * Nobody knows why anymore, but this interrupt has been handled as
->> +	 * a level irq from the very beginning of davinci support in mainline
->> +	 * linux.
->> +	 */
->> +	irq_set_handler(DAVINCI_INTC_IRQ(IRQ_TINT1_TINT34), handle_level_irq);
->> +
-> 
-> I've said it on v2, I'm repeating it on v3. There is no point in
-> duplicating this pointless hack on and on again. If there is a driver
-> using this interrupt, move the setup there, and fix the irq_set_type
-> callback.
-> 
-> If nothing is using it, remove it altogether.
+Hi Lirenzo,
 
-Alright, fine with me as well. Dropping the hack is fine. And I think
-that just boils down to discarding this patch.
+On Thu, 14 Feb 2019 10:31:38 +0000,
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> 
+> [CC'ed MarcZ]
+> 
+> On Thu, Feb 14, 2019 at 10:27:19AM +0530, Kishon Vijay Abraham I wrote:
+> > Hi Lorenzo,
+> > 
+> > On 13/02/19 10:27 PM, Lorenzo Pieralisi wrote:
+> > > On Wed, Feb 13, 2019 at 06:56:23PM +0530, Kishon Vijay Abraham I wrote:
+> > >> ks_pcie_legacy_irq_handler() uses 'virq' to get the IRQ number offset.
+> > >> This offset is used to get the correct IRQ_STATUS register
+> > >> corresponding to the IRQ line that raised the interrupt.
+> > >> There is no guarantee that 'virq' assigned for consecutive hardware
+> > >> IRQ will be contiguous. And this might get us an incorrect IRQ number
+> > >> offset.
+> > >>
+> > >> Fix it here by using 'hwirq' to get the IRQ number offset.
+> > >>
+> > >> Link: https://lkml.kernel.org/r/bb081d21-7c03-0357-4294-7e92d95d838c@arm.com
+> > >> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> > >> ---
+> > >>  drivers/pci/controller/dwc/pci-keystone.c | 17 +++++++++++++----
+> > >>  1 file changed, 13 insertions(+), 4 deletions(-)
+> > >>
+> > >> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+> > >> index e8b1d8eca78e..d35ac712a9f8 100644
+> > >> --- a/drivers/pci/controller/dwc/pci-keystone.c
+> > >> +++ b/drivers/pci/controller/dwc/pci-keystone.c
+> > >> @@ -87,7 +87,7 @@ struct keystone_pcie {
+> > >>  	struct dw_pcie		*pci;
+> > >>  	/* PCI Device ID */
+> > >>  	u32			device_id;
+> > >> -	int			legacy_host_irqs[PCI_NUM_INTX];
+> > >> +	int			legacy_host_irq;
+> > >>  	struct			device_node *legacy_intc_np;
+> > >>  
+> > >>  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+> > >> @@ -582,11 +582,11 @@ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
+> > >>   */
+> > >>  static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+> > >>  {
+> > >> -	unsigned int irq = irq_desc_get_irq(desc);
+> > >> +	unsigned int irq = desc->irq_data.hwirq;
+> > >>  	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
+> > >>  	struct dw_pcie *pci = ks_pcie->pci;
+> > >>  	struct device *dev = pci->dev;
+> > >> -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
+> > >> +	u32 irq_offset = irq - ks_pcie->legacy_host_irq;
+> > > 
+> > > I think you should use the plain hwirq number (that if I understand
+> > > correctly range in [0,3]) and drop legacy_host_irq.
+> > 
+> > The hwirq is [80, 83] for Keystone. We store legacy_host_irq (for Keystone it
+> > is 80) to get the correct offset in the range [0, 3].
+> 
+> IIUC the _parent_ hw_irq number should be what you need here, Marc (if
+> he has time) can correct me if I am wrong (or what I am suggesting is
+> a violation of IRQ domain bstraction usage).
+
+It isn't pretty, but it is something we already do in some cases (see
+irq-gic-v3-mbi.c::mbi_compose_msi_msg as an infamous example).
 
 Thanks,
-Sekhar
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
