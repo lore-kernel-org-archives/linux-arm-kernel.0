@@ -2,78 +2,84 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D278CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:54:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13642C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:55:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A101821928
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:54:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D567A222DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 16:55:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gLkDE/r+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A101821928
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LuEZPXKZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="d99rXLfY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D567A222DA
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KlJ5VSuZcJ9oE6Hh8K75mmTvSoHKdUHSqvsxDi2Nh28=; b=gLkDE/r+ONUUY+
-	PLFkxyBsN+KUy00JG10ZQc4M67rAzaayGQUfGaZn5Nk3VZp6LqPPztNorrfbM1EHO8iK9jOAFRzGV
-	6zZdqc3wi62hHxJ5hOSOKXgGDVDmCzrE67x4v/Dir3JKtaQtoHw+EvZfmIUBTROnbZgdADpX9EJR0
-	UE+KEAFqqlByHNnDGJVNhCxXnmw2EO4yLRJA4K7kDodBwlr6vIexyIMI7E9dv9K/yfWapa8qaM5tK
-	q/IOsNt+T8qkWfr/RtSBHxg1bfhzLXW0UIMABScRy71hpMKLX7+PrUB9JuRBInkDXJAJy4/WQUIQx
-	PhxVjlCtmHPqOEIk3NHQ==;
+	List-Owner; bh=xwPZPGvl1e+F9Ha5fZeQM6f+YfDnfgQOaH7kIUnSHbk=; b=LuEZPXKZg3ZoWk
+	ECBmb3NEIKwvOn++i3b9WNBpqJeKTRESwW3dJBzWUPWFRKWXq9cjisQ0SHBAte8MKQBFWCFojH99O
+	eVAEiin87nPfnkvhDM1QCDUlVmtrhC5xgNx5tZmStHFq0p5qxJ6uVgIrfW08zCnqs7QWZkO/92/vF
+	NgvkRZa92lc279ITNywI+mch1GM0ZhK4jv235w9I0bpt8FTTTuwQmAnLKSuL+f4s/JUrpVvHTZBUU
+	pL9FMxPDOv4VnD6frMpPj3+puNGF71blZBSfQmJYT3RYVufS9Zbv1onVVKggCBX4y3lVpFCSwWzD2
+	5uEoGDsNn8MKLN5uWBWQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guKHl-0003KZ-D0; Thu, 14 Feb 2019 16:54:53 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1guKIa-0004tI-CM; Thu, 14 Feb 2019 16:55:44 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guKHR-0002vM-Fe
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:54:35 +0000
-Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1EGplDe015219; Thu, 14 Feb 2019 17:54:30 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qmwsumk2t-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Thu, 14 Feb 2019 17:54:30 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 1EF9C31;
- Thu, 14 Feb 2019 16:54:30 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E7BE9A472;
- Thu, 14 Feb 2019 16:54:29 +0000 (GMT)
-Received: from localhost (10.75.127.47) by SFHDAG3NODE2.st.com (10.75.127.8)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 14 Feb 2019 17:54:30
- +0100
-From: Alexandre Torgue <alexandre.torgue@st.com>
-To: Linus Walleij <linus.walleij@linaro.org>, Maxime Coquelin
- <mcoquelin.stm32@gmail.com>
-Subject: [PATCH 2/2] pinctrl: stm32: return error upon hwspinlock failure
-Date: Thu, 14 Feb 2019 17:54:25 +0100
-Message-ID: <1550163266-19975-3-git-send-email-alexandre.torgue@st.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1550163266-19975-1-git-send-email-alexandre.torgue@st.com>
-References: <1550163266-19975-1-git-send-email-alexandre.torgue@st.com>
+ id 1guKIW-0004sx-Q3
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 16:55:42 +0000
+Received: by mail-it1-x144.google.com with SMTP id l131so15893921ita.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 08:55:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=SbBKzNBycKxM70itibKfUlYiJ9pJfd1fqDbErtUvpXc=;
+ b=d99rXLfYTXazHCp6agNx8f/TLrwjgUX4pj1ny26fJvjhOaGgaaZY49A6iZYz1cC65e
+ uCd3zm7zE3ZYC6rgH67f+DE4uDpu/g3bP0uCzpDWTKuTUmfpwg/SdX6DX2nLNWDIwMN1
+ LRPPsMwJgF22mEVbaRzYEG02AaBjDffWJn2u7lz0B8U7IjQV5jOAD00Fl2SUMdCaF1f2
+ tui1aHAa/JkdiocARufySsS6A22M3Ml15Zn3nkYZBzPmpubtvxPqADRb73PxSaCp14vP
+ rIxjo48gfu+NbF4kw5YiMMgNIebHdF14IKJFs8DhM2qvcdaxK6lgOkGolVYaRKSN7sML
+ KS3w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=SbBKzNBycKxM70itibKfUlYiJ9pJfd1fqDbErtUvpXc=;
+ b=Sc3kKDITQFD7uh5SPvWowtb1mjAcdzWrreHmyyMFP/kI0WtBEaYOkj6LArojPeaPZk
+ yJ8LZ+hq+iZXajBfY91aS9UkxQ80/XnBVWntn0Rg7iqnHfvkW2tSorJWhZ67b/0dA/JB
+ npuXdYzLxuE34ldSNEQviIvjeS5DJGvKicT3zdcraXVcnEmoKjrDEpXjvd5MuHeuuvYF
+ u3pVkLV+0l+UOYM+98qj8GYh3ytiJrJ9Ulunl7dBoBKN9fPw1BWgBa3MO4Esct2DUoHw
+ 6Gbk0a3l6fE6Q0odrFcDdXBv89wX5/2iucUbLPTteFp5fPbXz0vQdh+PSZDyu0j1dgpL
+ Xg9Q==
+X-Gm-Message-State: AHQUAuZOGSzsLJLv3vE+Iu5uQNUTIxifjPynLHqMVtsLVbPDKG7v4lX8
+ rTVtmjVAs6H2+T122S0BaGVD06tESlZjXmwoEnLN2w==
+X-Google-Smtp-Source: AHgI3IZ73trhTnBp56oqdiFpvhVapXV9PZgD9Ci4654hxG67oSOYjdqP39cfx3Orco0gZ94/lV+wvRPodce2JKUFiM4=
+X-Received: by 2002:a24:c3c4:: with SMTP id s187mr2932777itg.158.1550163339656; 
+ Thu, 14 Feb 2019 08:55:39 -0800 (PST)
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.47]
-X-ClientProxiedBy: SFHDAG1NODE3.st.com (10.75.127.3) To SFHDAG3NODE2.st.com
- (10.75.127.8)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-14_09:, , signatures=0
+References: <20190213132738.10294-1-ard.biesheuvel@linaro.org>
+ <20190213132738.10294-2-ard.biesheuvel@linaro.org>
+ <325ae70b-6520-a186-c65f-8ab29a5be3a5@arm.com>
+In-Reply-To: <325ae70b-6520-a186-c65f-8ab29a5be3a5@arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Thu, 14 Feb 2019 17:55:28 +0100
+Message-ID: <CAKv+Gu9BpVDg1=2bsR6ouWM2Xw1OZGMOZ4DXv5fQxE=HQXJsRg@mail.gmail.com>
+Subject: Re: [PATCH 1/2] arm64: account for GICv3 LPI tables in static
+ memblock reserve table
+To: Marc Zyngier <marc.zyngier@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_085433_888527_C1F56BB4 
-X-CRM114-Status: UNSURE (   9.53  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190214_085541_292591_D060C0AA 
+X-CRM114-Status: GOOD (  27.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,156 +91,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-gpio@vger.kernel.org, alexandre.torgue@st.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-stm32@st-md-mailman.stormreply.com
+Cc: linux-efi <linux-efi@vger.kernel.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Linux-MM <linux-mm@kvack.org>, James Morse <james.morse@arm.com>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Return error to the caller when the hwspinlock can't get locked.
+On Thu, 14 Feb 2019 at 16:48, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> Hi Ard,
+>
+> On 13/02/2019 13:27, Ard Biesheuvel wrote:
+> > In the irqchip and EFI code, we have what basically amounts to a quirk
+> > to work around a peculiarity in the GICv3 architecture, which permits
+> > the system memory address of LPI tables to be programmable only once
+> > after a CPU reset. This means kexec kernels must use the same memory
+> > as the first kernel, and thus ensure that this memory has not been
+> > given out for other purposes by the time the ITS init code runs, which
+> > is not very early for secondary CPUs.
+> >
+> > On systems with many CPUs, these reservations could overflow the
+> > memblock reservation table, and this was addressed in commit
+> > eff896288872 ("efi/arm: Defer persistent reservations until after
+> > paging_init()"). However, this turns out to have made things worse,
+> > since the allocation of page tables and heap space for the resized
+> > memblock reservation table itself may overwrite the regions we are
+> > attempting to reserve, which may cause all kinds of corruption,
+> > also considering that the ITS will still be poking bits into that
+> > memory in response to incoming MSIs.
+> >
+> > So instead, let's grow the static memblock reservation table on such
+> > systems so it can accommodate these reservations at an earlier time.
+> > This will permit us to revert the above commit in a subsequent patch.
+> >
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > ---
+> >  arch/arm64/include/asm/memory.h | 11 +++++++++++
+> >  include/linux/memblock.h        |  3 ---
+> >  mm/memblock.c                   | 10 ++++++++--
+> >  3 files changed, 19 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> > index e1ec947e7c0c..7e2b13cdd970 100644
+> > --- a/arch/arm64/include/asm/memory.h
+> > +++ b/arch/arm64/include/asm/memory.h
+> > @@ -332,6 +332,17 @@ static inline void *phys_to_virt(phys_addr_t x)
+> >  #define virt_addr_valid(kaddr)               \
+> >       (_virt_addr_is_linear(kaddr) && _virt_addr_valid(kaddr))
+> >
+> > +/*
+> > + * Given that the GIC architecture permits ITS implementations that can only be
+> > + * configured with a LPI table address once, GICv3 systems with many CPUs may
+> > + * end up reserving a lot of different regions after a kexec for their LPI
+> > + * tables, as we are forced to reuse the same memory after kexec (and thus
+> > + * reserve it persistently with EFI beforehand)
+> > + */
+> > +#if defined(CONFIG_EFI) && defined(CONFIG_ARM_GIC_V3_ITS)
+> > +#define INIT_MEMBLOCK_RESERVED_REGIONS       (INIT_MEMBLOCK_REGIONS + 2 * NR_CPUS)
+>
+> Since GICv3 has 1 pending table per CPU, plus one global property table,
+> can we make this 2 * NR_CPUS + 1? Or is that enough already?
+>
 
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+Ah, I misread the code then. That would mean we'll only need 1 extra
+slot per CPU.
 
-diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-index f6279c8..0b9ff5a 100644
---- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-+++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-@@ -583,8 +583,8 @@ static int stm32_pmx_get_func_groups(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
--static void stm32_pmx_set_mode(struct stm32_gpio_bank *bank,
--		int pin, u32 mode, u32 alt)
-+static int stm32_pmx_set_mode(struct stm32_gpio_bank *bank,
-+			      int pin, u32 mode, u32 alt)
- {
- 	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
- 	u32 val;
-@@ -620,6 +620,8 @@ static void stm32_pmx_set_mode(struct stm32_gpio_bank *bank,
- unlock:
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 	clk_disable(bank->clk);
-+
-+	return err;
- }
- 
- void stm32_pmx_get_mode(struct stm32_gpio_bank *bank, int pin, u32 *mode,
-@@ -676,9 +678,7 @@ static int stm32_pmx_set_mux(struct pinctrl_dev *pctldev,
- 	mode = stm32_gpio_get_mode(function);
- 	alt = stm32_gpio_get_alt(function);
- 
--	stm32_pmx_set_mode(bank, pin, mode, alt);
--
--	return 0;
-+	return stm32_pmx_set_mode(bank, pin, mode, alt);
- }
- 
- static int stm32_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-@@ -688,9 +688,7 @@ static int stm32_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 	struct stm32_gpio_bank *bank = gpiochip_get_data(range->gc);
- 	int pin = stm32_gpio_pin(gpio);
- 
--	stm32_pmx_set_mode(bank, pin, !input, 0);
--
--	return 0;
-+	return stm32_pmx_set_mode(bank, pin, !input, 0);
- }
- 
- static const struct pinmux_ops stm32_pmx_ops = {
-@@ -704,8 +702,8 @@ static const struct pinmux_ops stm32_pmx_ops = {
- 
- /* Pinconf functions */
- 
--static void stm32_pconf_set_driving(struct stm32_gpio_bank *bank,
--	unsigned offset, u32 drive)
-+static int stm32_pconf_set_driving(struct stm32_gpio_bank *bank,
-+				   unsigned offset, u32 drive)
- {
- 	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
- 	unsigned long flags;
-@@ -734,6 +732,8 @@ static void stm32_pconf_set_driving(struct stm32_gpio_bank *bank,
- unlock:
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 	clk_disable(bank->clk);
-+
-+	return err;
- }
- 
- static u32 stm32_pconf_get_driving(struct stm32_gpio_bank *bank,
-@@ -754,8 +754,8 @@ static u32 stm32_pconf_get_driving(struct stm32_gpio_bank *bank,
- 	return (val >> offset);
- }
- 
--static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
--	unsigned offset, u32 speed)
-+static int stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
-+				 unsigned offset, u32 speed)
- {
- 	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
- 	unsigned long flags;
-@@ -784,6 +784,8 @@ static void stm32_pconf_set_speed(struct stm32_gpio_bank *bank,
- unlock:
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 	clk_disable(bank->clk);
-+
-+	return err;
- }
- 
- static u32 stm32_pconf_get_speed(struct stm32_gpio_bank *bank,
-@@ -804,8 +806,8 @@ static u32 stm32_pconf_get_speed(struct stm32_gpio_bank *bank,
- 	return (val >> (offset * 2));
- }
- 
--static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
--	unsigned offset, u32 bias)
-+static int stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
-+				unsigned offset, u32 bias)
- {
- 	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
- 	unsigned long flags;
-@@ -834,6 +836,8 @@ static void stm32_pconf_set_bias(struct stm32_gpio_bank *bank,
- unlock:
- 	spin_unlock_irqrestore(&bank->lock, flags);
- 	clk_disable(bank->clk);
-+
-+	return err;
- }
- 
- static u32 stm32_pconf_get_bias(struct stm32_gpio_bank *bank,
-@@ -896,22 +900,22 @@ static int stm32_pconf_parse_conf(struct pinctrl_dev *pctldev,
- 
- 	switch (param) {
- 	case PIN_CONFIG_DRIVE_PUSH_PULL:
--		stm32_pconf_set_driving(bank, offset, 0);
-+		ret = stm32_pconf_set_driving(bank, offset, 0);
- 		break;
- 	case PIN_CONFIG_DRIVE_OPEN_DRAIN:
--		stm32_pconf_set_driving(bank, offset, 1);
-+		ret = stm32_pconf_set_driving(bank, offset, 1);
- 		break;
- 	case PIN_CONFIG_SLEW_RATE:
--		stm32_pconf_set_speed(bank, offset, arg);
-+		ret = stm32_pconf_set_speed(bank, offset, arg);
- 		break;
- 	case PIN_CONFIG_BIAS_DISABLE:
--		stm32_pconf_set_bias(bank, offset, 0);
-+		ret = stm32_pconf_set_bias(bank, offset, 0);
- 		break;
- 	case PIN_CONFIG_BIAS_PULL_UP:
--		stm32_pconf_set_bias(bank, offset, 1);
-+		ret = stm32_pconf_set_bias(bank, offset, 1);
- 		break;
- 	case PIN_CONFIG_BIAS_PULL_DOWN:
--		stm32_pconf_set_bias(bank, offset, 2);
-+		ret = stm32_pconf_set_bias(bank, offset, 2);
- 		break;
- 	case PIN_CONFIG_OUTPUT:
- 		__stm32_gpio_set(bank, offset, arg);
--- 
-2.7.4
+So I will change this to
 
+> > +#define INIT_MEMBLOCK_RESERVED_REGIONS       (INIT_MEMBLOCK_REGIONS + NR_CPUS)
+
+considering that INIT_MEMBLOCK_REGIONS defaults to 128, so that one
+global table is already accounted for.
+
+
+> > +#endif
+> > +
+> >  #include <asm-generic/memory_model.h>
+> >
+> >  #endif
+> > diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> > index 64c41cf45590..859b55b66db2 100644
+> > --- a/include/linux/memblock.h
+> > +++ b/include/linux/memblock.h
+> > @@ -29,9 +29,6 @@ extern unsigned long max_pfn;
+> >   */
+> >  extern unsigned long long max_possible_pfn;
+> >
+> > -#define INIT_MEMBLOCK_REGIONS        128
+> > -#define INIT_PHYSMEM_REGIONS 4
+> > -
+> >  /**
+> >   * enum memblock_flags - definition of memory region attributes
+> >   * @MEMBLOCK_NONE: no special request
+> > diff --git a/mm/memblock.c b/mm/memblock.c
+> > index 022d4cbb3618..a526c3ab8390 100644
+> > --- a/mm/memblock.c
+> > +++ b/mm/memblock.c
+> > @@ -26,6 +26,12 @@
+> >
+> >  #include "internal.h"
+> >
+> > +#define INIT_MEMBLOCK_REGIONS                128
+> > +#define INIT_PHYSMEM_REGIONS         4
+> > +#ifndef INIT_MEMBLOCK_RESERVED_REGIONS
+> > +#define INIT_MEMBLOCK_RESERVED_REGIONS       INIT_MEMBLOCK_REGIONS
+> > +#endif
+> > +
+> >  /**
+> >   * DOC: memblock overview
+> >   *
+> > @@ -92,7 +98,7 @@ unsigned long max_pfn;
+> >  unsigned long long max_possible_pfn;
+> >
+> >  static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
+> > -static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
+> > +static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
+> >  #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+> >  static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS] __initdata_memblock;
+> >  #endif
+> > @@ -105,7 +111,7 @@ struct memblock memblock __initdata_memblock = {
+> >
+> >       .reserved.regions       = memblock_reserved_init_regions,
+> >       .reserved.cnt           = 1,    /* empty dummy entry */
+> > -     .reserved.max           = INIT_MEMBLOCK_REGIONS,
+> > +     .reserved.max           = INIT_MEMBLOCK_RESERVED_REGIONS,
+> >       .reserved.name          = "reserved",
+> >
+> >  #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+> >
+>
+> Otherwise:
+>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
