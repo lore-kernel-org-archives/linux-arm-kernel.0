@@ -2,97 +2,75 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58274C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:20:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 162EEC10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:26:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28CC6222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:20:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB345222DC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:26:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KCtRoDKe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=oracle.com header.i=@oracle.com header.b="1Q3h77ek"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28CC6222DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=oracle.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qhE6fFdl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB345222DC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Content-Type:
-	In-Reply-To:MIME-Version:Date:Message-ID:From:References:To:Subject:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=x5D8g27tfxqM0ZgfCazU3wdI2tSvZJTr3q9cXoK5qa8=; b=KCtRoDKe4EkVFn8Z0fIfccU85
-	nSVnoUOAr/sq2qEfdY7VSrAzSCRGnlRgc0eEMAs9Ny3vacYQh67jryz1Eu+LxUwdldetm2eoqpdL3
-	wBTtQ+zj+2HYtpUqheGIBo1k6019T6D/TKYx/jtNbA5y7ALVQqQIxkNnFZGzbgAMFwYpemnGMWX7J
-	BH3B7pyEoyMazJx7fP99rqP50i81rOOfARFGkt+ATy8IeEnJTpyt+UlveAa9Yjw6flbDA1bvWfTRT
-	a0ubjfU3f6lnlHroj3YztyeqBzYvEqBE7lDclyhfiBhDtnliBCx46/7nQlTXCjRLt9JkjI/Da+Fi2
-	fGRArjyhQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=yEPkTA4mAU/MvVmqUcxcrbhQAHbgIyjvJOkhitzC4kA=; b=qhE6fFdl0EbYMN
+	ozTMlsu8HbQK5fsA92w6zyPcchv9YMewJVtUnh29HRjOG0gGit8JzPSC3Cjqpeiok3YWt/kDGhqZ5
+	7Cr/TRNMxg4ryVW9xrmqlW4WozsxxgAZMW/7mgNCum+f0VleUvIcAK62Jf/IaP91NDwpKnoE7vGtY
+	bnbtDpprlRabWMf27+SgwnusjLvPrQ6AIDE86VUGn2xmUgl/XRmyNkCiATUt5zE5tU2stdrNEOzxw
+	0n2SD6lzM3iC0i8UwdgjyGg8UXjcpGFGdufU/HPvOZzini0ndr3dB3y+bKyM1W/jGmsFDmiz2AmMH
+	TWde0SQl6c9fT/F+50gg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guKgG-0000f3-RA; Thu, 14 Feb 2019 17:20:12 +0000
-Received: from userp2130.oracle.com ([156.151.31.86])
+	id 1guKmL-0002T0-Ah; Thu, 14 Feb 2019 17:26:29 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guKgD-0000ee-Lw
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:20:11 +0000
-Received: from pps.filterd (userp2130.oracle.com [127.0.0.1])
- by userp2130.oracle.com (8.16.0.27/8.16.0.27) with SMTP id x1EHEh9O126979;
- Thu, 14 Feb 2019 17:19:28 GMT
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=oracle.com;
- h=subject : to : cc :
- references : from : message-id : date : mime-version : in-reply-to :
- content-type; s=corp-2018-07-02;
- bh=Z/qAl0rILNkjo+9n96+ul65QbUgdUPpDBNBiImZV1P4=;
- b=1Q3h77ek/zcGl7JP4I1iF7b4Hd/BiLn5LlRyb46NoP9p/3eNXUtoIXxQ0usjbmwA/eKV
- 4lbXkmHLYKUrS6lMKRlRXS5f5lbIoJwThJXYI73oU1OPchgUDeibud+cHIokXFU6JrlW
- ZGIvam5pTDfWLBEUl2fuxtP3QP8lKW2unELvZ6gVTZWYrCuDReVvdWoOFiK45WABD8yV
- Er90dBqJdIOtKiH9ONgPnGbS18o3KWHnElNE2wFCcLjenypobwery40aQmsh2mklGa+f
- xoc4FdeJyPR0nuWtHgQomJC2wO859Y+gYZD+4wOMtYGER4l+mYbIne5K3+CHeHt6qaPi og== 
-Received: from aserv0022.oracle.com (aserv0022.oracle.com [141.146.126.234])
- by userp2130.oracle.com with ESMTP id 2qhreksbbt-1
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 14 Feb 2019 17:19:28 +0000
-Received: from aserv0121.oracle.com (aserv0121.oracle.com [141.146.126.235])
- by aserv0022.oracle.com (8.14.4/8.14.4) with ESMTP id x1EHJRxJ005673
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=OK);
- Thu, 14 Feb 2019 17:19:27 GMT
-Received: from abhmp0018.oracle.com (abhmp0018.oracle.com [141.146.116.24])
- by aserv0121.oracle.com (8.14.4/8.13.8) with ESMTP id x1EHJRWM021695;
- Thu, 14 Feb 2019 17:19:27 GMT
-Received: from [192.168.1.16] (/24.9.64.241)
- by default (Oracle Beehive Gateway v4.0)
- with ESMTP ; Thu, 14 Feb 2019 17:19:26 +0000
-Subject: Re: [RFC PATCH v8 03/14] mm, x86: Add support for eXclusive Page
- Frame Ownership (XPFO)
-To: Borislav Petkov <bp@alien8.de>, juergh@gmail.com
-References: <cover.1550088114.git.khalid.aziz@oracle.com>
- <8275de2a7e6b72d19b1cd2ec5d71a42c2c7dd6c5.1550088114.git.khalid.aziz@oracle.com>
- <20190214105631.GJ32494@hirez.programming.kicks-ass.net>
- <20190214161552.GF4423@zn.tnic>
-From: Khalid Aziz <khalid.aziz@oracle.com>
-Organization: Oracle Corp
-Message-ID: <6c689028-6748-66b9-0d9c-2b57b5dd6383@oracle.com>
-Date: Thu, 14 Feb 2019 10:19:23 -0700
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1guKmH-0002ST-TV
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:26:27 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1EHHMFB015455; Thu, 14 Feb 2019 18:26:19 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2qn0jwuwnq-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 14 Feb 2019 18:26:19 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id AED1D34;
+ Thu, 14 Feb 2019 17:26:18 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 21AB8A581;
+ Thu, 14 Feb 2019 17:26:18 +0000 (GMT)
+Received: from localhost (10.75.127.46) by SFHDAG3NODE2.st.com (10.75.127.8)
+ with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 14 Feb 2019 18:26:18
+ +0100
+From: Alexandre Torgue <alexandre.torgue@st.com>
+To: Giuseppe Cavallaro <peppe.cavallaro@st.com>, Jose Abreu
+ <joabreu@synopsys.com>, <davem@davemloft.net>
+Subject: [net-next] net: stmmac: handle endianness in dwmac4_get_timestamp
+Date: Thu, 14 Feb 2019 18:26:16 +0100
+Message-ID: <1550165176-10099-1-git-send-email-alexandre.torgue@st.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-In-Reply-To: <20190214161552.GF4423@zn.tnic>
-Content-Type: multipart/mixed; boundary="------------8D637083EDAD02B721201657"
-Content-Language: en-US
-X-Proofpoint-Virus-Version: vendor=nai engine=5900 definitions=9167
- signatures=668683
-X-Proofpoint-Spam-Details: rule=notspam policy=default score=0
- priorityscore=1501 malwarescore=0
- suspectscore=0 phishscore=0 bulkscore=0 spamscore=0 clxscore=1011
- lowpriorityscore=0 mlxscore=0 impostorscore=0 mlxlogscore=999 adultscore=0
- classifier=spam adjust=0 reason=mlx scancount=1 engine=8.0.1-1810050000
- definitions=main-1902140117
+X-Originating-IP: [10.75.127.46]
+X-ClientProxiedBy: SFHDAG2NODE2.st.com (10.75.127.5) To SFHDAG3NODE2.st.com
+ (10.75.127.8)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-14_09:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_092009_851833_9E831645 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20190214_092626_244473_6112FB13 
+X-CRM114-Status: UNSURE (   8.54  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,104 +82,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mhocko@suse.com, kernel-hardening@lists.openwall.com,
- Peter Zijlstra <peterz@infradead.org>, catalin.marinas@arm.com,
- will.deacon@arm.com, dave.hansen@intel.com, deepa.srinivasan@oracle.com,
- steven.sistare@oracle.com, joao.m.martins@oracle.com, tglx@linutronix.de,
- tycho@tycho.ws, ak@linux.intel.com, x86@kernel.org, jmorris@namei.org,
- hch@lst.de, kanth.ghatraju@oracle.com, jsteckli@amazon.de, labbott@redhat.com,
- pradeep.vincent@oracle.com, konrad.wilk@oracle.com, jcm@redhat.com,
- liran.alon@oracle.com, luto@kernel.org, boris.ostrovsky@oracle.com,
- chris.hyser@oracle.com, linux-arm-kernel@lists.infradead.org,
- jmattson@google.com, Marco Benatto <marco.antonio.780@gmail.com>,
- linux-mm@kvack.org, andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org,
- tyhicks@canonical.com, john.haxby@oracle.com,
- Juerg Haefliger <juerg.haefliger@canonical.com>,
- kirill.shutemov@linux.intel.com, keescook@google.com,
- akpm@linux-foundation.org, torvalds@linux-foundation.org, dwmw@amazon.co.uk
+Cc: netdev@vger.kernel.org, Alexandre Torgue <alexandre.torgue@st.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is a multi-part message in MIME format.
---------------8D637083EDAD02B721201657
-Content-Type: text/plain; charset=utf-8
-Content-Transfer-Encoding: quoted-printable
+GMAC IP is little-endian and used on several kind of CPU (big or little
+endian). Main callbacks functions of the stmmac drivers take care about
+it. It was not the case for dwmac4_get_timestamp function.
 
-On 2/14/19 9:15 AM, Borislav Petkov wrote:
-> On Thu, Feb 14, 2019 at 11:56:31AM +0100, Peter Zijlstra wrote:
->>> +EXPORT_SYMBOL(xpfo_kunmap);
->>
->> And these here things are most definitely not IRQ-safe.
->=20
-> Should also be EXPORT_SYMBOL_GPL.
->=20
+Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
 
-Agreed. On the other hand, is there even a need to export this? It
-should only be called from kunmap() or kunmap_atomic() and not from any
-module directly. Same for xpfo_kmap.
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
+index 20299f6..736e296 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
+@@ -241,15 +241,18 @@ static inline void dwmac4_get_timestamp(void *desc, u32 ats, u64 *ts)
+ static int dwmac4_rx_check_timestamp(void *desc)
+ {
+ 	struct dma_desc *p = (struct dma_desc *)desc;
++	unsigned int rdes0 = le32_to_cpu(p->des0);
++	unsigned int rdes1 = le32_to_cpu(p->des1);
++	unsigned int rdes3 = le32_to_cpu(p->des3);
+ 	u32 own, ctxt;
+ 	int ret = 1;
+ 
+-	own = p->des3 & RDES3_OWN;
+-	ctxt = ((p->des3 & RDES3_CONTEXT_DESCRIPTOR)
++	own = rdes3 & RDES3_OWN;
++	ctxt = ((rdes3 & RDES3_CONTEXT_DESCRIPTOR)
+ 		>> RDES3_CONTEXT_DESCRIPTOR_SHIFT);
+ 
+ 	if (likely(!own && ctxt)) {
+-		if ((p->des0 == 0xffffffff) && (p->des1 == 0xffffffff))
++		if ((rdes0 == 0xffffffff) && (rdes1 == 0xffffffff))
+ 			/* Corrupted value */
+ 			ret = -EINVAL;
+ 		else
+-- 
+2.7.4
 
-Thanks,
-Khalid
-
---------------8D637083EDAD02B721201657
-Content-Type: application/pgp-keys;
- name="pEpkey.asc"
-Content-Transfer-Encoding: quoted-printable
-Content-Disposition: attachment;
- filename="pEpkey.asc"
-
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-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
-+Wrj8Rwom6h21PXZRKnlkis7ibQfE+TxqOI7vg=3D=3D
-=3DnPqY
------END PGP PUBLIC KEY BLOCK-----
-
---------------8D637083EDAD02B721201657
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---------------8D637083EDAD02B721201657--
-
