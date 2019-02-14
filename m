@@ -2,62 +2,77 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3B6CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 22:17:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D906C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 22:25:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9FFA220838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 22:17:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D2E6E2177E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 22:25:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lw6HbrPB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FFA220838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LNY09Rr2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="HFXrNl2U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2E6E2177E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Am3psuZMAz47PgJcytFIw8OTFmD51EbIjbdQCzN+mI8=; b=Lw6HbrPBxWBCF8
-	5aWDLucfnOEW66scLo3pEF5LlcFTOtl9aqx7M94bUa+MVEGzeYwmVr0rsUB3QYDrzg0XhaZ874B+C
-	EuLSGlNBPUUhAy9Debmvj/cl10L2HCMetFEUzYakHkvgiarM0DKcDeVyhGUtj2b9a+pp16k+LpnI3
-	Km4/c5PrCD2A5nGuVElnf9P+cC8Lm2Ai5fCJXJnoMD/VG5EEbfJYi612DI1HKZVbMJFohyc0oS1or
-	8UfcYhcnTkfjHDLz+oaW8tBikmYfPXVfMc9ZcCYF96jhx+/mby+uceM9Pg5VwRBBKKCCyoCbR3Lgb
-	+7uQ3tGWckYQA7nKE8sA==;
+	List-Owner; bh=eCsHI2KuYCMxQvF4SAYed8cLP8gs6E2UsqYpTQth0E8=; b=LNY09Rr2pI2KCV
+	nQlxfDSl36mAcBcdGB1o2WBdYjsS3Tu4w0FofCff+JtxdfI2wtOryzrkWmp/X9vBCL7+QZM2zz4in
+	x4Fc8uBbUyCaE3w2yuJ8ak9TsZZOJx4lq+IVysp6Or9vWNRTJbOi+4iUYBNmQjG9CUp17XDC4fiK6
+	JMu1olvMfz+jCvvzCG/mhcWP/vhXf7PxdpRUtB9ZMn4+7yaYAmFPHKiOScaXnvPuqccR2fsgNtHGs
+	vNGq9BXFKdSjpc3LNoqasLUKZfateSjVfgZwf2YvS97vkaM9Ca946THmJNUP+yVlTc3NSoOG6lvfe
+	INzPfqCWdH54Ej3xIJng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guPJm-00081h-NI; Thu, 14 Feb 2019 22:17:18 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1guPS3-0002bX-Ft; Thu, 14 Feb 2019 22:25:51 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guPJi-0007qN-Dy
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 22:17:16 +0000
-Received: from localhost (lfbn-lyo-1-149-219.w86-202.abo.wanadoo.fr
- [86.202.231.219])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id C7A34200009;
- Thu, 14 Feb 2019 22:17:03 +0000 (UTC)
-Date: Thu, 14 Feb 2019 23:17:03 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
-Subject: Re: [PATCH] can: mark expected switch fall-throughs
-Message-ID: <20190214221703.GQ10129@piout.net>
-References: <20190129180612.GA28650@embeddedor>
- <432a9399-95f4-e988-5cd2-93340f155fa1@microchip.com>
- <daae008e-35fd-7553-fcb2-7932fe53b959@embeddedor.com>
+ id 1guPS1-0002b3-G8
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 22:25:50 +0000
+Received: from mail-qk1-f170.google.com (mail-qk1-f170.google.com
+ [209.85.222.170])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 5F1AB2229F
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 22:25:46 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550183146;
+ bh=YL85AWpsB8yHn4HE/LjbG0iark5x6TEwUeV1Li2H6xs=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=HFXrNl2UCqG6EWD9zJ80rHR+SLzhZ0z2p7m8BwVsFKI4qSDLdNCsNjtFUYniNbHIy
+ SdnShVPgMlPjYo28+mK7brkQJzlSRJC/O0m8cnrVLHQMbR4G7EjKGzVVw3uGuSLK9/
+ rVneQ4FjVLLThNLiykpEJFjds/ugbLvDOV5kFpzQ=
+Received: by mail-qk1-f170.google.com with SMTP id p15so4607234qkl.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 14:25:46 -0800 (PST)
+X-Gm-Message-State: AHQUAuaII1t9KlpJyyKRgTw2F4EZOKPtF9uhRdTfzsV6cgPbQ3FyBbvi
+ 5HeQNv8MOcSh+G6MFHsSap42hxpjQmIOpYZndA==
+X-Google-Smtp-Source: AHgI3IbPbeaayaCLOakH1MmZKpETwRvANLH2Gb0Yo4wRcfifnKOKS4VCZp9wkiin1kvNuuOVeEESHA2tgHEUMWB0eiU=
+X-Received: by 2002:a37:94d:: with SMTP id 74mr4734584qkj.79.1550183145609;
+ Thu, 14 Feb 2019 14:25:45 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <daae008e-35fd-7553-fcb2-7932fe53b959@embeddedor.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190214175725.60462-1-ray.jui@broadcom.com>
+ <20190214175725.60462-4-ray.jui@broadcom.com>
+In-Reply-To: <20190214175725.60462-4-ray.jui@broadcom.com>
+From: Rob Herring <robh+dt@kernel.org>
+Date: Thu, 14 Feb 2019 16:25:33 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+W=+1=Sj8zQu_ECW9UzEiS8Oya8W_0ZQYPGemXC38qfg@mail.gmail.com>
+Message-ID: <CAL_Jsq+W=+1=Sj8zQu_ECW9UzEiS8Oya8W_0ZQYPGemXC38qfg@mail.gmail.com>
+Subject: Re: [PATCH v5 3/8] dt-bindings: i2c: iproc: make 'interrupts' optional
+To: Ray Jui <ray.jui@broadcom.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_141714_766946_0B8CBDA4 
-X-CRM114-Status: GOOD (  20.48  )
+X-CRM114-CacheID: sfid-20190214_142549_557004_9D12084C 
+X-CRM114-Status: GOOD (  12.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,79 +84,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, netdev@vger.kernel.org,
- linux-can@vger.kernel.org, Ludovic.Desroches@microchip.com, mkl@pengutronix.de,
- linux-arm-kernel@lists.infradead.org, davem@davemloft.net, wg@grandegger.com
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Wolfram Sang <wsa@the-dreams.de>,
+ Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
+ <bcm-kernel-feedback-list@broadcom.com>, Linux I2C <linux-i2c@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksCgpPbiAxNC8wMi8yMDE5IDE1OjM3OjI2LTA2MDAsIEd1c3Rhdm8gQS4gUi4gU2lsdmEgd3Jv
-dGU6Cj4gCj4gCj4gT24gMS8zMC8xOSAyOjExIEFNLCBOaWNvbGFzLkZlcnJlQG1pY3JvY2hpcC5j
-b20gd3JvdGU6Cj4gPiBPbiAyOS8wMS8yMDE5IGF0IDE5OjA2LCBHdXN0YXZvIEEuIFIuIFNpbHZh
-IHdyb3RlOgo+ID4+IEluIHByZXBhcmF0aW9uIHRvIGVuYWJsaW5nIC1XaW1wbGljaXQtZmFsbHRo
-cm91Z2gsIG1hcmsgc3dpdGNoIGNhc2VzCj4gPj4gd2hlcmUgd2UgYXJlIGV4cGVjdGluZyB0byBm
-YWxsIHRocm91Z2guCj4gPj4KPiA+PiBUaGlzIHBhdGNoIGZpeGVzIHRoZSBmb2xsb3dpbmcgd2Fy
-bmluZ3M6Cj4gPj4KPiA+PiBkcml2ZXJzL25ldC9jYW4vcGVha19jYW5mZC9wZWFrX3BjaWVmZF9t
-YWluLmM6NjY4OjM6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxsIHRocm91Z2ggWy1X
-aW1wbGljaXQtZmFsbHRocm91Z2g9XQo+ID4+IGRyaXZlcnMvbmV0L2Nhbi9zcGkvbWNwMjUxeC5j
-Ojg3NTo3OiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVudCBtYXkgZmFsbCB0aHJvdWdoIFstV2ltcGxp
-Y2l0LWZhbGx0aHJvdWdoPV0KPiA+PiBkcml2ZXJzL25ldC9jYW4vdXNiL3BlYWtfdXNiL3BjYW5f
-dXNiLmM6NDIyOjY6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxsIHRocm91Z2ggWy1X
-aW1wbGljaXQtZmFsbHRocm91Z2g9XQo+ID4+IGRyaXZlcnMvbmV0L2Nhbi9hdDkxX2Nhbi5jOjg5
-NTo2OiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVudCBtYXkgZmFsbCB0aHJvdWdoIFstV2ltcGxpY2l0
-LWZhbGx0aHJvdWdoPV0KPiA+PiBkcml2ZXJzL25ldC9jYW4vYXQ5MV9jYW4uYzo5NTM6MTU6IHdh
-cm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxsIHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRo
-cm91Z2g9XQo+ID4+IGRyaXZlcnMvbmV0L2Nhbi91c2IvcGVha191c2IvcGNhbl91c2IuYzogSW4g
-ZnVuY3Rpb24g4oCYcGNhbl91c2JfZGVjb2RlX2Vycm9y4oCZOgo+ID4+IGRyaXZlcnMvbmV0L2Nh
-bi91c2IvcGVha191c2IvcGNhbl91c2IuYzo0MjI6Njogd2FybmluZzogdGhpcyBzdGF0ZW1lbnQg
-bWF5IGZhbGwgdGhyb3VnaCBbLVdpbXBsaWNpdC1mYWxsdGhyb3VnaD1dCj4gPj4gICAgIGlmIChu
-ICYgUENBTl9VU0JfRVJST1JfQlVTX0xJR0hUKSB7Cj4gPj4gICAgICAgIF4KPiA+PiBkcml2ZXJz
-L25ldC9jYW4vdXNiL3BlYWtfdXNiL3BjYW5fdXNiLmM6NDI4OjI6IG5vdGU6IGhlcmUKPiA+PiAg
-ICBjYXNlIENBTl9TVEFURV9FUlJPUl9XQVJOSU5HOgo+ID4+ICAgIF5+fn4KPiA+Pgo+ID4+IFdh
-cm5pbmcgbGV2ZWwgMyB3YXMgdXNlZDogLVdpbXBsaWNpdC1mYWxsdGhyb3VnaD0zCj4gPj4KPiA+
-PiBUaGlzIHBhdGNoIGlzIHBhcnQgb2YgdGhlIG9uZ29pbmcgZWZmb3J0cyB0byBlbmFibGluZwo+
-ID4+IC1XaW1wbGljaXQtZmFsbHRocm91Z2guCj4gPj4KPiA+PiBOb3RpY2UgdGhhdCBpbiBzb21l
-IGNhc2VzIHNwZWxsaW5nIG1pc3Rha2VzIHdlcmUgZml4ZWQuCj4gPj4gSW4gb3RoZXIgY2FzZXMs
-IHRoZSAvKiBmYWxsIHRocm91Z2ggKi8gY29tbWVudCBpcyBwbGFjZWQKPiA+PiBhdCB0aGUgYm90
-dG9tIG9mIHRoZSBjYXNlIHN0YXRlbWVudCwgd2hpY2ggaXMgd2hhdCBHQ0MKPiA+PiBpcyBleHBl
-Y3RpbmcgdG8gZmluZC4KPiA+Pgo+ID4+IFNpZ25lZC1vZmYtYnk6IEd1c3Rhdm8gQS4gUi4gU2ls
-dmEgPGd1c3Rhdm9AZW1iZWRkZWRvci5jb20+Cj4gPj4gLS0tCj4gPj4gICBkcml2ZXJzL25ldC9j
-YW4vYXQ5MV9jYW4uYyAgICAgICAgICAgICAgICAgICAgfCA2ICsrKystLQo+ID4gCj4gPiBGb3Ig
-dGhpcyBvbmU6Cj4gPiBBY2tlZC1ieTogTmljb2xhcyBGZXJyZSA8bmljb2xhcy5mZXJyZUBtaWNy
-b2NoaXAuY29tPgo+ID4gCj4gCj4gVGhhbmtzLCBOaWNvbGFzLgo+IAoKSSB0aG91Z2ggSSBoYWQg
-YSBkw6lqw6AgdnUgYnV0IHlvdSBhY3R1YWxseSBzZW50IHRoZSBhdDkxIHBhcnQgdHdpY2UuCgo+
-IERhdmU6Cj4gCj4gSSB3b25kZXIgaWYgeW91IGNhbiB0YWtlIHRoaXMgcGF0Y2guCj4gCj4gVGhh
-bmtzCj4gLS0KPiBHdXN0YXZvCj4gCj4gPj4gICBkcml2ZXJzL25ldC9jYW4vcGVha19jYW5mZC9w
-ZWFrX3BjaWVmZF9tYWluLmMgfCAyICstCj4gPj4gICBkcml2ZXJzL25ldC9jYW4vc3BpL21jcDI1
-MXguYyAgICAgICAgICAgICAgICAgfCAzICsrLQo+ID4+ICAgZHJpdmVycy9uZXQvY2FuL3VzYi9w
-ZWFrX3VzYi9wY2FuX3VzYi5jICAgICAgIHwgMiArLQo+ID4+ICAgNCBmaWxlcyBjaGFuZ2VkLCA4
-IGluc2VydGlvbnMoKyksIDUgZGVsZXRpb25zKC0pCj4gPj4KPiA+PiBkaWZmIC0tZ2l0IGEvZHJp
-dmVycy9uZXQvY2FuL2F0OTFfY2FuLmMgYi9kcml2ZXJzL25ldC9jYW4vYXQ5MV9jYW4uYwo+ID4+
-IGluZGV4IGQ5OGM2OTA0NWIxNy4uMTcxOGMyMGY5Yzk5IDEwMDY0NAo+ID4+IC0tLSBhL2RyaXZl
-cnMvbmV0L2Nhbi9hdDkxX2Nhbi5jCj4gPj4gKysrIGIvZHJpdmVycy9uZXQvY2FuL2F0OTFfY2Fu
-LmMKPiA+PiBAQCAtOTAyLDcgKzkwMiw4IEBAIHN0YXRpYyB2b2lkIGF0OTFfaXJxX2Vycl9zdGF0
-ZShzdHJ1Y3QgbmV0X2RldmljZSAqZGV2LAo+ID4+ICAgCQkJCUNBTl9FUlJfQ1JUTF9UWF9XQVJO
-SU5HIDoKPiA+PiAgIAkJCQlDQU5fRVJSX0NSVExfUlhfV0FSTklORzsKPiA+PiAgIAkJfQo+ID4+
-IC0JY2FzZSBDQU5fU1RBVEVfRVJST1JfV0FSTklORzoJLyogZmFsbHRocm91Z2ggKi8KPiA+PiAr
-CQkvKiBmYWxsIHRocm91Z2ggKi8KPiA+PiArCWNhc2UgQ0FOX1NUQVRFX0VSUk9SX1dBUk5JTkc6
-Cj4gPj4gICAJCS8qCj4gPj4gICAJCSAqIGZyb206IEVSUk9SX0FDVElWRSwgRVJST1JfV0FSTklO
-Rwo+ID4+ICAgCQkgKiB0byAgOiBFUlJPUl9QQVNTSVZFLCBCVVNfT0ZGCj4gPj4gQEAgLTk1MSw3
-ICs5NTIsOCBAQCBzdGF0aWMgdm9pZCBhdDkxX2lycV9lcnJfc3RhdGUoc3RydWN0IG5ldF9kZXZp
-Y2UgKmRldiwKPiA+PiAgIAkJbmV0ZGV2X2RiZyhkZXYsICJFcnJvciBBY3RpdmVcbiIpOwo+ID4+
-ICAgCQljZi0+Y2FuX2lkIHw9IENBTl9FUlJfUFJPVDsKPiA+PiAgIAkJY2YtPmRhdGFbMl0gPSBD
-QU5fRVJSX1BST1RfQUNUSVZFOwo+ID4+IC0JY2FzZSBDQU5fU1RBVEVfRVJST1JfV0FSTklORzoJ
-LyogZmFsbHRocm91Z2ggKi8KClNlcmlvdXNseSwgZm9yIHRoYXQgb25lLCB5b3Ugc2hvdWxkIGZp
-eCB0aGUgY29tcGlsZXIuIFRoZSBmYWxsIHRocm91Z2gKaXMgbm90IGltcGxpY2l0LCBpdCBpcyBh
-Y3R1YWxseSBxdWl0ZSBleHBsaWNpdCBhbmQgdGhlIHdhcm5pbmcgaXMgc2ltcGx5Cndyb25nLgoK
-QWxzbywgdGhlIGdjYyBkb2N1bWVudGF0aW9uIHNheXMgdGhhdCAtV2ltcGxpY2l0LWZhbGx0aHJv
-dWdoPTMKcmVjb2duaXplcyAvKiBmYWxsdGhyb3VnaCAqLyBhcyBhIHByb3BlciBmYWxsIHRocm91
-Z2ggY29tbWVudCAoYW5kIEkKdGVzdGVkIHdpdGggZ2NjIDguMikuCgpUaGUgbWF0Y2hpbmcgcmVn
-ZXggaXMgWyBcdC4hXSooW0VlXWxzZSw/IHxbSWldbnRlbnRpb25hbChseSk/ICk/CmZhbGwocyB8
-IHwtKT90aHIob3VnaHx1KVsgXHQuIV0qKC1bXlxuXHJdKik/CgotLSAKQWxleGFuZHJlIEJlbGxv
-bmksIEJvb3RsaW4KRW1iZWRkZWQgTGludXggYW5kIEtlcm5lbCBlbmdpbmVlcmluZwpodHRwczov
-L2Jvb3RsaW4uY29tCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
-LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
-by9saW51eC1hcm0ta2VybmVsCg==
+On Thu, Feb 14, 2019 at 11:57 AM Ray Jui <ray.jui@broadcom.com> wrote:
+>
+> Update the binding document to make the 'interrupts' property optional.
+> For certain revisions of the I2C controller (e.g., iProc NIC I2C), I2C
+> interrupt is unwired to the interrupt controller. In such case, this
+> 'interrupts' property should be left unspecified, and driver will fall
+> back to polling mode
+>
+> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
+> Signed-off-by: Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>
+> ---
+>  .../devicetree/bindings/i2c/brcm,iproc-i2c.txt        | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
