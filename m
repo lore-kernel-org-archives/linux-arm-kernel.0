@@ -4,18 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D1FAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:41:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4166C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:43:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6CC16222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:41:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84A68218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 15:43:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X95IU5b0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CC16222A1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f3L/wu0c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84A68218FF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,41 +24,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qdEfiBBhk/GSdtyBOBkyysLDL3qRTwZfMVzLne3PHAE=; b=X95IU5b0LQMuqI
-	cLOS9Fa91jEkT7v8Tztl6LCEWX+yn8D5HaZYLxb15RKUC/8ctBHRd0+QJT7FLprFAHjeFnSsv1Zvk
-	h9vinbrE9K+7+kUjSbowsG1gl2GpfrC7Gd4KZPrxIwdVcqwzVu4IVcetdU0aK/OAxI+cbb2snqflH
-	AB6uov704gmeBiJFNZRYdnUscMYWAWXiIWOHFmGZgcIszP94Qc0AkejInDlN3qL/QfAw7Jafqtx5j
-	xXNNmWiyJgOEU4c60sX2YcEbItVOCgxLYSVLgDaf+auISmhOXapD0rkxlPlLSPprKC86ABsBZ4ivs
-	YhybH2uuoHVBcyWyemdw==;
+	List-Owner; bh=dCFsxWx6I+Rux4pwcm+y1FKUc5/4LyJ10vrX3tc1p1E=; b=f3L/wu0ce6ZVdk
+	k/ZSf4ppLE2oJprNc8qaQUPW06P0ahy1cpMn5ZOOp9xJTZmflbcvDO929NW10QFSwySTBj794pXs3
+	oejUhHLuInvAXXsGhN2EEHslG68Svi1tC1HtLEHcq43lUqt21JRP7EtguF8bG13hcYlM+9hMDI5c0
+	9oGETw1of8Vl02neCPA9FLkD4+qejG+ak/S58BVhceryg6Gwj+m1n29ZUuKO1Lwda/T4Mps0HtWSo
+	8Uz/S0qLOxT29V9fcgoE/3U7MXpeoyub0xp/iQtIZz6wsqXn4X39sB7apS4ZTBI+6ddrhAFRtcyYV
+	40rjcXbQiyCsJ8yh9cAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guJ8T-0007wT-0H; Thu, 14 Feb 2019 15:41:13 +0000
+	id 1guJAI-0008Js-St; Thu, 14 Feb 2019 15:43:06 +0000
 Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guJ8P-0007vZ-45
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:41:10 +0000
+ id 1guJAF-0008JV-Tr
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 15:43:05 +0000
 Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id A436380EA;
- Thu, 14 Feb 2019 15:41:13 +0000 (UTC)
-Date: Thu, 14 Feb 2019 07:41:00 -0800
+ by muru.com (Postfix) with ESMTPS id BCED780EA;
+ Thu, 14 Feb 2019 15:43:12 +0000 (UTC)
+Date: Thu, 14 Feb 2019 07:42:59 -0800
 From: Tony Lindgren <tony@atomide.com>
 To: Lokesh Vutla <lokeshvutla@ti.com>
 Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
  router bindings
-Message-ID: <20190214154100.GB5720@atomide.com>
+Message-ID: <20190214154259.GC5720@atomide.com>
 References: <20190212074237.2875-1-lokeshvutla@ti.com>
  <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
+ <20190212163018.GL5720@atomide.com>
+ <5b5d86b9-2aa7-718c-c1da-70bbf9bf589e@ti.com>
+ <20190213153215.GT5720@atomide.com>
+ <821ab540-469a-2166-9346-9cc0dec8ffbe@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
+In-Reply-To: <821ab540-469a-2166-9346-9cc0dec8ffbe@ti.com>
 User-Agent: Mutt/1.11.2 (2019-01-07)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_074109_199354_D4B35486 
-X-CRM114-Status: UNSURE (   9.39  )
+X-CRM114-CacheID: sfid-20190214_074303_998044_F780904F 
+X-CRM114-Status: UNSURE (   7.54  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -83,26 +83,18 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190214 08:39]:
-> IMHO, device ids are something which can be used in DT. There are many other
-> things like the interrupt ranges etc.. which are discoverable from sysfw and we
-> are implementing it.
+* Lokesh Vutla <lokeshvutla@ti.com> [190214 08:40]:
+> On 13/02/19 9:02 PM, Tony Lindgren wrote:
+> > OK so maybe update the description along those lines saying it's
+> > a shared piece of hardware between various independent SoC
+> > clusters which may or may not be running Linux.
+> 
+> IMHO, SoC integration is out of scope of this document. If you insist I can add
+> the details.
 
-We need to describe hardware in the device tree, not firmware.
-
-If you have something discoverable from the firmware, you should
-have the device driver query it from sysfw based on a hardware
-property, not based on some invented enumeration in the firmware.
-If there is some device to firmware translation needed, hide that
-into the device driver and keep it out of the device tree.
-
-For example, look at the interrupt binding where the interrupt
-is phandle to the controller and the bit offset from the interrupt
-controller instance.
-
-You need to use device IO address + bit offset (or register
-offset) type indexing for device tree here. Something out of
-the TRM that makes sense to developers.
+Certainly you need to justify how come such a critical piece
+of information as interrupt line routing is out of control
+of Linux here.
 
 Regards,
 
