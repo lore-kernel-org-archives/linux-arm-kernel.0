@@ -2,22 +2,23 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C8A53C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:46:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1A00C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:54:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 86D1321904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:46:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6AC6D20811
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:54:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q4vP48Km"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86D1321904
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iLFLfEzm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="vqIlewmA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6AC6D20811
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,37 +26,116 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=sGq8NEEdolIw77Y10HYSfzn1cZyrXhcmnNbPrLiWbho=; b=Q4vP48KmmkyKM6
-	rYcVQA5URd8LcvI5RGJUG85n10wI9gV3XyJD6ffwWayoNaR+UKUey5CUXztcJfywBEn0tpEUcq00m
-	DjLxM2sNVYuFHNT4FslYNuwc6bxFzFvN6zP439OBdMHnFHjXnn2H0t+N5WqPNgwUFpAdf/y0bNMXU
-	ty0Vv6eybKv2E6dsgivnq4ItLB9AFNd1U3epGuSDmFS9W1CfPSplebXtkmuXn3U7mX2TTjkMyf5Hi
-	2WUCYKAI51uyBJzLRT4lqv1aIHvdZ5KG02CZ5ndFJJDwbJP/w6WjB3AX2TGi5yl1tNhBNEVgo6MpI
-	gVeuDn05M9WAqnTWXLSA==;
+	List-Owner; bh=LA1WPWTOLrwbrbgcF0gQSdh+x+8xsdl9lSd5S9WM5YQ=; b=iLFLfEzmIRoZIp
+	SzFWpN+Q28H6kCwPyBNK5fYObdBdvYYDbOLuH4ejt7T05BrL00k1CsrM0VyrGp/M1G4M/VWm3+eRt
+	ZSNnOLxeKo4pD2wOhTjflBMc9h+Ie8RKI/TdlxXPbTxZ2ank5ygExnNZKd0sxl1qM/7OCxeJcAtGx
+	U269KAKCF5kVZdgWlZZXhd6hXFgKK0BZ3g4Sg0DGCQNTt0jgfe6ikSxOhCDcSBecC615bj0RLkpW5
+	5tztiGv65AOhlZfm3vnQl53AHpZQmn+nNvLNU2BUzswokftP/rveKg4oAIbNPNJKMPwh0UElwnlVz
+	s7aldNfTOaYj04ymIWdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu66v-0002b8-2Q; Thu, 14 Feb 2019 01:46:45 +0000
-Received: from szxga05-in.huawei.com ([45.249.212.191] helo=huawei.com)
+	id 1gu6E5-0004Gv-QW; Thu, 14 Feb 2019 01:54:09 +0000
+Received: from mail-eopbgr80088.outbound.protection.outlook.com ([40.107.8.88]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu66q-0002al-HA
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 01:46:42 +0000
-Received: from DGGEMS403-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id D93CFA9FCAEEEA0BDEF0;
- Thu, 14 Feb 2019 09:46:32 +0800 (CST)
-Received: from HGHY2Y004646261.china.huawei.com (10.184.12.158) by
- DGGEMS403-HUB.china.huawei.com (10.3.19.203) with Microsoft SMTP Server id
- 14.3.408.0; Thu, 14 Feb 2019 09:46:26 +0800
-From: Zenghui Yu <yuzenghui@huawei.com>
-To: <christoffer.dall@arm.com>, <marc.zyngier@arm.com>
-Subject: [PATCH] kvm: arm64: Fix comment for KVM_PHYS_SHIFT
-Date: Thu, 14 Feb 2019 01:45:46 +0000
-Message-ID: <1550108746-14704-1-git-send-email-yuzenghui@huawei.com>
-X-Mailer: git-send-email 2.6.4.windows.1
+ id 1gu6E1-0004GZ-RH
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 01:54:07 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=PzOiSwPPqH3kRb3bgLzh3GF5LAazsOKoCdDasjtZHh4=;
+ b=vqIlewmARyphyCu0c3zFhe9EF6oEg3RJTDXFqAPxxzqobfVcWKkluHNn8PcG4Il4BgfvahZ5+j5f7TGkLhwSdwnMP4mb0ON9JBwivv0GXJVx08yw8PSEYe84v83MpYoW50Kcz4BzrQmi95ykzsy9NlTzaWmWodmY0kBxomkY3Fw=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3850.eurprd04.prod.outlook.com (52.134.65.151) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.22; Thu, 14 Feb 2019 01:54:01 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
+ 01:54:01 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
+ <sboyd@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>, Daniel Baluta
+ <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>, "viresh.kumar@linaro.org"
+ <viresh.kumar@linaro.org>
+Subject: [PATCH V4 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Topic: [PATCH V4 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Index: AQHUxAgoEGMMDf+QVUa0wIDEs6tvwg==
+Date: Thu, 14 Feb 2019 01:54:01 +0000
+Message-ID: <1550108915-574-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0163.apcprd02.prod.outlook.com
+ (2603:1096:201:1f::23) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 846dab60-e264-41e7-f493-08d6921f4a69
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3850; 
+x-ms-traffictypediagnostic: DB3PR0402MB3850:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3850;
+ 23:6VWDYLLiWShfTLjYqaT7anv8mn74de5ifqPa3?=
+ =?iso-8859-1?Q?kSRRZSCpl/6EzFpmMTO47neOb2UXfAM4NWOJ4F2b9/HZE00Icye3ctPV8c?=
+ =?iso-8859-1?Q?lmrQP1w0RN/Wf1H2GdBRKXgM0fI6B9XkYTyNQO2F4QClVqcXXaEkZeUa4I?=
+ =?iso-8859-1?Q?47Gv+W3fwqyCVGJnVBnK2yKhJM38LcyZg9IXC04BJtbk7LmRYO3BCO1jo6?=
+ =?iso-8859-1?Q?IQkoOal9gYJ0fj1stiByp7ISWBJEah3zC2QIo3ut6Wg7y3Qf/BeXWZFWaG?=
+ =?iso-8859-1?Q?/DRnF6JPdEPtD9K7p86IOiDIhN2/pwegJ6JV07tC6cdKuUBjHnzdjk3/H+?=
+ =?iso-8859-1?Q?FhLypMP3/4ep38XcWM5fgGifyMjWN6ZZd5gG+jaE+YEdgipzYqF0/HCfiq?=
+ =?iso-8859-1?Q?5Y9nRb8tf6LTbNrhnVG4DFCIUGV8LSwWzqDdCrWfxclmtiBbCxaNJGSTyw?=
+ =?iso-8859-1?Q?D3V6GgcNERvkAk3HwN8PxSG5WcCFA2obHc0ndBzpy8ADxb8TdWz7YZ1KEZ?=
+ =?iso-8859-1?Q?Kiu/yrjRmv6T2/H3WfdtXSALdnsVFV3ktF0E8IKhyaPu3xZri4wn8HQgVY?=
+ =?iso-8859-1?Q?cS/TpOy8Bcgz1xuxCsJ70JVhkTXbTr6rZwei9DFU3JO51UUsQOi1WZPqfz?=
+ =?iso-8859-1?Q?Rj+qq36C14KHXEEdfB0B8/lFvSVbvNSnwh6DJysjZZ2sYm3sH2MGHNL1R5?=
+ =?iso-8859-1?Q?yuRFY/mtbzH0ePimsfyHrsFO8dKcbdFzFjCJ8nvJCCOaWVfkm+MRDHBjin?=
+ =?iso-8859-1?Q?2bVjBQVkqhrZAcF/C3vBvy2WF5fvXMpL682bp+zl0GRZ5gdS1MyLQqdthn?=
+ =?iso-8859-1?Q?D5iumWfwK81nt6sryj+XkJ1dASJvDAzrt+G75cg48BfGcqA5Rgft17Tn2O?=
+ =?iso-8859-1?Q?sxyOmh2XwTUuBNkQPz9+x4D76ZyWa2vz/b7EcvcheCtaobhbxtrVsMEGaU?=
+ =?iso-8859-1?Q?+Tn9Jt2TyGmKqXlGHFXJ97+sG5rckLmRMRwcKfHFFbMm7qfQFLf/atz5Je?=
+ =?iso-8859-1?Q?BvbNsPPj+OsCRad04vPsBNuVn3CIfAD6aykNd6e5Bmk7O4++KK+A98cbmh?=
+ =?iso-8859-1?Q?Fvbmphw6EIGcXYE11LQtjN8sGfkURSN1S3CSQWsQdADDchW5vMeq59EILN?=
+ =?iso-8859-1?Q?SufJhrXrgLMPXzF9d13XgNhSQhoVmF8cmFGLVAxsDqLTjbV42g/8/PRybC?=
+ =?iso-8859-1?Q?xgI4zxSDH726T1ZqekdVyGCs+mtSARYVZTwg/dx1k516NTLqTh+H2OysRR?=
+ =?iso-8859-1?Q?IjYmAI0EtdSJNX8lmtVCSs2ddbrmR9Sn8w4uS9IFA83uHUwl+aPFCyTStu?=
+ =?iso-8859-1?Q?UGl49FyV8UKso3NqPpQZt8mjWHjPTQqipH3wp5hoLpYdh0FWvcavAxk7kH?=
+ =?iso-8859-1?Q?MeW41feyUw=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3850778F492DDFE05DE6FCCEF5670@DB3PR0402MB3850.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09480768F8
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(346002)(136003)(366004)(376002)(39860400002)(396003)(199004)(189003)(256004)(71190400001)(52116002)(6506007)(7416002)(99286004)(6436002)(2501003)(14444005)(6486002)(6512007)(4326008)(26005)(71200400001)(14454004)(386003)(102836004)(478600001)(305945005)(2906002)(2201001)(36756003)(105586002)(3846002)(486006)(81166006)(476003)(97736004)(66066001)(106356001)(7736002)(86362001)(186003)(8676002)(50226002)(53936002)(110136005)(8936002)(316002)(81156014)(2616005)(68736007)(25786009)(6116002)(921003)(32563001)(1121003)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3850;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Xrxe4mDLi1Yyisk42/jJa4bO/4/c8vU1re+HywOf4Gqx2qjm42QJdb67ua84wuqPremnCBgqoz3C+FuJ+yWM+5UczZGz03N3dcHWW6mmG7JlrMbNL2kaN7TTN/c74Y2m6HGORyO+d9V1i0QuKjJ/hNSNkzdr7kmRYlSD8RJtG2C3jE1SVKlk5asg3O3aPLsFnlhR0ayyKXZZWGqTXdwB6w87knP7o4KwrhtyiUKUgoruVAnmow2gW8k5C1VAlh+yPizOTqDOHn8SqefgYS5XBvRSmuokJRom+FJ7TPRNfZrtPB09m6NmWZOoQg73PUE3EJqkYf6tBNzqeYGXpTt0Qpopoda3qPVGrCZuwK1lB838L0PlHSnOfiz3ztiR2uv/h+1GYZp5MbPZiR7Mqb31IzGBr1FXTqDDbB8IS9GanLw=
 MIME-Version: 1.0
-X-Originating-IP: [10.184.12.158]
-X-CFilter-Loop: Reflected
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 846dab60-e264-41e7-f493-08d6921f4a69
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 01:53:54.6018 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3850
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_174640_737076_B353F3F5 
-X-CRM114-Status: UNSURE (   9.29  )
+X-CRM114-CacheID: sfid-20190213_175405_999411_DEA45F95 
+X-CRM114-Status: UNSURE (   9.70  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -68,41 +148,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Zenghui Yu <yuzenghui@huawei.com>, wanghaibin.wang@huawei.com,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
- Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since Suzuki K Poulose's work on Dynamic IPA support, KVM_PHYS_SHIFT will
-be used only when machine_type's bits[7:0] equal to 0 (by default). Thus
-the outdated comment should be fixed.
+Add i.MX8QXP CPU opp table to support cpufreq.
 
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Zenghui Yu <yuzenghui@huawei.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+No change since V3.
+---
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 8af4b1b..a12bf48 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -138,7 +138,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- 	})
+diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+index 4021f25..593e2db 100644
+--- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+@@ -34,6 +34,10 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			clocks = <&clk IMX_A35_CLK>;
++			clock-latency = <61036>;
++			#cooling-cells = <2>;
++			operating-points-v2 = <&a35_0_opp_table>;
+ 		};
  
- /*
-- * We currently only support a 40bit IPA.
-+ * We currently support using a VM-specified IPA size. For backward
-+ * compatibility, the default IPA size is fixed to 40bits.
-  */
- #define KVM_PHYS_SHIFT	(40)
+ 		A35_1: cpu@1 {
+@@ -42,6 +46,7 @@
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			operating-points-v2 = <&a35_0_opp_table>;
+ 		};
  
+ 		A35_2: cpu@2 {
+@@ -50,6 +55,7 @@
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			operating-points-v2 = <&a35_0_opp_table>;
+ 		};
+ 
+ 		A35_3: cpu@3 {
+@@ -58,6 +64,7 @@
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			operating-points-v2 = <&a35_0_opp_table>;
+ 		};
+ 
+ 		A35_L2: l2-cache0 {
+@@ -65,6 +72,24 @@
+ 		};
+ 	};
+ 
++	a35_0_opp_table: opp-table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-900000000 {
++			opp-hz = /bits/ 64 <900000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <150000>;
++		};
++
++		opp-1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1100000>;
++			clock-latency-ns = <150000>;
++			opp-suspend;
++		};
++	};
++
+ 	gic: interrupt-controller@51a00000 {
+ 		compatible = "arm,gic-v3";
+ 		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
 -- 
-1.8.3.1
-
+2.7.4
 
 
 _______________________________________________
