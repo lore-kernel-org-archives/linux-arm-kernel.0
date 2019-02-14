@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A79CCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:33:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CFCB7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:34:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 75CF8222D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:33:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F46320675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 19:34:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fqBjogtk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="YR4mdKif"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75CF8222D9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lJaR2pH2";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="kXBtTe/c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F46320675
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c+oy/k/gGZGIb7tAVwIcT1bVzJd75n0pswOEaJ31JN0=; b=fqBjogtkJRqZeo
-	PHZQyVX/vL7+8OdMXiPXmOCfIrAhDEn/pSRpez8XaDySCgP47XoX5eaCAt1F+/vMaR7cwiEPZgJ2a
-	8f4NA0LzykZxDtMq8lVorg3LHB23O5/zy07d4kmfKTtoFuEfXILc147DYFfyOFfLUDWcLnszwmwv2
-	LVOLXkhk3hjm6Lon6neNynlfR+pjLy71QmExl+LUpw5DQ++uJF/jQZ4JzEzsyLX9jD4/xQxigFk5W
-	rDjZwXss+2Dh4XEMHv60pVIR7+NwBf0/qtH/pvKPMJx5vyj03V91GRpoSu8pjY5XyuXIgcrcI+TVj
-	p6Zlbr4WN2vCQIV3u88A==;
+	List-Owner; bh=rWVpvGf9Rr0uKz/g8L4GYUe/4ApuHIXrzogSgyPYgUw=; b=lJaR2pH23fu/Yk
+	1Jtoa9YD6cLPu/TVLNJOJwrPfthvpFoMCjF2nmpnJR6qJtoJPXBxqMb2AUX+7f7Q46s6FTFCGylSe
+	g4anODXIpy7Gdq2gTR6w4uKD0vIpQMIdYvDDzqSpEDWMCxW858y0fwSBz35wsHAQ0JavGSJGC8vfg
+	v/7Mr0QPbucDFUWNWaUGjWCBgz/gbemegkr/U8NpJkHXHO3dYgWcPBdn2rTS0etxVoJ2Tx6pK+Hf8
+	L/1fS7K+QAvFOiYdLCOXCecm6FzTC/1LuVTokqOs8aOwfyvn2+DCLBYXOfEJPjKOPhRQ19kQG1nSb
+	UaZM5lvC2g0KPKi+Fncg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guMlb-0006kU-Kr; Thu, 14 Feb 2019 19:33:51 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1guMlk-0006tZ-NV; Thu, 14 Feb 2019 19:34:00 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guMkr-0005k6-Eq
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:33:06 +0000
-Received: by mail-pf1-x442.google.com with SMTP id s22so3596879pfh.4
+ id 1guMkv-0005oE-2h
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 19:33:17 +0000
+Received: by mail-pf1-x444.google.com with SMTP id n74so3584798pfi.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 11:33:05 -0800 (PST)
+ Thu, 14 Feb 2019 11:33:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=qvbRbLJNQrsLfwewB47cDz1+x+w3diwoF9YMEG+Lj2w=;
- b=YR4mdKifcOd155tlUu0XmyU8rruftlI51Kjs+rpvMbzCLOanKN7+Zm5SEIYoSPn0AD
- OYiFaiLBugYD2TndvL1ZHsEL5XyHwzRSMZSscmrHyVCwbhah+TgL2n14TCXsgLQF6rzf
- X1Csi3MkYq4O1WgnGF2Ikw+VrM2Fn/wHPhGyg=
+ bh=dmLB70XfR2J1D03CPPvqliqiD+PkiFMaZcieUMY43lg=;
+ b=kXBtTe/clCxAbpE5dE4G/zYOQM5UWkCoZ8dYjMIC9oKZLt+EX4u/msuGADKWI4qMwe
+ NAjFd0bR1BORcLV9cm3xRxZ6UVMVvCniFOFeDyrXkvCS/g/ghZJxIHWbiR5x65Mi8jbq
+ Y12bxshHcvuqf8c5eLDHHik34DCAfHamojyo8=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=qvbRbLJNQrsLfwewB47cDz1+x+w3diwoF9YMEG+Lj2w=;
- b=b3F5VjPIhhJ2g1QS+y3GANNcqf0Vwp/1peyxlP8M8KjyE2qcUE+pCrRdAURMcM69nK
- GXuiHxhLxbcYAIEnAYGioCpYgxH0nccBrNsiUOCGM7BLlOwGkJWW11BnKAq1TojiuF9l
- xnvUo6j0JegljuEpwrspuF1VeLztK7MrEAob5vVg1vEtkakvmtk9A12bTJSX+R8aKla/
- 2PvU2SDQsn38Eup0gTLhHSb4dLw2DRTscciKkuyrnF+fUxjhVTfZhUvsmJymJJeOm+UC
- oO5dXdKvbp2+EbTr+SIzu7hDW5ZwZufIYI8ruj5EI17HG17FIxGI7z2QlnQx2lxGccz/
- squA==
-X-Gm-Message-State: AHQUAuagfSqpBjTLxne1wObJ6q7gRoeqR8Um8PipwvHdp8dRPZRy97s6
- lAQzGuHusJvm29vuBUMlIVUaRQ==
-X-Google-Smtp-Source: AHgI3IaXLCw5eOUQoSanll7LQS8yH4nSacOv4VCAnqLTy0+Ye++cPlgHKZ8Fr/lYbgeuA/sqStqOcQ==
-X-Received: by 2002:a62:6e07:: with SMTP id j7mr5869683pfc.135.1550172784895; 
- Thu, 14 Feb 2019 11:33:04 -0800 (PST)
+ bh=dmLB70XfR2J1D03CPPvqliqiD+PkiFMaZcieUMY43lg=;
+ b=W4rj57FQQtxAdx8Y+bAxjel+qqvUMaNN47g9Umsg7H7XQ/M8dDPKwbnIKT+ul/DO2s
+ lzF7OcBUkbhhcHlhtfM1T+/RUHH+alNdMo7pva+z9I2XRCFiobYKN0f5z1qJEtWKphyj
+ fLsW2a3X0dS+iHYDN3dqfghdjjaUM0HxnlArrmXRmzWtrLLHl4S5S7vQtMKn07UyEs3z
+ 6QJd/HkIk06pBH9j/KVtvnR9SLEGblgVyDiTnIoMFt932LOTjge4dL+6WqKAFIHV/AaK
+ PbKCNonDVveKoMrxPNqXheZK26F8OEGhFWGtSh+KjVPMm88dXIK8BkLA/aKyVUdr135N
+ /EEA==
+X-Gm-Message-State: AHQUAuZF51g3z+um95N1a0p7UWLb+HgfhOWyzS7ZIuBwIzJOxXWI4YB8
+ NOcVBRhU0uWv9JEdsBcIvgBo7w==
+X-Google-Smtp-Source: AHgI3IbHhb1emtbzhHKeCm+L56KqhBW7mFSfErni09bP9cRLuonoxPPLn1mJD0iOb9MTS6ldkEZmzQ==
+X-Received: by 2002:a63:e915:: with SMTP id i21mr1455445pgh.409.1550172788374; 
+ Thu, 14 Feb 2019 11:33:08 -0800 (PST)
 Received: from localhost.localdomain ([115.97.184.151])
- by smtp.gmail.com with ESMTPSA id o23sm10808832pfa.140.2019.02.14.11.33.01
+ by smtp.gmail.com with ESMTPSA id o23sm10808832pfa.140.2019.02.14.11.33.05
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 11:33:04 -0800 (PST)
+ Thu, 14 Feb 2019 11:33:07 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
  Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
-Subject: [PATCH v8 04/10] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
-Date: Fri, 15 Feb 2019 01:02:31 +0530
-Message-Id: <20190214193236.7504-5-jagan@amarulasolutions.com>
+Subject: [PATCH v8 05/10] drm/sun4i: sun6i_mipi_dsi: Simplify drq to support
+ all modes
+Date: Fri, 15 Feb 2019 01:02:32 +0530
+Message-Id: <20190214193236.7504-6-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20190214193236.7504-1-jagan@amarulasolutions.com>
 References: <20190214193236.7504-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_113305_495818_17CDA29E 
-X-CRM114-Status: GOOD (  14.46  )
+X-CRM114-CacheID: sfid-20190214_113309_662076_DC71353D 
+X-CRM114-Status: GOOD (  14.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,54 +104,79 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TCON DRQ for non-burst DSI mode can computed based on horizontal
-front porch value, but the current driver trying to include sync
-timings along with front porch resulting wrong drq.
+Allwinner MIPI DSI drq has enable mode bit and set bits.
+1) drq for non-burst, with front porch less than 20 would need to
+   set both enable mode bit and set bits.
+2) drq for non-burst, with front porch greater or equal to 20 would
+   not require to do any drq bit setup.
+3) drq for burst mode, would only need to set enable mode bit.
 
-This patch is trying to update the drq by subtracting hsync_start
-with hdisplay, which is horizontal front porch.
-
-Current code:
-------------
-mode->hsync_end - mode->hdisplay => horizontal front porch + sync
-
-With this patch:
-----------------
-mode->hsync_start - mode->hdisplay => horizontal front porch
-
-BSP code form BPI-M64-bsp is computing TCON DRQ set bits
-for non-burts as (from linux-sunxi/
-drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-
-=> panel->lcd_ht -    panel->lcd_x - panel->lcd_hbp
-=> (timmings->hor_front_porch + panel->lcd_hbp + panel->lcd_x)
-   - panel->lcd_x - panel->hbp
-=> timmings->hor_front_porch
-=> mode->hsync_start - mode->hdisplay
-
-So, update the DRQ set bits accordingly.
+This patch simplifies existing drq code by grouping into
+sun6i_dsi_get_drq and support all video modes.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Tested-by: Merlijn Wajer <merlijn@wizzup.org>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 39 ++++++++++++++++----------
+ 1 file changed, 24 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 4362d9df1da6..a4360aed17bf 100644
+index a4360aed17bf..ab95e2a873b5 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -402,9 +402,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
- 	struct mipi_dsi_device *device = dsi->device;
- 	u32 val = 0;
+@@ -355,6 +355,28 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ 		     SUN6I_DSI_INST_JUMP_CFG_NUM(1));
+ };
  
--	if ((mode->hsync_end - mode->hdisplay) > 20) {
++static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
++			      struct drm_display_mode *mode)
++{
++	struct mipi_dsi_device *device = dsi->device;
++
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		return SUN6I_DSI_TCON_DRQ_ENABLE_MODE;
++
 +	if ((mode->hsync_start - mode->hdisplay) > 20) {
- 		/* Maaaaaagic */
--		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
++		/* Maaaaaagic */
 +		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
++
++		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
++		drq /= 32;
++
++		return (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
++			SUN6I_DSI_TCON_DRQ_SET(drq));
++	}
++
++	return 0;
++}
++
+ static u16 sun6i_dsi_setup_inst_delay(struct sun6i_dsi *dsi,
+ 				      struct drm_display_mode *mode)
+ {
+@@ -399,21 +421,8 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ 				  struct drm_display_mode *mode)
+ {
+-	struct mipi_dsi_device *device = dsi->device;
+-	u32 val = 0;
+-
+-	if ((mode->hsync_start - mode->hdisplay) > 20) {
+-		/* Maaaaaagic */
+-		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+-
+-		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+-		drq /= 32;
+-
+-		val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+-		       SUN6I_DSI_TCON_DRQ_SET(drq));
+-	}
+-
+-	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
++	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
++		     sun6i_dsi_get_drq(dsi, mode));
+ }
  
- 		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
- 		drq /= 32;
+ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
 
