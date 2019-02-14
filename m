@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6DF0EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:47:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98AA9C10F04
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:47:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3BFDB2229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:47:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66CAA222A4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 06:47:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f0T3vaUw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3BFDB2229F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZKQdQ/Ma"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66CAA222A4
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sfWeLrPX9q4fH5mHWWz7oteUTP7Q+aXvbWD4DKL7bfQ=; b=f0T3vaUwgN+8bT
-	vWq3OltgWP9u97gKR4VcV/uZ8vt9wRvRI/H+lLi42R5Xdg7+pNjeck6ap2Rxu65HsrsLbogDJPUtq
-	x6/6dOTEIfZ1yn6J+AMhtmgvQNjy4DGOPqy19ELwQNtgs/YU7OebCAUY5RbYgefxxcMJyQTP/UcQE
-	ma23PtkJ9g5Bw2ozi4TnF+M3/PlFmOTfEsrrpbnDqwLF3H9AebLlEIFHT+RKs6ms72ean+yh1u3Cq
-	LSghNXwCyOWQhUrnVFBIMXc8S5Cnqx+ANJWQQO/DMRQ7ohv6cy+hvf98eXHrpqHevJKXJRJ+I7Koh
-	Nb0hihN1mwyLMYC9Pb5Q==;
+	List-Owner; bh=hsWjxw3OinbyQ9n1Xf6H3EuJjKaGlh8ixgur4rNyNBg=; b=ZKQdQ/MaesOXp+
+	56qxbDTvkSgzAEUgorNb1zHEIRQslQewEi2ELsjZ9gVWf5R8lu5Nh3HLPP+heKpXXRyQ1FPSG7wDh
+	huVW061RzTR+J34OwKPCHx/BO1fSX42KFas3JA5chdraZB9jQCLGmgukyt5UtdkvGbMfFXWPYekhs
+	066iY+VMwDgFpCmUD0/fp5azYUQuLzD3aum8Mzh9S7hiZB+Iqy1jvDMs7J26RPLUBhAgRhYDUK/Yu
+	4IfcdtcDPtv6SNvd+Ksjo8pGbNmX6c0wr0owGqMiS1AnpebgCkoaJ6VeIC32cMM+Kn4nlSSRDi5Mi
+	M8O7LK5zvb+N9gk7yG8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guAo7-000299-Ny; Thu, 14 Feb 2019 06:47:39 +0000
+	id 1guAoL-0002TR-PB; Thu, 14 Feb 2019 06:47:53 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guAnR-0001MF-Ht
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 06:47:01 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ id 1guAnR-0001Mx-L3
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 06:47:02 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1E6a35H013987; Thu, 14 Feb 2019 07:46:45 +0100
+ x1E6aHGp025935; Thu, 14 Feb 2019 07:46:48 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qn0jwrqas-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qmy1n94ad-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Thu, 14 Feb 2019 07:46:45 +0100
+ Thu, 14 Feb 2019 07:46:48 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id AD18F38;
- Thu, 14 Feb 2019 06:46:44 +0000 (GMT)
-Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 919E32431;
- Thu, 14 Feb 2019 06:46:44 +0000 (GMT)
-Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by Safex1hubcas22.st.com
- (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb
- 2019 07:46:44 +0100
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 46C0C31;
+ Thu, 14 Feb 2019 06:46:48 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas21.st.com [10.75.90.44])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 1D6492431;
+ Thu, 14 Feb 2019 06:46:48 +0000 (GMT)
+Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS21.st.com
+ (10.75.90.44) with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb
+ 2019 07:46:48 +0100
 Received: from localhost (10.201.23.166) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb 2019 07:46:44
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 14 Feb 2019 07:46:47
  +0100
 From: Christophe Roullier <christophe.roullier@st.com>
 To: <robh@kernel.org>, <davem@davemloft.net>, <joabreu@synopsys.com>,
  <mark.rutland@arm.com>, <mcoquelin.stm32@gmail.com>,
  <alexandre.torgue@st.com>, <peppe.cavallaro@st.com>
-Subject: [PATCH 1/8] net: ethernet: stmmac: manage Ethernet WoL for
- stm32mp157c.
-Date: Thu, 14 Feb 2019 07:45:56 +0100
-Message-ID: <1550126763-22669-2-git-send-email-christophe.roullier@st.com>
+Subject: [PATCH 4/8] net: ethernet: stmmac: add management of clk_csr property
+Date: Thu, 14 Feb 2019 07:45:59 +0100
+Message-ID: <1550126763-22669-5-git-send-email-christophe.roullier@st.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
 References: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
@@ -73,8 +72,8 @@ X-Originating-IP: [10.201.23.166]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-14_04:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_224657_910256_8014C5A5 
-X-CRM114-Status: GOOD (  13.38  )
+X-CRM114-CacheID: sfid-20190213_224657_991721_EB6EA793 
+X-CRM114-Status: GOOD (  10.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,79 +93,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add glue codes to support magic packet on stm32mp157c
+In Documentation stmmac.txt there is possibility to
+fixed CSR Clock range selection with property clk_csr.
+This patch add the management of this property
+For example to use it, add in your ethernet node DT:
+	clk_csr = <3>;
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c | 30 ++++++++++++++++++++++-
- 1 file changed, 29 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
-index 7e2e79d..d1cf145 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
-@@ -42,6 +42,7 @@ struct stm32_dwmac {
- 	struct clk *clk_ethstp;
- 	struct clk *syscfg_clk;
- 	bool int_phyclk;	/* Clock from RCC to drive PHY */
-+	int irq_pwr_wakeup;
- 	u32 mode_reg;		/* MAC glue-logic mode register */
- 	struct regmap *regmap;
- 	u32 speed;
-@@ -232,7 +233,9 @@ static int stm32_dwmac_parse_data(struct stm32_dwmac *dwmac,
- static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
- 			       struct device *dev)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
- 	struct device_node *np = dev->of_node;
-+	int err = 0;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+index 2b800ce..3031f2b 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
++++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
+@@ -408,6 +408,9 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
+ 	/* Default to phy auto-detection */
+ 	plat->phy_addr = -1;
  
- 	dwmac->int_phyclk = of_property_read_bool(np, "st,int-phyclk");
- 
-@@ -260,7 +263,26 @@ static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
- 		return PTR_ERR(dwmac->syscfg_clk);
- 	}
- 
--	return 0;
-+	/* Get IRQ information early to have an ability to ask for deferred
-+	 * probe if needed before we went too far with resource allocation.
-+	 */
-+	dwmac->irq_pwr_wakeup = platform_get_irq_byname(pdev,
-+							"stm32_pwr_wakeup");
-+	if (!dwmac->int_phyclk && dwmac->irq_pwr_wakeup >= 0) {
-+		err = device_init_wakeup(&pdev->dev, true);
-+		if (err) {
-+			dev_err(&pdev->dev, "Failed to init wake up irq\n");
-+			return err;
-+		}
-+		err = dev_pm_set_dedicated_wake_irq(&pdev->dev,
-+						    dwmac->irq_pwr_wakeup);
-+		if (err) {
-+			dev_err(&pdev->dev, "Failed to set wake up irq\n");
-+			device_init_wakeup(&pdev->dev, false);
-+		}
-+		device_set_wakeup_enable(&pdev->dev, false);
-+	}
-+	return err;
- }
- 
- static int stm32_dwmac_probe(struct platform_device *pdev)
-@@ -326,9 +348,15 @@ static int stm32_dwmac_remove(struct platform_device *pdev)
- 	struct net_device *ndev = platform_get_drvdata(pdev);
- 	struct stmmac_priv *priv = netdev_priv(ndev);
- 	int ret = stmmac_dvr_remove(&pdev->dev);
-+	struct stm32_dwmac *dwmac = priv->plat->bsp_priv;
- 
- 	stm32_dwmac_clk_disable(priv->plat->bsp_priv);
- 
-+	if (dwmac->irq_pwr_wakeup >= 0) {
-+		dev_pm_clear_wake_irq(&pdev->dev);
-+		device_init_wakeup(&pdev->dev, false);
-+	}
++	/* Get clk_csr from device tree */
++	of_property_read_u32(np, "clk_csr", &plat->clk_csr);
 +
- 	return ret;
- }
- 
+ 	/* "snps,phy-addr" is not a standard property. Mark it as deprecated
+ 	 * and warn of its use. Remove this when phy node support is added.
+ 	 */
 -- 
 2.7.4
 
