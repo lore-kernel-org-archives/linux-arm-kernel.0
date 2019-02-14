@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7FB55C10F04
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 03:44:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37D86C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 03:45:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E97A2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 03:44:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 03F2C2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 03:45:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oOcMZyz2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="R6Cepmj7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E97A2089F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="epWFqbFC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Ccs+iViM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03F2C2089F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,33 +26,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=u5fmI4ZD1J1MJVH1PJMqgQ63nh9etBcebHH52Ak+1eU=; b=oOcMZyz25fAgru
-	B/96vjG65Nyp5JGi/GJeTDFy+1BA+eb+uBWlochay9f5m4I9t68qHS8PqpkS9kEryOklHegx+chWu
-	HGd7J/gMlh4ljMqif8O/WA9E5Gk1dtihrIhHrjcLHRMo1G+er9vEWjfdFV+AWmcIpdc4BAQ8x8ZDG
-	8qKTrpp11iyFj+jaG+Fs37p+QybOrNNB+8q1lgiz2/qzUICzedYoZzpaocH4oQ4wf/C3ZaOQ6PAzN
-	ycMHdlnt9S0hN9G+AIW5YH15T51XQlpXfRO7uJa1WZuRkCn2h6wXdpWJcHUHycN4WXZffqnb0jOUb
-	zbBRZzHsZ4W9FlL/lFNQ==;
+	List-Owner; bh=vPOsSQugGq5D5Jn9tgLDbXU3/+hrg330fHwbvNsJXbM=; b=epWFqbFCc5xrcD
+	a4k1xRxYnwqBYyPxDctayvQj+ZsjHl7zjGWqB8avL90OtXd9xuN3jKFPsy7JinIkNoI5wzZSIwTFu
+	Ff5QzfXj4/1j5HGFawa8j+1zp6Q6ncBRfOKJPFmD+v1LVzktaH/De6uYW9n3zdF2pzWkEatYQ3bIy
+	q1NsCPdq9nTm9ovKP7Qy0kCy4NCBn2bJibRAVS3aFoS6MZ9hK3WLw7l49w8W2wG5PWVFyqXf8CdqY
+	WDdR5q6DUmP1Huyq+btFvDi5yRtpyA5RdHSht5o+JYp1hsX+CKSRibrA6p9pDzu5Ziw0V1KSsz0yr
+	0ydSnv4OcjMvwXCEYtXQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu7xD-000106-V1; Thu, 14 Feb 2019 03:44:51 +0000
-Received: from mail-db3eur04on0620.outbound.protection.outlook.com
- ([2a01:111:f400:fe0c::620]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gu7xO-0001Bg-2t; Thu, 14 Feb 2019 03:45:02 +0000
+Received: from mail-eopbgr130053.outbound.protection.outlook.com
+ ([40.107.13.53] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu7wy-0000au-LZ
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 03:44:38 +0000
+ id 1gu7x4-0000mE-4e
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 03:44:48 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=kDCwze7MSZ/0VU4jDuhIzch9cw/tNFuydaj2r0ScsoA=;
- b=R6Cepmj76lRPTBD/W97uPfGUn5sQKWj1ogyKY9xaRGfNdgBcHRrzagjtkxLrqrWl/FHUMPO91OvYs2tXWBDtwFL8p+YY7bNtyU5L3th5w9N+XWko3ITv7sTAZ6VMiyVH2DoTuNTheEpIv3tbY7NyzccM8nYtCGKpmkjFy48ahqU=
+ bh=nXG4twRAkYaLsjmzwbjU3xDHne01mU65iLRlM2QjRzc=;
+ b=Ccs+iViMP/2VevPmht7IOXV3Bikz5g6F1tuDKokTSIPPclsgz7Xeo5be2BcvVUuIA06JayjuKlc3MwxzH8k2alInZzW2Ur7V2e7ZzaBXmDrMQTiNlO9yS73LUYJiiUU18NSfrM7BmUmeXrndoNN8uaqOSlSQWwXTt6zOo6QKQUg=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3659.eurprd04.prod.outlook.com (52.134.66.160) with Microsoft SMTP
+ DB3PR0402MB3675.eurprd04.prod.outlook.com (52.134.69.146) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Thu, 14 Feb 2019 03:44:31 +0000
+ 15.20.1601.17; Thu, 14 Feb 2019 03:44:37 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 03:44:31 +0000
+ 03:44:37 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -67,11 +66,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>, "linux-rtc@vger.kernel.org"
  <linux-rtc@vger.kernel.org>
-Subject: [PATCH V2 2/4] firmware: imx: enable imx scu general irq function
-Thread-Topic: [PATCH V2 2/4] firmware: imx: enable imx scu general irq function
-Thread-Index: AQHUxBeY1ru6LM154k6AIjlXsKZZtA==
-Date: Thu, 14 Feb 2019 03:44:31 +0000
-Message-ID: <1550115535-14488-3-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V2 3/4] arm64: dts: freescale: imx8qxp: enable scu general irq
+ channel
+Thread-Topic: [PATCH V2 3/4] arm64: dts: freescale: imx8qxp: enable scu
+ general irq channel
+Thread-Index: AQHUxBebZGnL84gchEe72CRarVHnlw==
+Date: Thu, 14 Feb 2019 03:44:37 +0000
+Message-ID: <1550115535-14488-4-git-send-email-Anson.Huang@nxp.com>
 References: <1550115535-14488-1-git-send-email-Anson.Huang@nxp.com>
 In-Reply-To: <1550115535-14488-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
@@ -87,60 +88,58 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 380b0b78-e477-4849-e53b-08d6922eba4b
+x-ms-office365-filtering-correlation-id: 6b353fbf-88a3-4896-9da6-08d6922ebddf
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3659; 
-x-ms-traffictypediagnostic: DB3PR0402MB3659:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3659;
- 23:pWUaDS72ji8SLC7HohfkmRlvBcU0VXpmcX+t9?=
- =?iso-8859-1?Q?9WLnyYTgve7vgHj2BGAbDFt2kcjD6fa8MU3yeKzDEfKpjFf7M3pAXsGQuy?=
- =?iso-8859-1?Q?mD30DOPf4uHfGlSTeKuDaHWZrMsVvqyHEEMGdA+x2m2lfakeW7Kmyxkb1k?=
- =?iso-8859-1?Q?lxopMQ1CFNBmiOyjXMXnFixWR9mGS/LEMFjMN21q9NkVtYCM9OOvp2xz11?=
- =?iso-8859-1?Q?qWsQl/jPfs63iXfODsWGMsOyy1yeSXnDbR/WsEcRt3SWBvZ1w9WEVdFMiH?=
- =?iso-8859-1?Q?vZP84teAZjeXevkbCpHTUYx+IHkfwReMuW2bC39oNtlQ7TWwMaCjElJ3Cy?=
- =?iso-8859-1?Q?c9EaGGsUUhmjN0WzDSp/MKxPjkylcNtMxmjcBdPKYPOCoVjfd5zYOYAPar?=
- =?iso-8859-1?Q?OJiDF0OzDAHWYnPCIx4N8SPn3PGiDffJEVYFAK8TN1SNT4jUpg5IIsUO3A?=
- =?iso-8859-1?Q?H0vVTe1vCmx+/G8+cLKWIu2RvOHsPXqSSH/cUq7qgParuE8zapGGTh8nfV?=
- =?iso-8859-1?Q?o5/r/f97ikviOOOvToi1C8+NpkIKSxO17aEg63PoxJ7MzEdfM90JfAABHV?=
- =?iso-8859-1?Q?WF8JFcb+XS+gPomB2xt02U2MtUBBb0utjSMJdls6GNe4DwbjpcviLUI0jL?=
- =?iso-8859-1?Q?/v22TJftN9Z0rXZ0EvAL4vN/niyAVeKIbnMW54U95tUvVrKPXyajQ/vxgN?=
- =?iso-8859-1?Q?+EdU775N4b/s+CqQCNmWRkIx7gD0TaayvGiCT4ABgWVMP57DXoneOCTrv8?=
- =?iso-8859-1?Q?KHmBCd8uRUnsmefy2xKVYK2IKA7FI/HoloV+A0DdkY4XrJxJx6Kt85w8x2?=
- =?iso-8859-1?Q?8NXUAAoj4XGqg/bmBPpZu2e9TmPz7v98hToNbRddKugIcdz9XzJQikNh81?=
- =?iso-8859-1?Q?vYSnktpfXxxm1Ad6T6C+uqbR6GMQNhuLDoHZbymVJ84hsR8BXMEh9U0Hef?=
- =?iso-8859-1?Q?Zk1y2nDfFoHIN9AmwjwmcwbSy5AnuNKNWDXnFmT/1F8QKAdSnl1Yjvw/zq?=
- =?iso-8859-1?Q?H1D7LYRekLomLFdgigXEBvBEDB2COkyNwCveAzT61gt8gMWy5nHy1P13hs?=
- =?iso-8859-1?Q?OZ+ORBJK0TVZUhA5/yw770XuzQalRWGLQgQbTg7XjQRQDY5ZvSammapU2X?=
- =?iso-8859-1?Q?JPnogkWc8o1PKMbchoN82MKteGQXRT2+OyZtnX5zNYCkkr8wH3ai53T5Ec?=
- =?iso-8859-1?Q?5RK6xstG7m6+4JyKgU9h0B3eQ2Oj+uByYdKEq1BLSuMYXJiSp3CAePN8cK?=
- =?iso-8859-1?Q?NmCiXmf7j5zMWYvubU7NShzPq0uBXEnsZiEEgVhsTuygrjZVaQr85YOEM1?=
- =?iso-8859-1?Q?D/ibeOhVzAgU6Nz9e5hy8Nbv0Tx56+A6ps29Wl3o5lC1SiYLcWq2UPCz1J?=
- =?iso-8859-1?Q?DRhHY3XrvORmW5GF8HAXMtlJ2409sQB4Gn3DxQJY6KBhw+hkxpVCw=3D?=
- =?iso-8859-1?Q?=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB365963338780784444B7786DF5670@DB3PR0402MB3659.eurprd04.prod.outlook.com>
+ SRVR:DB3PR0402MB3675; 
+x-ms-traffictypediagnostic: DB3PR0402MB3675:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3675;
+ 23:fyoPuhWoUkYe/+r5AEL2b0lUc9ZCb9JWNd4c2?=
+ =?iso-8859-1?Q?OlB7h3cl6A9dgZD8iPSDejRTq6aEBRFggpBFKo90QbW7m9HIIYC1aWqk+j?=
+ =?iso-8859-1?Q?kJrUM9XmFefOZJTGYF/43WvMBo/Nw8nV7VkEHyXerpI3DnFI2+jWUlcQb2?=
+ =?iso-8859-1?Q?MenY99+yHqVLqKI7KFyI0tXhtKGlKJUKI0taTEtD2fZQLINnUDsPBqFitO?=
+ =?iso-8859-1?Q?jq1S4SyPB7PJJNbNQYVmTXiCX0NBtch/mUgK8GsBI8nYxu713a5sjjX+Ur?=
+ =?iso-8859-1?Q?QPbPGN2nk5utZOW9OPsCBxx6O2V8eauJjb0PePAhn9QXsvQUyZOErQm9WS?=
+ =?iso-8859-1?Q?obk5UYRw2RmkQN//ZETiapRMW7zCJ93yKNkjCljOVYzZn9zkyIMh/j0T4L?=
+ =?iso-8859-1?Q?rNPqkAJZ1VbACvMtWnI6YEfPi1TaqHoIVQQehXndbSUryK1xm+rZC4Q8te?=
+ =?iso-8859-1?Q?bbqusRuMB7fpC62lRGX/aU3EJjT6uBL3lKRURmxx9g6/qVMWFIK7DUnAN+?=
+ =?iso-8859-1?Q?S0jBgDnGzcJitn4xGAUhsVucOzVF74/8OCEYapLRUh2UUKPDlv0kdr4AO5?=
+ =?iso-8859-1?Q?DsA0kJO1CSOVDfwOUWnkev7wiAGQ/pnIk6HuFHQ6yXdj8T8ZUHPrtfCuoc?=
+ =?iso-8859-1?Q?DHrVvcAP6pAVQRmHGgaLUE62O+9GQ0s/8fZqaTdn/mDpgdPnSH9FgEyaIG?=
+ =?iso-8859-1?Q?Ptbzzi0klreVchebjQudpSO6Y5a2RmUzEAW23uGyM7b5qB/iAcKUTR0OTV?=
+ =?iso-8859-1?Q?IsEg5XfvzMCj8cBxmKGoF9in3IRVKe41RrzzHTFfto3am9qv5Tzk+N6urU?=
+ =?iso-8859-1?Q?QJcTQib3KzvoQc6HT5yTJOhTWlMuxN/zsZhcDpWBIRcTr2uq9xLp9miHen?=
+ =?iso-8859-1?Q?ajuWBdDJp8Y237PmN8qqXAF3a0MmzvL17TtMFrklPK5hEdD5C/3NBYw3JW?=
+ =?iso-8859-1?Q?v0cYd00J+VJBz0LkugIJz0HYnPozeDWgvaaXzNNV7KgmwOyscII+XcwTDR?=
+ =?iso-8859-1?Q?ekTCcfaa04+c+O8R1Vn5drWuxeF6wwnq4JMCpacYusXvT1jD2SMxYhzZQV?=
+ =?iso-8859-1?Q?aJujt7LtsE8QgHi1uRtyZBvVaGuivPTiK292NIY7ERmiO6aUnZTXGvug/q?=
+ =?iso-8859-1?Q?fLQcHI4gtGS13vCcDcVuxpyHcMR1VNFe5LodNiWoQPM9hLEmnU4YzLybir?=
+ =?iso-8859-1?Q?5URtJdKnDyutMY7fkfGv5ZjQzHzRRG2nPjHMhmctDnKxEeb631i0cFY1j+?=
+ =?iso-8859-1?Q?o21DYLPN2dUM5tbDOKZnrwg2AIrL8eHmMp1cUiuTCcKLht7sPfu0dq6vDv?=
+ =?iso-8859-1?Q?Y6fB550+NTl+o39UQlTWlqmjU?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3675E9D18365C2465396D135F5670@DB3PR0402MB3675.eurprd04.prod.outlook.com>
 x-forefront-prvs: 09480768F8
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(366004)(346002)(39860400002)(376002)(396003)(136003)(199004)(189003)(476003)(2616005)(68736007)(53936002)(52116002)(66066001)(14454004)(76176011)(486006)(86362001)(50226002)(4326008)(26005)(6512007)(2201001)(478600001)(71200400001)(6436002)(8936002)(6486002)(25786009)(446003)(8676002)(71190400001)(81156014)(81166006)(11346002)(186003)(2501003)(105586002)(3846002)(6116002)(386003)(6506007)(99286004)(102836004)(7416002)(316002)(2906002)(305945005)(110136005)(97736004)(7736002)(14444005)(106356001)(256004)(36756003)(921003)(1121003)(969003)(989001)(999001)(1009001)(1019001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3659;
+ SFS:(10009020)(396003)(136003)(366004)(376002)(346002)(39860400002)(199004)(189003)(76176011)(486006)(97736004)(4326008)(53936002)(256004)(305945005)(3846002)(6512007)(36756003)(50226002)(2906002)(476003)(106356001)(446003)(4744005)(2201001)(8936002)(6116002)(14454004)(11346002)(68736007)(52116002)(71190400001)(71200400001)(478600001)(2616005)(81166006)(7736002)(86362001)(81156014)(8676002)(386003)(7416002)(105586002)(186003)(26005)(6506007)(25786009)(6436002)(102836004)(110136005)(316002)(99286004)(2501003)(66066001)(6486002)(32563001)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3675;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: LmYLh770MDOwOpkLWlNODWE0VBI+aOg5JonEmMXhELdmjdC7B3CsD3eZLmXQN1l57UcK6mWjko6DFu8FLYlwPiBNiwb8YHVkgesImb75TgEGAHyB5Z1b/ACKxT3wahtq7CD99aBFCVWyC4FtV1QeqJV2ov2UgItiXJdEYWnfUOn3IrV+SNQGlkvLmhHDP44Ly15C+ipjPqF53aNrisVU0bLGyPpzWSXAr2zxmjvaH2pxzV0Y4S/cMRAp2Z7LaVL4EW2GyYjHcz3Sd6uxYfPiKIprQCXDSu2Hcb7vI6BzS/wbyAvuhJrZEiYGSOCXH+kISZPGVk/QKPu7ktgxRH34DVkN2BZ7awkGxmV34IMSnum80KGHeNi3UMeAs6tI5nGxITHeRaaLMk252vQSb2cvqAT94cTljBRsn4za3clf6s0=
+x-microsoft-antispam-message-info: GPtfJLXfLRjClICA1+vkmXbOAQ1OmK+ZsjoYm3BLsUvZKwFhaAWr0NRTw/98KUWwFprCBaMiZzi+FV/4ApBMG+KqYa7c5neTzcBNHkpk/QT68X8nuRD+e/veR8w1dhH52evFSIcT5WKqC4+2FiHRB3c3ijPlfySSY/x4j+38XF0XN0RAz/+KdUqWMYXkL+kCqLB7MdUmDQujA7WEGspn1d0FoICOPmYZqnxEt2lUgkXEilg8tVFboOKBV1pKaQdaM/thBW6VM6BZE/j7XFFUEGCbA5z0UIH1ZqUR7q9HEcyiQB8WCbU/cdFOQ4kAHncfQ4meQkcTwL1UuFd9oNzw/mR3PWeYK/piDVsZab4UUxJcMV09D11bpmCK5JTFgxQqvuL22viBlbM+nCicQLEjYDQR0FWY8Yyy1/IlZzWacrY=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 380b0b78-e477-4849-e53b-08d6922eba4b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 03:44:25.9954 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 6b353fbf-88a3-4896-9da6-08d6922ebddf
+X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 03:44:31.9576 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3659
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3675
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_194436_717327_9884473F 
-X-CRM114-Status: GOOD (  15.35  )
+X-CRM114-CacheID: sfid-20190213_194442_777263_C7615621 
+X-CRM114-Status: GOOD (  10.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -158,178 +157,42 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The System Controller Firmware (SCFW) controls RTC, thermal
-and WDOG etc., these resources' interrupt function are managed
-by SCU. When any IRQ pending, SCU will notify Linux via MU general
-interrupt channel #3, and Linux kernel needs to call SCU APIs
-to get IRQ status and notify each module to handle the interrupt.
-
-Since there is no data transmission for SCU IRQ notification, so
-doorbell mode is used for this MU channel, and SCU driver will
-use notifier mechanism to broadcast to every module which registers
-the SCU block notifier.
+On i.MX8QXP, SCU uses MU1 general interrupt channel #3 to notify
+user for IRQs of RTC alarm, thermal alarm and WDOG etc., mailbox
+RX doorbell mode is used for this function, this patch adds
+support for it.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
 No change since V1.
 ---
- drivers/firmware/imx/imx-scu.c   | 101 +++++++++++++++++++++++++++++++++++++++
- include/linux/firmware/imx/sci.h |   3 ++
- 2 files changed, 104 insertions(+)
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/imx/imx-scu.c b/drivers/firmware/imx/imx-scu.c
-index 2bb1a19..e93bea5 100644
---- a/drivers/firmware/imx/imx-scu.c
-+++ b/drivers/firmware/imx/imx-scu.c
-@@ -7,6 +7,7 @@
-  *
-  */
+diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+index 1e08387..593e2db 100644
+--- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+@@ -112,7 +112,8 @@
+ 	scu {
+ 		compatible = "fsl,imx-scu";
+ 		mbox-names = "tx0", "tx1", "tx2", "tx3",
+-			     "rx0", "rx1", "rx2", "rx3";
++			     "rx0", "rx1", "rx2", "rx3",
++			     "gi3";
+ 		mboxes = <&lsio_mu1 0 0
+ 			  &lsio_mu1 0 1
+ 			  &lsio_mu1 0 2
+@@ -120,7 +121,8 @@
+ 			  &lsio_mu1 1 0
+ 			  &lsio_mu1 1 1
+ 			  &lsio_mu1 1 2
+-			  &lsio_mu1 1 3>;
++			  &lsio_mu1 1 3
++			  &lsio_mu1 3 3>;
  
-+#include <dt-bindings/firmware/imx/rsrc.h>
- #include <linux/err.h>
- #include <linux/firmware/imx/types.h>
- #include <linux/firmware/imx/ipc.h>
-@@ -21,6 +22,8 @@
- 
- #define SCU_MU_CHAN_NUM		8
- #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
-+#define IMX_SC_IRQ_FUNC_STATUS	2
-+#define IMX_SC_IRQ_NUM_GROUP	6
- 
- struct imx_sc_chan {
- 	struct imx_sc_ipc *sc_ipc;
-@@ -77,7 +80,23 @@ static int imx_sc_linux_errmap[IMX_SC_ERR_LAST] = {
- 	-EIO,	 /* IMX_SC_ERR_FAIL */
- };
- 
-+struct imx_sc_msg_irq_get_status {
-+	struct imx_sc_rpc_msg hdr;
-+	union {
-+		struct {
-+			u16 resource;
-+			u8 group;
-+			u8 reserved;
-+		} send;
-+		struct {
-+			u32 status;
-+		} receive;
-+	} data;
-+} __packed;
-+
- static struct imx_sc_ipc *imx_sc_ipc_handle;
-+static struct work_struct imx_sc_general_irq_work;
-+static BLOCKING_NOTIFIER_HEAD(imx_scu_notifier_chain);
- 
- static inline int imx_sc_to_linux_errno(int errno)
- {
-@@ -194,6 +213,86 @@ int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
- }
- EXPORT_SYMBOL(imx_scu_call_rpc);
- 
-+int imx_scu_register_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_register(&imx_scu_notifier_chain, nb);
-+}
-+EXPORT_SYMBOL(imx_scu_register_notifier);
-+
-+int imx_scu_unregister_notifier(struct notifier_block *nb)
-+{
-+	return blocking_notifier_chain_unregister(&imx_scu_notifier_chain, nb);
-+}
-+EXPORT_SYMBOL(imx_scu_unregister_notifier);
-+
-+static int imx_scu_notifier_call_chain(unsigned long status, u8 *group)
-+{
-+	return blocking_notifier_call_chain(&imx_scu_notifier_chain,
-+					    status, (void *)group);
-+}
-+
-+static void imx_scu_general_irq_work_handler(struct work_struct *work)
-+{
-+	struct imx_sc_msg_irq_get_status msg;
-+	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-+	u32 irq_status;
-+	int ret;
-+	u8 i;
-+
-+	for (i = 0; i < IMX_SC_IRQ_NUM_GROUP; i++) {
-+		hdr->ver = IMX_SC_RPC_VERSION;
-+		hdr->svc = IMX_SC_RPC_SVC_IRQ;
-+		hdr->func = IMX_SC_IRQ_FUNC_STATUS;
-+		hdr->size = 2;
-+
-+		msg.data.send.resource = IMX_SC_R_MU_1A;
-+		msg.data.send.group = i;
-+
-+		ret = imx_scu_call_rpc(imx_sc_ipc_handle, &msg, true);
-+		if (ret) {
-+			pr_err("get irq status failed, ret %d\n", ret);
-+			return;
-+		}
-+
-+		irq_status = msg.data.receive.status;
-+		if (!irq_status)
-+			continue;
-+
-+		imx_scu_notifier_call_chain(irq_status, &i);
-+	}
-+}
-+
-+static void imx_scu_rxdb_callback(struct mbox_client *c, void *msg)
-+{
-+	schedule_work(&imx_sc_general_irq_work);
-+}
-+
-+static int imx_scu_enable_general_irq_channel(struct device *dev)
-+{
-+	struct mbox_client *cl;
-+	struct mbox_chan *ch;
-+	int ret = 0;
-+
-+	cl = devm_kzalloc(dev, sizeof(*cl), GFP_KERNEL);
-+	if (!cl)
-+		return -ENOMEM;
-+
-+	cl->dev = dev;
-+	cl->rx_callback = imx_scu_rxdb_callback;
-+
-+	/* SCU general IRQ uses general interrupt channel 3 */
-+	ch = mbox_request_channel_byname(cl, "gi3");
-+	if (IS_ERR(ch)) {
-+		ret = PTR_ERR(ch);
-+		dev_err(dev, "failed to request mbox chan gi3, ret %d\n", ret);
-+		return ret;
-+	}
-+
-+	INIT_WORK(&imx_sc_general_irq_work, imx_scu_general_irq_work_handler);
-+
-+	return ret;
-+}
-+
- static int imx_scu_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -246,6 +345,8 @@ static int imx_scu_probe(struct platform_device *pdev)
- 
- 	imx_sc_ipc_handle = sc_ipc;
- 
-+	imx_scu_enable_general_irq_channel(dev);
-+
- 	dev_info(dev, "NXP i.MX SCU Initialized\n");
- 
- 	return devm_of_platform_populate(dev);
-diff --git a/include/linux/firmware/imx/sci.h b/include/linux/firmware/imx/sci.h
-index ebc5509..9d608db 100644
---- a/include/linux/firmware/imx/sci.h
-+++ b/include/linux/firmware/imx/sci.h
-@@ -15,4 +15,7 @@
- 
- #include <linux/firmware/imx/svc/misc.h>
- #include <linux/firmware/imx/svc/pm.h>
-+
-+int imx_scu_register_notifier(struct notifier_block *nb);
-+int imx_scu_unregister_notifier(struct notifier_block *nb);
- #endif /* _SC_SCI_H */
+ 		clk: clock-controller {
+ 			compatible = "fsl,imx8qxp-clk";
 -- 
 2.7.4
 
