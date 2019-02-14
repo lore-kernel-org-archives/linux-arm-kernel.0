@@ -2,93 +2,90 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E25C3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:58:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F273C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:58:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9BFDD222DF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:58:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 102DB222C9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:58:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CzUjeu3w";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="fN10b40a"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9BFDD222DF
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Uy6owz2p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 102DB222C9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xn2F38SzX5TG/Ou7ryd+mCXAIcWJef6LyettFO3IpQ8=; b=CzUjeu3wtne6F7
-	iwglZUzv05+GuWHT8L+szh7sBiwBv2hCKtQxIbz8/9RYUhwPqs25H2VWaUeexoHTi6I6AliyrdgEu
-	N8KCCG84dvfmN8LaJZ8OoiIne3kQNWbUbe5LN/+QzcloLH9kC5ewY+CMVMfY75gK9fvj9rWi/87wo
-	KvWNBQVvf94VcxWkaF+4bPkUDyYL3E6K9FI74scN/KNOZbFsSGiYZadIwFpsuEvzPHXvPHKy4HIwG
-	yL5DLJffbWEIYWff08UiGOjP1+vky4jwHjvIReNGlV1PPJkNHPT34BC+8VRUZZOZWVGavFacaQWnk
-	lMkbqsc79TyUmm6VPGKg==;
+	List-Owner; bh=3MKLVn4Sl8XAN20ultKIDXNnj7wSL7+zAA8/DbdngOM=; b=Uy6owz2pIW0Vuy
+	e7ygFlNeKnaHIk6CE3NOG0HKWBly1f1adUd+UWDNc51MCEylou2JQH3W3m5uFAX6sf1DPEU6K5c0D
+	XkTytKNiR1WrPeyljVW3labH+18RgClZOVBmDUfyc4tmnTxUCobz2i8zMRnu4r4nDKtW5A7WD67zp
+	HglEecE1kXBDZqHgB3KGBSc4I5Yevaai+TpspAkH4abOkQ46UywUnWg5iDsP7EB4b3vNvLNw7LhBb
+	tYBZenVW6GLL/BWIS20y1/ZX/i1dw6l0U0+lYy0lYk+4UZap4fCv8Fham+zfF0V8/5MVSkoG9QFEm
+	N+aLxbzYCyPny0dL+Pcw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guISw-0004HH-V8; Thu, 14 Feb 2019 14:58:19 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1guIT6-0004UK-Ol; Thu, 14 Feb 2019 14:58:28 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guIOG-0005iD-6E
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:53:53 +0000
-Received: by mail-wr1-x443.google.com with SMTP id w17so6754098wrn.12
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:53:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=ZugfFi2Fb3Joyp8Q4KiICmt0UtXNfDKjj833gde5Sp0=;
- b=fN10b40anB9gPD0mP7zQ8v+tDK45lYC3pjQ5Fe5YRYlLq2AGXP2d07Y+2zA3Lm/Vz+
- vtWpVJNmOzQmTa7luK7pN+9S85ZiPLMZiz0OyY3s9h7BarrndWrz6K+utDhA6GHHGwhs
- jQkc5I2ha3sWzD6lZmVpgF1LXokpdwXJrmAbaJADsrTpCNc6Zqq8Wmvk6xo6ipBYOywQ
- /1wizszP2W0dAJkhmYz0TVYs8IuSRfgCJjYJPgF1d6xCqDnxE2PiUijC3nN6G4VqXSb3
- XNFFfgHWEcTXPUssmyQ/7pnYf4kKOCF74bB226l5zjffNKx1VdS+lpU8R6l03i+RnC3M
- siSA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=ZugfFi2Fb3Joyp8Q4KiICmt0UtXNfDKjj833gde5Sp0=;
- b=XAD7AkjoGuOAExKTueSiPGJfT457OJK4K8l9mNdJORUVnHaG9YIkzH3rRY3EBWuTqc
- nFGrO3RKAgfy5USYNxPNqyhnoOINozyyrtWmrsPFPd6PGfexhadSzkhPrRMr0j2E/Q6j
- Q4UF6P6a4D+wbciUIzy1nldzeD973IwpLH18bhseHfgweYMk2jMIhHXjQ7/0CuU8KLGf
- 0ZcSAAASLYHEN+qiF326EehqjUHi831JLoCBoJtIDE1C/tCEXBS0HF/4XdUmgy3M1+dW
- vB0R84d/1UQ6tM6liObvn70M5aCisSmkzNYny0V7HRo/RavOODn1KlITGDWVg43jarmY
- TUjg==
-X-Gm-Message-State: AHQUAuZrfOsr7bZgrqsH7WMKCD0V6G096aZ3D+m/g6H3QleFA8dK5Q0t
- 2Sh/iXo5wHmiKzbRxp/FxIhRnQ==
-X-Google-Smtp-Source: AHgI3IborPvRMecbUmQ0K8IEzz+qLWCmA7ky3158YV0EwxPqmWLv3Prf9aVTczuK1k0Yk/v9fVp4Rg==
-X-Received: by 2002:adf:ecd2:: with SMTP id s18mr1908833wro.293.1550156006793; 
- Thu, 14 Feb 2019 06:53:26 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id y20sm4181005wra.51.2019.02.14.06.53.25
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 06:53:26 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Dmitry Torokhov <dmitry.torokhov@gmail.com>, Sekhar Nori <nsekhar@ti.com>,
- Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
- David Lechner <david@lechnology.com>
-Subject: [PATCH v4 37/37] ARM: davinci: remove intc related fields from
- davinci_soc_info
-Date: Thu, 14 Feb 2019 15:52:31 +0100
-Message-Id: <20190214145231.8750-38-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190214145231.8750-1-brgl@bgdev.pl>
-References: <20190214145231.8750-1-brgl@bgdev.pl>
+ id 1guIQi-0001Id-Gr
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:56:05 +0000
+Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1EEjsnV023434; Thu, 14 Feb 2019 15:55:53 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2qmxr73qss-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 14 Feb 2019 15:55:53 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id C76A534;
+ Thu, 14 Feb 2019 14:55:52 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag3node1.st.com [10.75.127.7])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 90CF8569D;
+ Thu, 14 Feb 2019 14:55:52 +0000 (GMT)
+Received: from SFHDAG5NODE3.st.com (10.75.127.15) by SFHDAG3NODE1.st.com
+ (10.75.127.7) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Thu, 14 Feb
+ 2019 15:55:52 +0100
+Received: from SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47]) by
+ SFHDAG5NODE3.st.com ([fe80::7c09:5d6b:d2c7:5f47%20]) with mapi id
+ 15.00.1347.000; Thu, 14 Feb 2019 15:55:52 +0100
+From: Christophe ROULLIER <christophe.roullier@st.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: Re: [PATCH 7/8] ARM: dts: stm32: Add Ethernet support on stm32h7 SOC
+ and activate it for eval and disco boards
+Thread-Topic: [PATCH 7/8] ARM: dts: stm32: Add Ethernet support on stm32h7 SOC
+ and activate it for eval and disco boards
+Thread-Index: AQHUxHVhnxyM5yabkEOxlQrhZI8fig==
+Date: Thu, 14 Feb 2019 14:55:51 +0000
+Message-ID: <5c59f60a-2364-a4a8-117e-b485647fd88e@st.com>
+References: <1550126763-22669-1-git-send-email-christophe.roullier@st.com>
+ <1550126763-22669-8-git-send-email-christophe.roullier@st.com>
+ <20190214134414.GB5699@lunn.ch>
+In-Reply-To: <20190214134414.GB5699@lunn.ch>
+Accept-Language: fr-FR, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [10.75.127.49]
+Content-ID: <35B4D304070043499A7C310BE66315CA@st.com>
 MIME-Version: 1.0
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-14_07:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_065328_836924_81891FF8 
-X-CRM114-Status: GOOD (  12.20  )
+X-CRM114-CacheID: sfid-20190214_065600_945167_39A71AC5 
+X-CRM114-Status: GOOD (  12.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,345 +97,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "robh@kernel.org" <robh@kernel.org>,
+ Alexandre TORGUE <alexandre.torgue@st.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-stm32@st-md-mailman.stormreply.com"
+ <linux-stm32@st-md-mailman.stormreply.com>,
+ "joabreu@synopsys.com" <joabreu@synopsys.com>,
+ "mcoquelin.stm32@gmail.com" <mcoquelin.stm32@gmail.com>,
+ Peppe CAVALLARO <peppe.cavallaro@st.com>,
+ "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 2/14/19 2:44 PM, Andrew Lunn wrote:
+> On Thu, Feb 14, 2019 at 07:46:02AM +0100, Christophe Roullier wrote:
+>> +	mdio0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		compatible = "snps,dwmac-mdio";
+>> +		phy1: ethernet-phy@1 {
+>> +			reg = <0>;
+>> +		};
+> 
+> The reg value should be the same as ethernet-phy@X.
+> 
+>      Andrew
+>> +	mdio0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		compatible = "snps,dwmac-mdio";
+>> +		phy1: ethernet-phy@1 {
+>> +			reg = <0>;
+>> +		};
+> 
+> Here as well.
+> 
+>       Andrew
+> 
 
-The fields related to the two davinci interrupt controllers are no
-longer used. Remove them.
+Hi Andrew,
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/da830.c               |  98 ------------------
- arch/arm/mach-davinci/da850.c               | 108 --------------------
- arch/arm/mach-davinci/dm355.c               |   3 -
- arch/arm/mach-davinci/dm365.c               |   3 -
- arch/arm/mach-davinci/dm644x.c              |   3 -
- arch/arm/mach-davinci/dm646x.c              |   3 -
- arch/arm/mach-davinci/include/mach/common.h |   3 -
- 7 files changed, 221 deletions(-)
+Ok I will update.
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 7ce0b5f1200d..63511f638ce4 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -624,101 +624,6 @@ const short da830_eqep1_pins[] __initconst = {
- 	-1
- };
- 
--/* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
--static u8 da830_default_priorities[DA830_N_CP_INTC_IRQ] = {
--	[IRQ_DA8XX_COMMTX]		= 7,
--	[IRQ_DA8XX_COMMRX]		= 7,
--	[IRQ_DA8XX_NINT]		= 7,
--	[IRQ_DA8XX_EVTOUT0]		= 7,
--	[IRQ_DA8XX_EVTOUT1]		= 7,
--	[IRQ_DA8XX_EVTOUT2]		= 7,
--	[IRQ_DA8XX_EVTOUT3]		= 7,
--	[IRQ_DA8XX_EVTOUT4]		= 7,
--	[IRQ_DA8XX_EVTOUT5]		= 7,
--	[IRQ_DA8XX_EVTOUT6]		= 7,
--	[IRQ_DA8XX_EVTOUT7]		= 7,
--	[IRQ_DA8XX_CCINT0]		= 7,
--	[IRQ_DA8XX_CCERRINT]		= 7,
--	[IRQ_DA8XX_TCERRINT0]		= 7,
--	[IRQ_DA8XX_AEMIFINT]		= 7,
--	[IRQ_DA8XX_I2CINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT1]		= 7,
--	[IRQ_DA8XX_ALLINT0]		= 7,
--	[IRQ_DA8XX_RTC]			= 7,
--	[IRQ_DA8XX_SPINT0]		= 7,
--	[IRQ_DA8XX_TINT12_0]		= 7,
--	[IRQ_DA8XX_TINT34_0]		= 7,
--	[IRQ_DA8XX_TINT12_1]		= 7,
--	[IRQ_DA8XX_TINT34_1]		= 7,
--	[IRQ_DA8XX_UARTINT0]		= 7,
--	[IRQ_DA8XX_KEYMGRINT]		= 7,
--	[IRQ_DA830_MPUERR]		= 7,
--	[IRQ_DA8XX_CHIPINT0]		= 7,
--	[IRQ_DA8XX_CHIPINT1]		= 7,
--	[IRQ_DA8XX_CHIPINT2]		= 7,
--	[IRQ_DA8XX_CHIPINT3]		= 7,
--	[IRQ_DA8XX_TCERRINT1]		= 7,
--	[IRQ_DA8XX_C0_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C0_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_MEMERR]		= 7,
--	[IRQ_DA8XX_GPIO0]		= 7,
--	[IRQ_DA8XX_GPIO1]		= 7,
--	[IRQ_DA8XX_GPIO2]		= 7,
--	[IRQ_DA8XX_GPIO3]		= 7,
--	[IRQ_DA8XX_GPIO4]		= 7,
--	[IRQ_DA8XX_GPIO5]		= 7,
--	[IRQ_DA8XX_GPIO6]		= 7,
--	[IRQ_DA8XX_GPIO7]		= 7,
--	[IRQ_DA8XX_GPIO8]		= 7,
--	[IRQ_DA8XX_I2CINT1]		= 7,
--	[IRQ_DA8XX_LCDINT]		= 7,
--	[IRQ_DA8XX_UARTINT1]		= 7,
--	[IRQ_DA8XX_MCASPINT]		= 7,
--	[IRQ_DA8XX_ALLINT1]		= 7,
--	[IRQ_DA8XX_SPINT1]		= 7,
--	[IRQ_DA8XX_UHPI_INT1]		= 7,
--	[IRQ_DA8XX_USB_INT]		= 7,
--	[IRQ_DA8XX_IRQN]		= 7,
--	[IRQ_DA8XX_RWAKEUP]		= 7,
--	[IRQ_DA8XX_UARTINT2]		= 7,
--	[IRQ_DA8XX_DFTSSINT]		= 7,
--	[IRQ_DA8XX_EHRPWM0]		= 7,
--	[IRQ_DA8XX_EHRPWM0TZ]		= 7,
--	[IRQ_DA8XX_EHRPWM1]		= 7,
--	[IRQ_DA8XX_EHRPWM1TZ]		= 7,
--	[IRQ_DA830_EHRPWM2]		= 7,
--	[IRQ_DA830_EHRPWM2TZ]		= 7,
--	[IRQ_DA8XX_ECAP0]		= 7,
--	[IRQ_DA8XX_ECAP1]		= 7,
--	[IRQ_DA8XX_ECAP2]		= 7,
--	[IRQ_DA830_EQEP0]		= 7,
--	[IRQ_DA830_EQEP1]		= 7,
--	[IRQ_DA830_T12CMPINT0_0]	= 7,
--	[IRQ_DA830_T12CMPINT1_0]	= 7,
--	[IRQ_DA830_T12CMPINT2_0]	= 7,
--	[IRQ_DA830_T12CMPINT3_0]	= 7,
--	[IRQ_DA830_T12CMPINT4_0]	= 7,
--	[IRQ_DA830_T12CMPINT5_0]	= 7,
--	[IRQ_DA830_T12CMPINT6_0]	= 7,
--	[IRQ_DA830_T12CMPINT7_0]	= 7,
--	[IRQ_DA830_T12CMPINT0_1]	= 7,
--	[IRQ_DA830_T12CMPINT1_1]	= 7,
--	[IRQ_DA830_T12CMPINT2_1]	= 7,
--	[IRQ_DA830_T12CMPINT3_1]	= 7,
--	[IRQ_DA830_T12CMPINT4_1]	= 7,
--	[IRQ_DA830_T12CMPINT5_1]	= 7,
--	[IRQ_DA830_T12CMPINT6_1]	= 7,
--	[IRQ_DA830_T12CMPINT7_1]	= 7,
--	[IRQ_DA8XX_ARMCLKSTOPREQ]	= 7,
--};
--
- static struct map_desc da830_io_desc[] = {
- 	{
- 		.virtual	= IO_VIRT,
-@@ -807,9 +712,6 @@ static const struct davinci_soc_info davinci_soc_info_da830 = {
- 	.pinmux_base		= DA8XX_SYSCFG0_BASE + 0x120,
- 	.pinmux_pins		= da830_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(da830_pins),
--	.intc_base		= DA8XX_CP_INTC_BASE,
--	.intc_irq_prios		= da830_default_priorities,
--	.intc_irq_num		= DA830_N_CP_INTC_IRQ,
- 	.timer_info		= &da830_timer_info,
- 	.emac_pdata		= &da8xx_emac_pdata,
- };
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 62a00fa94696..8a50956a9181 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -299,111 +299,6 @@ const short da850_vpif_display_pins[] __initconst = {
- 	-1
- };
- 
--/* FIQ are pri 0-1; otherwise 2-7, with 7 lowest priority */
--static u8 da850_default_priorities[DA850_N_CP_INTC_IRQ] = {
--	[IRQ_DA8XX_COMMTX]		= 7,
--	[IRQ_DA8XX_COMMRX]		= 7,
--	[IRQ_DA8XX_NINT]		= 7,
--	[IRQ_DA8XX_EVTOUT0]		= 7,
--	[IRQ_DA8XX_EVTOUT1]		= 7,
--	[IRQ_DA8XX_EVTOUT2]		= 7,
--	[IRQ_DA8XX_EVTOUT3]		= 7,
--	[IRQ_DA8XX_EVTOUT4]		= 7,
--	[IRQ_DA8XX_EVTOUT5]		= 7,
--	[IRQ_DA8XX_EVTOUT6]		= 7,
--	[IRQ_DA8XX_EVTOUT7]		= 7,
--	[IRQ_DA8XX_CCINT0]		= 7,
--	[IRQ_DA8XX_CCERRINT]		= 7,
--	[IRQ_DA8XX_TCERRINT0]		= 7,
--	[IRQ_DA8XX_AEMIFINT]		= 7,
--	[IRQ_DA8XX_I2CINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT0]		= 7,
--	[IRQ_DA8XX_MMCSDINT1]		= 7,
--	[IRQ_DA8XX_ALLINT0]		= 7,
--	[IRQ_DA8XX_RTC]			= 7,
--	[IRQ_DA8XX_SPINT0]		= 7,
--	[IRQ_DA8XX_TINT12_0]		= 7,
--	[IRQ_DA8XX_TINT34_0]		= 7,
--	[IRQ_DA8XX_TINT12_1]		= 7,
--	[IRQ_DA8XX_TINT34_1]		= 7,
--	[IRQ_DA8XX_UARTINT0]		= 7,
--	[IRQ_DA8XX_KEYMGRINT]		= 7,
--	[IRQ_DA850_MPUADDRERR0]		= 7,
--	[IRQ_DA8XX_CHIPINT0]		= 7,
--	[IRQ_DA8XX_CHIPINT1]		= 7,
--	[IRQ_DA8XX_CHIPINT2]		= 7,
--	[IRQ_DA8XX_CHIPINT3]		= 7,
--	[IRQ_DA8XX_TCERRINT1]		= 7,
--	[IRQ_DA8XX_C0_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C0_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C0_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_THRESH_PULSE]	= 7,
--	[IRQ_DA8XX_C1_RX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_TX_PULSE]		= 7,
--	[IRQ_DA8XX_C1_MISC_PULSE]	= 7,
--	[IRQ_DA8XX_MEMERR]		= 7,
--	[IRQ_DA8XX_GPIO0]		= 7,
--	[IRQ_DA8XX_GPIO1]		= 7,
--	[IRQ_DA8XX_GPIO2]		= 7,
--	[IRQ_DA8XX_GPIO3]		= 7,
--	[IRQ_DA8XX_GPIO4]		= 7,
--	[IRQ_DA8XX_GPIO5]		= 7,
--	[IRQ_DA8XX_GPIO6]		= 7,
--	[IRQ_DA8XX_GPIO7]		= 7,
--	[IRQ_DA8XX_GPIO8]		= 7,
--	[IRQ_DA8XX_I2CINT1]		= 7,
--	[IRQ_DA8XX_LCDINT]		= 7,
--	[IRQ_DA8XX_UARTINT1]		= 7,
--	[IRQ_DA8XX_MCASPINT]		= 7,
--	[IRQ_DA8XX_ALLINT1]		= 7,
--	[IRQ_DA8XX_SPINT1]		= 7,
--	[IRQ_DA8XX_UHPI_INT1]		= 7,
--	[IRQ_DA8XX_USB_INT]		= 7,
--	[IRQ_DA8XX_IRQN]		= 7,
--	[IRQ_DA8XX_RWAKEUP]		= 7,
--	[IRQ_DA8XX_UARTINT2]		= 7,
--	[IRQ_DA8XX_DFTSSINT]		= 7,
--	[IRQ_DA8XX_EHRPWM0]		= 7,
--	[IRQ_DA8XX_EHRPWM0TZ]		= 7,
--	[IRQ_DA8XX_EHRPWM1]		= 7,
--	[IRQ_DA8XX_EHRPWM1TZ]		= 7,
--	[IRQ_DA850_SATAINT]		= 7,
--	[IRQ_DA850_TINTALL_2]		= 7,
--	[IRQ_DA8XX_ECAP0]		= 7,
--	[IRQ_DA8XX_ECAP1]		= 7,
--	[IRQ_DA8XX_ECAP2]		= 7,
--	[IRQ_DA850_MMCSDINT0_1]		= 7,
--	[IRQ_DA850_MMCSDINT1_1]		= 7,
--	[IRQ_DA850_T12CMPINT0_2]	= 7,
--	[IRQ_DA850_T12CMPINT1_2]	= 7,
--	[IRQ_DA850_T12CMPINT2_2]	= 7,
--	[IRQ_DA850_T12CMPINT3_2]	= 7,
--	[IRQ_DA850_T12CMPINT4_2]	= 7,
--	[IRQ_DA850_T12CMPINT5_2]	= 7,
--	[IRQ_DA850_T12CMPINT6_2]	= 7,
--	[IRQ_DA850_T12CMPINT7_2]	= 7,
--	[IRQ_DA850_T12CMPINT0_3]	= 7,
--	[IRQ_DA850_T12CMPINT1_3]	= 7,
--	[IRQ_DA850_T12CMPINT2_3]	= 7,
--	[IRQ_DA850_T12CMPINT3_3]	= 7,
--	[IRQ_DA850_T12CMPINT4_3]	= 7,
--	[IRQ_DA850_T12CMPINT5_3]	= 7,
--	[IRQ_DA850_T12CMPINT6_3]	= 7,
--	[IRQ_DA850_T12CMPINT7_3]	= 7,
--	[IRQ_DA850_RPIINT]		= 7,
--	[IRQ_DA850_VPIFINT]		= 7,
--	[IRQ_DA850_CCINT1]		= 7,
--	[IRQ_DA850_CCERRINT1]		= 7,
--	[IRQ_DA850_TCERRINT2]		= 7,
--	[IRQ_DA850_TINTALL_3]		= 7,
--	[IRQ_DA850_MCBSP0RINT]		= 7,
--	[IRQ_DA850_MCBSP0XINT]		= 7,
--	[IRQ_DA850_MCBSP1RINT]		= 7,
--	[IRQ_DA850_MCBSP1XINT]		= 7,
--	[IRQ_DA8XX_ARMCLKSTOPREQ]	= 7,
--};
--
- static struct map_desc da850_io_desc[] = {
- 	{
- 		.virtual	= IO_VIRT,
-@@ -739,9 +634,6 @@ static const struct davinci_soc_info davinci_soc_info_da850 = {
- 	.pinmux_base		= DA8XX_SYSCFG0_BASE + 0x120,
- 	.pinmux_pins		= da850_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(da850_pins),
--	.intc_base		= DA8XX_CP_INTC_BASE,
--	.intc_irq_prios		= da850_default_priorities,
--	.intc_irq_num		= DA850_N_CP_INTC_IRQ,
- 	.timer_info		= &da850_timer_info,
- 	.emac_pdata		= &da8xx_emac_pdata,
- 	.sram_dma		= DA8XX_SHARED_RAM_BASE,
-diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
-index c7cd765114af..4a482445b9a2 100644
---- a/arch/arm/mach-davinci/dm355.c
-+++ b/arch/arm/mach-davinci/dm355.c
-@@ -705,9 +705,6 @@ static const struct davinci_soc_info davinci_soc_info_dm355 = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm355_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm355_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm355_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm355_timer_info,
- 	.sram_dma		= 0x00010000,
- 	.sram_len		= SZ_32K,
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index bde3c3b94cc9..8e0a77315add 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -722,9 +722,6 @@ static const struct davinci_soc_info davinci_soc_info_dm365 = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm365_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm365_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm365_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm365_timer_info,
- 	.emac_pdata		= &dm365_emac_pdata,
- 	.sram_dma		= 0x00010000,
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 6d3498058283..cecc7ceb8d34 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -646,9 +646,6 @@ static const struct davinci_soc_info davinci_soc_info_dm644x = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm644x_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm644x_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios 	= dm644x_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm644x_timer_info,
- 	.emac_pdata		= &dm644x_emac_pdata,
- 	.sram_dma		= 0x00008000,
-diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-index a0a8b336c1a4..f33392f77a03 100644
---- a/arch/arm/mach-davinci/dm646x.c
-+++ b/arch/arm/mach-davinci/dm646x.c
-@@ -586,9 +586,6 @@ static const struct davinci_soc_info davinci_soc_info_dm646x = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm646x_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm646x_pins),
--	.intc_base		= DAVINCI_ARM_INTC_BASE,
--	.intc_irq_prios		= dm646x_default_priorities,
--	.intc_irq_num		= DAVINCI_N_AINTC_IRQ,
- 	.timer_info		= &dm646x_timer_info,
- 	.emac_pdata		= &dm646x_emac_pdata,
- 	.sram_dma		= 0x10010000,
-diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
-index 14e0e1c40611..9526e5da0d33 100644
---- a/arch/arm/mach-davinci/include/mach/common.h
-+++ b/arch/arm/mach-davinci/include/mach/common.h
-@@ -58,9 +58,6 @@ struct davinci_soc_info {
- 	u32				pinmux_base;
- 	const struct mux_config		*pinmux_pins;
- 	unsigned long			pinmux_pins_num;
--	u32				intc_base;
--	u8				*intc_irq_prios;
--	unsigned long			intc_irq_num;
- 	struct davinci_timer_info	*timer_info;
- 	int				gpio_type;
- 	u32				gpio_base;
--- 
-2.20.1
+Thanks.
 
-
+Christophe
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
