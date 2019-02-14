@@ -2,73 +2,62 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 15332C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:43:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EE1E1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:42:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D6C4B21904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 00:43:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BD9F121904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:42:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CI0LBAvG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6C4B21904
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Is8QBJFQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD9F121904
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=W0n/gKhNMHvHuyDvum0IoLZUmD2/HuiFFKqFD/DHCIo=; b=CI0LBAvGeG0tTch4VUmPi1IDY
-	JhtLirpRLWEyUBj9NgZG+3UICmN94HylgpCNaZvAAeIYOOjcf++TnhH0yqVsgNEH4LGaqV8HkaLS9
-	nblsOSmVU5DJcvOkkZE4y/OX+BmGHz0nxM6B1dEqisA2wMWdAPX4T126JT6epYJkQ9kyR2f9UPCjv
-	BcjKcaid+nGoU0qRGLB05xeaKqU/L5Xy4w+nzWZzNgP/0+9O5Z8kUsUsUOveac97x5tyIGNrogJTF
-	Fz/Jhgj52gVqXJmeKa9Y7ZxzENyI73a3mNX5yLcDdRoyVWWVzkUjnQjSC8hqQO0iB7Xi+bCSZG7z1
-	InYnW78vQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=twMjpXVVP0CHIyUNTRVj5iWfSJvwdo/4QTboQNzQOUE=; b=Is8QBJFQLMwQtr
+	fzEXqNDTkBECMSzuCeXPOK58PoCaRL06r+DrptLq1zyQ0LkPe3lIRLVTvnsWXFHti5j5+pftmwuBh
+	cfphjnZGiTYuQjE1R45r2BqAd3tZZZFkk437zcB6lDDbjVPd6p4Wx1RxYwuRJQc6XfNdjz0stuPri
+	X7btDXXeKOW7vcJn+B07jJx8jx731rX1Dvg2iEkPcmsaWD0XlMkf3L7OMA8ygHBaer6mnXTmiOBQE
+	I867/LHKq1Iiyyn0A1IVd8iu2aRB8uojyW2YMmw7hyT/MxoLC7nO0n2ipsvdr2web8//N00IEtSPf
+	52Qa5YhoTzNoiTlAnnXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu57P-0007tq-5z; Thu, 14 Feb 2019 00:43:11 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu57K-0007tC-Pb
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 00:43:08 +0000
-Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
- by mx.socionext.com with ESMTP; 14 Feb 2019 09:43:05 +0900
-Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
- by kinkan-ex.css.socionext.com (Postfix) with ESMTP id 3E117180101;
- Thu, 14 Feb 2019 09:43:05 +0900 (JST)
-Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Thu, 14 Feb 2019 09:43:05 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id A38BE1A04E0;
- Thu, 14 Feb 2019 09:43:04 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 81FD3121B6C;
- Thu, 14 Feb 2019 09:43:04 +0900 (JST)
-Subject: Re: [PATCH v2 07/15] ndings: clock: milbeaut: add Milbeaut clock
- description
-To: Stephen Boyd <sboyd@kernel.org>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org
-References: <1549628823-31388-1-git-send-email-sugaya.taichi@socionext.com>
- <155008053444.115909.15767350529461671558@swboyd.mtv.corp.google.com>
- <155008127539.115909.8938099989804942@swboyd.mtv.corp.google.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <38afb1e0-2af9-0eb1-9d1b-4ff7273e25ab@socionext.com>
-Date: Thu, 14 Feb 2019 09:43:03 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gu62q-0000oH-Lh; Thu, 14 Feb 2019 01:42:32 +0000
+Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gu62n-0000np-5I; Thu, 14 Feb 2019 01:42:30 +0000
+Received: from DGGEMS409-HUB.china.huawei.com (unknown [172.30.72.58])
+ by Forcepoint Email with ESMTP id 92BD6B8152EA3A6F4100;
+ Thu, 14 Feb 2019 09:42:21 +0800 (CST)
+Received: from localhost.localdomain.localdomain (10.175.113.25) by
+ DGGEMS409-HUB.china.huawei.com (10.3.19.209) with Microsoft SMTP Server id
+ 14.3.408.0; Thu, 14 Feb 2019 09:42:15 +0800
+From: YueHaibing <yuehaibing@huawei.com>
+To: Michael Turquette <mturquette@baylibre.com>, Stephen Boyd
+ <sboyd@kernel.org>, Matthias Brugger <matthias.bgg@gmail.com>, Weiyi Lu
+ <weiyi.lu@mediatek.com>
+Subject: [PATCH -next] clk: mediatek: fix platform_no_drv_owner.cocci warnings
+Date: Thu, 14 Feb 2019 01:56:16 +0000
+Message-ID: <20190214015616.130334-1-yuehaibing@huawei.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <155008127539.115909.8938099989804942@swboyd.mtv.corp.google.com>
-Content-Language: en-US
+X-Originating-IP: [10.175.113.25]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_164307_093705_03AE34FD 
-X-CRM114-Status: GOOD (  17.66  )
+X-CRM114-CacheID: sfid-20190213_174229_370038_3DC959C2 
+X-CRM114-Status: UNSURE (   7.10  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,66 +69,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
+Cc: linux-mediatek@lists.infradead.org, kernel-janitors@vger.kernel.org,
+ YueHaibing <yuehaibing@huawei.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Remove .owner field if calls are used which set it automatically
+Generated by: scripts/coccinelle/api/platform_no_drv_owner.cocci
 
-On 2019/02/14 3:07, Stephen Boyd wrote:
-> Quoting Stephen Boyd (2019-02-13 09:55:34)
->> The subject seems to have been cut off? "ndings"?
->>
->> Quoting Sugaya Taichi (2019-02-08 04:27:03)
->>> diff --git a/Documentation/devicetree/bindings/clock/milbeaut-clock.txt b/Documentation/devicetree/bindings/clock/milbeaut-clock.txt
->>> new file mode 100644
->>> index 0000000..bcfc5df
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/clock/milbeaut-clock.txt
->>> @@ -0,0 +1,49 @@
->>> +Milbeaut SoCs Clock Controller Binding
->>> +----------------------------------------
->>> +Milbeaut SoCs Clock controller is an integrated clock controller, which
->>> +generates and supplies to all modules.
->>> +
->>> +This binding uses common clock bindings
->>> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->>> +
->>> +Required properties:
->>> +- compatible: should be one of the following:
->>> +    "socionext,milbeaut-m10v-ccu" - for M10V SoC
->>> +- reg: shall contain base address and length of clock registers
->>> +- #clock-cells: shall be 1
->>> +- clocks: shall be an external clock
->>> +
->>> +Example: Clock controller node:
->>> +
->>> +       clk: m10v-clk-ctrl@1d021000 {
->>> +               compatible = "socionext,milbeaut-m10v-clk-ccu";
->>
->> I thought there was some length limit on compatible string names. 32
->> bytes? Just barely under!
->>
-> 
-> Ah I'm wrong. Compatible is 128. Good.
-> 
-> Seems I was thinking of DT property names.
-> 
+Signed-off-by: YueHaibing <yuehaibing@huawei.com>
+---
+ drivers/clk/mediatek/clk-mt2712.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Sorry confusing you.
-I accidently deleted "dt-bi" from subject when committing.
-I repair the string in the next version.
+diff --git a/drivers/clk/mediatek/clk-mt2712.c b/drivers/clk/mediatek/clk-mt2712.c
+index e36f4aab634d..b09cb3d99f66 100644
+--- a/drivers/clk/mediatek/clk-mt2712.c
++++ b/drivers/clk/mediatek/clk-mt2712.c
+@@ -1467,7 +1467,6 @@ static struct platform_driver clk_mt2712_drv = {
+ 	.probe = clk_mt2712_probe,
+ 	.driver = {
+ 		.name = "clk-mt2712",
+-		.owner = THIS_MODULE,
+ 		.of_match_table = of_match_clk_mt2712,
+ 	},
+ };
 
-Thanks,
-Sugaya Taichi
+
+
+
 
 
 _______________________________________________
