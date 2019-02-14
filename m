@@ -2,117 +2,86 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0052BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:50:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B057DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:52:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C3002222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:50:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7F2DF2229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:52:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="puBgKiOe";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cgs9uJwd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C3002222DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=roeck-us.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LBlCE9st";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="YAck+mNs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F2DF2229F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=IECOrnabwaan7Af4LgHYPHYfjJMy+MxdRB7RYJK2QNg=; b=puBgKiOe1+CVke/HRU3Pnczmh
-	PGJE1BXBRrVxYyMlhV4fj/9r057PuCnOR7q74hjWM1dYaxfAZ+wJC8QurxB76UoqLYkxjC67e47qP
-	LMNn+GhtvoeXoYw+TkqPJRO3WWQU2SdRdLp1W5sBR3V8t19ZsSrr9+pGekYlQYj2KoDsdJvkE1U2n
-	yPvzrT+VmBr/MAH0VtdYAeQENyd5N+HfmY1ergoZxhjl2ci5dwWRvK91rjATyluwxMilxafdW184b
-	5k5dZQ0ZHrBqt95Z85jcxgNkOHXLTKFOqJE4hDxdGvrKrdaUu6neEcbtFXso0GlLcmrESkgobBGpR
-	U9RCOHHEg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8eK7uZvPSnBmjrH65JXyqpwyibvsrkuJl3wKmvV7NRQ=; b=LBlCE9stZJrGzh
+	8gG0j0XBEal6uBZX/RZEPVTJFYbce1o1P1rLPHwVohvNRBuwX3/1CuJ32jGqrbxEO4jgvtEk+8RiN
+	AFB+QNc+SZi8Eb9qOxsIlcKIEZtUAE5qWnJJYe1kHO9+ostizg48g0FT7pMLyUnsTvQO+cI4eND2u
+	EZ5BS9AUB7tZ64D/8nqltetTmK0nxF2ung3/Sp9G8G1itvUptGSS8PJJNzuzMZqCe6XZWch7sg7T6
+	fvLr1cZFHufSVIcZLzLc1fja9uu6xd7HUIhDqTwzXsJLxW5XcOq3BeTtMrqWafGkQpmGCkkZU6eb0
+	EV+SltNiVD8ebskpB2hg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guILb-0003sa-9A; Thu, 14 Feb 2019 14:50:43 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1guIND-0004V3-AT; Thu, 14 Feb 2019 14:52:23 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guILW-0003ro-FN
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:50:41 +0000
-Received: by mail-pg1-x541.google.com with SMTP id v28so3169058pgk.10
+ id 1guIN9-0004UK-OW
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:52:21 +0000
+Received: by mail-it1-x141.google.com with SMTP id l15so2123757iti.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:50:37 -0800 (PST)
+ Thu, 14 Feb 2019 06:52:19 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=/6ddbdebD9iJzQo+1LigKy7GKDZ/EL0wAh/uqRy48F4=;
- b=cgs9uJwd7aQilHTRs0BfGQBJgYPxJ8uesBz2JQKSfzQgq6KmLl3yAhClFLIztuYuOO
- zpLdfeEIUGjc61mTwUZD76zq0nu03uw2oMnH3TdzI6m0TRVJQOVMMEjfVH9B3Oe6ae24
- 7gOvVvRbWc2yLYS/D4SqMGUmwXKm35GzHanlh7JeGVhBcLWjVH/UHr5ALl8Jz2Q/6aU6
- ozzz6S4/Wx6Q0GukfYw2VlSMq4zN9/g8xcIkJN9NvIvSSD1sUjvIy7XuiF6JNMYYfs5i
- ssxAWonQtPeC+Sd5MVKrjArmna/6ch+lirdWCNlvG5o8JN/9oB0fNxJscIv/RxHW6mQk
- aCsQ==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=+EGt+v5ZyVvPKwVW3emNjKEWeGsO2xJtAz1zaHUXrBU=;
+ b=YAck+mNs/CPhSATtPY3A+HQ1SQVRWX6LVgVNMp3RMAlrd36W4KQ0FybFxm5aco7jPl
+ 7ohcscM3KZrSCLBBeZJxxigV7BmH6OlqlOsiOuxDHTp3sd7utq+Abvf6zKtFd0pix/SN
+ /xecmi5kYK67GEgq7DW9WdNHMc40SkJqtexz6KjtAJ+MMS/CbaDqerur98Y65j68cTD9
+ j6YHk/mU0lHLAhVKpmAlvDf/SUmJhBx5xeYeIJwCs1oE5GKeIKEmJySWd5+8TOfL/GMk
+ obARw/CmdSQa3ESsdgu1w7JaWNzVv+MtoQ7iApfRutp0sKlhexqjp0ORfontJEam8vI1
+ IdGQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:subject:to:cc:references:from:message-id
- :date:user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=/6ddbdebD9iJzQo+1LigKy7GKDZ/EL0wAh/uqRy48F4=;
- b=PNc6mB83VIBrx8Euy2FBXXSyY3YCn5o82mwZvqWbNemg87htqDPKJzjyTPHNulp+Lm
- rn3Gh0qENshNpCs/vXZpeTuNBoOJ0LHpW64xxRgmBPJodGjMF/czgAWV2OcNsFGULTjw
- L07sJ9uRnY0xLrt3G/ojjbR0QWkjtcChy4OjdhGQ38sTD84jzT2l4YE1xAf5Bn3nu9ib
- dm2Jvgs4zbwZvQrr9/wSU3EBBepFzip3iJUVm2J7ii4bSDJGwPKal8J9BMG7glV1ZVgU
- F5YrAwM1ILo9maqu+OV3D3JQd8wg2jiqz00kJ4Vsiru1TpaU5xaTg4u/u0TNnbYQ1QmT
- +k2w==
-X-Gm-Message-State: AHQUAuaSYlWMDW2cvvoGd+/lohEHk6NH7SvTh2I2jTKKLeHt0HqwV5Zw
- DeRnIiEKgpB4G03MUTul430=
-X-Google-Smtp-Source: AHgI3IYUdduaKqJn681bDKNTZvqHHzr5vcqo0r1q6dCTqk3ZkG27QoyGfnu71hOZ61Fhhyi2NDhP9Q==
-X-Received: by 2002:a62:b248:: with SMTP id x69mr4429731pfe.256.1550155837389; 
- Thu, 14 Feb 2019 06:50:37 -0800 (PST)
-Received: from server.roeck-us.net ([2600:1700:e321:62f0:329c:23ff:fee3:9d7c])
- by smtp.gmail.com with ESMTPSA id
- 11sm3236506pfh.131.2019.02.14.06.50.34
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 06:50:36 -0800 (PST)
-Subject: Re: [PATCH 2/4] watchdog: imx_sc: Add i.MX system controller watchdog
- support
-To: Anson Huang <anson.huang@nxp.com>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "wim@linux-watchdog.org" <wim@linux-watchdog.org>,
- Aisheng Dong <aisheng.dong@nxp.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- Daniel Baluta <daniel.baluta@nxp.com>, Andy Gross <andy.gross@linaro.org>,
- "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>,
- "heiko@sntech.de" <heiko@sntech.de>, "arnd@arndb.de" <arnd@arndb.de>,
- "maxime.ripard@bootlin.com" <maxime.ripard@bootlin.com>,
- "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>,
- "jagan@amarulasolutions.com" <jagan@amarulasolutions.com>,
- "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
- "marc.w.gonzalez@free.fr" <marc.w.gonzalez@free.fr>,
- "olof@lixom.net" <olof@lixom.net>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
- "linux-watchdog@vger.kernel.org" <linux-watchdog@vger.kernel.org>
-References: <1550144346-1187-1-git-send-email-Anson.Huang@nxp.com>
- <1550144346-1187-3-git-send-email-Anson.Huang@nxp.com>
-From: Guenter Roeck <linux@roeck-us.net>
-Message-ID: <60e68ebe-389a-b410-d0b3-ad9a286b1a50@roeck-us.net>
-Date: Thu, 14 Feb 2019 06:50:33 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=+EGt+v5ZyVvPKwVW3emNjKEWeGsO2xJtAz1zaHUXrBU=;
+ b=qtRvoR8ROBVRol0vQ4Wu0+rZS9BhwfqfOGLe69z5HiWCBKBgNjCJ4/MzXSNKzddBwc
+ RrqD63WzDcxmUE3i81YyCLAxrPx8rhMwA8+6HsHgxhKMwAaxJca9lBeYG3SiDzxND3HR
+ OdDLFb+h8fL7kczoxejSVNocDXU0byq5p0CUqTFZUc7jqjUY716ifJTervzqIuT8g38n
+ T5eRb3QynluURxvXly3INr/OySckhksmwEpFMxb9DDZwflXASdTnZqKl7Fbtzl3atpAq
+ 7WnTXAFoT7R2tSouynrMCDEdH8AUYSl27EvhKlbgOX0C2CKmw+aRaJ0KLnLU39p/DJn9
+ oPGQ==
+X-Gm-Message-State: AHQUAuZdUyIAxPb6pqS92qa9FigoEmOlDkQPh+RKj7692iap2IKJ0M3k
+ o1kolBOkg8g7jSimAd1aIzc4mj/MdjwHkL3KWTQ=
+X-Google-Smtp-Source: AHgI3IY0C6Q/oztInKZQxwyd8k+COA306ww4jbwsIY03ZnBRkG6j/9fn3yyHQktGFWb1K6Y0nT0EJ+UQIh8nft81mcY=
+X-Received: by 2002:a6b:c545:: with SMTP id v66mr1752509iof.40.1550155938783; 
+ Thu, 14 Feb 2019 06:52:18 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1550144346-1187-3-git-send-email-Anson.Huang@nxp.com>
-Content-Language: en-US
+References: <20190214130910.9201-1-tiny.windzz@gmail.com>
+ <20190214130910.9201-5-tiny.windzz@gmail.com>
+ <20190214143842.nqsh6trwdjxq2ecd@flea>
+In-Reply-To: <20190214143842.nqsh6trwdjxq2ecd@flea>
+From: Frank Lee <tiny.windzz@gmail.com>
+Date: Thu, 14 Feb 2019 22:52:16 +0800
+Message-ID: <CAEExFWuxrVC1J0g93R3ifaDxOGy-20B4jftoHw932V7+wqhtxw@mail.gmail.com>
+Subject: Re: [PATCH 4/4] arm64: dts: allwinner: h6: Add CPU Operating
+ Performance Points table
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_065038_542448_C0E57A2B 
-X-CRM114-Status: GOOD (  32.15  )
+X-CRM114-CacheID: sfid-20190214_065219_805618_F77F8C55 
+X-CRM114-Status: GOOD (  19.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,297 +93,144 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>, robh+dt@kernel.org,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/14/19 3:44 AM, Anson Huang wrote:
-> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
-> inside, the system controller is in charge of controlling power,
-> clock and watchdog etc..
-> 
-> This patch adds i.MX system controller watchdog driver support,
-> watchdog operation needs to be done in secure EL3 mode via
-> ARM-Trusted-Firmware, using SMC call, CPU will trap into
-> ARM-Trusted-Firmware and then it will request system controller
-> to do watchdog operation via IPC.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->   drivers/watchdog/Kconfig      |  13 +++
->   drivers/watchdog/Makefile     |   1 +
->   drivers/watchdog/imx_sc_wdt.c | 210 ++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 224 insertions(+)
->   create mode 100644 drivers/watchdog/imx_sc_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 65c3c42..5c5b8ba 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -625,6 +625,19 @@ config IMX2_WDT
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called imx2_wdt.
->   
-> +config IMX_SC_WDT
-> +	tristate "IMX SC Watchdog"
-> +	depends on ARCH_MXC || COMPILE_TEST
-> +	select WATCHDOG_CORE
-> +	help
-> +	  This is the driver for the system controller watchdog
-> +	  on the NXP i.MX SoCs with system controller inside.
-> +	  If you have one of these processors and wish to have
-> +	  watchdog support enabled, say Y, otherwise say N.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called imx_sc_wdt.
-> +
->   config UX500_WATCHDOG
->   	tristate "ST-Ericsson Ux500 watchdog"
->   	depends on MFD_DB8500_PRCMU
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 4e78a8c..0c9da63 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -68,6 +68,7 @@ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
->   obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
->   obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
->   obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
-> +obj-$(CONFIG_IMX_SC_WDT) += imx_sc_wdt.o
->   obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
->   obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
->   obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
-> diff --git a/drivers/watchdog/imx_sc_wdt.c b/drivers/watchdog/imx_sc_wdt.c
-> new file mode 100644
-> index 0000000..ae52e34
-> --- /dev/null
-> +++ b/drivers/watchdog/imx_sc_wdt.c
-> @@ -0,0 +1,210 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright 2018-2019 NXP.
-> + */
-> +
-> +#include <linux/arm-smccc.h>
-> +#include <linux/io.h>
-> +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/moduleparam.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define DEFAULT_TIMEOUT 60
-> +/*
-> + * Software timer tick implemented in scfw side, support 10ms to 0xffffffff ms
-> + * in theory, but for normal case, 1s~128s is enough, you can change this max
-> + * value in case it's not enough.
-> + */
-> +#define MAX_TIMEOUT 128
-> +
-> +#define IMX_SIP_TIMER			0xC2000002
-> +#define IMX_SIP_TIMER_START_WDOG		0x01
-> +#define IMX_SIP_TIMER_STOP_WDOG		0x02
-> +#define IMX_SIP_TIMER_SET_WDOG_ACT	0x03
-> +#define IMX_SIP_TIMER_PING_WDOG		0x04
-> +#define IMX_SIP_TIMER_SET_TIMEOUT_WDOG	0x05
-> +#define IMX_SIP_TIMER_GET_WDOG_STAT	0x06
-> +#define IMX_SIP_TIMER_SET_PRETIME_WDOG	0x07
-> +
-> +#define SC_TIMER_WDOG_ACTION_PARTITION	0
-> +
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +module_param(nowayout, bool, 0000);
-> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
-> +		 __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-> +
-> +static unsigned int timeout = DEFAULT_TIMEOUT;
-> +module_param(timeout, uint, 0000);
-> +MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
-> +		 __MODULE_STRING(DEFAULT_TIMEOUT) ")");
-> +
-> +static struct watchdog_device imx_sc_wdd;
-> +
-> +static int imx_sc_wdt_ping(struct watchdog_device *wdog)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(IMX_SIP_TIMER, IMX_SIP_TIMER_PING_WDOG,
-> +		      0, 0, 0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static int imx_sc_wdt_start(struct watchdog_device *wdog)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(IMX_SIP_TIMER, IMX_SIP_TIMER_START_WDOG,
-> +		      0, 0, 0, 0, 0, 0, &res);
-> +	if (res.a0)
-> +		return res.a0;
-> +
-> +	arm_smccc_smc(IMX_SIP_TIMER, IMX_SIP_TIMER_SET_WDOG_ACT,
-> +		      SC_TIMER_WDOG_ACTION_PARTITION,
-> +		      0, 0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static int imx_sc_wdt_stop(struct watchdog_device *wdog)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	arm_smccc_smc(IMX_SIP_TIMER, IMX_SIP_TIMER_STOP_WDOG,
-> +		      0, 0, 0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static int imx_sc_wdt_set_timeout(struct watchdog_device *wdog,
-> +				unsigned int timeout)
-> +{
-> +	struct arm_smccc_res res;
-> +
-> +	wdog->timeout = timeout;
-> +	arm_smccc_smc(IMX_SIP_TIMER, IMX_SIP_TIMER_SET_TIMEOUT_WDOG,
-> +		      timeout * 1000, 0, 0, 0, 0, 0, &res);
-> +
-> +	return res.a0;
-> +}
-> +
-> +static const struct watchdog_ops imx_sc_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = imx_sc_wdt_start,
-> +	.stop  = imx_sc_wdt_stop,
-> +	.ping  = imx_sc_wdt_ping,
-> +	.set_timeout = imx_sc_wdt_set_timeout,
-> +};
-> +
-> +static const struct watchdog_info imx_sc_wdt_info = {
-> +	.identity	= "i.MX SC watchdog timer",
-> +	.options	= WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
-> +			  WDIOF_MAGICCLOSE | WDIOF_PRETIMEOUT,
-> +};
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int imx_sc_wdt_suspend(struct device *dev)
-> +{
-> +	if (test_bit(WDOG_ACTIVE, &imx_sc_wdd.status))
-> +		imx_sc_wdt_stop(&imx_sc_wdd);
-> +
+On Thu, Feb 14, 2019 at 10:38 PM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> Hi,
+>
+> On Thu, Feb 14, 2019 at 08:09:10AM -0500, Yangtao Li wrote:
+> > Add an OPP (Operating Performance Points) table for the CPU cores to
+> > enable DVFS (Dynamic Voltage & Frequency Scaling) on the H6. This
+> > information comes from github.
+> >
+> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > ---
+> >  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 61 ++++++++++++++++++++
+> >  1 file changed, 61 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > index 57a1390ecdc2..46a4a69eb38f 100644
+> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> > @@ -28,6 +28,8 @@
+> >                       enable-method = "psci";
+> >                       clocks = <&ccu CLK_CPUX>;
+> >                       clock-latency-ns = <244144>; /* 8 32k periods */
+> > +                     operating-points-v2 = <&cpu_opp_table>;
+> > +                     #cooling-cells = <2>;
+> >               };
+> >
+> >               cpu1: cpu@1 {
+> > @@ -37,6 +39,8 @@
+> >                       enable-method = "psci";
+> >                       clocks = <&ccu CLK_CPUX>;
+> >                       clock-latency-ns = <244144>; /* 8 32k periods */
+> > +                     operating-points-v2 = <&cpu_opp_table>;
+> > +                     #cooling-cells = <2>;
+> >               };
+> >
+> >               cpu2: cpu@2 {
+> > @@ -46,6 +50,8 @@
+> >                       enable-method = "psci";
+> >                       clocks = <&ccu CLK_CPUX>;
+> >                       clock-latency-ns = <244144>; /* 8 32k periods */
+> > +                     operating-points-v2 = <&cpu_opp_table>;
+> > +                     #cooling-cells = <2>;
+> >               };
+> >
+> >               cpu3: cpu@3 {
+> > @@ -55,6 +61,61 @@
+> >                       enable-method = "psci";
+> >                       clocks = <&ccu CLK_CPUX>;
+> >                       clock-latency-ns = <244144>; /* 8 32k periods */
+> > +                     operating-points-v2 = <&cpu_opp_table>;
+> > +                     #cooling-cells = <2>;
+> > +             };
+> > +     };
+> > +
+> > +     cpu_opp_table: opp_table {
+> > +             compatible = "operating-points-v2";
+> > +             opp-shared;
+> > +
+> > +             opp@480000000 {
+> > +                     opp-hz = /bits/ 64 <480000000>;
+> > +                     opp-microvolt = <800000 800000 880000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@720000000 {
+> > +                     opp-hz = /bits/ 64 <720000000>;
+> > +                     opp-microvolt = <800000 800000 880000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@816000000 {
+> > +                     opp-hz = /bits/ 64 <816000000>;
+> > +                     opp-microvolt = <800000 800000 880000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@888000000 {
+> > +                     opp-hz = /bits/ 64 <888000000>;
+> > +                     opp-microvolt = <800000 800000 940000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@1080000000 {
+> > +                     opp-hz = /bits/ 64 <1080000000>;
+> > +                     opp-microvolt = <840000 840000 1060000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@1320000000 {
+> > +                     opp-hz = /bits/ 64 <1320000000>;
+> > +                     opp-microvolt = <900000 900000 1160000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@1488000000 {
+> > +                     opp-hz = /bits/ 64 <1488000000>;
+> > +                     opp-microvolt = <960000 960000 1160000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+> > +             };
+> > +
+> > +             opp@1800000000 {
+> > +                     opp-hz = /bits/ 64 <1800000000>;
+> > +                     opp-microvolt = <1060000 1060000 1160000>;
+> > +                     clock-latency-ns = <244144>; /* 8 32k periods */
+>
+> So we definitely want to have that tested, especially since cpufreq
+> can lead to all kind of hard to debug errors (brown-outs, CPU lockups,
+> cache corruption, etc.). I good way to test that would be to use
+> cpufreq-ljt-stress-test here:
+> https://github.com/ssvb/cpuburn-arm/blob/master/cpufreq-ljt-stress-test
+>
+> I'm especially worried about the higher frequencies that will probably
+> make the SoC heat too much
+Indeed, in order to avoid this situation, it is best to have cpu cooling
+support(But now it does not support thermal driver? ).
 
-What is wrong with watchdog_active() ? It is used below ?
 
-> +	return 0;
-> +}
-> +
-> +static int imx_sc_wdt_resume(struct device *dev)
-> +{
-> +	if (test_bit(WDOG_ACTIVE, &imx_sc_wdd.status))
-> +		imx_sc_wdt_start(&imx_sc_wdd);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops imx_sc_wdt_pm_ops = {
-> +	.suspend = imx_sc_wdt_suspend,
-> +	.resume = imx_sc_wdt_resume,
-> +};
-> +
-> +#define IMX_SC_WDT_PM_OPS	(&imx_sc_wdt_pm_ops)
-> +
-> +#else
-> +
-> +#define IMX_SC_WDT_PM_OPS	NULL
-> +
-> +#endif
-> +
-> +static int imx_sc_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct watchdog_device *wdt = &imx_sc_wdd;
+In this case, perhaps we should remove the frequency beyond a certain
+range to avoid the CPU being too hot?
 
-Please use devm_kzalloc() and drop the static variable. You can use
-dev_get_drvdata() to access it where needed.
-
-> +	int err;
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->info = &imx_sc_wdt_info;
-> +	wdt->ops = &imx_sc_wdt_ops;
-> +	wdt->min_timeout = 1;
-> +	wdt->max_timeout = MAX_TIMEOUT;
-> +	wdt->parent = &pdev->dev;
-> +	watchdog_set_drvdata(wdt, NULL);
-> +
-This is quite pointless.
-
-> +	err = watchdog_init_timeout(wdt, DEFAULT_TIMEOUT, &pdev->dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to init the wdog timeout:%d\n",
-> +			err);
-> +		return err;
-> +	}
-> +
-> +	err = watchdog_register_device(wdt);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "Failed to register watchdog device\n");
-> +		return err;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx_sc_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct watchdog_device *wdt = platform_get_drvdata(pdev);
-> +
-> +	imx_sc_wdt_stop(wdt);
-
-Any reason for not using watchdog_stop_on_unregister() ?
-
-> +
-> +	watchdog_unregister_device(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static void imx_sc_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct watchdog_device *wdt = platform_get_drvdata(pdev);
-> +
-> +	if (watchdog_active(wdt))
-> +		imx_sc_wdt_stop(wdt);
-> +}
-> +
-Any reason for not using watchdog_stop_on_reboot() ?
-
-> +static const struct of_device_id imx_sc_wdt_dt_ids[] = {
-> +	{ .compatible = "fsl,imx8qxp-sc-wdt", },
-> +	{ /*sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, imx_sc_wdt_dt_ids);
-> +
-> +static struct platform_driver imx_sc_wdt_driver = {
-> +	.probe		= imx_sc_wdt_probe,
-> +	.remove		= imx_sc_wdt_remove,
-> +	.shutdown	= imx_sc_wdt_shutdown,
-> +	.driver		= {
-> +		.name	= "imx-sc-wdt",
-> +		.of_match_table = imx_sc_wdt_dt_ids,
-> +		.pm	= IMX_SC_WDT_PM_OPS,
-
-I prefer the use of SIMPLE_DEV_PM_OPS() together with
-__maybe_unused for the pm functions instead of #ifdef.
-This ensures that the unused code compiles even if PM_SLEEP
-is not enabled.
-
-Thanks,
-Guenter
+Yangtao
+>
+> Maxime
+>
+> --
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
