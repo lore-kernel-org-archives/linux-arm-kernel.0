@@ -2,92 +2,107 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D5222C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:54:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B0C00C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:58:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A03712147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:54:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D48D2080A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 20:58:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ieY35deT";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="eYht9W/J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A03712147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lr6AEpWD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="pYKEgMD1";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="W5Zu1Dm3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D48D2080A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/PiTlIMQZsExuM+USqyBBsK6v43MMqd3roUQslOQqvw=; b=ieY35deTCpMl08
-	RwRu07/jpNKnkhicrnQgbx2dSoSKgHPqAXv/KC+N7IyZ++0KjhrnGhhh1OAxCc608fkzqePjgRZlz
-	MVmvbj0rGS5WI0cIsErr29QE0a/pKBQ8+tOlCwNtxpY0EqbUCe5bfV2X7d1sbl7XmDk9a3+xdmH+4
-	sl2aaWR2pTQuRTfxMkJW5TcFgE1Fx5YUcnPhJy8fQNxQvAYfzsmE9/FolluKtiqUJemWl6IYenAGe
-	wAFiqGvrELxH53ID9un53XJAbCfdIaSs6CO5f1+vu6upmnYJXrJXTwueIsqNrCK844gXsPa1QwGCY
-	J/wAhqme1l/hd1c3a5/A==;
+	List-Owner; bh=jUQmWCsTtpVwV9IYnjL/PfEPEnuF4dNzDu6zj0pyHZU=; b=Lr6AEpWD7w/vjc
+	IPrawFdQTt4pePmwYyxGK4s8CFzHonY38iP4yTzdlwfYmltPZRE9SO1QcfHlYVCMv/kxnCkBpktkK
+	bditr/O+BwJuEL1W6rqna822m79QXpDpvf83Dg3U+RT2ecMocokw8iMwMo8N5NVBdL82xQ39mVqOO
+	6p2Hj6fm1pHs2xStC5k9eGvCt7zN628WX55bkuzEFRd0oQyuIMo2LNcBNAAyZzTbxtwYarlrWZehN
+	vkhdym4xPkaUOwCIm2LG6HkgUdBQPWRGaFbVb/u8iyIL3Bl7NrF7pHpsuRsTCDtgXmdK3DDg3qWbO
+	EB25+2y00IsSemCSPdjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guO1J-0000Xe-Vl; Thu, 14 Feb 2019 20:54:09 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1guO5H-0002bL-9A; Thu, 14 Feb 2019 20:58:15 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guO1G-0000XD-91
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 20:54:08 +0000
-Received: by mail-ot1-x341.google.com with SMTP id u16so12901481otk.8
+ id 1guO5F-0002T9-Ab
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 14 Feb 2019 20:58:13 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Type:Content-Transfer-Encoding:
+ MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:Cc:To:From:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=; b=pYKEgMD16EBkcUlRobsFT4BAzz
+ GMd+QxbBBUhvq9WsSSw14CVQRtyl0myb6wiKCTFsRA49QrQDbSH2soc8nzKx+dMTrfL1+ZHRqLF//
+ F0M3ADCWPLkGw6Vpmx5wwY0el9XAcfyaKdudAJt/b9gaErlammQykhD5MXfKisSm65AjX5EQT+Uru
+ kDIsd/e1SB6GyGrpN+jnTUFp4YaRKnRr9Ndno5aVRMxM4RWQWnh7Tv+anYkNOrFpoqdCnuWkfeGM8
+ bpXJCccFYc/cqULnRBN5JYr+VAUYzbEFIdKckO+kXToRrprEnNMyJSGDBTlyFBQf+t0Evu/Gdu6ty
+ 1RKm8OgQ==;
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guNqQ-0006OW-Br
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 20:42:56 +0000
+Received: by mail-wr1-x444.google.com with SMTP id c8so7988511wrs.4
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 12:54:05 -0800 (PST)
+ Thu, 14 Feb 2019 12:42:53 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8WhWTvDPALPcsS4Z5oPrAbLDHpvz4PaoO+zoGa92B18=;
- b=eYht9W/JgNyuEHNTArT3vpCagRdk1epBSfX0o9z9+ZwzSNHzbqCRO8emQP4F6cq0qI
- XgFr1NucZODoe5yffgaCiEuGwxmNH/5vJctSsI53VVuQGO/pcvx+Oc/YBE29SZ+Hv8Nx
- csiH/0mnMeNh0C8U3HKgvnP8PVywoTUvkbMqwGtjKpPHXTGiPKuwSs6x79ZX9ipEU8EK
- bxvbXm/phP4s9LFnl9SbZz8JrJ0wpJ4F+o4TJkHsd28XqVDYPV3i/DJg3lK9HExnFo8P
- rTXtKRQE0sp2iOtpuSB+Am2JzBIN0J2M4OHbWNWHEuuNlGfIh6L/MLFEqweVyohYDw/F
- Z2kQ==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=;
+ b=W5Zu1Dm3N/SF0jPCo4zSxBzKRJQcz0tUaKuj2Nlf29c2vSwnEK0qOZGcOqpIqQvJZk
+ QcIt8rh3fDLvu0Q6e7Sqeqv+8BkrgUiERAtTXL9pyzbag1aGtOxX9OIObPCm8gjvDo/0
+ idAHIua0oXF/a9Xpb42K9oshi40lSO75uZ/FHCt3puyGzC/gSMYpqzGNkv3lEVYg7oF3
+ RLs2nZpn+vWLPxX3rA2ZDt5z2XA8JD18UtLz+zBv+g5imLsIkYqAGa9SP5bnK9Y0SK26
+ Jm1xS7rnLCWGp/c2IHQ89fJsl0oOSf3xEqy0ZGKulBsL6m8DOM2vX0TQogCyk3HeKIiI
+ 11wQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=8WhWTvDPALPcsS4Z5oPrAbLDHpvz4PaoO+zoGa92B18=;
- b=elPVvDklRQdwFSlimsmoCsNB6nwVfoo8WMBdB1q46X+wjYDAmanRniQaFaBvzjxyqa
- MpPVFpYv8cvOTJoG9I123GF6EZFOydemhLsotYmy3RCgHvqcyG6CnMUv9FoPF2r1Wyr6
- axgn0rFxciXl+qzEvowIQunNokneCUE++yXSByFD12xb4l5p07V2sHJ5mbvIgL27eKNl
- PsOpclaIqlvzv375+wKEYc+t/1GvMAqTHxdq57FPVIvvvNI6Brt2lda4Vh/ycueoA9Rd
- vgU1ifrdxLSFf7ENv94Oj0aoMLkT9FzAO4WSqxoAD9RtqE5tG2sa0XYj3JIrXkyxV0OM
- azMQ==
-X-Gm-Message-State: AHQUAuYKiEYYcmLmuz+JmRu7A4eq93p+/s9g4YOsthQa6imvpllPr8hk
- jvIC1sug4U5zfVpOJred6EIOxKbtwb2e7cjDhdw=
-X-Google-Smtp-Source: AHgI3IaZkysrA5IBf/WLk7P98J0pXgpI3oza6DGqrB4ZCdRLO7U1ctzNZkucK/7JaTf2xnn4Y2re5PAS/FXEtT81wgA=
-X-Received: by 2002:aca:e302:: with SMTP id a2mr3816233oih.45.1550177644560;
- Thu, 14 Feb 2019 12:54:04 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=lHBvXENANR97FxCioR3l296/LYxbFU0P8w4xUxqD3hQ=;
+ b=a5Ik9mpvwJ+OhXwoF6pZQn3StgtDjH8dEOnrG63bfWlwhzw/KweoU2dumguCEYR1LW
+ fRJI5Ehi5dNZ6uFjGIfvGHoDxUA5s5JlW0Zhjoqliwvt6pW6/2RCNaSMjc6aw5qc11cH
+ TYNqUPtQhevrs7IqSmTUdYWRTGEcrVBMfiq1vO1q3wlhkuP16FP5R5MDL6UoF9ky/MHT
+ aCDX+jKujINF5/0qcdDmbhk4LHxkDJSdXpQWRRpmklCa2n/bKedbjd2bGbNa7Vzsbk6E
+ k2I/5XnEG2YqoTio0pdK6alUmZC83Y9//YxcPHsMxbF6YDmYt/VI3pEB/mluo016Pn7Z
+ y7nQ==
+X-Gm-Message-State: AHQUAuYfRyX6Np59hFuXq8Z03mat8o1oMpUcNJuuG0lxQ35dFuY8VV5w
+ lQY2TUxCtOkwXgxd7RkRWYM=
+X-Google-Smtp-Source: AHgI3IazXwuDqTmlaPB+165w9Jelia/AJS/1GvzTX1UwflXCqrqWQYpHsKY9EfCO3doE1od3peWYcg==
+X-Received: by 2002:a5d:548f:: with SMTP id h15mr4157477wrv.238.1550176972719; 
+ Thu, 14 Feb 2019 12:42:52 -0800 (PST)
+Received: from jernej-laptop.localnet (cpe1-6-175.cable.triera.net.
+ [213.161.6.175])
+ by smtp.gmail.com with ESMTPSA id c9sm3063410wrs.84.2019.02.14.12.42.50
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 14 Feb 2019 12:42:51 -0800 (PST)
+From: Jernej =?utf-8?B?xaBrcmFiZWM=?= <jernej.skrabec@gmail.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>
+Subject: Re: [PATCH v3 2/2] media: cedrus: Add H264 decoding support
+Date: Thu, 14 Feb 2019 21:42:49 +0100
+Message-ID: <21530997.5t1HIVrtlz@jernej-laptop>
+In-Reply-To: <4c00e1ab1e70adb1d94db59c37393250ca3791c5.1549895062.git-series.maxime.ripard@bootlin.com>
+References: <cover.d3bb4d93da91ed5668025354ee1fca656e7d5b8b.1549895062.git-series.maxime.ripard@bootlin.com>
+ <4c00e1ab1e70adb1d94db59c37393250ca3791c5.1549895062.git-series.maxime.ripard@bootlin.com>
 MIME-Version: 1.0
-References: <20190203185501.8958-1-anarsoul@gmail.com>
- <20190203185501.8958-9-anarsoul@gmail.com>
- <20190204074350.GC16448@ulmo>
- <CA+E=qVecudACOEXt74Kf=UA_F-uuHgEqHzKpYAq1ocMx3Sx+eQ@mail.gmail.com>
- <20190204082353.GE19087@ulmo> <20190204094012.GP3271@phenom.ffwll.local>
- <20190204112218.GB10412@ulmo> <20190204155909.GU3271@phenom.ffwll.local>
- <20190204162258.GB25476@ulmo> <20190205085737.GY3271@phenom.ffwll.local>
- <20190205102419.GA591@ulmo>
- <CA+E=qVcUsz=5s1+RqDdQ4Hm3_Q3jDFuZwuYXUuVx3ubFWmcG7w@mail.gmail.com>
- <CAL_JsqKQ0EmyYGYvz__ZZGN7_6jLezevHWc+psn82Uy6hWZXMA@mail.gmail.com>
-In-Reply-To: <CAL_JsqKQ0EmyYGYvz__ZZGN7_6jLezevHWc+psn82Uy6hWZXMA@mail.gmail.com>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Thu, 14 Feb 2019 12:54:23 -0800
-Message-ID: <CA+E=qVe2r0xUvDKkwniEkhO4szKRpyngD4P5mEqvgNJOLOxWHg@mail.gmail.com>
-Subject: Re: [PATCH RESEND v2 08/12] dt-bindings: add binding for generic eDP
- panel
-To: Rob Herring <robh+dt@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_125406_355301_0807FEF9 
-X-CRM114-Status: GOOD (  57.98  )
+X-CRM114-CacheID: sfid-20190214_204254_513025_80505A40 
+X-CRM114-Status: GOOD (  23.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,239 +114,223 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
- David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: linux-arm-kernel@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
+ jonas@kwiboo.se, jenskuske@gmail.com, linux-sunxi@googlegroups.com,
+ linux-kernel@vger.kernel.org, tfiga@chromium.org,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, hans.verkuil@cisco.com,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ sakari.ailus@linux.intel.com, nicolas.dufresne@collabora.com,
+ ezequiel@collabora.com, posciak@chromium.org, linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 12:38 PM Rob Herring <robh+dt@kernel.org> wrote:
->
-> On Thu, Feb 14, 2019 at 2:04 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> >
-> > On Tue, Feb 5, 2019 at 2:24 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > >
-> > > On Tue, Feb 05, 2019 at 09:57:37AM +0100, Daniel Vetter wrote:
-> > > > On Mon, Feb 04, 2019 at 05:22:58PM +0100, Thierry Reding wrote:
-> > > > > On Mon, Feb 04, 2019 at 04:59:09PM +0100, Daniel Vetter wrote:
-> > > > > > On Mon, Feb 04, 2019 at 12:22:18PM +0100, Thierry Reding wrote:
-> > > > > > > On Mon, Feb 04, 2019 at 10:40:12AM +0100, Daniel Vetter wrote:
-> > > > > > > > On Mon, Feb 04, 2019 at 09:23:59AM +0100, Thierry Reding wrote:
-> > > > > > > > > On Mon, Feb 04, 2019 at 12:13:55AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > > > On Sun, Feb 3, 2019 at 11:43 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > > > > > > > >
-> > > > > > > > > > > On Sun, Feb 03, 2019 at 10:54:57AM -0800, Vasily Khoruzhick wrote:
-> > > > > > > > > > > > eDP panels usually have EDID EEPROM, so there's no need to define panel
-> > > > > > > > > > > > width/height or any modes/timings in dts. But this panel still may have
-> > > > > > > > > > > > regulator and/or backlight.
-> > > > > > > > > > > >
-> > > > > > > > > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > > > > > > > > > ---
-> > > > > > > > > > > >  .../devicetree/bindings/display/panel/panel-edp.txt        | 7 +++++++
-> > > > > > > > > > > >  1 file changed, 7 insertions(+)
-> > > > > > > > > > > >  create mode 100644 Documentation/devicetree/bindings/display/panel/panel-edp.txt
-> > > > > > > > > > >
-> > > > > > > > > > > Please don't try to make panels look more generic than they really are.
-> > > > > > > > > > > You're going to have to provide a compatible string for your device that
-> > > > > > > > > > > is more specific than "panel-edp". You claim that you don't need any
-> > > > > > > > > > > extra information that is panel specific, but you don't know that now.
-> > > > > > > > > > > We have in the past thought that we didn't need things like prepare
-> > > > > > > > > > > delay, but then we ran into situations where we did need them.
-> > > > > > > > > > >
-> > > > > > > > > > > Just do what everybody else does. Provide a specific compatible string
-> > > > > > > > > > > and match on that in the panel-simple driver. Even if you can read all
-> > > > > > > > > > > the video timings from an EDID EEPROM, you can still provide a mode in
-> > > > > > > > > > > the panel descriptor to serve as a fallback if for example the EEPROM
-> > > > > > > > > > > is faulty on some device.
-> > > > > > > > > >
-> > > > > > > > > > Pinebook used several 768p panels that have slightly different timings
-> > > > > > > > > > and recent batch uses 1080p panel.
-> > > > > > > > > >
-> > > > > > > > > > What panel descriptor should I use as fallback?
-> > > > > > > > >
-> > > > > > > > > You don't use panel descriptors as fallback. The simple-panel driver
-> > > > > > > > > will bind to a panel device and use the corresponding descriptor. If
-> > > > > > > > > your device tree contains the correct information, the descriptor is
-> > > > > > > > > correct for the panel you have.
-> > > > > > > > >
-> > > > > > > > > In other words you need to ensure that you have the correct panel in
-> > > > > > > > > device tree for the board that you're using. This is exactly the same
-> > > > > > > > > thing as for other devices.
-> > > > > > > > >
-> > > > > > > > > One way to to this is to have separate device trees for each variant
-> > > > > > > > > of the board that you want to support. Another variant may be to have
-> > > > > > > > > a common device tree and then have some early firmware update the DTB
-> > > > > > > > > with the correct panel information.
-> > > > > > > >
-> > > > > > > > This would defeat the point of edp, which is to standardize the mess of
-> > > > > > > > panels (at least somewhat) and avoid having to change the DT/ACPI
-> > > > > > > > tables/firmware for every board you ship. Also, we do have DP quirking
-> > > > > > > > infrastructure already (using the OUI), I think if there's something that
-> > > > > > > > doesn't work then we should quirk it there.
-> > > > > > >
-> > > > > > > The problem is that while the attempt may have been to standardize, it
-> > > > > > > failed. It doesn't take into account any of the details such as timing
-> > > > > > > between things like powering up the display and enabling the backlight
-> > > > > > > or similar. I don't know how you'd want to "quirk" those kinds of
-> > > > > > > requirements because they are highly panel specific.
-> > > > > >
-> > > > > > Hm right, we get these from some firmware tables (and mix them with the
-> > > > > > spec one, since some of the firmware values are nonsense). I don't even
-> > > > > > know whether we can read the timings over dp aux somehow (you can power up
-> > > > > > the panel with some pessimistic values to figure those out, and you only
-> > > > > > need dp aux to work, which is much simpler than the entire panel).
-> > > > > >
-> > > > > > > > What does make sense though imo is if we try not to stuff the edp panel
-> > > > > > > > into panel-simple, because it's anything like a simple dumb panel. There's
-> > > > > > > > also some integration awkwardness since with this panel you need to do dp
-> > > > > > > > aux/i2c transactions to get at the information (edid alone isn't good
-> > > > > > > > enough for edp), and I'm not sure how exactly that's supposed to be
-> > > > > > > > instantiated. Maybe a special function to instantiate an edp panel, which
-> > > > > > > > takes both a DT node and the dp_aux controller would be much better,
-> > > > > > > > instead of trying to auto-match against a DT compatible string and load a
-> > > > > > > > panel driver which is almost all fake.
-> > > > > > > >
-> > > > > > > > Or we teach dp_aux to register itself and somehow teach panel-edp how it
-> > > > > > > > can get hold of the dp_aux channel it needs.
-> > > > > > >
-> > > > > > > We already do that. drm_dp_aux registers as an I2C adapter that can be
-> > > > > > > used to read EDID EEPROMs using I2C-over-AUX transactions. We already
-> > > > > > > use that on some platforms.
-> > > > > > >
-> > > > > > > Also note that simple-panel already supports getting video timings from
-> > > > > > > EDID. If a DDC link is present in DT, the driver will load the modes
-> > > > > > > from EDID and use them.
-> > > > > >
-> > > > > > Could we extend this to dp aux somehow? For edp you need the dp aux (which
-> > > > > > then gives you the ddc link automatically).
-> > > > >
-> > > > > I suppose we could do that. We could introduce a new property that would
-> > > > > allow the panel driver to get at the struct drm_dp_aux that can access
-> > > > > the panel. I'm not sure how much that would buy us. I suppose the driver
-> > > > > could go and use that drm_dp_aux to do I2C-over-AUX and ignore any
-> > > > > ddc-bus property in device tree. A drm_dp_aux object could also be used
-> > > > > to access DPCD if that's helpful.
-> > > > >
-> > > > > The driver proposed here doesn't need access to DPCD, so I'm not sure
-> > > > > that would immediately help.
-> > > >
-> > > > You definitely need dp aux to drive edp. That's where a lot of the really
-> > > > important stuff is stored, and it sounds like on non-broken panels even
-> > > > the timings (we've never implemented that on i915 somehow).
-> > >
-> > > I'm not sure I understand what you're saying here. I haven't worked with
-> > > eDP panels in a while, but my recollection is that you can use DP AUX to
-> > > read video timings over EDID. We provide support for that by exporting a
-> > > DP AUX controller as I2C adapter (i.e. register with the I2C subsystem)
-> > > and then that I2C adapter can be used to read the EDID. I wasn't aware
-> > > that eDP panels additionally stored the video timings somewhere else.
-> > >
-> > > What I meant above was that aside from the I2C-over-AUX for reading the
-> > > EDID, this driver doesn't do anything else with DP AUX in order to turn
-> > > the panel on. Looking at the eDP support we have on Tegra, there's a
-> > > DPCD register (DP_SET_POWER) that needs to be written in order to take
-> > > the sink device (i.e. panel) out of the power saving state. We do that
-> > > as part of the connector implementation rather than within the panel
-> > > driver. There are also additional registers such as DP_LINK_BW_SET that
-> > > need to be programmed. I think this is also relevant to regular DP and
-> > > detailed in the specification.
-> > >
-> > > Given all the above, I'm beginning to think that Rob's right in that
-> > > perhaps we shouldn't be treating eDP panels as panels, but rather to
-> > > make them look more like DP monitors and make all this code part of the
-> > > connector implementation. I think pretty much the only differences to
-> > > regular DP are that we might require some lower-level resources that a
-> > > DP monitor would usually have built-in (reset or power GPIOs, power
-> > > supplies, backlight, ...).
-> >
-> > I spent some time poking drm_connector code and I came to conclusion
-> > that it's not a good idea.
-> > Basically edp-connector driver will duplicate simple-panel code and
-> > will bring extra complexity
-> > into bridge driver for no benefit at all.
->
-> I said this on irc, but for everyone's benefit, what's used in the
-> kernel and the binding don't have to be aligned. I still think
-> following a connector binding in DT makes sense even if the kernel
-> implementation is actually a panel driver. Really, there's no
-> difference in bindings between a connector node and panel node.
->
-> > Also currently there are no stand-alone connector drivers, they all
-> > are part of display controller
-> > driver.
->
-> Probably that is something to be refactored. I think we have lots of cases of:
->
-> if (is_connector)
->     // call connector func
-> else
->     // call panel func
->
-> Or maybe that was panel vs. bridge (then a connector)? It's been a
-> while since I looked at this. In any case, each device in the chain
-> shouldn't really have much knowledge as to what it is attached to.
->
-> > One more thing to add is that I'm not sure that drm_connector is
-> > suitable for managing power
-> > and backlight -  I can't find appropriate callback in
-> > drm_connector_funcs to enable power and/or
-> > backlight. Basically there's nothing similar to enable() or disable()
-> > from drm_bridge_funcs.
->
-> Nobody has put the 5V supply on HDMI on a switchable regulator? It may
-> need to be always on for HPD to work, but I wouldn't expect all board
-> designers to get that right.
->
-> > > I'm not sure if that's enough for eDP panels, though. For example the
-> > > AUO B133HTN01 panel, used by the exynos5800-peach-pi, seems to be an eDP
-> > > panel. But the driver also specifies a couple of additional delays which
-> > > suggests that either it violates the eDP specification or that the eDP
-> > > specification doesn't define any power sequencing delays that would've
-> > > been needed. Or perhaps these delays are specified somewhere and the
-> > > driver just doesn't use them?
-> >
-> > Sigh. We can't foresee any bizarre behavior some hardware may or may
-> > not have.
->
-> Bingo! You just summed up why we have specific compatibles.
->
-> > Anyway,
-> > can you propose something that can handle same hardware with different
-> > edp panels via
-> > single software image (u-boot aka firmware is part of software image)
-> > and is acceptable
-> > upstream?
->
-> compatible = "vendor,some-panel", "edp-connector";
->
-> Either you have to fixup the first string for the actual panel or have
-> some testing up front that you don't need to.
+Dne ponedeljek, 11. februar 2019 ob 15:39:03 CET je Maxime Ripard napisal(a):
+> Introduce some basic H264 decoding support in cedrus. So far, only the
+> baseline profile videos have been tested, and some more advanced features
+> used in higher profiles are not even implemented.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  drivers/staging/media/sunxi/cedrus/Makefile       |   3 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus.c       |  31 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus.h       |  38 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus_dec.c   |  15 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus_h264.c  | 589 +++++++++++++++-
+>  drivers/staging/media/sunxi/cedrus/cedrus_hw.c    |   4 +-
+>  drivers/staging/media/sunxi/cedrus/cedrus_regs.h  |  91 ++-
+>  drivers/staging/media/sunxi/cedrus/cedrus_video.c |   9 +-
+>  8 files changed, 778 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_h264.c
+> 
+> diff --git a/drivers/staging/media/sunxi/cedrus/Makefile
+> b/drivers/staging/media/sunxi/cedrus/Makefile index
+> e9dc68b7bcb6..aaf141fc58b6 100644
+> --- a/drivers/staging/media/sunxi/cedrus/Makefile
+> +++ b/drivers/staging/media/sunxi/cedrus/Makefile
+> @@ -1,3 +1,4 @@
+>  obj-$(CONFIG_VIDEO_SUNXI_CEDRUS) += sunxi-cedrus.o
+> 
+> -sunxi-cedrus-y = cedrus.o cedrus_video.o cedrus_hw.o cedrus_dec.o
+> cedrus_mpeg2.o +sunxi-cedrus-y = cedrus.o cedrus_video.o cedrus_hw.o
+> cedrus_dec.o \ +		 cedrus_mpeg2.o cedrus_h264.o
+> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c
+> b/drivers/staging/media/sunxi/cedrus/cedrus.c index
+> ff11cbeba205..b275607b8111 100644
+> --- a/drivers/staging/media/sunxi/cedrus/cedrus.c
+> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
+> @@ -40,6 +40,36 @@ static const struct cedrus_control cedrus_controls[] = {
+>  		.codec		= CEDRUS_CODEC_MPEG2,
+>  		.required	= false,
+>  	},
+> +	{
+> +		.id		= 
+V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS,
+> +		.elem_size	= sizeof(struct 
+v4l2_ctrl_h264_decode_param),
+> +		.codec		= CEDRUS_CODEC_H264,
+> +		.required	= true,
+> +	},
+> +	{
+> +		.id		= 
+V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS,
+> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_slice_param),
+> +		.codec		= CEDRUS_CODEC_H264,
+> +		.required	= true,
+> +	},
+> +	{
+> +		.id		= V4L2_CID_MPEG_VIDEO_H264_SPS,
+> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_sps),
+> +		.codec		= CEDRUS_CODEC_H264,
+> +		.required	= true,
+> +	},
+> +	{
+> +		.id		= V4L2_CID_MPEG_VIDEO_H264_PPS,
+> +		.elem_size	= sizeof(struct v4l2_ctrl_h264_pps),
+> +		.codec		= CEDRUS_CODEC_H264,
+> +		.required	= true,
+> +	},
+> +	{
+> +		.id		= 
+V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX,
+> +		.elem_size	= sizeof(struct 
+v4l2_ctrl_h264_scaling_matrix),
+> +		.codec		= CEDRUS_CODEC_H264,
+> +		.required	= true,
+> +	},
+>  };
+> 
+>  #define CEDRUS_CONTROLS_COUNT	ARRAY_SIZE(cedrus_controls)
+> @@ -278,6 +308,7 @@ static int cedrus_probe(struct platform_device *pdev)
+>  	}
+> 
+>  	dev->dec_ops[CEDRUS_CODEC_MPEG2] = &cedrus_dec_ops_mpeg2;
+> +	dev->dec_ops[CEDRUS_CODEC_H264] = &cedrus_dec_ops_h264;
+> 
+>  	mutex_init(&dev->dev_mutex);
+> 
+> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.h
+> b/drivers/staging/media/sunxi/cedrus/cedrus.h index
+> 4aedd24a9848..8c64f9a27e9d 100644
+> --- a/drivers/staging/media/sunxi/cedrus/cedrus.h
+> +++ b/drivers/staging/media/sunxi/cedrus/cedrus.h
+> @@ -30,7 +30,7 @@
+> 
+>  enum cedrus_codec {
+>  	CEDRUS_CODEC_MPEG2,
+> -
+> +	CEDRUS_CODEC_H264,
+>  	CEDRUS_CODEC_LAST,
+>  };
+> 
+> @@ -40,6 +40,12 @@ enum cedrus_irq_status {
+>  	CEDRUS_IRQ_OK,
+>  };
+> 
+> +enum cedrus_h264_pic_type {
+> +	CEDRUS_H264_PIC_TYPE_FRAME	= 0,
+> +	CEDRUS_H264_PIC_TYPE_FIELD,
+> +	CEDRUS_H264_PIC_TYPE_MBAFF,
+> +};
+> +
+>  struct cedrus_control {
+>  	u32			id;
+>  	u32			elem_size;
+> @@ -47,6 +53,14 @@ struct cedrus_control {
+>  	unsigned char		required:1;
+>  };
+> 
+> +struct cedrus_h264_run {
+> +	const struct v4l2_ctrl_h264_decode_param	*decode_param;
+> +	const struct v4l2_ctrl_h264_pps			*pps;
+> +	const struct v4l2_ctrl_h264_scaling_matrix	*scaling_matrix;
+> +	const struct v4l2_ctrl_h264_slice_param		*slice_param;
+> +	const struct v4l2_ctrl_h264_sps			*sps;
+> +};
+> +
+>  struct cedrus_mpeg2_run {
+>  	const struct v4l2_ctrl_mpeg2_slice_params	*slice_params;
+>  	const struct v4l2_ctrl_mpeg2_quantization	*quantization;
+> @@ -57,12 +71,20 @@ struct cedrus_run {
+>  	struct vb2_v4l2_buffer	*dst;
+> 
+>  	union {
+> +		struct cedrus_h264_run	h264;
+>  		struct cedrus_mpeg2_run	mpeg2;
+>  	};
+>  };
+> 
+>  struct cedrus_buffer {
+>  	struct v4l2_m2m_buffer          m2m_buf;
+> +
+> +	union {
+> +		struct {
+> +			unsigned int			position;
+> +			enum cedrus_h264_pic_type	pic_type;
+> +		} h264;
+> +	} codec;
+>  };
+> 
+>  struct cedrus_ctx {
+> @@ -77,6 +99,19 @@ struct cedrus_ctx {
+>  	struct v4l2_ctrl		**ctrls;
+> 
+>  	struct vb2_buffer		*dst_bufs[VIDEO_MAX_FRAME];
+> +
+> +	union {
+> +		struct {
+> +			void		*mv_col_buf;
+> +			dma_addr_t	mv_col_buf_dma;
+> +			ssize_t		mv_col_buf_field_size;
+> +			ssize_t		mv_col_buf_size;
+> +			void		*pic_info_buf;
+> +			dma_addr_t	pic_info_buf_dma;
+> +			void		*neighbor_info_buf;
+> +			dma_addr_t	neighbor_info_buf_dma;
+> +		} h264;
+> +	} codec;
+>  };
+> 
+>  struct cedrus_dec_ops {
+> @@ -118,6 +153,7 @@ struct cedrus_dev {
+>  };
+> 
+>  extern struct cedrus_dec_ops cedrus_dec_ops_mpeg2;
+> +extern struct cedrus_dec_ops cedrus_dec_ops_h264;
+> 
+>  static inline void cedrus_write(struct cedrus_dev *dev, u32 reg, u32 val)
+>  {
+> diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c index
+> 443fb037e1cf..4c33e3b1283f 100644
+> --- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> +++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+> @@ -46,6 +46,21 @@ void cedrus_device_run(void *priv)
+>  			V4L2_CID_MPEG_VIDEO_MPEG2_QUANTIZATION);
+>  		break;
+> 
+> +	case V4L2_PIX_FMT_H264_SLICE:
+> +		run.h264.decode_param = cedrus_find_control_data(ctx,
+> +			V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS);
+> +		run.h264.pps = cedrus_find_control_data(ctx,
+> +			V4L2_CID_MPEG_VIDEO_H264_PPS);
+> +		run.h264.scaling_matrix = cedrus_find_control_data(ctx,
+> +			V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX);
+> +		run.h264.slice_param = cedrus_find_control_data(ctx,
+> +			V4L2_CID_MPEG_VIDEO_H264_SLICE_PARAMS);
+> +		run.h264.scaling_matrix = cedrus_find_control_data(ctx,
+> +			V4L2_CID_MPEG_VIDEO_H264_SCALING_MATRIX);
 
-Where do I take actual panel compatible from?
+You already assigned scaling_matrix few lines above.
 
-> The kernel can start
-> with only using the fallback string and if panel constraints turn out
-> to be specified sufficiently, we'll never need to use the panel
-> compatible.
+Best regards,
+Jernej
 
-So what panel compatible you want me to use if vendor used at least 3
-different panels?
-Introduce 2 more dts files (3 in total) even if they all work just
-fine with a single dts now?
-Add one more dts once laptop vendor decides to change panel vendor?
 
->
-> Rob
+
 
 _______________________________________________
 linux-arm-kernel mailing list
