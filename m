@@ -2,139 +2,63 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90748C10F04
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:15:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A919C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:15:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5E04A222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:15:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5AE2D222A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 10:15:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BNTxB2fr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="xaEk+8/1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5E04A222A1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sUOf4CCM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5AE2D222A1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=nyaOgljPvPi40a0GHMVpULD/NhNO3MooWLkHwv8uhFE=; b=BNTxB2frttceDr
-	+/XcuWd8KO7Dz+K8JJu8cmkYAF14zA2Z4hjYbpAUo0GAl2G6fksd3oVQF6N4vPiNcC78Essr7FQxe
-	RsOaXR33a/zd88Fn1pUx3NoUCBLEDt3CBq+GiuTK487cUueP8tLPihUu3zDrWQPccasfGbaZ62mZ7
-	1VtFJSX4lINXfDcmgaUpta7SEWkPsqt0BLEFOFHBCbuY62v+R+GYcn++Bu8JIngRvvslDHFe1wx9C
-	l7sWdfgz+YejlB27Mu2MxSwhQHO4npfkrkTfNx3QwM4hWYfToZYQdvdBV/2KBaNHdDFXTSVzh7mjr
-	2DLNRSLeyjipa1iR3akQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=eBSrefzX1JCIpijH6N8/CGEsmQbkt98mUHp4P7kjQaY=; b=sUOf4CCMapMoyX
+	mM1bvdY3QT/KYc1QPviVab+9yDN36d8GxCZTvqs+9byFmidk2NJoQNzMRfKkJNQbLZcIsu7TWFtTW
+	iT87QNMI+oRmUWZHXNpn73HowjroA4uO2Eh1Ef9XGZkFkzUGAY9ei45HBZq3QifCfspHDIELCFnzN
+	WjcGii8HecrvsDQwfWx9oMNxfdAIk77cCh7ElRSWn3JnJi/ONBNNh60lSse/EvJHGM+n7d0MOOaLt
+	ah/c7QRHIygaef2lmORhJ+t/VEd7vVVOI9fBGiaItVPLOHHjIwnJeAtiBU28+nnTKAgbOaPnmL4AC
+	llngFNSWaerZx9fOypAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guDkP-0006kq-RT; Thu, 14 Feb 2019 09:56:01 +0000
-Received: from mail-eopbgr60055.outbound.protection.outlook.com ([40.107.6.55]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1guDjP-00048P-Sa; Thu, 14 Feb 2019 09:54:59 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guDkJ-0006Xs-Cm
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:55:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=+aFI7o9PaamN2AU70fkmnBLQnt/J0ctj1ZKUp0I5VcA=;
- b=xaEk+8/1j6E3WyfexJR1P/d7lhARXfmJlEn3+iEjAOpoSDHqENyCWkB922lzA5FWaAkVJqKFsv9P6VtcNtu8Fbh07ocoyPGzY7xCnOAPuYGoP2pH0DN0yTmJgySxi2QUAs9VAWVW5a0Sg9Ng4GkOaVzO4n4BylUiqgduZC5HuME=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3818.eurprd04.prod.outlook.com (52.134.71.29) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Thu, 14 Feb 2019 09:55:51 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 09:55:51 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
- <sboyd@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>, Daniel Baluta
- <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "viresh.kumar@linaro.org"
- <viresh.kumar@linaro.org>
-Subject: [PATCH V6 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Topic: [PATCH V6 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Index: AQHUxEt3Dyj538gXXEiBj85l935Pcg==
-Date: Thu, 14 Feb 2019 09:55:51 +0000
-Message-ID: <1550137826-18531-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR03CA0075.apcprd03.prod.outlook.com
- (2603:1096:203:72::15) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: b07ef332-4066-4210-0303-08d6926299f9
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3818; 
-x-ms-traffictypediagnostic: DB3PR0402MB3818:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3818;
- 23:Hh1E3ZI5pFwYhQht4yDif0/5FWxc8d2Pd2ckR?=
- =?iso-8859-1?Q?YZlNHzPWJ5PFbgyRNpR5eV++j/o+eK7bAeF25PUK7npJJkrzzq3LsyAvuW?=
- =?iso-8859-1?Q?kxLqkEwo4gKwNRHo7kw0IF+qH1BP4Gg4BeXiAfWH3MvpIVU1dROTSrCyFR?=
- =?iso-8859-1?Q?9qSZtwS3YoFXV6DdrQkKKc5zybOoz105Gr3Ix5Jv28ROzdA0syS/Im6Bn3?=
- =?iso-8859-1?Q?Xulh/ic5ONiK/sfH3uDNV0ObLLtyEK2ajTAK0kRW5tzxgz7U6qabIOGzbG?=
- =?iso-8859-1?Q?qiY/XSqs6/ubtm7LoQXGuphbePu2p55Dq+zTl1iJFeWTkwgf+c7vgr0C1y?=
- =?iso-8859-1?Q?uiaWUNUSsp1liIBGQ1zzBMUV3kZQwWHsSCsnSK6oqSTIyAeN71AQXoj0y/?=
- =?iso-8859-1?Q?KzaOYgyzXJfjyrqbJC1oOwhsrKq4YX/UUXAwgJxL3g5Q1J/tAlul5BT24+?=
- =?iso-8859-1?Q?2AbVEoV4rYCVHgTow6y3ujRmp6BrXzl+YSSBOdARxFcUWMUsZHhaBecPeO?=
- =?iso-8859-1?Q?+nFQrcA68LGDks+lBh4rObaUXKXSU4JtRQFGcXZaE6Yv2CEcvTl8nt/6ke?=
- =?iso-8859-1?Q?UEnOverrS8lRlHfoOIEyk8fJESjnqxjlhzvT18P7ZrwTKng8l/VQx2hpsa?=
- =?iso-8859-1?Q?H8PqEKanzh2Ziztb1S7RYcPxTqpCQzR0IZVvsm/D1NXN42uR2PYX1fPzHN?=
- =?iso-8859-1?Q?WNqCNQjtosjqHgCXmxYiEq7P/vG0+dgMLaIQ4EnLhaBS2PMB79CAH7vfb/?=
- =?iso-8859-1?Q?43pR5sehHY3JDDrT+qwI4xhBx2T3Q4L0FCqO1qUe6O/d8YpS2Bai8uVrWg?=
- =?iso-8859-1?Q?GXzuGAEedf0zk2S/RiVy+gQg8jPz2kdlk6wI+6UxQh7Ad+m9rzlAOSLUm1?=
- =?iso-8859-1?Q?y3FAtAHWWcppIC5434b0NQ31QIpo6AOXBD0ca7AoP7cCd5yMDAPnVECpXm?=
- =?iso-8859-1?Q?bYhJUfVY7uTJn3BhPJu3wgS8QY79RQOlwKCHVxdROB/dKf2LiU4yaonbGH?=
- =?iso-8859-1?Q?tU9LNsgYQ3mLgvm7Y28QbO9MzmN1nkD6CQY4EHuyBWnxRxKWixqemR19dH?=
- =?iso-8859-1?Q?I4OhAFujs6ilo/Kj7QxlnrH2Ve9EgbG94JG6Uz2Vr9IAiWvPzivcDj/0Pc?=
- =?iso-8859-1?Q?+ADIUQ1WhvNuMKGR2dQa3md+9pl4gl4SEu0DC2YLcgvMWr/C4XGDK/RMGl?=
- =?iso-8859-1?Q?Cmg+tpdEv63Oq1nJ7D1qHJuw0Kfu1emEdUQSwWkqeezBAv4xLmU9ysydL5?=
- =?iso-8859-1?Q?UW02GVBSV/DsbtUc+gI?=
-x-microsoft-antispam-prvs: <DB3PR0402MB38183228B289763450D9C13EF5670@DB3PR0402MB3818.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(346002)(136003)(396003)(39860400002)(376002)(189003)(199004)(97736004)(71200400001)(8676002)(71190400001)(256004)(8936002)(7736002)(2501003)(81166006)(2906002)(81156014)(14454004)(52116002)(110136005)(305945005)(14444005)(53936002)(50226002)(6486002)(316002)(6512007)(68736007)(478600001)(2201001)(6436002)(486006)(476003)(186003)(2616005)(36756003)(6506007)(86362001)(386003)(26005)(106356001)(3846002)(4326008)(102836004)(6116002)(99286004)(7416002)(105586002)(25786009)(66066001)(921003)(32563001)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3818;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: ABKvUneXqX5+kVnxzIOwe54D1sd/SIW96DT437en/tYFvkVqxg+W6kJULFmZNLLaaWUi2o9xZkPU2HjeMJlLqUfBB9QXJYXNr/O1TFt7tO/8rSWQMiUSeO6dqf2YfPBJmsvl0jv/fxqhoXuiVwjhauL5zs/tYkqf0wdYAz9C2IIkfaO+zVX/Ymbs/oGXd8wrFL+ihVCbdcPNn3243EAnTY0AqpxhSB7Usdw6VpIfOwL51L+u02vGrwv7a995bbBpRcH/UrJfQNgoiHwHEuNSa6YVodJIPLcBuRv2AUN+kLO8XmK0dpu4FQmQbXPb0xWtqUTLOKe6BmUr0Db6gCwfXj0T+IXHANs5u+Ist6VS7uF2/vumYEfSMq4iafEBg034Tr6O5OGvr5/k4joNfM/FfeStK7XnIq0dwfutG6Qyw+c=
+ id 1guDj7-0003e3-KE
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 09:54:46 +0000
+X-Originating-IP: 90.88.30.68
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr [90.88.30.68])
+ (Authenticated sender: paul.kocialkowski@bootlin.com)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 7E9C61BF20B;
+ Thu, 14 Feb 2019 09:54:37 +0000 (UTC)
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: linux-media@vger.kernel.org, linux-kernel@vger.kernel.org,
+ devel@driverdev.osuosl.org, linux-arm-kernel@lists.infradead.org,
+ linux-sunxi@googlegroups.com
+Subject: [PATCH v3 1/2] media: v4l: Add definitions for the HEVC slice format
+ and controls
+Date: Thu, 14 Feb 2019 10:53:08 +0100
+Message-Id: <20190214095309.19594-2-paul.kocialkowski@bootlin.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190214095309.19594-1-paul.kocialkowski@bootlin.com>
+References: <20190214095309.19594-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: b07ef332-4066-4210-0303-08d6926299f9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 09:55:45.1668 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3818
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_015555_535753_4A68501D 
-X-CRM114-Status: UNSURE (   9.65  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190214_015441_990161_32957013 
+X-CRM114-Status: GOOD (  14.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -146,93 +70,870 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Hans Verkuil <hverkuil@xs4all.nl>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Alexandre Courbot <acourbot@chromium.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, Randy Li <ayaka@soulik.info>,
+ Tomasz Figa <tfiga@chromium.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Ezequiel Garcia <ezequiel@collabora.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add i.MX8QXP CPU opp table to support cpufreq.
+This introduces the required definitions for HEVC decoding support with
+stateless VPUs. The controls associated to the HEVC slice format provide
+the required meta-data for decoding slices extracted from the bitstream.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-Changes since V5:
-	- add clocks for all secondary CPUs too.
----
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+This interface comes with the following limitations:
+* No custom quantization matrices (scaling lists);
+* Support for a single temporal layer only;
+* No slice entry point offsets support;
+* No conformance window support;
+* No VUI parameters support;
+* No support for SPS extensions: range, multilayer, 3d, scc, 4 bits;
+* No support for PPS extensions: range, multilayer, 3d, scc, 4 bits.
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index aea6812..b5b2dc0 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -34,6 +34,9 @@
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ Documentation/media/uapi/v4l/biblio.rst       |   9 +
+ .../media/uapi/v4l/ext-ctrls-codec.rst        | 418 ++++++++++++++++++
+ .../media/uapi/v4l/pixfmt-compressed.rst      |  15 +
+ .../media/uapi/v4l/vidioc-queryctrl.rst       |  18 +
+ .../media/videodev2.h.rst.exceptions          |   3 +
+ drivers/media/v4l2-core/v4l2-ctrls.c          |  26 ++
+ drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
+ include/media/hevc-ctrls.h                    | 181 ++++++++
+ include/media/v4l2-ctrls.h                    |   7 +
+ include/uapi/linux/videodev2.h                |   1 +
+ 10 files changed, 679 insertions(+)
+ create mode 100644 include/media/hevc-ctrls.h
+
+diff --git a/Documentation/media/uapi/v4l/biblio.rst b/Documentation/media/uapi/v4l/biblio.rst
+index 3fc3f7ff338a..b4b3fcec55dd 100644
+--- a/Documentation/media/uapi/v4l/biblio.rst
++++ b/Documentation/media/uapi/v4l/biblio.rst
+@@ -131,6 +131,15 @@ ITU H.264
  
- 		A35_1: cpu@1 {
-@@ -42,6 +45,9 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
+ :author:    International Telecommunication Union (http://www.itu.ch)
  
- 		A35_2: cpu@2 {
-@@ -50,6 +56,9 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		A35_3: cpu@3 {
-@@ -58,6 +67,9 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		A35_L2: l2-cache0 {
-@@ -65,6 +77,24 @@
- 		};
- 	};
- 
-+	a35_0_opp_table: opp-table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
++.. _hevc:
 +
-+		opp-900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <150000>;
-+		};
++ITU H.265/HEVC
++==============
 +
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <150000>;
-+			opp-suspend;
-+		};
-+	};
++:title:     ITU-T Rec. H.265 | ISO/IEC 23008-2 "High Efficiency Video Coding"
 +
- 	gic: interrupt-controller@51a00000 {
- 		compatible = "arm,gic-v3";
- 		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
++:author:    International Telecommunication Union (http://www.itu.ch), International Organisation for Standardisation (http://www.iso.ch)
++
+ .. _jfif:
+ 
+ JFIF
+diff --git a/Documentation/media/uapi/v4l/ext-ctrls-codec.rst b/Documentation/media/uapi/v4l/ext-ctrls-codec.rst
+index d152474c18bc..3714dfd1449b 100644
+--- a/Documentation/media/uapi/v4l/ext-ctrls-codec.rst
++++ b/Documentation/media/uapi/v4l/ext-ctrls-codec.rst
+@@ -2067,6 +2067,424 @@ enum v4l2_mpeg_video_h264_hierarchical_coding_type -
+       - 0x00000002
+       -
+ 
++.. _v4l2-mpeg-hevc:
++
++``V4L2_CID_MPEG_VIDEO_HEVC_SPS (struct)``
++    Specifies the Sequence Parameter Set fields (as extracted from the
++    bitstream) for the associated HEVC slice data.
++    These bitstream parameters are defined according to :ref:`hevc`.
++    They are described in section 7.4.3.2 "Sequence parameter set RBSP
++    semantics" of the specification.
++
++.. c:type:: v4l2_ctrl_hevc_sps
++
++.. cssclass:: longtable
++
++.. flat-table:: struct v4l2_ctrl_hevc_sps
++    :header-rows:  0
++    :stub-columns: 0
++    :widths:       1 1 2
++
++    * - __u8
++      - ``chroma_format_idc``
++      -
++    * - __u8
++      - ``separate_colour_plane_flag``
++      -
++    * - __u16
++      - ``pic_width_in_luma_samples``
++      -
++    * - __u16
++      - ``pic_height_in_luma_samples``
++      -
++    * - __u8
++      - ``bit_depth_luma_minus8``
++      -
++    * - __u8
++      - ``bit_depth_chroma_minus8``
++      -
++    * - __u8
++      - ``log2_max_pic_order_cnt_lsb_minus4``
++      -
++    * - __u8
++      - ``sps_max_dec_pic_buffering_minus1``
++      -
++    * - __u8
++      - ``sps_max_num_reorder_pics``
++      -
++    * - __u8
++      - ``sps_max_latency_increase_plus1``
++      -
++    * - __u8
++      - ``log2_min_luma_coding_block_size_minus3``
++      -
++    * - __u8
++      - ``log2_diff_max_min_luma_coding_block_size``
++      -
++    * - __u8
++      - ``log2_min_luma_transform_block_size_minus2``
++      -
++    * - __u8
++      - ``log2_diff_max_min_luma_transform_block_size``
++      -
++    * - __u8
++      - ``max_transform_hierarchy_depth_inter``
++      -
++    * - __u8
++      - ``max_transform_hierarchy_depth_intra``
++      -
++    * - __u8
++      - ``scaling_list_enabled_flag``
++      -
++    * - __u8
++      - ``amp_enabled_flag``
++      -
++    * - __u8
++      - ``sample_adaptive_offset_enabled_flag``
++      -
++    * - __u8
++      - ``pcm_enabled_flag``
++      -
++    * - __u8
++      - ``pcm_sample_bit_depth_luma_minus1``
++      -
++    * - __u8
++      - ``pcm_sample_bit_depth_chroma_minus1``
++      -
++    * - __u8
++      - ``log2_min_pcm_luma_coding_block_size_minus3``
++      -
++    * - __u8
++      - ``log2_diff_max_min_pcm_luma_coding_block_size``
++      -
++    * - __u8
++      - ``pcm_loop_filter_disabled_flag``
++      -
++    * - __u8
++      - ``num_short_term_ref_pic_sets``
++      -
++    * - __u8
++      - ``long_term_ref_pics_present_flag``
++      -
++    * - __u8
++      - ``num_long_term_ref_pics_sps``
++      -
++    * - __u8
++      - ``sps_temporal_mvp_enabled_flag``
++      -
++    * - __u8
++      - ``strong_intra_smoothing_enabled_flag``
++      -
++
++``V4L2_CID_MPEG_VIDEO_HEVC_PPS (struct)``
++    Specifies the Picture Parameter Set fields (as extracted from the
++    bitstream) for the associated HEVC slice data.
++    These bitstream parameters are defined according to :ref:`hevc`.
++    They are described in section 7.4.3.3 "Picture parameter set RBSP
++    semantics" of the specification.
++
++.. c:type:: v4l2_ctrl_hevc_pps
++
++.. cssclass:: longtable
++
++.. flat-table:: struct v4l2_ctrl_hevc_pps
++    :header-rows:  0
++    :stub-columns: 0
++    :widths:       1 1 2
++
++    * - __u8
++      - ``dependent_slice_segment_flag``
++      -
++    * - __u8
++      - ``output_flag_present_flag``
++      -
++    * - __u8
++      - ``num_extra_slice_header_bits``
++      -
++    * - __u8
++      - ``sign_data_hiding_enabled_flag``
++      -
++    * - __u8
++      - ``cabac_init_present_flag``
++      -
++    * - __s8
++      - ``init_qp_minus26``
++      -
++    * - __u8
++      - ``constrained_intra_pred_flag``
++      -
++    * - __u8
++      - ``transform_skip_enabled_flag``
++      -
++    * - __u8
++      - ``cu_qp_delta_enabled_flag``
++      -
++    * - __u8
++      - ``diff_cu_qp_delta_depth``
++      -
++    * - __s8
++      - ``pps_cb_qp_offset``
++      -
++    * - __s8
++      - ``pps_cr_qp_offset``
++      -
++    * - __u8
++      - ``pps_slice_chroma_qp_offsets_present_flag``
++      -
++    * - __u8
++      - ``weighted_pred_flag``
++      -
++    * - __u8
++      - ``weighted_bipred_flag``
++      -
++    * - __u8
++      - ``transquant_bypass_enabled_flag``
++      -
++    * - __u8
++      - ``tiles_enabled_flag``
++      -
++    * - __u8
++      - ``entropy_coding_sync_enabled_flag``
++      -
++    * - __u8
++      - ``num_tile_columns_minus1``
++      -
++    * - __u8
++      - ``num_tile_rows_minus1``
++      -
++    * - __u8
++      - ``column_width_minus1[20]``
++      -
++    * - __u8
++      - ``row_height_minus1[22]``
++      -
++    * - __u8
++      - ``loop_filter_across_tiles_enabled_flag``
++      -
++    * - __u8
++      - ``pps_loop_filter_across_slices_enabled_flag``
++      -
++    * - __u8
++      - ``deblocking_filter_override_enabled_flag``
++      -
++    * - __u8
++      - ``pps_disable_deblocking_filter_flag``
++      -
++    * - __s8
++      - ``pps_beta_offset_div2``
++      -
++    * - __s8
++      - ``pps_tc_offset_div2``
++      -
++    * - __u8
++      - ``lists_modification_present_flag``
++      -
++    * - __u8
++      - ``log2_parallel_merge_level_minus2``
++      -
++    * - __u8
++      - ``slice_segment_header_extension_present_flag``
++      -
++
++``V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS (struct)``
++    Specifies various slice-specific parameters, especially from the NAL unit
++    header, general slice segment header and weighted prediction parameter
++    parts of the bitstream.
++    These bitstream parameters are defined according to :ref:`hevc`.
++    They are described in section 7.4.7 "General slice segment header
++    semantics" of the specification.
++
++.. c:type:: v4l2_ctrl_hevc_slice_params
++
++.. cssclass:: longtable
++
++.. flat-table:: struct v4l2_ctrl_hevc_slice_params
++    :header-rows:  0
++    :stub-columns: 0
++    :widths:       1 1 2
++
++    * - __u32
++      - ``bit_size``
++      - Size (in bits) of the current slice data.
++    * - __u32
++      - ``data_bit_offset``
++      - Offset (in bits) to the video data in the current slice data.
++    * - __u8
++      - ``nal_unit_type``
++      -
++    * - __u8
++      - ``nuh_temporal_id_plus1``
++      -
++    * - __u8
++      - ``slice_type``
++      -
++	(V4L2_HEVC_SLICE_TYPE_I, V4L2_HEVC_SLICE_TYPE_P or
++	V4L2_HEVC_SLICE_TYPE_B).
++    * - __u8
++      - ``colour_plane_id``
++      -
++    * - __u16
++      - ``slice_pic_order_cnt``
++      -
++    * - __u8
++      - ``slice_sao_luma_flag``
++      -
++    * - __u8
++      - ``slice_sao_chroma_flag``
++      -
++    * - __u8
++      - ``slice_temporal_mvp_enabled_flag``
++      -
++    * - __u8
++      - ``num_ref_idx_l0_active_minus1``
++      -
++    * - __u8
++      - ``num_ref_idx_l1_active_minus1``
++      -
++    * - __u8
++      - ``mvd_l1_zero_flag``
++      -
++    * - __u8
++      - ``cabac_init_flag``
++      -
++    * - __u8
++      - ``collocated_from_l0_flag``
++      -
++    * - __u8
++      - ``collocated_ref_idx``
++      -
++    * - __u8
++      - ``five_minus_max_num_merge_cand``
++      -
++    * - __u8
++      - ``use_integer_mv_flag``
++      -
++    * - __s8
++      - ``slice_qp_delta``
++      -
++    * - __s8
++      - ``slice_cb_qp_offset``
++      -
++    * - __s8
++      - ``slice_cr_qp_offset``
++      -
++    * - __s8
++      - ``slice_act_y_qp_offset``
++      -
++    * - __s8
++      - ``slice_act_cb_qp_offset``
++      -
++    * - __s8
++      - ``slice_act_cr_qp_offset``
++      -
++    * - __u8
++      - ``slice_deblocking_filter_disabled_flag``
++      -
++    * - __s8
++      - ``slice_beta_offset_div2``
++      -
++    * - __s8
++      - ``slice_tc_offset_div2``
++      -
++    * - __u8
++      - ``slice_loop_filter_across_slices_enabled_flag``
++      -
++    * - __u8
++      - ``pic_struct``
++      -
++    * - struct :c:type:`v4l2_hevc_dpb_entry`
++      - ``dpb[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      - The decoded picture buffer, for meta-data about reference frames.
++    * - __u8
++      - ``num_active_dpb_entries``
++      - The number of entries in ``dpb``.
++    * - __u8
++      - ``ref_idx_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      - The list of L0 reference elements as indices in the DPB.
++    * - __u8
++      - ``ref_idx_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      - The list of L1 reference elements as indices in the DPB.
++    * - __u8
++      - ``num_rps_poc_st_curr_before``
++      - The number of reference pictures in the short-term set that come before
++        the current frame.
++    * - __u8
++      - ``num_rps_poc_st_curr_after``
++      - The number of reference pictures in the short-term set that come after
++        the current frame.
++    * - __u8
++      - ``num_rps_poc_lt_curr``
++      - The number of reference pictures in the long-term set.
++    * - struct :c:type:`v4l2_hevc_pred_weight_table`
++      - ``pred_weight_table``
++      - The prediction weight coefficients for inter-picture prediction.
++
++.. c:type:: v4l2_hevc_dpb_entry
++
++.. cssclass:: longtable
++
++.. flat-table:: struct v4l2_hevc_dpb_entry
++    :header-rows:  0
++    :stub-columns: 0
++    :widths:       1 1 2
++
++    * - __u32
++      - ``buffer_tag``
++      - The V4L2 buffer tag that matches the associated reference picture.
++    * - __u8
++      - ``rps``
++      - The reference set for the reference frame
++        (V4L2_HEVC_DPB_ENTRY_RPS_ST_CURR_BEFORE,
++        V4L2_HEVC_DPB_ENTRY_RPS_ST_CURR_AFTER or
++        V4L2_HEVC_DPB_ENTRY_RPS_LT_CURR)
++    * - __u8
++      - ``field_pic``
++      - Whether the reference is a field picture or a frame.
++    * - __u16
++      - ``pic_order_cnt[2]``
++      - The picture order count of the reference. Only the first element of the
++        array is used for frame pictures, while the first element identifies the
++        top field and the second the bottom field in field-coded pictures.
++
++.. c:type:: v4l2_hevc_pred_weight_table
++
++.. cssclass:: longtable
++
++.. flat-table:: struct v4l2_hevc_pred_weight_table
++    :header-rows:  0
++    :stub-columns: 0
++    :widths:       1 1 2
++
++    * - __u8
++      - ``luma_log2_weight_denom``
++      -
++    * - __s8
++      - ``delta_chroma_log2_weight_denom``
++      -
++    * - __s8
++      - ``delta_luma_weight_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      -
++    * - __s8
++      - ``luma_offset_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      -
++    * - __s8
++      - ``delta_chroma_weight_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2]``
++      -
++    * - __s8
++      - ``chroma_offset_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2]``
++      -
++    * - __s8
++      - ``delta_luma_weight_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      -
++    * - __s8
++      - ``luma_offset_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX]``
++      -
++    * - __s8
++      - ``delta_chroma_weight_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2]``
++      -
++    * - __s8
++      - ``chroma_offset_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2]``
++      -
+ 
+ MFC 5.1 MPEG Controls
+ =====================
+diff --git a/Documentation/media/uapi/v4l/pixfmt-compressed.rst b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+index b6f857ac1a8e..ee82526cdc00 100644
+--- a/Documentation/media/uapi/v4l/pixfmt-compressed.rst
++++ b/Documentation/media/uapi/v4l/pixfmt-compressed.rst
+@@ -138,6 +138,21 @@ Compressed Formats
+       - ``V4L2_PIX_FMT_HEVC``
+       - 'HEVC'
+       - HEVC/H.265 video elementary stream.
++    * .. _V4L2-PIX-FMT-HEVC-SLICE:
++
++      - ``V4L2_PIX_FMT_HEVC_SLICE``
++      - 'S265'
++      - HEVC parsed slice data, as extracted from the HEVC bitstream.
++	This format is adapted for stateless video decoders that implement a
++	HEVC pipeline (using the :ref:`codec` and :ref:`media-request-api`).
++	Metadata associated with the frame to decode is required to be passed
++	through the following controls :
++        * ``V4L2_CID_MPEG_VIDEO_HEVC_SPS``
++        * ``V4L2_CID_MPEG_VIDEO_HEVC_PPS``
++        * ``V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS``
++	See the :ref:`associated Codec Control IDs <v4l2-mpeg-hevc>`.
++	Buffers associated with this pixel format must contain the appropriate
++	number of macroblocks to decode a full corresponding frame.
+     * .. _V4L2-PIX-FMT-FWHT:
+ 
+       - ``V4L2_PIX_FMT_FWHT``
+diff --git a/Documentation/media/uapi/v4l/vidioc-queryctrl.rst b/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
+index bf29dc5b9758..f37cb377e258 100644
+--- a/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
++++ b/Documentation/media/uapi/v4l/vidioc-queryctrl.rst
+@@ -473,6 +473,24 @@ See also the examples in :ref:`control`.
+       - n/a
+       - A struct :c:type:`v4l2_ctrl_h264_decode_param`, containing H264
+ 	decode parameters for stateless video decoders.
++    * - ``V4L2_CTRL_TYPE_HEVC_SPS``
++      - n/a
++      - n/a
++      - n/a
++      - A struct :c:type:`v4l2_ctrl_hevc_sps`, containing HEVC Sequence
++	Parameter Set for stateless video decoders.
++    * - ``V4L2_CTRL_TYPE_HEVC_PPS``
++      - n/a
++      - n/a
++      - n/a
++      - A struct :c:type:`v4l2_ctrl_hevc_pps`, containing HEVC Picture
++	Parameter Set for stateless video decoders.
++    * - ``V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS``
++      - n/a
++      - n/a
++      - n/a
++      - A struct :c:type:`v4l2_ctrl_hevc_slice_params`, containing HEVC
++	slice parameters for stateless video decoders.
+ 
+ .. tabularcolumns:: |p{6.6cm}|p{2.2cm}|p{8.7cm}|
+ 
+diff --git a/Documentation/media/videodev2.h.rst.exceptions b/Documentation/media/videodev2.h.rst.exceptions
+index 55cbe324b9fc..afba7d71971a 100644
+--- a/Documentation/media/videodev2.h.rst.exceptions
++++ b/Documentation/media/videodev2.h.rst.exceptions
+@@ -141,6 +141,9 @@ replace symbol V4L2_CTRL_TYPE_H264_PPS :c:type:`v4l2_ctrl_type`
+ replace symbol V4L2_CTRL_TYPE_H264_SCALING_MATRIX :c:type:`v4l2_ctrl_type`
+ replace symbol V4L2_CTRL_TYPE_H264_SLICE_PARAMS :c:type:`v4l2_ctrl_type`
+ replace symbol V4L2_CTRL_TYPE_H264_DECODE_PARAMS :c:type:`v4l2_ctrl_type`
++replace symbol V4L2_CTRL_TYPE_HEVC_SPS :c:type:`v4l2_ctrl_type`
++replace symbol V4L2_CTRL_TYPE_HEVC_PPS :c:type:`v4l2_ctrl_type`
++replace symbol V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS :c:type:`v4l2_ctrl_type`
+ 
+ # V4L2 capability defines
+ replace define V4L2_CAP_VIDEO_CAPTURE device-capabilities
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index 366200d31bc0..106c80ec9312 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -916,6 +916,9 @@ const char *v4l2_ctrl_get_name(u32 id)
+ 	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC Size of Length Field";
+ 	case V4L2_CID_MPEG_VIDEO_REF_NUMBER_FOR_PFRAMES:	return "Reference Frames for a P-Frame";
+ 	case V4L2_CID_MPEG_VIDEO_PREPEND_SPSPPS_TO_IDR:		return "Prepend SPS and PPS to IDR";
++	case V4L2_CID_MPEG_VIDEO_HEVC_SPS:			return "HEVC Sequence Parameter Set";
++	case V4L2_CID_MPEG_VIDEO_HEVC_PPS:			return "HEVC Picture Parameter Set";
++	case V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS:		return "HEVC Slice Parameters";
+ 
+ 	/* CAMERA controls */
+ 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
+@@ -1323,6 +1326,15 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
+ 	case V4L2_CID_MPEG_VIDEO_H264_DECODE_PARAMS:
+ 		*type = V4L2_CTRL_TYPE_H264_DECODE_PARAMS;
+ 		break;
++	case V4L2_CID_MPEG_VIDEO_HEVC_SPS:
++		*type = V4L2_CTRL_TYPE_HEVC_SPS;
++		break;
++	case V4L2_CID_MPEG_VIDEO_HEVC_PPS:
++		*type = V4L2_CTRL_TYPE_HEVC_PPS;
++		break;
++	case V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS:
++		*type = V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS;
++		break;
+ 	default:
+ 		*type = V4L2_CTRL_TYPE_INTEGER;
+ 		break;
+@@ -1696,6 +1708,11 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
+ 	case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
+ 		return 0;
+ 
++	case V4L2_CTRL_TYPE_HEVC_SPS:
++	case V4L2_CTRL_TYPE_HEVC_PPS:
++	case V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS:
++		return 0;
++
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -2291,6 +2308,15 @@ static struct v4l2_ctrl *v4l2_ctrl_new(struct v4l2_ctrl_handler *hdl,
+ 	case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
+ 		elem_size = sizeof(struct v4l2_ctrl_h264_decode_param);
+ 		break;
++	case V4L2_CTRL_TYPE_HEVC_SPS:
++		elem_size = sizeof(struct v4l2_ctrl_hevc_sps);
++		break;
++	case V4L2_CTRL_TYPE_HEVC_PPS:
++		elem_size = sizeof(struct v4l2_ctrl_hevc_pps);
++		break;
++	case V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS:
++		elem_size = sizeof(struct v4l2_ctrl_hevc_slice_params);
++		break;
+ 	default:
+ 		if (type < V4L2_CTRL_COMPOUND_TYPES)
+ 			elem_size = sizeof(s32);
+diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
+index 8aa7de17ecfa..e792fc97e263 100644
+--- a/drivers/media/v4l2-core/v4l2-ioctl.c
++++ b/drivers/media/v4l2-core/v4l2-ioctl.c
+@@ -1331,6 +1331,7 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
+ 		case V4L2_PIX_FMT_VP8:		descr = "VP8"; break;
+ 		case V4L2_PIX_FMT_VP9:		descr = "VP9"; break;
+ 		case V4L2_PIX_FMT_HEVC:		descr = "HEVC"; break; /* aka H.265 */
++		case V4L2_PIX_FMT_HEVC_SLICE:	descr = "HEVC Parsed Slice Data"; break;
+ 		case V4L2_PIX_FMT_FWHT:		descr = "FWHT"; break; /* used in vicodec */
+ 		case V4L2_PIX_FMT_CPIA1:	descr = "GSPCA CPiA YUV"; break;
+ 		case V4L2_PIX_FMT_WNVA:		descr = "WNVA"; break;
+diff --git a/include/media/hevc-ctrls.h b/include/media/hevc-ctrls.h
+new file mode 100644
+index 000000000000..005c71c67163
+--- /dev/null
++++ b/include/media/hevc-ctrls.h
+@@ -0,0 +1,181 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * These are the HEVC state controls for use with stateless HEVC
++ * codec drivers.
++ *
++ * It turns out that these structs are not stable yet and will undergo
++ * more changes. So keep them private until they are stable and ready to
++ * become part of the official public API.
++ */
++
++#ifndef _HEVC_CTRLS_H_
++#define _HEVC_CTRLS_H_
++
++#define V4L2_CID_MPEG_VIDEO_HEVC_SPS		(V4L2_CID_MPEG_BASE + 645)
++#define V4L2_CID_MPEG_VIDEO_HEVC_PPS		(V4L2_CID_MPEG_BASE + 646)
++#define V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS	(V4L2_CID_MPEG_BASE + 647)
++
++/* enum v4l2_ctrl_type type values */
++#define V4L2_CTRL_TYPE_HEVC_SPS 0x0110
++#define V4L2_CTRL_TYPE_HEVC_PPS 0x0111
++#define V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS 0x0112
++
++#define V4L2_HEVC_SLICE_TYPE_B	0
++#define V4L2_HEVC_SLICE_TYPE_P	1
++#define V4L2_HEVC_SLICE_TYPE_I	2
++
++struct v4l2_ctrl_hevc_sps {
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: Sequence parameter set */
++	__u8	chroma_format_idc;
++	__u8	separate_colour_plane_flag;
++	__u16	pic_width_in_luma_samples;
++	__u16	pic_height_in_luma_samples;
++	__u8	bit_depth_luma_minus8;
++	__u8	bit_depth_chroma_minus8;
++	__u8	log2_max_pic_order_cnt_lsb_minus4;
++	__u8	sps_max_dec_pic_buffering_minus1;
++	__u8	sps_max_num_reorder_pics;
++	__u8	sps_max_latency_increase_plus1;
++	__u8	log2_min_luma_coding_block_size_minus3;
++	__u8	log2_diff_max_min_luma_coding_block_size;
++	__u8	log2_min_luma_transform_block_size_minus2;
++	__u8	log2_diff_max_min_luma_transform_block_size;
++	__u8	max_transform_hierarchy_depth_inter;
++	__u8	max_transform_hierarchy_depth_intra;
++	__u8	scaling_list_enabled_flag;
++	__u8	amp_enabled_flag;
++	__u8	sample_adaptive_offset_enabled_flag;
++	__u8	pcm_enabled_flag;
++	__u8	pcm_sample_bit_depth_luma_minus1;
++	__u8	pcm_sample_bit_depth_chroma_minus1;
++	__u8	log2_min_pcm_luma_coding_block_size_minus3;
++	__u8	log2_diff_max_min_pcm_luma_coding_block_size;
++	__u8	pcm_loop_filter_disabled_flag;
++	__u8	num_short_term_ref_pic_sets;
++	__u8	long_term_ref_pics_present_flag;
++	__u8	num_long_term_ref_pics_sps;
++	__u8	sps_temporal_mvp_enabled_flag;
++	__u8	strong_intra_smoothing_enabled_flag;
++};
++
++struct v4l2_ctrl_hevc_pps {
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: Picture parameter set */
++	__u8	dependent_slice_segment_flag;
++	__u8	output_flag_present_flag;
++	__u8	num_extra_slice_header_bits;
++	__u8	sign_data_hiding_enabled_flag;
++	__u8	cabac_init_present_flag;
++	__s8	init_qp_minus26;
++	__u8	constrained_intra_pred_flag;
++	__u8	transform_skip_enabled_flag;
++	__u8	cu_qp_delta_enabled_flag;
++	__u8	diff_cu_qp_delta_depth;
++	__s8	pps_cb_qp_offset;
++	__s8	pps_cr_qp_offset;
++	__u8	pps_slice_chroma_qp_offsets_present_flag;
++	__u8	weighted_pred_flag;
++	__u8	weighted_bipred_flag;
++	__u8	transquant_bypass_enabled_flag;
++	__u8	tiles_enabled_flag;
++	__u8	entropy_coding_sync_enabled_flag;
++	__u8	num_tile_columns_minus1;
++	__u8	num_tile_rows_minus1;
++	__u8	column_width_minus1[20];
++	__u8	row_height_minus1[22];
++	__u8	loop_filter_across_tiles_enabled_flag;
++	__u8	pps_loop_filter_across_slices_enabled_flag;
++	__u8	deblocking_filter_override_enabled_flag;
++	__u8	pps_disable_deblocking_filter_flag;
++	__s8	pps_beta_offset_div2;
++	__s8	pps_tc_offset_div2;
++	__u8	lists_modification_present_flag;
++	__u8	log2_parallel_merge_level_minus2;
++	__u8	slice_segment_header_extension_present_flag;
++	__u8	padding;
++};
++
++#define V4L2_HEVC_DPB_ENTRY_RPS_ST_CURR_BEFORE	0x01
++#define V4L2_HEVC_DPB_ENTRY_RPS_ST_CURR_AFTER	0x02
++#define V4L2_HEVC_DPB_ENTRY_RPS_LT_CURR		0x03
++
++#define V4L2_HEVC_DPB_ENTRIES_NUM_MAX		16
++
++struct v4l2_hevc_dpb_entry {
++	__u64	timestamp;
++	__u8	rps;
++	__u8	field_pic;
++	__u16	pic_order_cnt[2];
++	__u8	padding[2];
++};
++
++struct v4l2_hevc_pred_weight_table {
++	__u8	luma_log2_weight_denom;
++	__s8	delta_chroma_log2_weight_denom;
++
++	__s8	delta_luma_weight_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__s8	luma_offset_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__s8	delta_chroma_weight_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2];
++	__s8	chroma_offset_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2];
++
++	__s8	delta_luma_weight_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__s8	luma_offset_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__s8	delta_chroma_weight_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2];
++	__s8	chroma_offset_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX][2];
++
++	__u8	padding[2];
++};
++
++struct v4l2_ctrl_hevc_slice_params {
++	__u32	bit_size;
++	__u32	data_bit_offset;
++
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: NAL unit header */
++	__u8	nal_unit_type;
++	__u8	nuh_temporal_id_plus1;
++
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: General slice segment header */
++	__u8	slice_type;
++	__u8	colour_plane_id;
++	__u16	slice_pic_order_cnt;
++	__u8	slice_sao_luma_flag;
++	__u8	slice_sao_chroma_flag;
++	__u8	slice_temporal_mvp_enabled_flag;
++	__u8	num_ref_idx_l0_active_minus1;
++	__u8	num_ref_idx_l1_active_minus1;
++	__u8	mvd_l1_zero_flag;
++	__u8	cabac_init_flag;
++	__u8	collocated_from_l0_flag;
++	__u8	collocated_ref_idx;
++	__u8	five_minus_max_num_merge_cand;
++	__u8	use_integer_mv_flag;
++	__s8	slice_qp_delta;
++	__s8	slice_cb_qp_offset;
++	__s8	slice_cr_qp_offset;
++	__s8	slice_act_y_qp_offset;
++	__s8	slice_act_cb_qp_offset;
++	__s8	slice_act_cr_qp_offset;
++	__u8	slice_deblocking_filter_disabled_flag;
++	__s8	slice_beta_offset_div2;
++	__s8	slice_tc_offset_div2;
++	__u8	slice_loop_filter_across_slices_enabled_flag;
++
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: Picture timing SEI message */
++	__u8	pic_struct;
++
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: General slice segment header */
++	struct v4l2_hevc_dpb_entry dpb[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__u8	num_active_dpb_entries;
++	__u8	ref_idx_l0[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++	__u8	ref_idx_l1[V4L2_HEVC_DPB_ENTRIES_NUM_MAX];
++
++	__u8	num_rps_poc_st_curr_before;
++	__u8	num_rps_poc_st_curr_after;
++	__u8	num_rps_poc_lt_curr;
++
++	/* ISO/IEC 23008-2, ITU-T Rec. H.265: Weighted prediction parameter */
++	struct v4l2_hevc_pred_weight_table pred_weight_table;
++
++	__u8	padding[2];
++};
++
++#endif
+diff --git a/include/media/v4l2-ctrls.h b/include/media/v4l2-ctrls.h
+index 22b6d09c4764..f24a835e5920 100644
+--- a/include/media/v4l2-ctrls.h
++++ b/include/media/v4l2-ctrls.h
+@@ -28,6 +28,7 @@
+  */
+ #include <media/mpeg2-ctrls.h>
+ #include <media/h264-ctrls.h>
++#include <media/hevc-ctrls.h>
+ 
+ /* forward references */
+ struct file;
+@@ -55,6 +56,9 @@ struct poll_table_struct;
+  * @p_h264_scaling_matrix:	Pointer to a struct v4l2_ctrl_h264_scaling_matrix.
+  * @p_h264_slice_param:		Pointer to a struct v4l2_ctrl_h264_slice_param.
+  * @p_h264_decode_param:	Pointer to a struct v4l2_ctrl_h264_decode_param.
++ * @p_hevc_sps:			Pointer to an HEVC sequence parameter set structure.
++ * @p_hevc_pps:			Pointer to an HEVC picture parameter set structure.
++ * @p_hevc_slice_params		Pointer to an HEVC slice parameters structure.
+  * @p:				Pointer to a compound value.
+  */
+ union v4l2_ctrl_ptr {
+@@ -71,6 +75,9 @@ union v4l2_ctrl_ptr {
+ 	struct v4l2_ctrl_h264_scaling_matrix *p_h264_scaling_matrix;
+ 	struct v4l2_ctrl_h264_slice_param *p_h264_slice_param;
+ 	struct v4l2_ctrl_h264_decode_param *p_h264_decode_param;
++	struct v4l2_ctrl_hevc_sps *p_hevc_sps;
++	struct v4l2_ctrl_hevc_pps *p_hevc_pps;
++	struct v4l2_ctrl_hevc_slice_params *p_hevc_slice_params;
+ 	void *p;
+ };
+ 
+diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
+index 673172c84fb9..5ae4f00f4078 100644
+--- a/include/uapi/linux/videodev2.h
++++ b/include/uapi/linux/videodev2.h
+@@ -669,6 +669,7 @@ struct v4l2_pix_format {
+ #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
+ #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
+ #define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC aka H.265 */
++#define V4L2_PIX_FMT_HEVC_SLICE v4l2_fourcc('S', '2', '6', '5') /* HEVC parsed slices */
+ #define V4L2_PIX_FMT_FWHT     v4l2_fourcc('F', 'W', 'H', 'T') /* Fast Walsh Hadamard Transform (vicodec) */
+ 
+ /*  Vendor-specific formats   */
 -- 
-2.7.4
+2.20.1
 
 
 _______________________________________________
