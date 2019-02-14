@@ -2,141 +2,71 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0EE5DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:54:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BC0DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:55:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C91BC21904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:54:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3C34221904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 01:55:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f2GA/Znc";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="rJwFqxdB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C91BC21904
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UUfVY//6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C34221904
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=EDOCTpiPjqvcw44qVu3Ja9IFLXhu+VAdhyZXXZOemsE=; b=f2GA/ZncQwrNAg
-	1UDmG0aWpi7/pW88s/U7Eq3LYKBuAim1tqN8DLSzI6GL0x6jCsCG5mwXksiO+13ePCOZcs+dgHxCh
-	YpGGKtvLi2dql3bxqol3sSPk3ayoI9m8ct0E20hbBoc0LeYxqzp6dnB+gqThfq8bn46mvBZpC2NEA
-	XoaozdDDryhNkQ/e+nuXmwS6lDIUbWyCoqcyEylJY6NKX+LYLq5iAw5HZenR+JEwEybyMfuAmevrC
-	xSsaVSmH2P/LbtJkCQQ1N+kWlzz57EGidCP/zM+9kUteDrC9xOLs3mls2J8Je7/ril9ntt+D4W2je
-	w9nXpmR5zAun1UlD7b/A==;
+	List-Owner; bh=QjaPAXwIYCI2UMmvM0j+PxzPpdVK3jnDLUecUTr8HSs=; b=UUfVY//6Ef6fHu
+	fvU5T02ZGaP4dsg4Ql3+gHzDLnXPDCW4+bPpbfNYTg5srCS+0hZASI/AxJZQHOtX15JBS6htTe9Od
+	Aa7/4L0h3t+fjcRLI/MKy5YQ9sWyqDe11tttydOUcg+hLCBadTz0W+t4hX+f6ERa1cU5XyvRP9Q25
+	njgozMTnfC5l+6y/hyiWdWWVYIrq5Ib9dB99VQwdrQ3BTOwzSIk9xzl4Cqo16SjixzFsa337WYtvH
+	viV3Fcd6pg9tVg4p/e0eZqF6RkFWEBWGyPToc+qnOHKkdTKYbDnrXVo1ZxNj57KB+SXzMxIJPBUZf
+	6h3fyvRTSrrr/9LQjgPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gu6EE-0004Rj-W8; Thu, 14 Feb 2019 01:54:19 +0000
-Received: from mail-eopbgr80088.outbound.protection.outlook.com ([40.107.8.88]
- helo=EUR04-VI1-obe.outbound.protection.outlook.com)
+	id 1gu6Es-0004nX-0H; Thu, 14 Feb 2019 01:54:58 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gu6E8-0004II-3U
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 01:54:16 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=hHkYAJ4t/SYAqFMpMYi9fxYycrMV51Pn/LP5JnRobNs=;
- b=rJwFqxdB81iPZ2hhBT0EwrgGJX8k8yY3BfqdqHRyjRRoPAM5KMG3MW+ISDwAgUov98v6pJo+8hBjpU8s6wGdBylesmakNwiBmq0BM59nTyVAv8+0EUXvJdAb1B8BkbNbOwg/PLD8jgct4I84wANt7wj+KDjKVnsQCn4xAxYgF2w=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3850.eurprd04.prod.outlook.com (52.134.65.151) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.22; Thu, 14 Feb 2019 01:54:08 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Thu, 14 Feb 2019
- 01:54:08 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
- <sboyd@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>, Daniel Baluta
- <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "viresh.kumar@linaro.org"
- <viresh.kumar@linaro.org>
-Subject: [PATCH V4 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Topic: [PATCH V4 2/2] clk: imx: scu: add cpu frequency scaling support
-Thread-Index: AQHUxAgs8uuWj5mH40eZScOWTh4APw==
-Date: Thu, 14 Feb 2019 01:54:08 +0000
-Message-ID: <1550108915-574-2-git-send-email-Anson.Huang@nxp.com>
-References: <1550108915-574-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1550108915-574-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0163.apcprd02.prod.outlook.com
- (2603:1096:201:1f::23) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: e606a76c-6eae-401f-ef0c-08d6921f4ed8
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3850; 
-x-ms-traffictypediagnostic: DB3PR0402MB3850:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3850;
- 23:4FNKRApOwAKW4q5nr94Tazm5SuV6kTd72NaoT?=
- =?iso-8859-1?Q?ZagQA8NxhS3LImGV31bY+9+/sf7eM97qfwNku/dA3pPt7NPnSCQR/pRAF5?=
- =?iso-8859-1?Q?bnLgDCRCN0sLq4iNfAppzk/DKBNNdQyFLNcK37WMZvVuvKlo9HnEu5wOUc?=
- =?iso-8859-1?Q?BTP0vD6arN4PUE8YiN5wBuIT+2Er0PDOmW6wQvcs1qKtyZQUrPQuBQZKnv?=
- =?iso-8859-1?Q?KEAYi1EncCa3I2ZCUq+dgoRH9ZC/n2yQH1dP5O5FRdkNA27lppeZtOSN1N?=
- =?iso-8859-1?Q?zPpR4MYUfQFpOnAl9RJGLmKkdZrVrEemm2V3cpTikhAqW0WtAC8mm+blKl?=
- =?iso-8859-1?Q?tZ/auBfuUA4xbQfN0PS6jGYYz8uAAUfsf36LxOnivpdjJnBYAfqJrQzVcb?=
- =?iso-8859-1?Q?yM8g3DuCG9s62yJSu4Vj3ruyrbsytpyzYvQ9iYghjWP5vUXZzvHnsI/Vgf?=
- =?iso-8859-1?Q?TUqY0Qsfe9Msay3i2TYTGe6plMRZyo28TBPfkqFRdk7oN7der1CwWN93r7?=
- =?iso-8859-1?Q?qWCsoXXbcCU9VztnXW556nEpTJn/ZoZBY86Qt6gfEMMJ0VeABkKrKTOidM?=
- =?iso-8859-1?Q?kP/0ms14Kzcpojv32FKZGtq2FEMdUs2Snlqmd7GJcYKDb/ogcu+vk3FQXl?=
- =?iso-8859-1?Q?0Ii6fJbFd4eEwHE20BHeEVDfOQFWt6qoAOr9a+/4zbprmPtYS9F/1EkYN0?=
- =?iso-8859-1?Q?iCLDskEag8JLpIsWVLrdMkCkos1i+Jg2EqKJ97hecKX/Qes6th6/m16O7W?=
- =?iso-8859-1?Q?voLlu8ZetLgrOXzY4JMNU4o8EyRqkNMj2LCaXTNm0sa3/ooFNj6WEluZFZ?=
- =?iso-8859-1?Q?YppitEWgXjurJ5+BbKTBMx1mWuUIJ8MzSo9F1lMSEaI+mOIC62tzMpFkND?=
- =?iso-8859-1?Q?g/+FdDDSUYUzjCQcg6tw59pX2V0CQFGTa7vTEhHKETklBthKAnq5OcHP3i?=
- =?iso-8859-1?Q?9xNSuWFHCfKI9N5rBB76P+kHI+N7hvQbVGzrS/+UCVzY6K5bxh3W9c4SUI?=
- =?iso-8859-1?Q?025m5mPhSa388KiDyVC2I0bi8nKa7FXgVbJ3SyeN11uhmnh6UeVRrVZrm0?=
- =?iso-8859-1?Q?s2U7QOm5D1n8DB3UHSPDNCdcVnjm+2CeHZePokop8i5JmJSddQ+e9ZvFVp?=
- =?iso-8859-1?Q?uEJoiTx6emDwbl4/ecjvdThYjE7ShiX/ditpvIBlBBglNLiMhSIgIEmFl2?=
- =?iso-8859-1?Q?euKNbLv6wPTjB3dOOKmA6UM9snbnI/LovFt9oGHItvg+gBuDmjSVOToKf3?=
- =?iso-8859-1?Q?Iun3OcqMcpiFOLPs3dDWmd+FMfHbukN9l1uLj2S2gNfffzI7dVu8m/82x4?=
- =?iso-8859-1?Q?AVsI=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3850364F0D04B0BAA84015DDF5670@DB3PR0402MB3850.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09480768F8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(366004)(376002)(39860400002)(396003)(199004)(189003)(256004)(71190400001)(76176011)(52116002)(6506007)(7416002)(99286004)(6436002)(2501003)(14444005)(6486002)(6512007)(4326008)(26005)(71200400001)(14454004)(386003)(102836004)(478600001)(305945005)(2906002)(2201001)(36756003)(105586002)(3846002)(486006)(81166006)(11346002)(476003)(97736004)(66066001)(106356001)(7736002)(86362001)(186003)(8676002)(50226002)(53936002)(110136005)(8936002)(316002)(81156014)(2616005)(68736007)(446003)(25786009)(6116002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3850;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: w0AT72hred62x86/+U4KGgkNJwQD530hOMlYCiZkbz57GhR6G6FfUjWjanvwyV8yY1zosNka5YhGOan3XjpGilBxoi6Bbq70s9VD2LOyGjGijKT8961TDpjCRbe1RcRWf/n8YGc1zFrwekI0lM1UoxoBVRwPzvFs9LN5aWFg6wRfOF6xKImWtJYWGIfIUxFNgjzCRxXlFpmWoFQd00lW0trpbnGaYWLhoNvb1uq9MCe5gK7V0tNL/cmNcENmEah+vYQV2Jd4GzUPvLPG/HzVIH1nEQ6iy4f5IoMF44rjVd45BEa5TP3idEe3zvaMCUmDlfnrru1BwaUjqeuF2M4/8i/zX8WkMitWLoL6rZxqANekCMF6R2BSZsn6BRX5YLiFCkIn0LlN57rsXF1JQbHn4uHv0QQKVg3wmy+Tyw7XtJg=
+ id 1gu6Ep-0004md-Bp; Thu, 14 Feb 2019 01:54:56 +0000
+X-UUID: 7686447b73ef443db1978263e6c13563-20190213
+X-UUID: 7686447b73ef443db1978263e6c13563-20190213
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ (envelope-from <qii.wang@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 488655370; Wed, 13 Feb 2019 17:54:33 -0800
+Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 13 Feb 2019 17:54:31 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by MTKMBS31N2.mediatek.inc
+ (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Thu, 14 Feb 2019 09:54:29 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Thu, 14 Feb 2019 09:54:28 +0800
+Message-ID: <1550109268.30065.13.camel@mhfsdcap03>
+Subject: Re: [PATCH v3 5/6] dt-bindings: i2c: Add Mediatek MT8183 i2c binding
+From: Qii Wang <qii.wang@mediatek.com>
+To: Wolfram Sang <wsa@the-dreams.de>
+Date: Thu, 14 Feb 2019 09:54:28 +0800
+In-Reply-To: <20190205131641.GF12401@kunai>
+References: <1548057574-8061-1-git-send-email-qii.wang@mediatek.com>
+ <1548057574-8061-6-git-send-email-qii.wang@mediatek.com>
+ <20190205131641.GF12401@kunai>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e606a76c-6eae-401f-ef0c-08d6921f4ed8
-X-MS-Exchange-CrossTenant-originalarrivaltime: 14 Feb 2019 01:54:01.7308 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3850
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190213_175412_494879_A4D324A4 
-X-CRM114-Status: GOOD (  16.16  )
+X-CRM114-CacheID: sfid-20190213_175455_408366_82B87CFA 
+X-CRM114-Status: UNSURE (   9.87  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,107 +78,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com,
+ srv_heupstream@mediatek.com, leilk.liu@mediatek.com, xinping.qian@mediatek.com,
+ linux-kernel@vger.kernel.org, liguo.zhang@mediatek.com,
+ linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On NXP's i.MX SoCs with system controller inside, CPU frequency
-scaling can ONLY be done by system controller firmware, and it
-can ONLY be requested from secure mode, so Linux kernel has to
-call ARM SMC to trap to ARM-Trusted-Firmware to request system
-controller firmware to do CPU frequency scaling.
+On Tue, 2019-02-05 at 14:16 +0100, Wolfram Sang wrote:
+> > +  - mediatek,share-i3c: i3c controller can share i2c function.
+> 
+> I am not happy with this binding. There must be a better way of using
+> the I3C controller in I2C mode. I think it would be easier to tell if we
+> had an I3C driver to see how it implements I2C fallback there. Is the
+> I3C driver on the way?
+> 
 
-This patch adds i.MX system controller CPU frequency scaling support,
-it reuses cpufreq-dt driver and implement the CPU frequency scaling
-inside SCU clock driver.
-
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-Changes since V3:
-        - use different clk ops for CPU clock to avoid runtime check in clk_set_rate;
-        - use rsrc_id to determine whether it is CPU frequency change and also to get
-          cluster ID for SMC call.
----
- drivers/clk/imx/clk-scu.c | 35 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c
-index 7ccf7ed..c234a6e 100644
---- a/drivers/clk/imx/clk-scu.c
-+++ b/drivers/clk/imx/clk-scu.c
-@@ -4,12 +4,17 @@
-  *   Dong Aisheng <aisheng.dong@nxp.com>
-  */
- 
-+#include <dt-bindings/firmware/imx/rsrc.h>
-+#include <linux/arm-smccc.h>
- #include <linux/clk-provider.h>
- #include <linux/err.h>
- #include <linux/slab.h>
- 
- #include "clk-scu.h"
- 
-+#define IMX_SIP_CPUFREQ			0xC2000001
-+#define IMX_SIP_SET_CPUFREQ		0x00
-+
- static struct imx_sc_ipc *ccm_ipc_handle;
- 
- /*
-@@ -145,6 +150,23 @@ static long clk_scu_round_rate(struct clk_hw *hw, unsigned long rate,
- 	return rate;
- }
- 
-+static int clk_scu_atf_set_cpu_rate(struct clk_hw *hw, unsigned long rate,
-+				    unsigned long parent_rate)
-+{
-+	struct clk_scu *clk = to_clk_scu(hw);
-+	struct arm_smccc_res res;
-+	unsigned long cluster_id;
-+
-+	if (clk->rsrc_id == IMX_SC_R_A35)
-+		cluster_id = 0;
-+
-+	/* CPU frequency scaling can ONLY be done by ARM-Trusted-Firmware */
-+	arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
-+		      cluster_id, rate, 0, 0, 0, 0, &res);
-+
-+	return 0;
-+}
-+
- /*
-  * clk_scu_set_rate - Set rate for a SCU clock
-  * @hw: clock to change rate for
-@@ -232,6 +254,14 @@ static const struct clk_ops clk_scu_ops = {
- 	.unprepare = clk_scu_unprepare,
- };
- 
-+static const struct clk_ops clk_scu_cpu_ops = {
-+	.recalc_rate = clk_scu_recalc_rate,
-+	.round_rate = clk_scu_round_rate,
-+	.set_rate = clk_scu_atf_set_cpu_rate,
-+	.prepare = clk_scu_prepare,
-+	.unprepare = clk_scu_unprepare,
-+};
-+
- struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type)
- {
- 	struct clk_init_data init;
-@@ -247,7 +277,10 @@ struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type)
- 	clk->clk_type = clk_type;
- 
- 	init.name = name;
--	init.ops = &clk_scu_ops;
-+	if (rsrc_id == IMX_SC_R_A35)
-+		init.ops = &clk_scu_cpu_ops;
-+	else
-+		init.ops = &clk_scu_ops;
- 	init.num_parents = 0;
- 	/*
- 	 * Note on MX8, the clocks are tightly coupled with power domain
--- 
-2.7.4
+I am very sorry for the late reply due to the Chinese New Year holiday.
+After confirmation, for I2C mode in I3C controller, we will push an I3C
+driver to implement I2C fallback there later, and we will remove
+"mediatek,share-i3c" for i2c controller driver in the next patch.
 
 
 _______________________________________________
