@@ -2,64 +2,80 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A312FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:06:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A941C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:08:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7389220838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:06:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EB181222B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 11:08:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JS9w/3dK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7389220838
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zamjb7nr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=integrasources.com header.i=@integrasources.com header.b="cRXs5t1t"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EB181222B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=integrasources.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=OET9ug9JzxjjXW8WPx/yebNf8ryvv8AQp1VxzWbevzY=; b=JS9w/3dKoBFnXylpchzY8EVH7
-	5w0fKfTGsuxQgw636ggoqyj4FCC2PXukt0wS5itkY4X7+gUXKq4lAMBxipRP8f/gohEC5w58u1vcs
-	cRbfJ09sBXY7y3Z86wv1fg/wdKvYcNrpc002SsvLcT6lqXPfsHfmgCG++XrdodA5oazQdDXjmjg6S
-	xsXrvvGLB3mOLNv4NX4146469fTYMrbaDyhuBzGBn8shF/31uKlMaoMYg99BxxAU/i9Z5ABnAlF5/
-	klI70gtDDsNc03mFmpCtx8ShTF54IXw8qQ8VDaTOKHs00XW86srcQs5XFSuivnMB+iL/SlFjyT7dq
-	357IIJpSw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:
+	Message-ID:Date:MIME-Version:Subject:To:From:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=S2Vuv3iCvcuM9ADwk6YuG0qf8pQFdk+r505mE6AArys=; b=Zamjb7nrAoIJPN
+	/Bbd1qiiZtpWXhHhFHJsowjX/ldgh5aIIsjzYNnGNjP19e5sYFs1CP7/CfNJZ/TmFfI/OStW/xXZ9
+	aRX/3hKHp03DlNCkdbgjnSF9/L/WeAgMQuIZY4D4eroGUsl+07qi/tq6E2ih1KkIf+GHh9Cv/daus
+	tpgjyVzskvrVDE4Y/2K1rJudfUEJZ7W32SVItEfUDc/wY500zNucn1FoRhOTayr0D0cHYSJxkAoqM
+	zlR3dF+89rD08AD9Z7dQC/TEk9N2YU69Zkr52GPJgRtYjaaV/yiC57jCT0edCI1JXcEa+guPoJeti
+	R9Pu05q9PkALqdPkYbxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guEqi-0007pY-NE; Thu, 14 Feb 2019 11:06:36 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guEqe-0007pE-Uw
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:06:34 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AEFEFEBD;
- Thu, 14 Feb 2019 03:06:32 -0800 (PST)
-Received: from [10.162.0.144] (a075553-lin.blr.arm.com [10.162.0.144])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5E4253F575;
- Thu, 14 Feb 2019 03:06:29 -0800 (PST)
-Subject: Re: [PATCH v5 3/5] arm64/kvm: context-switch ptrauth registers
-To: Kristina Martsenko <kristina.martsenko@arm.com>,
- linux-arm-kernel@lists.infradead.org
-References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-4-git-send-email-amit.kachhap@arm.com>
- <0a2df488-a80d-ef08-6241-7f4695f2a578@arm.com>
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Message-ID: <ee8669f7-5c3d-ada3-49f2-0c9b37559553@arm.com>
-Date: Thu, 14 Feb 2019 16:36:27 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guEsF-0008Dc-Fu; Thu, 14 Feb 2019 11:08:11 +0000
+Received: from f521.i.mail.ru ([94.100.184.5])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guEsB-0008Cn-Id
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 11:08:09 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=integrasources.com; s=mailru; 
+ h=References:In-Reply-To:Content-Transfer-Encoding:Content-Type:Message-ID:Reply-To:Date:MIME-Version:Subject:Cc:To:From;
+ bh=zEt7EE5xeiuzjaP8N/HhMq7vnmMJfEt2GZYfKYBzDTw=; 
+ b=cRXs5t1tR3VRWSQmAqmgwt8X7o9096dOU63kj+fOvrWd+BypDQHwGKXO3OqZ/rb5qeq8IARaQQUKNjYFB500lWV24mEh0UQk4yc3Hi1rRS1cjX1geWDcDRhMyo2/+c40gzZF/AzwPrH7alc8T4drbUisDShDW1jCwTXYb7iuTTo=;
+Received: by f521.i.mail.ru with local (envelope-from
+ <k.sudakov@integrasources.com>)
+ id 1guErp-00057L-F9; Thu, 14 Feb 2019 14:07:46 +0300
+Received: by e.mail.ru with HTTP;
+	Thu, 14 Feb 2019 14:07:45 +0300
+From: =?UTF-8?B?S29uc3RhbnRpbiBTdWRha292?= <k.sudakov@integrasources.com>
+To: =?UTF-8?B?UGF1bCBLb2NpYWxrb3dza2k=?= <paul.kocialkowski@bootlin.com>,
+ =?UTF-8?B?TWF4aW1lIFJpcGFyZA==?= <maxime.ripard@bootlin.com>
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCB2MyA4LzhdIGRybS9wYW5lbDogQWRkIFJvbmJvIFJC?=
+ =?UTF-8?B?MDcwRDMwIHBhbmVs?=
 MIME-Version: 1.0
-In-Reply-To: <0a2df488-a80d-ef08-6241-7f4695f2a578@arm.com>
-Content-Language: en-US
+X-Mailer: Mail.Ru Mailer 1.0
+Date: Thu, 14 Feb 2019 14:07:45 +0300
+X-Priority: 3 (Normal)
+Message-ID: <1550142465.930628529@f521.i.mail.ru>
+Authentication-Results: f521.i.mail.ru;
+ auth=pass smtp.auth=k.sudakov@integrasources.com
+ smtp.mailfrom=k.sudakov@integrasources.com
+X-77F55803: 75EFC73397A5A9587F9F52485CB584D72AF743E69CD4874722C24EB7D14BC411CF01FF74127E779F82DA8959A8B4202AC5C7FD16981B76AE
+X-7FA49CB5: 70AAF3C13DB70168C09775C1D3CA48CF3F395433950BAD63CEDC9CE4EAAF8441BD4B6F7A4D31EC0B5B47ED7565F4D52D9742502CCDD46D0D2A336C6518635091B2086D80B05047785571747095F342E8C7A0BC55FA0FE5FC90731C072697C03650FDC107160235D0A1984233DD075BF2389733CBF5DBD5E913377AFFFEAFD269A417C69337E82CC2CC7F00164DA146DAFE8445B8C89999725571747095F342E8C26CFBAC0749D213D2E47CDBA5A9658359CC434672EE6371117882F4460429728AD0CFFFB425014E40A5AABA2AD3711975ECD9A6C639B01B78DA827A17800CE72BDBFF48EC83968139616F89400644F575ECD9A6C639B01B4E70A05D1297E1BBC6867C52282FAC85D9B7C4F32B44FF572FE522B81756EA3300306258E7E6ABB4E4A6367B16DE6309
+X-DMARC-Policy: none
+X-Mailru-Sender: AAD8E2226B689FDAB33CC05F77CBC91E7DEEC48BFF9043B5B526F127086B2CFEF31CCE872E832FCF5E25B62EB3B830D12C9F54B9DBDCEB51B4873B7769F3E5F805C459423DECFE6322DF1A08BD40178C9DFED97C59FA62B9BC879F90144AC781E4A3161861B40CE50DA7A0AF5A3A8387
+X-Mras: OK
+X-Spam: undefined
+In-Reply-To: <25f4beadd3088b3fbb2751f120e4216969301136.camel@bootlin.com>
+References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+ <2663d767bffbc83f84f9086e614b0ec1dd343ced.1549896081.git-series.maxime.ripard@bootlin.com>
+ <25f4beadd3088b3fbb2751f120e4216969301136.camel@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_030633_012074_D66590BE 
-X-CRM114-Status: GOOD (  29.69  )
+X-CRM114-CacheID: sfid-20190214_030808_002160_7566864F 
+X-CRM114-Status: UNSURE (   2.83  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,173 +87,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Christoffer Dall <christoffer.dall@arm.com>,
- kvmarm@lists.cs.columbia.edu,
- Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
- Dave Martin <Dave.Martin@arm.com>, linux-kernel@vger.kernel.org
+Reply-To: =?UTF-8?B?S29uc3RhbnRpbiBTdWRha292?= <k.sudakov@integrasources.com>
+Cc: bbrezillon@kernel.org, =?UTF-8?B?U2FtIFJhdm5ib3Jn?= <sam@ravnborg.org>,
+ =?UTF-8?B?TWFhcnRlbiBMYW5raG9yc3Q=?= <maarten.lankhorst@linux.intel.com>,
+ dri-devel@lists.freedesktop.org, =?UTF-8?B?Q2hlbi1ZdSBUc2Fp?= <wens@csie.org>,
+ =?UTF-8?B?U2VhbiBQYXVs?= <seanpaul@chromium.org>,
+ =?UTF-8?B?VGhvbWFzIFBldGF6em9uaQ==?= <thomas.petazzoni@bootlin.com>,
+ =?UTF-8?B?SmFnYW4gVGVraQ==?= <jagan@openedev.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Hello Paul, Maxime. I suggest the patch to fix it.
 
-On 2/13/19 11:04 PM, Kristina Martsenko wrote:
-> Hi Amit,
-> 
-> (Please always Cc: everyone who commented on previous versions of the
-> series.)
-> 
-> On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
->> When pointer authentication is supported, a guest may wish to use it.
->> This patch adds the necessary KVM infrastructure for this to work, with
->> a semi-lazy context switch of the pointer auth state.
->>
->> Pointer authentication feature is only enabled when VHE is built
->> into the kernel and present into CPU implementation so only VHE code
->> paths are modified.
->>
->> When we schedule a vcpu, we disable guest usage of pointer
->> authentication instructions and accesses to the keys. While these are
->> disabled, we avoid context-switching the keys. When we trap the guest
->> trying to use pointer authentication functionality, we change to eagerly
->> context-switching the keys, and enable the feature. The next time the
->> vcpu is scheduled out/in, we start again.
->>
->> Pointer authentication consists of address authentication and generic
->> authentication, and CPUs in a system might have varied support for
->> either. Where support for either feature is not uniform, it is hidden
->> from guests via ID register emulation, as a result of the cpufeature
->> framework in the host.
->>
->> Unfortunately, address authentication and generic authentication cannot
->> be trapped separately, as the architecture provides a single EL2 trap
->> covering both. If we wish to expose one without the other, we cannot
->> prevent a (badly-written) guest from intermittently using a feature
->> which is not uniformly supported (when scheduled on a physical CPU which
->> supports the relevant feature). When the guest is scheduled on a
->> physical CPU lacking the feature, these attempts will result in an UNDEF
->> being taken by the guest.
-> 
-> [...]
-> 
->>   /*
->> + * Handle the guest trying to use a ptrauth instruction, or trying to access a
->> + * ptrauth register.
->> + */
->> +void kvm_arm_vcpu_ptrauth_trap(struct kvm_vcpu *vcpu)
->> +{
->> +	if (has_vhe() && kvm_supports_ptrauth())
->> +		kvm_arm_vcpu_ptrauth_enable(vcpu);
->> +	else
->> +		kvm_inject_undefined(vcpu);
->> +}
->> +
->> +/*
->>    * Guest usage of a ptrauth instruction (which the guest EL1 did not turn into
->> - * a NOP).
->> + * a NOP), or guest EL1 access to a ptrauth register.
-> 
-> Doesn't guest EL1 access of ptrauth registers go through trap_ptrauth
-> instead?
-Yes you are right.
-> 
->>    */
->>   static int kvm_handle_ptrauth(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>   {
->> -	/*
->> -	 * We don't currently support ptrauth in a guest, and we mask the ID
->> -	 * registers to prevent well-behaved guests from trying to make use of
->> -	 * it.
->> -	 *
->> -	 * Inject an UNDEF, as if the feature really isn't present.
->> -	 */
->> -	kvm_inject_undefined(vcpu);
->> +	kvm_arm_vcpu_ptrauth_trap(vcpu);
->>   	return 1;
->>   }
->>   
-> 
-> [...]
-> 
->> +static __always_inline bool __hyp_text __ptrauth_is_enabled(struct kvm_vcpu *vcpu)
->> +{
->> +	return IS_ENABLED(CONFIG_ARM64_PTR_AUTH) &&
->> +			vcpu->arch.ctxt.hcr_el2 & (HCR_API | HCR_APK);
->> +}
->> +
->> +void __no_ptrauth __hyp_text __ptrauth_switch_to_guest(struct kvm_vcpu *vcpu,
->> +					  struct kvm_cpu_context *host_ctxt,
->> +					  struct kvm_cpu_context *guest_ctxt)
->> +{
->> +	if (!__ptrauth_is_enabled(vcpu))
->> +		return;
->> +
->> +	ptrauth_keys_store((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
->> +	ptrauth_keys_switch((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
->> +}
->> +
->> +void __no_ptrauth __hyp_text __ptrauth_switch_to_host(struct kvm_vcpu *vcpu,
-> 
-> We don't call this code in the !VHE case anymore, so are the __hyp_text
-> annotations still needed?
-Yes they can be removed.
-> 
->> +					 struct kvm_cpu_context *host_ctxt,
->> +					 struct kvm_cpu_context *guest_ctxt)
->> +{
->> +	if (!__ptrauth_is_enabled(vcpu))
->> +		return;
->> +
->> +	ptrauth_keys_store((struct ptrauth_keys *) &guest_ctxt->sys_regs[APIAKEYLO_EL1]);
->> +	ptrauth_keys_switch((struct ptrauth_keys *) &host_ctxt->sys_regs[APIAKEYLO_EL1]);
->> +}
-> 
-> [...]
-> 
->> @@ -1040,14 +1066,6 @@ static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
->>   			kvm_debug("SVE unsupported for guests, suppressing\n");
->>   
->>   		val &= ~(0xfUL << ID_AA64PFR0_SVE_SHIFT);
->> -	} else if (id == SYS_ID_AA64ISAR1_EL1) {
->> -		const u64 ptrauth_mask = (0xfUL << ID_AA64ISAR1_APA_SHIFT) |
->> -					 (0xfUL << ID_AA64ISAR1_API_SHIFT) |
->> -					 (0xfUL << ID_AA64ISAR1_GPA_SHIFT) |
->> -					 (0xfUL << ID_AA64ISAR1_GPI_SHIFT);
->> -		if (val & ptrauth_mask)
->> -			kvm_debug("ptrauth unsupported for guests, suppressing\n");
->> -		val &= ~ptrauth_mask;
-> 
-> If all CPUs support address authentication, but no CPUs support generic
-> authentication, then I think the guest will still see address auth in
-> the ID register and try to use it, but since kvm_supports_ptrauth() ==
-> false, then kvm will enable trapping and inject an undef. So I think we
-> still need to zero the ID register bits here if !kvm_supports_ptrauth().
-Yes even James Morse suggested same thing.
-> 
-> In the following patch, I think we also need to zero the bits if
-> !kvm_arm_vcpu_ptrauth_allowed(), as done in v4 [1], because otherwise
-> the guest will see that ptrauth is available, but will receive an undef
-> when it tries to use it.
-ok.
-> 
-> Regarding the patch in v4, most of the work is passing the vcpu down to
-> read_id_reg(). Dave has a similar patch in his SVE series [2]. I think
-> it might make sense to rebase onto that patch and mention that patch as
-> a dependency in the cover letter.
-Yes it is helpful. Will check it.
-
-//Amit D
-> 
-> [1] https://lore.kernel.org/linux-arm-kernel/1545119810-12182-5-git-send-email-amit.kachhap@arm.com/
-> [2] https://lore.kernel.org/linux-arm-kernel/1547757219-19439-11-git-send-email-Dave.Martin@arm.com/
-> 
-> Thanks,
-> Kristina
-> 
-
+diff --no-dereference -u -r -N linux-5.0-rc6_origin/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.txt linux-5.0-rc6/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.txt
+--- linux-5.0-rc6_origin/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.txt	1970-01-01 07:00:00.000000000 +0700
++++ linux-5.0-rc6/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.txt	2019-02-14 18:00:06.613795857 +0700
+@@ -0,0 +1,23 @@
++Ronbo RB070D30N01A MIPI-DSI panel
++
++Required properties:
++	- compatible: must be "ronbo,rb070d30"
++	- reg: DSI virtual channel used by that screen
++	- vcc-lcd-supply: phandle to the power regulator
++	- backlight: phandle to the backlight used
++	- reset-gpios: a GPIO phandle for the reset pin
++	- power-gpios: a GPIO phandle for the power pin
++	- updn-gpios: a GPIO phandle for the updn pin (vertical flip)
++	- shlr-gpios: a GPIO phandle for the shlr pin (horizontal flip)
++
++Example:
++panel@0 {
++	compatible = "ronbo,rb070d30";
++	reg = <0>;
++	vcc-lcd-supply = <&reg_display>;
++	backlight = <&backlight>;
++	reset-gpios = <&r_pio 0 1 GPIO_ACTIVE_HIGH>; /* PL01 */
++	power-gpios = <&r_pio 0 2 GPIO_ACTIVE_HIGH>; /* PL02 */
++	updn-gpios = <&r_pio 0 3 GPIO_ACTIVE_HIGH>; /* PL03 */
++	shlr-gpios = <&r_pio 0 4 GPIO_ACTIVE_LOW>; /* PL04 */
++};
+diff --no-dereference -u -r -N linux-5.0-rc6_origin/Documentation/devicetree/bindings/vendor-prefixes.txt linux-5.0-rc6/Documentation/devicetree/bindings/vendor-prefixes.txt
+--- linux-5.0-rc6_origin/Documentation/devicetree/bindings/vendor-prefixes.txt	2019-02-11 05:42:20.000000000 +0700
++++ linux-5.0-rc6/Documentation/devicetree/bindings/vendor-prefixes.txt	2019-02-14 17:39:46.667994322 +0700
+@@ -334,6 +334,7 @@
+ riscv	RISC-V Foundation
+ rockchip	Fuzhou Rockchip Electronics Co., Ltd
+ rohm	ROHM Semiconductor Co., Ltd
++ronbo	Ronbo Electronics Ltd.
+ roofull	Shenzhen Roofull Technology Co, Ltd
+ samsung	Samsung Semiconductor
+ samtec	Samtec/Softing company
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
