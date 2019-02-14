@@ -2,80 +2,112 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C0FDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:24:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06F95C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:31:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D842C222D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:24:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CC1C82229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:31:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qXKcVKTF";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vDtFvFc8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D842C222D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rv9ClQd/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="QZegPqan"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC1C82229F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	Message-id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TZD5Q/Jso87iav+L7wnZs2qHND+Fj2qnTcyYmCKqQ5E=; b=qXKcVKTFS8hITf
-	/tLGpIdl/hMzlmkADTq3XtDBqDK3FLdL74tniNJ+F7EpIyCDC+MbSKTlUBHzLu5N5o8LKVztQqQfm
-	Mw6nI8x8BXwSEpUA3X+3CctuYP8DY3TRwdsupQxK56Kq2riQVA9uLaYiiCgyjDsstu0vxeft/BF6Z
-	KokprsOWyeT34rvvNHKV65XUyQwjUV6Q2DFNYQX4ChEfiE+5IdiEuVGNvJ17T7KULMuxvo4D+h6hG
-	HG5yyO+zezeJ4BopWSUh+eRIoC4ekK2zo3tX6DQuLeD2bCa24B9a/RnHmPCwHVdj002pFUoNzcD1X
-	7JgGRZzlzwuekUn4ypRA==;
+	In-Reply-To:List-Owner; bh=f6EL+xwPOmxoUabrQat3W3JgbSOV8oCVS98WDriDkNo=; b=Rv
+	9ClQd/91pJGIpAYoo16IwbJ8eUhNQcJ7hol1CyN3IVOq6B8FzXlfCnH9dqTB+Qk+3StCsA61VNqYK
+	l9KcpBVK3Xt9opB74UgyIV3mEyvtdCsA7Zpct5Rqbr0fEWP3DfPKt3ZlUMvAXiklcmJG8qrAknwkZ
+	0W5BXL0B1sJuXRCOv94U6faAfikf+nXpnVZS3wicw7MEaUMLrQSU+AXKvqo5/66BktdIqlwK6wEm6
+	WDMcK8r92NtAtQlcopSLu49XUmWzUTkNc8OOJEnmnMZi7kg5BxXcO04ylIztjbV0Pi88Cq1IMykyu
+	SAiPXj/b0p5GiJmHcnVg7EJiKmu/prGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guHw6-0000j4-VY; Thu, 14 Feb 2019 14:24:22 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1guI36-0004MA-Fc; Thu, 14 Feb 2019 14:31:36 +0000
+Received: from mailout2.w1.samsung.com ([210.118.77.12])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guHw3-0000ih-MM
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:24:21 +0000
-Received: from mail-qt1-f171.google.com (mail-qt1-f171.google.com
- [209.85.160.171])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 46BC4222D7
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 14:24:19 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550154259;
- bh=ZviCB4UK+yPmuMDh7PuGrRRgjNrg+f4+Z5wYwmTpiVU=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=vDtFvFc83qDStPyHEZLUlwUrpwWXv74xEIrNY/2b3RNdd2MhFRWIdFWRFtahgoUFc
- i3L0Ezh0zr18lZflRFlepGVeddLxITeJVwKNL0IHH+XswCSQG8vNQnJhxTnxbyUzX9
- pH0HivZPJZ4QmNa/jhgJP2KbHnD14XeC5nOXKn0c=
-Received: by mail-qt1-f171.google.com with SMTP id v10so6982653qtp.8
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:24:19 -0800 (PST)
-X-Gm-Message-State: AHQUAua16lkAVxAZs4VpTrvk99riGxJl9LwJGLwdTkILYHNKL8CIA+LR
- rDR0UvzLbdWjxPkHEJF7P3s23lPHXL/shZp1pA==
-X-Google-Smtp-Source: AHgI3IaAqyV0Bi9f8MwikDZm6bMdc94+avjRW4HSg1PgsYazr6lpxXVkrHs76nh+5S5uNjuJQGCucf7rkxY5jC/iQnc=
-X-Received: by 2002:ac8:4548:: with SMTP id z8mr3116552qtn.257.1550154258491; 
- Thu, 14 Feb 2019 06:24:18 -0800 (PST)
-MIME-Version: 1.0
-References: <20181205195050.4759-6-robh@kernel.org>
- <CGME20190213161024epcas3p3acc5c074714ad1d44fb90ab3f21cfcff@epcas3p3.samsung.com>
- <CAL_Jsq+xpRPvj=UcSo+jQKX1pB=9B3SV9jB5ZVhaVsKvOqtoOg@mail.gmail.com>
- <5cc4b5a3-c4ad-46a9-2856-3ed67c6755d3@samsung.com>
-In-Reply-To: <5cc4b5a3-c4ad-46a9-2856-3ed67c6755d3@samsung.com>
-From: Rob Herring <robh@kernel.org>
-Date: Thu, 14 Feb 2019 08:24:07 -0600
-X-Gmail-Original-Message-ID: <CAL_Jsq+hoRE5UG3+Z9OKDc3xmkJbGgQpUF+M4pzXJ_BSjj0kfg@mail.gmail.com>
-Message-ID: <CAL_Jsq+hoRE5UG3+Z9OKDc3xmkJbGgQpUF+M4pzXJ_BSjj0kfg@mail.gmail.com>
-Subject: Re: [PATCH] devfreq: Use of_node_name_eq for node name comparisons
-To: Chanwoo Choi <cw00.choi@samsung.com>,
- MyungJoo Ham <myungjoo.ham@samsung.com>
+ id 1guI31-0004LT-TZ
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:31:34 +0000
+Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
+ by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20190214143127euoutp023cd980b16cf262fd43e5de99123a1999~DQXmmRQ_m3010730107euoutp02H;
+ Thu, 14 Feb 2019 14:31:27 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
+ 20190214143127euoutp023cd980b16cf262fd43e5de99123a1999~DQXmmRQ_m3010730107euoutp02H
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1550154687;
+ bh=vlYj+X3X9RwnfDOOKJf/4CgLBXV7Gi+2g7C3ppiBsIM=;
+ h=From:To:Cc:Subject:Date:References:From;
+ b=QZegPqanX4UlNXLMZ47eTy4aShF+MP0rgHsj0JWPXwawqY+RG0oxeabITwcakdXQH
+ MnxdAxCjYEvu/XfGPh/7Sjc4UuP45KBf+3kqNtIR6dPzUvgyvh7NcbouPfnrRtWb2L
+ i6vGMARnaybZXu+5n3vu4UOeNdORKAz/EsZqOj7c=
+Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190214143126eucas1p1d1cdb9383f1793632e18628f6136e82e~DQXmG9Faz0421904219eucas1p1x;
+ Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges2new.samsung.com (EUCPMTA) with SMTP id 5B.EB.04294.EBB756C5; Thu, 14
+ Feb 2019 14:31:26 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d~DQXldHN9N0535005350eucas1p1B;
+ Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
+X-AuditID: cbfec7f4-c77a99c0000010c6-52-5c657bbe0303
+Received: from eusync1.samsung.com ( [203.254.199.211]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id 7E.EA.04128.EBB756C5; Thu, 14
+ Feb 2019 14:31:26 +0000 (GMT)
+Received: from AMDC2765.digital.local ([106.116.147.25]) by
+ eusync1.samsung.com (Oracle Communications Messaging Server 7.0.5.31.0 64bit
+ (built May  5 2014)) with ESMTPA id <0PMX00KTV706CB50@eusync1.samsung.com>;
+ Thu, 14 Feb 2019 14:31:26 +0000 (GMT)
+From: Marek Szyprowski <m.szyprowski@samsung.com>
+To: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: pm: fix HYP/SVC mode mismatch when MCPM is used
+Date: Thu, 14 Feb 2019 15:31:14 +0100
+Message-id: <20190214143114.24356-1-m.szyprowski@samsung.com>
+X-Mailer: git-send-email 2.17.1
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrKIsWRmVeSWpSXmKPExsWy7djPc7r7qlNjDI63a1lsnLGe1eJn+xYm
+ i/PnN7BbbHp8jdXi8q45bBYzzu9jslh75C67xfppP1ktPj37x25xqX8ik8WMyS/ZHLg9Ll+7
+ yOzx/kYru8fOWXfZPTat6mTzuHNtD5vH5iX1Hn1bVjF6fN4kF8ARxWWTkpqTWZZapG+XwJWx
+ aPNc5oJ2sYq1164yNjCuF+pi5OSQEDCROLeol62LkYtDSGAFo8S0O8cZIZzPjBKLJk9jh6ma
+ P2U/VNUyRommhauYIJwGJonTSx6zgVSxCRhKdL3tArNFBNwk/q07BNbBLNDOLPHiyXSwhLCA
+ q0Rb501mEJtFQFWia8FOFhCbV8BWonVqKxvEOnmJ1RsOMIM0SwjMYZO4uu4BE0TCReLJjwuM
+ ELaMxOXJ3SwQRc2MEu0zZrFDOD2MElvn7IAaZS1x+PhFVhCbWYBPYtK26UBjOYDivBIdbdAg
+ 8JDYtmwp2AIhgViJ793vmSYwii9gZFjFKJ5aWpybnlpslJdarlecmFtcmpeul5yfu4kRGJmn
+ /x3/soNx15+kQ4wCHIxKPLwrMlJjhFgTy4orcw8xSnAwK4nw+lUChXhTEiurUovy44tKc1KL
+ DzFKc7AoifNWMzyIFhJITyxJzU5NLUgtgskycXBKNTBy/pxygYPp3f+ci3sjTlf8nz2F70V7
+ /SLeCW5xd57y/F/pn9Ts2N13dQczH0PEo7dpJt02YZFHbi85u0uh8NGjyNoprO8Zd+54rK9s
+ ed5Vzfe8lp1O3uNjFzX4T9sHWrwI1LizYea6Dc5lETtuPOEUEF64pHhbYYW/ltbOP741W2Sb
+ lIxuOe5TYinOSDTUYi4qTgQAMa8JfMgCAAA=
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFprELMWRmVeSWpSXmKPExsVy+t/xy7r7qlNjDA52clpsnLGe1eJn+xYm
+ i/PnN7BbbHp8jdXi8q45bBYzzu9jslh75C67xfppP1ktPj37x25xqX8ik8WMyS/ZHLg9Ll+7
+ yOzx/kYru8fOWXfZPTat6mTzuHNtD5vH5iX1Hn1bVjF6fN4kF8ARxWWTkpqTWZZapG+XwJWx
+ aPNc5oJ2sYq1164yNjCuF+pi5OSQEDCRmD9lP1sXIxeHkMASRonvk1cyQjhNTBIb9v5jBqli
+ EzCU6HrbxQZiiwi4Sfxbdwisg1mgk1li3vQ9LCAJYQFXibbOm2ANLAKqEl0LdoLFeQVsJVqn
+ trJBrJOXWL3hAPMERq4FjAyrGEVSS4tz03OLjfSKE3OLS/PS9ZLzczcxAkNq27GfW3Ywdr0L
+ PsQowMGoxMO7IiM1Rog1say4MvcQowQHs5IIr18lUIg3JbGyKrUoP76oNCe1+BCjNAeLkjjv
+ eYPKKCGB9MSS1OzU1ILUIpgsEwenVAOjHFtIS+PUZ3fSv14S+2tSmcGoEPpe3WT3FiW1ZRZi
+ M1ev+hm4teBI3cFzp1yVSi9bCc3n7zl7ZOfXxOMdu+w101d8e/xossKksPYuPkMrpjMK89Yx
+ HjlmJF4TGWLH8rL4eW1OyLMbSrazPlgF5mb3bas8cXF+tcrE1rfH4vIW+hRsOjib40C1Ektx
+ RqKhFnNRcSIAFgIjvyUCAAA=
+X-CMS-MailID: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
+References: <CGME20190214143126eucas1p126506139ef72c1685654c8dac8957b3d@eucas1p1.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_062419_749638_9B40AB73 
-X-CRM114-Status: GOOD (  17.42  )
+X-CRM114-CacheID: sfid-20190214_063132_259454_B8D7F92B 
+X-CRM114-Status: GOOD (  17.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,45 +119,104 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org,
- linux-samsung-soc <linux-samsung-soc@vger.kernel.org>,
- "open list:THERMAL" <linux-pm@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, linux-samsung-soc@vger.kernel.org,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ Kevin Hilman <khilman@baylibre.com>, Seung-Woo Kim <sw0312.kim@samsung.com>,
  Krzysztof Kozlowski <krzk@kernel.org>,
- Kyungmin Park <kyungmin.park@samsung.com>, Kukjin Kim <kgene@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+ Russell King <rmk+kernel@armlinux.org.uk>,
+ Marian Mihailescu <mihailescu2m@gmail.com>,
+ Marek Szyprowski <m.szyprowski@samsung.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gV2VkLCBGZWIgMTMsIDIwMTkgYXQgOTo0OSBQTSBDaGFud29vIENob2kgPGN3MDAuY2hvaUBz
-YW1zdW5nLmNvbT4gd3JvdGU6Cj4KPiBIaSBSb2IsCj4KPiBPbiAxOS4gMi4gMTQuIOyYpOyghCAx
-OjA5LCBSb2IgSGVycmluZyB3cm90ZToKPiA+IE9uIFdlZCwgRGVjIDUsIDIwMTggYXQgMTo1MCBQ
-TSBSb2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPiB3cm90ZToKPiA+Pgo+ID4+IENvbnZlcnQg
-c3RyaW5nIGNvbXBhcmVzIG9mIERUIG5vZGUgbmFtZXMgdG8gdXNlIG9mX25vZGVfbmFtZV9lcSBo
-ZWxwZXIKPiA+PiBpbnN0ZWFkLiBUaGlzIHJlbW92ZXMgZGlyZWN0IGFjY2VzcyB0byB0aGUgbm9k
-ZSBuYW1lIHBvaW50ZXIuCj4gPj4KPiA+PiBGb3IgaW5zdGFuY2VzIHVzaW5nIG9mX25vZGVfY21w
-LCB0aGlzIGhhcyB0aGUgc2lkZSBlZmZlY3Qgb2Ygbm93IHVzaW5nCj4gPj4gY2FzZSBzZW5zaXRp
-dmUgY29tcGFyaXNvbnMuIFRoaXMgc2hvdWxkIG5vdCBtYXR0ZXIgZm9yIGFueSBGRFQgYmFzZWQK
-PiA+PiBzeXN0ZW0gd2hpY2ggYWxsIG9mIHRoZXNlIGFyZS4KPiA+Pgo+ID4+IENjOiBDaGFud29v
-IENob2kgPGN3MDAuY2hvaUBzYW1zdW5nLmNvbT4KPiA+PiBDYzogTXl1bmdKb28gSGFtIDxteXVu
-Z2pvby5oYW1Ac2Ftc3VuZy5jb20+Cj4gPj4gQ2M6IEt5dW5nbWluIFBhcmsgPGt5dW5nbWluLnBh
-cmtAc2Ftc3VuZy5jb20+Cj4gPj4gQ2M6IEt1a2ppbiBLaW0gPGtnZW5lQGtlcm5lbC5vcmc+Cj4g
-Pj4gQ2M6IEtyenlzenRvZiBLb3psb3dza2kgPGtyemtAa2VybmVsLm9yZz4KPiA+PiBDYzogbGlu
-dXgtcG1Admdlci5rZXJuZWwub3JnCj4gPj4gQ2M6IGxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5m
-cmFkZWFkLm9yZwo+ID4+IENjOiBsaW51eC1zYW1zdW5nLXNvY0B2Z2VyLmtlcm5lbC5vcmcKPiA+
-PiBTaWduZWQtb2ZmLWJ5OiBSb2IgSGVycmluZyA8cm9iaEBrZXJuZWwub3JnPgo+ID4+IC0tLQo+
-ID4+ICBkcml2ZXJzL2RldmZyZXEvZGV2ZnJlcS1ldmVudC5jICAgICB8IDIgKy0KPiA+PiAgZHJp
-dmVycy9kZXZmcmVxL2V2ZW50L2V4eW5vcy1wcG11LmMgfCAyICstCj4gPj4gIDIgZmlsZXMgY2hh
-bmdlZCwgMiBpbnNlcnRpb25zKCspLCAyIGRlbGV0aW9ucygtKQo+ID4KPiA+IENhbiBzb21lb25l
-IGFwcGx5IHRoaXMgcGxlYXNlLgo+Cj4gTXl1bmdqb28gcGlja2VkIHVwIHRoaXMgcGF0Y2hbMV0g
-b24gZGV2ZnJlcS5naXQKPiBidXQgaGFzIG5vdCB5ZXQgc2VudCB0aGUgcHVsbCByZXF1ZXN0LgoK
-T2theSwgdGhhbmtzLgoKUGxlYXNlIGFkZCB0aGF0IHRyZWUgdG8gbGludXgtbmV4dCBvciByZXBs
-eSB0byBwYXRjaGVzIHdoZW4gdGhleSd2ZQpiZWVuIGFwcGxpZWQsIHNvIHN1Ym1pdHRlcnMgaGF2
-ZSBzb21lIHdheSB0byBrbm93IHdoZW4gdGhlaXIgcGF0Y2ggaXMKYWNjZXB0ZWQuCgpSb2IKCl9f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
-ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
-dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
-ZWwK
+MCPM does a soft reset of the CPUs and uses common cpu_resume() routine to
+perform low-level platform initialization. This results in a try to install
+HYP stubs for the second time for each CPU and results in false HYP/SVC
+mode mismatch detection. The HYP stubs are already installed at the
+beginning of the kernel initialization on the boot CPU (head.S) or in the
+secondary_startup() for other CPUs. To fix this issue MCPM code should use
+a cpu_resume() routine without HYP stubs installation.
+
+This change fixes HYP/SVC mode mismatch on Samsung Exynos5422-based Odroid
+XU3/XU4/HC1 boards.
+
+Fixes: 3721924c8154 ("ARM: 8081/1: MCPM: provide infrastructure to allow for MCPM loopback")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+ arch/arm/common/mcpm_entry.c   |  2 +-
+ arch/arm/include/asm/suspend.h |  1 +
+ arch/arm/kernel/sleep.S        | 11 +++++++++++
+ 3 files changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
+index ad574d20415c..1b1b82b37ce0 100644
+--- a/arch/arm/common/mcpm_entry.c
++++ b/arch/arm/common/mcpm_entry.c
+@@ -381,7 +381,7 @@ static int __init nocache_trampoline(unsigned long _arg)
+ 	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+ 	phys_reset_t phys_reset;
+ 
+-	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
++	mcpm_set_entry_vector(cpu, cluster, cpu_resume_no_hyp);
+ 	setup_mm_for_reboot();
+ 
+ 	__mcpm_cpu_going_down(cpu, cluster);
+diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
+index 452bbdcbcc83..506314265c6f 100644
+--- a/arch/arm/include/asm/suspend.h
++++ b/arch/arm/include/asm/suspend.h
+@@ -10,6 +10,7 @@ struct sleep_save_sp {
+ };
+ 
+ extern void cpu_resume(void);
++extern void cpu_resume_no_hyp(void);
+ extern void cpu_resume_arm(void);
+ extern int cpu_suspend(unsigned long, int (*)(unsigned long));
+ 
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index a8257fc9cf2a..b856d183691e 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -122,6 +122,11 @@ ENDPROC(cpu_resume_after_mmu)
+ 
+ #ifdef CONFIG_MMU
+ 	.arm
++#ifdef CONFIG_MCPM
++ENTRY(cpu_resume_no_hyp)
++ARM_BE8(setend be)			@ ensure we are in BE mode
++	b	0f
++#endif
+ ENTRY(cpu_resume_arm)
+  THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
+  THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
+@@ -135,6 +140,9 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
+ 	bl	__hyp_stub_install_secondary
+ #endif
+ 	safe_svcmode_maskall r1
++#ifdef CONFIG_MCPM
++0:
++#endif
+ 	mov	r1, #0
+ 	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
+ 	ALT_UP_B(1f)
+@@ -163,6 +171,9 @@ ENDPROC(cpu_resume)
+ 
+ #ifdef CONFIG_MMU
+ ENDPROC(cpu_resume_arm)
++#endif
++#ifdef CONFIG_MCPM
++ENDPROC(cpu_resume_no_hyp)
+ #endif
+ 
+ 	.align 2
+-- 
+2.17.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
