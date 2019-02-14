@@ -2,65 +2,94 @@ Return-Path: <SRS0=niBm=QV=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A7ACC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:46:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B13EFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:51:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6C0C5222DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:46:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 84325222DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 17:51:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kDP0S9MC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C0C5222DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TyaVHVCE";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="PGshS3Ma"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84325222DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DAu/+EhL9Lh+qOEo78qQ5EivMPmjebD/Ifoe3Z4b9tA=; b=kDP0S9MCCsGfL1
-	byFT6nwf2v3sSjZoiiHsBfIahPP8bMZ58w5ERQ7dIrdehPAJ5LNbYuFa0pzx9KNANeNfUYGZgQ++t
-	doez3rc9QLhNJxmx4+fU/AwB0AUYSdUjwwxHTWRUrrBcTLFgM92zv+MWmKLLeYNiFacyFuM80BRvU
-	lT6qavLi4UG47q0i5ZDsSuZ8eyr9JRxnCBg5GXmFH89NS06lqoWCUHJxgJMxJP2ymEZaXR1Op47lo
-	CKf/jbYsuPqIrHf3lCDqX9TaFH0XeplHu2fTmIybp8/3TziaSWvmOJsUTZps96HudIEMR2v6xPbDe
-	uiGjBZErwBfo8er5tdIQ==;
+	List-Owner; bh=Of1iF3BusNVweGEbdxaR/bBPEktrUl7gWn5Dh06Y/Iw=; b=TyaVHVCE2uJUWl
+	Jc9lje2QZ45jDmhyBgARmwbnXavu+rZcLfz7d/KtXcDtQxDMYNsIIcGEahej5Y3iiVIva0LSWF9oS
+	UeNB+i/RClyeoRLFTCTFBzkQ6dcqC8tkp0GSjsbJL1LQpO9d4DbjgP80qiFqCBEVv341dm4jE5fFE
+	CH7o3pyNyfmPi04El/h6cb2aurK09qjsBoZDsIC+YD5d+kA71IiXEsJfZmQwaNn38ofh/XiDnhEWc
+	6KSJNU1iys9vHIYo34IFxl8YXnYKVg+o7b8o9vOC0wPYbTNDpI5E32+D1rXEyZGnF9sGEW4H1A7mz
+	bDnbvEyta0i9lEkGW5rQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guL5Y-000456-7r; Thu, 14 Feb 2019 17:46:20 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guL5V-00044f-Dj
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:46:18 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 4E2E680EA;
- Thu, 14 Feb 2019 17:46:25 +0000 (UTC)
-Date: Thu, 14 Feb 2019 09:46:12 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Message-ID: <20190214174612.GF5720@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
+	id 1guLAq-0005it-08; Thu, 14 Feb 2019 17:51:48 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guLAl-0005i3-Ry
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 17:51:45 +0000
+Received: by mail-lj1-x244.google.com with SMTP id g80so6014018ljg.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 09:51:43 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linux-foundation.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=YOAxNfp/u2AjpSAe9gJ1DkLd8kcSaDRiWtEtJaBSEcs=;
+ b=PGshS3MaeGeltwuyVtFmT0V6YZQZmxLLNBrf107mvwKlqUhZwGpD70GnjqQJh+4V2q
+ 3J6Xvbgr/CiWsk6q6rJVeglsaiLbeVTkiovB8o6FTpvJF+udviHo9Zs+xhaucNb0e3LD
+ IXDiqt1MsmZkkBaKR5AXhS5/XMcdP66J22GNk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=YOAxNfp/u2AjpSAe9gJ1DkLd8kcSaDRiWtEtJaBSEcs=;
+ b=eHPdEDiluWRbP6pLxr4QrJ6PTl1cGKLHMbTq78wRHua3sHI6CPRX5uiDH1W91TEq7B
+ 3oXF9CiuAHukNFMD7ga/og+6YkpHZHPrAR2ZMdlTuWwl4DjjE+RT2GY3p60cW2Gobtzl
+ 9zjsSrNkuE5kZzB1TDUWHUZzfi9m4CklAmDSP3lCIXkvgj1IaNO44SKBb+GyFK/2SgXY
+ Mhn4f/QYQJ97DQe4x58i4T+ydR1lQlfbK3WxV1bk7aJjLlTM78RqZ2vkNjdSaejzl7bT
+ iQvaGbNSFqKl4M7eFy4fm9whLzYNPZr3L+DYEGszoiwRycFBdHTyRfORIpD4K2oqv1lm
+ 5BDw==
+X-Gm-Message-State: AHQUAuZq3HIffOvDBbNBtGEkmSBDpyd7lSAEN6FrLb2evIzqDHNN+u/Y
+ HtK6oima2oRWxsmnD+NWWwk9b9FK+dQ=
+X-Google-Smtp-Source: AHgI3IZ21kL3iPmvNooahuJZ1tvufAyc7DQYbOIy2kG0tPICaBFHe875zkzqtX4aKuIGyFWzPk1PTA==
+X-Received: by 2002:a2e:9786:: with SMTP id y6-v6mr3145009lji.53.1550166701256; 
+ Thu, 14 Feb 2019 09:51:41 -0800 (PST)
+Received: from mail-lf1-f42.google.com (mail-lf1-f42.google.com.
+ [209.85.167.42])
+ by smtp.gmail.com with ESMTPSA id n21sm664690lfb.81.2019.02.14.09.51.38
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 09:51:38 -0800 (PST)
+Received: by mail-lf1-f42.google.com with SMTP id u21so5215756lfu.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 09:51:38 -0800 (PST)
+X-Received: by 2002:a19:2794:: with SMTP id n142mr3048400lfn.77.1550166697920; 
+ Thu, 14 Feb 2019 09:51:37 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+References: <1550089932-6888-1-git-send-email-longman@redhat.com>
+ <1550089932-6888-3-git-send-email-longman@redhat.com>
+ <20190214103333.GH32494@hirez.programming.kicks-ass.net>
+ <9e01d4ef-56df-7af8-a0f5-b49644e298bf@redhat.com>
+In-Reply-To: <9e01d4ef-56df-7af8-a0f5-b49644e298bf@redhat.com>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Thu, 14 Feb 2019 09:51:21 -0800
+X-Gmail-Original-Message-ID: <CAHk-=whKmuranma_HUOKBbDJHGmdWZr9MYW-+cmGzsOiJ2N1Sg@mail.gmail.com>
+Message-ID: <CAHk-=whKmuranma_HUOKBbDJHGmdWZr9MYW-+cmGzsOiJ2N1Sg@mail.gmail.com>
+Subject: Re: [PATCH v3 2/2] locking/rwsem: Optimize down_read_trylock()
+To: Waiman Long <longman@redhat.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_094617_503579_AC07E75D 
-X-CRM114-Status: GOOD (  16.60  )
+X-CRM114-CacheID: sfid-20190214_095143_915575_3BF3FF82 
+X-CRM114-Status: GOOD (  13.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,60 +101,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arch <linux-arch@vger.kernel.org>, linux-xtensa@linux-xtensa.org,
+ Davidlohr Bueso <dave@stgolabs.net>, linux-ia64@vger.kernel.org,
+ Tim Chen <tim.c.chen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Linux-sh list <linux-sh@vger.kernel.org>,
+ Peter Zijlstra <peterz@infradead.org>, linux-hexagon@vger.kernel.org,
+ the arch/x86 maintainers <x86@kernel.org>, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ "H. Peter Anvin" <hpa@zytor.com>,
+ "linux-alpha@vger.kernel.org" <linux-alpha@vger.kernel.org>,
+ sparclinux@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linuxppc-dev@lists.ozlabs.org, Andrew Morton <akpm@linux-foundation.org>,
+ "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190214 17:32]:
-> Hi Tony,
-> 	Please do not snip the on going discussion.
-> 
-> On 2/14/2019 9:11 PM, Tony Lindgren wrote:
-> > * Lokesh Vutla <lokeshvutla@ti.com> [190214 08:39]:
-> >> IMHO, device ids are something which can be used in DT. There are many other
-> >> things like the interrupt ranges etc.. which are discoverable from sysfw and we
-> >> are implementing it.
-> > 
-> > We need to describe hardware in the device tree, not firmware.
-> > 
-> > If you have something discoverable from the firmware, you should
-> > have the device driver query it from sysfw based on a hardware
-> > property, not based on some invented enumeration in the firmware.
-> 
-> Yes we are already querying sysfw for all the irq ranges that can be
-> discoverable. The topic of discussion here is about the parent interrupt
-> controller id. I am not sure how you are expecting an id be discoverable
-> from system firmware especially with a name.
+On Thu, Feb 14, 2019 at 6:53 AM Waiman Long <longman@redhat.com> wrote:
+>
+> The ARM64 result is what I would have expected given that the change was
+> to optimize for the uncontended case. The x86-64 result is kind of an
+> anomaly to me, but I haven't bothered to dig into that.
 
-Well names are quite standard in dts (but should be used with
-the phandle + offset). Think for example interrupt-names and
-reg-names :)
+I would say that the ARM result is what I'd expect from something that
+scales badly to begin with.
 
-> > If there is some device to firmware translation needed, hide that
-> > into the device driver and keep it out of the device tree.
-> 
-> If preferred this can be moved to of_match_data attached to each
-> compatible property. Then for each SoC a new compatible needs to be created.
+The x86-64 result is the expected one: yes, the cmpxchg is done one
+extra time, but it results in fewer cache transitions (the cacheline
+never goes into "shared" state), and cache transitions are what
+matter.
 
-Hiding the ID into the device driver and compatible property
-makes sense to me if the id is based on SoC + firmware.
+The cost of re-doing the instruction should be low. The cacheline
+ping-pong and the cache coherency messages is what hurts.
 
-But I'd rather have a proper hardware based phandle + index
-type mapping in the dts if possible though.
+So I actually think both are very easily explained.
 
-What does this id really consist of?
+The x86-64 number improves, because there is less cache coherency traffic.
 
-Regards,
+The arm64 numbers scaled horribly even before, and that's because
+there is too much ping-pong, and it's probably because there is no
+"stickiness" to the cacheline to the core, and thus adding the extra
+loop can make the ping-pong issue even worse because now there is more
+of it.
 
-Tony
+The cachelines not sticking at all to a core probably is good for
+fairness issues (in particular, sticking *too* much can cause horrible
+issues), but it's absolutely horrible if it means that you lose the
+cacheline even before you get to complete the second cmpxchg.
+
+                  Linus
 
 _______________________________________________
 linux-arm-kernel mailing list
