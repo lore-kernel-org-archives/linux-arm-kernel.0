@@ -3,78 +3,89 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 257E1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:16:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 299BAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:19:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E19A62080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:16:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E85B8222D4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 14 Feb 2019 14:19:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P4tVEJxM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="lWdUKpZ5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E19A62080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TCyrYgqG";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=synopsys.com header.i=@synopsys.com header.b="MmIgHR9z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E85B8222D4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=synopsys.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=++1a3pMqaeVyk3PAiXujAHzKC3rIiQdNQoeAKF7nUZM=; b=P4tVEJxMcf+YZi
-	fGdsm2WnoJqlC7FblWdpwoJsQ0O7pNwiMhR31ghJZ52MWaGThKTLaOHotxrErUV1a3D8qXjMhJrnt
-	ECf7tADWHUU6q0HOYXZQatxbxlZBghI1oCYh4o/eQfaez+Bd+8DH6+O2zSpRO10RF5fLazGHLubad
-	/DBdRbVG4FlCIr0HBrrisksbt29c3x/dKnnVfH4t0FmyqAGOqzpXfkqhdn1Du+7QzkzhMNrDer1E8
-	f40boVQVW6iAG2OQt50vz1KhZICviL+adslC4QhSCwsU4ltSKdpqtmJnpZYOkJoG4SGZwal0tTSw6
-	xluCJ/fqoN8CrDfoSS4w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2iA6VKJE+3IhapiVLRLul9bKiDhfhuUqIOw1xQN7gJs=; b=TCyrYgqGod0XSK
+	Rc0bq4FS8qaKpYx9kEeRBmfRhGxWwH5AbyS4DL0kB6y+qMHcIKlYymeKqv38RhD8CCCB/8ddeGULO
+	3wuUzog9QZ1k8sylYXLkTOS/MteMF9zLoupHjhOUuInlFpHlmJmFoDV9ib8Fe/ibXFGsUZi3NvSGv
+	iEp4VY4h8zN9kHHXJ+5pjrH9OWyp7ZyXt5kAaoVXgBEye0fhZmhq28AFvXcz5v6y9gmnryg2OwPv5
+	jZinbpsw+bDvJ4pmTai2JiKR1ISC93viT0THj+eHhgfbYbzsiXGC+6fOb0R1xRD/2fH6yUds5kzUu
+	nN4tqurMcR8I7JsYvAqg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guHoc-0006dH-KI; Thu, 14 Feb 2019 14:16:38 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1guHrc-0007Lb-DT; Thu, 14 Feb 2019 14:19:44 +0000
+Received: from smtprelay.synopsys.com ([198.182.60.111])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guHoX-0006ce-Sx
- for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:16:36 +0000
-Received: from mail-qt1-f180.google.com (mail-qt1-f180.google.com
- [209.85.160.180])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1guHrZ-0007Ko-44
+ for linux-arm-kernel@lists.infradead.org; Thu, 14 Feb 2019 14:19:42 +0000
+Received: from mailhost.synopsys.com (dc2-mailhost2.synopsys.com
+ [10.12.135.162])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4C73B222B6
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 14:16:33 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550153793;
- bh=yI1kE66VpuYQMMEK8/lcyOGgJ4h+beeo2bebLTahaEo=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=lWdUKpZ5b32vafVlM2ACyug91RHOEP61NQg/CmmJehD7ucGn9dPpQ+ElQXxTge8zj
- VzhEuVph7qY/Nbg+l2FsgLW2X4b+u4UVh0+7yRTOUCyWGdXiQ1GyKvqi6LPeU9MQOR
- Y4Mme7lN81ndam5Ak0ELEg8y2m1o+hJEC3Q9fDbQ=
-Received: by mail-qt1-f180.google.com with SMTP id a48so6974697qtb.4
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 06:16:33 -0800 (PST)
-X-Gm-Message-State: AHQUAua5LhXnn2OvbEiFHZr9fNhdkcD+cM2pvJIDS85hCtog2LqRZXV+
- q8bGT55zSQUwlT/swvuysLStr563YAbDkl+38g==
-X-Google-Smtp-Source: AHgI3IaY3wfg3Md+1Jr5MIMyVnKv0PcB1DKLA6qjTpequls8S4t1vV/LZF3iBSgJba/tP3oJC5hJw3YQ+h7efOS21HI=
-X-Received: by 2002:a0c:9e05:: with SMTP id p5mr3043949qve.246.1550153792504; 
- Thu, 14 Feb 2019 06:16:32 -0800 (PST)
+ by smtprelay.synopsys.com (Postfix) with ESMTPS id 32F2D10C1477;
+ Thu, 14 Feb 2019 06:19:37 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=synopsys.com; s=mail;
+ t=1550153977; bh=x7inVug3nWx9VUVjq+5f0/T6Kr35IEx3nZCt6HCe/do=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To:From;
+ b=MmIgHR9zpE9fNCOUPSjJru99/k5QgZr2ESRCNRyAyd+HmNDon27Yjpaxt+SCntfO1
+ tS0I2b7AgrCZcihRyMQRJJD6bL/cA7elGyHRWYm154tMZUYGinyZGUmuoiicuRabnT
+ fevQ1ZqJy0nNEKK12gE5+3xgNOZ+CLtrMBMP+VGI74/Pdo0aUU0VDGB5GbeZq60jwu
+ HG0xfU2LxpRtCbbOluw/U1jc2fpHCqIAkiG9g18s47+HPX/jTTIVfxi03W+1InNCPD
+ N99w/XlqQoIzI1jdeuXMObPZCc5og8C19SJBDL08Dd02oiwqbCvCcCWLn/A0svLH8G
+ fZU1N/Xp2XevQ==
+Received: from US01WXQAHTC1.internal.synopsys.com
+ (us01wxqahtc1.internal.synopsys.com [10.12.238.230])
+ (using TLSv1.2 with cipher AES128-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mailhost.synopsys.com (Postfix) with ESMTPS id 714EDA0090;
+ Thu, 14 Feb 2019 14:19:36 +0000 (UTC)
+Received: from DE02WEHTCB.internal.synopsys.com (10.225.19.94) by
+ US01WXQAHTC1.internal.synopsys.com (10.12.238.230) with Microsoft SMTP Server
+ (TLS) id 14.3.408.0; Thu, 14 Feb 2019 06:18:06 -0800
+Received: from DE02WEHTCA.internal.synopsys.com (10.225.19.92) by
+ DE02WEHTCB.internal.synopsys.com (10.225.19.94) with Microsoft SMTP Server
+ (TLS) id 14.3.408.0; Thu, 14 Feb 2019 15:18:04 +0100
+Received: from [10.107.19.176] (10.107.19.176) by
+ DE02WEHTCA.internal.synopsys.com (10.225.19.80) with Microsoft SMTP Server
+ (TLS) id 14.3.408.0; Thu, 14 Feb 2019 15:18:04 +0100
+Subject: Re: [net-next, PATCH] net: stmmac: use correct define to get rx
+ timestamp on GMAC4
+To: Alexandre Torgue <alexandre.torgue@st.com>,
+ Giuseppe Cavallaro <peppe.cavallaro@st.com>,
+ Jose Abreu <jose.abreu@synopsys.com>, <davem@davemloft.net>
+References: <1550153571-14404-1-git-send-email-alexandre.torgue@st.com>
+From: Jose Abreu <jose.abreu@synopsys.com>
+Message-ID: <7c03dff4-5185-dbd2-eeb4-867972512f2b@synopsys.com>
+Date: Thu, 14 Feb 2019 14:18:02 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-References: <20190204231554.87666-1-ray.jui@broadcom.com>
- <20190204231554.87666-4-ray.jui@broadcom.com>
- <20190213211651.GA10705@bogus>
- <796d9a96-f3f9-cb9a-faa3-4baf0e72da65@broadcom.com>
-In-Reply-To: <796d9a96-f3f9-cb9a-faa3-4baf0e72da65@broadcom.com>
-From: Rob Herring <robh@kernel.org>
-Date: Thu, 14 Feb 2019 08:16:21 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqK+QLRp7LqkMzQCXdLPaJU3fbiNWU_uyuPFJ4qDkP=siA@mail.gmail.com>
-Message-ID: <CAL_JsqK+QLRp7LqkMzQCXdLPaJU3fbiNWU_uyuPFJ4qDkP=siA@mail.gmail.com>
-Subject: Re: [PATCH v4 3/8] dt-bindings: i2c: iproc: make 'interrupts' optional
-To: Ray Jui <ray.jui@broadcom.com>
+In-Reply-To: <1550153571-14404-1-git-send-email-alexandre.torgue@st.com>
+Content-Language: en-US
+X-Originating-IP: [10.107.19.176]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_061633_970056_E03365DE 
-X-CRM114-Status: GOOD (  20.00  )
+X-CRM114-CacheID: sfid-20190214_061941_174772_9FED2DBB 
+X-CRM114-Status: GOOD (  16.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,73 +97,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Wolfram Sang <wsa@the-dreams.de>,
- Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <bcm-kernel-feedback-list@broadcom.com>, Linux I2C <linux-i2c@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: netdev@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 4:06 PM Ray Jui <ray.jui@broadcom.com> wrote:
->
-> Hi Rob,
->
-> On 2/13/2019 1:16 PM, Rob Herring wrote:
-> > On Mon, Feb 04, 2019 at 03:15:49PM -0800, Ray Jui wrote:
-> >> In prep for the introduction of polling mode into the driver, update the
-> >> binding document to make the 'interrupts' property optional
-> >>
-> >> Signed-off-by: Ray Jui <ray.jui@broadcom.com>
-> >> Signed-off-by: Rayagonda Kokatanur <rayagonda.kokatanur@broadcom.com>
-> >> ---
-> >>  .../devicetree/bindings/i2c/brcm,iproc-i2c.txt         | 10 +++++++---
-> >>  1 file changed, 7 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-> >> index 81f982ccca31..d3a3620b1f06 100644
-> >> --- a/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-> >> +++ b/Documentation/devicetree/bindings/i2c/brcm,iproc-i2c.txt
-> >> @@ -9,9 +9,6 @@ Required properties:
-> >>      Define the base and range of the I/O address space that contain the iProc
-> >>      I2C controller registers
-> >>
-> >> -- interrupts:
-> >> -    Should contain the I2C interrupt
-> >> -
-> >>  - clock-frequency:
-> >>      This is the I2C bus clock. Need to be either 100000 or 400000
-> >>
-> >> @@ -21,6 +18,13 @@ Required properties:
-> >>  - #size-cells:
-> >>      Always 0
-> >>
-> >> +Optional properties:
-> >> +
-> >> +- interrupts:
-> >> +    Should contain the I2C interrupt. If unspecified, driver will fall back to
-> >> +    polling mode
-> >
-> > What determines when you want to use polling mode? I'm not sure DT
-> > is the best way to control this unless it's really a property of
-> > the h/w. Driver behavior is really outside the scope of the DT. u-boot
-> > would use polling even if an interrupt is specified, for example.
-> >
-> It's tied to the particular revision of the I2C controller, i.e., the
-> iProc NIC i2c controller does not have interrupt line wired. In this
-> case, the behavior is determined by the DT compatible string of the
-> iProc I2C device. I thought that it makes sense to now move the
-> 'interrupts' property to be under "Optional" than "Required" which is
-> basically what this change is.
+Hi Alexandre,
 
-Okay, please put this detail into the commit msg.
+On 2/14/2019 2:12 PM, Alexandre Torgue wrote:
+> In dwmac4_wrback_get_rx_timestamp_status we looking for a RX timestamp.
+> For that receive descriptors are handled and so we should use defines
+> related to receive descriptors. It'll no change the functional behavior
+> as RDES3_RDES1_VALID=TDES3_RS1V=BIT(26) but it makes code easier to read.
+> 
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> 
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
+> index 20299f6..9f062b3 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac4_descs.c
+> @@ -268,7 +268,7 @@ static int dwmac4_wrback_get_rx_timestamp_status(void *desc, void *next_desc,
+>  	int ret = -EINVAL;
+>  
+>  	/* Get the status from normal w/b descriptor */
+> -	if (likely(p->des3 & TDES3_RS1V)) {
+> +	if (likely(p->des3 & RDES3_RDES1_VALID)) {
 
-Rob
+Shouldn't this also use le32_to_cpu() like bellow ?
+
+Thanks,
+Jose Miguel Abreu
+
+>  		if (likely(le32_to_cpu(p->des1) & RDES1_TIMESTAMP_AVAILABLE)) {
+>  			int i = 0;
+>  
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
