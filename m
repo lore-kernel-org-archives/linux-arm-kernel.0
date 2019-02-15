@@ -2,23 +2,22 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31B77C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:36:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 996CFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:37:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F20E7222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:36:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68ABD222D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:37:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EedxIo6r";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aJ3srTNN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F20E7222A1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mtx7SVF8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="BJxmEkrK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68ABD222D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,61 +25,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dPxUCdRYc53wSUcENsI0qCso70deBq/Gd2QKAgNND8c=; b=EedxIo6rycbAgf
-	hfi6LEaXPgS+n4GuzsFmtbmbAC4fd+LWeWdHtJnKfRzIqNz62+j8rsIPKCiKGrdiNHbw/5wIuzmdQ
-	RHaCAqYR8biONVcpbsVHM0A1dZyQT6dimgNEgh05wkYPpiEONvjJ+5cTogAnM0kxAtFqjq0+FEzaU
-	NLnhODwQrUBSh2FpN4TWo50VYr4NOdk9NWeukGUBAA+6sdLsGyHgzu1fV3583IMCSjMjZOpMNSxcH
-	oGc6kZR6kAD2fB81HFovKU5BjegGduQXTl4DdiHuZD0YBPZIIXwuieQVhJgEhmXLB4TUJyl4Sehm1
-	ten3bds9SApQl1dK5vYw==;
+	List-Owner; bh=NYq/lIzm5DokKlLIsvAblG4YtQg/BbrrwzKvunOIBKc=; b=Mtx7SVF8o5BDa1
+	HWxAZOZ4FxLR4Z8GEvKXMj7Vv7TiH+Z1th1Uu5WobIzxPhmQGRjGXuec8U1H0KmdLA9rCd2YD8qKZ
+	6lTMfVWFIEkkDIGx7r2URLZI4Hrm13j7jIUM5Wek/3DDJka5FO0KSY8eTAed3rpwVKBKJvnoBieVN
+	DvrZcuJj8aMHKrfgRBi2i2dHbolTXWCfqdzyiY5deOb5lpTUbCmAC4WnH+luTeluuO3juMglfdZRN
+	tcj3WVSAhCYksEmzlGW6JMHZdbdHyGSMsY7Mbz6Gkt7YqzfBiE1LtExDLQNqKHP3sfhFiiPgYKy1F
+	lSpHDY6xaTsC1PUNlr5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gujHs-0007vr-I6; Fri, 15 Feb 2019 19:36:40 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gujIb-0008BL-Fq; Fri, 15 Feb 2019 19:37:25 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gujHp-0007vX-EE
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 19:36:39 +0000
-Received: by mail-ot1-x344.google.com with SMTP id g1so18387096otj.11
+ id 1gujIX-0008B2-Vf
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 19:37:23 +0000
+Received: by mail-it1-x141.google.com with SMTP id z7so26930812iti.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 11:36:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ Fri, 15 Feb 2019 11:37:21 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=46q43Jx11uswLeLjDPuJ9o+ihz8Lrcqkcczy/VoH+u4=;
- b=aJ3srTNNc9RTdpQQlxElpYfjgXOcRidiQHGNpNKIWJJ3yirW31LpBrgPLYyj2EPc5V
- criPUdC4ThHouDGAQXiQEXBO67P3IGVIp0Y8LbqRo0eKMgYzEXfY4xI434c+/KGK8V0x
- O8GQdwPiF8aiRjqBueRlyohhcYKaWvFB/fRc3trEKMQX3KnAXSWOLZp6ou1cLpWBcusa
- VltoUjBDeemxdscJJ3E2i/8BsaseaoEq4gwOv1S9RnCJHqDGZcOdiRLqU5C7x6LZp8AC
- Qsn3Ad6BZfCxPoAn/q11BhSJyuR4sFyfT662uIboV06mxPrzrLJ5Mgu7tsVsvU06ihbQ
- M9xg==
+ :cc; bh=aOSC8ZzkPCXB6WyoycrO9I7WjBSurknF8CSDyuQMuwQ=;
+ b=BJxmEkrKTtLBxqiiTZTRpxbFj2xyLTKbacgro11C4Az8g6PqUfCPE6CF+pLWKWSuCj
+ YLA8+2qWfO0d1ctKZDB8Pn8wIDyAb3mTs2Wq+W8RJDXmXveKfKz5Ts6ARAUgay5WGSWD
+ Q+foTz6lzgWxhDNHg/RooLL2k84x/LiOTLyT0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=46q43Jx11uswLeLjDPuJ9o+ihz8Lrcqkcczy/VoH+u4=;
- b=bnipWJFpptohC61R64FzvwaTP1BOI4x/NrLqRooqO6TS53YfLnWTJs6K3hbfBMiAQh
- m8tgk9s5MIw9ieM88RksJ/9rIyFUs99kjc0l4HWT83SFRBTyeuEGWWQJi2WDXv9vgG6p
- Qchs26JgevLZr8R/1wLlHD7lTCyNMea/ZjnANWLXwlh+VB/3KIf6AQkObC2dMlcdkIWo
- xOnzGOEwp8FHUXo+rN9CYbMJMbMrOOTbbQpxpeybM3cS6A3B5ccJBBSHeQ8PyBWT1GCZ
- DZohTd/h2Nid96TGWBWjpeX6ReOtk2xFWIuSlj1e2aNu4uemFdmTgykyydqx32/MnV58
- tPhw==
-X-Gm-Message-State: AHQUAuaCXCPqxoIBUwakiHbkEpEQm8sUS+kqt48wZIdmRkWmx9MLFYHr
- 05TjMnchtTdZtqW06KaXWvGwm2Pz4Yh0fvHahhs=
-X-Google-Smtp-Source: AHgI3IatitUDZlUrwDmkZItZrHssHpPK438YCGYYnCFc04sym0HpRc6Mid/M+TGCci+R/yZxZ/YsUilhsDAoVMZuL+8=
-X-Received: by 2002:a9d:7c92:: with SMTP id q18mr6331974otn.111.1550259396598; 
- Fri, 15 Feb 2019 11:36:36 -0800 (PST)
+ bh=aOSC8ZzkPCXB6WyoycrO9I7WjBSurknF8CSDyuQMuwQ=;
+ b=OwlNiCpFye1NdheLxG9RcDetXtYkkjcHj15LzlMMoCrfinQFb6HOBgCl1m8NAED/ab
+ 8RYT2KW8Rcuuriqqq5nQ4LROabEG8gbS3+ei9prq3rVOnWVTOYMHy8XSKl5YWCWtKpYc
+ DSD9NQEPkXDuU3Gu+9ecpeNoNKeLcYfjcvGuy082XjbsFghbEwpGKaO6usGeiwopxMTH
+ 6ha6JbwtQLuIne6f7u24LfDpd977di7uZnngqFBwR919OpoAvnV7GgtrW4mzFgdHs324
+ PriwzGkENk8sa/cUHBoZE0QDskTa2KS9Vvcj9irxhSKNpbNnANxnJOc2F+YajENNKz2y
+ PqnQ==
+X-Gm-Message-State: AHQUAuYvsQPP4iO3Yr9+rrntputaM8iYudMHB/+dcepeXRJETeBgrjC9
+ zIISO410Fn5zjMnsMxj+CcjfSRHO51V3g20cjKsL37ZNnPc=
+X-Google-Smtp-Source: AHgI3IYTObnlggwGkTQ2WRCe9gBMEsne4EQK/lC5WAFH1qcM9/jUub3W+2pb7FqZ30CUIWXx2uIZTMtxqfsSJB4Qis4=
+X-Received: by 2002:a6b:b790:: with SMTP id h138mr6264910iof.114.1550259440391; 
+ Fri, 15 Feb 2019 11:37:20 -0800 (PST)
 MIME-Version: 1.0
-References: <20190215050957.20755-1-anarsoul@gmail.com>
- <CGME20190215051043epcas5p37cd953f0a76fb34e819b45c330dc6368@epcas5p3.samsung.com>
- <20190215050957.20755-6-anarsoul@gmail.com>
- <7d71654e-7169-2682-5655-0a9a9ea91c6d@samsung.com>
-In-Reply-To: <7d71654e-7169-2682-5655-0a9a9ea91c6d@samsung.com>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Fri, 15 Feb 2019 11:36:57 -0800
-Message-ID: <CA+E=qVe1UOxprkG+zm1OX87f9vOPyHom=hxhnzGxidBA54WxkA@mail.gmail.com>
-Subject: Re: [PATCH v3 05/11] drm/bridge: Add Analogix anx6345 support
-To: Andrzej Hajda <a.hajda@samsung.com>
+References: <20190214192544.7314-1-jagan@amarulasolutions.com>
+ <20190214192544.7314-8-jagan@amarulasolutions.com>
+In-Reply-To: <20190214192544.7314-8-jagan@amarulasolutions.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Sat, 16 Feb 2019 01:07:08 +0530
+Message-ID: <CAMty3ZDqnVBkcT5kiKf-pKGccEuQR0xtBXBgB2-_XFXkRKi+_A@mail.gmail.com>
+Subject: Re: [PATCH v8 7/8] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
+ start delay
+To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
+ Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_113637_505234_BDBACFB5 
-X-CRM114-Status: GOOD (  27.56  )
+X-CRM114-CacheID: sfid-20190215_113722_475779_21988258 
+X-CRM114-Status: GOOD (  15.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,164 +89,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
+Cc: Michael Trimarchi <michael@amarulasolutions.com>,
+ linux-amarula@amarulasolutions.com,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
  dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+ linux-kernel <linux-kernel@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 1:13 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
-
-Hi Andrzej,
-
-Thanks for review!
-
-> > +#include <linux/of_gpio.h>
-> Do you need this header?
-
-I'll drop it.
-
-> > +#include <drm/drmP.h>
+On Fri, Feb 15, 2019 at 12:56 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
 >
-> drmP.h is/should be deprecated.
-
-Same here
-
-> > +struct anx6345_platform_data {
-> > +     struct regulator *dvdd12;
-> > +     struct regulator *dvdd25;
-> > +     struct gpio_desc *gpiod_reset;
-> > +};
+> Vertical video start delay is computed by excluding vertical porch
+> value from total vertical timings, but the current driver excluding
+> vertical porch along with vertical sync values from total vertical
+> timings resulting wrong start delay.
 >
-> Why do you need this struct, why just do not embed it's fields directly
-> into struct anx6345 ?
-
-OK, I'll embed it into struct anx6345
-
-> > +     if (WARN_ON(anx6345->powered))
-> > +             return;
+> This patch trying to update the video start delay by subtracting
+> vertical porch from vertical total, on the other hand it added 1
+> extra start_delay line for TCON based on the Allwinner BSP reference.
 >
-> It should not happen, you can remove this warn.
-
-OK
-
-> > +     if (pdata->dvdd12) {
+> BSP code form BPI-M64-bsp is computing video start delay as
+> (from linux-sunxi/
+> drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 >
-> If regulators are required this will be never null.
-
-Right, and regulator subsystem will return dummy regulator if it's
-missing in dts.
-I'll remove redundant checks.
-
-> > +
-> > +     if (pdata->dvdd25) {
+> u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+> => (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
+> => (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
+>    - panel->lcd_y - (panel->lcd_vbp)
+> => timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
+>                              - panel->lcd_y - panel->lcd_vbp
+> => timmings->ver_front_porch
 >
-> ditto
-
-OK
-
-> > +
-> > +     if (anx6345->panel)
-> > +             drm_panel_prepare(anx6345->panel);
+> So, update the start delay computation accordingly.
 >
-> again, here and below: panel is never null, check can be removed.
-
-That's not true, panel is optional. It can be DP connector, not a panel.
-
-> > +
-> > +     gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
-> > +     usleep_range(1000, 2000);
-> > +
-> > +     gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+>  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 19 ++++++++++++++++++-
+>  1 file changed, 18 insertions(+), 1 deletion(-)
 >
->
-> Start/stop sequence seems odd regarding reset gpio:
->
-> 1. In probe reset is set to low, in poweroff to high - incosistent.
->
-> 2. If in case of disabled device reset should be 0, there is no point to
-> set it again to 0 three lines above.
->
-> 3. I suspect in dts reset gpio should be declared as active_low, and the
-> logic in the driver should be reverted, in power off it should be set to
-> high, in power on it should be lowered (logically).
+> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> index a08dfdcbe9e8..31cf9c58e98d 100644
+> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> @@ -358,7 +358,24 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+>  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+>                                            struct drm_display_mode *mode)
+>  {
+> -       return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
+> +       u32 vfp, start_delay;
+> +
+> +       /* vertical front porch */
+> +       vfp = mode->vsync_start - mode->vdisplay;
+> +
+> +       /* start_delay = vertical total - vertical front porch */
+> +       start_delay = mode->vtotal - vfp;
+> +
+> +       /* add extra 1 delay line for TCON, as per Allwinner BSP */
+> +       start_delay = 1;
 
-OK, I'll look into it.
+This has to be += 1;
 
-> > +err_poweroff:
-> > +     DRM_ERROR("Failed DisplayPort transmitter initialization: %d\n", err);
->
-> redundant message
-
-OK, will drop.
-
-> > +             DRM_ERROR("Get sink count failed %d\n", err);
->
-> The rule of thumb I heard is that if you start message capitalized you
-> should end with dot. Since I do not know if it is enforced in kernel I
-> leave the decision up to you.
-
-I grepped DRM_ERROR in driver/gpu/drm and they do exactly the same as here.
-So I'll just keep it as is for consistency.
-
-> > +static bool anx6345_bridge_mode_fixup(struct drm_bridge *bridge,
-> > +                                   const struct drm_display_mode *mode,
-> > +                                   struct drm_display_mode *adjusted_mode)
-> > +{
-> > +     if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-> > +             return false;
-> > +
-> > +     /* Max 1200p at 5.4 Ghz, one lane */
-> > +     if (mode->clock > 154000)
-> > +             return false;
->
-> These checks should be in mode_valid callback.
-
-OK
-
-> > +     /* Map slave addresses of ANX6345 */
-> > +     for (i = 0; i < I2C_NUM_ADDRESSES; i++) {
-> > +             if (anx6345_i2c_addresses[i] >> 1 != client->addr)
-> > +                     anx6345->i2c_clients[i] = i2c_new_dummy(client->adapter,
-> > +                                             anx6345_i2c_addresses[i] >> 1);
-> > +             else
-> > +                     anx6345->i2c_clients[i] = client;
->
->
-> I see this contredanse is copy/pasted from anx78*, but it looks quite
-> complicated. As I understand there are two i2c addresses, why we cannot
-> assume one address is for control interfaces and another  is dummy? It would
-> simplify the code here and in other places.
-
-Sorry, I don't get you, could you elaborate? Note that anx6345 uses
-both addresses,
-i2c_new_dummy() just registers new i2c device bound to a dummy driver and it's
-supposed to be used for devices that consume more than one i2c address.
-
-> > +     if (!found) {
-> > +             DRM_ERROR("ANX%x (ver. %d) not supported by this driver\n",
-> > +                       anx6345->chipid, version);
-> > +             err = -ENODEV;
-> > +             goto err_poweroff;
-> > +     }
->
->
-> As I see chip becomes powered forever, is it OK? Usually it should be
-> powered only when pipeline starts, and powered-off after pipeline stops.
-
-I'll look into how hard it would be to implement but personally I
-think it's OK for now.
-We can add more sophisticated power management once this driver is merged.
+Typo change while re-basing, I will fix this in next version.
 
 _______________________________________________
 linux-arm-kernel mailing list
