@@ -2,22 +2,22 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D301C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:00:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3B67C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:00:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B66C21A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:00:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B320821A80
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:00:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TdNkkw6h";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="GyLX2bHg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B66C21A80
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OV55y0Qt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B320821A80
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,56 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KbnNGDJMzTkvDVYh24CQ2jPGrf+u0tbNSsGngUnCjgg=; b=TdNkkw6hBqFW9B
-	lqZhgbf08EKioG61dQgtfy489RI3hoTlH30Y+2wLhpPL3it/v0hsXMxwEGY3stRlvFS6Zn4nxpsJw
-	mAVhqT31O9bnKH5WhpcXXCvAYwjvGZGAlDiRJ7j2eLZKZZnBgaQVwhhCJarkE6CxcLjAQGLoVu/9i
-	fuFSw0+7cGJBdM1554XuZDls8GVhsW1WQNjkfXsxVBQC2l3qNl8gC1c6APGbzx7DpggVvQG1TT1+P
-	7b+oJNBY5ZRR123kg+3ewDnGxyl8jWX27oPeEmn9UqJVcz/VrRxXe+GsN3zIQjytH3Oh6INpHGgCW
-	D6pbXufYHAOKjo9klQ1A==;
+	List-Owner; bh=xlMJFRcChSd0KxEu5adZVf7o/0amoz9OnwaFbOaRS+4=; b=OV55y0QtvTgIrT
+	rHeTwgrLPA7HZd+3DHqdIS5LFs+r3WbpvsCAfs4IFoKPykUvnGLr6zOw5v+Q3Kg3k0PSo/f7oumqY
+	OIptPyAT6fqjZ7yqVskDrrwumAou/CYCt3i0qcIRvr465VeHcTesI5W5O5OdQJ77PJlzpnjSNU3vd
+	LGsgH487CWz+oodOVlYCG/1y+Cfhc3h2YR/se3cQnshWfT2TSUuFee+y6a2wb/CNX+eEGdZ5LJ+zY
+	c2g40uBYi4IbNqqe1ZPWOWp2rTq/75btwfzT+685h8KxLAIYDLYr6UeSjGM64XdT24I6ZzumVWbGl
+	acSGK6B1JLvnTK3HD6mQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gud6D-0002YU-Us; Fri, 15 Feb 2019 13:00:13 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gud6O-0002jw-2U; Fri, 15 Feb 2019 13:00:24 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gud66-0001uM-Bp
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:00:11 +0000
-Received: from mail-lf1-f45.google.com (mail-lf1-f45.google.com
- [209.85.167.45])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 94D50222A1
+ id 1gud6E-0002Ys-Ir
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:00:17 +0000
+Received: by mail-qt1-f196.google.com with SMTP id p25so10437173qtb.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 13:00:04 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550235604;
- bh=j9fPIohsDCJA+ww/gyaTWGE6yJNj4pXz1PTBvIzuBH8=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=GyLX2bHg5Bg+H2k15jTAHMWm0ByLyaJchTxznL1wUWf2dcETkXIV6F7jBWSOxw07h
- d/aG+1ngIzrsENOjophq+TJP8lJa653t97cjre0n2aIEqopzIUlYJ3Mrl8w3Q1U8cS
- 3ulfzK05xAXOpVtnnOltv4EaIeP1k4lAKH5APt2A=
-Received: by mail-lf1-f45.google.com with SMTP id u21so7142038lfu.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 05:00:04 -0800 (PST)
-X-Gm-Message-State: AHQUAuZHMZMyWOD5eZ9lUvJH0SKKW/xwBwWJdwkPDmcJcv9qP9Qm1r+a
- O/Byiju/owZj/6kq4QYHEjRAg4F5ACYw8MBqFFk=
-X-Google-Smtp-Source: AHgI3IZSnLt725EfnAC4SoODraQlAkRJvTuOS+gNTCHMJFWkRlz+9qRLtSnETJN/BoMIUH8bebXRqdgisI40Y6jYMSw=
-X-Received: by 2002:a19:d83:: with SMTP id 125mr5307555lfn.159.1550235599920; 
- Fri, 15 Feb 2019 04:59:59 -0800 (PST)
+ Fri, 15 Feb 2019 05:00:14 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=svG8JeKrRDKlcsCFY+Nz8gGi4gI1GKeA7/KfFIAx3No=;
+ b=VHS+J1VFHbsyX6EhAw/05cTeELOavTYdmBI3TTuu6cT1NG5AuFSNfWbB3WLjcs4Mqi
+ MGe1mFH2eXRS6jK5Lm7i2RC8wCJveQnRDj24JCQZRbnqOSWGZsLqKhrVHgVdE6NGJ4tv
+ /acsLo08SX6yi6l3L12FG1i0eEaf5IjWjpKTo2jD2RDu3E/PwphQe44YwZBfSlivOETb
+ 9JSbscGj5MZ5YTAykmCwwjTst/ObzlgNXyCDc7zR3ff8i8vg/UEgueEZeXApHclJ2CS5
+ lowtrX3ESQAb3DJ07PZIWEvfmifdoVEF8CQLlLJZUPvTkv/R57pblDNglYV1Qjd/V9Cc
+ D0Xw==
+X-Gm-Message-State: AHQUAuYvZmNtCylAUjL8UcforT6hArM3Dki/xPvHLOsrtGMRvlvNv/Pv
+ Ad2LJeZzKzNFeUDMlgGGGg3PkTCKqxp5SU/2nQw=
+X-Google-Smtp-Source: AHgI3IbNCMGf6CSOBmdcF+SZZmcVzkSxhJew3OksS79y8Yhi+GdQBlZ/tsOpLMmwqFsaLe13cO/k4HQbbQc24gxVq1E=
+X-Received: by 2002:ac8:33f1:: with SMTP id d46mr7262630qtb.319.1550235613702; 
+ Fri, 15 Feb 2019 05:00:13 -0800 (PST)
 MIME-Version: 1.0
-References: <CGME20190215125239eucas1p2d9167af42f2d04e462c56a070c3371c2@eucas1p2.samsung.com>
- <20190215125229.30180-1-m.szyprowski@samsung.com>
- <20190215125229.30180-4-m.szyprowski@samsung.com>
-In-Reply-To: <20190215125229.30180-4-m.szyprowski@samsung.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Fri, 15 Feb 2019 13:59:48 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPdwvPX28WJ8DyXvygzHj_qS0-126cA1aCdL7ktObTPNKA@mail.gmail.com>
-Message-ID: <CAJKOXPdwvPX28WJ8DyXvygzHj_qS0-126cA1aCdL7ktObTPNKA@mail.gmail.com>
-Subject: Re: [PATCH 3/5] clocksource: exynos_mct: Increase priority over ARM
- arch timer
-To: Marek Szyprowski <m.szyprowski@samsung.com>
+References: <pull-1548951676-587288@atomide.com>
+In-Reply-To: <pull-1548951676-587288@atomide.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 13:59:57 +0100
+Message-ID: <CAK8P3a3mXHq=C0v-nHBpPTmxCuRc4hfkDzH-XdaKnVXPpb=tYA@mail.gmail.com>
+Subject: Re: [GIT PULL 1/3] soc changes for ti81xx for v5.1
+To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_050006_446671_77DDEE5B 
-X-CRM114-Status: GOOD (  13.51  )
+X-CRM114-CacheID: sfid-20190215_050014_846793_66D73450 
+X-CRM114-Status: GOOD (  12.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,34 +79,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Chanwoo Choi <cw00.choi@samsung.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-omap <linux-omap@vger.kernel.org>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 15 Feb 2019 at 13:52, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+On Thu, Jan 31, 2019 at 5:24 PM Tony Lindgren <tony@atomide.com> wrote:
 >
-> Exynos Multi-Core Timer driver (exynos_mct) must be started before ARM
-> Architected Timers (arch_timer), because they both share some common
-> hardware blocks (global system counter) and turning on MCT is needed
-> to get ARM Architected Timer working properly. Increase MCT timer rating
-> and hotplug priority over ARM Archictected timer driver to achieve that.
+> From: "Tony Lindgren" <tony@atomide.com>
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/clocksource/exynos_mct.c | 4 ++--
->  include/linux/cpuhotplug.h       | 2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+>
+>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v5.1/soc-ti-81xx-signed
+>
+> for you to fetch changes up to d27cda291b2341d39692421b4e64940879ff9dd8:
+>
+>   ARM: ti81xx: Add hwmod boilerplate for all GPIO and SPI peripherals (2019-01-24 08:43:38 -0800)
+>
+> ----------------------------------------------------------------
+> SoC updates for ti81xx for v5.1 merge window
+>
+> Two changes to add legacy hwmod data for gpio and spi peripherals on
+> ti81xx. We have not yet updated ti81xx to probe devices with ti-sysc
+> interconnect target module driver, so these changes are still needed
+> to make devices usable for the related device tree changes.
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Pulled into arm/dt, thanks!
 
-Best regards,
-Krzysztof
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
