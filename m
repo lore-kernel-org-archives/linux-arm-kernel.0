@@ -2,69 +2,71 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2994C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74F17C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A20EE222BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 451CA21924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CBH6Tnz2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="VQixXjME"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A20EE222BE
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tSo4cEMR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 451CA21924
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L5jlU4157E57co1HYGXJVB6POtQQkWG8HYmVbYuXxys=; b=CBH6Tnz2QOPvF4
-	m2e52rdubE2p3d+RCaGWuCcXFPzzRW1JhsbvtQDDt55b/nlcgYsPuoU6wMbMQRXTxsA7DZlF8ux2w
-	110Px9TZeNJhyLpeevk2hueVxShja/OWMPhbnNDSSAYhjW+s/KB4gWXGC6O64KpKdGkAUFlVjwJNh
-	qRza47tqvqsGCZ4Ht10i8aE4JYZIKHan+S0SngLIIUnHM/BLRDV7sQ8L3ZVxKKmUvhbbURqIy+NBc
-	w4Igxvmj5IzoSoY9PpWlTBavrtH/5KqdxACNoLcPSBRt8Ko3URW2IYMyqs7KzPhk24sQoiGuvkaTa
-	LGi+dXILDn7OqtUukVcw==;
+	List-Owner; bh=ibQh/WGlIqRS5ESFd3YRgmy811aIhzbwvdDlN2p8E0A=; b=tSo4cEMRHonAy1
+	O/D/DVFs+7oLrLnFSAs2JRSs+vl9paKKVT5mDbVpC9o72AL0LAE39bwZeKG4MTTWzLr11AAl/9JYX
+	Cz6sE5TByH2QeTGEoap5X+Caqa0PffGQzvXTcVjZkWed+9nbgRJdFuNbMht4OKDO464LCa9SXa+Ks
+	7nLs3D2qBjcNXuEJ8Z/Y27PKX3uQ2OOfXXSIiBCLjfR9GQ9KHUQmFdtDuJMkc2WgH/BoIA5w6rqjO
+	0IdT14i1YUJ1Hq6Nv8bIm8DcOpGCOMZWDGO6R5QYCWL1gX576YQsyZxVX7txFXwNc3irtRdtAIzGp
+	mIVUOKinc867L06tFsZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugsj-0003Ku-9c; Fri, 15 Feb 2019 17:02:33 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1gugsx-0003b2-6e; Fri, 15 Feb 2019 17:02:47 +0000
+Received: from mail-qk1-f177.google.com ([209.85.222.177])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugsV-00036B-PA
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:02:22 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=W6e6qznt2JOS/949BOx6FvCW23lwdk9RLTqcCBKSms8=; b=VQixXjMEKCu41JsHECIrGLk922
- JlxigX1+jwtXXbU8T/s/JNnxGXLVL+jIY3zP4WLxrDm8LYM6plPdNXzEZYsA96vAI20gTNSvW84eV
- sEI/+TfRoLg1kKap9pl+oKz8kezMEcty2rbkBf5YDy7abOIeEqFIjlyF8PLRBm8Za20g=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gugsU-00087M-CR; Fri, 15 Feb 2019 18:02:18 +0100
-Date: Fri, 15 Feb 2019 18:02:18 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Subject: Re: [PATCH RESEND net] net: phy: xgmiitorgmii: Support generic PHY
- status read
-Message-ID: <20190215170218.GS708@lunn.ch>
-References: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
+ id 1gugss-0003Vn-4K
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:02:43 +0000
+Received: by mail-qk1-f177.google.com with SMTP id m9so6099431qkl.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 09:02:41 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=/9zAIeq2Ol4m9ysnOUmt4bHtlKlrrmIDX6JCSKz/pRE=;
+ b=XcL+NMq28RuY0ErL0luISKhMNV7UQgqx9g9Wqv69SqFofsNpx3MwlTMh981jT4cANu
+ o8y3hTgXcg+4WEFnnjYpw63mWVB2pRgCyrbVb+q5fsJb6NWZqq7Y/3m4jRlaiT7932tf
+ aDRSaSIFDfk1o8t5DcRT8axMSuDhAO5mU7c0S/O1e8At4FkQFDHQkAtJ+2B+OTOsIL7Q
+ 7B2QRKQhDZgOyB1dDx15NHqLwNcURzxN1jfmFBY2h4xR05bcULSVLeLUQkOUb5ETCLgc
+ mSs8uLji179K2AsfdFxmvh8DWlsMdb97AwcUc/OR1XIVLnRMRl7oqR5Wzx3ZqUoYmdkv
+ HcNA==
+X-Gm-Message-State: AHQUAuajj/V0MugrEHAZZV0QY8rCTYoveJhntWA4XJuCOJYGQsfe3SUg
+ T5v88jI4itoK80STXwnxG2HodvvsUGRJJatKdH0=
+X-Google-Smtp-Source: AHgI3IbwmLqV3Zax5Lup19d5xghzKvGL2sRDkktZ1FER3kEV3EJDqpUp3luGQUbDVjbSOgqn9rAqzP8y+ECUxSWoBTw=
+X-Received: by 2002:a37:7cf:: with SMTP id 198mr7767513qkh.173.1550250161012; 
+ Fri, 15 Feb 2019 09:02:41 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <1549044263-5862-1-git-send-email-santosh.shilimkar@oracle.com>
+In-Reply-To: <1549044263-5862-1-git-send-email-santosh.shilimkar@oracle.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 18:02:24 +0100
+Message-ID: <CAK8P3a3pspTHpVNDxwLG-GyajyjLN4nRz4k-3uUqwOP3xJzP3w@mail.gmail.com>
+Subject: Re: [GIT PULL] soc: ti: couple of non critical fixes for v5.1
+To: Santosh Shilimkar <santosh.shilimkar@oracle.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_090220_275995_38540678 
-X-CRM114-Status: UNSURE (   9.81  )
+X-CRM114-CacheID: sfid-20190215_090242_371681_C232654E 
+X-CRM114-Status: UNSURE (   8.70  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -77,30 +79,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Florian Fainelli <f.fainelli@gmail.com>, netdev@vger.kernel.org,
- linux-kernel@vger.kernel.org, Michal Simek <michal.simek@xilinx.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org,
- Heiner Kallweit <hkallweit1@gmail.com>
+Cc: Olof Johansson <olof@lixom.net>, arm-soc <arm@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Kevin Hilman <khilman@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 05:32:20PM +0100, Paul Kocialkowski wrote:
-> Some PHY drivers like the generic one do not provide a read_status
-> callback on their own but rely on genphy_read_status being called
-> directly.
-> 
-> With the current code, this results in a NULL function pointer call.
-> Call genphy_read_status instead when there is no specific callback.
-> 
-> Fixes: f411a6160bd4 ("net: phy: Add gmiitorgmii converter support")
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+On Fri, Feb 1, 2019 at 7:04 PM Santosh Shilimkar
+<santosh.shilimkar@oracle.com> wrote:
+> soc: ti: couple of non critical fixes for v5.1
+>
+>  - Fix the Clang warning for enum in Navigator dma
+>  - Simplify code in ti_sci with DEFINE_SHOW_ATTRIBUTE macro
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Pulled into arm/drivers, thanks!
 
-    Andrew
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
