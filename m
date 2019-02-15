@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80707C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ACC0CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:43:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50CD52192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7ACD42192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:43:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lvL4mmDg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50CD52192D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AhawcoEM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7ACD42192D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,49 +24,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ERcfzkyHwuoXovn6TwXNEvnEfD4AgYP52iYag8cphRc=; b=lvL4mmDgyIARlm
-	5rqtVoM0uUNrkcp2CstOwfRKWDTvAaoH3dJC6BsuFt9LWpcPrQWjOjvhiTUWo2mo7Za3M4ODUznkk
-	xl3al2WW8xUmNQ3Q9rApHnVdobEK0FuhDd+lji5MSA/RNoWOPym5HF096ndmHGjTafVS6431e3j5d
-	xkxvFuQ9uWfWxxNAAGCmerf8X3KVebp0BWPArFkNYj+BgIBQMxIy3Wy6uL9bvITkOCkKNFuS6Ct7A
-	EvlzKho5W8uXS7N+HamYNu02uyYT54nfkxzk7OYzQ5aKlkc7fox9HC41F9EutmaAmn/pnC2sPBY9e
-	2WEniAniyO439QPheA/Q==;
+	List-Owner; bh=RvYDMGTmGU2A1z1vzHWNVFsyDx83DYAG82Cb0zXLa7o=; b=AhawcoEML5xa/J
+	dsb2qN28oe6A1hJqJhIprWbxCFNtfFCx3mlwbYcVMAaXffkSAcXhttqSojWjFukUaD0mMnlFMlT4T
+	iUkRritYv2pwLL5VbVsA+qW5GmLRNtdAIRkoksMAl8r/Fu5/7bfcoqysX3xDU4lx5V8huQAxEe1dO
+	u4LHl1+GPnrPGym98cEc2mtkmgpcStvhEazODsooUdZE22aTyZ+r0DNDE2v2rnyX65gdy5SUx9dgM
+	vzyBnmY2GWzyiQmpmgpfXlBMczVcY7JbpLM4eyIoEfwyNqBjuGoy7AxxqbV7LsG3jatc4keGSqi9B
+	wmJOvJN4i/fpPHFraSwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guegz-0003Js-7d; Fri, 15 Feb 2019 14:42:17 +0000
-Received: from mail-qt1-f174.google.com ([209.85.160.174])
+	id 1guehq-0003cG-Pu; Fri, 15 Feb 2019 14:43:10 +0000
+Received: from mail-qt1-f175.google.com ([209.85.160.175])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guegr-0003Ix-Vb
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:42:11 +0000
-Received: by mail-qt1-f174.google.com with SMTP id p25so10803155qtb.3
+ id 1guehn-0003bF-TB
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:43:09 +0000
+Received: by mail-qt1-f175.google.com with SMTP id z39so11140194qtz.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 06:42:09 -0800 (PST)
+ Fri, 15 Feb 2019 06:43:07 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=nHeiByyqppvpAPHd1dy0pr5ngtRczwVzajYPyO5noPg=;
- b=cZtLUAe8udDm+QmFd/3dM0H+aHtfuWaMPktWvYyiXN4JvvCfHewCyK3rE3w22UOrd4
- 37MUVedb0AIr+YtuCjNlARdyLif467BK/hVm76kkL4BQBtCr/3eIVGPxejgcpRzJ6BZn
- hkPPw3L+KyvJRWmyokEZN2tvUcJzOHbQTUXmhzbhV2Y+WjXQOboWPYUNTrsIqWUgY424
- /5qNIVD+c2PWIPT4lwUZw3wC7VcxNSOEosvt52g7Tr+GW2mHeQf3UgQids05JDxX3l7K
- 0JXxAd/n+n43ZJvvz7qxFXB1xhU6M5ZCLF1f2kjZH70uSU8zarEY2XArx4TlPlAUxQ9L
- n7lg==
-X-Gm-Message-State: AHQUAuaMKMdnLchcV4ohKgSYHthdD0cdDeDumN0jDzRYam3uOgxuRLxL
- a+4fONP41/2CkERDuTiriTe9GxsiRISJHpAmUZKfww==
-X-Google-Smtp-Source: AHgI3Iann4cLIT0/2KIGNvtHAbi33GQuWQqUZX+QXzATh5FvsIFZuCklS/ZqSSdgkPngRMi7lrlPRARGo0+b6QS95og=
-X-Received: by 2002:ac8:33f1:: with SMTP id d46mr7675030qtb.319.1550241728854; 
- Fri, 15 Feb 2019 06:42:08 -0800 (PST)
+ bh=t+RbHZ78PVOcqPqIj6PSIFQirW4zu1js94QAADBlDA8=;
+ b=tkcLQT9yk7h4Ru//cZHhqRmc3sfEJEd/lINEksI98x9L9F4otb4kPSwuAjb87yE4CA
+ jQZvGhI72X9ytM/SQTxYC1ttOF/roIuUJGSwb+Wsc+g7q5hIjTJ5LkCn5hDITkfiODhX
+ FSA1gM35AvHsVhDCjzPL6VK+8Qo/xwnodLgtibaglIOaWc6gXMNK8uVBTWaR/2hix33I
+ x1+cuQqrs4RtjlooMTEzQ5Wi8ZUl8i7dogSgOdkiFd49M7x+7nyRUFbukeV8F3ojzqlh
+ wGed55vlZ6XY9GO1nefV49Q0Pv+Mvrd7C1gCuNjNX1TviuZVZ54Naah5Rnyohtt9Ndkv
+ +99Q==
+X-Gm-Message-State: AHQUAuZlAThod0t7+76wAKV2JLFO+/ZkI17+JATVO/Up4wpNsM2ff0Dv
+ ygWHVX+OegXFKAefPQxD8498s10+qIk2e40Y0ec=
+X-Google-Smtp-Source: AHgI3IYfUjneFhoBhJKACK2EzQnbdieyUobkvCXPjBxyLhYFSrYWj2fZqR4DoJBw8jxt0St3maURVE6XDV3QFlr31ow=
+X-Received: by 2002:ac8:445a:: with SMTP id m26mr7734444qtn.212.1550241786796; 
+ Fri, 15 Feb 2019 06:43:06 -0800 (PST)
 MIME-Version: 1.0
-References: <20190208102933.3op53lsvppizl6b4@flea>
-In-Reply-To: <20190208102933.3op53lsvppizl6b4@flea>
+References: <20190208103133.4jomhfzbqphbxkm6@flea>
+In-Reply-To: <20190208103133.4jomhfzbqphbxkm6@flea>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 15:41:52 +0100
-Message-ID: <CAK8P3a0WDqB=suJz1a59NzYYRStmKQeizuxUrLvDOLGMDkUUwA@mail.gmail.com>
-Subject: Re: [GIT PULL] Allwinner arm64 DT changes for 5.1, take 2
+Date: Fri, 15 Feb 2019 15:42:50 +0100
+Message-ID: <CAK8P3a2mHyaDr3Fao0SZEtHeEcv4JXVDb5KCy9Cj43vO7vB6xw@mail.gmail.com>
+Subject: Re: [GIT PULL] Allwinner DT changes for 5.1, take 2
 To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_064210_012237_116E770C 
-X-CRM114-Status: UNSURE (   8.69  )
+X-CRM114-CacheID: sfid-20190215_064307_937180_6B4131E0 
+X-CRM114-Status: UNSURE (   8.77  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,18 +86,18 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 11:29 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> Allwinner arm64 DT changes for 5.1, take 2
+On Fri, Feb 8, 2019 at 11:31 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Allwinner DT changes for 5.1, take 2
 >
-> Our usual round of DT changes for the arm64 Allwinner SoCs:
->   - Enabling of the various power supplies on most a64 boards
->   - H6 SRAM controller support
->   - A64 CSI support
+> Our usual bunch of DT changes for the Allwinner arm SoCs:
+>   - LCD support for the Q8 A13 tablets
+>   - GMAC support for the A80
+>   - PMIC power supplies for the A83t
 
 
 Pulled into arm/dt, thanks!
 
-       Arnd
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
