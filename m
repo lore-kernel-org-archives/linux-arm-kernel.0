@@ -2,71 +2,69 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 254DEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:56:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C09FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:59:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E945221A4C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:56:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 38796206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:59:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MW0K1fVW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="JlHCeoes"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E945221A4C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CtRg1Jbg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38796206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8QtIw8Kv7zazusxO9u5L+Ay3x6fvTr2+nH2+/IZmaus=; b=MW0K1fVWtkWLE1
-	ngY6WJG0ZAXmjixjctNWweljTsl+0m2htZ6WvmbvqNmajAvRdBrI+YpPS+bcc/E41x6TX3hMIK4uj
-	iNZhjTARNywlUyUBaCPULIWGhc+8GuvanC5dxr3OGRQPahQXmoENRQOeMo9Cv25SQf8m6BKwQzTiH
-	GkaTdryzfQ0cpH15ZFHFg9NSU58FAmjVtv/hH2qMQnfsiHJI0Tmq7kZR4fe+9Bpv4AuVJnme8Z/WS
-	6hxuRn2LTtrEKJGqYY7xFMDpQuYQpUnYqH3usMl7HK7biE50MI6FYGpGZ3AWUUWT+N1JOznuaAwZZ
-	AI96Ji3i//N26J8g46sg==;
+	List-Owner; bh=8VzGlRx3eWQJLyr3g9mQI5reO0KcmRC3LLQAeTvQclw=; b=CtRg1JbgHGoDT0
+	VWMh8VMJmWyqiB16rwcybD29fFaYYIhi4M8kpynDCz1LW31VPW/2AOnb/6182miPvxPOIsXZFCCOW
+	UnSK1vkQ9XvjusxChdQMuvgexkFfUkXQdpW3xXR63uuk1S+4/lX8zKL9tX0sMNsi/hcNiJAyWOOMM
+	IokeJUO6MGCNWx/YP5K/a019+Z/ZGQ42U0x8jaFdQswTLlUJ6dZd4TBZTebIO2T2KO8VIQNozPoAP
+	z6fQ4tvr08PPO1IsDDheoRfC+8mB9LnBp5XnhIHs/38EsCElBO0UFLeIdmtYb/e1M3x+WUQb+vfBU
+	7maAnGB5WFKCDOiP/pPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gueuk-00023m-KC; Fri, 15 Feb 2019 14:56:30 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
+	id 1guexU-0002T8-VZ; Fri, 15 Feb 2019 14:59:20 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gueuh-00023V-71
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:56:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:
- Subject:Cc:To:From:Date:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:List-Id:List-Help:List-Unsubscribe:List-Subscribe:
- List-Post:List-Owner:List-Archive;
- bh=dldtYif/dX4XCSUDkPWXBJDWGjlPLsUwDCWthZFiG6Y=; b=JlHCeoespOqqUOfLvCEu1kKpkX
- 05Mc1JrJoCAjbdk8EYDIM4NJRC1OOH7/RWihzOaqM96/zV1qvnnLqm5Nir4n6T9poZJLCuj0qn7/o
- MlPPOpFT/Q2QoXFBUOuTNMdAiiUV3pHbxJ/r6tGxs0eSij890yLAf+L7pH25D05iikRw=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.89)
- (envelope-from <andrew@lunn.ch>)
- id 1gueub-0006YJ-FN; Fri, 15 Feb 2019 15:56:21 +0100
-Date: Fri, 15 Feb 2019 15:56:21 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Claudiu Manoil <claudiu.manoil@nxp.com>
-Subject: Re: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
- support
-Message-ID: <20190215145621.GO708@lunn.ch>
-References: <1550225414-12125-1-git-send-email-claudiu.manoil@nxp.com>
- <1550225414-12125-4-git-send-email-claudiu.manoil@nxp.com>
- <20190215133459.GH5699@lunn.ch>
- <VI1PR04MB488080895C871B6B3ABA571D96600@VI1PR04MB4880.eurprd04.prod.outlook.com>
+ id 1guexR-0002ST-Bj; Fri, 15 Feb 2019 14:59:18 +0000
+Received: by mail-qt1-f194.google.com with SMTP id b8so11100605qtr.9;
+ Fri, 15 Feb 2019 06:59:15 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=vB5Hxnougqsf7aojhxU3N93bTIMAReQ4+DjbflBf9Og=;
+ b=AhG1M/VlVuJ0SLeJVBddevf3DMFIcu9njOTt8p0IfyocHzVHCfUSdDHaeAfajHDr+k
+ akqfLc7SsVMz0LzKBOThVA3iajO2YQyMJs99LAnXb8pT4EnmSlWd1CKVi6uwntyOH7mO
+ nysra/myTGcSggt+Ftr3amlUAPjp2cw75wEzLoCDXCsfHC7q8eeI7Os3DWaMmxwVUGh8
+ V1tovdhYwctPd/EgY0oBCUYLCqhVQy3KmR0TpNczZTgeG2iqnUqDU7wsb/wAHwcQskOP
+ UqAGcWCrrvbjNZz4S6LNrovKE81gsbjHFKjDVvvIOBzTWo4clpfa5YrNDROTV19Gm+h9
+ KElw==
+X-Gm-Message-State: AHQUAuajAamrQvqmS7v5yNbFGmBEo0RJND19q9nSmPkAcFnoG6eG5SOR
+ FFmmy4ciT4o80KjtylgcjEsJO+BWwym8gCW+QdQ=
+X-Google-Smtp-Source: AHgI3IaLM9JcA/i4tLJkAxw98Qvo5lwG3CJIpl1xHNaXdEU6/JOq7z0cwWk2dpnoSdcZvxhRysEPIKig0h4IkcwbfTU=
+X-Received: by 2002:a0c:e98f:: with SMTP id z15mr7635045qvn.115.1550242755017; 
+ Fri, 15 Feb 2019 06:59:15 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <VI1PR04MB488080895C871B6B3ABA571D96600@VI1PR04MB4880.eurprd04.prod.outlook.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <d55e396b-0cbc-62a2-7bfd-c988cda086ff@gmail.com>
+In-Reply-To: <d55e396b-0cbc-62a2-7bfd-c988cda086ff@gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 15:58:58 +0100
+Message-ID: <CAK8P3a0wfWzZ0GTgMDAEPFNM_g5tLMVW=6ZdR+cK1L2cxc=YhA@mail.gmail.com>
+Subject: Re: [GIT PULL] Mediatek DT 64 bit updates for v5.1
+To: Matthias Brugger <matthias.bgg@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_065627_407714_F1A61D1A 
-X-CRM114-Status: UNSURE (   8.07  )
+X-CRM114-CacheID: sfid-20190215_065917_431050_8F6B13A2 
+X-CRM114-Status: UNSURE (   9.16  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -79,37 +77,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
- Alexandru Marginean <alexandru.marginean@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "David S . Miller" <davem@davemloft.net>,
+Cc: Matthias Brugger <mbrugger@suse.com>,
+ Viresh Kumar <viresh.kumar@linaro.org>, Erin Lo <erin.lo@mediatek.com>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Ryder Lee <ryder.lee@mediatek.com>, YT Shen <yt.shen@mediatek.com>,
+ arm-soc <arm@kernel.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ honghui.zhang@mediatek.com, Chunfeng Yun <chunfeng.yun@mediatek.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> Hi,
-> I don't really see what bindings would need to be documented, as the node
-> names and properties used so far are common.  Like, the "mdio" node name
-> is common, the enetc ports are "pci" nodes, nothing special for these.
-> What's missing?
+On Fri, Feb 8, 2019 at 9:00 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
 
-Hi Claudiu
+> ----------------------------------------------------------------
+> mt2712:
+> Add device nodes for usb3, iommu, smi, i2c, spi, pwm,
+> mmc, NAND flash and PCIe
+>
+> mt6797:
+> add pinctrl node
+> enable uart pins on x20 board
+> enable uart pins on EVB
+>
+> mt7622:
+> Add all CPUs to the cooling maps
+>
+> mt7623a:
+> Remove unused binding description
+>
+> mt7629:
+> Add binding description for the SoC and the BananaPi
+> based on this chip
+>
+> mt8173:
+> Add all CPUs to the cooling maps
+>
+> mt8183:
+> Add binding description for the SoC
 
-It is not well defined where to put phy nodes. Some drivers do allow
-them directly in the MAC node, some drivers optionally allow an mdio
-sub-node, others enforce an mdio sub-node. The name of the sub-node is
-also not well defined.
+Pulled into arm/dt, thanks!
 
-So just documenting that the mdio sub-node is mandatory will help
-people writing device trees for their boards.
-
-       Andrew
-
-
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
