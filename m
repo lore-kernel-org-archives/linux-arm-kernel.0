@@ -2,61 +2,69 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B931C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:09:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B998C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:10:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4A7AA21B1A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:09:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A61E21A80
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:10:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bb7X0ELO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A7AA21B1A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oDQlXL+q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A61E21A80
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zY4kLaK43Y+akKvQIsRvyV6r0eTMURN9sgL7aBiqvps=; b=bb7X0ELOkYa1GW
-	rA+SeabRvtTFoj8Ft7atQrVY+7IqrNxKANlpgd72ajOvjJAOmpGAQ1QAb9lVk6BfjXc0nijmCljhP
-	kqivRE+aVKcR8TAlI0j8EhsYx1g5GeyGvHiSgwYKcD+7pU4qs9ceS/E7ZMh8Rz17GAPOk5dLhDq/3
-	9YRnXiCs7syRVL/e4lxbvRQp94Ui0UKc9yP3kpyj0wSQsoJPpsfr7Eor1dyq113fcF19Ivx+qfAJD
-	iBshwbwVplPYlPEMxmqKXX8sDK3MgmUETawSWmMiq9wlNVM/Fd1unrEhwNTvOPSb5JQunJADaKWR/
-	8fu7MepuiJnGDl5BW4Bg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=E17WW5UOYTJXAEnTmFF4PBiNSANXTOnPB5wQUN8gL9E=; b=oDQlXL+qUHGWffi+4RQcmaSke5
+	PuUONOyAhe8f+VHWsOeKDfKL+Og3+Cep8SnKxxZNWjX+M+zdPz0I764H6w03FZCxVhqB8QvWjg72+
+	k5Kiwwj5J34IrY3KTHe4T/DblNMA+XTP19pGDwZr95XtDxBH/m0pp8PLGxk5Px4XvNrlkI9MEVZSW
+	53O45V44X8yXTNGi0YFj7C0loetNyD1jVjm43wTJU+HnOJoqOfmHsBCwkehpEk9P+u/uaFwdqR1rp
+	eNk6R9rjGGratlgDVoCmcWSCc5EoOJlkB+Cj/c3/xeXcqXMrUJY8jv+u/Kiae0WeP4PvJu9ad3XUz
+	P7+V03HQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guaQw-0004Fz-Pu; Fri, 15 Feb 2019 10:09:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guaQt-0004FY-Q9; Fri, 15 Feb 2019 10:09:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0806DA78;
- Fri, 15 Feb 2019 02:09:23 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BCF823F557;
- Fri, 15 Feb 2019 02:09:20 -0800 (PST)
-Date: Fri, 15 Feb 2019 10:09:15 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>
-Subject: Re: [PATCH v2 00/15] PCI: endpoint: Cleanup EPC features
-Message-ID: <20190215100915.GA26061@e107981-ln.cambridge.arm.com>
-References: <20190114111513.21618-1-kishon@ti.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190114111513.21618-1-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+	id 1guaRp-0005m3-IS; Fri, 15 Feb 2019 10:10:21 +0000
+Received: from inva021.nxp.com ([92.121.34.21])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guaRm-0005lA-Bg
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 10:10:19 +0000
+Received: from inva021.nxp.com (localhost [127.0.0.1])
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 158A12001FE;
+ Fri, 15 Feb 2019 11:10:17 +0100 (CET)
+Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
+ [134.27.226.22])
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 08AA32000E9;
+ Fri, 15 Feb 2019 11:10:17 +0100 (CET)
+Received: from fsr-ub1664-016.ea.freescale.net
+ (fsr-ub1664-016.ea.freescale.net [10.171.71.216])
+ by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id 8A5D4205EC;
+ Fri, 15 Feb 2019 11:10:16 +0100 (CET)
+From: Claudiu Manoil <claudiu.manoil@nxp.com>
+To: Shawn Guo <shawnguo@kernel.org>, Li Yang <leoyang.li@nxp.com>,
+ "David S . Miller" <davem@davemloft.net>
+Subject: [PATCH net-next v2 2/3] arm64: dts: fsl: ls1028a-rdb: Add ENETC
+ external eth ports for the LS1028A RDB board
+Date: Fri, 15 Feb 2019 12:10:13 +0200
+Message-Id: <1550225414-12125-3-git-send-email-claudiu.manoil@nxp.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1550225414-12125-1-git-send-email-claudiu.manoil@nxp.com>
+References: <1550225414-12125-1-git-send-email-claudiu.manoil@nxp.com>
+X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_020923_855699_C736E7C3 
-X-CRM114-Status: GOOD (  20.46  )
+X-CRM114-CacheID: sfid-20190215_021018_545017_24E096F8 
+X-CRM114-Status: UNSURE (   7.64  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,88 +76,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Heiko Stuebner <heiko@sntech.de>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- Shawn Lin <shawn.lin@rock-chips.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
- Alan Douglas <adouglas@cadence.com>, Jingoo Han <jingoohan1@gmail.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, alexandru.marginean@nxp.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ netdev@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 04:44:58PM +0530, Kishon Vijay Abraham I wrote:
-> Hi Lorenzo,
-> 
-> The Endpoint controller driver uses features member in 'struct pci_epc'
-> to advertise the list of supported features to the endpoint function
-> driver.
-> 
-> There are a few shortcomings with this approach.
->   *) Certain endpoint controllers support fixed size BAR (e.g. TI's
->      AM654 uses Designware configuration with fixed size BAR). The
->      size of each BARs cannot be passed to the endpoint function
->      driver.
->   *) Too many macros for handling EPC features.
->      (EPC_FEATURE_NO_LINKUP_NOTIFIER, EPC_FEATURE_BAR_MASK,
->       EPC_FEATURE_MSIX_AVAILABLE, EPC_FEATURE_SET_BAR,
->       EPC_FEATURE_GET_BAR)
->   *) Endpoint controllers are directly modifying struct pci_epc
->      members. (I have plans to move struct pci_epc to
->      drivers/pci/endpoint so that pci_epc members are referenced
->      only by endpoint core).
-> 
-> To overcome the above shortcomings, introduced pci_epc_get_features()
-> API, pci_epc_features structure and a ->get_features() callback.
-> 
-> Also added a patch to set BAR flags in pci_epf_alloc_space and
-> remove it from pci-epf-test function driver.
-> 
-> Changes from v1:
-> *) Fixed helper function to return '0' (or BAR_0) for any incorrect
->    values in reserved BAR.
-> *) Do not set_bar or alloc space for BARs if the BARs are reserved
-> *) Fix incorrect check of epc_features in pci_epf_test_bind
-> 
-> Tested on TI's DRA7xx platform and AM654 platform. Support for PCIe
-> in AM654 platform will be posted shortly.
-> 
-> Kishon Vijay Abraham I (15):
->   PCI: endpoint: Add new pci_epc_ops to get EPC features
->   PCI: dwc: Add ->get_features() callback function in dw_pcie_ep_ops
->   PCI: designware-plat: Populate ->get_features() dw_pcie_ep_ops
->   PCI: pci-dra7xx: Populate ->get_features() dw_pcie_ep_ops
->   PCI: rockchip: Populate ->get_features() dw_pcie_ep_ops
->   PCI: cadence: Populate ->get_features() cdns_pcie_epc_ops
->   PCI: endpoint: Add helper to get first unreserved BAR
->   PCI: endpoint: Fix pci_epf_alloc_space to set correct MEM TYPE flags
->   PCI: pci-epf-test: Remove setting epf_bar flags in function driver
->   PCI: pci-epf-test: Do not allocate next BARs memory if current BAR is
->     64Bit
->   PCI: pci-epf-test: Use pci_epc_get_features to get EPC features
->   PCI: cadence: Remove pci_epf_linkup from Cadence EP driver
->   PCI: rockchip: Remove pci_epf_linkup from Rockchip EP driver
->   PCI: designware-plat: Remove setting epc->features in Designware plat
->     EP driver
->   PCI: endpoint: Remove features member in struct pci_epc
-> 
->  drivers/pci/controller/dwc/pci-dra7xx.c       | 13 +++
->  .../pci/controller/dwc/pcie-designware-ep.c   | 12 +++
->  .../pci/controller/dwc/pcie-designware-plat.c | 17 +++-
->  drivers/pci/controller/dwc/pcie-designware.h  |  1 +
->  drivers/pci/controller/pcie-cadence-ep.c      | 25 ++---
->  drivers/pci/controller/pcie-rockchip-ep.c     | 16 +++-
->  drivers/pci/endpoint/functions/pci-epf-test.c | 93 ++++++++++++-------
->  drivers/pci/endpoint/pci-epc-core.c           | 53 +++++++++++
->  drivers/pci/endpoint/pci-epf-core.c           |  4 +-
->  include/linux/pci-epc.h                       | 31 +++++--
->  10 files changed, 201 insertions(+), 64 deletions(-)
+The LS1028A RDB board features an Atheros PHY connected over
+SGMII to the ENETC PF0 (or Port0).  ENETC Port1 (PF1) has no
+external connection on this board, so it can be disabled for now.
 
-Applied to pci/endpoint for v5.1, thanks !
+Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+---
+v2 - added a mdio node as parent for the phy node
 
-Lorenzo
+ arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
+index fdeb417..f86b054 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
+@@ -71,3 +71,20 @@
+ &duart1 {
+ 	status = "okay";
+ };
++
++&enetc_port0 {
++	phy-handle = <&sgmii_phy0>;
++	phy-connection-type = "sgmii";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		sgmii_phy0: ethernet-phy@2 {
++			reg = <0x2>;
++		};
++	};
++};
++
++&enetc_port1 {
++	status = "disabled";
++};
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
