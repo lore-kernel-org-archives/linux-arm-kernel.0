@@ -2,70 +2,73 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21067C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:43:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1ED63C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:50:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DAA5521A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:43:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E71E021929
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:50:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dnt4f8yL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAA5521A80
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AquKQmzh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="CgSbVqPR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E71E021929
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xLdCusPO6n5pClaV6UwWOjpKuxQPBjnTYL+ud5rjaGE=; b=Dnt4f8yLKHbA7K
-	d5o00GDzgY/Uiy4D/xZORKNsKCQ84eV3UsFzBbNUKGOBCZ6LEeOBoPvYo/uXI4HgtNEk18dhyJVWD
-	0yT1FbLcI6t6CZ8T2ZJ7lNIluAZoB1dI0yJIGTYC69UKyigUNq9D9RCzXCxTr0j6/OSqOE8uhENBs
-	QVwlYgQl6PqVNG/XiD+lh/783WD7vkjSFxy5Fn3Rfm+lLl3QiWFjboRnQd0O63a2hAGHDaiHBxnjj
-	9nSCL/wW7ihdq8m1EC6BnT6A5zvYncTxQah8Dx2vwHrvm0eZHdPvEd45Tc6BwYE9vyuj+rI1ROJhY
-	SQyefU8PxJ1xUJNUDYfA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ryzZ+j2jIxlrEZSVCUAggrXohVO8etMCGuxHmeB2YaY=; b=AquKQmzhMlfPLoCvP1so5pEts
+	XvbV+3KF9a2jpyzMBZD4W+OcVjf5timFBBTNuEkgM8DglwTz6MJo7Q9gXPl31YBVtiludVgs+Yj8O
+	+uEaYVnFb95eRxWorKlDwgvl6gthVccM2ESmh+Bu0d3s5Yz5bmp3PBPkhJQ+UCQchIS4FiCSXQvA2
+	PX2lQf5h1XPmoB+IMonxsRObrQy9xPpBxl93/1CYZoQ1UqC2rofUcXYet1Yle0HBZ0rt8GQRK8mam
+	zA4YL4vNy85lgTIX56qAJ7JFSWgARNtkclxVDtE2fR2MPoH63shZan/mm6fjTLjUHl/UkfMfHk/A4
+	FZ9REgmlw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gubtO-0003pT-NQ; Fri, 15 Feb 2019 11:42:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gubtL-0003on-Jp
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 11:42:52 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8F6A9EBD;
- Fri, 15 Feb 2019 03:42:49 -0800 (PST)
-Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 40D293F575;
- Fri, 15 Feb 2019 03:42:37 -0800 (PST)
-Date: Fri, 15 Feb 2019 11:42:27 +0000
-Message-ID: <864l95s2fw.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Andre Przywara <andre.przywara@arm.com>
-Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for firmware
- workaround state
-In-Reply-To: <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190107120537.184252-2-andre.przywara@arm.com>
- <20190122151714.GG3578@e103592.cambridge.arm.com>
- <20190125144657.3db91c91@donnerap.cambridge.arm.com>
- <20190129213223.GB3567@e103592.cambridge.arm.com>
- <20190130113900.10089070@donnerap.cambridge.arm.com>
- <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1guc0W-0006od-Iw; Fri, 15 Feb 2019 11:50:16 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guc0S-0006o7-Kj
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 11:50:13 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=c95PgAzIO6iaZB/cwfuElNDev1u2tploAESUHa9b+sU=; b=CgSbVqPRIVE/W/Eq63wfC/Art
+ 5IpaWVksoBHrJoXzuSKdvl3iPh6LeVmYBVdClF4nonxFe/MI+sXpIpl144Hs1Tb8R5BK52dAfE3W4
+ 0M9DW0kVUQh5b6ATNfHOGM5FmQRoXUMyN1/RtAwPfKX2mHBF0k0yi1Rtq+Hx4t9QK5F2I=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1guc0I-0006Dw-9P; Fri, 15 Feb 2019 11:50:02 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 2C1A41127748; Fri, 15 Feb 2019 11:50:01 +0000 (GMT)
+Date: Fri, 15 Feb 2019 11:50:01 +0000
+From: Mark Brown <broonie@kernel.org>
+To: Nathan Chancellor <natechancellor@gmail.com>
+Subject: Re: [PATCH] arm64/neon: Disable -Wincompatible-pointer-types when
+ building with Clang
+Message-ID: <20190215115001.GA7897@sirena.org.uk>
+References: <20190215013959.21320-1-natechancellor@gmail.com>
+MIME-Version: 1.0
+In-Reply-To: <20190215013959.21320-1-natechancellor@gmail.com>
+X-Cookie: Neutrinos have bad breadth.
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_034251_658760_7E7A039D 
-X-CRM114-Status: GOOD (  17.85  )
+X-CRM114-CacheID: sfid-20190215_035012_831662_CBF96618 
+X-CRM114-Status: UNSURE (   6.84  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,59 +80,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Maydell <peter.maydell@linaro.org>, kvm@vger.kernel.org,
- Christoffer Dall <Christoffer.Dall@arm.com>, Dave Martin <Dave.Martin@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
+ Will Deacon <will.deacon@arm.com>, Kevin Hilman <khilman@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============8673449970637339707=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 15 Feb 2019 09:58:57 +0000,
-Andre Przywara <andre.przywara@arm.com> wrote:
-> 
-> On Wed, 30 Jan 2019 11:39:00 +0000
-> Andre Przywara <andre.przywara@arm.com> wrote:
-> 
-> Peter, Marc, Christoffer,
-> 
-> can we have an opinion on whether it's useful to introduce some
-> common scheme for firmware workaround system registers (parts of
-> KVM_REG_ARM_FW_REG(x)), which would allow checking them for
-> compatibility between two kernels without specifically knowing about
-> them?
-> Dave suggested to introduce some kind of signed encoding in the 4
-> LSBs for all those registers (including future ones), where 0 means
-> UNKNOWN and greater values are better. So without knowing about the
-> particular register, one could judge whether it's safe to migrate.
-> I am just not sure how useful this is, given that QEMU seems to ask
-> the receiving kernel about any sysreg, and doesn't particularly care
-> about the meaning of those registers. And I am not sure we really
-> want to introduce some kind of forward looking scheme in the kernel
-> here, short of a working crystal ball. I think the kernel policy was
-> always to be as strict as possible about those things.
 
-I honestly don't understand how userspace can decide whether a given
-configuration is migratable or not solely based on the value of such a
-register. In my experience, the target system has a role to play, and
-is the only place where we can find out about whether migration is
-actually possible.
+--===============8673449970637339707==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="OXfL5xGRrasGEqWY"
+Content-Disposition: inline
 
-As you said, userspace doesn't interpret the data, nor should it. It
-is only on the receiving end that compatibility is assessed and
-whether some level of compatibility can be safely ensured.
 
-So to sum it up, I don't believe in this approach as a general way of
-describing the handling or errata.
+--OXfL5xGRrasGEqWY
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
 
-Thanks,
+On Thu, Feb 14, 2019 at 06:39:59PM -0700, Nathan Chancellor wrote:
+> After commit cc9f8349cb33 ("arm64: crypto: add NEON accelerated XOR
+> implementation"), Clang builds for arm64 started failing with the
+> following error message.
 
-	M.
+Reviewed-by: Mark Brown <broonie@kernel.org>
 
--- 
-Jazz is not dead, it just smell funny.
+--OXfL5xGRrasGEqWY
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxmp2YACgkQJNaLcl1U
+h9DQjgf+Ip4Cg39+BMHVOwgGtQZ8sGLb2muZVuewBtYYoXWujQ/2ACbqGpUTK+l6
+bCINCYohI10vWmLlO+pVkjae1tgZ3zVaSxlL/+Kcjf9FjLpWDda2TB1kg39VOd23
+mxV+V9uYHJGdtUGaxqp3hSecfUU9isXHugsfakzgxbWagq7h55RRY++4ZUGPAoGw
+yed8jvoYDJBVYvpSFAnZsf330/do0f6obFAq5UAUZrRIivc3kPgZo/KAoF92bo2m
+rLna+hwqvRt7Xi6YwEH2QZ+CPMfIITK4Rgoc10vzMGs3RNLfJLbUlf3j6zOPn51D
+V85AXuaop5+IPMC8l89jVsRJwJXnug==
+=uD/V
+-----END PGP SIGNATURE-----
+
+--OXfL5xGRrasGEqWY--
+
+
+--===============8673449970637339707==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============8673449970637339707==--
+
