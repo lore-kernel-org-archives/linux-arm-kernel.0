@@ -2,60 +2,74 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B12DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:29:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AE198C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:29:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA82B2190B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:29:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 789242190B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:29:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o33zZjtE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA82B2190B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WxA8cL2m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 789242190B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lhkGwE9I8fxxaQDpTJUUHMMqQKMReQP4UBOVkqu5moM=; b=o33zZjtEdmYyLC
-	CqlxO5GGd1/AqY1UODD5z+Kpn83NS1tj2UTXxZU4kOyBKV8rheMipI8edJNkVTk9jOb7IX9Bx/2Hg
-	yFs78EGyjeucUtNRhyvtvYL3bTl5EA/30DKHCmHVfHqUpeaujv/fbpSGkYreAKZAFXU9J9TDMxl51
-	mAnh4+BUE+7B3wGgHGTU9mYNKVrpgRPPXdoZC91/6dBgPZi5aei7wtWZTPz8PBlAe1q4qOQz8NMRC
-	wV2QXq3hEO9F4NdqL4VBBubCvPBc1kODxJyFH+8QmaTEAjczISSwcHHVaz1p3fH2e+8+KBmh1D3w4
-	mxYpb/op1ouskJMzdS8w==;
+	List-Owner; bh=t1OekHSOywKcqPI1prv338j+478iYTk4UNnFEb7317U=; b=WxA8cL2m+2AMX7
+	oWEDEM4DTMlj1j1ZkyT/t8Ackjmc+/XuxcjUywLuYwrVzJaeSvBQVvRGBBJhaNQwXFpraaGCJPFiM
+	voAiBFd5xl/MTFdFDW1kQ6Fld0Mivijdz5ke9GvHjT+Oszi5YWrFTxwKY8I/QnrpNR7m5KdqyXBkA
+	lMybu6MzpEqLpjAwtnIip88DXmievVLWf4ctN8epmdAZb6+tuJDQm/HWO1DJNQzd5FgxkOWNrbQmZ
+	dz/qx1viEFCrIrbFo3aoAZ+Kf4WTU0nidiY6PHlJHAAeKy5iGBz7D55jcmUEGL7IOslpQsZgKrxXS
+	wwE5ROuQnpvWjgsoZ8Sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugMv-0001Vy-Hb; Fri, 15 Feb 2019 16:29:41 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gugN9-0001mq-Cj; Fri, 15 Feb 2019 16:29:55 +0000
+Received: from mail-qk1-f196.google.com ([209.85.222.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugMr-0001V3-U2
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:29:39 +0000
-Received: from aptenodytes (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id 8C269200009;
- Fri, 15 Feb 2019 16:29:29 +0000 (UTC)
-Message-ID: <e8928afbb43cc8fffbb9b9034b2a94907fef596d.camel@bootlin.com>
-Subject: Re: [PATCH] net: phy: xgmiitorgmii: Support generic PHY status read
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Andrew Lunn <andrew@lunn.ch>
-Date: Fri, 15 Feb 2019 17:29:29 +0100
-In-Reply-To: <20190215162344.GQ708@lunn.ch>
-References: <20190215161708.18645-1-paul.kocialkowski@bootlin.com>
- <20190215162344.GQ708@lunn.ch>
-Organization: Bootlin
-User-Agent: Evolution 3.30.5 
+ id 1gugN5-0001ho-E9
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:29:52 +0000
+Received: by mail-qk1-f196.google.com with SMTP id p15so6024701qkl.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 08:29:51 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nGq8Wn2fRGGja+894QKAGb9/iuj4uGbC8rMRmzQyRCo=;
+ b=YaR7j5AwcNj1d6xxVMKIw06VqEY2Ff78Pq1ogFGbUPk6gueGl0DLs8yW8Q8AEXwkjV
+ YsmaJ5SUhgXc9VyGMARvZx4b/fe1Wu8poDrcDpcUf0zyG5bjfZhxGo8/P4+q+zu6SBOZ
+ ua/oq4c+ldzKcU0QTshNdPBt+m0WMBH2LFvwR18NkOvojlRSmHefVEb/PxfWUVY2c5gg
+ 5PWZ0MbWtVchH3QBxnIjRyCI4FJb56qcA69IKs7rM8rYLsfSePADEOUhq11ETEYIIeJ7
+ NFI7pE94DEsYQqqThzaDscFdWNwzenCLH4Pt/XdkjaxXqH200HJxY1X/oTwYA/Jx5+TQ
+ Ngvg==
+X-Gm-Message-State: AHQUAubQWgSXiuYahIOOZPy0WhalMujvvLXXvtuWKyrW+l6CLjOIloMi
+ AElayjjZ2qBuNnp5KWQIrC4ngZvk8nb2A6BtZik=
+X-Google-Smtp-Source: AHgI3IYUnnyVuzK6IlQ7/ZXnjeWY9udH3aSlqMa2L/27c+ys74POegzyenO3qoLlOjleHq1ETJ0bmpcb8eWFNLW+6IQ=
+X-Received: by 2002:a37:bdc6:: with SMTP id n189mr7482756qkf.330.1550248190218; 
+ Fri, 15 Feb 2019 08:29:50 -0800 (PST)
 MIME-Version: 1.0
+References: <20190208150935.32108-1-thierry.reding@gmail.com>
+ <20190208150935.32108-3-thierry.reding@gmail.com>
+ <CAK8P3a0zEQ3oY8vYBxpnq3wg0pDfag66Y7FxZ1muvxHh+SwHyg@mail.gmail.com>
+In-Reply-To: <CAK8P3a0zEQ3oY8vYBxpnq3wg0pDfag66Y7FxZ1muvxHh+SwHyg@mail.gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 17:29:33 +0100
+Message-ID: <CAK8P3a0kZFV=JHTSYGLVy5jXUFGp6zAUJ9350yLVFOQ3A+EmOw@mail.gmail.com>
+Subject: Re: [GIT PULL 2/9] cpufreq: tegra: Add support for Tegra210
+To: Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_082938_108457_AC9903FD 
-X-CRM114-Status: GOOD (  18.03  )
+X-CRM114-CacheID: sfid-20190215_082951_536718_828D98ED 
+X-CRM114-Status: GOOD (  15.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,63 +81,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Florian Fainelli <f.fainelli@gmail.com>, netdev@vger.kernel.org,
- linux-kernel@vger.kernel.org, Michal Simek <michal.simek@xilinx.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org,
- Heiner Kallweit <hkallweit1@gmail.com>
+Cc: "open list:TEGRA ARCHITECTURE SUPPORT" <linux-tegra@vger.kernel.org>,
+ arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Jon Hunter <jonathanh@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Fri, Feb 15, 2019 at 5:28 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Fri, Feb 8, 2019 at 4:09 PM Thierry Reding <thierry.reding@gmail.com> wrote:
+> >
+> > Hi ARM SoC maintainers,
+> >
+> > The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+> >
+> >   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-5.1-cpufreq
+> >
+> > for you to fetch changes up to 43c36002b86d6027b48f7c68ac32245f73f29f6b:
+> >
+> >   cpufreq: dt-platdev: add Tegra210 to blacklist (2019-02-06 14:31:19 +0100)
+> >
+> > Thanks,
+> > Thierry
+> >
+> > ----------------------------------------------------------------
+> > cpufreq: tegra: Add support for Tegra210
+> >
+> > This uses the DFLL clock support to enable CPU frequency scaling on
+> > Tegra210.
+>
+> I see the Ack from Viresh, but I don't see why you'd like to have them
+> merged through the soc tree rather than the cpufreq tree.
+>
+> Could you clarify? It's no problem to do it, I just want to make sure
+> there is a good reason for it.
 
-On Fri, 2019-02-15 at 17:23 +0100, Andrew Lunn wrote:
-> On Fri, Feb 15, 2019 at 05:17:08PM +0100, Paul Kocialkowski wrote:
-> > Some PHY drivers like the generic one do not provide a read_status
-> > callback on their own but rely on genphy_read_status being called
-> > directly.
-> > 
-> > With the current code, this results in a NULL function pointer call.
-> > Call genphy_read_status instead when there is no specific callback.
-> > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> > ---
-> >  drivers/net/phy/xilinx_gmii2rgmii.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
-> > index 74a8782313cf..bd6084e315de 100644
-> > --- a/drivers/net/phy/xilinx_gmii2rgmii.c
-> > +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
-> > @@ -44,7 +44,10 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
-> >  	u16 val = 0;
-> >  	int err;
-> >  
-> > -	err = priv->phy_drv->read_status(phydev);
-> 
-> Hi Paul
-> 
-> How about using phy_read_status()?
+Nevermind, I just found the 0/9 message that explains it all, pulled now
+into arm/drivers.
 
-Thanks fo rthe suggestion! Though I don't that would work here since
-our priv->phy_drv != phydev->drv, so it looks like we need to be
-breaking it down in the driver.
-
-I suppose this driver is a bit unusual since it represents a GMII to
-RGMII bridge, so it's not actually a PHY driver on its own -- it just
-sticks itself in between the actual PHY and the MAC.
-
-Cheers,
-
-Paul
-
--- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
-
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
