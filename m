@@ -3,19 +3,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81112C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:32:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E457C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:34:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4DFF02192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:32:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6ABFC2192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:34:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rvogqr9e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DFF02192D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HZ+Nqqz5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6ABFC2192D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,49 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GJ5qmsWbodfLf9uWgLIfUHrSPFObd1r4hxfDnKX2q4c=; b=Rvogqr9en87Yvn
-	Ds4Kp/WCplcqiNTCjopnccMC0WGme7YwRC4bCE5cy0NBJ6cN1vr33Ydu+fb3lS2B9WpNmvlFl9nz1
-	1mr3EdqFwxMZDhI0O3muQWMXWvbjEcakNutlS9spiw+3YfWhNXc6M+3jgJ6aLY0s3SxTIH6GeOu2G
-	pmX4DEjgyiRf1eplZ1SyK4sjAYg9vsbNKo9a6xvlHBCLTgg9VSP8jBVbOiBIlziN9aPpGS9rhVrft
-	PmpcKnZkKGsc+kMvgdJYAm3PSsK0B3EdbokjVgFIxY1gFpyZKbqI/VZmMTjhNBd6IAyFnvyGJFk3/
-	c7DeENRmtrEATH4mCQAA==;
+	List-Owner; bh=h3l6esPI/WGWx89mnMOdFJzQvQbD6co24faugTg2Ul0=; b=HZ+Nqqz5OrGOD6
+	k8CUUVDwMKKEn9n0+sW1moFlQYBk0SC6g3Jh9quX3HepxAoEFQWCCXB8YEw4z/+1kuBDob+p0qhxY
+	CSSHurLf9v70T1zMaSVYu8DMf7Kf9bABfhEGP8dXl7izC7Vk2Mn0W6G9ZyksQHAidvyCKCLyyMVXc
+	ZTLsMJfde3cNQ2bI3WX1Iz2RHtRqPwZFjo6IXHuGMJVLt4Gkjcv2EPyn8WOBv9Ma5Jc0urhfRQZSy
+	oXm3zuDPFS9xE6BhWac7hQqj83tVdngyahmKiTX8l3SerdfbE4gFcwgQcgEmbDaXu/ePAICBiXZOY
+	jy8zGSCDdwXLP8TQlwag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gueXF-00070m-OV; Fri, 15 Feb 2019 14:32:13 +0000
+	id 1gueZi-0007Lq-JK; Fri, 15 Feb 2019 14:34:46 +0000
 Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gueXC-00070R-DJ
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:32:11 +0000
-Received: by mail-qt1-f196.google.com with SMTP id y4so11014028qtc.10
+ id 1gueZe-0007L9-VM
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:34:44 +0000
+Received: by mail-qt1-f196.google.com with SMTP id a48so11063645qtb.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 06:32:10 -0800 (PST)
+ Fri, 15 Feb 2019 06:34:42 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=ZtlhZ6LSocXlByLhn167GyhXfgQhenriK+nVtq2zjsk=;
- b=IZPKwNgBHXP6N/GSwyo9NlPVPaNSHQmGOugHqqUWKrznVw3LhsrNYCciqotAxStX8f
- u2TxG67BlYZgBB3a8tm3TnWuL0/Ou0w3ZJlxJkD8X/L7LruFW82SUS1FLfuoJWq726Pt
- xF/MFMvhj8T4sMJQD/75M5luQ+2kePYYRBoIhpZ5c9ZhX8iu817xaVnSTrlzkdkHQlFV
- 8ElwtFvboiU7QPM78duQu832R3EOBbaEiY8EuQ38MLQrOM6+COfpmaa/u+8DkJMKRZe1
- hGfxAyw+IDNMpIJm7yJKKE+Xy7mZojMAQC689Oy9N7f04cdmiVkvX0tB3lYLq5DYRq+F
- IWmQ==
-X-Gm-Message-State: AHQUAuZfQiTCLUOZQWByfBEbU+0AQj7mTxREcTRBPbHtKXzAVDxKxLcd
- KGpvJ6eH8YYcZP2vfCTUvKtzb3DwBFUM0AOjJadKlQ==
-X-Google-Smtp-Source: AHgI3IaFYltdMkUEXkvXSYpI25nwuy7iDfElsj6643H8vrc0HxjnwyZ4Z2m5SzsTS3DdxV89lkgtWiI0xKJH4QhgSUs=
-X-Received: by 2002:ac8:4141:: with SMTP id e1mr7476694qtm.96.1550241129380;
- Fri, 15 Feb 2019 06:32:09 -0800 (PST)
+ bh=WFZm56oMWvy13ehVmFJkNf+gJMaMRuR7s7NkavSEYX0=;
+ b=ZXEQY5ex7ewmLTpStiuLFjvdCkjiQQMX/ecapPviHPy0SpISFJ/pYOUEjxZ5uJPOFf
+ SxHhygnkWLdKHjgpzGrHFthV/a5p+sQukOHJ3GO4mRMpx74eXC4zyEW0Li9DxrsKyCN7
+ BEOg81YSXAj9o5OBJTmwRLiKE5Yi9AL6UCl/KaHvfaRvY+N02aG4kHMLTwpCOlP9mgnl
+ H6U/9NMGanzvVncvk1w+09V0mn1a07RYqDey94FtCM3SYqKfATzStxglLGM/DjJb1RAa
+ 1pqVToPj6aWQ5voeLKq5Ri6yLGl3AssA5nH0JGwIkGsB4/KvZ/BKeJitshLojPtpz0Ej
+ oNCA==
+X-Gm-Message-State: AHQUAuaP5mGJjLKrbhigms/U4xzCFOWlHoOUpqdrnrc+cMWWPTUTzald
+ LY4Y6wBXyV/7RaGNc0kg0EuyqoolLkuDCpZgG2M=
+X-Google-Smtp-Source: AHgI3IY2cuhHp0rp7izwS+iKcgVYp7SMb64KNigpaiqoJGXlQe9wPespNz7R5r/8KBupvN9nc3Q5M1w2bghTYHcHfzY=
+X-Received: by 2002:a0c:c60f:: with SMTP id v15mr7381826qvi.40.1550241282166; 
+ Fri, 15 Feb 2019 06:34:42 -0800 (PST)
 MIME-Version: 1.0
 References: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
-In-Reply-To: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
+ <1549254680-1282-3-git-send-email-andy.gross@linaro.org>
+In-Reply-To: <1549254680-1282-3-git-send-email-andy.gross@linaro.org>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 15:31:52 +0100
-Message-ID: <CAK8P3a1K+oUTrq903=8zfguJRXCQDvaXLT+TY-u6P8Obpr3myw@mail.gmail.com>
-Subject: Re: [GIT PULL] Qualcomm ARM64 DT updates for 5.1
+Date: Fri, 15 Feb 2019 15:34:24 +0100
+Message-ID: <CAK8P3a2D7Lti=uj1tfUbSRkgmR-qL3kHbmNBCGBVAftoa39jeA@mail.gmail.com>
+Subject: Re: [GIT PULL] Qualcomm Device Tree updates for 5.1
 To: Andy Gross <andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_063210_449410_7C2BF45E 
-X-CRM114-Status: UNSURE (   9.00  )
+X-CRM114-CacheID: sfid-20190215_063443_002366_353E1D31 
+X-CRM114-Status: UNSURE (   7.59  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -89,25 +90,18 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On Mon, Feb 4, 2019 at 5:31 AM Andy Gross <andy.gross@linaro.org> wrote:
-> ----------------------------------------------------------------
-> Qualcomm ARM64 Updates for v5.1
+> Qualcomm Device Tree Changes for v5.1
 >
-> * Add MSM8998 RPMCC, I2C, and USB related nodes
-> * Add MSM8996 rpmpd node
-> * Fix typo in MSM8996 pin definitions
-> * Disable MSM8996 VFE smmu to fix security violation
-> * Add I2C, SPI, rpmcc, uart, and WCN3990 wlan nodes on QCS404
-> * Enable SDCC1 HS400 support on QCS404
-> * Add a multitude of nodes on SDM845:
->   SD, UFS, USB, LPASS, SCM, QSPI, PDC, DPU, videocc, GPU, RPMh
->   bus interconnect, WCN3990 WLAN
-> * Add gpio ranges to SDM845 TLMM
-> * Fix regulator load on sdcard on MSM8998-mtp board
-
+> * Fixup GIC IRQ flags and GSBI state on MSM8660
+> * Add USB OTG, gpio ranges, and Wifi support on MSM8974 Hammerhead
+> * Remove skeleton.dtsi on IPQ4019
 
 Pulled into arm/dt, thanks!
 
-      Arnd
+The skeleton.dtsi removal was already there, and I had to resolve a trivial
+whitespace conflict here.
+
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
