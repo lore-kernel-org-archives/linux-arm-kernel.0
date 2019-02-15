@@ -2,59 +2,56 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1971FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:03:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D58FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:07:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E36002190C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:03:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1FC0621924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:07:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l38YrdgJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E36002190C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DZMSV4Lv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FC0621924
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=6Rt/VFJnkfmkJ81b7VDiQSpNK9ZTRknUgaosG3ybIfI=; b=l38YrdgJ4n/YDbdCi5OK+m2d/
-	9DTiQ+EBBhv2jMb/ODLdxUmrmPR4W+LqgQK6WLYTKlGBBohyHtaYIkOoA/Bp7HLYlyjNq0Z6xFng4
-	AULfmFNhmX6uMOXxOVSZi5tIWTMcTd8XwAk3+asbl9yjjRxgy+cXw28CVODpJ8jg7aCwm0rQ7f/X8
-	8eDEEilgqqYLl6Q/DreyuYk1Qr2GujR63z16CzelybpuzSfpweQ5io1EXORNFICTV53JEmIb2pPG9
-	84xgTum0TOPKONmroSFhb+usEJrXVcrp3WuF/CRNRCFxnyJdf3EfwBxcdqSbBeq46y2dXs8jwMtHh
-	ibje9mugg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ySHWtYHVQp3rDk20qIGeDvhJ4C2YskDEI8DI74FCk7w=; b=DZMSV4Lv6zgNHG
+	nIoBRytUMSwSEWZZ+y8Rg69wuukGYuj93P2LVll4kjlc14OhvL4Otja2N3nOWpJBQRB62/dEYTcli
+	SpT5OzK+z1Z2WpBmjeQZEgaULzOiGpDt4YqeuyUNi4K+EF/DNkOS3Xa1AvU3q9yi+1zi+SgNFj+e3
+	THa9WDK2KizsbPzpW7jJXFXezZShkXENbuoKlkLz3d9WKcyRRb9WRPUnjAG5alx9ClMRQ+pCnjbgC
+	75DTHdBDR3Ryq+GkxynkB4Nbuq/Rh8el1KtDMIWuQApjeXhwltTAdfIe2/8IIbeEuVrxIAO/qeqFp
+	WhtQV5b26pnAmS3koSBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guZOf-0002sN-Oq; Fri, 15 Feb 2019 09:03:01 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guZOc-0002rt-OF; Fri, 15 Feb 2019 09:03:00 +0000
-Received: from localhost (unknown [83.221.228.209])
- by pokefinder.org (Postfix) with ESMTPSA id E354F2E3551;
- Fri, 15 Feb 2019 10:02:57 +0100 (CET)
-Date: Fri, 15 Feb 2019 10:02:57 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Qii Wang <qii.wang@mediatek.com>
-Subject: Re: [PATCH v3 5/6] dt-bindings: i2c: Add Mediatek MT8183 i2c binding
-Message-ID: <20190215090257.geumssb2cucs7rzt@ninjato>
-References: <1548057574-8061-1-git-send-email-qii.wang@mediatek.com>
- <1548057574-8061-6-git-send-email-qii.wang@mediatek.com>
- <20190205131641.GF12401@kunai>
- <1550109268.30065.13.camel@mhfsdcap03>
+	id 1guZSh-0004Z2-QC; Fri, 15 Feb 2019 09:07:11 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guZSd-0004Xx-EP; Fri, 15 Feb 2019 09:07:09 +0000
+Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
+ helo=diego.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1guZSZ-00007D-A5; Fri, 15 Feb 2019 10:07:03 +0100
+From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
+To: Robin Murphy <robin.murphy@arm.com>
+Subject: Re: [PATCH] arm64: dts: rockchip: Add nanopi4 bluetooth
+Date: Fri, 15 Feb 2019 10:07:02 +0100
+Message-ID: <2775075.jaMbaEJbN1@diego>
+In-Reply-To: <a7c0fae925a838ad5bb540f4302614a94472b437.1550188024.git.robin.murphy@arm.com>
+References: <a7c0fae925a838ad5bb540f4302614a94472b437.1550188024.git.robin.murphy@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <1550109268.30065.13.camel@mhfsdcap03>
-User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_010258_941185_D6175B83 
-X-CRM114-Status: GOOD (  14.25  )
+X-CRM114-CacheID: sfid-20190215_010707_632168_ACC74BE4 
+X-CRM114-Status: GOOD (  10.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,89 +63,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- srv_heupstream@mediatek.com, Rob Herring <robh@kernel.org>,
- leilk.liu@mediatek.com, xinping.qian@mediatek.com,
- linux-kernel@vger.kernel.org, liguo.zhang@mediatek.com,
- linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============4225351234860739266=="
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Am Freitag, 15. Februar 2019, 01:02:34 CET schrieb Robin Murphy:
+> Describe the Bluetooth portion of the Ampak combo module - this is
+> either an AP6356S or an AP6212 depending on the board variant, but
+> there are no relevant compatibility differences between the two.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
---===============4225351234860739266==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="pzwi6i3t3hyzmfbc"
-Content-Disposition: inline
+applied for (hopefully) 5.1
 
-
---pzwi6i3t3hyzmfbc
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Thu, Feb 14, 2019 at 09:54:28AM +0800, Qii Wang wrote:
-> On Tue, 2019-02-05 at 14:16 +0100, Wolfram Sang wrote:
-> > > +  - mediatek,share-i3c: i3c controller can share i2c function.
-> >=20
-> > I am not happy with this binding. There must be a better way of using
-> > the I3C controller in I2C mode. I think it would be easier to tell if we
-> > had an I3C driver to see how it implements I2C fallback there. Is the
-> > I3C driver on the way?
-> >=20
->=20
-> I am very sorry for the late reply due to the Chinese New Year holiday.
-
-No worries. I hope you enjoyed the holidays!
-
-> After confirmation, for I2C mode in I3C controller, we will push an I3C
-> driver to implement I2C fallback there later, and we will remove
-> "mediatek,share-i3c" for i2c controller driver in the next patch.
-
-The problem with DT bindings is that you need to support them forever
-once you introduced them. Because there might be old device trees on
-boards out there which need the property. So, I don't like the idea of
-having a temporary binding which is meant to be removed anyway. My take
-is that you should just send out the I3C driver which will handle the
-I2C support then.
-
-Adding Rob to CC in case he has a different opinion.
+Thanks
+Heiko
 
 
---pzwi6i3t3hyzmfbc
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxmgEEACgkQFA3kzBSg
-KbaYzQ/9GMVjiYKg0Awt5r1WZ23GftvsUaudHFYCqO3OuZ4iTC3cHFAvYIDxsUKh
-1L/HNEup5EICTXVUe6AoFPe6MFyC4w8e7/00n2Nsj9mfTUFjaR/2DcRWqrR0kv4T
-x48s/UmUVhe8PtRT7AbX3aKkA/Jm6puhFHPCjpaLaDX20mw35B/hLIJ7lkqmpce0
-fN1R2Vuo2xGHueDHv4MBbtsTC4wcOTfPVJwNVfd6nOoDOhQX+UyAqYJyoQ8exaJM
-QmCfPea170F4Ov6fLgrGilWqwiN9EQDbudmlZA8vt0dflDMG+Awt5rFgEpvfKlj0
-Zndw5Kwi1NCCH6b4P/GcUOaTKcrNwwA7b7/A4/dQTIVcAx/WXM+ibKY7ZQz3mfAg
-LgswXBgkDL3jx3gLjHWtYjc39KVzROIBed24BIX80F1G7tfvkkhshm9KJ7gi4yks
-NA2CSlS4Ufgqb0LVgRGK7e6LEFVoBL4kMlMutSToiWdrwB1tJAdWj8F986EB4v9t
-5BzNW9pjN922TqY0k2gtrhFcFGyeb1BP9rvobMaFHLLt31hCIp4gkuWln7TjMFtD
-LiHknLpKMjHUUd4jib/5RRnXtIAmSh7dag/5zM3m7m+Jx4T2k8E5MCQ9eI4ZlGfm
-Rw2Pno7LzRHIeS5oZBAVt2n4U2gfl/okiqdkP0d9kMF1z5vbduY=
-=A+6v
------END PGP SIGNATURE-----
-
---pzwi6i3t3hyzmfbc--
-
-
---===============4225351234860739266==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4225351234860739266==--
-
