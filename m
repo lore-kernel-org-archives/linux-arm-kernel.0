@@ -4,127 +4,65 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 090CCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:23:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C7BBC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:25:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CAEA921A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:23:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D03221B1A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 10:25:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aE1ZpEPC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="MshO6e6/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAEA921A80
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eYL4NBc9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D03221B1A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=c9rlCY5MxhKQGg9ngNOMKUzEb7CT87Rq7JA+VlRjCQw=; b=aE1ZpEPCDfZmIz
-	ancK4105hjPUi7O5oPBaBY2+hyf0DxAm6TZXshLR6dTJrhTOxJbTtVYPCAnkU/Ar2i/qRUh8iQuZI
-	zl+IxOmhk6+RPCiTpPNFtwdkIEV/+PLHwiKL8LQGkU1xacNPgT3nwArDLVnDgVWjq74cHzWHKp4Pm
-	59x9TziZrkfqONXY94DseexBD6qkv6aLH6iTDV29iAcPyfu7R96RLsbjiIIpbZqrTpygXANNhltVE
-	nOYNKSI0dgwldmQQLKBwrEoVUIkFQFVMdaEPZa+7CrURxna9T4Av8VvKIq3agpzaJwdjCUDLSp09W
-	X3dklI/KSb0lxeKhYzUQ==;
+	List-Owner; bh=e+odav1gBO3MwIDKh1Qkqvu/9DaMf85OXvLssZEd3CU=; b=eYL4NBc9SfOx7U
+	nvJUNz7DzH6sg7N3Jlss10ztAa+2VDbgMCeIYycu5XQ27VvE/qlI8Rll4ABNVykIdVIcM3vTxBcTP
+	g3RLNZP/Xjyt4Dr/VhZYH++Cizfdj1/xueJy3FmhM0JmKmlxamP7UpcJcmf6oBXdyX+FUfdd6Zz+Q
+	tc5/IuUVhhOxq6KxMWAQhELSAKnRX2275RyvLwDjt94cGo+DZqWXWwqXxLy/7Zx1qytGoNZFhFwSU
+	U9dVLRhcJ6QbtmafZvnfrYpOd6TUwKU3Vgky+QJBXN7fOhgGDHoWE0CypiYtnku4SWMqtj9ZbFhEd
+	PGlkSC+J3ORq7IPPiu3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guaeh-0002Tn-2p; Fri, 15 Feb 2019 10:23:39 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1guagd-00044J-W1; Fri, 15 Feb 2019 10:25:39 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guaec-0002T7-UH
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 10:23:37 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190215102332euoutp0258d3d0c527d39d702e3e8401b786146a~DgobiYrHB2592525925euoutp02v
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 10:23:32 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190215102332euoutp0258d3d0c527d39d702e3e8401b786146a~DgobiYrHB2592525925euoutp02v
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1550226212;
- bh=Xgs4ECjK2w2EGc1IdmngDs3q2ZGicewg2WMbPX5mPK8=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=MshO6e6/oWOzB8evWhSqlgQgrfhWTzM9GlC4wMBGGJ3qyBW8GihHXTvZqew0RR0b9
- AQqx0jFo86D3eBBH67wlCUIn/TE8jibxLrvE5ygtligKz1TZFKR1o4lNbDRo7yTwaN
- RjMY9iTf+3sA/Osqi0gtnODH1DX1nAZ3TnbV6Fb8=
-Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20190215102331eucas1p2abebf11a2874539bacbb273af36ef610~DgoarAooA2803828038eucas1p2u;
- Fri, 15 Feb 2019 10:23:31 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges3new.samsung.com (EUCPMTA) with SMTP id 5C.2F.04806.323966C5; Fri, 15
- Feb 2019 10:23:31 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190215102330eucas1p1107316a33f3cf5ab7347d0e2eb088516~DgoZvncKb0580005800eucas1p1f;
- Fri, 15 Feb 2019 10:23:30 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190215102330eusmtrp170f252a98f16f630dec5f40cfc6fea33~DgoZhJW1z0652206522eusmtrp1L;
- Fri, 15 Feb 2019 10:23:30 +0000 (GMT)
-X-AuditID: cbfec7f5-34dff700000012c6-f1-5c66932393a3
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 39.9C.04284.223966C5; Fri, 15
- Feb 2019 10:23:30 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190215102329eusmtip23cf2ffe37c0b6db7b58c0bc386c48d49~DgoY-ZqNK0079700797eusmtip2O;
- Fri, 15 Feb 2019 10:23:29 +0000 (GMT)
-Subject: Re: [PATCH] ARM: pm: fix HYP/SVC mode mismatch when MCPM is used
-To: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <7548bc35-caef-0737-be39-5ddb8e097f67@samsung.com>
-Date: Fri, 15 Feb 2019 11:23:28 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
-MIME-Version: 1.0
-In-Reply-To: <20190214165807.eq34njmunqhrdvxx@shell.armlinux.org.uk>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrOKsWRmVeSWpSXmKPExsWy7djPc7rKk9NiDDae4LPYOGM9q8XP9i1M
- FufPb2C32PT4GqvF5V1z2CxmnN/HZHFo6l5Gi/XTfrJafHr2j91ixuSXbA5cHpevXWT2eH+j
- ld1j56y77B6bVnWyedy5tofNY/OSeo++LasYPT5vkgvgiOKySUnNySxLLdK3S+DK+LzkCnPB
- G/mKNRuPMTcwfpPsYuTkkBAwkdg0aQZbFyMXh5DACkaJI6cns0M4Xxgl3v9vgMp8ZpTYsv0K
- kMMB1vLrbAJEfDmjxLODf1kgnPeMEhe2bGYEmSss4CmxpOMAK0iDiICVxIUeDZAaZoHPTBL/
- fnxjBalhEzCU6HrbxQZi8wrYSSxrXwNmswioSrz5eYwFxBYViJGYcu4IO0SNoMTJmU/A4pwC
- LhKnt21hBrGZBeQltr+dA2WLS9x6Mp8J4rdH7BI37uhD2C4S/cv6mCFsYYlXx7ewQ9gyEqcn
- 94A9ICHQzCjRPmMWO4TTwyixdc4ONogqa4nDxy+CfcMsoCmxfhfUUEeJbzdWMkFChU/ixltB
- iBv4JCZtm84MEeaV6GgTgqhWk5h1fB3c2oMXLjFPYFSaheSzWUi+mYXkm1kIexcwsqxiFE8t
- Lc5NTy02zkst1ytOzC0uzUvXS87P3cQITF6n/x3/uoNx35+kQ4wCHIxKPLwrMlJjhFgTy4or
- cw8xSnAwK4nwLupKixHiTUmsrEotyo8vKs1JLT7EKM3BoiTOW83wIFpIID2xJDU7NbUgtQgm
- y8TBKdXAGGhv2Z0QK9R9S9727re5Z1793GrN/ESXb4qtr7R85kT5ItG9X19Y/nB8EO0saPzK
- zXVBmWOncERo8XSprRkanUwdxe/mHXVJ//psq2O2pLnr1/27nvBsuBYh7cw8Y6vd0guntSyd
- xL4lTjYMMTGW/bcn/kx1Tt0ZjXnlS3Ss+a7MN401nsGtxFKckWioxVxUnAgAdle861oDAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFrrJIsWRmVeSWpSXmKPExsVy+t/xe7pKk9NiDN4+ELfYOGM9q8XP9i1M
- FufPb2C32PT4GqvF5V1z2CxmnN/HZHFo6l5Gi/XTfrJafHr2j91ixuSXbA5cHpevXWT2eH+j
- ld1j56y77B6bVnWyedy5tofNY/OSeo++LasYPT5vkgvgiNKzKcovLUlVyMgvLrFVija0MNIz
- tLTQMzKx1DM0No+1MjJV0rezSUnNySxLLdK3S9DL+LzkCnPBG/mKNRuPMTcwfpPsYuTgkBAw
- kfh1NqGLkYtDSGApo8SuE8vZuxg5geIyEienNbBC2MISf651sUEUvWWUaH0ykwkkISzgKbGk
- 4wAryCARASuJCz0aIDXMAl+ZJCZ838oO0XCaUeLW9AvMIA1sAoYSXW9BJnFy8ArYSSxrXwNm
- swioSrz5eYwFZJCoQIzE1XOMECWCEidnPmEBsTkFXCROb9sCNoZZQF3iz7xLULa8xPa3c6Bs
- cYlbT+YzTWAUmoWkfRaSlllIWmYhaVnAyLKKUSS1tDg3PbfYUK84Mbe4NC9dLzk/dxMjMFq3
- Hfu5eQfjpY3BhxgFOBiVeHhXZKTGCLEmlhVX5h5ilOBgVhLhXdSVFiPEm5JYWZValB9fVJqT
- WnyI0RTot4nMUqLJ+cBEklcSb2hqaG5haWhubG5sZqEkznveoDJKSCA9sSQ1OzW1ILUIpo+J
- g1OqgbGaMaDHX0DywuuXi03en5KSelh5d6mAVqL8TbXgAsY330/Kd4i/O/7ygfqTi+m3F384
- djBa5FWXntvfE32JSl4mgfVZTcfEsrjeb8ny6AnLL0j+3L3X1M5w4qyTs6/xXjlQ1tTYkbNF
- cdLci7m9PSXL5i9aPPnSnW6BHxrP5W/9fZ5QEqfyeIISS3FGoqEWc1FxIgDzBLqW7AIAAA==
-X-CMS-MailID: 20190215102330eucas1p1107316a33f3cf5ab7347d0e2eb088516
-X-Msg-Generator: CA
-X-RootMTR: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190214143126eucas1p126506139ef72c1685654c8dac8957b3d
-References: <CGME20190214143126eucas1p126506139ef72c1685654c8dac8957b3d@eucas1p1.samsung.com>
- <20190214143114.24356-1-m.szyprowski@samsung.com>
- <20190214165807.eq34njmunqhrdvxx@shell.armlinux.org.uk>
+ id 1guaga-00043e-S0
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 10:25:38 +0000
+Received: from lupine.hi.pengutronix.de
+ ([2001:67c:670:100:3ad5:47ff:feaf:1a17] helo=lupine)
+ by metis.ext.pengutronix.de with esmtp (Exim 4.89)
+ (envelope-from <p.zabel@pengutronix.de>)
+ id 1guagV-00078g-Jj; Fri, 15 Feb 2019 11:25:31 +0100
+Message-ID: <1550226330.4531.10.camel@pengutronix.de>
+Subject: Re: [PATCH v2 1/2] dt-bindings: reset: Add HI3670 reset controller
+ binding
+From: Philipp Zabel <p.zabel@pengutronix.de>
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, 
+ xuwei5@hisilicon.com, robh+dt@kernel.org
+Date: Fri, 15 Feb 2019 11:25:30 +0100
+In-Reply-To: <20190215054955.788-2-manivannan.sadhasivam@linaro.org>
+References: <20190215054955.788-1-manivannan.sadhasivam@linaro.org>
+ <20190215054955.788-2-manivannan.sadhasivam@linaro.org>
+X-Mailer: Evolution 3.22.6-1+deb9u1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:3ad5:47ff:feaf:1a17
+X-SA-Exim-Mail-From: p.zabel@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_022335_267177_21280B06 
-X-CRM114-Status: GOOD (  23.86  )
+X-CRM114-CacheID: sfid-20190215_022537_051875_61660F6B 
+X-CRM114-Status: GOOD (  16.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,127 +74,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nicolas Pitre <nicolas.pitre@linaro.org>, linux-samsung-soc@vger.kernel.org,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- Kevin Hilman <khilman@baylibre.com>, Seung-Woo Kim <sw0312.kim@samsung.com>,
- linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
- Marian Mihailescu <mihailescu2m@gmail.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, guodong.xu@linaro.org, john.stultz@linaro.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, 2019-02-15 at 11:19 +0530, Manivannan Sadhasivam wrote:
+> HI3670 SoC is architecturally same as the HI3660 SoC. Hence, the same
+> driver is reused for HI3670 SoC and the binding is documented here which
+> uses the fallback approach.
+> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
+>  .../devicetree/bindings/reset/hisilicon,hi3660-reset.txt   | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> index 2bf3344b2a02..2df4bddeb688 100644
+> --- a/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> +++ b/Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+> @@ -5,11 +5,12 @@ Please also refer to reset.txt in this directory for common reset
+>  controller binding usage.
+>  
+>  The reset controller registers are part of the system-ctl block on
+> -hi3660 SoC.
+> +hi3660 and hi3670 SoCs.
+>  
+>  Required properties:
+> -- compatible: should be
+> -		 "hisilicon,hi3660-reset"
+> +- compatible: should be one of the following:
+> +		 "hisilicon,hi3660-reset" for HI3660
+> +		 "hisilicon,hi3670-reset", "hisilicon,hi3660-reset" for HI3670
+>  - hisi,rst-syscon: phandle of the reset's syscon.
+>  - #reset-cells : Specifies the number of cells needed to encode a
+>    reset source.  The type shall be a <u32> and the value shall be 2.
 
-On 2019-02-14 17:58, Russell King - ARM Linux admin wrote:
-> On Thu, Feb 14, 2019 at 03:31:14PM +0100, Marek Szyprowski wrote:
->> MCPM does a soft reset of the CPUs and uses common cpu_resume() routine to
->> perform low-level platform initialization. This results in a try to install
->> HYP stubs for the second time for each CPU and results in false HYP/SVC
->> mode mismatch detection. The HYP stubs are already installed at the
->> beginning of the kernel initialization on the boot CPU (head.S) or in the
->> secondary_startup() for other CPUs. To fix this issue MCPM code should use
->> a cpu_resume() routine without HYP stubs installation.
->>
->> This change fixes HYP/SVC mode mismatch on Samsung Exynos5422-based Odroid
->> XU3/XU4/HC1 boards.
->>
->> Fixes: 3721924c8154 ("ARM: 8081/1: MCPM: provide infrastructure to allow for MCPM loopback")
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  arch/arm/common/mcpm_entry.c   |  2 +-
->>  arch/arm/include/asm/suspend.h |  1 +
->>  arch/arm/kernel/sleep.S        | 11 +++++++++++
->>  3 files changed, 13 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/common/mcpm_entry.c b/arch/arm/common/mcpm_entry.c
->> index ad574d20415c..1b1b82b37ce0 100644
->> --- a/arch/arm/common/mcpm_entry.c
->> +++ b/arch/arm/common/mcpm_entry.c
->> @@ -381,7 +381,7 @@ static int __init nocache_trampoline(unsigned long _arg)
->>  	unsigned int cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
->>  	phys_reset_t phys_reset;
->>  
->> -	mcpm_set_entry_vector(cpu, cluster, cpu_resume);
->> +	mcpm_set_entry_vector(cpu, cluster, cpu_resume_no_hyp);
->>  	setup_mm_for_reboot();
->>  
->>  	__mcpm_cpu_going_down(cpu, cluster);
->> diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
->> index 452bbdcbcc83..506314265c6f 100644
->> --- a/arch/arm/include/asm/suspend.h
->> +++ b/arch/arm/include/asm/suspend.h
->> @@ -10,6 +10,7 @@ struct sleep_save_sp {
->>  };
->>  
->>  extern void cpu_resume(void);
->> +extern void cpu_resume_no_hyp(void);
->>  extern void cpu_resume_arm(void);
->>  extern int cpu_suspend(unsigned long, int (*)(unsigned long));
->>  
->> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
->> index a8257fc9cf2a..b856d183691e 100644
->> --- a/arch/arm/kernel/sleep.S
->> +++ b/arch/arm/kernel/sleep.S
->> @@ -122,6 +122,11 @@ ENDPROC(cpu_resume_after_mmu)
->>  
->>  #ifdef CONFIG_MMU
->>  	.arm
->> +#ifdef CONFIG_MCPM
->> +ENTRY(cpu_resume_no_hyp)
->> +ARM_BE8(setend be)			@ ensure we are in BE mode
->> +	b	0f
-> What if the kernel is built for Thumb?  You'll be branching to thumb
-> code at the '0' label - don't you need to do the same that
-> cpu_resume_arm does below?
+Thank you, I think it makes sense for this to be merged together with
+the other patch via the linux-hisi tree.
 
-Maybe yes, but I don't get how did it work so far. Current version of
-the cpu_resume() doesn't check the CPU ARM/Thumb mode. Such version is
-used by MCPM, blSwitcher and various suspend/resume code from
-arch/arm/mach-*. The mode check is in the cpu_resume_arm(), which is
-used only by two SoC drivers in drivers/soc). Does it mean that most of
-the current cpu_resume() users are wrong?
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-I've didn't try building Thumb kernel so far to check that.
-
->> +#endif
->>  ENTRY(cpu_resume_arm)
->>   THUMB(	badr	r9, 1f		)	@ Kernel is entered in ARM.
->>   THUMB(	bx	r9		)	@ If this is a Thumb-2 kernel,
->> @@ -135,6 +140,9 @@ ARM_BE8(setend be)			@ ensure we are in BE mode
->>  	bl	__hyp_stub_install_secondary
->>  #endif
->>  	safe_svcmode_maskall r1
->> +#ifdef CONFIG_MCPM
->> +0:
->> +#endif
-> You don't need to conditionalise this.  I'd also use a symbol rather
-> than a numeric label given that safe_svcmode_maskall is a macro that
-> also uses numeric labels.
-
-Okay.
-
->>  	mov	r1, #0
->>  	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
->>  	ALT_UP_B(1f)
->> @@ -163,6 +171,9 @@ ENDPROC(cpu_resume)
->>  
->>  #ifdef CONFIG_MMU
->>  ENDPROC(cpu_resume_arm)
->> +#endif
->> +#ifdef CONFIG_MCPM
->> +ENDPROC(cpu_resume_no_hyp)
->>  #endif
->>  
->>  	.align 2
->> -- 
->> 2.17.1
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
-
+regards
+Philipp
 
 _______________________________________________
 linux-arm-kernel mailing list
