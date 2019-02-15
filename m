@@ -3,82 +3,56 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A911EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:49:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06339C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:53:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 773092192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:48:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D07FD204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:52:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AZSNECIV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="F1wZf7j7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 773092192D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HW8/c6YK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D07FD204EC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=PIqELhKVVEwca6/1MHGEQoaiXz8RxMxO1M9WpwquPjM=; b=AZSNECIVOTjC381QXjqB+KOGE
-	v33m7cAG/Ggffl7kIrUWevttf8RJellMT6zhLqqqge25UJGHSX4dmvus4sNc7UOoMrpPZ6yZls5CV
-	QSVBumMEK5nN/iYtKhwqB82ujvlZtTO/U9Ui8G2mGSVAJYcxCgWKNufLeEBhlZDYcrvaNk0lpCCC7
-	LZBEbHjEx/yzhNBch49qIYt4XBCzithNP4tka+Js9FMndwDjcwxh6Mq4DaHn/mAq0H+r3goEx8Dmz
-	vGLGkq8bN2FWnDHwvtc60vaV68MUFmHzJhnQYr9uMGfE3TsoP2ClMydm6LEQr7cTMvfbk692pFhE/
-	MSbs90Xtw==;
+	 bh=VYrZFdDJrof9W0qRcSgDo6fvYqJLx/s6rndPnqTG6ao=; b=HW8/c6YK+omZxRlsc+kL2+vUJ
+	5IPTacamScvQzYeb+V0XKxWI4Mr3yxqD0j86HQIm+WM60ym6pd1Sdua6XOH0vi+bBLzypDbl8AKNM
+	DVah23rRRrcs4sW+WwatOu8geB74dL1HuxvHzSfMQhzIpo0K6B01GT+fJdCiuWhv3lvwh/e0pQf+V
+	hMOjop2+tp46vPAdmVbE767+W7p+Vi76jrbU8f7yNd1erXViVOBzde36epZL4Ucf5ZMu+nnZAt6AM
+	bxdm+nqTqb5jSjocIseSkk2YU2OheAPxRlFEw1xL9SmtIx0Nke2L8XsY9T7e27AiD+z9ohgJccNGS
+	gxNlUGjAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guZAZ-0004qW-Jc; Fri, 15 Feb 2019 08:48:27 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guZAV-0004mc-Be
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 08:48:25 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1F8mMIS009913;
- Fri, 15 Feb 2019 02:48:22 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550220502;
- bh=Gyk2Q3oXt18BwtJ2h0Yrustu6G0tnn/n4V3TTANsQfg=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=F1wZf7j75Zw457hYSokjJMUi2DELEW0DBuALGTdiCL9t5Ac20IIzJ/HoX3z4UwLcm
- 7QBDtefxAzdb1f8eovAaa2HZZXsHTIsdZru7WjxlfTlZt7CpS2w6L35teXXkKDEC1a
- KCUBot7I3fmFxRxjqfTBc3GWDei20/XHcVGe/urI=
-Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1F8mME2102622
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 15 Feb 2019 02:48:22 -0600
-Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 15
- Feb 2019 02:48:21 -0600
-Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 15 Feb 2019 02:48:21 -0600
-Received: from [127.0.0.1] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1F8mIPL018285;
- Fri, 15 Feb 2019 02:48:19 -0600
-Subject: Re: [PATCH v2 0/3] arm64: ti: k3-am654: USB support
-To: Roger Quadros <rogerq@ti.com>
-References: <1549370722-414-1-git-send-email-rogerq@ti.com>
-From: Tero Kristo <t-kristo@ti.com>
-Message-ID: <d67c23b7-bd1c-c7ae-e878-9437d41e26ff@ti.com>
-Date: Fri, 15 Feb 2019 10:48:08 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guZEi-0006Rp-89; Fri, 15 Feb 2019 08:52:44 +0000
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guZEe-0006RV-GI
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 08:52:41 +0000
+Received: from localhost (unknown [83.221.228.209])
+ by pokefinder.org (Postfix) with ESMTPSA id AF80A2E3551;
+ Fri, 15 Feb 2019 09:52:39 +0100 (CET)
+Date: Fri, 15 Feb 2019 09:52:39 +0100
+From: Wolfram Sang <wsa@the-dreams.de>
+To: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+Subject: Re: [PATCH v2] i2c: aspeed: Add multi-master use case support
+Message-ID: <20190215085239.v5cjmcef2q62xiyl@ninjato>
+References: <20190211185444.4965-1-jae.hyun.yoo@linux.intel.com>
 MIME-Version: 1.0
-In-Reply-To: <1549370722-414-1-git-send-email-rogerq@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20190211185444.4965-1-jae.hyun.yoo@linux.intel.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_004823_487299_99102926 
-X-CRM114-Status: GOOD (  20.83  )
+X-CRM114-CacheID: sfid-20190215_005240_690297_4F7BDF5E 
+X-CRM114-Status: GOOD (  10.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,66 +64,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: nm@ti.com, devicetree@vger.kernel.org, vigneshr@ti.com, nsekhar@ti.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: linux-aspeed@lists.ozlabs.org, James Feist <james.feist@linux.intel.com>,
+ Andrew Jeffery <andrew@aj.id.au>,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, openbmc@lists.ozlabs.org,
+ Brendan Higgins <brendanhiggins@google.com>, linux-kernel@vger.kernel.org,
+ Jarkko Nikula <jarkko.nikula@linux.intel.com>, Joel Stanley <joel@jms.id.au>,
+ Vernon Mauery <vernon.mauery@linux.intel.com>,
+ linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============1048174329060260669=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05/02/2019 14:45, Roger Quadros wrote:
-> Hi,
-> 
-> The AM654 SoC supports 2 DWC3 USB controller instances. The
-> AM654 base board supports the 2nd (USB1) instance in high-speed.
-> 
-> This series enables support for USB1 instance on the AM654-base-board.
-> 
-> The series depends on [1] and [2]. Both are in the -next branch of their
-> respective maintainer trees.
-> 
-> To test you can apply on top of linux-next. As usb/next was just pushed
-> today, it might have not reached linux-next yet. If so please pull that from [3].
-> 
-> If using arm64 defconfig, you need to enable
-> 	CONFIG_USB_DWC3_KEYSTONE=y
-> 	CONFIG_OMAP_USB2=y
-> and the necessary USB drivers that you want to test. e.g. USB network adapter.
-> 
-> [1] AM654 USB2 PHY support https://lkml.org/lkml/2018/12/5/908
-> [2] AM654 DWC3 support https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1896101.html
-> [3] usb-next https://git.kernel.org/pub/scm/linux/kernel/git/balbi/usb.git/log/?h=next
-> 
-> Changelog:
-> v2
-> - usb & phy nodes are not kept disabled in k3-am65-main.dtsi.
->    Unused ones are disabled in board dts instead.
 
-Series queued for 5.1, thanks.
+--===============1048174329060260669==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="ybsnxjjqnbgxua7z"
+Content-Disposition: inline
 
--Tero
 
-> 
-> cheers,
-> -roger
-> 
-> 
-> Jyri Sarha (1):
->    arm64: dts: ti: am654: Add Main System Control Module node
-> 
-> Roger Quadros (2):
->    arm64: dts: ti: k3-am6: add USB support
->    arm64: dts: ti: k3-am654-base-board: enable USB1
-> 
->   arch/arm64/boot/dts/ti/k3-am65-main.dtsi       | 84 ++++++++++++++++++++++++++
->   arch/arm64/boot/dts/ti/k3-am654-base-board.dts | 28 +++++++++
->   2 files changed, 112 insertions(+)
-> 
+--ybsnxjjqnbgxua7z
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+On Mon, Feb 11, 2019 at 10:54:44AM -0800, Jae Hyun Yoo wrote:
+> In multi-master environment, this driver's master cannot know
+> exactly when a peer master sends data to this driver's slave so
+> cases can be happened that this master tries sending data through
+> the master_xfer function but slave data from a peer master is still
+> being processed or slave xfer is started by a peer immediately
+> after it queues a master command. To support multi-master use cases
+> properly, this H/W provides arbitration in physical level and it
+> provides priority based command handling too to avoid conflicts in
+> multi-master environment, means that if a master and a slave events
+> happen at the same time, H/W will handle a higher priority event
+> first and a pending event will be handled when bus comes back to
+> the idle state.
+>=20
+> To support this H/W feature properly, this patch adds the 'pending'
+> state of master and its handling code so that the pending master
+> xfer can be continued after slave operation properly.
+>=20
+> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
+
+Applied to for-next, thanks!
+
+
+--ybsnxjjqnbgxua7z
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxmfdcACgkQFA3kzBSg
+KbYJEw//dnf7zJDVpII7ZpsgPtNZerCcz/+RipuuRefqyn6ol/03zMNMDsTsqWTZ
+WB9tWi0dBE0uC50iOyLKS0M9I5b1xVqKasEl2Z/r8J9IvGuakbIfGfhiYJ9oJgdH
+zJBxkc5W2Or1FJ9AUIxpKWeaUSeE6J2/wv5168RfjLQAb+Sr9jVCrCon1ZsTo/7B
+9lBwoYMAXTonbf615WTcU+fnRHDyIbjboL0OB1W2Iv8ksmTPvETviuqfSk4PyiSJ
+RLcQUWrw44sUu9sSUzQNZ97g6l20R/LnFtXdQYIDrXNTmP+tXlAfxqdt6ghVumwa
+toW9MZX/JkYc0xrBIOQPpEL61yqLyoQdChhv9ahUAKUiKTIkz0Io9S5PobOMvIbd
+sGyJ+abYVA9Qvg8CH+ZKQGZwm/SgIGfKtkIgbh+3Q6ATChB5dDfytJw4N2OoVu0T
+5DgPrkmpIaVF9JTOnhvzQZYswpBZuDk11yC2Tea2s9Djp1fN3ettw+uYLbcnLmo1
+GNLWOtLTkT0gr/krY8xy006jaMOa4tjlLLKlB9AzUNB4APidP2UDKE68wrxlo7SD
++5nQ+CZn9CJUBdXR5hQeDrzpoTdRBgNlUPUaB0TOK3Sbz962vu1I4019xG1ITLwf
+OEUWzonl3lABGqbew7I3lyn5Py9nEcWVfW+6Ks74i5vvRBcIAOQ=
+=dfmE
+-----END PGP SIGNATURE-----
+
+--ybsnxjjqnbgxua7z--
+
+
+--===============1048174329060260669==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1048174329060260669==--
+
