@@ -2,73 +2,128 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B28FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:41:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 74161C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC7E02192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:41:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 440F92192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jC5OoQBV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC7E02192D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rLsMiU/o";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="j9Gw3aw0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 440F92192D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oq2f82tJtdWTOSfCDjTtkkjrRTfJBOxsIx1Hzrfr8Jw=; b=jC5OoQBVE/PFxr
-	khhjM8umVP1vG20sNbnAi3PMEgfQag2SmwGzQDenE8GwDBxC/auUmy36/H+a0eX2WDH+fkF+LvMgO
-	pcZ60+O1VBITYXdow5qgcRAkIpXZKHxSLDlQH9hM/8a+ZAsODyarruNhkVTrfRI6/rdZv5OYXQRSX
-	/HkCmq7ZGf+17Hekx8nlKxoxtAE+gas++TPBvn0XzOkXbV3Iis5ByH9mvLbuDZgcGlVucVW8kRwuw
-	q49eNnn2hwDAmPNBNXlebeqpTEBG3Wx7kYXMgwUecAWcDHlG8JqDbhzSVvlTFaFw3GKqKqYvnWhzY
-	2zzZqVo3ADEnCBLKRSCg==;
+	List-Owner; bh=2V9zRm75x1BO53T/Ge3Xg++Q6mL4SP03qQ5sbP68Kco=; b=rLsMiU/o4k6Cwk
+	cJ3QUTWsiIR0P75IhutuoSj9OST0HtqDM5Kv4WsO1rfXYPbXUfKlniZKJ14CIuVh1Ul+aGIts4na4
+	An/HqemeS6e2pGLerMlao07fRrDhS/GNFhpmKIZ/0il4uH22G8fPSIPt4taal6vNzPrSLGO1gJI7i
+	FNCVCbizHfMdsHJ9scXEIzXdOszZIcjPXuOa6wzf781d+PmYChORTmy2dD0JDlg/Ryjp9V2ShLjSn
+	ADV1hLvRwq/9dzbWIOkRgQjdZgelX5AfxSdqHEt2k5aXMTSR7DfdqDy76R8+O7d5sDIFMOavmIOby
+	rKeCqjdgPQ8lT5OL24Hw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guefx-0002kY-6o; Fri, 15 Feb 2019 14:41:13 +0000
-Received: from mail-qk1-f174.google.com ([209.85.222.174])
+	id 1guegd-00031p-Fd; Fri, 15 Feb 2019 14:41:55 +0000
+Received: from mail-db5eur01on0616.outbound.protection.outlook.com
+ ([2a01:111:f400:fe02::616]
+ helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guefu-0002k1-5C
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:41:11 +0000
-Received: by mail-qk1-f174.google.com with SMTP id w204so5818481qka.2
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 06:41:09 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=4uNRJM7dazka7G4wiBtjiyv+VA94i45hBrC+e5bB04M=;
- b=TYUCHzcB2IYnMRdcriIKK8AoFHB6N24KFc33qrlvTw5vZWaNtoRW3Qi76I+MxQWTNg
- m/zVJwFs8KXQ+3c13rEzerxLQ3snuKKZF7smWt8wPD7oS9ixU2wHGQYgaSp1kgapb92y
- 9JrfeHufSUyYZQEcy1JtD1pD2gxklhWJrraArnFrcNzdQ7l7a0IM36OvXRw9XrDrxGuO
- NibkWZEgiFAlfSI6HM3+4aG4ywE52G+hJ+PRkambvn1xofPSabc5kmSLhGgC7rCSkhXX
- SeuBkNVqlFv8aerRTYjeDKshw2hW817ViWNTt6ont1JutMyir4ftT3xokoCeEBdjFPpO
- 0Zbg==
-X-Gm-Message-State: AHQUAubC8bhw/C/bfJj4azjMoBUTUYCfJBjE4MWx7W06KjG0kaeIICwc
- Ga+8VVPjjc43+NE3crOUvvH5+hpUfABULJ565GM=
-X-Google-Smtp-Source: AHgI3IaAKMd6gpTObloPLc7x3GkkOJQhAifyyFcJ34D9iTKa9bZ84K/D/QbTSl9qWZIVniKp3YodRwlShstEixDE/c4=
-X-Received: by 2002:a05:620a:12a5:: with SMTP id
- x5mr7284370qki.291.1550241669009; 
- Fri, 15 Feb 2019 06:41:09 -0800 (PST)
+ id 1guegZ-00031F-NU
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:41:53 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=3U7gU+TLwJ9yh/IZqBptRDOJ4Njji7BTTzXJKb8fOIg=;
+ b=j9Gw3aw0oU4wgp7e2sQGuzaT6adMO8hl+L8XbsKBxp/K7lvetbNSo0KwTsY1t+mIs2d/gkWpAp7LuZfvyGSQ2RyqkrisgE6NgHPOZc1MckDP4aHLp5siScbaTtoQuSqOKI0FUfNQjeRKQ4fzoZ91TYNENWYJ6U+DfXBzM/evCUg=
+Received: from VI1PR04MB4880.eurprd04.prod.outlook.com (20.177.49.153) by
+ VI1PR04MB4174.eurprd04.prod.outlook.com (52.134.30.142) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.17; Fri, 15 Feb 2019 14:41:47 +0000
+Received: from VI1PR04MB4880.eurprd04.prod.outlook.com
+ ([fe80::3d48:4560:6982:4c32]) by VI1PR04MB4880.eurprd04.prod.outlook.com
+ ([fe80::3d48:4560:6982:4c32%3]) with mapi id 15.20.1601.023; Fri, 15 Feb 2019
+ 14:41:47 +0000
+From: Claudiu Manoil <claudiu.manoil@nxp.com>
+To: Andrew Lunn <andrew@lunn.ch>
+Subject: RE: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
+ support
+Thread-Topic: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
+ support
+Thread-Index: AQHUxRa2xfAoHsNatECZeGrGwDGmUaXg3FCAgAAPfPA=
+Date: Fri, 15 Feb 2019 14:41:47 +0000
+Message-ID: <VI1PR04MB488080895C871B6B3ABA571D96600@VI1PR04MB4880.eurprd04.prod.outlook.com>
+References: <1550225414-12125-1-git-send-email-claudiu.manoil@nxp.com>
+ <1550225414-12125-4-git-send-email-claudiu.manoil@nxp.com>
+ <20190215133459.GH5699@lunn.ch>
+In-Reply-To: <20190215133459.GH5699@lunn.ch>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=claudiu.manoil@nxp.com; 
+x-originating-ip: [86.34.165.90]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: e18b633c-c1c1-4738-bd77-08d69353b6c0
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4174; 
+x-ms-traffictypediagnostic: VI1PR04MB4174:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; VI1PR04MB4174;
+ 23:HGabyH9cr78tsrJyumilkISD8DSaQK4Na/2MmrADl?=
+ =?us-ascii?Q?i+oPEyC10HpGkYkFgoDuCehNSTvP5I5c+0kolXwFNiRXzfXE5NCoeDR9LYab?=
+ =?us-ascii?Q?KWTe8yS6sPLvUFWaZsk0jSQloSiS9zrgxFYrmZTQsM0uSM5wedZvWT1WvfuE?=
+ =?us-ascii?Q?SvLZEXHx/o/LXpvVrv84dV/0EEI2ohnC6WT4CZs7H0KmSncuj4jN3aS7WJHN?=
+ =?us-ascii?Q?cduYPQjCji4WMb9iapDAuM1G7HhQdd6073I1VcNGpwvpdRWqnMgpTnY4wqCp?=
+ =?us-ascii?Q?dYY1K7lIVNWLN9nKtDpwBA/yx0lwjQuX8ob5tolRupyB16Uo/OYsrhtyow09?=
+ =?us-ascii?Q?9/x/CiRqDjqXdLWHUuUCT3EJjAm9jkellEageKdpfe0FZRSZ0AW2YXhiH13t?=
+ =?us-ascii?Q?8o9J2qPVSLtX9cjmgaInGAGVTtxZv9cuq8E7m5RJqJaNSoGRYIsTlQR4d4/J?=
+ =?us-ascii?Q?wmx9MnbMcMAxCT6a2IEUuGdrBVF2tqwkJPL7DTOR6IyqnvBL0lUDQxE207dR?=
+ =?us-ascii?Q?zAPGVcOwQW3xJi20Ro/MyAEB4YCZ+4D2ULZZlfI+RWBvo1R2dfvxwaSjwU4N?=
+ =?us-ascii?Q?PNTbENl+foiq+wbQefAKi66DZLVO3Xn39i3VimAFMpS+4eWejyx4qRt0r4MI?=
+ =?us-ascii?Q?FQnB/R+E7EcGhyhaYmTYZ/0nNhjzeGj/IFd+0PPuxYbYp0m3TSN4AtAB+lZo?=
+ =?us-ascii?Q?dVM1dQVI8nU76ytz5q7t/jtQ1FnQV9lQRmr0/UzAIFm34BO86fN4UktsUQdB?=
+ =?us-ascii?Q?+NXuChburA1QlEZ9FX1O3EClIMrJVG4ivKb+MtHS/DncN1ue2Fc2l9sKwgzR?=
+ =?us-ascii?Q?vcQe9v5Kha1H1vl1dR1I9G17O/UsjiwtI4no6KOYgrr6ekbearp5HeUpa19E?=
+ =?us-ascii?Q?v4hHeaTGQ3Wt05Pa5K3PCojR7FBlJpZzI9bUaSGCXM2YLhik08jz914vHlyD?=
+ =?us-ascii?Q?ohwccGYv2fnqh4mh//pTcr6Keva3LRXIRK8kuNMP6ytZGuAmIfTCg3Nt2Osa?=
+ =?us-ascii?Q?3GhOge9PyDDA7KmCR6frm8EqJG5QpB51BZrA8fJeIyIP8KFUKUQDI5WfttTL?=
+ =?us-ascii?Q?vCJK1aoYdIhcQ+f/AS1CvLn5HNc+IJoEssxM5tcKxY4uUKcrFb9oLNqk68of?=
+ =?us-ascii?Q?Y3xioPr0iUgX91pK51/xKpFnLCQd3xCWlfU7h5N5cePBq4zIxI3AHe8iu/K3?=
+ =?us-ascii?Q?/Z8VAR8VEcKt8CbQGrxLXwz5ecMsY6DAEqq?=
+x-microsoft-antispam-prvs: <VI1PR04MB4174D6E2E2AA227D7FE4E97196600@VI1PR04MB4174.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09497C15EB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(136003)(39860400002)(396003)(376002)(366004)(199004)(189003)(13464003)(8936002)(6436002)(81166006)(8676002)(86362001)(68736007)(305945005)(81156014)(6916009)(478600001)(54906003)(6116002)(3846002)(74316002)(316002)(102836004)(6506007)(26005)(186003)(99286004)(7696005)(76176011)(14454004)(25786009)(256004)(11346002)(486006)(4326008)(476003)(446003)(105586002)(33656002)(55016002)(9686003)(106356001)(53936002)(6246003)(97736004)(71200400001)(71190400001)(7736002)(44832011)(66066001)(229853002)(2906002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4174;
+ H:VI1PR04MB4880.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: QdsvHuRuRi1DF9v7DGLl2qYGnYPjNpj2IRzdHCGqZyzjIFwjLU3XGR9A9U84+8SrWqAV43qfYg+irNReW+AtIRNKJaQfGXu88jkwBbnVbI4RX1jo3V3I1G1Fs/E2fzUjokv32KQFlk1RV11B9MZGO0c1hi72+ATJQzeWxf9gIKJUUjdy7QpzNWWD3Ncj00LgPUs0f82xN9aSG7OaGRQX0EGWkB71YAyGEyBDhm0KytDsMCTN359+ZZaF9aNRXgmoiFGxt1Q1MF0E1GztVxJ/zEDLOdhBp2/TalSo4Bbr3vM4kDlRnIO31HGyVrYO9aIgmF9/ZKYk8XZjRZe3T6UtsM8u9rjUFj2i96jzxpTSuRIhUrWcB923GRa1MAMuO5YRXJ1Gc2cxWyaIRTlHG51wMdS7oOA7z9vU3QlOmHe9q8c=
 MIME-Version: 1.0
-References: <20190208102354.vwygnt2wevbjntwy@flea>
-In-Reply-To: <20190208102354.vwygnt2wevbjntwy@flea>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 15:40:52 +0100
-Message-ID: <CAK8P3a0oaEEfKJJVbicdY6p0ZHeTL7yCgYvFLms+u90isLiz8g@mail.gmail.com>
-Subject: Re: [GIT PULL] Allwinner H3/H5 changes for 5.1
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: e18b633c-c1c1-4738-bd77-08d69353b6c0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Feb 2019 14:41:47.6066 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4174
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_064110_194428_5EA82F1D 
-X-CRM114-Status: UNSURE (   9.07  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190215_064151_767937_3FA180A7 
+X-CRM114-Status: GOOD (  10.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,24 +135,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chen-Yu Tsai <wens@csie.org>, arm-soc <arm@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
+ Alexandru Marginean <alexandru.marginean@nxp.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>, "David S .
+ Miller" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 11:24 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> Allwinner H3 and H5 changes for 5.1
->
-> Our usual round of DT changes shared between arm and arm64.
->
-> We have a bunch of changes for board, improving the eMMC support on the H5
-> variant of the All-H3-CC, enabling HDMI and reworking the CSI driver.
 
-Pulled into arm/dt, thanks!
 
-     Arnd
+>-----Original Message-----
+>From: Andrew Lunn <andrew@lunn.ch>
+>Sent: Friday, February 15, 2019 3:35 PM
+>To: Claudiu Manoil <claudiu.manoil@nxp.com>
+>Cc: Shawn Guo <shawnguo@kernel.org>; Leo Li <leoyang.li@nxp.com>; David S .
+>Miller <davem@davemloft.net>; Alexandru Marginean
+><alexandru.marginean@nxp.com>; linux-arm-kernel@lists.infradead.org;
+>devicetree@vger.kernel.org; netdev@vger.kernel.org; linux-
+>kernel@vger.kernel.org
+>Subject: Re: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
+>support
+>
+>On Fri, Feb 15, 2019 at 12:10:14PM +0200, Claudiu Manoil wrote:
+>> Each ENETC PF has its own MDIO interface, the corresponding
+>> MDIO registers are mapped in the ENETC's Port register block.
+>> The current patch adds a driver for these PF level MDIO buses,
+>> so that each PF can manage directly its own external link.
+>>
+>> Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
+>> Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+>> ---
+>> v2 - used readx_poll_timeout()
+>>    - added mdio node child to the port node
+>
+>Hi Claudiu
+>
+>Please document this in the device tree binding.
+>
+
+Hi,
+I don't really see what bindings would need to be documented, as the node
+names and properties used so far are common.  Like, the "mdio" node name
+is common, the enetc ports are "pci" nodes, nothing special for these.
+What's missing?
+
+Regards,
+Claudiu
 
 _______________________________________________
 linux-arm-kernel mailing list
