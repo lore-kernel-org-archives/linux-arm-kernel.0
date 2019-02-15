@@ -2,21 +2,20 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 229CCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:43:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92A59C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:45:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E7FB52192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:43:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 612752190C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:45:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qB8MrZOD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7FB52192D
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y9UUtFgZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 612752190C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,51 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BnA4Z9yWA5yP8Mtq5EsOPOE7Xi0SejdbCyn7KN36X5w=; b=qB8MrZOD/dPp+M
-	ijWAovDa0NtjC2SQkdFs9TYN2HjeAQSTXWrINik+0hiPPqG1WUNTsIUQZD+S4ROEaRS/4CO4glF2C
-	yubZkdzc+oSWVUMhUeTLoX/IHJLPEU4VObwZjSnMpGy3Pk6ihJD4HHvEvuvQmFQg72HSsNBSIzLgR
-	EruzwA3HMEcrYdhv9RaV8qcd02MqGtSjWD9afgJWF7hRoAkr7ededqRnUCzi9n2aY5FlwMHS1/jKn
-	a7YH8UBSsy2lrXseVyLjn1JBmtEtNlER92JVgzziP1DLDduiBydCAmOtUmMw5/fN3F0kMKzrtnb06
-	GEfcDohPCBW3gizhMn/w==;
+	List-Owner; bh=urOGC5ih4AyUO2OTyaa8hN0OiapImZ1PRhNTFRz7YNE=; b=Y9UUtFgZ92a4pQ
+	3dD8wUbnUrp9VWb9sDXAyIa1uP9K0jiFz7F7IoaCmz+zc/jb1CRGGs2X1xVNTeVNFCANO9QOGIjCk
+	Z6etaJOdgxf1Rfa0AB+N9sbvxVHf5kPg/cKGlLGUl7jPh/lFRbUTTOU85U3rgqxwqy3gLhp2CzG14
+	pImxoavqBj2VIejQYXxN8krSL85JFHkLifEbGmeqFYG6u05Lf3y1fdJ1+gO9Ts3290u5VKfxBGJ/5
+	YzbDPUu9994MXFDFQ5gCXAGj52hqZjStBUIUe9sMGDrKP/ozHbzIKB96BnKftfFCDk8S7HVKRAdlq
+	Rnyr/uQy5gamsh+/CFzw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufee-0007yo-Qc; Fri, 15 Feb 2019 15:43:56 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1guffq-0001AR-FH; Fri, 15 Feb 2019 15:45:10 +0000
+Received: from mail-qk1-f195.google.com ([209.85.222.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufec-0007yM-6P
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:43:55 +0000
-Received: by mail-qt1-f194.google.com with SMTP id y20so11245969qtm.13
+ id 1guffm-0000YV-AA
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:45:08 +0000
+Received: by mail-qk1-f195.google.com with SMTP id r21so5908144qkl.11
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 07:43:54 -0800 (PST)
+ Fri, 15 Feb 2019 07:45:06 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=pvbqqwZCSlZj94ijWSBgj81ysEPNf8u1cl1PvRDX/Rs=;
- b=sr27JT25qyQtsDdz9tglW7IWLeIGv7HNabPty+BPjaqXoXzXIgp/dmpcNNLJRy8aQu
- p/aa1eu3FgaSWVLBodyiB595zcJ3/Yt8dwUfYAWUj3wjoBqDC+VXSzrdoSdUQYG0ywcx
- H6hMjT1z+BL3ZvgUUVve6o9AzcP7PkQT5+TX03CEKL/CanQfsrqZCg8F1Ebjd5kR41r+
- c/9tbD0DXGAW7av3JalZFAYQI2kWmdvT/wYEAe+c9zBZLEfkIWKsQ5rUweO2iLbO05BQ
- 2x0+wlydzB20fJBclNur1iFWDbj+sQllCAdWvsdsb3smx6c/ecAsEHIAXp0AnHuh0TkY
- 5CNg==
-X-Gm-Message-State: AHQUAuZ1xbG8mswIYig1n7kFG2umJTnbwPoocBgrh+kt8N28Vp9Vb2iq
- NdtvJzo4D3UoG2omp7CbCDRXI00dqwrM0ZLJUqMP1LiV
-X-Google-Smtp-Source: AHgI3IZ4AEJPT0WGlhdnmLKJcZFSYRK9BZO3JmRLRtNZxNOi2XMYiiW62jxJi2y8v28+ENinj+lcOFc//ovAc8WlsHE=
-X-Received: by 2002:ac8:445a:: with SMTP id m26mr7969009qtn.212.1550245433330; 
- Fri, 15 Feb 2019 07:43:53 -0800 (PST)
+ bh=Y6s3IwoXv7j1dAi3PRDD2CkqfUPTvMHgcgvQtlOjYy8=;
+ b=oUzLzhiHw01I3kM900U8dlZn/4Qs5iMUziUgaOBPtElGL5oBmwjfu5UDDAq3Bh6jM4
+ 0nmhRchNH87iJWC3/rRuNFOa8mvJAkB1Q0tw3Ezs4gEHYENaG+CTLnjr43r4cyEn2VAH
+ XE1KsC+tEci/LwC/Njr/ebeWBNmQaIqyJPlBWHWmCAlin83xbiFIq9rCsK3XhpUS2+/l
+ 3GAR+oo2j8L2CO3T6528rFPeq4MQed6N9VFNG9vBCLShZqUXh2B+jCn0R0X/dACqDvRL
+ kMlHkRFLCK2NdN/IOSJ92x/298PKRpdDbNy5t7zWomtv1O/tTseRuorCyMLUfgHSKvEo
+ sujg==
+X-Gm-Message-State: AHQUAubTBB1MD2OUlv+HaiK/FTRCX4JFeRiwvZ3Rpw2HqLj4j9CmB/86
+ wEYYWZqgEieFpc2A64qSyUM+Aaii3oi/NsqxMoE=
+X-Google-Smtp-Source: AHgI3Ia/V920ENZRsmlP9MJSNszoqStoHZE51s1UJxGnkvcyXp/I97Abi5yzbroQXXRD6WpPjl2T8uHh0MF44/komoA=
+X-Received: by 2002:a37:7cf:: with SMTP id 198mr7499604qkh.173.1550245505275; 
+ Fri, 15 Feb 2019 07:45:05 -0800 (PST)
 MIME-Version: 1.0
-References: <pull-1550167958-188990@atomide.com>
- <pull-1550167958-188990@atomide.com-2>
- <CAK8P3a0y5FYYOvqPqhDSmR1Jxgx3AJzHtEkuku+_s-1vV_a8Lg@mail.gmail.com>
-In-Reply-To: <CAK8P3a0y5FYYOvqPqhDSmR1Jxgx3AJzHtEkuku+_s-1vV_a8Lg@mail.gmail.com>
+References: <87k1ia561h.fsf@FE-laptop>
+In-Reply-To: <87k1ia561h.fsf@FE-laptop>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 16:43:37 +0100
-Message-ID: <CAK8P3a0kZhJppsFzaTZL+PVCDP8BHwiquF6et3=i6MwA8YNpAg@mail.gmail.com>
-Subject: Re: [GIT PULL 2/2] more dts changes for omaps for v5.1
-To: Tony Lindgren <tony@atomide.com>
+Date: Fri, 15 Feb 2019 16:44:49 +0100
+Message-ID: <CAK8P3a1+anoAJvXmU8xCVnyuEAVC-Hs055ybZjmUmfJRdd0x=w@mail.gmail.com>
+Subject: Re: [GIT PULL] ARM: mvebu: dt for v5.1 (#1)
+To: Gregory CLEMENT <gregory.clement@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_074354_228937_253A859E 
-X-CRM114-Status: GOOD (  15.66  )
+X-CRM114-CacheID: sfid-20190215_074506_926644_C61F98E8 
+X-CRM114-Status: UNSURE (   8.69  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,57 +79,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-omap <linux-omap@vger.kernel.org>, arm-soc <arm@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ arm-soc <arm@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 4:21 PM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Thu, Feb 14, 2019 at 7:13 PM Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > From: "Tony Lindgren" <tony@atomide.com>
-> >
-> > The following changes since commit b4c30df0eb354d8e081132b7b7449f6d17619614:
-> >
-> >   ARM: dts: omap4-sdp: Make ethernet working even if booted with latest u-boot (2019-01-24 08:23:43 -0800)
-> >
-> > are available in the Git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v5.1/dt-pt2-signed
-> >
-> > for you to fetch changes up to 947b7802597106dcbef2ddca23d386f9339ba334:
-> >
-> >   ARM: dts: omap3-gta04: declare backlight in lcd node (2019-02-12 10:52:25 -0800)
-> >
-> > ----------------------------------------------------------------
-> > More dts changes for omaps
-> >
-> > We add support for Bosch Guardian am335x device, and configure more
-> > devices like GNSS and LCD backlight for omap3-gta04. And we replace
-> > the wlcore binding documentation URL with a local file that we have.
->
-> Pulled into arm/dt, thanks!
->
+On Fri, Feb 8, 2019 at 10:22 PM Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
 
-During routine checks, I came across these gta04 warnings:
+>
+> ----------------------------------------------------------------
+> Andrew Lunn (1):
+>       arch: arm: dts: Remove disabled marvell,dsa properties
+>
+>  arch/arm/boot/dts/armada-370-rd.dts            | 42 -------------------
+>  arch/arm/boot/dts/armada-388-clearfog.dts      | 58 --------------------------
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts  | 47 ---------------------
+>  arch/arm/boot/dts/kirkwood-dir665.dts          | 47 ---------------------
+>  arch/arm/boot/dts/kirkwood-linksys-viper.dts   | 47 ---------------------
+>  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 47 ---------------------
+>  arch/arm/boot/dts/kirkwood-rd88f6281.dtsi      | 41 ------------------
+>  7 files changed, 329 deletions(-)
 
-../arch/arm/boot/dts/omap3-gta04.dtsi:757.7-764.4: Warning
-(graph_port): /ocp@68000000/dss@48050000/encoder@48050c00/port: graph
-node unit address error, expected "0"
-../arch/arm/boot/dts/omap3-gta04.dtsi:757.7-764.4: Warning
-(graph_port): /ocp@68000000/dss@48050000/encoder@48050c00/port: graph
-node unit address error, expected "0"
-../arch/arm/boot/dts/omap3-gta04.dtsi:757.7-764.4: Warning
-(graph_port): /ocp@68000000/dss@48050000/encoder@48050c00/port: graph
-node unit address error, expected "0"
-../arch/arm/boot/dts/omap3-gta04.dtsi:757.7-764.4: Warning
-(graph_port): /ocp@68000000/dss@48050000/encoder@48050c00/port: graph
-node unit address error, expected "0"
+Could you have a look at these warnings and send a follow-up pull request?
 
-Can you have a look and send a fix?
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:21.4-16: Warning
+(reg_format): /dsa/switch@0:reg: property has invalid length (8 bytes)
+(#address-cells == 2, #size-cells == 1)
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:23.5-15: Warning
+(reg_format): /dsa/switch@0/port@4:reg: property has invalid length (4
+bytes) (#address-cells == 2, #size-cells == 1)
+arch/arm/boot/dts/kirkwood-rd88f6281-z0.dtb: Warning
+(pci_device_bus_num): Failed prerequisite 'reg_format'
+arch/arm/boot/dts/kirkwood-rd88f6281-z0.dtb: Warning (i2c_bus_reg):
+Failed prerequisite 'reg_format'
+arch/arm/boot/dts/kirkwood-rd88f6281-z0.dtb: Warning (spi_bus_reg):
+Failed prerequisite 'reg_format'
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:20.12-26.5: Warning
+(avoid_default_addr_size): /dsa/switch@0: Relying on default
+#address-cells value
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:20.12-26.5: Warning
+(avoid_default_addr_size): /dsa/switch@0: Relying on default
+#size-cells value
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:22.11-25.6: Warning
+(avoid_default_addr_size): /dsa/switch@0/port@4: Relying on default
+#address-cells value
+../arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts:22.11-25.6: Warning
+(avoid_default_addr_size): /dsa/switch@0/port@4: Relying on default
+#size-cells value
+
+Thanks,
 
       Arnd
 
