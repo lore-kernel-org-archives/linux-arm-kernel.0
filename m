@@ -2,20 +2,21 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB9A1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 934C4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:39:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6DAE4222BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F85F222A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:39:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u2hImOkw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DAE4222BE
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uUlM6C08"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F85F222A1
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,49 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2Vl/G7XTRrmDRUrhDOEO0jn8vLuucdhifpZbqeQNq1E=; b=u2hImOkwGp3dq7
-	QeUQyfgzCZCh2DyDqMllcsz3245b5XN/QMiEtL91Wiu8fCLI5oiIr31zpyrJ+k8YQEIh8OzczWc90
-	qwhX2/4t9g7NcV321LUUDS4Dl5yKaQHllgJrgG6kwKGrq0HbLq3rBf6gDi8NP5dKtxBst9gvl8kl/
-	q/kI6jDB+RK5gsrKmJoPHJTMY2ksNCDfs0jZ7+HJux+PQ8y/wMnn+pAXzhwe7Q37xU+u3eH1HTPmM
-	5dWcy4cGpKP9cvmBZfzy11ETx95ZE00+bvjI2m1XcHqjsp4gX1LiiMb9tEOKq4SmFDjW3hcLeuB2i
-	McYsBz/Ibe8U3V9LbGeg==;
+	List-Owner; bh=BOQntyVBan5s2Fp2e2cpUFX13cWE3nxKschL6O18RMY=; b=uUlM6C08eEUk8z
+	4R7N/0HOfcSQ3G7iWHg8lLeScWEik0+OeVBMPCDitM1sfbwNlvUeTbgP20glhMNrG3c1xw8FYxQQD
+	MAE/bAlsaf/jC7soAp8adQtGGCoEEp7SNzi42+HhQM/YJOnSEnt9VzJl1UKOPxubB635ergnTWyN8
+	U711Ac1sGH8wJdTBTyoHzlzUTUGlpP3/P92L3okcF25mqiAmWH53aVlKQCIVn6aqVovFKhzVrK2zE
+	V2pr4rbfvawJm8RbuyFxtvoyHX+c8U92hWmydYvT9LJ+FHVm6JvFk86xauXPorylyCZj9KHqRj0Wv
+	u4OCwV2cH7MBoZPLO3Pg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugUO-0006u0-SY; Fri, 15 Feb 2019 16:37:24 +0000
+	id 1gugWE-0007yF-3k; Fri, 15 Feb 2019 16:39:18 +0000
 Received: from mail-qt1-f171.google.com ([209.85.160.171])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugU0-0006LT-Uo
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:37:02 +0000
-Received: by mail-qt1-f171.google.com with SMTP id z39so11592348qtz.0
+ id 1gugWB-0007xs-Kh
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:39:17 +0000
+Received: by mail-qt1-f171.google.com with SMTP id y20so11467607qtm.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 08:37:00 -0800 (PST)
+ Fri, 15 Feb 2019 08:39:14 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=c1pz5LION+0bshI+8SkfZhKEhxtU+ZnbkWGAaOcOpY0=;
- b=FdqN2i15uH5anp4hmiQFVEDi9g/goYhXzwYD0srR4ll9l1yEd74R//FQu1qNfxZF2x
- gZOZAczIy9dKflNEXgt4bI3oRVVRxUs9lFzOmkMlo0L+5OZePuryyTpve77CBDJmcHm3
- acLOZ1Sy5JAKk8yJTVKarF0oODJhTWUYQExpRqwFATY9L6+teitVCXou6HpAhYHHJlBw
- C2cl9tic56SVreAGGvMdtLqo73iKxJFo4Z2R9rKIQ6nqZJwDkq5lKIKCpsF5emxvMjtZ
- ZIw/luYpqdC17zDvMynvGfwhFNNfyrYsKdK4PMmlalPJ4IKKlKqc8feJmryiKHufz5e8
- M9kg==
-X-Gm-Message-State: AHQUAuYRlSYaPxGwsNyhsp65iLr6+kvehmSHB+Tr/sgjO+5y+Mpqdspz
- YeAVc+ItcU1ZhylYHfQC6cZhCdBH/pZfe5wZRZY=
-X-Google-Smtp-Source: AHgI3IYy6la3i/tajgqg/QINmgsRxV1pwVh7f/C8j85B/z9q9o5pQjtSCTAeVol9L2D36whZPkrL/q88xpW2OCHJvqc=
-X-Received: by 2002:a0c:d791:: with SMTP id z17mr7775781qvi.149.1550248619986; 
- Fri, 15 Feb 2019 08:36:59 -0800 (PST)
+ bh=DnjvNs79nsKCq8O4x29rBtDMFnxwX+SSKivYIz8I1Qs=;
+ b=hB9QO5eZaEnz4hGnZMycKN4puzZklK1kpW+kPG/fttCs18xkg+CdXf7MUzUPXXROuu
+ bzow8Ey0r9XYS8wQL5upewcLGA/jpZt+/+fvvQVqI05F5V8yjE4rt25AZuTbiQ63CMOh
+ k93KWw0Obs3ork6g7ks89IddfURDqAQ4E1D7HG+xauBUNYVWcJ6JY0mV1ODCHeolLxj2
+ wuvC3xiam7w2ItMJzB+GhWfocuFXoV15smtPIYisIXpia/iU4IWkJ8ngItqPWUf/fpk1
+ u6p1mdxSbsJIdqVoxjZuWrb3940AQUkY7UfETngDSWmcyJHi7w+UpqZHCKS0SOItWUqA
+ WORA==
+X-Gm-Message-State: AHQUAubquEIIqzcPyXEnav/lM8TYEMLdSEksklLiHT/dXIcT0eYdSKae
+ F4Jmq3OmUFQUkfhtkXMaAzoAHVJ7m4aMvU/EcE4=
+X-Google-Smtp-Source: AHgI3Iaa3101FZg18LE37CONVRQZsCk7O4gu0luFnzt1ugXpbeZu4GTy+dDW4eu3euBu6OFWjhYxmRWgfjSjgb3pNXU=
+X-Received: by 2002:ac8:2c34:: with SMTP id d49mr8353629qta.152.1550248753436; 
+ Fri, 15 Feb 2019 08:39:13 -0800 (PST)
 MIME-Version: 1.0
-References: <87womhub5h.fsf@belgarion.home> <87bm3ftjsx.fsf@belgarion.home>
-In-Reply-To: <87bm3ftjsx.fsf@belgarion.home>
+References: <20190212112126.572-1-shawnguo@kernel.org>
+ <20190212112126.572-7-shawnguo@kernel.org>
+In-Reply-To: <20190212112126.572-7-shawnguo@kernel.org>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 17:36:43 +0100
-Message-ID: <CAK8P3a2UNhTaaBkX51a-jzq4JWGXPkS+QbeSZp9n86Yb4muGBg@mail.gmail.com>
-Subject: Re: [GIT PULL] pxa for v5.1
-To: Robert Jarzmik <robert.jarzmik@free.fr>
+Date: Fri, 15 Feb 2019 17:38:56 +0100
+Message-ID: <CAK8P3a149udLq=Auz48=+0-i3m_iMvPbB=nBMFtR7xDU12PO7g@mail.gmail.com>
+Subject: Re: [GIT PULL 7/7] i.MX MAINTAINERS update for 5.1
+To: Shawn Guo <shawnguo@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_083700_985633_B130F641 
-X-CRM114-Status: GOOD (  11.51  )
+X-CRM114-CacheID: sfid-20190215_083915_678086_ABD65713 
+X-CRM114-Status: GOOD (  13.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,28 +80,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm-soc <arm@kernel.org>, Haojian Zhuang <haojian.zhuang@gmail.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Daniel Mack <zonque@gmail.com>
+Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>, arm-soc <arm@kernel.org>,
+ Fabio Estevam <festevam@gmail.com>, linux-imx@nxp.com,
+ Sascha Hauer <kernel@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 11:17 PM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Tue, Feb 12, 2019 at 12:22 PM Shawn Guo <shawnguo@kernel.org> wrote:
 >
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 >
-> > Hi Arnd, Kevin, and Olof,
-> >
-> > This is the pxa pull request for 5.1, totally negative diff stat :)
-> > Can you please consider pulling ?
+>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-maintainers-5.1
+>
+> for you to fetch changes up to 17ffc1193a4b5610400c43623a43115f3d2e15a6:
+>
+>   MAINTAINERS: imx: Change Fabio's email address (2019-01-22 14:02:38 +0800)
+>
+> ----------------------------------------------------------------
+> i.MX MAINTAINERS update for 5.1:
+>  - Add all files matching "imx" and "mxs" to the IMX entry, so that we
+>    can get copied on all IMX related changes without explicitly listing
+>    so many files and folders.
+>  - Update Fabio's email address.
 
-Thanks a lot for the reminder. Your original message ended up in my spam
-folder, the second one was still marked as potentially dangerous by gmail,
-but not put into spam, so I managed to find the first.
+Pulled into arm/soc, thanks!
 
-Nice work at cleaning up the old platform code, pulled into arm/soc now, thanks!
+I briefly considered adding it to the 5.0-fixes branch instead, as we often
+do for MAINTAINERS updates, but it sounds like Fabio's old address
+is still able to receive email and he just prefers the new one, so I assume
+there is no rush here.
 
       Arnd
 
