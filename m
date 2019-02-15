@@ -2,72 +2,57 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E247C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:02:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A74D2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:05:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F16CC21B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:02:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73D7B222D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:05:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VqO0JJzi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F16CC21B18
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PhWCOibp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73D7B222D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=k4jWD98BABr6krs+ap4eUv15JtnXRZdtAZc8Dffjs/A=; b=VqO0JJziBmcEnB
-	adpyF6l+LEUouLa/l+z3nt3kX8GGr9JWPAIM9CL2nvbAUR5wrVn+7/67r3rTj5YuXIBlkXR7SCKIE
-	nPYf3NYqiUWqldK4j2uxI9Gvfr8Ym6+e7uJCpnPOkVEi1wgBfYr4YXSJUdAd2jiVXZ16bHElZUd6z
-	yVEjcTVmw7JbTm+PSProA9/rU2YuFGcFkkgEIFBQrWCnqLXyTanADE4FhZvM88o/NHG8ztdzgk5Ji
-	xfLy9nU3XORoK/0+g5w6iJp59cMTj0bNOZp8GFynmEWzAWu2bENdb5JDAFV2h0hsNNYO/RxW3Jwr3
-	5BSLXcU7pWjUXR3DyLjw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=IBLn3lJAESsH6JXnBkh+iM2rF9bqrjOJjGs86fetqfU=; b=PhWCOibpwgu0yK
+	TzydGIFbEoBy3hTzgZyVVoCz5ssyw+66D67C42zM3PwWcAukHDcmolbt0k0YEWyQSqNZG93MbWH0K
+	hXdLubb0v53w2FPucT+LFRqsGPwfdq/K5XRzlrtaJprVcqmk4dSSNb5/4OIS0RF2IeRoqT9UDZ7f1
+	3M2/XRtyYYQKkzHeIbKqykG4ltv8Lu52hE6TfMEcekce5wvXKWbS8ELsxxDs6bOyXdAZVQCzE8wjQ
+	6NIo10+lOMHA969JqkfeabEVHg3dlvBWF0Zq2es/Qw2ZpzRmnSMzcXPkG9c8/YwNi2yybONRRhHJj
+	2xXscCK+TR9qX1q9iJmQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gujgz-000212-VA; Fri, 15 Feb 2019 20:02:37 +0000
-Received: from mail-qt1-f196.google.com ([209.85.160.196])
+	id 1gujk1-0003e3-Eh; Fri, 15 Feb 2019 20:05:45 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gujgw-00020e-Ob
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 20:02:36 +0000
-Received: by mail-qt1-f196.google.com with SMTP id p25so12056140qtb.3
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 12:02:34 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=wNBu8YUL9FclCL7/VIQQFcNrowBc2EUMCY0kWHxaIKY=;
- b=r7ozW25OFclVANbaoJy8AtcOGPODkHJvkguG2eh3vW/zxmwNVXr9ii494zyXvjsZqu
- LB3plGgQomHBn3/WU+75ZnM4DELjxcJrCcwJUl5H+g87Dn63A7oErSUXoj++Uet+oWQv
- CilJexI7LuWeBqmj0eXciWKA/tAITB+MMYFJ0eelem++0doeG3jaya6EjRwhTqlGpBO4
- +EiA/zzeiN9rE60aJD1+smXovhBnTE4jEHFTTrwSVl0PMxaSbezFWlAtJUB/z3fo3Qgg
- XnOAqn4ctdHizTFas41KelNHSmxTkRfB1nwiFsU0NtCDFExgue/YdLhxaYGg/Hk9Il1Y
- csPw==
-X-Gm-Message-State: AHQUAuaD0wLZvCXFaK7yuFSG4C2BeabAjjktijCJJHU+Gqit5aGU+RGA
- Kn1etvoD6XyZRth2SymhfIZqGJ8cg7Y1V4RHrpE=
-X-Google-Smtp-Source: AHgI3IYN6jhdxxtDfJoBa5J1RayI7ywxZ/n7X2ko0oqkqzkK3KRrxbwkQgaTSBson7DjPU0XVTsRh/KeGsaVJzIqB3M=
-X-Received: by 2002:a0c:e98f:: with SMTP id z15mr8732671qvn.115.1550260953755; 
- Fri, 15 Feb 2019 12:02:33 -0800 (PST)
+ id 1gujjy-0003dL-Cv
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 20:05:44 +0000
+Received: from bigeasy by Galois.linutronix.de with local (Exim 4.80)
+ (envelope-from <bigeasy@linutronix.de>)
+ id 1gujjp-0001cd-Ed; Fri, 15 Feb 2019 21:05:33 +0100
+Date: Fri, 15 Feb 2019 21:05:33 +0100
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [RFC PATCH] ARM: enable irq in translation/section permission fault
+ handlers
+Message-ID: <20190215200533.ypfrdekg7j4ucu6a@linutronix.de>
 MIME-Version: 1.0
-References: <1550259289-21779-1-git-send-email-andy.gross@linaro.org>
-In-Reply-To: <1550259289-21779-1-git-send-email-andy.gross@linaro.org>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 21:02:17 +0100
-Message-ID: <CAK8P3a2P7zgiNDtH=YBf8ziCXrdLZ3HJMso3bZAKo5FBcjEmyA@mail.gmail.com>
-Subject: Re: [GIT PULL] Qualcomm Device Tree updates for 5.1 - Part 2
-To: Andy Gross <andy.gross@linaro.org>
+Content-Disposition: inline
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_120234_793380_F3DA545A 
-X-CRM114-Status: GOOD (  11.94  )
+X-CRM114-CacheID: sfid-20190215_120542_582801_B30E576B 
+X-CRM114-Status: GOOD (  12.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,37 +64,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kevin Hilman <khilman@baylibre.com>,
- Bjorn Andersson <bjorn.andersson@linaro.org>, arm-soc <arm@kernel.org>,
- linux-arm-msm@vger.kernel.org, Olof Johansson <olof@lixom.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>,
+ Bernd Edlinger <bernd.edlinger@hotmail.de>,
+ Russell King <linux@armlinux.org.uk>, Arnd Bergmann <arnd@arndb.de>,
+ yadi.hu@windriver.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 8:34 PM Andy Gross <andy.gross@linaro.org> wrote:
->
-> The following changes since commit 40122db87778970c96062c9f49b42cdf6809bf94:
->
->   ARM: dts: ipq4019: Remove skeleton.dtsi (2019-01-22 15:04:51 -0600)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-5.1-2
->
-> for you to fetch changes up to 97131f85c08e024df49480ed499aae8fb754067f:
->
->   ARM: dts: qcom: ipq4019: Fix MSI IRQ type (2019-02-06 15:53:17 -0600)
->
-> ----------------------------------------------------------------
-> Qualcomm Device Tree Changes for v5.1 - Part 2
->
-> * Fix MSI IRQ type on IPQ4019
+From: "Yadi.hu" <yadi.hu@windriver.com>
 
-Pulled into arm/drivers, thanks!
+Accessing a kernel address in user space causes a SIGSEGV which is sent
+via
+-> do_DataAbort
+   -> do_sect_fault || do_translation_fault
+      -> do_bad_area
+         -> __do_user_fault
+            -> force_sig_fault
+Since commit
 
-     Arnd
+  02fe2845d6a83 ("ARM: entry: avoid enabling interrupts in prefetch/data abort handlers")
+
+that path is carried out with disabled interrupts. Page/alignment fault
+do enable interrupts but data abort has been left out.
+
+On -RT the siglock is a sleeping spinlock and requires interrupts to be
+enabled in order to acquire it.
+
+Enable interrupts in the DataAbort handler if the parent context had
+interrupts enabled. Move harden_branch_predictor() before interrupts are
+enabled.
+
+Reported-by: <Bernd Edlinger <bernd.edlinger@hotmail.de>
+Signed-off-by: Yadi.hu <yadi.hu@windriver.com>
+[bigeasy: rewrote patch description, reordered patch]
+Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+---
+I though that the "interrupt enable part" has already been posted and
+then Bernd complained about a warning from harden_branch_predictor() on
+-RT so here it is.
+
+ arch/arm/mm/fault.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 58f69fa07df95..da82967865836 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -161,8 +161,6 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 		unsigned int fsr, unsigned int sig, int code,
+ 		struct pt_regs *regs)
+ {
+-	if (addr > TASK_SIZE)
+-		harden_branch_predictor();
+ 
+ #ifdef CONFIG_DEBUG_USER
+ 	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+@@ -191,6 +189,11 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	struct task_struct *tsk = current;
+ 	struct mm_struct *mm = tsk->active_mm;
+ 
++	if (addr > TASK_SIZE && user_mode(regs))
++		harden_branch_predictor();
++
++	if (interrupts_enabled(regs))
++		local_irq_enable();
+ 	/*
+ 	 * If we are in kernel mode at this point, we
+ 	 * have no context to handle this fault with.
+-- 
+2.20.1
 
 _______________________________________________
 linux-arm-kernel mailing list
