@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E8246C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C7454C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B85AD2190C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8E61321927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HWz/AAYT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B85AD2190C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FiPWr39h"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E61321927
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,54 +25,55 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m+keD0V4/joGt6mJrI4xbSyAirAwYIjOfWS0tUTG1m4=; b=HWz/AAYT41WTyq
-	Gimp808qwmTscewz9b08B3+YhXP3JLwz+0ij7JGs7DnTyeiguLLe7BP36BV/lFLEGh6Jk73eFHWtE
-	q7It2ln0fr3hMnfE4cl3OIngLUID6I24CiVwyyZRuRJyLT/B9lEbtFimVFQ91qlsNRdK2LFI6ltR+
-	AZCuPkEMz1r1Cugnw9zdxYC4qHzM5NKHCVjPSvznueQKjYgY3QdVQlGapZqST2U/v9ywBgDK5dyjo
-	3qY5s9S1QsjxJ/UwCI1AnivqOf5zSjBHtUvOLR6JQaSjlROZpa88TH9Jf8xFLVMG51a/k73ELSgKZ
-	uGsZiML/X1k/Ba3d83WA==;
+	List-Owner; bh=QblggG5Ja5NFuQVad7ZR1Xt3BbTFDSlDbiPXUsMWoLI=; b=FiPWr39hS1pEav
+	am6/N9Tx7jG0ozA9UtwsUmKfR9UBgOYG9uS/qv/Cnz8TD0y3mbu5gOxA4f99pGErMmJGmF9gB7KWp
+	bw55F88hstnUc5NSgT8LBYT1xwzIdXCOfg+ZhPOynL5Fv1CoBJxTrRMNf32SzOXUatTgblny3h0wZ
+	rOzsmiq4B61PoVsosDhKc99UTjyAfS7Me9cSLHx7Kd4CrUgHes2NgKw8a5spUkBR0Kcmc95FrbIjM
+	oUgScLU2iL8HItVbQ/RZ3NmVyi+jrDidoajoGzKcE8EmCn3eigcFlZq9ch4r/2Dxt3heSNcn/fttU
+	kOBL3nqRniZTqoa7Pvvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guftE-0001m3-EQ; Fri, 15 Feb 2019 15:59:00 +0000
+	id 1gufti-0002Ab-T1; Fri, 15 Feb 2019 15:59:30 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guft2-0001bq-5t
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:58:50 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ id 1guft7-0001d0-8Z
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:58:58 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1FFuY5s000918; Fri, 15 Feb 2019 16:58:43 +0100
+ x1FFu78e023120; Fri, 15 Feb 2019 16:58:47 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qmy1njc13-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qnw3ns2qk-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 15 Feb 2019 16:58:43 +0100
+ Fri, 15 Feb 2019 16:58:47 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id CFABA31;
- Fri, 15 Feb 2019 15:58:42 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9631431;
+ Fri, 15 Feb 2019 15:58:46 +0000 (GMT)
 Received: from Webmail-eu.st.com (gpxdag5node5.st.com [10.75.127.78])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B0679599A;
- Fri, 15 Feb 2019 15:58:42 +0000 (GMT)
-Received: from localhost (10.75.127.51) by GPXDAG5NODE5.st.com (10.75.127.78)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7D786599A;
+ Fri, 15 Feb 2019 15:58:46 +0000 (GMT)
+Received: from localhost (10.75.127.48) by GPXDAG5NODE5.st.com (10.75.127.78)
  with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Fri, 15 Feb 2019 16:58:42 +0100
+ Fri, 15 Feb 2019 16:58:45 +0100
 From: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Maxime Coquelin <mcoquelin.stm32@gmail.com>, Alexandre Torgue
  <alexandre.torgue@st.com>
-Subject: [PATCH v1 1/3] ARM: dts: stm32: Add Vivante GPU support on STM32MP157c
-Date: Fri, 15 Feb 2019 16:58:34 +0100
-Message-ID: <1550246316-9747-2-git-send-email-pierre-yves.mordret@st.com>
+Subject: [PATCH v1 2/3] ARM: dts: stm32: enable Vivante GPU support on
+ stm32mp157c-ed1 board
+Date: Fri, 15 Feb 2019 16:58:35 +0100
+Message-ID: <1550246316-9747-3-git-send-email-pierre-yves.mordret@st.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1550246316-9747-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1550246316-9747-1-git-send-email-pierre-yves.mordret@st.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.51]
-X-ClientProxiedBy: SFHDAG7NODE2.st.com (10.75.127.20) To GPXDAG5NODE5.st.com
+X-Originating-IP: [10.75.127.48]
+X-ClientProxiedBy: SFHDAG6NODE3.st.com (10.75.127.18) To GPXDAG5NODE5.st.com
  (10.75.127.78)
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-15_12:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_075848_739923_656BB5DE 
-X-CRM114-Status: GOOD (  11.64  )
+X-CRM114-CacheID: sfid-20190215_075853_954136_AD82BF71 
+X-CRM114-Status: GOOD (  10.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,34 +93,47 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Append Vivante GPU DT configuration.
+Enable Vivante GPU driver for stm32mp157c-ed1 board.
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
- arch/arm/boot/dts/stm32mp157c.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/stm32mp157c-ed1.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index f8bbfff..29540bc 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -1106,6 +1106,16 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+index 98ef7a0..792f402 100644
+--- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
++++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
+@@ -20,6 +20,17 @@
+ 		reg = <0xC0000000 0x40000000>;
+ 	};
  
-+		gpu: gpu@59000000 {
-+			compatible = "vivante,gc";
-+			reg = <0x59000000 0x800>;
-+			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&rcc GPU>, <&rcc GPU_K>;
-+			clock-names = "bus" ,"core";
-+			resets = <&rcc GPU_R>;
-+			status = "disabled";
-+		};
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
- 		dsi: dsi@5a000000 {
- 			compatible = "st,stm32-dsi";
- 			reg = <0x5a000000 0x800>;
++		gpu_reserved: gpu@f8000000 {
++			reg = <0xf8000000 0x8000000>;
++			no-map;
++		};
++	};
++
+ 	aliases {
+ 		serial0 = &uart4;
+ 	};
+@@ -53,6 +64,11 @@
+ 	status = "okay";
+ };
+ 
++&gpu {
++	contiguous-area = <&gpu_reserved>;
++	status = "okay";
++};
++
+ &i2c4 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c4_pins_a>;
 -- 
 2.7.4
 
