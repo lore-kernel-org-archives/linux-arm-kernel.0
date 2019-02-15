@@ -2,72 +2,92 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7789CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8222AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:36:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 46B9B2229F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5392D21927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:36:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BJ3KCtFm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46B9B2229F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qvqE5tP9";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CknEENK4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5392D21927
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=3TiG/kuX3YSQgc7Ca16wnM8n2Xobgl/IwqD12GP69OQ=; b=BJ3KCtFmhyANtMbAC+2VlGFTr
-	e6cYGHHqCOJkIeEYppgWXs1xJxBxVL4Z4ffrkVWCjkeM6ym29S6P1ti4gFutySo20GyZsbU/6nhTR
-	ZWDDpQEaX1tcxTogBYsJLaUD8JT0CNdJJeuzR80B0P0VdfZA8BBnxbGUelpzlXmZGjbkHi3PUuTaR
-	NB6pGnm93ABpJBNGfFizhD9gjvfu27q22xjIzCS7WHBrpfJddUWN6KUKxEOshqhJ8P6c66joCOmOc
-	WxREtwELwH/1WHBG0SSY02olTLcGAljV8V/efPq7SQ5yubmaegthqqtgoEiplRD05RNXE86lbP0rm
-	BEKrmZ4KA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=OYIdWn9Df+MyZfujvIwAkRLBDaUwpgSwiAlne0bEaBk=; b=qvqE5tP9sl0qeS
+	BmKgvWi+XTVOivNbPPou8Kt9bqDFEcMLJ8B5Ji+EP/+WIcQ90J7NqiKqhPSNNu2PgQnzmiMFFm8of
+	WGE7iLzOzy7zlTG5wlxNGdgMzUnQq49Qq1Gd9z7jea4LsZQDDxhEB0pXtQjNql1B07WL7P0YuWSXr
+	H0dxzVSck6l9xLPNHCQMN5dUnOOnZnzPwy2ln2GtnF+HNwlqqGU9AwqU8ZZl5ihiHgpAj8vnruuQ0
+	behdGNeT/tM+W4+ZUw8nHKAKNW9NtN2ebptL5qBU3WTtcVZiMfsKuU2lHr5oUxNdrKapzhngCCnFZ
+	P6Xdd7PMreD6nNh8TuOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guTCw-0000wJ-47; Fri, 15 Feb 2019 02:26:30 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guTCr-0000vb-F3
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 02:26:27 +0000
-Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
- by mx.socionext.com with ESMTP; 15 Feb 2019 11:26:24 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by iyokan-ex.css.socionext.com (Postfix) with ESMTP id BC3736117D;
- Fri, 15 Feb 2019 11:26:24 +0900 (JST)
-Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Fri, 15 Feb 2019 11:26:24 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id 767DB1A15B7;
- Fri, 15 Feb 2019 11:26:24 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 60A60120459;
- Fri, 15 Feb 2019 11:26:24 +0900 (JST)
-Subject: Re: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce
- timer for Milbeaut SoCs
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org, 
- linux-arm-kernel@lists.infradead.org
-References: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
- <96b6fbb3-9cd9-7468-6733-98667664f0b8@linaro.org>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <c67990f4-fa87-5741-684a-9b836fa460b0@socionext.com>
-Date: Fri, 15 Feb 2019 11:26:24 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1guTN1-0004Zm-Eh; Fri, 15 Feb 2019 02:36:55 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guTMx-0004Z2-Ku; Fri, 15 Feb 2019 02:36:53 +0000
+Received: by mail-pf1-x444.google.com with SMTP id g6so4074338pfh.13;
+ Thu, 14 Feb 2019 18:36:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:mime-version:content-disposition
+ :user-agent; bh=ybJ6FRmizCH+Ysla/KYM0KU4CJcaZTaDUg0Dc25IXgc=;
+ b=CknEENK4WWQ15y3wJPfIxhUzIaUUiVppnBDGCGYaHDjVrtgl0kyqkNGqsjGZvo+yVL
+ d4sh6wqoe+z/JuZevryqfNRHbo9vH2xm13dggmJG78gI3QkLRRoQvPJvUO5NGBv2qsb6
+ 1mxG6i+IgqvE8AQdCpqd15C0+yqMcgVFcU8mCPdE0SdXGCSLfuyRINJeS8SyxIgOCMU6
+ jpkV7ZqePbD0McFyHLHqfNjptby50fXpYVBmGptpQJYIXjF4d22rudV9nc0PELTXp4AR
+ Ei5KrURLyx69ritVapzRYgIFX+mYJ/EejNawVddqxsBS+Wht7f5qAQSdVHAnhrs8Cgjb
+ LNbg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=ybJ6FRmizCH+Ysla/KYM0KU4CJcaZTaDUg0Dc25IXgc=;
+ b=cSrT7hv8Y59zjouHEYc/l9TtK0fw8xogkFvVmNEKZto04hwSK3fSJHYBimWKrKw3Oi
+ LUrHXZoVFwVhjTNAXfjuY2abDtvfe+7OKCVggFldp553t5vssP8gjPsOmZ0JW1N5rT2w
+ 6kmD08M8+La/948jm5MAE5LkaY/Mo2mJAftuhKSq33zn+HfTfsi6Mm724MbCVY1/RkQj
+ Tv4AyJQiRsOE+VaaQndvg6ZWo4Qj0GXE8XLfLxwlGXWIbK4tUGW1RU2lN5qOw985gLDO
+ 3YYRSXZyTIYFopwRxT2mQdUSuxTS96Aq5LfXpRzeftspC/UuqU/wSyj5ehOJlTWkH2yf
+ 5nlA==
+X-Gm-Message-State: AHQUAub+JLy3DMXmakXjQAQ3MqJIgwhFWfQIN2GwVPkT3pIAg/7j1mMP
+ U18Ch/VToPeJaG53SAmuGDM=
+X-Google-Smtp-Source: AHgI3IYtCM+dhZI2FfJRnUme1duZ/3d7ZuNv03wmI45ynR22iAVUN9tbmQqTQ2AjvRjC5MO6GHyrEA==
+X-Received: by 2002:a65:6149:: with SMTP id o9mr3081509pgv.315.1550198210461; 
+ Thu, 14 Feb 2019 18:36:50 -0800 (PST)
+Received: from jordon-HP-15-Notebook-PC ([49.207.53.51])
+ by smtp.gmail.com with ESMTPSA id i8sm8817908pfj.18.2019.02.14.18.36.48
+ (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Thu, 14 Feb 2019 18:36:49 -0800 (PST)
+Date: Fri, 15 Feb 2019 08:11:05 +0530
+From: Souptick Joarder <jrdr.linux@gmail.com>
+To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
+ kirill.shutemov@linux.intel.com, vbabka@suse.cz, riel@surriel.com,
+ sfr@canb.auug.org.au, rppt@linux.vnet.ibm.com, peterz@infradead.org,
+ linux@armlinux.org.uk, robin.murphy@arm.com, iamjoonsoo.kim@lge.com,
+ treding@nvidia.com, keescook@chromium.org, m.szyprowski@samsung.com,
+ stefanr@s5r6.in-berlin.de, hjc@rock-chips.com, heiko@sntech.de,
+ airlied@linux.ie, oleksandr_andrushchenko@epam.com, joro@8bytes.org,
+ pawel@osciak.com, kyungmin.park@samsung.com, mchehab@kernel.org,
+ boris.ostrovsky@oracle.com, jgross@suse.com
+Subject: [PATCH v4 0/9] mm: Use vm_map_pages() and vm_map_pages_zero() API
+Message-ID: <20190215024104.GA26331@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
-In-Reply-To: <96b6fbb3-9cd9-7468-6733-98667664f0b8@linaro.org>
-Content-Language: en-US
+Content-Disposition: inline
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_182625_868999_2C73E31B 
-X-CRM114-Status: GOOD (  21.27  )
+X-CRM114-CacheID: sfid-20190214_183651_713439_6417C341 
+X-CRM114-Status: GOOD (  12.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,239 +99,93 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
+Cc: linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, xen-devel@lists.xen.org, linux-mm@kvack.org,
+ iommu@lists.linux-foundation.org, linux1394-devel@lists.sourceforge.net,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Daniel
+Previouly drivers have their own way of mapping range of
+kernel pages/memory into user vma and this was done by
+invoking vm_insert_page() within a loop.
 
-On 2019/02/15 0:22, Daniel Lezcano wrote:
-> On 08/02/2019 13:26, Sugaya Taichi wrote:
->> Add timer driver for Milbeaut SoCs series.
->>
->> The timer has two 32-bit width down counters, one of which is configured
->> as a clockevent device and the other is configured as a clock source.
->>
->> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
+As this pattern is common across different drivers, it can
+be generalized by creating new functions and use it across
+the drivers.
 
-Thank you!
+vm_map_pages() is the API which could be used to map
+kernel memory/pages in drivers which has considered vm_pgoff.
 
->> ---
->>   drivers/clocksource/Kconfig          |   9 ++
->>   drivers/clocksource/Makefile         |   1 +
->>   drivers/clocksource/timer-milbeaut.c | 161 +++++++++++++++++++++++++++++++++++
->>   3 files changed, 171 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-milbeaut.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a9e26f6..9101b8f 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -634,4 +634,13 @@ config GX6605S_TIMER
->>   	help
->>   	  This option enables support for gx6605s SOC's timer.
->>   
->> +config MILBEAUT_TIMER
->> +	bool "Milbeaut timer driver" if COMPILE_TEST
->> +	depends on OF
->> +	depends on ARM
->> +	select TIMER_OF
->> +	select CLKSRC_MMIO
->> +	help
->> +	  Enables the support for Milbeaut timer driver.
->> +
->>   endmenu
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index cdd210f..6f2543b 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
->>   obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
->>   obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
->>   obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
->> +obj-$(CONFIG_MILBEAUT_TIMER)	+= timer-milbeaut.o
->>   obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
->>   obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
->>   obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
->> diff --git a/drivers/clocksource/timer-milbeaut.c b/drivers/clocksource/timer-milbeaut.c
->> new file mode 100644
->> index 0000000..f2019a8
->> --- /dev/null
->> +++ b/drivers/clocksource/timer-milbeaut.c
->> @@ -0,0 +1,161 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (C) 2018 Socionext Inc.
->> + */
->> +
->> +#include <linux/clk.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqreturn.h>
->> +#include <linux/sched_clock.h>
->> +#include "timer-of.h"
->> +
->> +#define MLB_TMR_TMCSR_OFS	0x0
->> +#define MLB_TMR_TMR_OFS		0x4
->> +#define MLB_TMR_TMRLR1_OFS	0x8
->> +#define MLB_TMR_TMRLR2_OFS	0xc
->> +#define MLB_TMR_REGSZPCH	0x10
->> +
->> +#define MLB_TMR_TMCSR_OUTL	BIT(5)
->> +#define MLB_TMR_TMCSR_RELD	BIT(4)
->> +#define MLB_TMR_TMCSR_INTE	BIT(3)
->> +#define MLB_TMR_TMCSR_UF	BIT(2)
->> +#define MLB_TMR_TMCSR_CNTE	BIT(1)
->> +#define MLB_TMR_TMCSR_TRG	BIT(0)
->> +
->> +#define MLB_TMR_TMCSR_CSL_DIV2	0
->> +#define MLB_TMR_DIV_CNT		2
->> +
->> +#define MLB_TMR_SRC_CH  (1)
->> +#define MLB_TMR_EVT_CH  (0)
->> +
->> +#define MLB_TMR_SRC_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_SRC_CH)
->> +#define MLB_TMR_EVT_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_EVT_CH)
->> +
->> +#define MLB_TMR_SRC_TMCSR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMCSR_OFS)
->> +#define MLB_TMR_SRC_TMR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMR_OFS)
->> +#define MLB_TMR_SRC_TMRLR1_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR1_OFS)
->> +#define MLB_TMR_SRC_TMRLR2_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR2_OFS)
->> +
->> +#define MLB_TMR_EVT_TMCSR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMCSR_OFS)
->> +#define MLB_TMR_EVT_TMR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMR_OFS)
->> +#define MLB_TMR_EVT_TMRLR1_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR1_OFS)
->> +#define MLB_TMR_EVT_TMRLR2_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR2_OFS)
->> +
->> +#define MLB_TIMER_RATING	500
->> +
->> +static irqreturn_t mlb_timer_interrupt(int irq, void *dev_id)
->> +{
->> +	struct clock_event_device *clk = dev_id;
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val;
->> +
->> +	val = readl_relaxed(timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	val &= ~MLB_TMR_TMCSR_UF;
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +
->> +	clk->event_handler(clk);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int mlb_set_state_periodic(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
->> +
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +
->> +	writel_relaxed(to->of_clk.period, timer_of_base(to) +
->> +				MLB_TMR_EVT_TMRLR1_OFS);
->> +	val |= MLB_TMR_TMCSR_RELD | MLB_TMR_TMCSR_CNTE |
->> +		MLB_TMR_TMCSR_TRG | MLB_TMR_TMCSR_INTE;
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_set_state_oneshot(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
->> +
->> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_clkevt_next_event(unsigned long event,
->> +				   struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +
->> +	writel_relaxed(event, timer_of_base(to) + MLB_TMR_EVT_TMRLR1_OFS);
->> +	writel_relaxed(MLB_TMR_TMCSR_CSL_DIV2 |
->> +			MLB_TMR_TMCSR_CNTE | MLB_TMR_TMCSR_INTE |
->> +			MLB_TMR_TMCSR_TRG, timer_of_base(to) +
->> +			MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_config_clock_source(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_SRC_TMCSR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR1_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR2_OFS);
->> +	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
->> +		MLB_TMR_SRC_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int mlb_config_clock_event(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static struct timer_of to = {
->> +	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
->> +
->> +	.clkevt = {
->> +		.name = "mlb-clkevt",
->> +		.rating = MLB_TIMER_RATING,
->> +		.cpumask = cpu_possible_mask,
->> +		.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT,
->> +		.set_state_oneshot = mlb_set_state_oneshot,
->> +		.set_state_periodic = mlb_set_state_periodic,
->> +		.set_next_event = mlb_clkevt_next_event,
->> +	},
->> +
->> +	.of_irq = {
->> +		.flags = IRQF_TIMER | IRQF_IRQPOLL,
->> +		.handler = mlb_timer_interrupt,
->> +	},
->> +};
->> +
->> +static u64 notrace mlb_timer_sched_read(void)
->> +{
->> +	return ~readl_relaxed(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS);
->> +}
->> +
->> +static int __init mlb_timer_init(struct device_node *node)
->> +{
->> +	int ret;
->> +	unsigned long rate;
->> +
->> +	ret = timer_of_init(node, &to);
->> +	if (ret)
->> +		return ret;
->> +
->> +	rate = timer_of_rate(&to) / MLB_TMR_DIV_CNT;
->> +	mlb_config_clock_source(&to);
->> +	clocksource_mmio_init(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS,
->> +		node->name, rate, MLB_TIMER_RATING, 32,
->> +		clocksource_mmio_readl_down);
->> +	sched_clock_register(mlb_timer_sched_read, 32, rate);
->> +	mlb_config_clock_event(&to);
->> +	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to), 15,
->> +		0xffffffff);
->> +	return 0;
->> +}
->> +TIMER_OF_DECLARE(mlb_peritimer, "socionext,milbeaut-timer",
->> +		mlb_timer_init);
->>
-> 
-> 
+vm_map_pages_zero() is the API which could be used to map
+range of kernel memory/pages in drivers which has not considered
+vm_pgoff. vm_pgoff is passed default as 0 for those drivers.
+
+We _could_ then at a later "fix" these drivers which are using
+vm_map_pages_zero() to behave according to the normal vm_pgoff
+offsetting simply by removing the _zero suffix on the function
+name and if that causes regressions, it gives us an easy way to revert.
+
+Tested on Rockchip hardware and display is working fine, including talking
+to Lima via prime.
+
+v1 -> v2:
+        Few Reviewed-by.
+
+        Updated the change log in [8/9]
+
+        In [7/9], vm_pgoff is treated in V4L2 API as a 'cookie'
+        to select a buffer, not as a in-buffer offset by design
+        and it always want to mmap a whole buffer from its beginning.
+        Added additional changes after discussing with Marek and
+        vm_map_pages() could be used instead of vm_map_pages_zero().
+
+v2 -> v3:
+        Corrected the documentation as per review comment.
+
+        As suggested in v2, renaming the interfaces to -
+        *vm_insert_range() -> vm_map_pages()* and
+        *vm_insert_range_buggy() -> vm_map_pages_zero()*.
+        As the interface is renamed, modified the code accordingly,
+        updated the change logs and modified the subject lines to use the
+        new interfaces. There is no other change apart from renaming and
+        using the new interface.
+
+        Patch[1/9] & [4/9], Tested on Rockchip hardware.
+
+v3 -> v4:
+	Fixed build warnings on patch [8/9] reported by kbuild test robot.
+
+Souptick Joarder (9):
+  mm: Introduce new vm_map_pages() and vm_map_pages_zero() API
+  arm: mm: dma-mapping: Convert to use vm_map_pages()
+  drivers/firewire/core-iso.c: Convert to use vm_map_pages_zero()
+  drm/rockchip/rockchip_drm_gem.c: Convert to use vm_map_pages()
+  drm/xen/xen_drm_front_gem.c: Convert to use vm_map_pages()
+  iommu/dma-iommu.c: Convert to use vm_map_pages()
+  videobuf2/videobuf2-dma-sg.c: Convert to use vm_map_pages()
+  xen/gntdev.c: Convert to use vm_map_pages()
+  xen/privcmd-buf.c: Convert to use vm_map_pages_zero()
+
+ arch/arm/mm/dma-mapping.c                          | 22 ++----
+ drivers/firewire/core-iso.c                        | 15 +---
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c        | 17 +----
+ drivers/gpu/drm/xen/xen_drm_front_gem.c            | 18 ++---
+ drivers/iommu/dma-iommu.c                          | 12 +---
+ drivers/media/common/videobuf2/videobuf2-core.c    |  7 ++
+ .../media/common/videobuf2/videobuf2-dma-contig.c  |  6 --
+ drivers/media/common/videobuf2/videobuf2-dma-sg.c  | 22 ++----
+ drivers/xen/gntdev.c                               | 11 ++-
+ drivers/xen/privcmd-buf.c                          |  8 +--
+ include/linux/mm.h                                 |  4 ++
+ mm/memory.c                                        | 81 ++++++++++++++++++++++
+ mm/nommu.c                                         | 14 ++++
+ 13 files changed, 134 insertions(+), 103 deletions(-)
+
+-- 
+1.9.1
 
 
 _______________________________________________
