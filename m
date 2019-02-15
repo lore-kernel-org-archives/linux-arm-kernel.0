@@ -2,65 +2,82 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5797EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:58:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB0CBC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:02:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 249AE21A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:58:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7220B21B1C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:02:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UdInQXaq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 249AE21A80
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ldt4/g9M";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="M06tQnzm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7220B21B1C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3FwSZy2lEjJdECugN5ZnQlJgDi5YgnLdLoP542ceyAw=; b=UdInQXaq1EUNjv
-	Tcqjg+lZhoIl/kVgsTLsWsawm1OgUkFYYnzCQTZ8b0xtq4Vl063/JVThzooLAFGPfPHAl5B4pOVqr
-	0NuQUFFg7bx6ivIJh6J8daSoBA61S4c5ThUJE6RuuunRWJ+JDo+S2FdEGlFFyb7SHHaAvuZrSGYIx
-	iK6HnMZxshA+WHyAmEeIZKga3vWGUZzrG1BvQvcOJtd7Mp5BMDB+wYLrbKfDfJPHhXzSXredAQGVq
-	5DeOiy2qASswzC/VusM+3DZmFlvKRi/CPc9NH5DwK2EnW7WPnA7iP+H4qB0YQo9yhH9kMt9G6SlL4
-	9LZVmCjaMkgc/sj/AVsQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=eIb0vsXYcWYzbj64xo4fXZMyAXcLKDx1vjn8EFi3ZWc=; b=ldt
+	4/g9M+VkOOL9JWginQx1wuDxf8rGyndWZ4QvBTUNm1pWb3xq56KH2J3ifi5cqCzPoCIArp9H1pXQ0
+	0Sr50xJ9I4jUA8Xo+9KHHpSOduWQoS+DANqvIJ/uPwZshVzdYwB+OgGq7eIejdY9jREqcl17dUmI/
+	+B3OBFzVBm2mbiXW/bNbqHvtq9yjOaLyqbNx8xNW4pgc9XFBXBbtymyHtGCYbeze/59qDAQSNMeWX
+	tnHUmIp+z49gsHjDGuP5nFXWiJxwORWAhdFOtvZWgEeYOpsMWBkYKR1PwjiodTJZQVzmLeS+Vloag
+	4aY0n2rLO0+MKJk06VgGw4plWYFzjtQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guZJp-0000JF-N8; Fri, 15 Feb 2019 08:58:01 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guZJl-0000GP-Cw; Fri, 15 Feb 2019 08:57:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AAECCA78;
- Fri, 15 Feb 2019 00:57:56 -0800 (PST)
-Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 54EB73F557;
- Fri, 15 Feb 2019 00:57:52 -0800 (PST)
-Date: Fri, 15 Feb 2019 08:57:49 +0000
-Message-ID: <86a7ixsa2a.wl-marc.zyngier@arm.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Matthias Brugger <matthias.bgg@gmail.com>
-Subject: Re: [PATCH v7 1/6] dt-bindings: mtk-sysirq: Add compatible for
- Mediatek MT8183
-In-Reply-To: <fe86572e-690b-0e11-cb00-4cfe3a33c5fa@gmail.com>
-References: <1550210558-30516-1-git-send-email-erin.lo@mediatek.com>
- <1550210558-30516-2-git-send-email-erin.lo@mediatek.com>
- <fe86572e-690b-0e11-cb00-4cfe3a33c5fa@gmail.com>
-User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
- FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
- (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
-Organization: ARM Ltd
-MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
+	id 1guZNw-0002ZQ-Ac; Fri, 15 Feb 2019 09:02:16 +0000
+Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guZNs-0002Rj-15
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 09:02:14 +0000
+Received: by mail-pg1-x541.google.com with SMTP id y4so4498662pgc.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 01:02:11 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=TKEr6BQfPYwpZOOmXDLLiGCXvoI2GmC6CPcG6Delj7k=;
+ b=M06tQnzmpEvPURrsn18wmE1G0bf8j/j3E4/gaRn5UHdWAIszU5S/8BRF4bn0GNtXSe
+ r7t1bSEpPbePPUAaBWw95Kui9EIi7UJTA81Di6i6f5bxLCXBdflLoBmKbdqrWgc+DwRL
+ gE2EemCnKz5LtwY05osXbp7gG2eB8OesL0+Ec=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=TKEr6BQfPYwpZOOmXDLLiGCXvoI2GmC6CPcG6Delj7k=;
+ b=AQweAmfF6Z3t7ayqBjJ9dpnRJJlFQUCc39KgHntdnYGLXNQ2GykIiHEA8tFsX6Y9Jx
+ G5gIqglg3eLXajbOy+3u39MC+4Kf7FAAe33kDObwd/gIAOSpkZa+5Uuh0h+/VUp3usj5
+ HKbyqyZgM+7aRAW1qZ3peDv73RgBQMrKKriU4tXee5i4nZ+tNlOoKjjrDtbNNazcuw0q
+ Js7tcJI2eUist2w/i20LNE/HBkJpSwAeI7N+iYx4ToGb2sMQdJlupCYNX0IPmqO0o36T
+ TGGOYTt5dAipYHSY9E0Ci9UxOlTnk1qZkcu9Ei8NvG+rprjzw0f7NLadNiGGrTsBM8b+
+ TMxg==
+X-Gm-Message-State: AHQUAuYDNeswiCpQ+QD3DnEu3wynRc/68SdGzLLF38CQxAqFBSVrecMg
+ epeKghtkGQ0xHzD8VXBXf4pqVbBmCZUFZA==
+X-Google-Smtp-Source: AHgI3IZ+IPALVVKhe1XQ2ry7m3Jzss69II/WcqBU5mzDNdUy2gIbEPcfg4GYGt2NpDsJktpgvm9zaw==
+X-Received: by 2002:a65:6219:: with SMTP id d25mr4392407pgv.18.1550221330954; 
+ Fri, 15 Feb 2019 01:02:10 -0800 (PST)
+Received: from hsinyi-z840.tpe.corp.google.com
+ ([2401:fa00:1:10:b852:bd51:9305:4261])
+ by smtp.gmail.com with ESMTPSA id z67sm9012653pfd.188.2019.02.15.01.02.08
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Fri, 15 Feb 2019 01:02:10 -0800 (PST)
+From: Hsin-Yi Wang <hsinyi@chromium.org>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] i2c: mediatek: modify threshold passed to
+ i2c_get_dma_safe_msg_buf()
+Date: Fri, 15 Feb 2019 17:02:02 +0800
+Message-Id: <20190215090202.157100-1-hsinyi@chromium.org>
+X-Mailer: git-send-email 2.18.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_005757_438308_FE2CEDD3 
-X-CRM114-Status: GOOD (  11.74  )
+X-CRM114-CacheID: sfid-20190215_010212_075795_9CEE268B 
+X-CRM114-Status: GOOD (  12.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,47 +89,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Jason Cooper <jason@lakedaemon.net>,
- srv_heupstream <srv_heupstream@mediatek.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Erin Lo <erin.lo@mediatek.com>, Stephen Boyd <sboyd@codeaurora.org>,
- linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- linux-serial@vger.kernel.org, mars.cheng@mediatek.com,
- yingjoe.chen@mediatek.com, Thomas Gleixner <tglx@linutronix.de>,
- eddie.huang@mediatek.com, Linus Walleij <linus.walleij@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Ryder Lee <ryder.lee@mediatek.com>, Wolfram Sang <wsa@the-dreams.de>,
+ Jun Gao <jun.gao@mediatek.com>, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
+ Hsin-Yi Wang <hsinyi@chromium.org>, Matthias Brugger <matthias.bgg@gmail.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 15 Feb 2019 07:21:50 +0000,
-Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> 
-> 
-> 
-> On 2/15/19 7:02 AM, Erin Lo wrote:
-> > This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
-> > Platform.
-> > 
-> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> > Acked-by: Rob Herring <robh@kernel.org>
-> > ---
-> 
-> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-> 
-> Marc you want me to take it through my tree?
+i2c_get_dma_safe_msg_buf() allocates space based on msg->len. If threshold is
+0 and msg->len is also 0, function makes zero-length allocation, which returns
+a special ZERO_SIZE_PTR instead of a NULL pointer, and this will cause later
+code to fail. Modify the threshold to > 0 so the function returns NULL pointer.
 
-Yes please.
+Fixes: fc66b39fe36a ("i2c: mediatek: Use DMA safe buffers for i2c transactions")
+Signed-off-by: Hsin-Yi Wang <hsinyi@chromium.org>
+---
+ drivers/i2c/busses/i2c-mt65xx.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-
-	M.
-
+diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+index a74ef76705e0..2bb4d20ead32 100644
+--- a/drivers/i2c/busses/i2c-mt65xx.c
++++ b/drivers/i2c/busses/i2c-mt65xx.c
+@@ -503,7 +503,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
+ 		writel(I2C_DMA_CON_RX, i2c->pdmabase + OFFSET_CON);
+ 
+-		dma_rd_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
++		dma_rd_buf = i2c_get_dma_safe_msg_buf(msgs, 1);
+ 		if (!dma_rd_buf)
+ 			return -ENOMEM;
+ 
+@@ -526,7 +526,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		writel(I2C_DMA_INT_FLAG_NONE, i2c->pdmabase + OFFSET_INT_FLAG);
+ 		writel(I2C_DMA_CON_TX, i2c->pdmabase + OFFSET_CON);
+ 
+-		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
++		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 1);
+ 		if (!dma_wr_buf)
+ 			return -ENOMEM;
+ 
+@@ -549,7 +549,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_INT_FLAG);
+ 		writel(I2C_DMA_CLR_FLAG, i2c->pdmabase + OFFSET_CON);
+ 
+-		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 0);
++		dma_wr_buf = i2c_get_dma_safe_msg_buf(msgs, 1);
+ 		if (!dma_wr_buf)
+ 			return -ENOMEM;
+ 
+@@ -561,7 +561,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 			return -ENOMEM;
+ 		}
+ 
+-		dma_rd_buf = i2c_get_dma_safe_msg_buf((msgs + 1), 0);
++		dma_rd_buf = i2c_get_dma_safe_msg_buf((msgs + 1), 1);
+ 		if (!dma_rd_buf) {
+ 			dma_unmap_single(i2c->dev, wpaddr,
+ 					 msgs->len, DMA_TO_DEVICE);
 -- 
-Jazz is not dead, it just smell funny.
+2.18.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
