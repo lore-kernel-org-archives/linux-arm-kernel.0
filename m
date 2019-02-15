@@ -2,63 +2,70 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A02FDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:39:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21067C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:43:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6F19221A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:39:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DAA5521A80
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 11:43:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RWFaf5fH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F19221A80
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dnt4f8yL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DAA5521A80
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QRVVV6qYoN1L5Kta0Hk3COlSpWKKF8hixxOPB2zYbaw=; b=RWFaf5fHskAzOI
-	WBesk87byuBsVgOo3ozDzi7Ep4C+XEtkQEN6W5HHATx15O56PLW5HNpui6ePyijgcUTd+9FmbEo63
-	u/XwpOzPYIRzrWGf6BSdUmPVNFhYBxYj5m/XekJ5HXPC8SSJJQM0tghTwDu8fKVa1VgWdHk6JQMkN
-	9oZFk1Oo92lOaLYTtlJXecrmQPIOLHZ0D5wksTtmyylt+3MqmuqVNLUR317GyW03zbpZYt+AxCWs9
-	vWOIQiO3ymUAgwB/fSkUhk+Wx2J5P8/6fOJAMo8+aLgyxvISSvsZgcMw1wkaVMD7dzOLpA1EH4YNF
-	NjsH+1uOgJkYY7U//6VQ==;
+	List-Owner; bh=xLdCusPO6n5pClaV6UwWOjpKuxQPBjnTYL+ud5rjaGE=; b=Dnt4f8yLKHbA7K
+	d5o00GDzgY/Uiy4D/xZORKNsKCQ84eV3UsFzBbNUKGOBCZ6LEeOBoPvYo/uXI4HgtNEk18dhyJVWD
+	0yT1FbLcI6t6CZ8T2ZJ7lNIluAZoB1dI0yJIGTYC69UKyigUNq9D9RCzXCxTr0j6/OSqOE8uhENBs
+	QVwlYgQl6PqVNG/XiD+lh/783WD7vkjSFxy5Fn3Rfm+lLl3QiWFjboRnQd0O63a2hAGHDaiHBxnjj
+	9nSCL/wW7ihdq8m1EC6BnT6A5zvYncTxQah8Dx2vwHrvm0eZHdPvEd45Tc6BwYE9vyuj+rI1ROJhY
+	SQyefU8PxJ1xUJNUDYfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gubqK-0001w7-3V; Fri, 15 Feb 2019 11:39:44 +0000
+	id 1gubtO-0003pT-NQ; Fri, 15 Feb 2019 11:42:54 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gubqG-0001vN-8w
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 11:39:41 +0000
+ id 1gubtL-0003on-Jp
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 11:42:52 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B456BEBD;
- Fri, 15 Feb 2019 03:39:38 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 11C853F575;
- Fri, 15 Feb 2019 03:39:35 -0800 (PST)
-Date: Fri, 15 Feb 2019 11:39:33 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-Subject: Re: [PATCH v6 1/4] acpi: arm64: add iort support for PMCG
-Message-ID: <20190215113933.GB27700@e107981-ln.cambridge.arm.com>
-References: <20190204121324.11460-1-shameerali.kolothum.thodi@huawei.com>
- <20190204121324.11460-2-shameerali.kolothum.thodi@huawei.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190204121324.11460-2-shameerali.kolothum.thodi@huawei.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8F6A9EBD;
+ Fri, 15 Feb 2019 03:42:49 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 40D293F575;
+ Fri, 15 Feb 2019 03:42:37 -0800 (PST)
+Date: Fri, 15 Feb 2019 11:42:27 +0000
+Message-ID: <864l95s2fw.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Andre Przywara <andre.przywara@arm.com>
+Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for firmware
+ workaround state
+In-Reply-To: <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
+References: <20190107120537.184252-1-andre.przywara@arm.com>
+ <20190107120537.184252-2-andre.przywara@arm.com>
+ <20190122151714.GG3578@e103592.cambridge.arm.com>
+ <20190125144657.3db91c91@donnerap.cambridge.arm.com>
+ <20190129213223.GB3567@e103592.cambridge.arm.com>
+ <20190130113900.10089070@donnerap.cambridge.arm.com>
+ <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_033940_330607_FFC5E79B 
-X-CRM114-Status: GOOD (  28.50  )
+X-CRM114-CacheID: sfid-20190215_034251_658760_7E7A039D 
+X-CRM114-Status: GOOD (  17.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,280 +77,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, vkilari@codeaurora.org, neil.m.leeder@gmail.com,
- jean-philippe.brucker@arm.com, pabba@codeaurora.org, john.garry@huawei.com,
- will.deacon@arm.com, rruigrok@codeaurora.org, linuxarm@huawei.com,
- linux-kernel@vger.kernel.org, linux-acpi@vger.kernel.org, guohanjun@huawei.com,
- andrew.murray@arm.com, robin.murphy@arm.com,
- linux-arm-kernel@lists.infradead.org
+Cc: Peter Maydell <peter.maydell@linaro.org>, kvm@vger.kernel.org,
+ Christoffer Dall <Christoffer.Dall@arm.com>, Dave Martin <Dave.Martin@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 04, 2019 at 12:13:21PM +0000, Shameer Kolothum wrote:
-> From: Neil Leeder <nleeder@codeaurora.org>
+On Fri, 15 Feb 2019 09:58:57 +0000,
+Andre Przywara <andre.przywara@arm.com> wrote:
 > 
-> Add support for the SMMU Performance Monitor Counter Group
-> information from ACPI. This is in preparation for its use
-> in the SMMUv3 PMU driver.
+> On Wed, 30 Jan 2019 11:39:00 +0000
+> Andre Przywara <andre.przywara@arm.com> wrote:
 > 
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> Signed-off-by: Hanjun Guo <guohanjun@huawei.com>
-> Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/acpi/arm64/iort.c | 117 ++++++++++++++++++++++++++++++++++++----------
->  include/linux/acpi_iort.h |   6 +++
->  2 files changed, 99 insertions(+), 24 deletions(-)
+> Peter, Marc, Christoffer,
 > 
-> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> index e48894e..e2c9b26 100644
-> --- a/drivers/acpi/arm64/iort.c
-> +++ b/drivers/acpi/arm64/iort.c
-> @@ -356,7 +356,8 @@ static struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
->  	if (map->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
->  		if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT ||
->  		    node->type == ACPI_IORT_NODE_PCI_ROOT_COMPLEX ||
-> -		    node->type == ACPI_IORT_NODE_SMMU_V3) {
-> +		    node->type == ACPI_IORT_NODE_SMMU_V3 ||
-> +		    node->type == ACPI_IORT_NODE_PMCG) {
->  			*id_out = map->output_base;
->  			return parent;
->  		}
-> @@ -394,6 +395,8 @@ static int iort_get_id_mapping_index(struct acpi_iort_node *node)
->  		}
->  
->  		return smmu->id_mapping_index;
-> +	case ACPI_IORT_NODE_PMCG:
-> +		return 0;
->  	default:
->  		return -EINVAL;
->  	}
-> @@ -1218,14 +1221,23 @@ static void __init arm_smmu_v3_init_resources(struct resource *res,
->  	}
->  }
->  
-> -static bool __init arm_smmu_v3_is_coherent(struct acpi_iort_node *node)
-> +static void __init arm_smmu_v3_dma_configure(struct device *dev,
-> +					     struct acpi_iort_node *node)
->  {
->  	struct acpi_iort_smmu_v3 *smmu;
-> +	enum dev_dma_attr attr;
->  
->  	/* Retrieve SMMUv3 specific data */
->  	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
->  
-> -	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-> +	attr = (smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE) ?
-> +			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-> +
-> +	/* We expect the dma masks to be equivalent for all SMMUv3 set-ups */
-> +	dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +	/* Configure DMA for the page table walker */
-> +	acpi_dma_configure(dev, attr);
->  }
->  
->  #if defined(CONFIG_ACPI_NUMA)
-> @@ -1301,30 +1313,82 @@ static void __init arm_smmu_init_resources(struct resource *res,
->  	}
->  }
->  
-> -static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
-> +static void __init arm_smmu_dma_configure(struct device *dev,
-> +					  struct acpi_iort_node *node)
->  {
->  	struct acpi_iort_smmu *smmu;
-> +	enum dev_dma_attr attr;
->  
->  	/* Retrieve SMMU specific data */
->  	smmu = (struct acpi_iort_smmu *)node->node_data;
->  
-> -	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
-> +	attr = (smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK) ?
-> +			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-> +
-> +	/* We expect the dma masks to be equivalent for SMMU set-ups */
-> +	dev->dma_mask = &dev->coherent_dma_mask;
-> +
-> +	/* Configure DMA for the page table walker */
-> +	acpi_dma_configure(dev, attr);
-> +}
-> +
-> +static int __init arm_smmu_v3_pmcg_count_resources(struct acpi_iort_node *node)
-> +{
-> +	struct acpi_iort_pmcg *pmcg;
-> +
-> +	/* Retrieve PMCG specific data */
-> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
-> +
-> +	/*
-> +	 * There are always 2 memory resources.
-> +	 * If the overflow_gsiv is present then add that for a total of 3.
-> +	 */
-> +	return pmcg->overflow_gsiv ? 3 : 2;
-> +}
-> +
-> +static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
-> +						   struct acpi_iort_node *node)
-> +{
-> +	struct acpi_iort_pmcg *pmcg;
-> +
-> +	/* Retrieve PMCG specific data */
-> +	pmcg = (struct acpi_iort_pmcg *)node->node_data;
-> +
-> +	res[0].start = pmcg->page0_base_address;
-> +	res[0].end = pmcg->page0_base_address + SZ_4K - 1;
-> +	res[0].flags = IORESOURCE_MEM;
-> +	res[1].start = pmcg->page1_base_address;
-> +	res[1].end = pmcg->page1_base_address + SZ_4K - 1;
-> +	res[1].flags = IORESOURCE_MEM;
-> +
-> +	if (pmcg->overflow_gsiv)
-> +		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
-> +				       ACPI_EDGE_SENSITIVE, &res[2]);
-> +}
-> +
-> +static int __init arm_smmu_v3_pmcg_add_platdata(struct platform_device *pdev)
-> +{
-> +	u32 model = IORT_SMMU_V3_PMCG_GENERIC;
-> +
-> +	return platform_device_add_data(pdev, &model, sizeof(model));
->  }
->  
->  struct iort_dev_config {
->  	const char *name;
->  	int (*dev_init)(struct acpi_iort_node *node);
-> -	bool (*dev_is_coherent)(struct acpi_iort_node *node);
-> +	void (*dev_dma_configure)(struct device *dev,
-> +				  struct acpi_iort_node *node);
->  	int (*dev_count_resources)(struct acpi_iort_node *node);
->  	void (*dev_init_resources)(struct resource *res,
->  				     struct acpi_iort_node *node);
->  	void (*dev_set_proximity)(struct device *dev,
->  				    struct acpi_iort_node *node);
-> +	int (*dev_add_platdata)(struct platform_device *pdev);
->  };
->  
->  static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
->  	.name = "arm-smmu-v3",
-> -	.dev_is_coherent = arm_smmu_v3_is_coherent,
-> +	.dev_dma_configure = arm_smmu_v3_dma_configure,
->  	.dev_count_resources = arm_smmu_v3_count_resources,
->  	.dev_init_resources = arm_smmu_v3_init_resources,
->  	.dev_set_proximity = arm_smmu_v3_set_proximity,
-> @@ -1332,9 +1396,16 @@ static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
->  
->  static const struct iort_dev_config iort_arm_smmu_cfg __initconst = {
->  	.name = "arm-smmu",
-> -	.dev_is_coherent = arm_smmu_is_coherent,
-> +	.dev_dma_configure = arm_smmu_dma_configure,
->  	.dev_count_resources = arm_smmu_count_resources,
-> -	.dev_init_resources = arm_smmu_init_resources
-> +	.dev_init_resources = arm_smmu_init_resources,
-> +};
-> +
-> +static const struct iort_dev_config iort_arm_smmu_v3_pmcg_cfg __initconst = {
-> +	.name = "arm-smmu-v3-pmcg",
-> +	.dev_count_resources = arm_smmu_v3_pmcg_count_resources,
-> +	.dev_init_resources = arm_smmu_v3_pmcg_init_resources,
-> +	.dev_add_platdata = arm_smmu_v3_pmcg_add_platdata,
->  };
->  
->  static __init const struct iort_dev_config *iort_get_dev_cfg(
-> @@ -1345,6 +1416,8 @@ static __init const struct iort_dev_config *iort_get_dev_cfg(
->  		return &iort_arm_smmu_v3_cfg;
->  	case ACPI_IORT_NODE_SMMU:
->  		return &iort_arm_smmu_cfg;
-> +	case ACPI_IORT_NODE_PMCG:
-> +		return &iort_arm_smmu_v3_pmcg_cfg;
->  	default:
->  		return NULL;
->  	}
-> @@ -1362,7 +1435,6 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
->  	struct fwnode_handle *fwnode;
->  	struct platform_device *pdev;
->  	struct resource *r;
-> -	enum dev_dma_attr attr;
->  	int ret, count;
->  
->  	pdev = platform_device_alloc(ops->name, PLATFORM_DEVID_AUTO);
-> @@ -1393,19 +1465,19 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
->  		goto dev_put;
->  
->  	/*
-> -	 * Add a copy of IORT node pointer to platform_data to
-> -	 * be used to retrieve IORT data information.
-> +	 * Platform devices based on PMCG nodes uses platform_data to
-> +	 * pass the hardware model info to the driver. For others, add
-> +	 * a copy of IORT node pointer to platform_data to be used to
-> +	 * retrieve IORT data information.
->  	 */
-> -	ret = platform_device_add_data(pdev, &node, sizeof(node));
-> +	if (ops->dev_add_platdata)
-> +		ret = ops->dev_add_platdata(pdev);
-> +	else
-> +		ret = platform_device_add_data(pdev, &node, sizeof(node));
-> +
->  	if (ret)
->  		goto dev_put;
->  
-> -	/*
-> -	 * We expect the dma masks to be equivalent for
-> -	 * all SMMUs set-ups
-> -	 */
-> -	pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-> -
->  	fwnode = iort_get_fwnode(node);
->  
->  	if (!fwnode) {
-> @@ -1415,11 +1487,8 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
->  
->  	pdev->dev.fwnode = fwnode;
->  
-> -	attr = ops->dev_is_coherent && ops->dev_is_coherent(node) ?
-> -			DEV_DMA_COHERENT : DEV_DMA_NON_COHERENT;
-> -
-> -	/* Configure DMA for the page table walker */
-> -	acpi_dma_configure(&pdev->dev, attr);
-> +	if (ops->dev_dma_configure)
-> +		ops->dev_dma_configure(&pdev->dev, node);
->  
->  	iort_set_device_domain(&pdev->dev, node);
->  
-> diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-> index 38cd77b..832bd6a 100644
-> --- a/include/linux/acpi_iort.h
-> +++ b/include/linux/acpi_iort.h
-> @@ -26,6 +26,12 @@
->  #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
->  #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
->  
-> +/*
-> + * PMCG model identifiers for use in smmu pmu driver. Please note
-> + * that, this is not part of the IORT specification.
+> can we have an opinion on whether it's useful to introduce some
+> common scheme for firmware workaround system registers (parts of
+> KVM_REG_ARM_FW_REG(x)), which would allow checking them for
+> compatibility between two kernels without specifically knowing about
+> them?
+> Dave suggested to introduce some kind of signed encoding in the 4
+> LSBs for all those registers (including future ones), where 0 means
+> UNKNOWN and greater values are better. So without knowing about the
+> particular register, one could judge whether it's safe to migrate.
+> I am just not sure how useful this is, given that QEMU seems to ask
+> the receiving kernel about any sysreg, and doesn't particularly care
+> about the meaning of those registers. And I am not sure we really
+> want to introduce some kind of forward looking scheme in the kernel
+> here, short of a working crystal ball. I think the kernel policy was
+> always to be as strict as possible about those things.
 
-And it is a Linux internal tag that has nothing to do with HW, it is
-just fabricated for matching a driver, I would like to have this
-clarified in the comment please.
+I honestly don't understand how userspace can decide whether a given
+configuration is migratable or not solely based on the value of such a
+register. In my experience, the target system has a role to play, and
+is the only place where we can find out about whether migration is
+actually possible.
 
-I would have avoided adding another hook to differentiate platform data
-but given that it is self-contained in IORT code that should be fine for
-the sake of making progress:
+As you said, userspace doesn't interpret the data, nor should it. It
+is only on the receiving end that compatibility is assessed and
+whether some level of compatibility can be safely ensured.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+So to sum it up, I don't believe in this approach as a general way of
+describing the handling or errata.
 
-> + */
-> +#define IORT_SMMU_V3_PMCG_GENERIC        0x00000000 /* Generic SMMUv3 PMCG */
-> +
->  int iort_register_domain_token(int trans_id, phys_addr_t base,
->  			       struct fwnode_handle *fw_node);
->  void iort_deregister_domain_token(int trans_id);
-> -- 
-> 2.7.4
-> 
-> 
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
