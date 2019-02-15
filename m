@@ -2,84 +2,88 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A93A2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 22:38:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F786C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:02:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7401F222D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 22:38:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C982222DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:02:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VUOPdMDE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dvVJ5osn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7401F222D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WYfF7wAB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="og9vZugm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C982222DD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YZlPF5NDZctW+qMgzqX1sazU/jHVe5CqsfIa0MUnZCE=; b=VUOPdMDEQBmDzQ
-	m6znu2P3Ac902IQaPOXuTTY+4T94dTqwE8BXzkDySC5eo05S2vIWDX7LWeVESOBHdvJeX0P6l3iG3
-	xQBN2T4R2g43j7AVSLYkTRlHmN5+RRgAou5rTJjSen0Pc0z9JFtczG7N6ZIfnJgQlCibXeaKjIdNv
-	8DdRBi6PgtnfT5W6DmuHid4hElPczGEUB30RjMLqddHrM7sfqdadI0GLY65dDGtMGDZ/4MgtXFBP1
-	UCGBVPB795T56deJUTobYcScHkTyavtaDc+MereaXTdx7JQFLRKAamelDcgT9E94tqKqD/cgfCuYT
-	3FRkdOTX7gbJYf1jyBkg==;
+	List-Owner; bh=NjIZqm2KtPveQSG8Gju8jDOqRrZVTR+NQzycyvphSmA=; b=WYfF7wABjfu1Dt
+	9i3D/vIWcSugEtdTTnrvgSMacKxogV5n8m6m6FWY6yROE4m5TwOB++zqoJ1DhiLNBxhEIZjG5OFHz
+	U/tj6Y6+bl+CMI0EZC0P3uD+RheOMn2zZpg6vSoZ7MTG8KjKcAS0s2FUeMuFm2pROMi68Fy0ixGdS
+	vqKV1Jy2Qawh3lxt6Z7e2vg4QvG7a2zg2BDIPno3n6XcsY3IHY02e65q47y7pL9B9vh3QcoW7Wzg8
+	0hV37ltT0B8tGCNC70bAqN1ebQ1ULPC0/+4mThIz2XoI4Uxc+vqx8M/JE1W/VA12O0dSeAaHnBW5e
+	KzylbaJtdQPEssywhyCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gum7O-0007th-2N; Fri, 15 Feb 2019 22:38:02 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gumUf-0007Ng-2I; Fri, 15 Feb 2019 23:02:05 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gum7K-0007t2-7V
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 22:38:00 +0000
-Received: by mail-it1-x142.google.com with SMTP id f10so4424847ita.4
+ id 1gumUb-0007N3-9S
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 23:02:03 +0000
+Received: by mail-pf1-x441.google.com with SMTP id s22so5528046pfh.4
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 14:37:57 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=uBrEda264CqNMTYOMGS0nexpjUH9Pl0ktn0oy73iTQQ=;
- b=dvVJ5osnYZfeHX+vNv5He+jERnpxxiU8cBaBi/EvYPQJPjvdhotw33wZ8LpwvflWEV
- AzGfo5Du+5xxb2rfFJR7JvbOwkD9hfePdm3U4mhGK/7O/OdtRjxkoZtuXdxJe8wNuorH
- +Drrvo9p7HtG8fT1xOcwRbOb9xpWJjpUthpDax4T7IMLDLqOdAWbB1iSb2detZszkXQY
- +DhukMk6uz6G4IsRIEiesDLa/kxw2d5XCRne2cuOHwMF298ParMoQo/flFsLFDXKmQLD
- SURDhyWkIGb4XCOPWLMsZr/UO1M1I5Z/il7jBDt4CsDKjoepqzadPMzGMyAhyPFa2RYn
- kwNQ==
+ Fri, 15 Feb 2019 15:02:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:in-reply-to:references:date:message-id
+ :mime-version; bh=LskzHuROK1h+gyPGnPZqzE5FllwThTsMmeq6vc0//LQ=;
+ b=og9vZugmjhrYTK70TlkPkVuAQYa5h3LX7Fq+EcnKu35gWDHfCHkZ/aojkvDTshNZEA
+ 9K8M+vIhtH8jFWmx0u61pht9F0HtpIV8LPm/diPraRFSGI5PhXr3ZLKUonbfwLJqN8dw
+ 216lx67v2bZ4ggR7MYRE8OMFHO7pOrrNZmIy7FXac1bfvPXTtSv3OQAEMJE1cjCPOvPg
+ gDasXpfkQefbfelmizxxjBdPMsx+sHBtu2Ady9fs8tHn6vT5D/RHm4ha0Nz9ZCnbux8S
+ 6R0xwcYwzJGGw6ra9GeA3aGs/VL+jXxfIND74bOarHE9z59vLQpQByUkMOCvMkFUMtxJ
+ sCvw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=uBrEda264CqNMTYOMGS0nexpjUH9Pl0ktn0oy73iTQQ=;
- b=EQDObSH+3xlf0idnK3TFLTh4v3U88AX8prrCnsRCvBR7QAkmYZX26aT3IM5gG8C/DY
- kBAeEh7lwqqaSoLP0WPYLnd3Yk9H7jR/xfXr3NkKOH+Mjfp3WYODoqWJnHSyDWgc7eqi
- VcyxtudHbaWW7nhZ5IARSq21xg+qN2uAtQbTkeE1/qpOe4bbEv6vchfVQIYctTHPsuBO
- 0a8g3rzu+eXEHHmep2v7vDihecrAh3+tzbRnx+c+QTRVH8pD4LUyCvFsPWEUtHnEpo7h
- pFfmgVgLlLah4UCJ+61QV+xrO58cR9espw7TVsBh1QdqgpgTQy3LTlH2q0EGEsKAyqNX
- CNyw==
-X-Gm-Message-State: AHQUAubn9SBd8M4OCwvFqlH/ZvhOMoJ79Ab1QEZI1Ak33a7h0LbPLYPL
- 0Qc408HMXma/xiwNuQ1rIhoRkmxgmToc6U/VJwk=
-X-Google-Smtp-Source: AHgI3IahV4OmPcigrKpWwYcnR6p27RifYaIvff/zCE0UzwetuDR1lgFSs4MRjksglvfENytNw9F/oBWqbGbDHB/qteM=
-X-Received: by 2002:a24:d06:: with SMTP id 6mr6982863itx.104.1550270274657;
- Fri, 15 Feb 2019 14:37:54 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
+ :message-id:mime-version;
+ bh=LskzHuROK1h+gyPGnPZqzE5FllwThTsMmeq6vc0//LQ=;
+ b=b81bCRdGPLJUgb6/fETT3z9HLOHZF+CuFxMs3e/QrkJ3O65qPTACk3ckvwZCB8Jxt7
+ yHjTvQFNLmMbER+7J/dgOPCN+cm9rx2xDN2IfbA2hI77Qulrj0foogsvcunz5qC3oege
+ GsfcCYINvkvyw+GjNOhH9Df/kTrWBcEw0XaI72/wEhK0hBaroUq9fawc7bf+W5TGEkdD
+ TDbkG+JB1vxx9+yVSxJ9VMm7jvnvz6emvUV/pgyc7RE4QjSZC50bGkjRcom9BlkizQ0I
+ +KklCVbzPFRxzpVEhHbm49s/Ajuql9Q/wOwHIXqaDOaGhJWyJVSvfMmEbg8WQ7Qm+EXc
+ VebQ==
+X-Gm-Message-State: AHQUAuYfriloTaj8j68OeWuWIm+T14iFFi4rIh6XMZ81NcshN7FjQmu2
+ pi5YmAJirakA94/yPHvbgVWT+A==
+X-Google-Smtp-Source: AHgI3IYBoKhPT2cQE3BGmTJ89853tcuDcm+y323TWsBUgTye1X15PrrRNZ/bvAePCEWZIkAgyqx9ag==
+X-Received: by 2002:a63:e84c:: with SMTP id a12mr11375134pgk.241.1550271719930; 
+ Fri, 15 Feb 2019 15:01:59 -0800 (PST)
+Received: from localhost ([2601:602:9200:a1a5:100f:5904:cb2b:8631])
+ by smtp.googlemail.com with ESMTPSA id f13sm9093713pfa.132.2019.02.15.15.01.59
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 15 Feb 2019 15:01:59 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ linux-amlogic@lists.infradead.org
+Subject: Re: [PATCH 0/2] ARM: dts: add the clock measurer on Meson8/Meson8b
+In-Reply-To: <20190209002641.9105-1-martin.blumenstingl@googlemail.com>
+References: <20190209002641.9105-1-martin.blumenstingl@googlemail.com>
+Date: Fri, 15 Feb 2019 15:01:58 -0800
+Message-ID: <7h4l94k655.fsf@baylibre.com>
 MIME-Version: 1.0
-References: <20190214204433.155715-1-dianders@chromium.org>
- <4238ceb7-d286-9ef9-39b6-b2e0571f2981@arm.com>
- <CAD=FV=WeBD0bqxWPZcV1dz5Sdn47Ap=FZU3Y+YPbxsVCQEUcLQ@mail.gmail.com>
-In-Reply-To: <CAD=FV=WeBD0bqxWPZcV1dz5Sdn47Ap=FZU3Y+YPbxsVCQEUcLQ@mail.gmail.com>
-From: Rob Clark <robdclark@gmail.com>
-Date: Fri, 15 Feb 2019 17:37:41 -0500
-Message-ID: <CAF6AEGsGc8g--3W_xpR8VUt778WR19v_HOemhd7Jv=f4QBqVgw@mail.gmail.com>
-Subject: Re: [PATCH] iommu/arm-smmu: Allow disabling bypass via kernel config
-To: Doug Anderson <dianders@chromium.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_143758_297277_68958E93 
-X-CRM114-Status: GOOD (  27.97  )
+X-CRM114-CacheID: sfid-20190215_150201_370420_8FFDB70A 
+X-CRM114-Status: UNSURE (   8.28  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,96 +95,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
- Evan Green <evgreen@chromium.org>,
- "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 7:40 PM Doug Anderson <dianders@chromium.org> wrote:
->
-> Hi,
->
-> On Thu, Feb 14, 2019 at 1:32 PM Robin Murphy <robin.murphy@arm.com> wrote:
-> >
-> > Hi Doug,
-> >
-> > On 2019-02-14 8:44 pm, Douglas Anderson wrote:
-> > > Right now the only way to disable the iommu bypass for the ARM SMMU is
-> > > with the kernel command line parameter 'arm-smmu.disable_bypass'.
-> > >
-> > > In general kernel command line parameters make sense for things that
-> > > someone would like to tweak without rebuilding the kernel or for very
-> > > basic communication between the bootloader and the kernel, but are
-> > > awkward for other things.  Specifically:
-> > > * Human parsing of the kernel command line can be difficult since it's
-> > >    just a big runon space separated line of text.
-> > > * If every bit of the system was configured via the kernel command
-> > >    line the kernel command line would get very large and even more
-> > >    unwieldly.
-> > > * Typically there are not easy ways in build systems to adjust the
-> > >    kernel command line for config-like options.
-> > >
-> > > Let's introduce a new config option that allows us to disable the
-> > > iommu bypass without affecting the existing default nor the existing
-> > > ability to adjust the configuration via kernel command line.
-> >
-> > I say let's just flip the default - for a while now it's been one of
-> > those "oh yeah, we should probably do that" things that gets instantly
-> > forgotten again, so some 3rd-party demand is plenty to convince me :)
-> >
-> > There are few reasons to allow unmatched stream bypass, and even fewer
-> > good ones, so I'd be happy to shift the command-line burden over to the
-> > esoteric cases at this point, and consider the config option in future
-> > if anyone from that camp pops up and screams hard enough.
->
-> Sure, I can submit that patch if we want.  I presume I'll get lots of
-> screaming but I'm used to that.  ;-)
->
-> ...specifically I found that when I turned on "disably bypass" on my
-> board (sdm845-cheza, which is not yet upstream) that a bunch of things
-> that used to work broke.  That's a good thing because all the things
-> that broke need to be fixed properly (by adding the IOMMUs) but
-> presumably my board is not special in relying on the old insecure
-> behavior.
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-So one niggly bit, beyond the drivers that aren't but should be using
-iommu, is the case where bootloader lights up the display.  We
-actually still have a lot of work to do for this (in that clk and
-genpd drivers need to be aware of handover, in addition to just
-iommu)..  But I'd rather not make a hard problem harder just yet.
-
-(it gets worse, afaict so far on the windows-arm laptops since in that
-case uefi/edk is actually taking the iommu out of bypass and things go
-badly when arm-smmu disables clks after probe..)
-
-But I might recommend making the default a kconfig option for now, so
-in the distro kernel case, where display driver is a kernel module,
-you aren't making a hard problem harder.  For cases where bootloader
-isn't enabling display, things are much easier, and I think we could
-switch the default sooner.  But I fear for cases where bootloader is
-enabling display it is a much harder problem :-(
-
-BR,
--R
-
-
+> The 32-bit Amlogic Meson SoCs also have a "clock measurer", just like
+> the newer 64-bit ones.
 >
-> I'm about to head on vacation for a week so I'm not sure I'll get to
-> re-post before then.  If not I'll post this sometime after I get back
-> unless someone beats me to it.
->
-> -Doug
-> _______________________________________________
-> iommu mailing list
-> iommu@lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> Add the node of the clock measurer to meson8.dtsi and meson8b.dtsi
+> so we can see the measured clock frequencies in:
+> /sys/kernel/debug/meson-clk-msr/
+
+Queued up, probably for v5.2, unless I get one more late PR in
+(unlikely.)
+
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
