@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 10B88C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:39:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B28FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:41:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1D9F2192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:39:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC7E02192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:41:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qtUTa+jF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1D9F2192D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jC5OoQBV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC7E02192D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,50 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nVuEoORa3ZHbTfzfEPSr421dK9XxLBv01LJif4s+ujU=; b=qtUTa+jF/9V+is
-	GeDaIKgrsm636PU+5jt7Xe73wJNi25Ft9epB8gFMMNxGqgYXSJO8LOMS+5LRujOS9okE5j8xQFAhv
-	I4Rr5QoF4nd9Lo/4crWKhpFnYAwLxRl0/fZOSc/22DhgBDha5mnNymUhzh2lypsuH8eLGkwxDN57G
-	PxTZC3hqvg4ZlhezFqYR+uGk+zhcGgszgNHLt7QqWnFZBGd20/qw01cfSNkLZs2SqH6OHHtFFToSy
-	pfl3aysq1m+HJkLkqidgdP4S8f5ckMQj6rvIoIUckbEyP/awLEs8xQ77aUDt1Gu/XIAZpL1mCSOY9
-	jY56CI/NZUjOFa/ObzcQ==;
+	List-Owner; bh=oq2f82tJtdWTOSfCDjTtkkjrRTfJBOxsIx1Hzrfr8Jw=; b=jC5OoQBVE/PFxr
+	khhjM8umVP1vG20sNbnAi3PMEgfQag2SmwGzQDenE8GwDBxC/auUmy36/H+a0eX2WDH+fkF+LvMgO
+	pcZ60+O1VBITYXdow5qgcRAkIpXZKHxSLDlQH9hM/8a+ZAsODyarruNhkVTrfRI6/rdZv5OYXQRSX
+	/HkCmq7ZGf+17Hekx8nlKxoxtAE+gas++TPBvn0XzOkXbV3Iis5ByH9mvLbuDZgcGlVucVW8kRwuw
+	q49eNnn2hwDAmPNBNXlebeqpTEBG3Wx7kYXMgwUecAWcDHlG8JqDbhzSVvlTFaFw3GKqKqYvnWhzY
+	2zzZqVo3ADEnCBLKRSCg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gueeZ-0001BT-MC; Fri, 15 Feb 2019 14:39:47 +0000
-Received: from mail-qt1-f170.google.com ([209.85.160.170])
+	id 1guefx-0002kY-6o; Fri, 15 Feb 2019 14:41:13 +0000
+Received: from mail-qk1-f174.google.com ([209.85.222.174])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gueeW-0001B6-MB
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:39:45 +0000
-Received: by mail-qt1-f170.google.com with SMTP id 2so11081118qtb.5
+ id 1guefu-0002k1-5C
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:41:11 +0000
+Received: by mail-qk1-f174.google.com with SMTP id w204so5818481qka.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 06:39:44 -0800 (PST)
+ Fri, 15 Feb 2019 06:41:09 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=iHQa20uxFdUkS45psg1iPPhX8Vf891fQZ0XjO3evSSk=;
- b=C+MK2Xmtr/Ldv83LeybToVJvUA4hVksYlpvEq5UAHGrTvI5li9sPVRTz+9WRUZkS5E
- z1yOBK8gkKn/B2ljmBi8gnAaBV2pQh1owzFG1D7hWIc7RB0ORa/uI5JrJUKuPRB3QA2c
- oPmlRyzKCjU147WJ+hZYV7z5wqgfhVHWiekQCXkywK6KUm3aHeDfWbSZdSkF73/Q7x6S
- 5MAWbxmou57fj+Y5ljsQT4x04g70vELI0KoRIqadX6tzh5xNjn41eouir02e6uQuWSF1
- /L6sl1yEQSn8u1eI14Yg9JxKrgn/yqqHA0wuUv06q8ru7Bpu7+GKb2H7ZUNLj4lSQxuW
- KM6w==
-X-Gm-Message-State: AHQUAuYNM+n6lVfaLrxE03SUxdF+LziY7eFh8j0ps058hx3OkFvUxrEC
- M1s63CGlu9UebukYVmaKGtMe44OmDrK63xbQeJw=
-X-Google-Smtp-Source: AHgI3IagM4kav/GirhSNWuIYrLuem0u/FUa3QdrCRbjaA+s6OyvH4oWnvMmO9GzaD56ZUYg2nLIMosqIBtwEGvqUJ9E=
-X-Received: by 2002:ac8:445a:: with SMTP id m26mr7723156qtn.212.1550241583629; 
- Fri, 15 Feb 2019 06:39:43 -0800 (PST)
+ bh=4uNRJM7dazka7G4wiBtjiyv+VA94i45hBrC+e5bB04M=;
+ b=TYUCHzcB2IYnMRdcriIKK8AoFHB6N24KFc33qrlvTw5vZWaNtoRW3Qi76I+MxQWTNg
+ m/zVJwFs8KXQ+3c13rEzerxLQ3snuKKZF7smWt8wPD7oS9ixU2wHGQYgaSp1kgapb92y
+ 9JrfeHufSUyYZQEcy1JtD1pD2gxklhWJrraArnFrcNzdQ7l7a0IM36OvXRw9XrDrxGuO
+ NibkWZEgiFAlfSI6HM3+4aG4ywE52G+hJ+PRkambvn1xofPSabc5kmSLhGgC7rCSkhXX
+ SeuBkNVqlFv8aerRTYjeDKshw2hW817ViWNTt6ont1JutMyir4ftT3xokoCeEBdjFPpO
+ 0Zbg==
+X-Gm-Message-State: AHQUAubC8bhw/C/bfJj4azjMoBUTUYCfJBjE4MWx7W06KjG0kaeIICwc
+ Ga+8VVPjjc43+NE3crOUvvH5+hpUfABULJ565GM=
+X-Google-Smtp-Source: AHgI3IaAKMd6gpTObloPLc7x3GkkOJQhAifyyFcJ34D9iTKa9bZ84K/D/QbTSl9qWZIVniKp3YodRwlShstEixDE/c4=
+X-Received: by 2002:a05:620a:12a5:: with SMTP id
+ x5mr7284370qki.291.1550241669009; 
+ Fri, 15 Feb 2019 06:41:09 -0800 (PST)
 MIME-Version: 1.0
-References: <20190204160210.18046-1-dinguyen@kernel.org>
- <20190204160210.18046-2-dinguyen@kernel.org>
-In-Reply-To: <20190204160210.18046-2-dinguyen@kernel.org>
+References: <20190208102354.vwygnt2wevbjntwy@flea>
+In-Reply-To: <20190208102354.vwygnt2wevbjntwy@flea>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 15:39:27 +0100
-Message-ID: <CAK8P3a3rWE63yB2h7AGqO78aqkKmsBoxJyo5X0zv12YWN36NmA@mail.gmail.com>
-Subject: Re: [GIT PULL 2/2] ARM: dts: socfpga: updates for v5.1
-To: Dinh Nguyen <dinguyen@kernel.org>
+Date: Fri, 15 Feb 2019 15:40:52 +0100
+Message-ID: <CAK8P3a0oaEEfKJJVbicdY6p0ZHeTL7yCgYvFLms+u90isLiz8g@mail.gmail.com>
+Subject: Re: [GIT PULL] Allwinner H3/H5 changes for 5.1
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_063944_726862_D73579F3 
-X-CRM114-Status: UNSURE (   8.93  )
+X-CRM114-CacheID: sfid-20190215_064110_194428_5EA82F1D 
+X-CRM114-Status: UNSURE (   9.07  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -80,23 +80,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Chen-Yu Tsai <wens@csie.org>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 4, 2019 at 5:02 PM Dinh Nguyen <dinguyen@kernel.org> wrote:
-> SoCFPGA DTS updates for v5.1
-> - Add SMMU node for Stratix10
-> - Add vendor prefix fo Novtech
-> - Add a new 96Boards Chameleon96 board that uses a Cyclone5 SoCFPGA
-> - Add missing reset properties for all IP on Cyclone5 and Arria10
+On Fri, Feb 8, 2019 at 11:24 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Allwinner H3 and H5 changes for 5.1
 >
+> Our usual round of DT changes shared between arm and arm64.
+>
+> We have a bunch of changes for board, improving the eMMC support on the H5
+> variant of the All-H3-CC, enabling HDMI and reworking the CSI driver.
 
 Pulled into arm/dt, thanks!
 
-      Arnd
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
