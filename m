@@ -2,85 +2,68 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DC00FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26B99C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA6932192C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6D832192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Os6da72X";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="IKeEb0j6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA6932192C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fPRYnp6G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6D832192C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=2Zx0QB6uV6j5+pQsXRbw7UhNKXU4sdfe/AyCLW3ZLtU=; b=Os6
-	da72X6Jxnj7Et5aXB8fAbh/IppIK0xuW5sBT+yDxeV4Qmzcj9ItIJOPOFpW7FEhyeljTh4BVojbP0
-	NF9ZJa5HMAht0LRbcSIzNqpiTpl6YVTqltERBxVALydw/4SjTCWTnzymatlqe7ngJkpgTd8W+9EYG
-	tK/C2+uWdsU+giKn3MzTORn/Zhg/xUzBmhAQgswyxAqGcwh0/TX58EEyFCu3R2x0IfBXwHNZ58/hs
-	T34gWdTSmY3qS3Pb+zOfaPhcxs8dbT+7eYMeEvOX2h6p7pGmBK6AMfKj0H8K6q9IvhVpz6duJL9+r
-	mlvmEEzuHlUjbFUAlVAZZj2GL6huEqA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=G1vrNTofHmsox2FZNo9hm/LoV2qmlRJuIDXaFbgX5/Q=; b=fPRYnp6GuDahiLGCU1kn5jM7g
+	VQOv5615mB/BL1fNbdsaSrHqSDi95EZqZA7/h8D2suFarS1jIiXekma+oosQJzJcrjg1ZGrV6aR0f
+	87ZvRv/LutWu/x7x/1PHF2f3NPulOsgcACaiLCA2H+nfvcFsvsLLZWyhHgty7OEKwZW04g0xMYsjw
+	6QmA9bS4hy+oBdrpjki+lm7YALP8Tch2rVnY3HeAso+Gmkd9OYoQXhAdFuH2qZMvzgETG+anHpNoh
+	vDLcPb26GYoC+WmwLsoXhMrjHkp+/5ew2OFDzlT8zD8HC3AL7HOOvJi/DO25K/Tjgvx50yWqI+xTL
+	Hoa457dGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guVYg-00076u-PP; Fri, 15 Feb 2019 04:57:06 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guVYd-00075f-1X
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 04:57:04 +0000
-Received: by mail-pg1-x541.google.com with SMTP id m1so4203513pgq.8
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 20:57:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=kSA1TWJhCcW942nec5H5KUTcw9lD/Qj1J6bxw+KVpGs=;
- b=IKeEb0j6DAR83CuSjVdt+YyIhrkgUdVyBUvbEEJELqkUf4I5O2LdHtKSQF3GXDVXr8
- p+lBX83Z8AvVqicqN6dgQpD90KQr6K48FvDCOEOuqkW+KYy9yRqDXj7PC2yKwQ7bsSJA
- kf6eR03uJ2NwVMbFYaGO08gzKuLMJ5dOQwZcfRP8oxrJWlps6mpeosxAbOA0+Mksm341
- HpsUizT8a2SB9VvjXR6BMuDHyDh5i8VRHiVbIffyNCG7PIQ0ojP8GrEw23oylLkbfTSo
- n+f0ZEXu3X7tk8LvrL+bY22Ljry9OscxM/fZtUz5oaYUs9KlH+y5fir2gCmRAhtcTi5C
- koJQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=kSA1TWJhCcW942nec5H5KUTcw9lD/Qj1J6bxw+KVpGs=;
- b=kHNwuQZJPgw5gFIYw8ZN5NTVIR56Pl8oL8PqbtWNc8mUPL7iBidWeSgUZzEwZXcNH4
- GRvJ/CBMRYMfSP5lKuSZw6Iv2+vfJpGABK4j3ly+dJflfc9eN5fLtSnu8cma012RPeTs
- vYwenqEvUkG3sLg9dIoAcYtbc/K94OBxm74XRv33sG3Wd5ZIQl/fHLQBBdNYb6koaO7E
- lOEyp931lcX6noHvlR2+YkS62sfvYPUCGVzfnOeX2s2o42wl8C56WUF2EFUorpuRZS6P
- r3mB82PAmqyjRIJhG0NWTqm18BzXKrIlLvXfvk+xijXQ97SneKjHH/ZYY36xFr8gBNtM
- lBnA==
-X-Gm-Message-State: AHQUAuZkGrT9Rx8y51qM3OyX2k9vfIF9WYqesZJM5gRbRWZW8dhBlbqU
- CBtESq6RXG8drBm/GXDcsQJJ
-X-Google-Smtp-Source: AHgI3IYEo2fZJzhKYguqyf8Kkk3NMjRd9PiChuOsx5/5A+QXOd7rdaa/TR826KA2AgI9mwkoiO9rJQ==
-X-Received: by 2002:a63:6ac5:: with SMTP id f188mr3592785pgc.165.1550206621218; 
- Thu, 14 Feb 2019 20:57:01 -0800 (PST)
-Received: from localhost.localdomain ([2409:4072:98a:c91:14c4:f458:9909:7fad])
- by smtp.gmail.com with ESMTPSA id
- y12sm9021267pgh.38.2019.02.14.20.56.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 20:57:00 -0800 (PST)
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: heiko@sntech.de
-Subject: [PATCH v2] arm64: dts: rockchip: Add on-board WiFi/BT support for
- Rock960 boards
-Date: Fri, 15 Feb 2019 10:26:48 +0530
-Message-Id: <20190215045648.26380-1-manivannan.sadhasivam@linaro.org>
-X-Mailer: git-send-email 2.17.1
+	id 1guVZS-0007Vk-Hs; Fri, 15 Feb 2019 04:57:54 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guVZO-0007VI-PM
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 04:57:53 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 184FFA78;
+ Thu, 14 Feb 2019 20:57:50 -0800 (PST)
+Received: from [10.162.0.144] (a075553-lin.blr.arm.com [10.162.0.144])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BDB873F589;
+ Thu, 14 Feb 2019 20:57:46 -0800 (PST)
+Subject: Re: [PATCH v5 5/5] arm64/kvm: control accessibility of ptrauth key
+ registers
+To: Dave P Martin <Dave.Martin@arm.com>,
+ Kristina Martsenko <Kristina.Martsenko@arm.com>
+References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
+ <1548658727-14271-6-git-send-email-amit.kachhap@arm.com>
+ <6ddfa9ae-5c98-540e-b4aa-8149c8515c9e@arm.com>
+ <20190213175428.GR32634@e103592.cambridge.arm.com>
+From: Amit Daniel Kachhap <amit.kachhap@arm.com>
+Message-ID: <0c22684d-3101-f90c-83d8-d649bb1c799e@arm.com>
+Date: Fri, 15 Feb 2019 10:27:44 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190213175428.GR32634@e103592.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_205703_110845_4ECCFF0C 
-X-CRM114-Status: GOOD (  14.35  )
+X-CRM114-CacheID: sfid-20190214_205751_267702_2305E306 
+X-CRM114-Status: GOOD (  28.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,182 +75,158 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: tom@vamrs.com, mani@kernel.org, linux-kernel@vger.kernel.org, dev@vamrs.com,
- linux-rockchip@lists.infradead.org, pbrobinson@gmail.com,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- ezequiel@collabora.com, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <Mark.Rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
+ Marc Zyngier <Marc.Zyngier@arm.com>, Catalin Marinas <Catalin.Marinas@arm.com>,
+ Will Deacon <Will.Deacon@arm.com>, Christoffer Dall <Christoffer.Dall@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ "kvmarm@lists.cs.columbia.edu" <kvmarm@lists.cs.columbia.edu>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add on-board WiFi/BT support for Rock960 boards such as Rock960 based
-on AP6356S and Ficus based on AP6354 wireless modules.
+Hi,
 
-Firmwares for the respective boards are available here:
+On 2/13/19 11:24 PM, Dave P Martin wrote:
+> On Wed, Feb 13, 2019 at 05:35:46PM +0000, Kristina Martsenko wrote:
+>> On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
+>>> According to userspace settings, ptrauth key registers are conditionally
+>>> present in guest system register list based on user specified flag
+>>> KVM_ARM_VCPU_PTRAUTH.
+>>>
+>>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
+>>> Cc: kvmarm@lists.cs.columbia.edu
+>>> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>>   Documentation/arm64/pointer-authentication.txt |  3 ++
+>>>   arch/arm64/kvm/sys_regs.c                      | 42 +++++++++++++++++++-------
+>>>   2 files changed, 34 insertions(+), 11 deletions(-)
+>>>
+> 
+> [...]
+> 
+>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> 
+> [...]
+> 
+>>> @@ -2487,18 +2493,22 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
+>>>   }
+>>>   
+>>>   /* Assumed ordered tables, see kvm_sys_reg_table_init. */
+>>> -static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
+>>> +static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind,
+>>> +			const struct sys_reg_desc *desc, unsigned int len)
+>>>   {
+>>>   	const struct sys_reg_desc *i1, *i2, *end1, *end2;
+>>>   	unsigned int total = 0;
+>>>   	size_t num;
+>>>   	int err;
+>>>   
+>>> +	if (desc == ptrauth_reg_descs && !kvm_arm_vcpu_ptrauth_allowed(vcpu))
+>>> +		return total;
+>>> +
+>>>   	/* We check for duplicates here, to allow arch-specific overrides. */
+>>>   	i1 = get_target_table(vcpu->arch.target, true, &num);
+>>>   	end1 = i1 + num;
+>>> -	i2 = sys_reg_descs;
+>>> -	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
+>>> +	i2 = desc;
+>>> +	end2 = desc + len;
+>>>   
+>>>   	BUG_ON(i1 == end1 || i2 == end2);
+>>>   
+>>> @@ -2526,7 +2536,10 @@ unsigned long kvm_arm_num_sys_reg_descs(struct kvm_vcpu *vcpu)
+>>>   {
+>>>   	return ARRAY_SIZE(invariant_sys_regs)
+>>>   		+ num_demux_regs()
+>>> -		+ walk_sys_regs(vcpu, (u64 __user *)NULL);
+>>> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, sys_reg_descs,
+>>> +				ARRAY_SIZE(sys_reg_descs))
+>>> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, ptrauth_reg_descs,
+>>> +				ARRAY_SIZE(ptrauth_reg_descs));
+>>>   }
+>>>   
+>>>   int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>> @@ -2541,7 +2554,12 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>>   		uindices++;
+>>>   	}
+>>>   
+>>> -	err = walk_sys_regs(vcpu, uindices);
+>>> +	err = walk_sys_regs(vcpu, uindices, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>>> +	if (err < 0)
+>>> +		return err;
+>>> +	uindices += err;
+>>> +
+>>> +	err = walk_sys_regs(vcpu, uindices, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
+>>>   	if (err < 0)
+>>>   		return err;
+>>>   	uindices += err;
+>>> @@ -2575,6 +2593,7 @@ void kvm_sys_reg_table_init(void)
+>>>   	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
+>>>   	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
+>>>   	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
+>>> +	BUG_ON(check_sysreg_table(ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs)));
+>>>   
+>>>   	/* We abuse the reset function to overwrite the table itself. */
+>>>   	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
+>>> @@ -2616,6 +2635,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
+>>>   
+>>>   	/* Generic chip reset first (so target could override). */
+>>>   	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
+>>> +	reset_sys_reg_descs(vcpu, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
+>>>   
+>>>   	table = get_target_table(vcpu->arch.target, true, &num);
+>>>   	reset_sys_reg_descs(vcpu, table, num);
+>>
+>> This isn't very scalable, since we'd need to duplicate all the above
+>> code every time we add new system registers that are conditionally
+>> accessible.
+> 
+> Agreed, putting feature-specific checks in walk_sys_regs() is probably
+> best avoided.  Over time we would likely accumulate a fair number of
+> these checks.
+> 
+>> It seems that the SVE patches [1] solved this problem by adding a
+>> check_present() callback into struct sys_reg_desc. It probably makes
+>> sense to rebase onto that patch and just implement the callback for the
+>> ptrauth key registers as well.
+>>
+>> [1] https://lore.kernel.org/linux-arm-kernel/1547757219-19439-13-git-send-email-Dave.Martin@arm.com/
+> 
+> Note, I'm currently refactoring this so that enumeration through
+> KVM_GET_REG_LIST can be disabled independently of access to the
+> register.  This may not be the best approach, but for SVE I have a
+> feature-specific ID register to handle too (ID_AA64ZFR0_EL1), which
+> needs to be hidden from the enumeration but still accessible with
+> read-as-zero behaviour.
+> 
+> This changes the API a bit: I move to a .restrictions() callback which
+> returns flags to say what is disabled, and this callback is used in the
+> common code so that you don't have repeat your "feature present" check
+> in every accessor, as is currently the case.
+> 
+> I'm aiming to post a respun series in the next day or two.  The code
+> may of course change again after it gets reviewed...
+> 
+> 
+> Basing on [1] is probably a reasonable starting point, though.
 
-http://people.linaro.org/~manivannan.sadhasivam/rock960_wifi/
-http://people.linaro.org/~manivannan.sadhasivam/ficus_wifi/
+Thanks Kristina and Dave for this pointer. I will rebase my next 
+iteration based on it.
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
-
-Changes in v2:
-
-* Added address and size cells property to sdio0 node
-
- .../boot/dts/rockchip/rk3399-rock960.dtsi     | 98 ++++++++++++++++++-
- 1 file changed, 97 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-index 56abbb08c133..d33cd441dee9 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-@@ -9,6 +9,15 @@
- #include "rk3399-opp.dtsi"
- 
- / {
-+	sdio_pwrseq: sdio-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		clocks = <&rk808 1>;
-+		clock-names = "ext_clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_enable_h>;
-+		reset-gpios = <&gpio0 RK_PB2 GPIO_ACTIVE_LOW>;
-+	};
-+
- 	vcc1v8_s0: vcc1v8-s0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc1v8_s0";
-@@ -362,6 +371,20 @@
- };
- 
- &pinctrl {
-+	bt {
-+		bt_enable_h: bt-enable-h {
-+			rockchip,pins = <0 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_host_wake_l: bt-host-wake-l {
-+			rockchip,pins = <0 RK_PA4 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+
-+		bt_wake_l: bt-wake-l {
-+			rockchip,pins = <2 RK_PD3 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
- 	sdmmc {
- 		sdmmc_bus1: sdmmc-bus1 {
- 			rockchip,pins =
-@@ -387,6 +410,26 @@
- 		};
- 	};
- 
-+	sdio0 {
-+		sdio0_bus4: sdio0-bus4 {
-+			rockchip,pins =
-+				<2 20 RK_FUNC_1 &pcfg_pull_up_20ma>,
-+				<2 21 RK_FUNC_1 &pcfg_pull_up_20ma>,
-+				<2 22 RK_FUNC_1 &pcfg_pull_up_20ma>,
-+				<2 23 RK_FUNC_1 &pcfg_pull_up_20ma>;
-+		};
-+
-+		sdio0_cmd: sdio0-cmd {
-+			rockchip,pins =
-+				<2 24 RK_FUNC_1 &pcfg_pull_up_20ma>;
-+		};
-+
-+		sdio0_clk: sdio0-clk {
-+			rockchip,pins =
-+				<2 25 RK_FUNC_1 &pcfg_pull_none_20ma>;
-+		};
-+	};
-+
- 	pmic {
- 		pmic_int_l: pmic-int-l {
- 			rockchip,pins =
-@@ -403,6 +446,19 @@
- 				<1 14 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
- 	};
-+
-+	sdio-pwrseq {
-+		wifi_enable_h: wifi-enable-h {
-+			rockchip,pins =
-+				<0 RK_PB2 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
-+
-+	wifi {
-+		wifi_host_wake_l: wifi-host-wake-l {
-+			rockchip,pins = <0 RK_PA3 RK_FUNC_GPIO &pcfg_pull_none>;
-+		};
-+	};
- };
- 
- &pwm2 {
-@@ -413,6 +469,35 @@
- 	status = "okay";
- };
- 
-+&sdio0 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	clock-frequency = <50000000>;
-+	bus-width = <4>;
-+	cap-sdio-irq;
-+	cap-sd-highspeed;
-+	no-emmc;
-+	keep-power-in-suspend;
-+	mmc-pwrseq = <&sdio_pwrseq>;
-+	non-removable;
-+	num-slots = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-+	sd-uhs-sdr104;
-+
-+	status = "okay";
-+
-+	brcmf: wifi@1 {
-+		compatible = "brcm,bcm4329-fmac";
-+		reg = <1>;
-+		interrupt-parent = <&gpio0>;
-+		interrupts = <RK_PA3 GPIO_ACTIVE_HIGH>;
-+		interrupt-names = "host-wake";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&wifi_host_wake_l>;
-+	};
-+};
-+
- &sdhci {
- 	bus-width = <8>;
- 	mmc-hs400-1_8v;
-@@ -439,8 +524,19 @@
- 
- &uart0 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&uart0_xfer &uart0_cts>;
-+	pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
- 	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		clocks = <&rk808 1>;
-+		clock-names = "ext_clock";
-+		device-wakeup-gpios = <&gpio2 RK_PD3 GPIO_ACTIVE_HIGH>;
-+		host-wakeup-gpios = <&gpio0 RK_PA4 GPIO_ACTIVE_HIGH>;
-+		shutdown-gpios = <&gpio0 RK_PB1 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&bt_host_wake_l &bt_wake_l &bt_enable_h>;
-+	};
- };
- 
- &uart2 {
--- 
-2.17.1
-
+Thanks,
+Amit
+> 
+> Cheers
+> ---Dave
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
