@@ -2,20 +2,21 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82245C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:26:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9DD86C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:28:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53EB52192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:26:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B6C920643
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:28:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kmAQ6r1Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53EB52192D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C0rFro1z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B6C920643
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,51 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xqYX1Ad2q3apStRAnjNSTo3xItZJAtCx/A0t9TMtvkc=; b=kmAQ6r1YgyWnpd
-	iuEaautshRAZuy+Rkelr2YUIPvyZ5fWMmOSfyvOa/DoExsKiRCfsmCBqpUaL1wAQW+974F6RLLUng
-	QpaJJHyQkX89D2eWMcJ8T+iMx/mQzNhsI/R6fTQKndB3Nl/hVXN0U7JkoVLU4wt0bWqUqHJq8ywkI
-	43Ilx5QaE0E9/65ur1MvIJZTSDpHiu/Jvqp0BB9OTc1EgnqXsvVXsA6czuzg/FHzKNDrDjHSdpkX6
-	9sk7mvuMiLrOTtu0C7vUbs1DZGFcRr7hNlkcFbScKL3ViC21sw4uCdKk8xces57gyWhD8lYxWuElG
-	sV1ASI8QM2oO/A0SQy7w==;
+	List-Owner; bh=COevmw45q4EnskHmp3Mg5buWThftCnjUi5f+y/X/Lcs=; b=C0rFro1zxf16Dg
+	/wBYVgQFpyylSWS85hzhjoiwsrTUhztA/4f/wPCPCC7h9WSFTVHylHEyXV9RngWMugDdbemrKjaqt
+	rz2qHXD6oZfRB1iiu8iy4rxqK0jpePHW/dP/x3mb27n2R8mwl3ullz1qqPgUKIR5yqM+cvpwY66wy
+	0iTADThaiBm54lFSX1eDa+Q4u9WYmOPCyZzMnS2e8WxE21hQpSAcLBZgMlR9Ui8IhMYyyhBpwwC/s
+	YGZzBTTmMU+i1mFXgV96AHygDWAIK1qgFjkQ2X+bDbIksoQ4D55TChOnCIP08y7toAhxct8MjJ5l1
+	JuG/JwQG7KzrJF6CqUOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugJL-0000gk-JT; Fri, 15 Feb 2019 16:25:59 +0000
-Received: from mail-qk1-f194.google.com ([209.85.222.194])
+	id 1gugLy-0001AK-7x; Fri, 15 Feb 2019 16:28:42 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugJI-0000gP-MU
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:25:58 +0000
-Received: by mail-qk1-f194.google.com with SMTP id w204so6038371qka.2
+ id 1gugLv-00019v-C4
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:28:40 +0000
+Received: by mail-qt1-f196.google.com with SMTP id p25so11226579qtb.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 08:25:56 -0800 (PST)
+ Fri, 15 Feb 2019 08:28:39 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=A8V914NAm+9ho9sRkD0V2A986MJDmKm2/TvXSdAg2v8=;
- b=M4CUjAlLpxMKsvu0feQMJQCk4iMRSou2QTStUeM9hwajLrlCfI7behFDiP6eCj4Qx8
- fSuH+bCmEFtV9x/eRAbw+iQ7JqlPtyswYnwcrTxKMizwRJY00gZ9D05ThBDrXqi7I571
- TDbpNvB+slVD/OI+TCh5jpWEOZrBj7hEuklTkZeYqYYED5TOLPPcg7sVlKq9JHGph1SJ
- Xu/GWwelBDq2rPINh/JAPXULyhkLDs4SkWILauZgUnYrWfxzJG2HxRlxvfGcvb9Dumvy
- 0c+KgKpZOouR30vQ4OIOxEcjIlXjZ404uhHiJxH+p8I1nqgJu8gpYiXXI1Tyrx6CO22o
- lsfw==
-X-Gm-Message-State: AHQUAuYxPkHZ3Nk1smWUdScpHLoGP4epIyXHW5qCBpQZDuIdjK1w8xI+
- W3i1tKkrvznVX01qpV9P3CcYEWC47s1xt9fi62jigg==
-X-Google-Smtp-Source: AHgI3IZrriYMO/bi0ma6XqXPLC2krsM3IDY8pPI7dO/HJ7joXSuTRS8m1nfWvat9rjV8zTTMrx71NZdXhbGaZJd7MMo=
-X-Received: by 2002:a05:620a:12a5:: with SMTP id
- x5mr7668117qki.291.1550247955869; 
- Fri, 15 Feb 2019 08:25:55 -0800 (PST)
+ bh=y7k2/so7kSaJ6lzIZPeGqCFAR42XPj+R6a2hD8Y+QFw=;
+ b=AbsugxZjwSCL6UmwfatQ4RGXuu3XhJOmWLXVUIYtLmzgA88efoIQeBNztppScrJGao
+ iE0fwIKPY3TWlKz//f03svoXD46s5SlBEQTm/en0PRitXljtEeV9agKnvY2D7Sfga/Ik
+ QpU3cISXK6KBzGqP4iiBLmxZxqb9hd5l+AZ46vIzdHNJEz0RalHsWb5e/igWPu9ddgK0
+ fYomqcUQn3zaxvdR1vVThapaScM3VTEcApQavNjEy2E6F1dwrITShwkFLgZPe6NxjmzN
+ TCEn20M/6cO8pv6HQnTSyEXNYRM0H6UkI73t8a7zOvfpTFf0MLwxy5G61P35YPZLM00z
+ VDPQ==
+X-Gm-Message-State: AHQUAuaT7LCzZaDDVhBn0QaJWaF3R5LAC+dOXgVNtElr3AeE+TQTDJ6o
+ 0m1MDSNXVxWdwGitmfP6SB1zl4QRKqElQXP8j0U=
+X-Google-Smtp-Source: AHgI3IZVaPy3RMqNCVAKpEbBcXOSD+85gngxO5E8JBxIPOnWz1K2oJ36RGjiC/61XuHTlWHWPFOV2CdYt2tsxfDV+BA=
+X-Received: by 2002:ac8:1d12:: with SMTP id d18mr8096577qtl.343.1550248118508; 
+ Fri, 15 Feb 2019 08:28:38 -0800 (PST)
 MIME-Version: 1.0
 References: <20190208150935.32108-1-thierry.reding@gmail.com>
- <20190208150935.32108-5-thierry.reding@gmail.com>
-In-Reply-To: <20190208150935.32108-5-thierry.reding@gmail.com>
+ <20190208150935.32108-3-thierry.reding@gmail.com>
+In-Reply-To: <20190208150935.32108-3-thierry.reding@gmail.com>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 17:25:39 +0100
-Message-ID: <CAK8P3a2tSaHsAOarZ8NHO-N4ZcLQL2rD2ti1rAe4meidWbVNEw@mail.gmail.com>
-Subject: Re: [GIT PULL 4/9] soc/tegra: Changes for v5.1-rc1
+Date: Fri, 15 Feb 2019 17:28:22 +0100
+Message-ID: <CAK8P3a0zEQ3oY8vYBxpnq3wg0pDfag66Y7FxZ1muvxHh+SwHyg@mail.gmail.com>
+Subject: Re: [GIT PULL 2/9] cpufreq: tegra: Add support for Tegra210
 To: Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_082556_733361_ECB32707 
-X-CRM114-Status: GOOD (  10.39  )
+X-CRM114-CacheID: sfid-20190215_082839_406773_22264EA7 
+X-CRM114-Status: GOOD (  12.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,40 +89,37 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On Fri, Feb 8, 2019 at 4:09 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-
+>
+> Hi ARM SoC maintainers,
+>
+> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+>
+>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-5.1-cpufreq
+>
+> for you to fetch changes up to 43c36002b86d6027b48f7c68ac32245f73f29f6b:
+>
+>   cpufreq: dt-platdev: add Tegra210 to blacklist (2019-02-06 14:31:19 +0100)
+>
+> Thanks,
+> Thierry
+>
 > ----------------------------------------------------------------
-> soc/tegra: Changes for v5.1-rc1
+> cpufreq: tegra: Add support for Tegra210
 >
-> This contains a couple of miscellaneous fixes for minor issues and a
-> largish rework of the PMC driver to make it work on systems where the
-> PMC has been locked down and can only be accessed from secure firmware.
+> This uses the DFLL clock support to enable CPU frequency scaling on
+> Tegra210.
 
-Pulled into arm/drivers.
+I see the Ack from Viresh, but I don't see why you'd like to have them
+merged through the soc tree rather than the cpufreq tree.
 
-> ----------------------------------------------------------------
-> Jon Hunter (1):
->       soc/tegra: pmc: Make tegra_powergate_is_powered() a local function
->
-> Joseph Lo (1):
->       soc/tegra: fuse: Fix typo in tegra210_init_speedo_data
->
-> Mikko Perttunen (1):
->       soc/tegra: pmc: Support systems where PMC is marked secure
->
-> Thierry Reding (6):
->       soc/tegra: pmc: Use TEGRA186_ prefix for GPIO names
->       soc/tegra: pmc: Sort includes alphabetically
->       soc/tegra: pmc: Add missing kerneldoc
->       soc/tegra: pmc: Pass struct tegra_pmc * where possible
->       soc/tegra: pmc: Make alignment consistent
->       soc/tegra: pmc: Explicitly initialize all fields
->
-> Timo Alho (1):
->       soc/tegra: fuse: Fix illegal free of IO base address
+Could you clarify? It's no problem to do it, I just want to make sure
+there is a good reason for it.
 
-Should that last one have been marked 'Cc:stable' ?
-
-       Arnd
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
