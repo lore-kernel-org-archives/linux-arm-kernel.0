@@ -2,22 +2,23 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 996CFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:37:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A97E9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:43:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68ABD222D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:37:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AB7C20645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:43:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mtx7SVF8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="BJxmEkrK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68ABD222D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nI8ChJSL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="QzvX1RWw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AB7C20645
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,59 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NYq/lIzm5DokKlLIsvAblG4YtQg/BbrrwzKvunOIBKc=; b=Mtx7SVF8o5BDa1
-	HWxAZOZ4FxLR4Z8GEvKXMj7Vv7TiH+Z1th1Uu5WobIzxPhmQGRjGXuec8U1H0KmdLA9rCd2YD8qKZ
-	6lTMfVWFIEkkDIGx7r2URLZI4Hrm13j7jIUM5Wek/3DDJka5FO0KSY8eTAed3rpwVKBKJvnoBieVN
-	DvrZcuJj8aMHKrfgRBi2i2dHbolTXWCfqdzyiY5deOb5lpTUbCmAC4WnH+luTeluuO3juMglfdZRN
-	tcj3WVSAhCYksEmzlGW6JMHZdbdHyGSMsY7Mbz6Gkt7YqzfBiE1LtExDLQNqKHP3sfhFiiPgYKy1F
-	lSpHDY6xaTsC1PUNlr5A==;
+	List-Owner; bh=wLvx09gFriC41vyP8hDD04Pm94+Dgklj9/Ev83FL3Yc=; b=nI8ChJSL57OeKc
+	I6H6cq++6C4ACj8mIfYZMYDgQ6ipOuAQ9XjYBipo+XsF/FcDS5yLmynrfZtkzm4i1wtTrp+YIcsv+
+	xMoOm9NscqyJcf6ibdkxphXz6vSFkWZVFrkERd0eNVaWgz4Qk8NYvHYKsM2nrRcP03An3kgZoX5Ec
+	a6K+KcJFM1Gw8PPMbwDhuItnP7uovJBhkR3faFpTpJO11Y3WWmCQJfWWC9NqKFWdX/rPAvcxtElNW
+	q/RywYMqY9ZguwA+F2JMeHDDKApqm6f5F/STKEYrwQWlhlh5PgIlemHrYapvdEHChi7eqXRcAHMxy
+	VR+fOcApDm3nD2clnuNw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gujIb-0008BL-Fq; Fri, 15 Feb 2019 19:37:25 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gujOp-0001sL-Ua; Fri, 15 Feb 2019 19:43:51 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gujIX-0008B2-Vf
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 19:37:23 +0000
-Received: by mail-it1-x141.google.com with SMTP id z7so26930812iti.0
+ id 1gujOl-0001rx-OI
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 19:43:49 +0000
+Received: by mail-pf1-x442.google.com with SMTP id g6so5288659pfh.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 11:37:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
+ Fri, 15 Feb 2019 11:43:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=aOSC8ZzkPCXB6WyoycrO9I7WjBSurknF8CSDyuQMuwQ=;
- b=BJxmEkrKTtLBxqiiTZTRpxbFj2xyLTKbacgro11C4Az8g6PqUfCPE6CF+pLWKWSuCj
- YLA8+2qWfO0d1ctKZDB8Pn8wIDyAb3mTs2Wq+W8RJDXmXveKfKz5Ts6ARAUgay5WGSWD
- Q+foTz6lzgWxhDNHg/RooLL2k84x/LiOTLyT0=
+ :cc; bh=Y4VPsTrJhCPr2tzOP/3m8FNofgdnkZWBfxUguKvGXlM=;
+ b=QzvX1RWw9heSyUOtT0WxbJsmldDKqwlIHz3A8ysKJmSHlq2iXCky42aP+4GWBuDSjB
+ mWq+0p+YKSdliN45F+MjF8L4RCmBgeQ5oRHsm7/oIeX4jAsjQpAkuegFBgNmMEa87Q4u
+ +c9oXNTSpmEyUoyKxqENKbk3JfNotpTt+v1HFx47ZbnDos1XF2xxA0LDiPK/zGwponDf
+ C7UX0jlnrXpHFavbZDjmYbkA0LygOEmfgY95doaQFKtZWtlTKA/RfwnjuQecOJAljHqt
+ NHWTSDK3/ZUtF/RUV/vc3JzxCMG8ek213J/JCSXyOET2TIb8G2YbL3r33sdS+i6mYI6Z
+ WQ0w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=aOSC8ZzkPCXB6WyoycrO9I7WjBSurknF8CSDyuQMuwQ=;
- b=OwlNiCpFye1NdheLxG9RcDetXtYkkjcHj15LzlMMoCrfinQFb6HOBgCl1m8NAED/ab
- 8RYT2KW8Rcuuriqqq5nQ4LROabEG8gbS3+ei9prq3rVOnWVTOYMHy8XSKl5YWCWtKpYc
- DSD9NQEPkXDuU3Gu+9ecpeNoNKeLcYfjcvGuy082XjbsFghbEwpGKaO6usGeiwopxMTH
- 6ha6JbwtQLuIne6f7u24LfDpd977di7uZnngqFBwR919OpoAvnV7GgtrW4mzFgdHs324
- PriwzGkENk8sa/cUHBoZE0QDskTa2KS9Vvcj9irxhSKNpbNnANxnJOc2F+YajENNKz2y
- PqnQ==
-X-Gm-Message-State: AHQUAuYvsQPP4iO3Yr9+rrntputaM8iYudMHB/+dcepeXRJETeBgrjC9
- zIISO410Fn5zjMnsMxj+CcjfSRHO51V3g20cjKsL37ZNnPc=
-X-Google-Smtp-Source: AHgI3IYTObnlggwGkTQ2WRCe9gBMEsne4EQK/lC5WAFH1qcM9/jUub3W+2pb7FqZ30CUIWXx2uIZTMtxqfsSJB4Qis4=
-X-Received: by 2002:a6b:b790:: with SMTP id h138mr6264910iof.114.1550259440391; 
- Fri, 15 Feb 2019 11:37:20 -0800 (PST)
+ bh=Y4VPsTrJhCPr2tzOP/3m8FNofgdnkZWBfxUguKvGXlM=;
+ b=oplqVVs11DHhb91lhKS7ndeFPeqRPPZUpcDQnceQgbZ0ifCiKKdkRsneMskwxml3vj
+ w1JZJd2TH2lpq8zf92oTGnwqloAIeYvwSb2rVPdXwWYbOk746orLLDOdoRQoWr6V7lV1
+ D0Jcf/gZwoWuE4/vDHYEB1eH/ACFe9H5mtdPuplIMomslX0kodzJemYWSSpsxptwkjm2
+ 3yONJOkj7+IWHg4W0WIdj2aF09ehvcTH7FiBXvNHx4E9RuBTEZI6uMNDe1vincAYq4OC
+ UeibWkVcwSJzT6rpL1rtdvQn5t5SN+woK9ignSeSGvl9Wuar3EovAb/xjwqDG7SoNkUM
+ WIXQ==
+X-Gm-Message-State: AHQUAuaapbrBN2fdvxmTyatxc2zYPU21ixJcSjr6g/LlkncBhxFLuXHu
+ ghIbpvR5UsXqR9pZ25SMzOicD4+NBeeW7t6dNUqdrA==
+X-Google-Smtp-Source: AHgI3IbiD8IbyZkLXJGGUqvXDzuWynNdDEh3ZDH7uR5ag4CwtC0t1hWcoJC+/zhlHoF+on1bKqTegSqCpQyA4wLRPWk=
+X-Received: by 2002:a62:e704:: with SMTP id s4mr11361704pfh.94.1550259826624; 
+ Fri, 15 Feb 2019 11:43:46 -0800 (PST)
 MIME-Version: 1.0
-References: <20190214192544.7314-1-jagan@amarulasolutions.com>
- <20190214192544.7314-8-jagan@amarulasolutions.com>
-In-Reply-To: <20190214192544.7314-8-jagan@amarulasolutions.com>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Sat, 16 Feb 2019 01:07:08 +0530
-Message-ID: <CAMty3ZDqnVBkcT5kiKf-pKGccEuQR0xtBXBgB2-_XFXkRKi+_A@mail.gmail.com>
-Subject: Re: [PATCH v8 7/8] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
- start delay
-To: Maxime Ripard <maxime.ripard@bootlin.com>, David Airlie <airlied@linux.ie>,
- Daniel Vetter <daniel@ffwll.ch>, Chen-Yu Tsai <wens@csie.org>
+References: <20190215013959.21320-1-natechancellor@gmail.com>
+ <20190215185026.GE15084@fuggles.cambridge.arm.com>
+ <CAKv+Gu-=2C4fBPAKNrkeiOsMG0Fg3jHHGuG2rVZvjtT=0-aDkA@mail.gmail.com>
+ <CAKwvOd=+_pwHStdhfB3bAYEuyMEjJ+T+gyTd9KA7GyNE2wMk7g@mail.gmail.com>
+ <CAKv+Gu-41fhEfJF+pvfCQRqXs4vYPHs77rkJo9=X8Y23QVd6Tw@mail.gmail.com>
+In-Reply-To: <CAKv+Gu-41fhEfJF+pvfCQRqXs4vYPHs77rkJo9=X8Y23QVd6Tw@mail.gmail.com>
+From: Nick Desaulniers <ndesaulniers@google.com>
+Date: Fri, 15 Feb 2019 11:43:35 -0800
+Message-ID: <CAKwvOdke_HbSrmGO5ThNy4o87G4BhA845QcgZFUTB7m6cBHTDg@mail.gmail.com>
+Subject: Re: [PATCH] arm64/neon: Disable -Wincompatible-pointer-types when
+ building with Clang
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_113722_475779_21988258 
-X-CRM114-Status: GOOD (  15.86  )
+X-CRM114-CacheID: sfid-20190215_114347_817626_B4108294 
+X-CRM114-Status: GOOD (  14.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,69 +94,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- linux-kernel <linux-kernel@vger.kernel.org>
+Cc: Sandeep Patil <sspatil@google.com>, Greg KH <gregkh@linuxfoundation.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Mark Brown <broonie@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 12:56 AM Jagan Teki <jagan@amarulasolutions.com> wrote:
+On Fri, Feb 15, 2019 at 11:28 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 >
-> Vertical video start delay is computed by excluding vertical porch
-> value from total vertical timings, but the current driver excluding
-> vertical porch along with vertical sync values from total vertical
-> timings resulting wrong start delay.
+> On Fri, 15 Feb 2019 at 20:25, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> >
+> > On Fri, Feb 15, 2019 at 11:20 AM Ard Biesheuvel
+> > <ard.biesheuvel@linaro.org> wrote:
+> > > Provided that we stop sending Clang enablement patches to -stable:
+> >
+> > What does that mean?  We're trying to provide clang support back to
+> > 4.4 LTS branches. (so 4.4, 4.9, 4.14, 4.19).
 >
-> This patch trying to update the video start delay by subtracting
-> vertical porch from vertical total, on the other hand it added 1
-> extra start_delay line for TCON based on the Allwinner BSP reference.
+> I understand that is what you are attempting, but that does not mean
+> it /belongs/ in -stable.
 >
-> BSP code form BPI-M64-bsp is computing video start delay as
-> (from linux-sunxi/
-> drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> There are rules for stable, and people that track stable kernels (such
+> as the distros) should be able to rely on us to only backport bug
+> fixes, not linker script changes and other updates that fix issues
+> that did not exist when those kernels were released.
 >
-> u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
-> => (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
-> => (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
->    - panel->lcd_y - (panel->lcd_vbp)
-> => timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
->                              - panel->lcd_y - panel->lcd_vbp
-> => timmings->ver_front_porch
->
-> So, update the start delay computation accordingly.
->
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index a08dfdcbe9e8..31cf9c58e98d 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -358,7 +358,24 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
->  static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
->                                            struct drm_display_mode *mode)
->  {
-> -       return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
-> +       u32 vfp, start_delay;
-> +
-> +       /* vertical front porch */
-> +       vfp = mode->vsync_start - mode->vdisplay;
-> +
-> +       /* start_delay = vertical total - vertical front porch */
-> +       start_delay = mode->vtotal - vfp;
-> +
-> +       /* add extra 1 delay line for TCON, as per Allwinner BSP */
-> +       start_delay = 1;
+> It is unclear to me how these clang changes benefit those users.
 
-This has to be += 1;
+If you're referring to
+https://www.spinics.net/lists/stable/msg278381.html, that's fair (I
+think those were helpful for LLD support on arm64).
 
-Typo change while re-basing, I will fix this in next version.
+Why didn't you speak up then?  Why is this coming up now?
+-- 
+Thanks,
+~Nick Desaulniers
 
 _______________________________________________
 linux-arm-kernel mailing list
