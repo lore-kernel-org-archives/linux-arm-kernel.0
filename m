@@ -2,66 +2,80 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2F738C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:05:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E7946C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:05:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0133721927
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:05:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9F2721927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:05:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RCyitHyW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0133721927
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="slebZRJE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9F2721927
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=Ec49NnTH+LRUD4cm6oKm4k4hhltdPSK2jYeAZlpbA3g=; b=RCyitHyWPeYD98ovD6dFkyipH
-	yXN0k3JdL7LAmFF6f9huUElaEB16Hn5rxshCu7TylNw5wE7eqBJ4cuG1/SPO1iCMjHswH2M5vKvD2
-	1wKcWPFGi8MoBaXOQjZ9iSwpC3tVcB+UJw73NKP8T8gKzlvtEWn/U1scoN6NdFnYqzS7v27TG9GEO
-	1Rz074q0Py1+i4Dy8xlEjUf3WxpVsM4zCT2RndyxWUVLvVNfzIqGPPG671e2G57D2NCq/IRGjp3Mp
-	6Hw+5LyM6l1RqKt3upf1CqsRKj3i1mQDwSCnOAYFl/HDtwBVTtMaGOSlywXk2XPxtk0OGM6ruJAZ4
-	LRZ1ePxoA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=OL4Ul8KPBmpIFmHb5gJ1om2kVS2ITqy2dDdhpH/VlZo=; b=slebZRJEPuSlHI
+	PMLN9PRdWG6cQna2C3NmSy3Mivet6/p5MSs7Vhz4KXCQ1dE4QbZlFO/yTNdgXtBipWLTLRWYry/K1
+	XOk++RUx45eTbG08Meyg5IDNVJH7ffSNeERW/LwB+8mdgllxawCKUVgbojovTrqEFHpNeZM0Ui4tV
+	IRPj4bnDdgPLOpax4ZuCMNEMuLHQhOM2hUTtTB9Zi48O9Do+cylo+T99P8qlcntVjl7zeFPU5HSHD
+	Ubv0GT/4BpPY2oi7x5fIjM37ADYsyKVtsETubQ17AskuOlm8VeF+CIHvwdutcdRaSEGnvmkkTU32I
+	l/l3HTC9ag3COpgIy3LA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufz5-0005uR-Ck; Fri, 15 Feb 2019 16:05:03 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufz0-0005n0-HK
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:05:00 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A70F3EBD;
- Fri, 15 Feb 2019 08:04:57 -0800 (PST)
-Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 077F83F557;
- Fri, 15 Feb 2019 08:04:56 -0800 (PST)
-Subject: Re: [RFC 2/3] arm_pmu: acpi: spe: Add initial MADT/SPE probing
-To: Will Deacon <will.deacon@arm.com>
-References: <20190209004718.3292087-1-jeremy.linton@arm.com>
- <20190209004718.3292087-3-jeremy.linton@arm.com>
- <20190214171125.GG2475@fuggles.cambridge.arm.com>
- <c740a06e-d5d3-3e42-d19b-fbfea02ac0e7@arm.com>
- <20190215150015.GA6803@fuggles.cambridge.arm.com>
-From: Jeremy Linton <jeremy.linton@arm.com>
-Message-ID: <09cbaf45-d514-3cb3-4bab-744491462338@arm.com>
-Date: Fri, 15 Feb 2019 10:04:54 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gufzT-0007KL-H7; Fri, 15 Feb 2019 16:05:27 +0000
+Received: from mail-lf1-f68.google.com ([209.85.167.68])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gufz9-00068l-WD; Fri, 15 Feb 2019 16:05:13 +0000
+Received: by mail-lf1-f68.google.com with SMTP id h10so7337917lfc.12;
+ Fri, 15 Feb 2019 08:05:07 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=pvVSU+OeBtnbLINS2fqQeebEh/Lf+PMY28nuMnUdYR0=;
+ b=E4JWJTs0BcPGQvR2bQ3CCSpfNhvjJ9kuDF/tN2ZVSzkUzNYQmtZFPf24jg8uL1Z4dc
+ NlV8oTUKMKheitPOXbmFTFLoQ3DfCguYnCGl82bNc9gBjQjLTZnDto6EYO5eRPNKPCWi
+ PVxMLWMBFxcxKX9Z32dFFeU8afMNseMOW4xjg2+BKLzz6LL+RG++2WlIg2mNMM4zr6nF
+ EJwoCaShPJE+B4AuIansx3uTw3J+9CGow7vom1xz1J5/HyHA03vCJq6RgmjMLB8LK/Ge
+ Tx3O54a1a5pMVA0t0sxmTR/6XUuzXyQNfqhiYz8tHyA75IEaF6Jo4X9HK0gB3erTgqMh
+ 99ZA==
+X-Gm-Message-State: AHQUAuYLBnBLjxBXJXOGLyZtEtBL0fgaI2a7J7dN8g60ljqfg9fLuF5S
+ /9VGkphRLe7xKr1d6Bs4UT0=
+X-Google-Smtp-Source: AHgI3IZRcnlB46Fnw+lqoINS7IG2dpHY6TaBaBqVmAUpJPIafA96D5LXIxG+4kwQCsRiLn251kDSgQ==
+X-Received: by 2002:a19:5611:: with SMTP id k17mr5705165lfb.168.1550246705884; 
+ Fri, 15 Feb 2019 08:05:05 -0800 (PST)
+Received: from xi.terra ([85.230.190.116])
+ by smtp.gmail.com with ESMTPSA id f10-v6sm1298296ljc.31.2019.02.15.08.05.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 15 Feb 2019 08:05:04 -0800 (PST)
+Received: from johan by xi.terra with local (Exim 4.91)
+ (envelope-from <johan@kernel.org>)
+ id 1gufyz-0000qc-Eh; Fri, 15 Feb 2019 17:04:57 +0100
+Date: Fri, 15 Feb 2019 17:04:57 +0100
+From: Johan Hovold <johan@kernel.org>
+To: Loys Ollivier <lollivier@baylibre.com>
+Subject: Re: [PATCH v4 2/4] dt-bindings: gnss: add mediatek binding
+Message-ID: <20190215160457.GO28278@localhost>
+References: <1550070569-18588-1-git-send-email-lollivier@baylibre.com>
+ <1550070569-18588-3-git-send-email-lollivier@baylibre.com>
 MIME-Version: 1.0
-In-Reply-To: <20190215150015.GA6803@fuggles.cambridge.arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <1550070569-18588-3-git-send-email-lollivier@baylibre.com>
+User-Agent: Mutt/1.11.3 (2019-02-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_080458_575236_29FCC60E 
-X-CRM114-Status: GOOD (  20.25  )
+X-CRM114-CacheID: sfid-20190215_080508_364017_1555920E 
+X-CRM114-Status: GOOD (  16.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,74 +87,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, catalin.marinas@arm.com, rafael.j.wysocki@intel.com,
- linux-kernel@vger.kernel.org, robert.moore@intel.com,
- linux-acpi@vger.kernel.org, lenb@kernel.org, erik.schmauss@intel.com,
- linux-arm-kernel@lists.infradead.org, devel@acpica.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
+ Kevin Hilman <khilman@baylibre.com>, Johan Hovold <johan@kernel.org>,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On 2/15/19 9:00 AM, Will Deacon wrote:
-> On Thu, Feb 14, 2019 at 12:03:57PM -0600, Jeremy Linton wrote:
->> On 2/14/19 11:11 AM, Will Deacon wrote:
->>> On Fri, Feb 08, 2019 at 06:47:17PM -0600, Jeremy Linton wrote:
->>>> +/*
->>>> + * For lack of a better place, hook the normal PMU MADT walk
->>>> + * and create a SPE device if we detect a recent MADT with
->>>> + * a homogeneous PPI mapping.
->>>> + */
->>>> +static int arm_spe_acpi_parse_irqs(void)
->>>> +{
->>>> +	int cpu, ret, irq;
->>>> +	u16 gsi = 0;
->>>> +	bool first = true;
->>>> +
->>>> +	struct acpi_madt_generic_interrupt *gicc;
->>>> +
->>>> +	/*
->>>> +	 * sanity check all the GICC tables for the same interrupt number
->>>> +	 * for now we only support homogeneous ACPI/SPE machines.
->>>> +	 */
->>>> +	for_each_possible_cpu(cpu) {
->>>> +		gicc = acpi_cpu_get_madt_gicc(cpu);
->>>> +
->>>> +		if (gicc->header.length < ACPI_MADT_GICC_SPE)
->>>> +			return -ENODEV;
->>>> +
->>>> +		if (first) {
->>>> +			gsi = gicc->spe_overflow_interrupt;
->>>> +			if (!gsi)
->>>> +				return -ENODEV;
->>>> +			first = false;
->>>> +		} else if (gsi != gicc->spe_overflow_interrupt) {
->>>> +			pr_warn("ACPI: SPE must have homogeneous interrupts\n");
->>>> +			return -EINVAL;
->>>> +		}
->>>
->>> Unfortunately, I don't think this is sufficient to detect a homogeneous
->>> system: we'll have to check the MIDRs instead, which is nasty. I would
->>> personally be in favour of enforcing homogeneity for ACPI systems when we
->>> bring up secondary CPUs, but I suspect others would disagree.
->>
->> Given that all the SPE capable machines i'm aware of at the moment are
->> homogeneous, are we ok with just doing an online CPU MIDR check for now, and
->> cleaning that up if/when someone builds a machine and complains?
+On Wed, Feb 13, 2019 at 04:09:27PM +0100, Loys Ollivier wrote:
+> Add binding for Mediatek-based GNSS receivers.
 > 
-> Yeah, I think we added a new bit to the PPTT to tell you that the machine is
-> homogenous, so just check that first and bail if it's not set.
+> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> ---
+> v4:
+> Use standard names for reset-gpios and gnss-fix-gpios
+> s/an/a UART
+> 
+> v3:
+> Removed the I2C and SPI interfaces references.
+> Removed the "mediatek,mt3339" compatible line.
+> Added the optional propertied (reset, fix)
+> Added the pin names for the optional properties.
+> 
+> v2:
+> Renamed bindings from Globaltop/gtop to Mediatek/mtk.
+> Moved current-speed as an optional propertie.
+> Removed the status line in the example.
+> Added "mediatek,mt3339" compatible.
+> 
+>  .../devicetree/bindings/gnss/mediatek.txt          | 37 ++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gnss/mediatek.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gnss/mediatek.txt b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> new file mode 100644
+> index 000000000000..12283d429baa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gnss/mediatek.txt
+> @@ -0,0 +1,37 @@
+> +Mediatek-based GNSS Receiver DT binding
+> +
+> +Mediatek chipsets are used in GNSS-receiver modules produced by several
+> +vendors and can use a UART interface.
+> +
+> +Please see Documentation/devicetree/bindings/gnss/gnss.txt for generic
+> +properties.
+> +
+> +Required properties:
+> +
+> +- compatible	: Must be
+> +
+> +			"globaltop,pa6h"
+> +
+> +- vcc-supply	: Main voltage regulator (pin name: VCC)
+> +
+> +Optional properties:
+> +
+> +- current-speed		: Default UART baud rate
+> +- gnss-fix-gpios	: GPIO used to determine device position fix state
+> +			  (pin name: FIX, 3D_FIX)
+> +- reset-gpios		: GPIO used to reset the device
+> +  		  	  (pin name: RESET, NRESET)
+> +- timepulse-gpios	: Time pulse GPIO (pin name: PPS1, 1PPS)
+> +- v-bckp-supply		: Backup voltage regulator
+> +  			  (pin name: VBAT, VBACKUP)
 
-Yes of course, 100% better plan. Although its probably going to have to 
-be more of a case of walking all the possible cores and assuring they 
-have the same flag level (similar to how the socket flag is handled). Of 
-course that information is useful enough it should probably just be done 
-as part of the normal cpu topology walk. Then the people who have to 
-back port these patches end up with a big dependent set... <chuckle>
+As we discussed, I changed this to "vbackup-supply" (here and in the
+driver) before applying.
 
+Note that git reported some whitespace errors above too (spaces before
+tabs) that I fixed up. Not sure why checkpatch doesn't complain.
 
+All now applied.
+
+Thanks,
+Johan
 
 _______________________________________________
 linux-arm-kernel mailing list
