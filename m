@@ -2,72 +2,91 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-12.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EBA6FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:45:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92BC3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:48:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B2ECB21B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:45:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EE14222DE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:48:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z3RrlAUH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2ECB21B18
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Az3N/hP3";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="pUXmih3F"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EE14222DE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NbpRYr2QwdfNufXOZrlb5xTT9YD6iujIg0pz3bziPqc=; b=Z3RrlAUHj7pRMH
-	oEdImxI/qSmoGA/HnBeFCy29YehBPZZtRwEVWxKdydYXq9g1pgXZf+fghzrsJVOYr8KNKwaU6R60f
-	+l36fTZXLZoQfJQsMuvgg1eqfomAy3WX50l8TIylY0xsOqVTvuPAtbBc4+KyCppVhc2RuCkg18vxY
-	WnVcLAuGRvhXcwNM2AFqiQiYkp41wH3TNSgO4PKlx2Pt1oo2QlwxvsqWy5kmpqCbjqLvyWoHksi7L
-	0evXH6v2hUhIEqajieyJ5uK1yr0CnzrO3z48gWjKHtMjReyYUaM4Yh7b550SOWuHyRe+ugaXgtyKZ
-	QPjZgaFIIn7s1bodP18A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=FCWSzbXGKFhxbtREUWTw/66Y8vYMlVHJBGkvbNXbaOU=; b=Az3N/hP3JuH1Rs5YOYm7CMdE6
+	3/FXiIusuQBAZyE8LUkg04db1LbhIFmhQxC44PMjBUjDfSA8uy/+UFYQFDZejMQ2SJRrjsAAohO3a
+	2jSeFL7KriuTP+WIC614KOYvj0tDAo7sphCTKePMIcoi/0LIWhiBedmbVI08uoVu0zo5FLifbNYn/
+	kRUfUijA24FVi/Um3cQpMrUkXlBTIF0HCAAk/0ej+XH8l6dats+k721yi+8Fzd1qNlloXdRi0HB/9
+	Ot1ZvZ0tEkxvG/Iarr6YfwEQuRloLgwiyQxDRLx1cK7E6YWkbuBmqBN9v2NTye8VBcc5J876flaIM
+	kpbWPzAiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gulI6-0007RQ-HR; Fri, 15 Feb 2019 21:45:02 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gulLW-0000mo-OT; Fri, 15 Feb 2019 21:48:34 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gulI2-0007Pv-2b
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 21:45:00 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gulHp-00075a-4b; Fri, 15 Feb 2019 22:44:45 +0100
-Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gulHo-0002hT-6k; Fri, 15 Feb 2019 22:44:44 +0100
-Date: Fri, 15 Feb 2019 22:44:44 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Zhi Li <lznuaa@gmail.com>
-Subject: Re: [PATCH V4 4/4] MAINTAINERS: Added imx DDR performonitor driver
- maintainer information
-Message-ID: <20190215214444.n2watl6k5ij6ptfs@pengutronix.de>
-References: <1550253761-26841-1-git-send-email-Frank.Li@nxp.com>
- <1550253761-26841-4-git-send-email-Frank.Li@nxp.com>
- <20190215200141.pncrzp3oaoja2mnd@pengutronix.de>
- <CAHrpEqTexakw-OXjUt3nTdroPxv2YVjT-8VmZTUpDeF6e_dZMw@mail.gmail.com>
+ id 1gulLT-0000mT-4y
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 21:48:32 +0000
+Received: by mail-wm1-x342.google.com with SMTP id m1so11534819wml.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 13:48:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=H0UNeMGeog0sEpv5KWWrm4MAOwdmUcClX06pvDr0B0Q=;
+ b=pUXmih3F36ep6IeZGA6mhE+paww7aVCZtRw9lzQdULcjK3eDpiVtxleZm0hce6NOtK
+ TR1Y/ydTRibxlrlqD+wloi6WK7Q0lIgSHnceCQb15MWNoLEhlPIsHM/Er3E6lqiaXcUG
+ fDD+P48Sw4SB7hCf0Xw2uevSapBE5EhfWgxEHd3UUKmggcvZxjC8bkfV9wej0RXowW38
+ RyDlSMoZkbNoHnIPwEAp09dIcJGc8OAOqdhlWFFxgqdwfR98D8T2CCsBQgEpuPB+1kZ+
+ STZayZ/0Kr6vUMQhl2cOB7Wvjg+qqRiywZ2/vSdMZEHQ/g3nK5eza5lsNORKNRDKgpfj
+ Pw0g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=H0UNeMGeog0sEpv5KWWrm4MAOwdmUcClX06pvDr0B0Q=;
+ b=mHs3/0K918jvb34A6aDG0CnefmfXXzkronJepKtoaFx/gz3gFYzzorGtLqgVSiRGhw
+ TP+ia1cwEApdjujkhfRDq4nHGR8OccW8gA5DENIr1bkFRuBE6w8W1yMhFyjMKTF0f2I6
+ QDcfJ7YZEtK8u4dd9iDudyXsffIDN3fLwMlGZzAMWrOdBkpOTv8h9TwYqjbUEq4gvjyH
+ bgBGZdqQPcMhR8DKE+5P+nVqAJ9cbu8aekAhBSA13sx9g1SFbhhqdsFvbTeFxDE21xUV
+ UcCk4lBN8XA3v+xMrkR7ExXA6BcWOWTSyAWJZeCCkxtKgY+0H/ZobAYAAN0oduumzeZv
+ dhsg==
+X-Gm-Message-State: AHQUAub5nFdJQ+1zTO13KBiHetQzVsbf/neRADiEUBqOZYlQ2ZqCnUSf
+ ndg+fdwzhXelR2HcIlQ0osU=
+X-Google-Smtp-Source: AHgI3IZAyr5wYFXclPV54PbA3mNQSQetnADv501PC2E2qS3Vj/M9t2bN+OceW2bzRD4Ymsao8PtPTA==
+X-Received: by 2002:a1c:ca01:: with SMTP id a1mr7709588wmg.124.1550267308532; 
+ Fri, 15 Feb 2019 13:48:28 -0800 (PST)
+Received: from localhost (pD9E51D2D.dip0.t-ipconnect.de. [217.229.29.45])
+ by smtp.gmail.com with ESMTPSA id y1sm7997192wrh.65.2019.02.15.13.48.27
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 15 Feb 2019 13:48:27 -0800 (PST)
+Date: Fri, 15 Feb 2019 22:48:26 +0100
+From: Thierry Reding <thierry.reding@gmail.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [GIT PULL 6/9] ARM: tegra: Core changes for v5.1-rc1
+Message-ID: <20190215214826.GB12838@ulmo>
+References: <20190208150935.32108-1-thierry.reding@gmail.com>
+ <20190208150935.32108-7-thierry.reding@gmail.com>
+ <CAK8P3a2vDG97hP80i6rknqFnDdpoCGMBpmoy2Gp-jUWnGJ5VCg@mail.gmail.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAHrpEqTexakw-OXjUt3nTdroPxv2YVjT-8VmZTUpDeF6e_dZMw@mail.gmail.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+In-Reply-To: <CAK8P3a2vDG97hP80i6rknqFnDdpoCGMBpmoy2Gp-jUWnGJ5VCg@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_134458_275733_3BCB444B 
-X-CRM114-Status: GOOD (  15.16  )
+X-CRM114-CacheID: sfid-20190215_134831_189419_8C86E5F4 
+X-CRM114-Status: GOOD (  18.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,96 +98,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- Aisheng Dong <aisheng.dong@nxp.com>, "festevam@gmail.com" <festevam@gmail.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Frank Li <frank.li@nxp.com>, "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: "open list:TEGRA ARCHITECTURE SUPPORT" <linux-tegra@vger.kernel.org>,
+ Dmitry Osipenko <digetx@gmail.com>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Jon Hunter <jonathanh@nvidia.com>
+Content-Type: multipart/mixed; boundary="===============5530303226735087983=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 03:13:00PM -0600, Zhi Li wrote:
-> On Fri, Feb 15, 2019 at 2:01 PM Uwe Kleine-K=F6nig
-> <u.kleine-koenig@pengutronix.de> wrote:
+
+--===============5530303226735087983==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="IrhDeMKUP4DT/M7F"
+Content-Disposition: inline
+
+
+--IrhDeMKUP4DT/M7F
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Feb 15, 2019 at 05:48:25PM +0100, Arnd Bergmann wrote:
+> On Fri, Feb 8, 2019 at 4:09 PM Thierry Reding <thierry.reding@gmail.com> =
+wrote:
 > >
-> > On Fri, Feb 15, 2019 at 06:03:16PM +0000, Frank Li wrote:
-> > > Add DDR perf counter driver maintainer information
-> > >
-> > > Signed-off-by: Frank Li <Frank.Li@nxp.com>
-> > > ---
-> > > No change from v1 to v4
-> > >
-> > >  MAINTAINERS | 7 +++++++
-> > >  1 file changed, 7 insertions(+)
-> > >
-> > > diff --git a/MAINTAINERS b/MAINTAINERS
-> > > index 6ba068e..687be0f 100644
-> > > --- a/MAINTAINERS
-> > > +++ b/MAINTAINERS
-> > > @@ -6163,6 +6163,13 @@ L:     linux-i2c@vger.kernel.org
-> > >  S:   Maintained
-> > >  F:   drivers/i2c/busses/i2c-cpm.c
-> > >
-> > > +FREESCALE IMX DDR Performance Monitor DRIVER
-> > > +M:   Frank Li <Frank.li@nxp.com>
-> > > +L:   linux-arm-kernel@lists.infradead.org
-> > > +S:   Maintained
-> > > +F:   drivers/perf/fsl_imx8_ddr_perf.c
-> > > +F:   Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
-> > > +
+> > Hi ARM SoC maintainers,
 > >
-> > With da8b7f0fb02b ("MAINTAINERS: add all files matching "imx" and "mxs"
-> > to the IMX entry") that sits currently in next the "ARM/FREESCALE IMX /
-> > MXC ARM ARCHITECTURE" also matches for these two files.
+> > The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee=
+500c:
 > >
-> > Is this good here or not?
-> =
+> >   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+> >
+> > are available in the Git repository at:
+> >
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/te=
+gra-for-5.1-arm-core
+> >
+> > for you to fetch changes up to 1c6279b49d3ffff38357e93d112512fecf3711a7:
+> >
+> >   ARM: tegra: Restore memory arbitration on resume from LP1 on Tegra30+=
+ (2019-01-16 13:22:04 +0100)
+> >
+> > Thanks,
+> > Thierry
+> >
+> > ----------------------------------------------------------------
+> > ARM: tegra: Core changes for v5.1-rc1
+> >
+> > This contains three fixes for resume from LP1 on Tegra30.
+> >
+>=20
+> Pulled into arm/soc?
+>=20
+> Should these bugfixes have been marked Cc:stable?
 
-> Yes! what's do you means?
-> Needn't these entry because da8b7f0fb02b?
+I don't think that'd be worth it. As far as I can tell these have been
+broken since forever. Backporting this would be fairly involved and I'm
+not sure if this hurts enough to warrant the additional work, given that
+it's not been reported in all this time.
 
-It's just that we then will have two entries that will match. In a tree
-where I have both, this series and da8b7f0fb02b I see:
+Dmitry, can you clarify whether you want these to be backported?
 
-	$ scripts/get_maintainer.pl -f drivers/perf/fsl_imx8_ddr_perf.c
-	Frank Li <Frank.li@nxp.com> (maintainer:FREESCALE IMX DDR Performance Moni=
-tor DRIVER)
-	Will Deacon <will.deacon@arm.com> (maintainer:ARM PMU PROFILING AND DEBUGG=
-ING)
-	Mark Rutland <mark.rutland@arm.com> (maintainer:ARM PMU PROFILING AND DEBU=
-GGING)
-	Shawn Guo <shawnguo@kernel.org> (maintainer:ARM/FREESCALE IMX / MXC ARM AR=
-CHITECTURE)
-	Sascha Hauer <s.hauer@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC =
-ARM ARCHITECTURE)
-	Pengutronix Kernel Team <kernel@pengutronix.de> (reviewer:ARM/FREESCALE IM=
-X / MXC ARM ARCHITECTURE)
-	Fabio Estevam <fabio.estevam@nxp.com> (reviewer:ARM/FREESCALE IMX / MXC AR=
-M ARCHITECTURE)
-	NXP Linux Team <linux-imx@nxp.com> (reviewer:ARM/FREESCALE IMX / MXC ARM A=
-RCHITECTURE)
-	linux-arm-kernel@lists.infradead.org (open list:FREESCALE IMX DDR Performa=
-nce Monitor DRIVER)
-	linux-kernel@vger.kernel.org (open list)
+Thierry
 
-That's not necessarily a bad thing, but something I want people to make
-aware of.
+--IrhDeMKUP4DT/M7F
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Best regards
-Uwe
+-----BEGIN PGP SIGNATURE-----
 
--- =
+iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxnM6oACgkQ3SOs138+
+s6GKghAAvzjv7yHNObjctpQ+geAbVuYXlxI075X1apxWDzKOl8VmtitxcDvX5Jfa
+4xNCfSVrvGGKaPdn/HV93VS2DHNnvjfqwvAbmBIswxfEyVR145hy5nSSoVZo3pC1
+rb+GFgMouNo9K1hvVljo2LwxmS4rD3vDzwkULBb5P3JMarGXlx+LQ81piP0zuZ5R
+C5r/L8sER/wX+Klff9QZIRlLtDPXeCCFHIDG5VIQzUaf3k+DU99F1Zd7x5oNVNmb
+bxEfKMvmhrvWH1ThjGAwRRiYenraLo1isnnMLKH3r/V53Dh5OYdMqB6tFHaXlKbF
+eGf1C2OFbHqL6ohsPPhx8ljIU/CWqxcoIYosMv4VVB3n/v0rPxJ4KmW4nme5J1An
+2Dks/hPr/H7kqRxcLnJ4z+3d65k39PvuS2UkPrfc7VyX+zKatFynOyE9qv2D6IXw
+rMYeRNNZW8bQKul0rN0G/gcFyOyT4T4x6C78lCfJwr1Y1ZLDMTquuRMrunALfyqY
+MvWxBVg/qdqAbHR8dGaqnFBJDRqXeY8VpDN44yXDcjjXazMBsggERB0Ltnpj1tSa
+YAg/aJwT+3z5HzdycbL43xjLpT3TxPPYwk1T8rt+TOiosZ7WNNckwde1TFoJKe1C
+1WnFn/d1GSQJ0w8ZjX+yZ/Pm+9dcx9C2fEkxusKn1qH+1TVez1s=
+=BIii
+-----END PGP SIGNATURE-----
 
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+--IrhDeMKUP4DT/M7F--
+
+
+--===============5530303226735087983==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5530303226735087983==--
+
