@@ -2,69 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5038FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:01:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26C93C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:01:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 20F4F206C0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:01:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EBD03206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:01:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J4m2AmB+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="MIqjAlxX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20F4F206C0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eR8Iy6hO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBD03206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fMd94wG9Hy5T2V5gYR0DzP75SLlJRidQf8XMYVpbY8w=; b=J4m2AmB+vwE9If
-	GYLp1wMgYdbK/7OIgtDCdmsStFZoKiOEYZnNCSzc72pknUI8lGyYxpyCyAF88MDQFkZgmQClRJ479
-	crmOZCVXmkbdqnl/hyMP904cZyT9eCs3cPcQdh/Kf65AXVqEPt2XpP+hNqJPaqXeMq4Rhbsn9AFj1
-	j2LJFYJhgnl6rlByOgm0zU9Ui5MqfMmpnCkyLTHFRSb6Y/qTaedjaQbqhngzp+SAtq+vsCKpWlvL+
-	PNnupU3chiEUlIZ2raiMc8Billw43u257qQBV1lMH80+USIqWgvIas4Fsh145zx6PUje1VK4Ui8yJ
-	kYjVhGG9mc5gINEHT2xg==;
+	List-Owner; bh=6M8SqvTJT6dM15HuMXixjEoPvQkcgz2Jz4yK2EsWf7U=; b=eR8Iy6hORCL9z6
+	SG1PSfbOnQ0/OAZzlE/SM9npT+5qArg3ZVjIq1vC9pJHg53rBWng9yT+PlGwtkvfQq68gtlVIRC2j
+	sYE1Pvc1gtf+qNwpQ+A6Ru5PGnPdGYjE1jGoHCUmLHCaO417AGxiCOqCRuD2DW2E87hXO1XBirWsw
+	FJcdQ0wyRA9Md70lVNakia0me6S0tZoGE/nSXm8+cKYX1dQLGT4Lh3ISvF1KKAAlOL5g6UF+VfyEh
+	cTER7Ak1ZWhBIPB7uoPUmw4zp3HyC5kcq+vT15RSGE0Dnro3PD/swaRJze0Ckl16/Z6+U9eEz6dgD
+	2XDFJ3zbE64DNV8VhlyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guezA-0004It-WF; Fri, 15 Feb 2019 15:01:05 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1guezc-0004bF-AW; Fri, 15 Feb 2019 15:01:32 +0000
+Received: from mail-qt1-f170.google.com ([209.85.160.170])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guez8-0004IH-I0
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:01:03 +0000
-Received: from devbox (NE2965lan1.rev.em-net.ne.jp [210.141.244.193])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 6AD0D207E0;
- Fri, 15 Feb 2019 15:01:00 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550242861;
- bh=AkVBKEMZ0ZYJo67INS81B29Rgu0o9C+VCzGlb/jazs8=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=MIqjAlxX0GHFbsj9JncL/1H7+IfZ0hRrH34WM4G7PMtnyN5vECPRdt3AsFpFz6117
- HddvhlNMLNhkexjGJ2FGwdZLbxQ0d7/eRetcAGlmpeOChx6WLQwVhNxm0fijb/mXao
- SOXwYKisokyabfcyzOmKHm1s22Lx2L9vDlupxG18=
-Date: Sat, 16 Feb 2019 00:00:58 +0900
-From: Masami Hiramatsu <mhiramat@kernel.org>
-To: Will Deacon <will.deacon@arm.com>
-Subject: Re: [PATCH v3 4/4] arm64: kprobes: Use
- arch_populate_kprobe_blacklist()
-Message-Id: <20190216000058.a75ff4d9497065ce216e246d@kernel.org>
-In-Reply-To: <20190214155522.GA1825@fuggles.cambridge.arm.com>
-References: <154998617300.21869.11457765723750331236.stgit@devbox>
- <154998628802.21869.4041705065539411318.stgit@devbox>
- <20190214155522.GA1825@fuggles.cambridge.arm.com>
-X-Mailer: Sylpheed 3.5.1 (GTK+ 2.24.31; x86_64-redhat-linux-gnu)
-Mime-Version: 1.0
+ id 1guezX-0004ab-N2
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:01:29 +0000
+Received: by mail-qt1-f170.google.com with SMTP id o6so11144092qtk.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 07:01:27 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=my9fA8/4JIWOHGEqP7KrolBBAVc5sG2aG/q+C8Iv64w=;
+ b=YjKNitmHwKz7xv0KkKr7YOjO8Z1CU+X1srjlhc5VCWfxCHhmCLytJznC+Uo4F8M7qH
+ vO1CIguCGaiZXL25dwlRyvsjdu5bQ9Iv+5rxOyoIsZ5Zs5q+LxZ6TlHgazL58mpT2Btr
+ AUIL4jHSwNthxePJQyMbeHi5rBw7Lf4aV4nsGYAuzFRJPzrtjJYO3OZ5e98ttmti0psV
+ KeN8UbKKdlT629CW9j7dgYx/2ASsdX31lNtloaQeBuKLDXplpuGoWxgkHVhzjav9nX+8
+ Gka88DLyHLKt1ccDBFTScuxx7SDsfNrr3isrv+f3xbPfSuB8dOH7W1tICIxxrmpchzhx
+ /+vg==
+X-Gm-Message-State: AHQUAuaIVIAjesrR4kY8Kwg7xoxSGxRg+LEG2zwiLP+9mo9VPgAg0r6n
+ remOrcsqvFmJjYWPkic+Py8LYEVnc1NuynHJM7t7BA==
+X-Google-Smtp-Source: AHgI3Ia1hxM2mvajpqIWZmBc0i2rdHlPyJY2tbuRjKv6iBYhX1BL1gaAgpmrjN3onGpq1ZnsZtCoQbzKy+vjzLkQ5x8=
+X-Received: by 2002:ac8:445a:: with SMTP id m26mr7793427qtn.212.1550242886711; 
+ Fri, 15 Feb 2019 07:01:26 -0800 (PST)
+MIME-Version: 1.0
+References: <87mun6568h.fsf@FE-laptop>
+In-Reply-To: <87mun6568h.fsf@FE-laptop>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 16:01:10 +0100
+Message-ID: <CAK8P3a1Nm6pEocoXt_yuuR6Xp=48L7sVgs75Li8hyv6kuNX0+w@mail.gmail.com>
+Subject: Re: [GIT PULL] ARM: mvebu: dt64 for v5.1 (#1)
+To: Gregory CLEMENT <gregory.clement@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_070102_611020_06E64D05 
-X-CRM114-Status: GOOD (  20.47  )
+X-CRM114-CacheID: sfid-20190215_070127_757832_E7248D12 
+X-CRM114-Status: UNSURE (   8.56  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,74 +79,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Pratyush Anand <panand@redhat.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, James Morse <james.morse@arm.com>,
- "David A . Long" <dave.long@linaro.org>, linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ arm-soc <arm@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 14 Feb 2019 15:55:22 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+On Fri, Feb 8, 2019 at 10:18 PM Gregory CLEMENT
+<gregory.clement@bootlin.com> wrote:
 
-> Hi Masami,
-> 
-> On Wed, Feb 13, 2019 at 12:44:48AM +0900, Masami Hiramatsu wrote:
-> > Use arch_populate_kprobe_blacklist() instead of
-> > arch_within_kprobe_blacklist() so that we can see the full
-> > blacklisted symbols under the debugfs.
-> > 
-> > Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
-> > ---
-> >   Changes in v3
-> >    - Do not populate blacklist in __kprobe_text in
-> >      arch_populate_kprobe_blacklist(), since it is already
-> >      populated in populate_kprobe_blacklist().
-> >    - Add exception entry text blacklist since those are rejected
-> >      by in_exception_text().
-> > ---
-> >  arch/arm64/kernel/probes/kprobes.c |   45 +++++++++++++++++++++---------------
-> >  1 file changed, 26 insertions(+), 19 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/probes/kprobes.c b/arch/arm64/kernel/probes/kprobes.c
-> > index 194262fca5cd..37d913f33a89 100644
-> > --- a/arch/arm64/kernel/probes/kprobes.c
-> > +++ b/arch/arm64/kernel/probes/kprobes.c
-> > @@ -465,26 +465,33 @@ kprobe_breakpoint_handler(struct pt_regs *regs, unsigned int esr)
-> >  	return DBG_HOOK_HANDLED;
-> >  }
-> >  
-> > -bool arch_within_kprobe_blacklist(unsigned long addr)
-> 
-> I think it would be useful to add a comment here so that we remember
-> why this code is the way it is:
-> 
-> /*
->  * Provide a blacklist of symbols identifying ranges which cannot be kprobed.
->  * This blacklist is exposed to userspace via debugfs (kprobes/blacklist).
->  */
+> ----------------------------------------------------------------
+> mvebu dt64 for 5.1 (part 1)
+>
+>  - Interrupt support to Armada 7K/8K thermal nodes
+>  - Armada 37xx related patches allowing to enable suspend to RAM
+>    (USB2, USB3, PCIe, SATA, DSA)
+>  - uDPU board support (Armada-3720 based):single-port FTTdp
+>     distribution point unit
+>  - Fixes for EspressoBin Ethernet support when using U-Boot mainline
+>  - cleanup for partitions under flashes nodes
+>
 
-Agreed. This looks good to me too.
+Pulled into arm/dt, thanks!
 
-> 
-> With that, you can have my ack for the series:
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thank you!
-
-> 
-> Catalin -- can you pick these up with that comment added, please?
-> 
-> Cheers,
-> 
-> Will
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+         Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
