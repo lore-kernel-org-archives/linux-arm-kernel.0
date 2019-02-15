@@ -2,68 +2,96 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26B99C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 026BAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:10:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6D832192C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 04:57:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B48702192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:10:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fPRYnp6G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6D832192C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XdX1sqpU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="PKTgwk5k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B48702192C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=G1vrNTofHmsox2FZNo9hm/LoV2qmlRJuIDXaFbgX5/Q=; b=fPRYnp6GuDahiLGCU1kn5jM7g
-	VQOv5615mB/BL1fNbdsaSrHqSDi95EZqZA7/h8D2suFarS1jIiXekma+oosQJzJcrjg1ZGrV6aR0f
-	87ZvRv/LutWu/x7x/1PHF2f3NPulOsgcACaiLCA2H+nfvcFsvsLLZWyhHgty7OEKwZW04g0xMYsjw
-	6QmA9bS4hy+oBdrpjki+lm7YALP8Tch2rVnY3HeAso+Gmkd9OYoQXhAdFuH2qZMvzgETG+anHpNoh
-	vDLcPb26GYoC+WmwLsoXhMrjHkp+/5ew2OFDzlT8zD8HC3AL7HOOvJi/DO25K/Tjgvx50yWqI+xTL
-	Hoa457dGw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=UFdCABbwT2WNWuQZeFO4Gi/gYjinUZjzZDicMsySf64=; b=XdX1sqpUhJfiK+
+	dv/suB0VDBxJdS2AmxafbRLociWCvuKAr4qIq5lwqk8ckXh/oq0phOO3ZlXZcJnfOxPwyeCwgQ0vj
+	sgcurUtEwagkHr5Rm/1N4+StNUnxb+NBNTAaXodDpSdeqL0/7aXKICgejxkc0yzNHE924z5kEm9T3
+	HuZ1LNbd8or226HwHqheEFHdI8VtE9dsmcEANdSUfdNWfjQnoiTEQWs7sK5qmYKIuSFQBC+hAyHZR
+	exoiosZdyKDkPaU0aVr+d3JEo4B12WdXLAtwfvoCzGVx8UPcrHT7/D57/8a8XqQ/ddXy106jvtEqQ
+	1yzCZ7NQVjTltU4rhtow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guVZS-0007Vk-Hs; Fri, 15 Feb 2019 04:57:54 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guVZO-0007VI-PM
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 04:57:53 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 184FFA78;
- Thu, 14 Feb 2019 20:57:50 -0800 (PST)
-Received: from [10.162.0.144] (a075553-lin.blr.arm.com [10.162.0.144])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BDB873F589;
- Thu, 14 Feb 2019 20:57:46 -0800 (PST)
-Subject: Re: [PATCH v5 5/5] arm64/kvm: control accessibility of ptrauth key
- registers
-To: Dave P Martin <Dave.Martin@arm.com>,
- Kristina Martsenko <Kristina.Martsenko@arm.com>
-References: <1548658727-14271-1-git-send-email-amit.kachhap@arm.com>
- <1548658727-14271-6-git-send-email-amit.kachhap@arm.com>
- <6ddfa9ae-5c98-540e-b4aa-8149c8515c9e@arm.com>
- <20190213175428.GR32634@e103592.cambridge.arm.com>
-From: Amit Daniel Kachhap <amit.kachhap@arm.com>
-Message-ID: <0c22684d-3101-f90c-83d8-d649bb1c799e@arm.com>
-Date: Fri, 15 Feb 2019 10:27:44 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guVlZ-0003V3-Vf; Fri, 15 Feb 2019 05:10:25 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guVlX-0003UU-2C
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 05:10:24 +0000
+Received: by mail-pg1-x542.google.com with SMTP id r124so4231850pgr.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 14 Feb 2019 21:10:22 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=8s+H7lj60BiLptDN+KBUxWv5PfCaR6r6g6JP6RGFK5Q=;
+ b=PKTgwk5k1GG+tI8EdXEEpv7ycf2Dx25kmfLtcZKl+8Q/B/ERCrHcW1EEDc9T9te1DH
+ fSy4mgBcTCdsdmCtdpa97Mur6zAN0rde3FTl4/CrwhCoMzW6aDAoLZsEEV5gOczRj0gk
+ h8GpWkL4nq+8k1TWuLPE4gmy8YWYKudACoBDGw1QQCO19LUqaDTcuK9GDdoWOM7z6yXj
+ MuAsp6OGuAznASAngk5GY0/IZo5R86TTp7EEVWIqu5xzhdME3KGNDFQsSWFrhBhawrQI
+ sTiGsg37YnW+LehPsxHTCXtFkxoRUNYfNwhy6U1VUDvTbDLWsf92PoPkS7EUoUpys6Zh
+ +whA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=8s+H7lj60BiLptDN+KBUxWv5PfCaR6r6g6JP6RGFK5Q=;
+ b=Zpr0+k/lAEVy11tkyGKyhdTMrYLVEH4dGagHLPxq9a1AEEf63/FOrhKAKtI7ht2vYL
+ LxH1DhxhBYaBHmgWLyMsdSDdzRffemVs4aSsOiaqLFsc8PwvuSzOlYAPRy9A4Lyf4s30
+ 50a0vQdiqyxL7emtBOH3eiwLdqjSsgoIx8k/k4KEyHkJV/K58KC/fID7RoLkr5iO4xqo
+ eu4Fn04BotBvYt/A7PyybE1zoOCp2kVjmSbEV8tZ15cw/RCDXMK7ALSiuNhIboAL/iJS
+ NYCuQihZMOUGlkV8PUnnSgFe5LcSAv/EmivqMij+9T/cW6O9fDlyk4e9J27/SlGSlCZ1
+ RSJg==
+X-Gm-Message-State: AHQUAuYj4dIVh6znDlDZ4s2QkgOo1fd6rFh4WrmTk0i4chpLPvr5A+Pu
+ nO23Biht3y8gyEF7Ig4lNYQ=
+X-Google-Smtp-Source: AHgI3IaT3jYNlXrg3NqN9vZzmdZlQNEDmsFK3Rp3RpMgGmpsd9JuVSRht7MsnDBZo1Ie5KIZcIeSdg==
+X-Received: by 2002:a63:4e1a:: with SMTP id c26mr3594383pgb.175.1550207422325; 
+ Thu, 14 Feb 2019 21:10:22 -0800 (PST)
+Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
+ [216.71.213.236])
+ by smtp.gmail.com with ESMTPSA id m9sm4900442pgr.7.2019.02.14.21.10.21
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 21:10:21 -0800 (PST)
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Archit Taneja <architt@codeaurora.org>,
+ Andrzej Hajda <a.hajda@samsung.com>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
+ dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
+Subject: [PATCH v3 00/11] Analogix ANX6345 RGB-(e)DP bridge support
+Date: Thu, 14 Feb 2019 21:09:46 -0800
+Message-Id: <20190215050957.20755-1-anarsoul@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-In-Reply-To: <20190213175428.GR32634@e103592.cambridge.arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_205751_267702_2305E306 
-X-CRM114-Status: GOOD (  28.75  )
+X-CRM114-CacheID: sfid-20190214_211023_107434_F88CE5C3 
+X-CRM114-Status: GOOD (  17.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,158 +103,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>, Andrew Jones <drjones@redhat.com>,
- Marc Zyngier <Marc.Zyngier@arm.com>, Catalin Marinas <Catalin.Marinas@arm.com>,
- Will Deacon <Will.Deacon@arm.com>, Christoffer Dall <Christoffer.Dall@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- "kvmarm@lists.cs.columbia.edu" <kvmarm@lists.cs.columbia.edu>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+This patchset brings support for Analogix ANX6345 RGB-(e)DP bridge, which
+is used by some Allwinner A64 laptops, such as Pinebook and Olimex
+TERES-I.
 
-On 2/13/19 11:24 PM, Dave P Martin wrote:
-> On Wed, Feb 13, 2019 at 05:35:46PM +0000, Kristina Martsenko wrote:
->> On 28/01/2019 06:58, Amit Daniel Kachhap wrote:
->>> According to userspace settings, ptrauth key registers are conditionally
->>> present in guest system register list based on user specified flag
->>> KVM_ARM_VCPU_PTRAUTH.
->>>
->>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: Christoffer Dall <christoffer.dall@arm.com>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
->>> Cc: kvmarm@lists.cs.columbia.edu
->>> Cc: Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> ---
->>>   Documentation/arm64/pointer-authentication.txt |  3 ++
->>>   arch/arm64/kvm/sys_regs.c                      | 42 +++++++++++++++++++-------
->>>   2 files changed, 34 insertions(+), 11 deletions(-)
->>>
-> 
-> [...]
-> 
->>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> 
-> [...]
-> 
->>> @@ -2487,18 +2493,22 @@ static int walk_one_sys_reg(const struct sys_reg_desc *rd,
->>>   }
->>>   
->>>   /* Assumed ordered tables, see kvm_sys_reg_table_init. */
->>> -static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind)
->>> +static int walk_sys_regs(struct kvm_vcpu *vcpu, u64 __user *uind,
->>> +			const struct sys_reg_desc *desc, unsigned int len)
->>>   {
->>>   	const struct sys_reg_desc *i1, *i2, *end1, *end2;
->>>   	unsigned int total = 0;
->>>   	size_t num;
->>>   	int err;
->>>   
->>> +	if (desc == ptrauth_reg_descs && !kvm_arm_vcpu_ptrauth_allowed(vcpu))
->>> +		return total;
->>> +
->>>   	/* We check for duplicates here, to allow arch-specific overrides. */
->>>   	i1 = get_target_table(vcpu->arch.target, true, &num);
->>>   	end1 = i1 + num;
->>> -	i2 = sys_reg_descs;
->>> -	end2 = sys_reg_descs + ARRAY_SIZE(sys_reg_descs);
->>> +	i2 = desc;
->>> +	end2 = desc + len;
->>>   
->>>   	BUG_ON(i1 == end1 || i2 == end2);
->>>   
->>> @@ -2526,7 +2536,10 @@ unsigned long kvm_arm_num_sys_reg_descs(struct kvm_vcpu *vcpu)
->>>   {
->>>   	return ARRAY_SIZE(invariant_sys_regs)
->>>   		+ num_demux_regs()
->>> -		+ walk_sys_regs(vcpu, (u64 __user *)NULL);
->>> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, sys_reg_descs,
->>> +				ARRAY_SIZE(sys_reg_descs))
->>> +		+ walk_sys_regs(vcpu, (u64 __user *)NULL, ptrauth_reg_descs,
->>> +				ARRAY_SIZE(ptrauth_reg_descs));
->>>   }
->>>   
->>>   int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->>> @@ -2541,7 +2554,12 @@ int kvm_arm_copy_sys_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->>>   		uindices++;
->>>   	}
->>>   
->>> -	err = walk_sys_regs(vcpu, uindices);
->>> +	err = walk_sys_regs(vcpu, uindices, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
->>> +	if (err < 0)
->>> +		return err;
->>> +	uindices += err;
->>> +
->>> +	err = walk_sys_regs(vcpu, uindices, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->>>   	if (err < 0)
->>>   		return err;
->>>   	uindices += err;
->>> @@ -2575,6 +2593,7 @@ void kvm_sys_reg_table_init(void)
->>>   	BUG_ON(check_sysreg_table(cp15_regs, ARRAY_SIZE(cp15_regs)));
->>>   	BUG_ON(check_sysreg_table(cp15_64_regs, ARRAY_SIZE(cp15_64_regs)));
->>>   	BUG_ON(check_sysreg_table(invariant_sys_regs, ARRAY_SIZE(invariant_sys_regs)));
->>> +	BUG_ON(check_sysreg_table(ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs)));
->>>   
->>>   	/* We abuse the reset function to overwrite the table itself. */
->>>   	for (i = 0; i < ARRAY_SIZE(invariant_sys_regs); i++)
->>> @@ -2616,6 +2635,7 @@ void kvm_reset_sys_regs(struct kvm_vcpu *vcpu)
->>>   
->>>   	/* Generic chip reset first (so target could override). */
->>>   	reset_sys_reg_descs(vcpu, sys_reg_descs, ARRAY_SIZE(sys_reg_descs));
->>> +	reset_sys_reg_descs(vcpu, ptrauth_reg_descs, ARRAY_SIZE(ptrauth_reg_descs));
->>>   
->>>   	table = get_target_table(vcpu->arch.target, true, &num);
->>>   	reset_sys_reg_descs(vcpu, table, num);
->>
->> This isn't very scalable, since we'd need to duplicate all the above
->> code every time we add new system registers that are conditionally
->> accessible.
-> 
-> Agreed, putting feature-specific checks in walk_sys_regs() is probably
-> best avoided.  Over time we would likely accumulate a fair number of
-> these checks.
-> 
->> It seems that the SVE patches [1] solved this problem by adding a
->> check_present() callback into struct sys_reg_desc. It probably makes
->> sense to rebase onto that patch and just implement the callback for the
->> ptrauth key registers as well.
->>
->> [1] https://lore.kernel.org/linux-arm-kernel/1547757219-19439-13-git-send-email-Dave.Martin@arm.com/
-> 
-> Note, I'm currently refactoring this so that enumeration through
-> KVM_GET_REG_LIST can be disabled independently of access to the
-> register.  This may not be the best approach, but for SVE I have a
-> feature-specific ID register to handle too (ID_AA64ZFR0_EL1), which
-> needs to be hidden from the enumeration but still accessible with
-> read-as-zero behaviour.
-> 
-> This changes the API a bit: I move to a .restrictions() callback which
-> returns flags to say what is disabled, and this callback is used in the
-> common code so that you don't have repeat your "feature present" check
-> in every accessor, as is currently the case.
-> 
-> I'm aiming to post a respun series in the next day or two.  The code
-> may of course change again after it gets reviewed...
-> 
-> 
-> Basing on [1] is probably a reasonable starting point, though.
+It reuses some definitions from ANX78xx driver that already exists in the
+kernel tree, but the driver code itself is rewritten due to significant
+difference between ANX6345 and ANX78xx.
 
-Thanks Kristina and Dave for this pointer. I will rebase my next 
-iteration based on it.
+This patchset also adds support for LCD panels used in Pinebook, dt
+property to disable strict dot clock check in sun4i drm driver and adds
+nodes necessary for LCD support into Pinebook dts.
 
-Thanks,
-Amit
-> 
-> Cheers
-> ---Dave
-> 
+v2: - sort Kconfig and Makefile entries alphabetically
+    - remove panel supply from anx6345
+    - add support for panels into anx6345 driver
+    - add compatible and binding for generic eDP panel
+    - replace patch that adds 5% tolerance for dotclock check in sun4i
+      driver for panel and bridges with patch that adds 1% tolerance
+      in case if bridge is connected.
+v3: - replace 1% tolerance patch with patch that adds dt property to
+      disable strict dot clock check
+    - add support for LCD panels used in Pinebook
+    - drop generic eDP panel driver
+    - drop Teres-I changes, I don't have hardware to test them anyway.
+
+Icenowy Zheng (7):
+  drm/bridge: move ANA78xx driver to analogix subdirectory
+  drm/bridge: split some definitions of ANX78xx to dedicated headers
+  drm/bridge: extract some Analogix I2C DP common code
+  dt-bindings: Add ANX6345 DP/eDP transmitter binding
+  drm/bridge: Add Analogix anx6345 support
+  arm64: allwinner: a64: add pinmux for RGB666 LCD
+  arm64: allwinner: a64: enable LCD-related hardware for Pinebook
+
+Vasily Khoruzhick (4):
+  drm/sun4i: rgb: Add DT property to disable strict clock rate check
+  drm/panel: simple: Add BOE HB140WX1-501 panel support
+  dt-bindings: Add Guangdong Neweast Optoelectronics CO. LTD vendor
+    prefix
+  drm/panel: simple: Add NewEast Optoelectronics CO., LTD WJFH116008A
+    panel support
+
+ .../bindings/display/bridge/anx6345.txt       |  56 ++
+ .../display/panel/boe,hb140wx1-501.txt        |   7 +
+ .../display/panel/neweast,wjfh116008a.txt     |   7 +
+ .../bindings/display/sunxi/sun4i-drm.txt      |   2 +
+ .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+ .../dts/allwinner/sun50i-a64-pinebook.dts     |  76 ++
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |   9 +
+ drivers/gpu/drm/bridge/Kconfig                |  10 -
+ drivers/gpu/drm/bridge/Makefile               |   4 +-
+ drivers/gpu/drm/bridge/analogix-anx78xx.h     | 719 ---------------
+ drivers/gpu/drm/bridge/analogix/Kconfig       |  25 +
+ drivers/gpu/drm/bridge/analogix/Makefile      |   4 +
+ .../drm/bridge/analogix/analogix-anx6345.c    | 845 ++++++++++++++++++
+ .../bridge/{ => analogix}/analogix-anx78xx.c  | 146 +--
+ .../drm/bridge/analogix/analogix-anx78xx.h    | 265 ++++++
+ .../drm/bridge/analogix/analogix-i2c-dptx.c   | 169 ++++
+ .../drm/bridge/analogix/analogix-i2c-dptx.h   | 258 ++++++
+ .../bridge/analogix/analogix-i2c-txcommon.h   | 240 +++++
+ drivers/gpu/drm/panel/panel-simple.c          |  65 ++
+ drivers/gpu/drm/sun4i/sun4i_rgb.c             |   5 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c            |   3 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.h            |   1 +
+ 22 files changed, 2041 insertions(+), 876 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/anx6345.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hb140wx1-501.txt
+ create mode 100644 Documentation/devicetree/bindings/display/panel/neweast,wjfh116008a.txt
+ delete mode 100644 drivers/gpu/drm/bridge/analogix-anx78xx.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix-anx6345.c
+ rename drivers/gpu/drm/bridge/{ => analogix}/analogix-anx78xx.c (90%)
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix-anx78xx.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix-i2c-dptx.c
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix-i2c-dptx.h
+ create mode 100644 drivers/gpu/drm/bridge/analogix/analogix-i2c-txcommon.h
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
