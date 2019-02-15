@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69577C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:04:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D661C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:04:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 29E0A2086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:04:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B8D32086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:04:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XXLLSgX9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 29E0A2086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K7945vsn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B8D32086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jFOakWldWxP+moj5o6adakYeA92DKwxMLsWSodlHc+E=; b=XXLLSgX9qwCsgB
-	hlzgkdwic8NalqZy3jpVUj1JTNLeasqKeAnloyffGwyhLkcFWLyNRHfWK/4n6AEI6Do6MU+9exK8i
-	+jzm2CEuvt7QEKqrJydNRcYfH11u9W1qeEuk8o2l4iJe1H5/8fDjMXERMxuR3BiSBIPFbFws3wT51
-	uyntwqF+FPRynf61c9wtM2OXCfiWCr72CS4jZ/4GpRAe852Nx4Dv1ILzX16NjPbsbvldGbFcMK8hz
-	4tc/oEyM5yFesBYS0wxMk1wVWAwj/F4hFVWeB9VCxH0I0yhNIEPfDFa62PfCj33Y3x+av6T+DFGsh
-	hviWtSkYTwbVBDt5zbWw==;
+	List-Owner; bh=muuhtg3ijYIQSZ9AGKpqcHjGDvgsU0Qmq2+yoblxIKk=; b=K7945vsn2US1+U
+	U3lZDOkgjQq0xBs+ymYPfaTwM7HBFpGsEIP0SPgpC+Pnud1UvbzcIc5Pc+j9A0wnk9hxKg+iVuPtR
+	MvCDrI60ctI9BlpGhPoxjE9fxuVPLH4M0LmdJLVb0uoVFNq0cwAraBg/YlFKZOUeV0ddllIwIwRso
+	INNR3cMk31P4JqIJf7UVybqUxAZrbNi0+rV0ru5Z0nb6QQbBnJPEPvhv9W1oL4sdY1PJQvQlRhA3G
+	XAku3K/ZYwYNrjjtY6/YDeb78YYKuylSyzsuedevpKGms0McTmeC+6bOViGOnppjROooUgYB41Z7C
+	NbA4KvtBvb6eqP9xuQRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugub-0005ZQ-1m; Fri, 15 Feb 2019 17:04:29 +0000
+	id 1gugun-0005qf-Ju; Fri, 15 Feb 2019 17:04:41 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugtW-0004Dg-4F
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:03:31 +0000
+ id 1gugtZ-0004Ie-8E
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:03:35 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D806115BF;
- Fri, 15 Feb 2019 09:03:21 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1763AEBD;
+ Fri, 15 Feb 2019 09:03:25 -0800 (PST)
 Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
  [10.1.196.69])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E40033F557;
- Fri, 15 Feb 2019 09:03:18 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 234B13F557;
+ Fri, 15 Feb 2019 09:03:21 -0800 (PST)
 From: Steven Price <steven.price@arm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH 05/13] mm: pagewalk: Allow walking without vma
-Date: Fri, 15 Feb 2019 17:02:26 +0000
-Message-Id: <20190215170235.23360-6-steven.price@arm.com>
+Subject: [PATCH 06/13] mm: pagewalk: Add 'depth' parameter to pte_hole
+Date: Fri, 15 Feb 2019 17:02:27 +0000
+Message-Id: <20190215170235.23360-7-steven.price@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190215170235.23360-1-steven.price@arm.com>
 References: <20190215170235.23360-1-steven.price@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_090322_985433_2F5EFE96 
-X-CRM114-Status: GOOD (  15.49  )
+X-CRM114-CacheID: sfid-20190215_090326_112721_57B2ADE6 
+X-CRM114-Status: GOOD (  21.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,78 +85,174 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Since 48684a65b4e3: "mm: pagewalk: fix misbehavior of walk_page_range
-for vma(VM_PFNMAP)", page_table_walk() will report any kernel area as
-a hole, because it lacks a vma.
+The pte_hole() callback is called at multiple levels of the page tables.
+Code dumping the kernel page tables needs to know what at what depth
+the missing entry is. Add this is an extra parameter to pte_hole().
+When the depth isn't know (e.g. processing a vma) then -1 is passed.
 
-This means each arch has re-implemented page table walking when needed,
-for example in the per-arch ptdump walker.
-
-Remove the requirement to have a vma except when trying to split huge
-pages.
+Note that depth starts at 0 for a PGD so that PUD/PMD/PTE retain their
+natural numbers as levels 2/3/4.
 
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- mm/pagewalk.c | 25 +++++++++++++++++--------
- 1 file changed, 17 insertions(+), 8 deletions(-)
+ fs/proc/task_mmu.c |  4 ++--
+ include/linux/mm.h |  5 +++--
+ mm/hmm.c           |  2 +-
+ mm/migrate.c       |  1 +
+ mm/mincore.c       |  1 +
+ mm/pagewalk.c      | 16 ++++++++++------
+ 6 files changed, 18 insertions(+), 11 deletions(-)
 
+diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+index f0ec9edab2f3..91131cd4e9e0 100644
+--- a/fs/proc/task_mmu.c
++++ b/fs/proc/task_mmu.c
+@@ -474,7 +474,7 @@ static void smaps_account(struct mem_size_stats *mss, struct page *page,
+ 
+ #ifdef CONFIG_SHMEM
+ static int smaps_pte_hole(unsigned long addr, unsigned long end,
+-		struct mm_walk *walk)
++			  __always_unused int depth, struct mm_walk *walk)
+ {
+ 	struct mem_size_stats *mss = walk->private;
+ 
+@@ -1203,7 +1203,7 @@ static int add_to_pagemap(unsigned long addr, pagemap_entry_t *pme,
+ }
+ 
+ static int pagemap_pte_hole(unsigned long start, unsigned long end,
+-				struct mm_walk *walk)
++			    __always_unused int depth, struct mm_walk *walk)
+ {
+ 	struct pagemapread *pm = walk->private;
+ 	unsigned long addr = start;
+diff --git a/include/linux/mm.h b/include/linux/mm.h
+index 1a4b1615d012..0418a018d7b3 100644
+--- a/include/linux/mm.h
++++ b/include/linux/mm.h
+@@ -1420,7 +1420,8 @@ void unmap_vmas(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
+  *	       pmd_trans_huge() pmds.  They may simply choose to
+  *	       split_huge_page() instead of handling it explicitly.
+  * @pte_entry: if set, called for each non-empty PTE (4th-level) entry
+- * @pte_hole: if set, called for each hole at all levels
++ * @pte_hole: if set, called for each hole at all levels,
++ *            depth is -1 if not known
+  * @hugetlb_entry: if set, called for each hugetlb entry
+  * @test_walk: caller specific callback function to determine whether
+  *             we walk over the current vma or not. Returning 0
+@@ -1445,7 +1446,7 @@ struct mm_walk {
+ 	int (*pte_entry)(pte_t *pte, unsigned long addr,
+ 			 unsigned long next, struct mm_walk *walk);
+ 	int (*pte_hole)(unsigned long addr, unsigned long next,
+-			struct mm_walk *walk);
++			int depth, struct mm_walk *walk);
+ 	int (*hugetlb_entry)(pte_t *pte, unsigned long hmask,
+ 			     unsigned long addr, unsigned long next,
+ 			     struct mm_walk *walk);
+diff --git a/mm/hmm.c b/mm/hmm.c
+index a04e4b810610..e3e6b8fda437 100644
+--- a/mm/hmm.c
++++ b/mm/hmm.c
+@@ -440,7 +440,7 @@ static void hmm_range_need_fault(const struct hmm_vma_walk *hmm_vma_walk,
+ }
+ 
+ static int hmm_vma_walk_hole(unsigned long addr, unsigned long end,
+-			     struct mm_walk *walk)
++			     __always_unused int depth, struct mm_walk *walk)
+ {
+ 	struct hmm_vma_walk *hmm_vma_walk = walk->private;
+ 	struct hmm_range *range = hmm_vma_walk->range;
+diff --git a/mm/migrate.c b/mm/migrate.c
+index d4fd680be3b0..8b62a9fecb5c 100644
+--- a/mm/migrate.c
++++ b/mm/migrate.c
+@@ -2121,6 +2121,7 @@ struct migrate_vma {
+ 
+ static int migrate_vma_collect_hole(unsigned long start,
+ 				    unsigned long end,
++				    __always_unused int depth,
+ 				    struct mm_walk *walk)
+ {
+ 	struct migrate_vma *migrate = walk->private;
+diff --git a/mm/mincore.c b/mm/mincore.c
+index 218099b5ed31..c4edbc688241 100644
+--- a/mm/mincore.c
++++ b/mm/mincore.c
+@@ -104,6 +104,7 @@ static int __mincore_unmapped_range(unsigned long addr, unsigned long end,
+ }
+ 
+ static int mincore_unmapped_range(unsigned long addr, unsigned long end,
++				   __always_unused int depth,
+ 				   struct mm_walk *walk)
+ {
+ 	walk->private += __mincore_unmapped_range(addr, end,
 diff --git a/mm/pagewalk.c b/mm/pagewalk.c
-index 98373a9f88b8..dac0c848b458 100644
+index dac0c848b458..b8038f852f06 100644
 --- a/mm/pagewalk.c
 +++ b/mm/pagewalk.c
-@@ -36,7 +36,7 @@ static int walk_pmd_range(pud_t *pud, unsigned long addr, unsigned long end,
- 	do {
- again:
+@@ -38,7 +38,7 @@ static int walk_pmd_range(pud_t *pud, unsigned long addr, unsigned long end,
  		next = pmd_addr_end(addr, end);
--		if (pmd_none(*pmd) || !walk->vma) {
-+		if (pmd_none(*pmd)) {
+ 		if (pmd_none(*pmd)) {
  			if (walk->pte_hole)
- 				err = walk->pte_hole(addr, next, walk);
+-				err = walk->pte_hole(addr, next, walk);
++				err = walk->pte_hole(addr, next, 3, walk);
  			if (err)
-@@ -59,9 +59,14 @@ static int walk_pmd_range(pud_t *pud, unsigned long addr, unsigned long end,
- 		if (!walk->pte_entry)
+ 				break;
  			continue;
+@@ -88,7 +88,7 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
+ 		next = pud_addr_end(addr, end);
+ 		if (pud_none(*pud)) {
+ 			if (walk->pte_hole)
+-				err = walk->pte_hole(addr, next, walk);
++				err = walk->pte_hole(addr, next, 2, walk);
+ 			if (err)
+ 				break;
+ 			continue;
+@@ -123,13 +123,17 @@ static int walk_p4d_range(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	p4d_t *p4d;
+ 	unsigned long next;
+ 	int err = 0;
++	/* If the p4ds are actually just pgds then we should report a depth
++	 * of 0 not 1 (as a missing entry is really a missing pgd
++	 */
++	int depth = (PTRS_PER_P4D == 1)?0:1;
  
--		split_huge_pmd(walk->vma, pmd, addr);
--		if (pmd_trans_unstable(pmd))
--			goto again;
-+		if (walk->vma) {
-+			split_huge_pmd(walk->vma, pmd, addr);
-+			if (pmd_trans_unstable(pmd))
-+				goto again;
-+		} else if (pmd_large(*pmd)) {
-+			continue;
-+		}
-+
- 		err = walk_pte_range(pmd, addr, next, walk);
+ 	p4d = p4d_offset(pgd, addr);
+ 	do {
+ 		next = p4d_addr_end(addr, end);
+ 		if (p4d_none_or_clear_bad(p4d)) {
+ 			if (walk->pte_hole)
+-				err = walk->pte_hole(addr, next, walk);
++				err = walk->pte_hole(addr, next, depth, walk);
+ 			if (err)
+ 				break;
+ 			continue;
+@@ -160,7 +164,7 @@ static int walk_pgd_range(unsigned long addr, unsigned long end,
+ 		next = pgd_addr_end(addr, end);
+ 		if (pgd_none_or_clear_bad(pgd)) {
+ 			if (walk->pte_hole)
+-				err = walk->pte_hole(addr, next, walk);
++				err = walk->pte_hole(addr, next, 0, walk);
+ 			if (err)
+ 				break;
+ 			continue;
+@@ -206,7 +210,7 @@ static int walk_hugetlb_range(unsigned long addr, unsigned long end,
+ 		if (pte)
+ 			err = walk->hugetlb_entry(pte, hmask, addr, next, walk);
+ 		else if (walk->pte_hole)
+-			err = walk->pte_hole(addr, next, walk);
++			err = walk->pte_hole(addr, next, -1, walk);
+ 
  		if (err)
  			break;
-@@ -81,7 +86,7 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
- 	do {
-  again:
- 		next = pud_addr_end(addr, end);
--		if (pud_none(*pud) || !walk->vma) {
-+		if (pud_none(*pud)) {
- 			if (walk->pte_hole)
- 				err = walk->pte_hole(addr, next, walk);
- 			if (err)
-@@ -95,9 +100,13 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
- 				break;
- 		}
- 
--		split_huge_pud(walk->vma, pud, addr);
--		if (pud_none(*pud))
--			goto again;
-+		if (walk->vma) {
-+			split_huge_pud(walk->vma, pud, addr);
-+			if (pud_none(*pud))
-+				goto again;
-+		} else if (pud_large(*pud)) {
-+			continue;
-+		}
- 
- 		if (walk->pmd_entry || walk->pte_entry)
- 			err = walk_pmd_range(pud, addr, next, walk);
+@@ -249,7 +253,7 @@ static int walk_page_test(unsigned long start, unsigned long end,
+ 	if (vma->vm_flags & VM_PFNMAP) {
+ 		int err = 1;
+ 		if (walk->pte_hole)
+-			err = walk->pte_hole(start, end, walk);
++			err = walk->pte_hole(start, end, -1, walk);
+ 		return err ? err : 1;
+ 	}
+ 	return 0;
 -- 
 2.20.1
 
