@@ -2,60 +2,57 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5F0AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:19:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68ADFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:19:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A9DE21924
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:19:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B13D2192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 09:19:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CNxLAX9T"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A9DE21924
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rQHOltk8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B13D2192C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=SJR5AIOZhGVLotsBYT0LRTW5JsftSxwjupZvclTXHaQ=; b=CNxLAX9TpHmWqROOU4tWCQVnL
-	2Dlqd4OcDW6GocWMLhJ3tHrNzH3Cy4xuR9ZvdIBM5jkZFUcqvBcGTBYd6KDCcd1KBlOegiLEgLEyA
-	cQB1enQVNvQynnT2s6U8tFKSOCcCc5eS+F82NkhTT2gZ4nZV6Qv9YL2ttpcyyFM0h0dYdxNlaluHi
-	SaDDr7nIpTh/GKtxhBTjAi8UoWNKFEUE1dtkCmXJIeMI47gKlHcBKXLx3rB6dxPiXfBOZLrLTGLoh
-	1h3Dyo8C2JtfazNuRgu5XB3EikBuQ6KQv3NtEm0VnqpaOdIOrY6gU8fqpisutalqEpPCSEy43pxw6
-	Ob6GfoMvw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=RF59J+qXXzPAda1zaYhmexathUTN0uqEVALuUpzLnM0=; b=rQHOltk82Ixuh1
+	ssEAtPlErR8oe5rADzwpC3QxTM3fdmJL2ZspjdxMyycgtCid1nw8WP/xCcV+a1WgDtHF6UClCjG3N
+	uX63kIEp4m/BBybu1917gS/AwucTGtM30z5p+xUlCu3UYDZ5Lb6UskFkMFtcAIjreCaqrRAMcito5
+	yKRS4If9ed423swpT4eGHLwvgh5yHJtsdopBQS97KZYM3sPdeB0UBUWmhhL891plODXW+y2itC+sA
+	iOaPtA/FKu4YUjfC5cISwtQu8BTBWdE/q2akIUA+qeuwhobqaknWLul1NDsATp9k52iVN8nsI6mfO
+	pWgHbTWyT5u2NSXTtS4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guZdz-0001V9-OL; Fri, 15 Feb 2019 09:18:51 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guZdw-0001Uj-Pu
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 09:18:50 +0000
-Received: from localhost (unknown [83.221.228.209])
- by pokefinder.org (Postfix) with ESMTPSA id EE8B42E3551;
- Fri, 15 Feb 2019 10:18:47 +0100 (CET)
-Date: Fri, 15 Feb 2019 10:18:47 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: kbuild test robot <lkp@intel.com>
-Subject: Re: [PATCH v4 3/3] i2c: at91: added slave mode support
-Message-ID: <20190215091847.pkagndsndjzumzwd@ninjato>
-References: <20181227151311.20107-4-ludovic.desroches@microchip.com>
- <201901050345.JaEWLmjh%fengguang.wu@intel.com>
- <20190115224351.rtbqaqro5pl3dvov@ninjato>
+	id 1guZeK-0001kE-5X; Fri, 15 Feb 2019 09:19:12 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guZeG-0001iy-1G; Fri, 15 Feb 2019 09:19:09 +0000
+Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
+ helo=diego.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1guZe8-0000CI-0R; Fri, 15 Feb 2019 10:19:00 +0100
+From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
+To: Akash Gajjar <Akash_Gajjar@mentor.com>
+Subject: Re: [PATCH 2/4] arm64: dts: rockchip: rockpro64 dts remove unused node
+Date: Fri, 15 Feb 2019 10:18:59 +0100
+Message-ID: <4653141.o6ZdamfZ6d@diego>
+In-Reply-To: <20190213170651.3210-3-Akash_Gajjar@mentor.com>
+References: <20190213170651.3210-1-Akash_Gajjar@mentor.com>
+ <20190213170651.3210-3-Akash_Gajjar@mentor.com>
 MIME-Version: 1.0
-In-Reply-To: <20190115224351.rtbqaqro5pl3dvov@ninjato>
-User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_011848_985977_7BE8904E 
-X-CRM114-Status: UNSURE (   9.07  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190215_011908_222240_4A3E35D7 
+X-CRM114-Status: GOOD (  10.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,74 +64,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alexandre.belloni@bootlin.com, me@jue.yt, linux-kernel@vger.kernel.org,
- Ludovic Desroches <ludovic.desroches@microchip.com>, kbuild-all@01.org,
- andriy.shevchenko@linux.intel.com, Juergen Fitschen <jfi@ssv-embedded.de>,
- linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============1684280162935976668=="
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Shohei Maruyama <cheat.sc.linux@outlook.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ Rob Herring <robh+dt@kernel.org>, Oskari Lemmela <oskari@lemmela.net>,
+ Levin Du <djw@t-chip.com.cn>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Am Mittwoch, 13. Februar 2019, 18:06:38 CET schrieb Akash Gajjar:
+> lcd panel pinmux and vcc1v8_s3 regulator is redundant and has a no impact,
+> so removing it.
+> 
+> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
 
---===============1684280162935976668==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="qchyiiv27q5ypmam"
-Content-Disposition: inline
+vcc1v8_s3 is actually also a emmc supply, so I'd like to keep it around
+for completenes sake.
 
+I've now dropped the regulator portions so that only the lcd-pinmux
+gets removed and reworded the commit message accordingly
+and applied the result for 5.1
 
---qchyiiv27q5ypmam
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Jan 15, 2019 at 11:43:51PM +0100, Wolfram Sang wrote:
->=20
-> > All errors (new ones prefixed by >>):
-> >=20
-> > >> ERROR: "at91_init_twi_bus_slave" [drivers/i2c/busses/i2c-at91.ko] un=
-defined!
-> > >> ERROR: "at91_twi_probe_slave" [drivers/i2c/busses/i2c-at91.ko] undef=
-ined!
->=20
-> That needs to be fixed. Rest looks good to me!
-
-Ludovic, do you have time to fix it? I would really like to apply this
-series for the next merge window.
+Thanks
+Heiko
 
 
---qchyiiv27q5ypmam
-Content-Type: application/pgp-signature; name="signature.asc"
 
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxmg/MACgkQFA3kzBSg
-Kbaxtg/9EujPwpdjaYtxYjWa2I4ETfR0dHWnklKyaTbLIDlAi1HZnfhQ656dWaat
-h+FpC6m9SubOr3DeJxG7XVBsygDvn8AnWS0UJPxzYlBSuOl+XAPoDdpiBwMugpEL
-mKBOyBiLUQ8M7L1LzGHvgnm5Bm3r4xBirPVBYckHc5S2kMGqgarQYopILiwrC62D
-6b+eyKYWbcmpESEIwPz7Sl6KbcOb1WzEJbdmxNCFDmzQhV4K15fMl/BsrRSb0OLa
-9qwhzQ+suUHXk6plDkXg49qvzxEZmPEPg0fDLFAdDHKUVNnLitgj+2DzSdAxSv5c
-PpQaWv82b4CxxAyMi4Zm35CsfwiLb4fhMnfflZh0AaCoRBQit9/R/ROPCFmMVkSG
-2LJ3ap6eENveUXifYjqNV4aoucOtvcQrn0u2Dt2WhaVrlImVoq7hW7+JirzTZxUd
-VpPdsB9Zx7yU/6EgeuzvXaeH780vuWkGezw7GgnQMA9as1KQXOyAsw9KwKEgHnBI
-MlHxZrpv0uYAKKVXV/5gvYmQF5TpkhhWfe4iSkMXGuHKqXFBZ095XAagt6roP58I
-hOQ4eGbKyE9kiIbR2Ie8fQwSK/PpBTDxxcF2ZUk/F2DbPRyh9j1yHLnqWPs11TTo
-fftCDKNQAV44g5TveOVZ7eQUWM9lL/UoSyrrjS8yGZs7LIXKvPI=
-=PYSp
------END PGP SIGNATURE-----
-
---qchyiiv27q5ypmam--
-
-
---===============1684280162935976668==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1684280162935976668==--
-
