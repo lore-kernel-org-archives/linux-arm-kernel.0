@@ -2,152 +2,67 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C703C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:53:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 716DEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:54:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4FDB3222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:53:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41356222A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:54:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gDtITrJV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o/vGb/rI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FDB3222A1
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UsjQGt+i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41356222A1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QOHctYOjFca6LH3ExtJgWanXM1aqHVl/Kp0iZPZp7UY=; b=gDtITrJVkoD/4u
-	XUQH4/tgggZ98JfEDj34OecNEurRjzIrzq166OQ6rIUwBQK/RCN60s22T4giYp8CB5ChgX0SJzzK0
-	b8kIQoZp8bxhwN4Uyv2C1Slcn0GBeMN17YSdliIeGDibTJrIEoGcFhGtezK6re1GfwZkNlLdIFLSQ
-	T16y6OVWo8AYs+2W9y8gqB9y2YQj+Fv64fUfxT8UVBgsbW0jftMvJ8HmuSdnDT5mFdoGbrRIzvDAa
-	7SFkg6ue7d7Vjb0UU6FsYq5ztQGjsEPBtlKCKgPJt3bJZ+VG87O1O9Ppyqr/+m4gyJDbC+0PTUb7G
-	t4C4GQBN85DzjhResc9Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=RE8TSMDm+1Kn1NrmdeksaBXpfLh3ejGV1+eq1mM1VpY=; b=UsjQGt+iizK5WVyfkMja6TSV+
+	TMilrExuUJ1VEJ2Gf18G8ddYOOYTDcxcRhVJ1vRyOIwcGxWa7+sUzFE0yfgN5lNzfmhT7El7wMm0d
+	0rMOkXZi0ORmBFvLCbP+ZdceiwyrNyi81ryGgYZpUrvvbW2FC2vciarwl7qiboy3mU65zHTR1Qy83
+	10ONYytxRxtFP4tzZXt8CB8StCXxiRcVpKecRvnXFMbzCIH1uUYKoe+NsWndjUWRNuLye3dLozhEw
+	MeHUDQvGnevDRPhi2WRqKGqCGNtkPDLRPqXpmznliBu7J1QRbItjKGRmIRoABfCbwTUeNmZ/1xb2p
+	Aw8yQrdKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guicF-000756-1T; Fri, 15 Feb 2019 18:53:39 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guicB-00074l-QP
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 18:53:37 +0000
-Received: by mail-pf1-x444.google.com with SMTP id c123so5256883pfb.0
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 10:53:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=Uww3jCESWScKQjArtNEG2mXqopLtMszsmqcohIsxJRk=;
- b=o/vGb/rITIf7015lgR+bCPuFxuXDiUB3+VsybbG/i2t2KfcmIGrsFjSCcD9bX9UuP8
- dPvh72QConN24X3DlXyfbAwofU7EYAkCnxbuZXTGUtuCe8mzvwuzshRllQtCa2XGRgYf
- +xwPT/xGmK10LK60N1hv/VLDPxO+p9LGywCeX318eT/rFUp3aullNiJUcdklUBwt1ZKq
- M6MkICsNqntz1vbf6NEmJzqKrRUYBB0K1zldgTF0DfA18pnL0GNHTQlun0M8Ix+dGxef
- TPKaY+9orBE5DhF/0RDvpUQV2cJADkG4vGbTihCoizQMlJd6bdQgcAuwb0eDCQMWWuhF
- sPOQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=Uww3jCESWScKQjArtNEG2mXqopLtMszsmqcohIsxJRk=;
- b=fIx8gf12Ysb6Cl9vHxIkGEBa42IHGJ2jC6yvvmAlIPPr26n2pfOikSxeNBi9+1v0s1
- 8w4RHeMTcRvmUpsHKcATDHiToKX+3S8Bt+y6d9wOGQlnLr65mQPAscf3VLREve0NdKm4
- 2I0c2uyZMiAly5lp3jEiuZcXEyo7j/jUsGmD0umdG1zK/b+a8+gXGh9v7EDSGELgqhz3
- ll+5zFY2dnVa3L1gFsLE20mwNHZgQkjFS5z9PxLRTbvBg3aDQM7ahXzoo/2KSrjFDevU
- piWiPAQGSf/1Ue5N6pua8D4D8Rv7P7hL9B/rsEvWgGywHkQZsgre6aO2JijwXouG7ErD
- XsMg==
-X-Gm-Message-State: AHQUAuYp2LgEzK8hGP6DdzWRlwVZbTAkBXou+hBEy9PjQXh+4u1uP27m
- +cvCSrxbuCUdfmILz47XI3A=
-X-Google-Smtp-Source: AHgI3IZ6bl/A5T7VR0voC2MbWO0BCRk0w5yOM+h6AJg36fklDMuyOajpswS6TMbBEpKp1wg5CdUuPQ==
-X-Received: by 2002:a65:60c2:: with SMTP id r2mr6835174pgv.319.1550256814736; 
- Fri, 15 Feb 2019 10:53:34 -0800 (PST)
-Received: from [10.67.48.220] ([192.19.223.250])
- by smtp.googlemail.com with ESMTPSA id l5sm7452612pgl.51.2019.02.15.10.53.30
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 15 Feb 2019 10:53:33 -0800 (PST)
-Subject: Re: [PATCH RESEND net] net: phy: xgmiitorgmii: Support generic PHY
- status read
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- netdev@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-References: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
- <387ed483-b205-beda-319d-6f2b8ea55601@gmail.com>
- <38f6708476e9beca4583ccc2a62e238a4981b735.camel@bootlin.com>
-From: Florian Fainelli <f.fainelli@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
-Message-ID: <958bb823-3dc8-607f-3c38-3d902acb85a8@gmail.com>
-Date: Fri, 15 Feb 2019 10:53:26 -0800
+	id 1guidC-0007Yi-5v; Fri, 15 Feb 2019 18:54:38 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guid4-0007Xu-UY
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 18:54:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F9C2A78;
+ Fri, 15 Feb 2019 10:54:29 -0800 (PST)
+Received: from [192.168.100.241] (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1A7BD3F589;
+ Fri, 15 Feb 2019 10:54:28 -0800 (PST)
+Subject: Re: [PATCH v4 03/12] arm64: Remove the ability to build a kernel
+ without ssbd
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Andre Przywara <andre.przywara@arm.com>
+References: <20190125180711.1970973-1-jeremy.linton@arm.com>
+ <20190125180711.1970973-4-jeremy.linton@arm.com>
+ <20190130180415.0cab24e0@donnerap.cambridge.arm.com>
+ <20190215182037.GI100037@arrakis.emea.arm.com>
+From: Jeremy Linton <jeremy.linton@arm.com>
+Message-ID: <7fa79e1a-3b35-520a-676b-031030108c50@arm.com>
+Date: Fri, 15 Feb 2019 12:54:22 -0600
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <38f6708476e9beca4583ccc2a62e238a4981b735.camel@bootlin.com>
+In-Reply-To: <20190215182037.GI100037@arrakis.emea.arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_105335_884411_94A21F53 
-X-CRM114-Status: GOOD (  23.13  )
+X-CRM114-CacheID: sfid-20190215_105435_072092_119BA801 
+X-CRM114-Status: GOOD (  21.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -159,78 +74,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Michal Simek <michal.simek@xilinx.com>,
- "David S . Miller" <davem@davemloft.net>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Heiner Kallweit <hkallweit1@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: stefan.wahren@i2se.com, mlangsdo@redhat.com, julien.thierry@arm.com,
+ marc.zyngier@arm.com, ykaukab@suse.de, suzuki.poulose@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, steven.price@arm.com,
+ Christoffer Dall <christoffer.dall@arm.com>, shankerd@codeaurora.org,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org,
+ dave.martin@arm.com
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/15/19 10:34 AM, Paul Kocialkowski wrote:
-> Hi,
-> 
-> On Fri, 2019-02-15 at 09:38 -0800, Florian Fainelli wrote:
->> On 2/15/19 8:32 AM, Paul Kocialkowski wrote:
->>> Some PHY drivers like the generic one do not provide a read_status
->>> callback on their own but rely on genphy_read_status being called
->>> directly.
->>>
->>> With the current code, this results in a NULL function pointer call.
->>> Call genphy_read_status instead when there is no specific callback.
->>>
->>> Fixes: f411a6160bd4 ("net: phy: Add gmiitorgmii converter support")
->>> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
->>> ---
->>> Added Fixes tag and net label for resend.
+Hi,
+
+
+Thanks for taking a look at this:
+
+On 2/15/19 12:20 PM, Catalin Marinas wrote:
+> On Wed, Jan 30, 2019 at 06:04:15PM +0000, Andre Przywara wrote:
+>> On Fri, 25 Jan 2019 12:07:02 -0600
+>> Jeremy Linton <jeremy.linton@arm.com> wrote:
+>>> Buried behind EXPERT is the ability to build a kernel without
+>>> SSBD, this needlessly clutters up the code as well as creates
+>>> the opportunity for bugs. It also removes the kernel's ability
+>>> to determine if the machine its running on is vulnerable.
 >>
->> You would want to use phy_read_status() which encapsulates that check as
->> well as checks that the phy_drv pointer is not NULL.
-> 
-> Well, this driver is a bit different and our priv->phy_drv != phydev-
->> drv, so we can't use the helper directly. I should probably have
-> mentionned it in the commit message, sorry!
-> 
-> As I was mentionning to Andrew in the initial submission of this patch,
-> this driver is a bit unusual since it represents a GMII to RGMII
-> bridge, so it's not actually a PHY driver on its own -- it just sticks
-> itself in between the actual PHY and the MAC.
-
-Yes, my bad, you should still consider checking priv->phy_drv though, if
-someone unbinds the PHY driver on either side, you are toast.
-
-> 
-> Cheers and thanks for the review,
-> 
-> Paul
-> 
->>>  drivers/net/phy/xilinx_gmii2rgmii.c | 5 ++++-
->>>  1 file changed, 4 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
->>> index 74a8782313cf..bd6084e315de 100644
->>> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
->>> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
->>> @@ -44,7 +44,10 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
->>>  	u16 val = 0;
->>>  	int err;
->>>  
->>> -	err = priv->phy_drv->read_status(phydev);
->>> +	if (priv->phy_drv->read_status)
->>> +		err = priv->phy_drv->read_status(phydev);
->>> +	else
->>> +		err = genphy_read_status(phydev);
->>>  	if (err < 0)
->>>  		return err;
->>>  
->>>
+>> I don't know the original motivation for this config option, typically
+>> they are not around for no reason.
+>> I see the benefit of dropping those config options, but we want to make
+>> sure that people don't start hacking around to remove them again.
 >>
+>>> Since its also possible to disable it at boot time, lets remove
+>>> the config option.
 >>
+>> Given the level of optimisation a compiler can do with the state being
+>> known at compile time, I would imagine that it's not the same (though
+>> probably very close).
+>>
+>> But that's not my call, it would be good to hear some maintainer's
+>> opinion on this.
+> 
+> Having spoken to Will, we'd rather keep the config options if possible.
+> Even if they are behind EXPERT and default y, they come in handy when
+> debugging.
+> 
+> Can we still have the sysfs information regardless of whether the config
+> is enabled or not? IOW, move the #ifdefs around to always have the
+> detection while being able to disable the actual workarounds via config?
+
+Yes, that is possible, but the ifdef'ing gets even worse. (see v3).
+
+> Are the code paths between config and cmdline disabling identical? At a
+> quick look I got the impression they are not exactly the same.
+
+No, they do vary slightly. For debugging I would expect that the CONFIG 
+disabled code paths to be the one that accumulates bugs over time. The 
+command line options just force the runtime vulnerable/not-vulnerable 
+decision, which should be the code paths in general use. For benchmark 
+the run-time options are also a better choice because they don't have 
+any 2nd order affects caused by code alignment/etc changes.
+
+Maybe your implying the CONFIG_ options should basically force the 
+command line? That both reduces the code paths, and simplifies the 
+ifdef'ing.
 
 
--- 
-Florian
+
 
 _______________________________________________
 linux-arm-kernel mailing list
