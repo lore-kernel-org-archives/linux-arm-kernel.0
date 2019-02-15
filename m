@@ -2,22 +2,23 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A11D4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 06:20:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48ACAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 07:24:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64EF3214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 06:20:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D16021925
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 07:24:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HpmgH9rw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="jOUoVPLQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64EF3214DA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DXZSuHnp";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="blybIFt5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D16021925
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,63 +26,72 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=v04Gig5K5XQ66OvkpsJjoNFUmJkni866Fby7otXyayw=; b=HpmgH9rwsCBJF4
-	hivxq1abAbdw9MlSSYg16Gymv9usgcFHHQJle62NnPYpUOHmBtlgVG+j1UVn0TOFdHcfTzx8Q1Cpq
-	QpyhlEQ6MH+VlMatJQ0S0/yG8JEVn/DSedAF3cHt5nLiLkEjRCAC3ciJE6OyCfub9zoBwioTSj94r
-	0zJrJughmA1jhMTI92vZkyrOZmx9HKTQje42ki0iZ3n5swT/PZJJy3GEcayzAjFwyKNsvKITeVr41
-	tpx+usA/4WEZ2yBiiHqLC9jPOKVfR4XC8XmQBpGolz/0N0OCbHneQKOJmgDGnYbnRdfbkviXWAtO6
-	jx9UD0cgxiGHDjvaN62A==;
+	List-Owner; bh=66Ed7T46raNcWfrvCA3YOkVcLW7yClNZSSgS/bFGdmE=; b=DXZSuHnpozazX1
+	+4sYST9M3v9MLJdqwp4A7HlrzQrRunkgPVMs9ES751SBltoe13G3tr1wMMOYIjqhl9/oU4M84LHms
+	VG2w1ixK6/9pFBabUnwZ+U90TGLGLkbqcgyNEARebjYQ9TysPZ2Xn3Hsd7CA/GkiIyl3gu1zuBOw0
+	smMhAqxV9XIWgrGngKcIz7Bop5ZeuqJtBTUZq6QQC9yX0ISaNS0HFEUlQT9T9KaMUUkWl5JtWTw5f
+	pjSeows9WiNmne3JLI6LKyopkMP75C90tUO5pDIqiumRg8odQpUTDDHZr5oYuVIkVw0oHVctTLDbo
+	d6vaxfDThPZbQdMJWdwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guWr0-00069j-Um; Fri, 15 Feb 2019 06:20:06 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1guXr0-0007zl-PC; Fri, 15 Feb 2019 07:24:10 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guWqw-0005Oz-CP; Fri, 15 Feb 2019 06:20:04 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1F6JrfR083423;
- Fri, 15 Feb 2019 00:19:53 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550211593;
- bh=VvYosYLXTZE6Xwyjczf/0uYinaS7PQPeE6ljLNmbDgc=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=jOUoVPLQmKbqsitdkvRyRrmkqcoziJBqhVj5Yly5QTX34OkliiQz7JLrH+TLKJJfZ
- wySnQRfSzYfmG6N8uHg7HmiWzdzmkReLIULgEzALzo4+zsD8uxDqnGHvmh4w2Z3qPP
- 8GPt5BpMLSRurtmpD0Xjkb24LD4c4M+jI0F9BALg=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1F6JrKR015573
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 15 Feb 2019 00:19:53 -0600
-Received: from DLEE102.ent.ti.com (157.170.170.32) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 15
- Feb 2019 00:19:52 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE102.ent.ti.com
- (157.170.170.32) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 15 Feb 2019 00:19:52 -0600
-Received: from [172.24.190.233] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1F6JmOD016900;
- Fri, 15 Feb 2019 00:19:49 -0600
-Subject: Re: [PATCH v2 08/15] PCI: endpoint: Fix pci_epf_alloc_space to set
- correct MEM TYPE flags
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-References: <20190114111513.21618-1-kishon@ti.com>
- <20190114111513.21618-9-kishon@ti.com>
- <20190211173723.GA31035@e107981-ln.cambridge.arm.com>
- <ebadc615-f633-e84e-041a-99b7936a123b@ti.com>
- <20190214162928.GA32523@e107981-ln.cambridge.arm.com>
-From: Kishon Vijay Abraham I <kishon@ti.com>
-Message-ID: <edc76e9b-bdd4-80bb-3dff-1d44a100c153@ti.com>
-Date: Fri, 15 Feb 2019 11:49:12 +0530
+ id 1guXqx-0007yq-NM; Fri, 15 Feb 2019 07:24:09 +0000
+Received: by mail-ed1-x541.google.com with SMTP id b14so7124893edt.6;
+ Thu, 14 Feb 2019 23:24:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=RFbQfwT9/wI/RORTUjQ3U5Yg8CJ+8DH8wJ1ahrulbsk=;
+ b=blybIFt5OTKxp1WUoiro1xJDcfgPKy9/3NJH9+Y8BpSlL/43pnfgASi+YmKW8qZdyt
+ 5a6OiGtixLknLzCA8e9U61SLDOVt0kLBbu8dAMpTZVo/H9NUw7hIuEm0fgkrjEWAIMBW
+ fk6iUhfEEoy1A5ELuAO0KGYKqSxCdkmKf+mSgbfN5mgJj0hyw20Ni0ZKaNkX4WRPkpuU
+ LVuuMsXokLEz8orXgquv+gPY9+jTmYhuwNoQfJBt1uPndj3KKlIagjqty0hmdtEuk5+C
+ 5cGnpjwYYXm/GeHyHXdZYzTOdLjAzD1Aj4m1suCJmNvLxwAXeuJvF8NC7z5iTndhwWMs
+ hybA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=RFbQfwT9/wI/RORTUjQ3U5Yg8CJ+8DH8wJ1ahrulbsk=;
+ b=tIJtSCwQEL/EqK3fqRYy9B6V+BY1G2QDmFmdRPgyaSJBmFAmtmSGDe8ix7GB/ZaOaB
+ GJkB1iP6BwHM9XhgI2rVdGy8xXHT33s11J8Z1etO82gEk85vupWXFrsVZDgmJ7w9x+nB
+ O3XrLOkAUR+BmiQl3k169rrJQ8A5x1R+PQae2rFNKIjU/wo0X2800OMreuSr6ko6/aoT
+ rGnsIfaitJBBg4yyUHXBanBymG1E4dC5+YcvYbYePiAfvIfh/LwIwvKws23lm7g+tPDC
+ 9STaPodHrMFouDt7CdL4I1CSBX1ffMExhLJr9YhLkQIMhdUy7l1wCuP2PZCqHqAyYATk
+ V8PA==
+X-Gm-Message-State: AHQUAubjg/qhLwdcYELQ1Oyv1V1oxgWcr8w4mRaHmaz/CwkVWAA1u+nP
+ y2847EDzvLi+sW1WC+YzWhQ=
+X-Google-Smtp-Source: AHgI3IaRcvNDZ6LrhNsdE+1h3x/aLnoScqSN/glGCsbecY0yiEJlkmZwYgYgQazCUTWS4FPBFufJgw==
+X-Received: by 2002:a50:a982:: with SMTP id n2mr6293614edc.236.1550215442691; 
+ Thu, 14 Feb 2019 23:24:02 -0800 (PST)
+Received: from linux-gy6r.site ([93.176.151.17])
+ by smtp.gmail.com with ESMTPSA id z19sm1039676ejm.47.2019.02.14.23.24.00
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 23:24:01 -0800 (PST)
+Subject: Re: [PATCH v7 1/6] dt-bindings: mtk-sysirq: Add compatible for
+ Mediatek MT8183
+To: Erin Lo <erin.lo@mediatek.com>, Linus Walleij <linus.walleij@linaro.org>, 
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Jason Cooper <jason@lakedaemon.net>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Stephen Boyd <sboyd@codeaurora.org>
+References: <1550210558-30516-1-git-send-email-erin.lo@mediatek.com>
+ <1550210558-30516-2-git-send-email-erin.lo@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Message-ID: <fe86572e-690b-0e11-cb00-4cfe3a33c5fa@gmail.com>
+Date: Fri, 15 Feb 2019 08:21:50 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190214162928.GA32523@e107981-ln.cambridge.arm.com>
+In-Reply-To: <1550210558-30516-2-git-send-email-erin.lo@mediatek.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_222002_543477_CF244516 
-X-CRM114-Status: GOOD (  18.96  )
+X-CRM114-CacheID: sfid-20190214_232407_763532_042FA718 
+X-CRM114-Status: GOOD (  16.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,54 +103,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Heiko Stuebner <heiko@sntech.de>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- Shawn Lin <shawn.lin@rock-chips.com>, linux-pci@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
- Alan Douglas <adouglas@cadence.com>, Jingoo Han <jingoohan1@gmail.com>,
- Bjorn Helgaas <bhelgaas@google.com>, linux-omap@vger.kernel.org,
+Cc: devicetree@vger.kernel.org, srv_heupstream <srv_heupstream@mediatek.com>,
+ mars.cheng@mediatek.com, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ yingjoe.chen@mediatek.com, eddie.huang@mediatek.com, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Lorenzo,
 
-On 14/02/19 9:59 PM, Lorenzo Pieralisi wrote:
-> On Wed, Feb 13, 2019 at 07:17:14PM +0530, Kishon Vijay Abraham I wrote:
->> Hi Lorenzo,
->>
->> On 11/02/19 11:07 PM, Lorenzo Pieralisi wrote:
->>> On Mon, Jan 14, 2019 at 04:45:06PM +0530, Kishon Vijay Abraham I wrote:
->>>> pci_epf_alloc_space() sets the MEM TYPE flags to indicate a 32-bit
->>>> Base Address Register irrespective of the size. Fix it here to indicate
->>>> 64-bit BAR if the size is > 2GB.
->>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>>  drivers/pci/endpoint/pci-epf-core.c | 4 +++-
->>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>
->>> This looks like a fix and should me marked as such. Does it work
->>> as as standalone patch if it gets backported ?
->>
->> Yeah, it should work. But the current users doesn't allocate > 2GB and some
->> EPC drivers configure their registers based on size. So nothing is broken
->> without this patch as such.
+
+On 2/15/19 7:02 AM, Erin Lo wrote:
+> This adds dt-binding documentation of SYSIRQ for Mediatek MT8183 SoC
+> Platform.
 > 
-> I suspect you mean 4GB (here and the commit log), right ? I am checking
-> the commit logs, aiming at merging the patches.
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> ---
 
-A 32bit BAR register can support a 'size' of only up to 2GB. Though it can hold
-a memory address of up to 4GB.
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-This is also mentioned in the PCI Local Bus Specification.
-"A 32-bit register can be implemented to support a single memory size that is a
-power of 2 from 16 bytes to 2 GB"
+Marc you want me to take it through my tree?
 
-Thanks
-Kishon
+>  .../devicetree/bindings/interrupt-controller/mediatek,sysirq.txt         | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> index 33a98eb..91aa9ab 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/mediatek,sysirq.txt
+> @@ -5,6 +5,7 @@ interrupt.
+>  
+>  Required properties:
+>  - compatible: should be
+> +	"mediatek,mt8183-sysirq", "mediatek,mt6577-sysirq": for MT8183
+>  	"mediatek,mt8173-sysirq", "mediatek,mt6577-sysirq": for MT8173
+>  	"mediatek,mt8135-sysirq", "mediatek,mt6577-sysirq": for MT8135
+>  	"mediatek,mt8127-sysirq", "mediatek,mt6577-sysirq": for MT8127
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
