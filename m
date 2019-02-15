@@ -2,185 +2,84 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13229C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:27:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3BDCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:29:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CF24B2192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:27:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 90F0E2192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:29:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gi6KlzdT";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="n5uoeju4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF24B2192D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YS5mgVyz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ettus-com.20150623.gappssmtp.com header.i=@ettus-com.20150623.gappssmtp.com header.b="mzveJjO+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90F0E2192D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ettus.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2VqQ579+fPKmQeYIGewRXQ8sYKDSK8ovGrWF04vskoM=; b=Gi6KlzdTFBDYeP
-	u/S6A5w0b3uxhitrj98oMyvcb1+lDhaYBDY+yoxUh8OtGTNS628Muy3jXAP7BwVzXmSaBWyRDnVE0
-	U28TgZpr12t36U5NcXjJcFIra9O3F1M2oAT3VH05SK3D/UJu+fPpvsMCKcgLQwIUg5tI32o4xEKsM
-	XrhkPtdk7QbxbbpMQKeozsmdRrQrmQ6XBamx2kUPi6CegB8nJ6hEmliRR3GWHFr7vbyowGdQrYSUl
-	vUa1qLaiVhBGrWY4guVIHJ2t1IZNOdA2149jq01noCybPeGlYhNysvl8q2KIapFiaInhcUkrAx67m
-	48FyHL7il9kVPS53WR2A==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Pcz9mMe7EviKGJvck0+R7TJDYWW5E3DhJfv1CH2ytcY=; b=YS5mgVyzCwtEvC
+	25yWiQ/0OljkJ1uuEBNIK/HF3PPuYODe9VklamnyslvMlRaP1xyiD6uYkkAwKK47qXy8r5wgLubrT
+	D76Oaa7ohp1o5WNwRqdt6rvS7EbH1ZDbJ94t77KascI1eyPDoET4eRnI+MZRuQ2SoNBnXPNxt3br/
+	IW246NKPaXoydklJdzmkf+eu6bgXN/SMs2BUM+wa92phKaCEcdtdd09quQthKGa7h45TpCwFg5L6U
+	SviO6RFkW3gG149xO/Aq+KnEGdcWFQRk8AeAU+oVuXaMzBMjrv19YKe2Wp38wvftdk7sw89hjosam
+	H8GgPK1PoVRMtAxFi9kQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufOK-0000nF-I8; Fri, 15 Feb 2019 15:27:04 +0000
-Received: from mail-ed1-x529.google.com ([2a00:1450:4864:20::529])
+	id 1gufQx-00019L-44; Fri, 15 Feb 2019 15:29:47 +0000
+Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufOG-0000m5-NS; Fri, 15 Feb 2019 15:27:02 +0000
-Received: by mail-ed1-x529.google.com with SMTP id d9so8232982edh.12;
- Fri, 15 Feb 2019 07:27:00 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=AJfGbUUbv5MeiJiOWalJPdc/xA6lLPfTVX0VaPI35sM=;
- b=n5uoeju4uLYlOIvHmDSz04n9Qf7ClU745HGz82GrjDTxRfU6M3ANEp7DK++eov5jwY
- q5CAqGvjMPj46TLnnZ4uvFKttE7QJRy416qaQFtQAGu+3rzIfhSF/DdOTUcUViqY0/IX
- DItM3Eb9zWoauRnPpyGuu18urIjRpfekF3ADc5zBcKYgyMCsvCaT8Md3oAsGVzdZ2T8k
- Yo64HbSGTdPzM0KFDfpbYoWa5NFawVd8IVEIufoYbXeYoYANQ2xiWwe7ZEm63+pY7OWC
- 9njPxh7Lfsg0m7TPqHQyZjuuehqfOHh2nsW2ZdsnjOVqYoQNkEc/JWwkgJvEYbBU5PlM
- igaQ==
+ id 1gufQt-00018z-NY
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:29:45 +0000
+Received: by mail-ed1-x542.google.com with SMTP id f2so8235351edy.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 07:29:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=ettus-com.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=+qQVLOm+tc6witGNoTG9gdfSDZengbsbLuRNCQL5ryo=;
+ b=mzveJjO+4aNOs1o6nVRjMlC6boIT0oM6N0eJWQHCDX/CwBMyt0vGJJs0G5RW7nPToK
+ PBWAAGkqRsYICdw+NAgWwbPxtenmagWpOE6i2KEfSJfAxPrjBXTcxE05W6iiSEnPz8B8
+ Wcw64qfslCSHVfwCD5Xn6SVMl0iPf9CDSlbnU9xYXBQyl4dEw3w8yb+vPNizXonIKhhX
+ YUwecHkV49EbXpJFyTAaLx9Q0mNlg4ZiTl06VGMp9dWQzUQlopDfpz/bFbu7AvVe4Qaw
+ JIBlrELn6xm0XLFY8/59DQCSuLQf/FBjF4nDNHzramoQGPygGnC+pf188J043T3P7yVb
+ Ad7g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=AJfGbUUbv5MeiJiOWalJPdc/xA6lLPfTVX0VaPI35sM=;
- b=ffkPJiUGoveziKWrCTMzhy7AQQBf5qJRZ4ZfaidfFuTVX39vTsBAmYCEGEP8JmKhWF
- gDdzXpsapciNBdUqt2di0VvEvm0H1QkbD+U7SkCpPcjdQKitY5Gm4XuVnzGvDdlZenOn
- 5SO68Q2lhMFFPXWre19+5mgNJddyXt7Sgmh7mK53CvlGJm3v8yt7Dv0AJiJUk9xN3Nio
- MhkL0RV22bwswzwVHm/aaEJ/QQRUPa9NASySret69zHgA3sGy4JXA0yBh9JkygUSGKKC
- wb7iqA/rAQQszWSiq9BjoQJjSDeAnCCaC/1MVT+GFB6VSVCuxIl3/yLFSGpdPs8JnVGC
- Baiw==
-X-Gm-Message-State: AHQUAuZVT56jRekVqGu4okdzEfIYT9d1HvXw8R5BqkYIRMRdg9IVDMRB
- VA4JHBMdPKXLwIJVxYql2Spf7RPg
-X-Google-Smtp-Source: AHgI3IYWk+R2NEHEZ1OHpIcizCNDT+vGGx7p94FJN7ZmErlezbTrARgC8S0IKRCfjiu8nIIxj/R1rg==
-X-Received: by 2002:a50:ae63:: with SMTP id c90mr4814478edd.285.1550244418936; 
- Fri, 15 Feb 2019 07:26:58 -0800 (PST)
-Received: from ziggy.stardust ([37.223.146.9])
- by smtp.gmail.com with ESMTPSA id a5sm1588486ede.4.2019.02.15.07.26.57
- (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
- Fri, 15 Feb 2019 07:26:58 -0800 (PST)
-Subject: Re: [GIT PULL] Mediatek DT 32 bit updates for v5.1
-To: Arnd Bergmann <arnd@arndb.de>
-References: <40e8af4e-e86d-af97-d9bf-0932c97a2829@gmail.com>
- <CAK8P3a3jS29RYQfSj84D-mAaGzdyQ1MYLK+MtXp7ubYrssY-ug@mail.gmail.com>
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <c83d0db8-043d-4276-0143-f81f05d7e4d5@gmail.com>
-Date: Fri, 15 Feb 2019 16:26:56 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.3
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=+qQVLOm+tc6witGNoTG9gdfSDZengbsbLuRNCQL5ryo=;
+ b=F6zd17newi+C/pUttFS8YEAr8Koyl4jTuAMywDvcU4elT/iFWRLfW0ZwS5QZApF0Ut
+ 1u1Yn6Ga3TBv09wi8c6S1lJUpfZa8zVN14elPRGprpKnSfImKR4G9PX5n5GG6OATP44n
+ OVH/SQHPmDsjUIpk5jgVlvz0FgpSZzqVHLgWsm1+EVPeSG0W+pCOS/aU0sz+L6FCPVC4
+ V0lt3BBvHO7jk2OsIOt43oVGsw85myGcRo5QXcYqop01Jhd/YcvSQxHfhoXsihg4rqR8
+ icKh8OKyfsIT8t90cA6ZzVftHWtWVwjggkhtPgVdTdJZc+yzU7aB2fgWK9gykK/2MX4r
+ g6Zg==
+X-Gm-Message-State: AHQUAub6jl/P5Gw5qHnVrn5ZWr+DnOJEdCjF3gAFU1N4tKFCfj44/Ad1
+ KQ55iEz7F+zkljjAoY86slKGTHNOjl9TYu8bgX8/gg==
+X-Google-Smtp-Source: AHgI3IbhNdX2Bg74RLwEkcrRhm1vApGLVElMs+TzLvz6uAt2lN8weU+z+0CEEofHxBAMRg2aie/EVF7GCI6DKXSyJXs=
+X-Received: by 2002:a17:906:651:: with SMTP id
+ t17mr7169879ejb.144.1550244581539; 
+ Fri, 15 Feb 2019 07:29:41 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAK8P3a3jS29RYQfSj84D-mAaGzdyQ1MYLK+MtXp7ubYrssY-ug@mail.gmail.com>
-Content-Language: en-US
+References: <20190131213957.11568-1-alex.williams@ettus.com>
+ <CAKfKVtFM1zPb-MjBwY8WREy4xoHW60JrjZ-LnSzBvJ1Yv_zgsw@mail.gmail.com>
+In-Reply-To: <CAKfKVtFM1zPb-MjBwY8WREy4xoHW60JrjZ-LnSzBvJ1Yv_zgsw@mail.gmail.com>
+From: Alex Williams <alex.williams@ettus.com>
+Date: Fri, 15 Feb 2019 07:29:30 -0800
+Message-ID: <CAJZzcDiv8BGDa8pj-2gP+BWiu=CfrsDi15xHr=UUFwCwE-E4zg@mail.gmail.com>
+Subject: Re: [PATCH] i2c: cadence: Handle transfer_size rollover
+To: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_072700_765230_618262F6 
-X-CRM114-Status: GOOD (  13.56  )
+X-CRM114-CacheID: sfid-20190215_072943_827280_9A045A19 
+X-CRM114-Status: GOOD (  13.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -192,42 +91,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>, arm-soc <arm@kernel.org>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-mediatek@lists.infradead.org>, Ryder Lee <ryder.lee@mediatek.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-kernel@vger.kernel.org, Alex Williams <alex.williams@ni.com>,
+ linux-arm-kernel@lists.infradead.org, mical.simek@xilinx.com,
+ linux-i2c@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Feb 15, 2019 at 2:53 AM Shubhrajyoti Datta
+<shubhrajyoti.datta@gmail.com> wrote:
+>
+> HI Alex,
+>
+> Thanks for the patch.
+>
+> On Fri, Feb 1, 2019 at 4:22 AM <alex.williams@ettus.com> wrote:
+> >
+> > From: Alex Williams <alex.williams@ni.com>
+> >
+> > Under certain conditions, Cadence's I2C controller's transfer_size
+>
+> Any help in reproducing the conditions would be appreciated
+>
+>
+> > register will roll over and generate invalid read transactions. Before
+> > this change, the ISR relied solely on the RXDV bit to determine when to
+> > write more data to the user's buffer. The invalid read data would cause
+> > overruns, smashing stacks and worse.
+> >
+> > This change stops the buffer writes to the requested boundary and
+> > reports the error. The controller will be reset so normal transactions
+> > may resume.
+> >
+> > Signed-off-by: Alex Williams <alex.williams@ni.com>
 
 
-On 15/02/2019 15:54, Arnd Bergmann wrote:
-> On Fri, Feb 8, 2019 at 8:59 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
->>   ssh://git@gitolite.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
->> tags/v5.0-next-dts32
->>
->> for you to fetch changes up to 60b71a239bbd286232a547349815d6330f10db7c:
->>
->>   dt-bindings: interrupt-controller: update bindings for MT7623 (2019-02-08
->> 13:18:04 +0100)
->>
->> ----------------------------------------------------------------
->> mt7623:
->> add cooling mask to all CPUs
->> add compatible to sysirq binding
-> 
-> I replaced the URL with the publically accessible
-> https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
-> and merged it into arm/dt, thanks!
-> 
+One possible related errata is here:
+https://www.xilinx.com/support/answers/61664.html
 
-Argh, thanks for the info. I'll have to see what changed that made my workflow
-broke. Using a rolling release always bring some surprises...
+In our case, we only needed to hammer on i2c to reproduce in a few
+minutes, with a script like this:
+while true
+    do date
+    cat /sys/class/gpio/gpio882/direction > /dev/null
+    cat /sys/class/gpio/gpio883/direction > /dev/null
+    cat /sys/class/gpio/gpio884/direction > /dev/null
+    cat /sys/class/gpio/gpio885/direction > /dev/null
+    cat /sys/class/gpio/gpio886/direction > /dev/null
+    cat /sys/class/gpio/gpio887/direction > /dev/null
+    cat /sys/class/gpio/gpio888/direction > /dev/null
+    cat /sys/class/gpio/gpio889/direction > /dev/null
+    cat /sys/class/gpio/gpio890/direction > /dev/null
+    cat /sys/class/gpio/gpio891/direction > /dev/null
+    cat /sys/class/gpio/gpio892/direction > /dev/null
 
-Regards,
-Matthias
+    cat /sys/class/gpio/gpio894/direction > /dev/null
+    cat /sys/class/gpio/gpio895/direction > /dev/null
+    cat /sys/class/gpio/gpio896/direction > /dev/null
+    cat /sys/class/gpio/gpio897/direction > /dev/null
+    cat /sys/class/gpio/gpio898/direction > /dev/null
+    cat /sys/class/gpio/gpio899/direction > /dev/null
+    cat /sys/class/gpio/gpio900/direction > /dev/null
+    cat /sys/class/gpio/gpio901/direction > /dev/null
+    cat /sys/class/gpio/gpio902/direction > /dev/null
+    cat /sys/class/gpio/gpio903/direction > /dev/null
+    cat /sys/class/gpio/gpio904/direction > /dev/null
+    cat /sys/class/gpio/gpio905/direction > /dev/null
+done
+
+In normal usage, we have code that sets up a number of i2c GPIO
+expanders and pokes them for values as it initializes devices.
+Occasionally, the transfer size register will roll over, and the ISR
+will cause memory corruption, since it doesn't stop writing at the
+requested boundary.
 
 _______________________________________________
 linux-arm-kernel mailing list
