@@ -2,64 +2,59 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D8FAFC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:03:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFF66C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:03:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E54F21924
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:03:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC08421924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:03:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iHcMOYb1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E54F21924
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dTPkt9Xd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC08421924
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8xmwHnWHdh9MFPkDuojANhrTkIqpyeCRCFc1VsF+NNM=; b=iHcMOYb1MUILCZ
-	qkhaX/Ctz8ou1nLpheIfxqO3LDfGOmZGX8bSzZRxPT+1zT7noFhcrNir7cPfToIT41vnX7BamxO6V
-	N10XpOc+9ySswBEDP3fd35fCQUX9V+HLtgE4Ov1WnjtUQq/4FaB1mfcJ/zElNLm4Wd5XttE5Jl3ln
-	PhoxSq+gsBQjb5BueiYwzUc87qo+DuFyAoWMWXNC5i1sEEuYcG90Cno2DgSoSuAlo8zE1ViQiJmD2
-	+UJhHlYkkiYs1YmO0xo4MqIa8aZKoG0r6Xax120hIhxzM1k6JOp5j2fbByKGg79kC8Rt5/Xxt/IBf
-	WRqhtxfMGEi2RuFbr7MA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=JUChcNAGqxTACK9E4ispFhXofKRik+NNwszp1zMDSzA=; b=dTPkt9Xdwqno7U
+	9N37cf3ksf42ZoW5ARHrwgwK0ZqlKufmVtkZLZXHhhGvgZ/q+Z//WumsScDDMBpzgW04+o287oRtH
+	zpgk4ZWXZfJ5fi7J+GnJeDak2YocV3jiVO/6WPNL6B8r06MV/ZG6FpNOWCZ3QcjLfXxj98ouduk4u
+	9B20wkTIeTur95tdinbviI7rO6+bCMTAu5engAahJTMw6Dmvbb+9g2g8w/rM+FWNDBazdFLptxdXT
+	8SK1hStNKeZ0oJrSUBb7kCosLqoFvxJCQpuap1SmIszBqx8ohoz15DVg/WLdmVccF95PBZeRN2v7D
+	OcwsMaPfB8jpaha7TsJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugtM-0003yq-IN; Fri, 15 Feb 2019 17:03:12 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gugtU-0004Ab-Vm; Fri, 15 Feb 2019 17:03:20 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugst-0003Xa-I0
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:02:45 +0000
+ id 1gugtG-0003vs-0M
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:03:10 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EEF4DEBD;
- Fri, 15 Feb 2019 09:02:42 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id DB3883F557;
- Fri, 15 Feb 2019 09:02:40 -0800 (PST)
-Date: Fri, 15 Feb 2019 17:02:38 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Zhi Li <lznuaa@gmail.com>
-Subject: Re: [PATCH V3 1/4] drivers/perf: imx_ddr: Add ddr performance
- counter support
-Message-ID: <20190215170238.GB10859@lakrids.cambridge.arm.com>
-References: <1550081533-25000-1-git-send-email-Frank.Li@nxp.com>
- <20190215142241.GB55505@lakrids.cambridge.arm.com>
- <CAHrpEqT9sS2gmvB9iSH6V2-B3iza05qMGGLYRwR2sR3ZjO4wqA@mail.gmail.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9A0F8EBD;
+ Fri, 15 Feb 2019 09:03:03 -0800 (PST)
+Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
+ [10.1.196.69])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A5A373F557;
+ Fri, 15 Feb 2019 09:03:00 -0800 (PST)
+From: Steven Price <steven.price@arm.com>
+To: linux-mm@kvack.org
+Subject: [PATCH 00/13] Convert x86 & arm64 to use generic page walk
+Date: Fri, 15 Feb 2019 17:02:21 +0000
+Message-Id: <20190215170235.23360-1-steven.price@arm.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAHrpEqT9sS2gmvB9iSH6V2-B3iza05qMGGLYRwR2sR3ZjO4wqA@mail.gmail.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_090243_620329_B281BA97 
-X-CRM114-Status: GOOD (  21.66  )
+X-CRM114-CacheID: sfid-20190215_090306_084743_82F715C8 
+X-CRM114-Status: GOOD (  14.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,107 +66,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Frank Li <frank.li@nxp.com>, "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: x86@kernel.org, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Steven Price <steven.price@arm.com>,
+ =?UTF-8?q?J=C3=A9r=C3=B4me=20Glisse?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 10:04:10AM -0600, Zhi Li wrote:
-> On Fri, Feb 15, 2019 at 8:22 AM Mark Rutland <mark.rutland@arm.com> wrote:
-> >
-> > On Wed, Feb 13, 2019 at 06:12:27PM +0000, Frank Li wrote:
-> > > +struct fsl_ddr_devtype_data {
-> > > +     unsigned int flags;
-> > > +};
-> > > +
-> > > +static const struct fsl_ddr_devtype_data imx8_data;
-> > > +static const struct fsl_ddr_devtype_data imx8m_data = {
-> > > +     .flags = DDR_CAP_AXI_ID,
-> > > +};
-> > > +
-> > > +static const struct of_device_id imx_ddr_pmu_dt_ids[] = {
-> > > +     { .compatible = "fsl,imx8-ddr-pmu", .data = (void *)&imx8_data},
-> > > +     { .compatible = "fsl,imx8m-ddr-pmu", .data = (void *)&imx8m_data},
-> > > +     { /* sentinel */ }
-> > > +};
-> >
-> > You could encode the flags directly in of_device_id::data, and avoid the
-> > need for this structure entirely.
-> 
-> I plan use fsl_ddr_devtype to save some friendly AXI ID name in future, such as
-> GPU  0x111122222
-> VPU  0x333344444
-> 
-> so user can use bus master name instead of to look ref manual to get hex number.
-> 
-> perf stat -e ddr0/axid_read, axid=GPU
-> 
-> But perf application can't pass string by config.
-> 
-> Any suggestion here ?
+Most architectures current have a debugfs file for dumping the kernel
+page tables. Currently each architecture has to implement custom
+functions for walking the page tables because the generic
+walk_page_range() function is unable to walk the page tables used by the
+kernel.
 
-Remove it for now, and we can consider it if/when you add that
-functionality.
+This series extends the capabilities of walk_page_range() so that it can
+deal with the page tables of the kernel (which have no VMAs and can
+contain larger huge pages than exist for user space). x86 and arm64 are
+then converted to make use of walk_page_range() removing the custom page
+table walkers.
 
-However, I will say that in general I am not a fan of coding SoC-level
-details into individual drivers, and I would prefer to avoid hard coding
-the AXI IDs here regardless.
+Potentially future changes could unify the implementations of the
+debugfs walkers further, moving the common functionality into common
+code. This would require a common way of handling the effective
+permissions (currently implemented only for x86) along with a per-arch
+way of formatting the page table information for debugfs. One
+immediate benefit would be getting the KASAN speed up optimisation in
+arm64 (and other arches) which is currently only implemented for x86.
 
-> > > +static u32 ddr_perf_alloc_counter(struct ddr_pmu *pmu, int event)
-> > > +{
-> > > +     int i;
-> > > +
-> > > +     /* Always map cycle event to counter 0 */
-> > > +     if (event == EVENT_CYCLES_ID)
-> > > +             return EVENT_CYCLES_COUNTER;
-> >
-> > What if the cycle counter is already in use?
-> 
-> cycles counter is dedicated to cycles events.
-> Can't use for other event.
+James Morse (2):
+  arm64: mm: Add p?d_large() definitions
+  mm: Add generic p?d_large() macros
 
-What I meant was if you have two cycles events, they'll both try to
-configure the cycle counter (e.g. when it overflows), which may not
-behave as you expect.
+Steven Price (11):
+  x86/mm: Add p?d_large() definitions
+  mm: pagewalk: Add p4d_entry() and pgd_entry()
+  mm: pagewalk: Allow walking without vma
+  mm: pagewalk: Add 'depth' parameter to pte_hole
+  mm: pagewalk: Add test_p?d callbacks
+  arm64: mm: Convert mm/dump.c to use walk_page_range()
+  x86/mm: Point to struct seq_file from struct pg_state
+  x86/mm+efi: Convert ptdump_walk_pgd_level() to take a mm_struct
+  x86/mm: Convert ptdump_walk_pgd_level_debugfs() to take an mm_struct
+  x86/mm: Convert ptdump_walk_pgd_level_core() to take an mm_struct
+  x86: mm: Convert dump_pagetables to use walk_page_range
 
-I think that you should only allow one event to use the cycle counter at
-a time.
+ arch/arm64/include/asm/pgtable.h |   2 +
+ arch/arm64/mm/dump.c             | 108 +++++-----
+ arch/x86/include/asm/pgtable.h   |   8 +-
+ arch/x86/mm/debug_pagetables.c   |   8 +-
+ arch/x86/mm/dump_pagetables.c    | 342 ++++++++++++++++---------------
+ arch/x86/platform/efi/efi_32.c   |   2 +-
+ arch/x86/platform/efi/efi_64.c   |   4 +-
+ fs/proc/task_mmu.c               |   4 +-
+ include/asm-generic/pgtable.h    |  10 +
+ include/linux/mm.h               |  25 ++-
+ mm/hmm.c                         |   2 +-
+ mm/migrate.c                     |   1 +
+ mm/mincore.c                     |   1 +
+ mm/pagewalk.c                    |  92 ++++++---
+ 14 files changed, 350 insertions(+), 259 deletions(-)
 
-> > > +static irqreturn_t ddr_perf_irq_handler(int irq, void *p)
-> > > +{
-> > > +     int i;
-> > > +     u8 reg;
-> > > +     int val;
-> > > +     int counter;
-> > > +     struct ddr_pmu *pmu = (struct ddr_pmu *) p;
-> > > +     struct perf_event *event;
-> > > +
-> > > +     /* Only cycles counter overflowed can issue irq. all counters will
-> > > +      * be stopped when cycles counter overflow. but other counter don't stop
-> > > +      * when overflow happen. Update all of the local counter values,
-> > > +      * then reset the cycles counter, so the others can continue
-> > > +      * counting.
-> > > +      */
-> >
-> > That is a rather unfortunate design decision.
-> >
-> > Can any of the counters count multiple events per cycle?
-> 
-> No,  other events always much less than cycle counters.
+-- 
+2.20.1
 
-Ok. Please describe that in the comment.
-
-Thanks,
-Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
