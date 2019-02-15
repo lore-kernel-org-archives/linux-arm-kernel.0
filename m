@@ -2,92 +2,88 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF385C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 12:25:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DF10C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 12:35:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7FE2D21929
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 12:25:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1873F2192B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 12:35:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CP4r0nyM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="nRrFNkH4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FE2D21929
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nLVBPHxg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="Kr/UJNQy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1873F2192B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
-	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=M7Q4wBxUCp3srAl7vzqksgz6xy2RPlfK+fw3bTny9lY=; b=CP4r0nyMlxBelAPAATprLGfHnY
-	BQSgzFscuY8k1xXHco5dOtMiYSyD2c9YNRbnu33yehqkbvfXpY7XghLgQQWQqYesAAqAnoeFCEZbV
-	TawxHqpxy6/73+3bpDEKQr4KLxL+YMHxXNJQvydeTiz7MgPDrLjJFPSP5i8DoDl8kVzyE83ppWegA
-	q3fxoX36vnb9EG62/6Spsp+dYGuPOBg2NX6VJXHfV1YsUvqrXbkR1etqnn7Z2Y0wo/GK6wnIujYCQ
-	kntbEYyTMqONNXseuuI5EjLKIolKdddv8VuDcme+ituLNq7TIPr+n50CdQtUuI0sEk30Mb0ApDCFg
-	XCpqhe/g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=1psQTxqQMMiHW50pBbuekzP0OrxxCJN4a9z4UTcN5Wg=; b=nLVBPHxge1IYMo
+	4ZrTrhmoURU5g6/u2rXlmG7tBm843tBiTobHhBFYsE+RWLcyrKpnH5vlQKgnVnV7K84AJY0HH1ohX
+	DM3+TqwoqIrcckUWs/evvUzqvHWHKEqUVDRWhbft4E5UB4iCYBZeA6s1HMw/4hIwYnYgbK17rKdd7
+	vHODtmCZiGTfpC59zHq5loHgsAzgqZoRq8HezrF5WtHt1Tsayr1YxkLiq5ACazC3EtapPljnLLVph
+	/lolLYImpLkM0pErhVayZ26Vi/v3baYU+aDMrKWIk8jHw+BATK2dMqGfSQN6nfSvsZcjM3i6ZuPru
+	ZzrY/mRYoKCTD7dIdw5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gucYb-0004Og-Qg; Fri, 15 Feb 2019 12:25:29 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1guci4-0007dX-UT; Fri, 15 Feb 2019 12:35:16 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gucYX-0004NI-Qz
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 12:25:27 +0000
-Received: by mail-ed1-x543.google.com with SMTP id h58so7790002edb.5
+ id 1guci1-0007bx-F2
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 12:35:14 +0000
+Received: by mail-wr1-x444.google.com with SMTP id w17so10135987wrn.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 04:25:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=references:user-agent:from:to:cc:subject:in-reply-to:date
- :message-id:mime-version;
- bh=kaYhpM3K1lORUrG4TIL1K2D+s9nWHtiHPzXDKda8A0E=;
- b=nRrFNkH4Rf5YL6oIfpcUZxZDrnILQ/wVBi0OglfDxNwG3jevICe+YCnXBUKUIlWcLd
- C3A1rh9wOGdBpMs10ko4HdFZtAbREng0aKZp/WG/fW9BP2hsSNLOsVdpIqhyawKYAW+T
- UqSXXeU+TH+02NhJnZ6YY7WiP5G0uU9rJTO3iAKregSBEHy1F5aI7knhYPU28dR1Xbzc
- zMZTme+eZH1NwlJ/TkiBSRPyTbaEwahPugkN9FBEdSZmFFTt9Kxp/fz/kW61tNBlsTyV
- 2UFidFtkZzXvFO/ia6scjaivvj6GpkZeJRtLlXBp4PH/9dZiZFGtp0yrFUzsjp6DtVnJ
- tezQ==
+ Fri, 15 Feb 2019 04:35:10 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=atZFuYFI6PCjEKbz744irCb4Q52i0WgYmzqti6jr2VI=;
+ b=Kr/UJNQyn/IICTOW2Ft17pyKdLyKTmKmP23y+Yves59ZfRQDV56DzKA7iigfMhQGzn
+ si2JpEF8z6Gs0jiMlRVTYIBQ7QkGpHgJtYTr32w/qB5iR3MTJNr/dL6FXuzfSVPlqJLR
+ /aQTzyJu4thTM7cfn0biRcY318S9K5jS+x2cUeELVZh0l16xtbEzTXvh62ZUK4oAjT74
+ aRRzLdyRLyOxqXYDO02XwRo2Jwp10xiu8g+MFJvMWYMXm3c4zvgpACC5JOW3N1bSwcuy
+ XIBk+8ETYUK/k0Uqh1KFioAdF7n9w2OdPtHk98HOhq928uKJR2HzebplFb46umOa4d+h
+ NOOg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:references:user-agent:from:to:cc:subject
- :in-reply-to:date:message-id:mime-version;
- bh=kaYhpM3K1lORUrG4TIL1K2D+s9nWHtiHPzXDKda8A0E=;
- b=dk7qWuzHNMwNY9s4m0nM654wCguzz/zKW6YMX7aMK96z/Y/oIdW4gqN0HQfmTHjbnx
- AiftbknNY8ImA3G9pvj1wOE1sfUZvewY6TwbLfre+/mBhqZufBaay60VktA8qWTGjTrB
- nqh2AmjZpk7YPNAoafs8bIWMD03twx56HkuBhTrn3DcUZo0Ox99kWBPHYRbAXMjxqwub
- sfuozQnu0BR4famvelRmOPavKz5St/T8OgpYWGr3/RfMadnZzOIeMRRNWjCxTzjVxBs1
- ztk4kmDAyZQuF+nE08UST7n5Gi1yZzgbGy6VnKqhC+S7Jjha63KH7yPbCeFEWr2i0ytG
- qQ5A==
-X-Gm-Message-State: AHQUAuay0GwFtHOXnAO2TQzxZ25ODO6QXRN7S1jLcc2dywFRiBucpmAn
- VBD03YEyg5F9RdvXA9GsHX4YuQ==
-X-Google-Smtp-Source: AHgI3Ia/AePt867GBuhHiFAwymq6ydcEdV1qGEvztO6A8kE+RS2ElAgaOZuQ6A1eaTnIiBYuvDB0pg==
-X-Received: by 2002:a17:906:32c7:: with SMTP id
- k7mr6496809ejk.180.1550233524020; 
- Fri, 15 Feb 2019 04:25:24 -0800 (PST)
-Received: from localhost ([2620:10d:c092:180::1:2b])
- by smtp.gmail.com with ESMTPSA id c25sm512455ejx.59.2019.02.15.04.25.22
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=atZFuYFI6PCjEKbz744irCb4Q52i0WgYmzqti6jr2VI=;
+ b=W8TSAB1Jf2Qj4OyP9s6P51MFt6oOhy0WnBYnRpstieBtxIcYp7hb7moZaseI8EU7tQ
+ z2cT3F9mk+tvoeXjPyNbRJSPp+oigZ8d1lxb5vChduPUBRSmOB6EF+3QblAYyrQZLhX4
+ m7+2v7kb9CD1qP6LO8Me1r5MAEDq2elZkCrE3bEFRsb9y7qV5qtgc8MZmijckfjFTZtu
+ +XPyPpPoN/aSat6VHMNVz+ejND2vVNub2zSENWpo6ok56/tXH8IlwM6cao31FmvcPqAR
+ ekbDFH8vRJ9fby7Gde5bWvk4dU8lfMNAzSMBYC7QY8WEJ1pLT6y9iSWVosrP742BaH1A
+ H6oA==
+X-Gm-Message-State: AHQUAubCxXPqi2mMnPnsMHpeTxjgZii/J7iQfxgFFGzZoK+4pg+QENKi
+ JW+/WHaNspN8r3TeTnLh3tjyw2rjU4Y=
+X-Google-Smtp-Source: AHgI3Ibq2BlsgKDdZGmgtfiPRND2zBxziiTCERtMTvwfPz1Ly0BR0p70PVOWc5Cwyctj28VeKQEEQg==
+X-Received: by 2002:adf:dd10:: with SMTP id a16mr6409297wrm.37.1550234109263; 
+ Fri, 15 Feb 2019 04:35:09 -0800 (PST)
+Received: from localhost.localdomain
+ (laubervilliers-657-1-83-120.w92-154.abo.wanadoo.fr. [92.154.90.120])
+ by smtp.gmail.com with ESMTPSA id y13sm636673wrw.31.2019.02.15.04.35.07
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 15 Feb 2019 04:25:23 -0800 (PST)
-References: <1550070569-18588-1-git-send-email-lollivier@baylibre.com>
- <1550070569-18588-5-git-send-email-lollivier@baylibre.com>
- <20190214100019.GA4197@Red> <20190214101212.GJ28278@localhost>
-User-agent: mu4e 1.0; emacs 25.3.2
-From: Loys Ollivier <lollivier@baylibre.com>
-To: Johan Hovold <johan@kernel.org>
-Subject: Re: [PATCH v4 4/4] gnss: add driver for mediatek receivers
-In-reply-to: <20190214101212.GJ28278@localhost>
-Date: Fri, 15 Feb 2019 13:25:20 +0100
-Message-ID: <86d0ntfdcf.fsf@baylibre.com>
+ Fri, 15 Feb 2019 04:35:08 -0800 (PST)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To: linux-arm-kernel@lists.infradead.org, Ingo Molnar <mingo@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>
+Subject: [GIT PULL 0/2] EFI fixes for v5.0-rc
+Date: Fri, 15 Feb 2019 13:33:31 +0100
+Message-Id: <20190215123333.21209-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_042526_018902_A081357E 
-X-CRM114-Status: GOOD (  19.60  )
+X-CRM114-CacheID: sfid-20190215_043513_518134_A29E9C20 
+X-CRM114-Status: GOOD (  11.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,82 +95,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Martin Blumenstingl <martin.blumenstingl@googlemail.com>,
- Kevin Hilman <khilman@baylibre.com>, Loys Ollivier <lollivier@baylibre.com>,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- Corentin Labbe <clabbe.montjoie@gmail.com>, linux-amlogic@lists.infradead.org,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-efi@vger.kernel.org, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Mike Rapoport <rppt@linux.ibm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+The following changes since commit 1f947a7a011fcceb14cb912f5481a53b18f1879a:
 
-On Thu 14 Feb 2019 at 10:12, Johan Hovold <johan@kernel.org> wrote:
+  Merge branch 'akpm' (patches from Andrew) (2019-02-12 17:15:33 -0800)
 
-> On Thu, Feb 14, 2019 at 11:00:19AM +0100, Corentin Labbe wrote:
->> On Wed, Feb 13, 2019 at 04:09:29PM +0100, Loys Ollivier wrote:
->> > Add driver for serial-connected Mediatek-based GNSS receivers.
->> > 
->> > These devices typically boot transmitting vendor specific NMEA output
->> > sequences. The serial port bit rate is read from the device tree
->> > "current-speed".
->> > 
->> > Note that the driver uses the generic GNSS serial implementation and
->> > therefore essentially only manages power abstracted into three power
->> > states: ACTIVE, STANDBY, and OFF.
->> > 
->> > For mediatek receivers with a main supply and no enable-gpios, this simply
->> > means that the main supply is disabled in STANDBY and OFF (the optional
->> > backup supply is kept enabled while the driver is bound).
->> > 
->> > Note that the timepulse-support is left unimplemented.
->> > 
->> > Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
->
->> > +static int mtk_set_active(struct gnss_serial *gserial)
->> > +{
->> > +	struct mtk_data *data = gnss_serial_get_drvdata(gserial);
->> > +	int ret;
->> > +
->> > +	ret = regulator_enable(data->vcc);
->> > +	if (ret)
->> > +		return ret;
->> > +
->> > +	return 0;
->> > +}
->> 
->> Hello
->> 
->> This could be simplified to return regulator_enable(data->vcc);
->
-> Indeed, but I prefer this style which clearly separates the error path
-> from the success path while making the success return value explicit.
->
+are available in the Git repository at:
 
-It respects the coding style/standard and I prefer the original version.
-It's also easier to debug if you want to add extra code on error.
+  git://git.kernel.org/pub/scm/linux/kernel/git/efi/efi.git tags/efi-urgent
 
->> Furthermore, after this simplification, the function seems useless.
->
-> Why do you think so? You still need to retrieve the regulator from the
-> driver data. Sure, this could be folded into mtk_set_power(), but that
-> would be less ideal if there are more resources that need to be managed
-> (e.g. an external lna supply).
+for you to fetch changes up to 98f19a800ac41cffa72a17b019eaf8160a01c22b:
 
-I would be in favor to keep mtk_set_active. It clearly shows when the
-regulator is enabled.
-It also seems logic to have an enable/standby function in the driver.
-Even if those are trivial (for now).
+  efi/arm: Revert "Defer persistent reservations until after paging_init()" (2019-02-15 09:58:04 +0100)
 
->
-> Thanks,
-> Johan
+----------------------------------------------------------------
+Yet another fix for the EFI memreserve code used by the GICv3 driver on
+arm64.
 
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      arm64: account for GICv3 LPI tables in static memblock reserve table
+      efi/arm: Revert "Defer persistent reservations until after paging_init()"
 
--- 
--L
+ arch/arm64/include/asm/memory.h         | 11 +++++++++++
+ arch/arm64/kernel/setup.c               |  1 -
+ drivers/firmware/efi/efi.c              |  4 ----
+ drivers/firmware/efi/libstub/arm-stub.c |  3 ---
+ include/linux/efi.h                     |  7 -------
+ include/linux/memblock.h                |  3 ---
+ mm/memblock.c                           | 10 ++++++++--
+ 7 files changed, 19 insertions(+), 20 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
