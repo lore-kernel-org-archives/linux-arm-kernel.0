@@ -2,72 +2,124 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C10CEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F549C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88889218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D4ED1218D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WZABo1fu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88889218D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iL8xZl5A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D4ED1218D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4ryx/nI7HgZ+4lCt7Tkv4zL3JDekSvzeSSKlpH0n+mo=; b=WZABo1fuFEk2Pm
-	ijk7ntf6iTEAMsrCTU6U5ws+YtrsCtMDRxuPyzwedMB1SAMlPgKP1WX9mzWYINu6kEwz/0NZ3QMn4
-	UuTbU0MZ4Aa1qEy+SfkYS59NncQ9UFnjmsuIubYrQ2fauovQWYw2EHrlgkz6dTajhkLRrV2KMy8FV
-	3+MwAq2nC9pM6HSm/O9hzvJ2ZPk5qUviFJiqqz6x1ushs8fCPYBdh7332uF3aFfU+AS4W2wO8AiTf
-	P8lsdb9D2/i1h+jybConzFy9u5QGy8CGuW6b+tXM/yhEDQVj/eeX+MboKDkRuk83vQtQaq4Boy3gb
-	969OvseavPzXCOd3aE1A==;
+	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=NWvYTsiCcd3mtrBMNCTgElv1vxP46ZO1xIC02YE4NZs=; b=iL8xZl5AHjFNHAVBiRy9Xlt5Ss
+	JUSN7wC3Lhq+n5vI33slvO8nBoigFdLzfOJCHVuDotH9+9ypZ8B/V/GdKd6Dpkrd8XoFaMaRy87Cw
+	UK9yTClWiYXUM7VIWJAWSs8zuNSav0XIIUlKyc3oNTv5LSA1dJaazsoEITOF8S8ts67L8v55BCVkP
+	9iVyg+GBT/qgcWtba13dqmfy8D1ZCdY9tYO6qDpAfqa+0MXtvwVPn9+J2BHbx4qfhNUR3ALfk/N8v
+	U14t2Y1ecSSIL2TA/EPzUvr3DFjGkf9dn26JD6umsI+vtyDizKlwEKcnOqsD+wLFk3s6w5elQLgBo
+	aK7nSZAw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guhNZ-0003Qz-Kq; Fri, 15 Feb 2019 17:34:25 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guhNR-0003Od-DO; Fri, 15 Feb 2019 17:34:19 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F207EBD;
- Fri, 15 Feb 2019 09:34:17 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8157A3F589;
- Fri, 15 Feb 2019 09:34:14 -0800 (PST)
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-To: Kazuhito Hagio <k-hagio@ab.jp.nec.com>,
- Bhupesh Sharma <bhsharma@redhat.com>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
- <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
- <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
- <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
- <20190213111552.GA8265@dhcp-128-65.nay.redhat.com>
- <bed51e6e-3dcb-8e07-1d31-9d81bfca20e5@arm.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03568504@BPXM09GP.gisp.nec.co.jp>
-From: James Morse <james.morse@arm.com>
-Message-ID: <37ed4c14-e4b9-49c0-4816-c289ce65fd76@arm.com>
-Date: Fri, 15 Feb 2019 17:34:12 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+	id 1guhNr-0003o2-9I; Fri, 15 Feb 2019 17:34:43 +0000
+Received: from mga05.intel.com ([192.55.52.43])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guhNZ-0003QX-Vo
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:34:31 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from orsmga001.jf.intel.com ([10.7.209.18])
+ by fmsmga105.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 15 Feb 2019 09:34:23 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.58,373,1544515200"; d="scan'208";a="138950984"
+Received: from ray.jf.intel.com (HELO [10.7.201.17]) ([10.7.201.17])
+ by orsmga001.jf.intel.com with ESMTP; 15 Feb 2019 09:34:23 -0800
+Subject: Re: [PATCH v3] hugetlb: allow to free gigantic pages regardless of
+ the configuration
+To: Alexandre Ghiti <alex@ghiti.fr>, Vlastimil Babka <vbabka@suse.cz>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
+ <will.deacon@arm.com>, Benjamin Herrenschmidt <benh@kernel.crashing.org>,
+ Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
+ Martin Schwidefsky <schwidefsky@de.ibm.com>,
+ Heiko Carstens <heiko.carstens@de.ibm.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ x86@kernel.org, Dave Hansen <dave.hansen@linux.intel.com>,
+ Andy Lutomirski <luto@kernel.org>, Peter Zijlstra <peterz@infradead.org>,
+ Alexander Viro <viro@zeniv.linux.org.uk>,
+ Mike Kravetz <mike.kravetz@oracle.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
+ linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
+References: <20190214193100.3529-1-alex@ghiti.fr>
+From: Dave Hansen <dave.hansen@intel.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=dave.hansen@intel.com; keydata=
+ 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
+Message-ID: <c6d9be5f-3b3a-c95b-0045-9f98ea52a5c4@intel.com>
+Date: Fri, 15 Feb 2019 09:34:24 -0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <4AE2DC15AC0B8543882A74EA0D43DBEC03568504@BPXM09GP.gisp.nec.co.jp>
-Content-Language: en-GB
+In-Reply-To: <20190214193100.3529-1-alex@ghiti.fr>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_093417_458873_80B0739A 
-X-CRM114-Status: GOOD (  25.32  )
+X-CRM114-CacheID: sfid-20190215_093426_259707_07D8FFDB 
+X-CRM114-Status: GOOD (  25.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,138 +131,154 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- Steve Capper <Steve.Capper@arm.com>,
- "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- "anderson@redhat.com" <anderson@redhat.com>,
- Kristina Martsenko <kristina.martsenko@arm.com>,
- Borislav Petkov <bp@alien8.de>, Dave Young <dyoung@redhat.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi guys,
+> -#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
+> +#ifdef CONFIG_CONTIG_ALLOC
+>  /* The below functions must be run on a range from a single zone. */
+>  extern int alloc_contig_range(unsigned long start, unsigned long end,
+>  			      unsigned migratetype, gfp_t gfp_mask);
+> -extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
+>  #endif
+> +extern void free_contig_range(unsigned long pfn, unsigned int nr_pages);
 
-(CC: +Steve, +Kristina) "What's the best way of letting user-space know the MMU
-config when 52-bit VA and pointer-auth may be in use?"
+There's a lot of stuff going on in this patch.  Adding/removing config
+options.  Please get rid of these superfluous changes or at least break
+them out.
 
-On 13/02/2019 19:52, Kazuhito Hagio wrote:
-> On 2/13/2019 1:22 PM, James Morse wrote:
->> On 13/02/2019 11:15, Dave Young wrote:
->>> On 02/12/19 at 11:03pm, Kazuhito Hagio wrote:
->>>> On 2/12/2019 2:59 PM, Bhupesh Sharma wrote:
->>>>> BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
->>>>> (which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
->>>>> mentioned that the changes look necessary.
->>>>>
->>>>> [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
->>>>
->>>>>>> The increased 'PTRS_PER_PGD' value for such cases needs to be then
->>>>>>> calculated as is done by the underlying kernel
->>
->> Aha! Nothing to do with which-bits-are-pfn in the tables...
->>
->> You need to know if the top level PGD is 512bytes or bigger. As we use a
->> kmem-cache the adjacent data could be some else's page tables.
->>
->> Is this really a problem though? You can't pull the user-space pgd pointers out
->> of no-where, you must have walked some task_struct and struct_mm's to find them.
->> In which case you would have the VMAs on hand to tell you if its in the mapped
->> user range.
->>
->> It would be good to avoid putting something arch-specific in here if we can at
->> all help it.
+>  #ifdef CONFIG_CMA
+>  /* CMA stuff */
+> diff --git a/mm/Kconfig b/mm/Kconfig
+> index 25c71eb8a7db..138a8df9b813 100644
+> --- a/mm/Kconfig
+> +++ b/mm/Kconfig
+> @@ -252,12 +252,17 @@ config MIGRATION
+>  	  pages as migration can relocate pages to satisfy a huge page
+>  	  allocation instead of reclaiming.
+>  
+> +
+>  config ARCH_ENABLE_HUGEPAGE_MIGRATION
+>  	bool
 
->>>>>>> (see
->>>>>>> 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
->>>>>>>
->>>>>>> #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
->>>>
->>>> Yes, this is the reason why makedumpfile needs the MAX_USER_VA_BITS.
->>>> It is used for pgd_index() also in makedumpfile to walk page tables.
->>>>
->>>> /* to find an entry in a page-table-directory */
->>>> #define pgd_index(addr)         (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
->>>
->>> Since Dave mentioned crash tool does not need it, but crash should also
->>> travel the pg tables.
-> 
-> The crash utility is always invoked with vmlinux, so it can read the
-> vabits_user variable directly from vmcore, but makedumpfile can not.
+Like this. :)
 
-(This sounds fragile. That symbol's name may change, it may disappear
-completely! ... but I guess crash changes with every kernel release anyway)
+>  config ARCH_ENABLE_THP_MIGRATION
+>  	bool
+>  
+> +config CONTIG_ALLOC
+> +	def_bool y
+> +	depends on (MEMORY_ISOLATION && COMPACTION) || CMA
+> +
+>  config PHYS_ADDR_T_64BIT
+>  	def_bool 64BIT
 
+Please think carefully though the Kconfig dependencies.  'select' is
+*not* the same as 'depends on'.
 
->>> If this is really necessary it would be good to describe what will
->>> happen without the patch, eg. some user visible error from an actual test etc.
->>
->> Yes please, it would really help if there was a specific example we could discuss.
-> 
-> With 52-bit user space and 48-bit kernel space configuration,
-> makedumpfile will not be able to convert a virtual kernel address
-> to a physical address, and fail to capture a dumpfile, because the
-> pgd_index() will return a wrong index.
+This replaces a bunch of arch-specific "select ARCH_HAS_GIGANTIC_PAGE"
+with a 'depends on'.  I *think* that ends up being OK, but it absolutely
+needs to be addressed in the changelog about why *you* think it is OK
+and why it doesn't change the functionality of any of the patched
+architetures.
 
-Got it, thanks!
-(all this user stuff had me thinking it was user-space you were trying to walk).
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index afef61656c1e..e686c92212e9 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1035,7 +1035,6 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
+>  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
+>  		nr_nodes--)
+>  
+> -#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
+>  static void destroy_compound_gigantic_page(struct page *page,
+>  					unsigned int order)
+>  {
 
-Yes, this is because of commit e842dfb5a2d3 ("arm64: mm: Offset TTBR1 to allow
-52-bit PTRS_PER_PGD"). The kernel has offset the ttbr1 value, if you try and
-walk it without knowing the offset you get junk.
+Whats the result of this #ifdef removal?  A universally larger kernel
+even for architectures that do not support runtime gigantic page
+alloc/free?  That doesn't seem like a good thing.
 
-Ideally we tell you the offset with some 'ttbr1_offset=' in vmcoreinfo, but if
-the offsetting code disappears, the kernel would still have to provide
-'ttbr1_offset=0' for user-space to keep working.
+> @@ -1058,6 +1057,12 @@ static void free_gigantic_page(struct page *page, unsigned int order)
+>  	free_contig_range(page_to_pfn(page), 1 << order);
+>  }
+>  
+> +static inline bool gigantic_page_runtime_allocation_supported(void)
+> +{
+> +	return IS_ENABLED(CONFIG_CONTIG_ALLOC);
+> +}
 
-I'd like to find something future-proof that always has an unambiguous meaning,
-and isn't a problem if the kernel variable/symbol/kconfig names change.
+Why bother having this function?  Why don't the callers just check the
+config option directly?
 
-With pointer-auth in use too you can't guess which bits are address and which
-bits are data.
+> +#ifdef CONFIG_CONTIG_ALLOC
+>  static int __alloc_gigantic_page(unsigned long start_pfn,
+>  				unsigned long nr_pages, gfp_t gfp_mask)
+>  {
+> @@ -1143,22 +1148,15 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+>  static void prep_new_huge_page(struct hstate *h, struct page *page, int nid);
+>  static void prep_compound_gigantic_page(struct page *page, unsigned int order);
+>  
+> -#else /* !CONFIG_ARCH_HAS_GIGANTIC_PAGE */
+> -static inline bool gigantic_page_supported(void) { return false; }
+> +#else /* !CONFIG_CONTIG_ALLOC */
+>  static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
+>  		int nid, nodemask_t *nodemask) { return NULL; }
+> -static inline void free_gigantic_page(struct page *page, unsigned int order) { }
+> -static inline void destroy_compound_gigantic_page(struct page *page,
+> -						unsigned int order) { }
+>  #endif
+>  
+>  static void update_and_free_page(struct hstate *h, struct page *page)
+>  {
+>  	int i;
+>  
+> -	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+> -		return;
 
-Taking arch-specific to its extreme, we could expose TCR_EL1, but this is a
-problem if we ever switch that per task (some new bits may turn up with a new
-feature). Some of those bits vary per cpu too, so we'd have to mask them out in
-case user-space tries to conclude something from them.
+I don't get the point of removing this check.  Logically, this reads as
+checking if the architecture supports gigantic hstates and has nothing
+to do with allocation.
 
+>  	h->nr_huge_pages--;
+>  	h->nr_huge_pages_node[page_to_nid(page)]--;
+>  	for (i = 0; i < pages_per_huge_page(h); i++) {
+> @@ -2276,13 +2274,20 @@ static int adjust_pool_surplus(struct hstate *h, nodemask_t *nodes_allowed,
+>  }
+>  
+>  #define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
+> -static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
+> +static int set_max_huge_pages(struct hstate *h, unsigned long count,
+>  						nodemask_t *nodes_allowed)
+>  {
+>  	unsigned long min_count, ret;
+>  
+> -	if (hstate_is_gigantic(h) && !gigantic_page_supported())
+> -		return h->max_huge_pages;
+> +	if (hstate_is_gigantic(h) &&
+> +		!gigantic_page_runtime_allocation_supported()) {
 
-My current best suggestion is to export:
-from core code:
-* USER_MMAP_END, the maximum value a user-space can try and mmap().
-This would normally be TASK_SIZE, but x86 and powerpc also have support for
-larger VA space, and its plumbed into mm slightly differently. We should have
-one arch-independent property that covers all these. On arm64 this would be the
-runtime va bits for user-space's TTBR. (This assumes the value isn't per-task)
+The indentation here is wrong and reduces readability.  Needs to be like
+this:
 
-arch specific:
-* ARM64_TCR.T1SZ, the va bits mapped by the kernel's TTBR. (We can assume we'll
-never flip user/kernel space). This has to be arch specific, it will always have
-a value and its meaning comes from the ARM-ARM (so linux can't change it in the
-future). It should be the same on every CPU.
-* ARM64_TTBR1.BADDR, the pa of the kernel page tables, which implicitly has the
-offset. Again this always has a value, and its meaning comes from the ARM-ARM.
-If we ever get clever with different page-tables/TCR values on different CPUs,
-these two should come from the same CPU.
+	if (hstate_is_gigantic(h) &&
+	    !gigantic_page_runtime_allocation_supported()) {
 
+> +		spin_lock(&hugetlb_lock);
+> +		if (count > persistent_huge_pages(h)) {
+> +			spin_unlock(&hugetlb_lock);
+> +			return -EINVAL;
+> +		}
+> +		goto decrease_pool;
+> +	}
 
-I think this gives you what you need if user/kernel may both be using
-pointer-auth and both may be using 52-bit va. I'm pretty sure the 48:52 bits can
-be picked at boot time depending on the kernel kconfig and the hardware support.
+Needs comments.
 
-Does anyone have a better idea? (or a corner where this won't work?)
+	/* Gigantic pages can be freed but not allocated */
 
-
-Thanks,
-
-James
+or something.
 
 _______________________________________________
 linux-arm-kernel mailing list
