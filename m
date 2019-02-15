@@ -2,84 +2,59 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3BDCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:29:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AFC0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:31:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 90F0E2192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:29:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 384AC2192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:31:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YS5mgVyz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ettus-com.20150623.gappssmtp.com header.i=@ettus-com.20150623.gappssmtp.com header.b="mzveJjO+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 90F0E2192D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ettus.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BY+9LPx6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 384AC2192D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pcz9mMe7EviKGJvck0+R7TJDYWW5E3DhJfv1CH2ytcY=; b=YS5mgVyzCwtEvC
-	25yWiQ/0OljkJ1uuEBNIK/HF3PPuYODe9VklamnyslvMlRaP1xyiD6uYkkAwKK47qXy8r5wgLubrT
-	D76Oaa7ohp1o5WNwRqdt6rvS7EbH1ZDbJ94t77KascI1eyPDoET4eRnI+MZRuQ2SoNBnXPNxt3br/
-	IW246NKPaXoydklJdzmkf+eu6bgXN/SMs2BUM+wa92phKaCEcdtdd09quQthKGa7h45TpCwFg5L6U
-	SviO6RFkW3gG149xO/Aq+KnEGdcWFQRk8AeAU+oVuXaMzBMjrv19YKe2Wp38wvftdk7sw89hjosam
-	H8GgPK1PoVRMtAxFi9kQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=VvOaT9NF0qhOr2gfItgx/ual1I4pqird2uuCWSFqtJ0=; b=BY+9LPx668ZYf5
+	Fu2eISu46HXPUsfhY9eC10Nff5LYVYcl8F1FBMoeevZqs3g99L1G2h5oD5wF+rjucZW3u8M8/fOHt
+	AzWT8314a+d+Ux4D27G3wJOz7LNa1i3NX748BO0bDEIWjrKwh7GW9OnaD5XWeJopGpOhZ1ITNA4vs
+	OK0J8jAUOkqYUpoWn6OlGxh994o1UhNy+JgbYQ3uzFMUFPY8ooeOqsoYoghLnLefolFbJIM8s4BU7
+	7JW+0Opwf91Y/d/msWkpmnr0fClt3AYJojloMu9FCZKae80s3P2zKFpa0C4hEfTkazHWTwBzC2DyK
+	hHsCm9rEqqD8x8WQ9M8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufQx-00019L-44; Fri, 15 Feb 2019 15:29:47 +0000
-Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
+	id 1gufSG-0002h3-6E; Fri, 15 Feb 2019 15:31:08 +0000
+Received: from relay4-d.mail.gandi.net ([217.70.183.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufQt-00018z-NY
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:29:45 +0000
-Received: by mail-ed1-x542.google.com with SMTP id f2so8235351edy.13
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 07:29:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=ettus-com.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+qQVLOm+tc6witGNoTG9gdfSDZengbsbLuRNCQL5ryo=;
- b=mzveJjO+4aNOs1o6nVRjMlC6boIT0oM6N0eJWQHCDX/CwBMyt0vGJJs0G5RW7nPToK
- PBWAAGkqRsYICdw+NAgWwbPxtenmagWpOE6i2KEfSJfAxPrjBXTcxE05W6iiSEnPz8B8
- Wcw64qfslCSHVfwCD5Xn6SVMl0iPf9CDSlbnU9xYXBQyl4dEw3w8yb+vPNizXonIKhhX
- YUwecHkV49EbXpJFyTAaLx9Q0mNlg4ZiTl06VGMp9dWQzUQlopDfpz/bFbu7AvVe4Qaw
- JIBlrELn6xm0XLFY8/59DQCSuLQf/FBjF4nDNHzramoQGPygGnC+pf188J043T3P7yVb
- Ad7g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=+qQVLOm+tc6witGNoTG9gdfSDZengbsbLuRNCQL5ryo=;
- b=F6zd17newi+C/pUttFS8YEAr8Koyl4jTuAMywDvcU4elT/iFWRLfW0ZwS5QZApF0Ut
- 1u1Yn6Ga3TBv09wi8c6S1lJUpfZa8zVN14elPRGprpKnSfImKR4G9PX5n5GG6OATP44n
- OVH/SQHPmDsjUIpk5jgVlvz0FgpSZzqVHLgWsm1+EVPeSG0W+pCOS/aU0sz+L6FCPVC4
- V0lt3BBvHO7jk2OsIOt43oVGsw85myGcRo5QXcYqop01Jhd/YcvSQxHfhoXsihg4rqR8
- icKh8OKyfsIT8t90cA6ZzVftHWtWVwjggkhtPgVdTdJZc+yzU7aB2fgWK9gykK/2MX4r
- g6Zg==
-X-Gm-Message-State: AHQUAub6jl/P5Gw5qHnVrn5ZWr+DnOJEdCjF3gAFU1N4tKFCfj44/Ad1
- KQ55iEz7F+zkljjAoY86slKGTHNOjl9TYu8bgX8/gg==
-X-Google-Smtp-Source: AHgI3IbhNdX2Bg74RLwEkcrRhm1vApGLVElMs+TzLvz6uAt2lN8weU+z+0CEEofHxBAMRg2aie/EVF7GCI6DKXSyJXs=
-X-Received: by 2002:a17:906:651:: with SMTP id
- t17mr7169879ejb.144.1550244581539; 
- Fri, 15 Feb 2019 07:29:41 -0800 (PST)
+ id 1gufSD-0002gH-1Q
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:31:07 +0000
+X-Originating-IP: 90.88.30.68
+Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
+ [90.88.30.68]) (Authenticated sender: thomas.petazzoni@bootlin.com)
+ by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 3B55EE0004;
+ Fri, 15 Feb 2019 15:30:50 +0000 (UTC)
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+To: Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Gregory Clement <gregory.clement@bootlin.com>
+Subject: [PATCH] ARM: dts: armada-xp: fix Armada XP boards NAND description
+Date: Fri, 15 Feb 2019 16:30:42 +0100
+Message-Id: <20190215153042.8973-1-thomas.petazzoni@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <20190131213957.11568-1-alex.williams@ettus.com>
- <CAKfKVtFM1zPb-MjBwY8WREy4xoHW60JrjZ-LnSzBvJ1Yv_zgsw@mail.gmail.com>
-In-Reply-To: <CAKfKVtFM1zPb-MjBwY8WREy4xoHW60JrjZ-LnSzBvJ1Yv_zgsw@mail.gmail.com>
-From: Alex Williams <alex.williams@ettus.com>
-Date: Fri, 15 Feb 2019 07:29:30 -0800
-Message-ID: <CAJZzcDiv8BGDa8pj-2gP+BWiu=CfrsDi15xHr=UUFwCwE-E4zg@mail.gmail.com>
-Subject: Re: [PATCH] i2c: cadence: Handle transfer_size rollover
-To: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_072943_827280_9A045A19 
-X-CRM114-Status: GOOD (  13.78  )
+X-CRM114-CacheID: sfid-20190215_073105_377573_70E4FC84 
+X-CRM114-Status: GOOD (  10.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,80 +66,219 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, Alex Williams <alex.williams@ni.com>,
- linux-arm-kernel@lists.infradead.org, mical.simek@xilinx.com,
- linux-i2c@vger.kernel.org
+Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Miquel Raynal <miquel.raynal@bootlin.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 2:53 AM Shubhrajyoti Datta
-<shubhrajyoti.datta@gmail.com> wrote:
->
-> HI Alex,
->
-> Thanks for the patch.
->
-> On Fri, Feb 1, 2019 at 4:22 AM <alex.williams@ettus.com> wrote:
-> >
-> > From: Alex Williams <alex.williams@ni.com>
-> >
-> > Under certain conditions, Cadence's I2C controller's transfer_size
->
-> Any help in reproducing the conditions would be appreciated
->
->
-> > register will roll over and generate invalid read transactions. Before
-> > this change, the ISR relied solely on the RXDV bit to determine when to
-> > write more data to the user's buffer. The invalid read data would cause
-> > overruns, smashing stacks and worse.
-> >
-> > This change stops the buffer writes to the requested boundary and
-> > reports the error. The controller will be reset so normal transactions
-> > may resume.
-> >
-> > Signed-off-by: Alex Williams <alex.williams@ni.com>
+Commit 3b79919946cd2cf4dac47842afc9a893acec4ed7 ("ARM: dts:
+armada-370-xp: update NAND node with new bindings") updated some
+Marvell Armada DT description to use the new NAND controller bindings,
+but did it incorrectly for a number of boards: armada-xp-gp,
+armada-xp-db and armada-xp-lenovo-ix4-300d. Due to this, the NAND is
+no longer detected on those platforms.
 
+This commit fixes that by properly using the new NAND DT binding. This
+commit was runtime-tested on Armada XP GP, the two other platforms are
+only compile-tested.
 
-One possible related errata is here:
-https://www.xilinx.com/support/answers/61664.html
+Fixes: 3b79919946cd2 ("ARM: dts: armada-370-xp: update NAND node with new bindings")
+Cc: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+---
+ arch/arm/boot/dts/armada-xp-db.dts            | 46 +++++-----
+ arch/arm/boot/dts/armada-xp-gp.dts            | 13 +--
+ .../boot/dts/armada-xp-lenovo-ix4-300d.dts    | 85 ++++++++++---------
+ 3 files changed, 76 insertions(+), 68 deletions(-)
 
-In our case, we only needed to hammer on i2c to reproduce in a few
-minutes, with a script like this:
-while true
-    do date
-    cat /sys/class/gpio/gpio882/direction > /dev/null
-    cat /sys/class/gpio/gpio883/direction > /dev/null
-    cat /sys/class/gpio/gpio884/direction > /dev/null
-    cat /sys/class/gpio/gpio885/direction > /dev/null
-    cat /sys/class/gpio/gpio886/direction > /dev/null
-    cat /sys/class/gpio/gpio887/direction > /dev/null
-    cat /sys/class/gpio/gpio888/direction > /dev/null
-    cat /sys/class/gpio/gpio889/direction > /dev/null
-    cat /sys/class/gpio/gpio890/direction > /dev/null
-    cat /sys/class/gpio/gpio891/direction > /dev/null
-    cat /sys/class/gpio/gpio892/direction > /dev/null
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index f3ac7483afed..5d04dc68cf57 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -144,30 +144,32 @@
+ 				status = "okay";
+ 			};
+ 
+-			nand@d0000 {
++			nand-controller@d0000 {
+ 				status = "okay";
+-				label = "pxa3xx_nand-0";
+-				num-cs = <1>;
+-				marvell,nand-keep-config;
+-				nand-on-flash-bbt;
+-
+-				partitions {
+-					compatible = "fixed-partitions";
+-					#address-cells = <1>;
+-					#size-cells = <1>;
+-
+-					partition@0 {
+-						label = "U-Boot";
+-						reg = <0 0x800000>;
+-					};
+-					partition@800000 {
+-						label = "Linux";
+-						reg = <0x800000 0x800000>;
+-					};
+-					partition@1000000 {
+-						label = "Filesystem";
+-						reg = <0x1000000 0x3f000000>;
+ 
++				nand@0 {
++					reg = <0>;
++					label = "pxa3xx_nand-0";
++					nand-rb = <0>;
++					nand-on-flash-bbt;
++
++					partitions {
++						compatible = "fixed-partitions";
++						#address-cells = <1>;
++						#size-cells = <1>;
++
++						partition@0 {
++							label = "U-Boot";
++							reg = <0 0x800000>;
++						};
++						partition@800000 {
++							label = "Linux";
++							reg = <0x800000 0x800000>;
++						};
++						partition@1000000 {
++							label = "Filesystem";
++							reg = <0x1000000 0x3f000000>;
++						};
+ 					};
+ 				};
+ 			};
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 1139e9469a83..b4cca507cf13 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -160,12 +160,15 @@
+ 				status = "okay";
+ 			};
+ 
+-			nand@d0000 {
++			nand-controller@d0000 {
+ 				status = "okay";
+-				label = "pxa3xx_nand-0";
+-				num-cs = <1>;
+-				marvell,nand-keep-config;
+-				nand-on-flash-bbt;
++
++				nand@0 {
++					reg = <0>;
++					label = "pxa3xx_nand-0";
++					nand-rb = <0>;
++					nand-on-flash-bbt;
++				};
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+index bbbb38888bb8..87dcb502f72d 100644
+--- a/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
++++ b/arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts
+@@ -81,49 +81,52 @@
+ 
+ 			};
+ 
+-			nand@d0000 {
++			nand-controller@d0000 {
+ 				status = "okay";
+-				label = "pxa3xx_nand-0";
+-				num-cs = <1>;
+-				marvell,nand-keep-config;
+-				nand-on-flash-bbt;
+-
+-				partitions {
+-					compatible = "fixed-partitions";
+-					#address-cells = <1>;
+-					#size-cells = <1>;
+-
+-					partition@0 {
+-						label = "u-boot";
+-						reg = <0x00000000 0x000e0000>;
+-						read-only;
+-					};
+-
+-					partition@e0000 {
+-						label = "u-boot-env";
+-						reg = <0x000e0000 0x00020000>;
+-						read-only;
+-					};
+-
+-					partition@100000 {
+-						label = "u-boot-env2";
+-						reg = <0x00100000 0x00020000>;
+-						read-only;
+-					};
+-
+-					partition@120000 {
+-						label = "zImage";
+-						reg = <0x00120000 0x00400000>;
+-					};
+-
+-					partition@520000 {
+-						label = "initrd";
+-						reg = <0x00520000 0x00400000>;
+-					};
+ 
+-					partition@e00000 {
+-						label = "boot";
+-						reg = <0x00e00000 0x3f200000>;
++				nand@0 {
++					reg = <0>;
++					label = "pxa3xx_nand-0";
++					nand-rb = <0>;
++					nand-on-flash-bbt;
++
++					partitions {
++						compatible = "fixed-partitions";
++						#address-cells = <1>;
++						#size-cells = <1>;
++
++						partition@0 {
++							label = "u-boot";
++							reg = <0x00000000 0x000e0000>;
++							read-only;
++						};
++
++						partition@e0000 {
++							label = "u-boot-env";
++							reg = <0x000e0000 0x00020000>;
++							read-only;
++						};
++
++						partition@100000 {
++							label = "u-boot-env2";
++							reg = <0x00100000 0x00020000>;
++							read-only;
++						};
++
++						partition@120000 {
++							label = "zImage";
++							reg = <0x00120000 0x00400000>;
++						};
++
++						partition@520000 {
++							label = "initrd";
++							reg = <0x00520000 0x00400000>;
++						};
++
++						partition@e00000 {
++							label = "boot";
++							reg = <0x00e00000 0x3f200000>;
++						};
+ 					};
+ 				};
+ 			};
+-- 
+2.20.1
 
-    cat /sys/class/gpio/gpio894/direction > /dev/null
-    cat /sys/class/gpio/gpio895/direction > /dev/null
-    cat /sys/class/gpio/gpio896/direction > /dev/null
-    cat /sys/class/gpio/gpio897/direction > /dev/null
-    cat /sys/class/gpio/gpio898/direction > /dev/null
-    cat /sys/class/gpio/gpio899/direction > /dev/null
-    cat /sys/class/gpio/gpio900/direction > /dev/null
-    cat /sys/class/gpio/gpio901/direction > /dev/null
-    cat /sys/class/gpio/gpio902/direction > /dev/null
-    cat /sys/class/gpio/gpio903/direction > /dev/null
-    cat /sys/class/gpio/gpio904/direction > /dev/null
-    cat /sys/class/gpio/gpio905/direction > /dev/null
-done
-
-In normal usage, we have code that sets up a number of i2c GPIO
-expanders and pokes them for values as it initializes devices.
-Occasionally, the transfer size register will roll over, and the ISR
-will cause memory corruption, since it doesn't stop writing at the
-requested boundary.
 
 _______________________________________________
 linux-arm-kernel mailing list
