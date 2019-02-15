@@ -2,83 +2,57 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50E76C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:48:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD714C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:48:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2494121B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:47:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC47321B1C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 08:48:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GxqyWm+j";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="O3bs5ZdH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2494121B18
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vAPKpc2B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC47321B1C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=A42SXch8StDGLOexDzE618b+sxNRJG/dsCA6LNjtSbY=; b=GxqyWm+jiUoMQmNsQIO5TQRje
-	m/AbyL+n77eJs4Q7OAxCs4EJabeYBipFs3MrV83W8+HadVrlaaKbfZPrOQAI7M+rQ3igQtI6MfYVo
-	ztOIdMNEHFesfIXxQf5Qu4QXh9enicvxJ7EJWSFgzCUIk/lOiyEBH5Xo2cgt63anMbSD4nYetKm8N
-	psSBXT6i28CvvHuCMUO1IObo6VHkrze5gpxbCSrK/BDst/ISWBJ0rEakxwtWrsfDKKnEbmNA9POMT
-	3tOCWMVxO8B3xi3uHsorBuzEbxcN0j+34K2yX9mJlkgc+HHukvb6FmxbPsy+SifyY3hyfl2SBz4ND
-	xykOEOv4Q==;
+	 bh=wF05VYXTz5qEZGwC7mh40BUy+RmrwICUqr9Fn/NO7BQ=; b=vAPKpc2BKZDGpDhalYuKc49e5
+	xomlznq/Nqpttb0bMdrmb+Ko/PmB5MvvEA5fIwwh4oszOJcLcddcpNQa+kFgQgARgSPAMVqxJPFla
+	bYcY3LPPvmdj0xHXadxATrq8x8laAt+We/8fNWor3WlbsKzqnWaRXg76NZ400SxnUA+FHT4fugFdE
+	rgfJWaupY4R/85ve1F6IvJrVsD7jc9Wbles7JJun5+bMfmagegdmVZtoryodkorvE9uv0RNj4WTqa
+	r7oSd3zCyr/jRDduRGloEDxteVsV0saDa28eGUXRjX7jex5vTRmVyiiyAPt64UIq5rGbEmDKcwIVB
+	gGG+GM2+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guZ9n-000481-8X; Fri, 15 Feb 2019 08:47:39 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guZ9j-00046v-Gy
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 08:47:36 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1F8l45F009427;
- Fri, 15 Feb 2019 02:47:04 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550220424;
- bh=nUJepTBtTwngvi6oNNkiaprUXgTouPzurWm6N7pL0Qo=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=O3bs5ZdHdFbv+U/iFhy82Gb8IBttho4URzllTvOZKrxd4oJYdg2LMGxmLe4QcvFCw
- IgubyvMVV5dJHXBTLW5Uda7LVBLwJAbHWX1INVPG2ra2hDbTmCR7ZFtQp3y4YK9Al3
- 9bs8NmysBNV6dseoyR653YpelQ42STajPfBey8Zw=
-Received: from DLEE108.ent.ti.com (dlee108.ent.ti.com [157.170.170.38])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1F8l47Z111923
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 15 Feb 2019 02:47:04 -0600
-Received: from DLEE103.ent.ti.com (157.170.170.33) by DLEE108.ent.ti.com
- (157.170.170.38) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 15
- Feb 2019 02:47:02 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 15 Feb 2019 02:47:02 -0600
-Received: from [127.0.0.1] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1F8kx90019290;
- Fri, 15 Feb 2019 02:46:59 -0600
-Subject: Re: [PATCH] arm64: dts: ti: k3-am65: Add MSMC RAM node
-To: Roger Quadros <rogerq@ti.com>
-References: <1547199855-16374-1-git-send-email-rogerq@ti.com>
- <5C5980B6.4010502@ti.com>
-From: Tero Kristo <t-kristo@ti.com>
-Message-ID: <a2227e9f-dd47-cc33-b0f2-0be682462d36@ti.com>
-Date: Fri, 15 Feb 2019 10:46:49 +0200
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1guZA1-0004MY-Mj; Fri, 15 Feb 2019 08:47:53 +0000
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1guZ9j-00046t-OT; Fri, 15 Feb 2019 08:47:37 +0000
+Received: from localhost (unknown [83.221.228.209])
+ by pokefinder.org (Postfix) with ESMTPSA id 3D2F22E3551;
+ Fri, 15 Feb 2019 09:47:32 +0100 (CET)
+Date: Fri, 15 Feb 2019 09:47:31 +0100
+From: Wolfram Sang <wsa@the-dreams.de>
+To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Subject: Re: [PATCH v2] i2c: bcm2835: Clear current buffer pointers and
+ counts after a transfer
+Message-ID: <20190215084731.gy7khiydgyzgfsjk@ninjato>
+References: <20181227154225.5492-1-paul.kocialkowski@bootlin.com>
 MIME-Version: 1.0
-In-Reply-To: <5C5980B6.4010502@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20181227154225.5492-1-paul.kocialkowski@bootlin.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_004735_638036_1AC28725 
-X-CRM114-Status: GOOD (  16.58  )
+X-CRM114-CacheID: sfid-20190215_004735_936045_5FBFDD35 
+X-CRM114-Status: GOOD (  15.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,87 +64,90 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, devicetree@vger.kernel.org,
- Lokesh Vutla <lokeshvutla@ti.com>, linux-kernel@vger.kernel.org,
- "Andrew F . Davis" <afd@ti.com>, robh+dt@kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: Stefan Wahren <stefan.wahren@i2se.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Scott Branden <sbranden@broadcom.com>,
+ Eben Upton <eben@raspberrypi.org>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Ray Jui <rjui@broadcom.com>, linux-kernel@vger.kernel.org,
+ Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
+ linux-i2c@vger.kernel.org, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org, linux-rpi-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============3253540754925632842=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 05/02/2019 14:25, Roger Quadros wrote:
-> Tero,
-> 
-> On 11/01/19 11:44, Roger Quadros wrote:
->> The AM65 SoC has 2MB MSMC RAM. Add this as a mmio-sram
->> node so drivers can use it via genpool API.
->>
->> Following areas are marked reserved:
->> - Lower 128KB for ATF
->> - 64KB@0xf0000 for SYSFW
->> - Upper 1MB for cache
->>
->> The reserved locations are subject to change at runtime by
->> the bootloader.
->>
->> Cc: Nishanth Menon <nm@ti.com>
->> Cc: Lokesh Vutla <lokeshvutla@ti.com>
->> Cc: Andrew F. Davis <afd@ti.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> 
-> Is this patch good to pick for -next?
 
-Queued for 5.1, thanks.
+--===============3253540754925632842==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="zp4qokiwiqe3hwav"
+Content-Disposition: inline
 
--Tero
 
-> 
-> cheers,
-> -roger
-> 
->> ---
->>   arch/arm64/boot/dts/ti/k3-am65-main.dtsi | 20 ++++++++++++++++++++
->>   1 file changed, 20 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
->> index 272cf8f..5a18150 100644
->> --- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
->> +++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
->> @@ -6,6 +6,26 @@
->>    */
->>   
->>   &cbass_main {
->> +	msmc_ram: sram@70000000 {
->> +		compatible = "mmio-sram";
->> +		reg = <0x0 0x70000000 0x0 0x200000>;
->> +		#address-cells = <1>;
->> +		#size-cells = <1>;
->> +		ranges = <0x0 0x0 0x70000000 0x200000>;
->> +
->> +		atf-sram@0 {
->> +			reg = <0x0 0x20000>;
->> +		};
->> +
->> +		sysfw-sram@f0000 {
->> +			reg = <0xf0000 0x10000>;
->> +		};
->> +
->> +		l3cache-sram@100000 {
->> +			reg = <0x100000 0x100000>;
->> +		};
->> +	};
->> +
->>   	gic500: interrupt-controller@1800000 {
->>   		compatible = "arm,gic-v3";
->>   		#address-cells = <2>;
->>
-> 
+--zp4qokiwiqe3hwav
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+On Thu, Dec 27, 2018 at 04:42:25PM +0100, Paul Kocialkowski wrote:
+> The driver's interrupt handler checks whether a message is currently
+> being handled with the curr_msg pointer. When it is NULL, the interrupt
+> is considered to be unexpected. Similarly, the i2c_start_transfer
+> routine checks for the remaining number of messages to handle in
+> num_msgs.
+>=20
+> However, these values are never cleared and always keep the message and
+> number relevant to the latest transfer (which might be done already and
+> the underlying message memory might have been freed).
+>=20
+> When an unexpected interrupt hits with the DONE bit set, the isr will
+> then try to access the flags field of the curr_msg structure, leading
+> to a fatal page fault.
+>=20
+> The msg_buf and msg_buf_remaining fields are also never cleared at the
+> end of the transfer, which can lead to similar pitfalls.
+>=20
+> Fix these issues by introducing a cleanup function and always calling
+> it after a transfer is finished.
+>=20
+> Fixes: e2474541032d ("i2c: bcm2835: Fix hang for writing messages larger =
+than 16 bytes")
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+
+Applied to for-current, thanks!
+
+
+--zp4qokiwiqe3hwav
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxmfKMACgkQFA3kzBSg
+KbZtrxAAohPOgZx5no3ThwDEyYTFd9bMJTKd+4Vz+n1rXHl2K9Ib1/rNfkPq9fiq
+7HteQbVVbxw+KOLBUUjGBv6oqF7Wf7D6Im6JDEJvMINRXXvkyKODS/x+4QkPLmzl
+4h+r2BkzJpR9Bd5hmWYvot8dia8sUM0qJpEGxKoxezbarIwK6gGeXBZb5hDm94R+
+Qb2robryMxM5URI15D8wPFPUhnOxFhv01fRb1bVgJgcF1k2iBIFWHDU+13YGqgPX
+v2q6DjebSMv/riI5o/wxOuM9o77cvYA8O8OKyc2bdtLxVuoi9yHIvR0LtG/t4ylS
+ZODqbfhu2hk4qlqGVYaq9kYxtH0W/eiE7nTUpM8aNvqLKOrK0HVM6kCm2Tt+TBJI
+XpZGBUPdS9YHv5bWJEQvT2svoli0whFKa16glpK3lzl7f6e2xxG2rqfV4xiqaZSt
+vW+x2XO07lvZgVYBi/PyfPD+WazQZaZdxk8kWuYwO6KN8if4h8ltoqrfbbhFGQGa
+Bs/kFkddb5hzAXBPUdHGr+dEgKT9VrIEYRrdc1PtSeSrbOFeu+xJviH8zgnlar56
+romtLgZ3AoxcColAq7JFrMa1ZiYI1torjIxfMFtoNRZZv/JxgDMPuaSwCBMywlxZ
+joUf0GbmiGtLW+zMeTb0B6RNTVMimxXB/XqQ0rirCkv8o0N0oP8=
+=JjNL
+-----END PGP SIGNATURE-----
+
+--zp4qokiwiqe3hwav--
+
+
+--===============3253540754925632842==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3253540754925632842==--
+
