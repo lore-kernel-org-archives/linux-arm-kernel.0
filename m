@@ -2,20 +2,21 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A0271C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7789CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6DC5521934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 46B9B2229F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 02:26:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c2MtGWQO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DC5521934
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BJ3KCtFm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46B9B2229F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,51 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=iFiLvC5l6OD7TodkvMKO8aKG3GnpEW0AtcxMHi5oloM=; b=c2MtGWQOjvk0jBemMjQMBZz+9
-	6fUOU0zas6Kqpw9AJY7s4eq5r6kfYigm3zRc+Qm8UQcR9NUGyn6MjXHBnZDELMlOGiHfzWwa15Rp/
-	CbYM7sBPNpjuIMK0VnHDSjcdS2t3zz2yGBkbZGpr5+9x+QzUgIdmwNOFcvdwqljpWEMqAGsOpkt9g
-	1bJ9iquaCEDyRpqcbD1b/+9xLqcoaMdW4ue60+29Fe7fUvJEw/8XHbF5g/YL6jnmHEkQealIlpvUs
-	grKP5rL7rVSuaLD8kttf+xnVGDM4b9dStZaEIaTlz9I6uU8UCsMj5x/o+2dEeKr3s4WsWjJuDCg4e
-	JVGFxXpSw==;
+	 bh=3TiG/kuX3YSQgc7Ca16wnM8n2Xobgl/IwqD12GP69OQ=; b=BJ3KCtFmhyANtMbAC+2VlGFTr
+	e6cYGHHqCOJkIeEYppgWXs1xJxBxVL4Z4ffrkVWCjkeM6ym29S6P1ti4gFutySo20GyZsbU/6nhTR
+	ZWDDpQEaX1tcxTogBYsJLaUD8JT0CNdJJeuzR80B0P0VdfZA8BBnxbGUelpzlXmZGjbkHi3PUuTaR
+	NB6pGnm93ABpJBNGfFizhD9gjvfu27q22xjIzCS7WHBrpfJddUWN6KUKxEOshqhJ8P6c66joCOmOc
+	WxREtwELwH/1WHBG0SSY02olTLcGAljV8V/efPq7SQ5yubmaegthqqtgoEiplRD05RNXE86lbP0rm
+	BEKrmZ4KA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guTCR-0000Zu-Vb; Fri, 15 Feb 2019 02:25:59 +0000
+	id 1guTCw-0000wJ-47; Fri, 15 Feb 2019 02:26:30 +0000
 Received: from mx.socionext.com ([202.248.49.38])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guTCO-0000Yk-Gb
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 02:25:58 +0000
-Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
- by mx.socionext.com with ESMTP; 15 Feb 2019 11:25:51 +0900
+ id 1guTCr-0000vb-F3
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 02:26:27 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 15 Feb 2019 11:26:24 +0900
 Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by kinkan-ex.css.socionext.com (Postfix) with ESMTP id BB1F6180B51;
- Fri, 15 Feb 2019 11:25:51 +0900 (JST)
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id BC3736117D;
+ Fri, 15 Feb 2019 11:26:24 +0900 (JST)
 Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Fri, 15 Feb 2019 11:25:51 +0900
+ Fri, 15 Feb 2019 11:26:24 +0900
 Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id 28C961A15B7;
- Fri, 15 Feb 2019 11:25:51 +0900 (JST)
+ by kinkan.css.socionext.com (Postfix) with ESMTP id 767DB1A15B7;
+ Fri, 15 Feb 2019 11:26:24 +0900 (JST)
 Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 0C5EA120459;
- Fri, 15 Feb 2019 11:25:51 +0900 (JST)
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 60A60120459;
+ Fri, 15 Feb 2019 11:26:24 +0900 (JST)
 Subject: Re: [PATCH v2 06/15] clocksource/drivers/timer-milbeaut: Introduce
  timer for Milbeaut SoCs
-To: Arnd Bergmann <arnd@arndb.de>, Daniel Lezcano <daniel.lezcano@linaro.org>
+To: Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org, 
+ linux-arm-kernel@lists.infradead.org
 References: <1549628812-31235-1-git-send-email-sugaya.taichi@socionext.com>
- <80f521e5-6207-a32f-2f79-c2cb81dd1908@linaro.org>
- <c6fd5a9d-17df-a13d-7634-4c54d3e65f9c@socionext.com>
- <8f4ea33f-f176-e8d6-40fc-3286bd6a3fcc@linaro.org>
- <CAK8P3a1u=u93v7FSwXMmexCvoTectdm1tDQ+g2AoB2_rTRTs=Q@mail.gmail.com>
+ <96b6fbb3-9cd9-7468-6733-98667664f0b8@linaro.org>
 From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <feb7c60c-ed9a-1ff0-0871-d9b3fc7a40dc@socionext.com>
-Date: Fri, 15 Feb 2019 11:25:41 +0900
+Message-ID: <c67990f4-fa87-5741-684a-9b836fa460b0@socionext.com>
+Date: Fri, 15 Feb 2019 11:26:24 +0900
 User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
  Thunderbird/60.5.0
 MIME-Version: 1.0
-In-Reply-To: <CAK8P3a1u=u93v7FSwXMmexCvoTectdm1tDQ+g2AoB2_rTRTs=Q@mail.gmail.com>
+In-Reply-To: <96b6fbb3-9cd9-7468-6733-98667664f0b8@linaro.org>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_182556_664312_14CC1611 
-X-CRM114-Status: GOOD (  22.52  )
+X-CRM114-CacheID: sfid-20190214_182625_868999_2C73E31B 
+X-CRM114-Status: GOOD (  21.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,68 +81,237 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
  Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, Thomas Gleixner <tglx@linutronix.de>,
- Takao Orito <orito.takao@socionext.com>,
- Arnd Bergmann <arnd.bergmann@linaro.org>, linux-soc@vger.kernel.org,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+Hi, Daniel
 
-
-On 2019/02/15 0:18, Arnd Bergmann wrote:
-> On Thu, Feb 14, 2019 at 3:44 PM Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
+On 2019/02/15 0:22, Daniel Lezcano wrote:
+> On 08/02/2019 13:26, Sugaya Taichi wrote:
+>> Add timer driver for Milbeaut SoCs series.
 >>
->> On 13/02/2019 11:34, Sugaya, Taichi wrote:
->>> Hi,
->>>
->>> On 2019/02/12 18:06, Daniel Lezcano wrote:
->>>> On 08/02/2019 13:26, Sugaya Taichi wrote:
->>>>> Add timer driver for Milbeaut SoCs series.
->>>>>
->>>>> The timer has two 32-bit width down counters, one of which is configured
->>>>> as a clockevent device and the other is configured as a clock source.
->>>>>
->>>>> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
->>>>
->>>> Do want me to take it through my tree?
->>>>
->>>
->>> Yes, please.
->>>
->>> By the way, the patch series includes other sub-system drivers, so
->>> should it be splitted into each driver patch ?
+>> The timer has two 32-bit width down counters, one of which is configured
+>> as a clockevent device and the other is configured as a clock source.
 >>
->> Well usually changes are per sub-systems but in case of first submission
->> you may ask linux-soc@ team to take all the patches together with the
->> acked-by tags from those subsystems maintainer.
->>
->> Added in Cc: Arnd@ and linux-soc@
->>
->> I'll wait a bit before applying the patch you clarify this.
+>> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
 > 
-> Yes, I think merging them all together is best here.
-> 
-> I saw the patches fly past but did not do a complete review,
-> but if all other review comments are addressed, I'd suggest
-> sending the entire series for inclusion to linux-soc@vger.kernel.org
-> with the Acked-by/Reviewed-by tags from subsystem maintainers
-> added in.
-> 
->       Arnd
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
 
-Thank you for suggestion.
-OK. I will send the series to the ML with the Acked-by/Reviewed-by tags.
+Thank you!
 
-Thanks,
-Sugaya Taichi
+>> ---
+>>   drivers/clocksource/Kconfig          |   9 ++
+>>   drivers/clocksource/Makefile         |   1 +
+>>   drivers/clocksource/timer-milbeaut.c | 161 +++++++++++++++++++++++++++++++++++
+>>   3 files changed, 171 insertions(+)
+>>   create mode 100644 drivers/clocksource/timer-milbeaut.c
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index a9e26f6..9101b8f 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -634,4 +634,13 @@ config GX6605S_TIMER
+>>   	help
+>>   	  This option enables support for gx6605s SOC's timer.
+>>   
+>> +config MILBEAUT_TIMER
+>> +	bool "Milbeaut timer driver" if COMPILE_TEST
+>> +	depends on OF
+>> +	depends on ARM
+>> +	select TIMER_OF
+>> +	select CLKSRC_MMIO
+>> +	help
+>> +	  Enables the support for Milbeaut timer driver.
+>> +
+>>   endmenu
+>> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+>> index cdd210f..6f2543b 100644
+>> --- a/drivers/clocksource/Makefile
+>> +++ b/drivers/clocksource/Makefile
+>> @@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
+>>   obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
+>>   obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
+>>   obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
+>> +obj-$(CONFIG_MILBEAUT_TIMER)	+= timer-milbeaut.o
+>>   obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
+>>   obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
+>>   obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
+>> diff --git a/drivers/clocksource/timer-milbeaut.c b/drivers/clocksource/timer-milbeaut.c
+>> new file mode 100644
+>> index 0000000..f2019a8
+>> --- /dev/null
+>> +++ b/drivers/clocksource/timer-milbeaut.c
+>> @@ -0,0 +1,161 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Copyright (C) 2018 Socionext Inc.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/irqreturn.h>
+>> +#include <linux/sched_clock.h>
+>> +#include "timer-of.h"
+>> +
+>> +#define MLB_TMR_TMCSR_OFS	0x0
+>> +#define MLB_TMR_TMR_OFS		0x4
+>> +#define MLB_TMR_TMRLR1_OFS	0x8
+>> +#define MLB_TMR_TMRLR2_OFS	0xc
+>> +#define MLB_TMR_REGSZPCH	0x10
+>> +
+>> +#define MLB_TMR_TMCSR_OUTL	BIT(5)
+>> +#define MLB_TMR_TMCSR_RELD	BIT(4)
+>> +#define MLB_TMR_TMCSR_INTE	BIT(3)
+>> +#define MLB_TMR_TMCSR_UF	BIT(2)
+>> +#define MLB_TMR_TMCSR_CNTE	BIT(1)
+>> +#define MLB_TMR_TMCSR_TRG	BIT(0)
+>> +
+>> +#define MLB_TMR_TMCSR_CSL_DIV2	0
+>> +#define MLB_TMR_DIV_CNT		2
+>> +
+>> +#define MLB_TMR_SRC_CH  (1)
+>> +#define MLB_TMR_EVT_CH  (0)
+>> +
+>> +#define MLB_TMR_SRC_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_SRC_CH)
+>> +#define MLB_TMR_EVT_CH_OFS	(MLB_TMR_REGSZPCH * MLB_TMR_EVT_CH)
+>> +
+>> +#define MLB_TMR_SRC_TMCSR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMCSR_OFS)
+>> +#define MLB_TMR_SRC_TMR_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMR_OFS)
+>> +#define MLB_TMR_SRC_TMRLR1_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR1_OFS)
+>> +#define MLB_TMR_SRC_TMRLR2_OFS	(MLB_TMR_SRC_CH_OFS + MLB_TMR_TMRLR2_OFS)
+>> +
+>> +#define MLB_TMR_EVT_TMCSR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMCSR_OFS)
+>> +#define MLB_TMR_EVT_TMR_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMR_OFS)
+>> +#define MLB_TMR_EVT_TMRLR1_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR1_OFS)
+>> +#define MLB_TMR_EVT_TMRLR2_OFS	(MLB_TMR_EVT_CH_OFS + MLB_TMR_TMRLR2_OFS)
+>> +
+>> +#define MLB_TIMER_RATING	500
+>> +
+>> +static irqreturn_t mlb_timer_interrupt(int irq, void *dev_id)
+>> +{
+>> +	struct clock_event_device *clk = dev_id;
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val;
+>> +
+>> +	val = readl_relaxed(timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	val &= ~MLB_TMR_TMCSR_UF;
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +
+>> +	clk->event_handler(clk);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static int mlb_set_state_periodic(struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
+>> +
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +
+>> +	writel_relaxed(to->of_clk.period, timer_of_base(to) +
+>> +				MLB_TMR_EVT_TMRLR1_OFS);
+>> +	val |= MLB_TMR_TMCSR_RELD | MLB_TMR_TMCSR_CNTE |
+>> +		MLB_TMR_TMCSR_TRG | MLB_TMR_TMCSR_INTE;
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_set_state_oneshot(struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +	u32 val = MLB_TMR_TMCSR_CSL_DIV2;
+>> +
+>> +	writel_relaxed(val, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_clkevt_next_event(unsigned long event,
+>> +				   struct clock_event_device *clk)
+>> +{
+>> +	struct timer_of *to = to_timer_of(clk);
+>> +
+>> +	writel_relaxed(event, timer_of_base(to) + MLB_TMR_EVT_TMRLR1_OFS);
+>> +	writel_relaxed(MLB_TMR_TMCSR_CSL_DIV2 |
+>> +			MLB_TMR_TMCSR_CNTE | MLB_TMR_TMCSR_INTE |
+>> +			MLB_TMR_TMCSR_TRG, timer_of_base(to) +
+>> +			MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_config_clock_source(struct timer_of *to)
+>> +{
+>> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_SRC_TMCSR_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMR_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR1_OFS);
+>> +	writel_relaxed(~0, timer_of_base(to) + MLB_TMR_SRC_TMRLR2_OFS);
+>> +	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
+>> +		MLB_TMR_SRC_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static int mlb_config_clock_event(struct timer_of *to)
+>> +{
+>> +	writel_relaxed(0, timer_of_base(to) + MLB_TMR_EVT_TMCSR_OFS);
+>> +	return 0;
+>> +}
+>> +
+>> +static struct timer_of to = {
+>> +	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
+>> +
+>> +	.clkevt = {
+>> +		.name = "mlb-clkevt",
+>> +		.rating = MLB_TIMER_RATING,
+>> +		.cpumask = cpu_possible_mask,
+>> +		.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT,
+>> +		.set_state_oneshot = mlb_set_state_oneshot,
+>> +		.set_state_periodic = mlb_set_state_periodic,
+>> +		.set_next_event = mlb_clkevt_next_event,
+>> +	},
+>> +
+>> +	.of_irq = {
+>> +		.flags = IRQF_TIMER | IRQF_IRQPOLL,
+>> +		.handler = mlb_timer_interrupt,
+>> +	},
+>> +};
+>> +
+>> +static u64 notrace mlb_timer_sched_read(void)
+>> +{
+>> +	return ~readl_relaxed(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS);
+>> +}
+>> +
+>> +static int __init mlb_timer_init(struct device_node *node)
+>> +{
+>> +	int ret;
+>> +	unsigned long rate;
+>> +
+>> +	ret = timer_of_init(node, &to);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	rate = timer_of_rate(&to) / MLB_TMR_DIV_CNT;
+>> +	mlb_config_clock_source(&to);
+>> +	clocksource_mmio_init(timer_of_base(&to) + MLB_TMR_SRC_TMR_OFS,
+>> +		node->name, rate, MLB_TIMER_RATING, 32,
+>> +		clocksource_mmio_readl_down);
+>> +	sched_clock_register(mlb_timer_sched_read, 32, rate);
+>> +	mlb_config_clock_event(&to);
+>> +	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to), 15,
+>> +		0xffffffff);
+>> +	return 0;
+>> +}
+>> +TIMER_OF_DECLARE(mlb_peritimer, "socionext,milbeaut-timer",
+>> +		mlb_timer_init);
+>>
+> 
+> 
 
 
 _______________________________________________
