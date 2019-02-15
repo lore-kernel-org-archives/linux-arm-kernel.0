@@ -2,64 +2,57 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9742AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:15:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02771C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:46:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 604F1222A1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:15:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C2F6E222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 20:46:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pZgTkh70"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 604F1222A1
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MtTjzg80"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2F6E222BE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FDau9eTA11BMwvMHjSOv/23UkL6J99WCZWuoDWMNHQU=; b=pZgTkh70QqqqK9
-	5RhNZ0DnFpfkOWN+QINvHeuZpn9OFBrYPwArSCdVQStC7ZmjQvnLrDyA31BJUEsflGlfYtrSgH35x
-	buo/+jNogXeJh2oY2k/HhgT0VZ13AnBztKB22F85HWFE9YBafqtEsjJgZx5wmI1DLHoSDt8VIeOfa
-	6eAgQuPeLWXr2wa6xhd9+yrbQ+2aLg+VmiGvVpbKr/NbinRpGzr5Peojo/ZmHVax6BMufKG4SMDCP
-	ujahunLFwKP4zu+R6t6386NOORZGxxHn3ja28TMk1zHdrNxv1GTLHbeQM70EQNJIsctAsQAzB8vUB
-	g25ZczoDpEtvjuFAF/VQ==;
+	List-Owner; bh=EPm9RV6I/JVydZrPNJl0z5tfGUeU5tUcLkigdIhtYvs=; b=MtTjzg80u18B+B
+	Pk/aRS5OHqrvs6VS/e2UonNCjMPUTxcreMM/pcmUFIrS2fnLcIpLPhpgKTv09bCZbIsTjOMNTuZ7J
+	eILFd6ejElJTB7SGSFEwpNE6pIRnCaqUUBvb273OC0EoIuDst8VM51N3IQ9qCFJzvnyKnMx4aESHq
+	keTw5AYhf+5sTV8MAtZeaZb8yrCEQMOqr1tGftcu0tTsU9ssAbEMUgacCM8Klb+e9TNbiAZKhn5n+
+	VzH5C+G5vWHYD1vSNR8MR8shn6rO+ni/8PZJchI5HldqaIeOA7jBRadYQs8/zKpsBYqzleqhDVm18
+	/oZMXLQmRxM44FEF8jNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gujt1-0005im-L5; Fri, 15 Feb 2019 20:15:03 +0000
-Received: from smtp06.smtpout.orange.fr ([80.12.242.128]
- helo=smtp.smtpout.orange.fr)
+	id 1gukNI-0007Ex-Jh; Fri, 15 Feb 2019 20:46:20 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gujsw-0005dq-VI
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 20:15:01 +0000
-Received: from belgarion ([90.76.35.80]) by mwinf5d29 with ME
- id d8Em1z00C1jkVcS038EnfN; Fri, 15 Feb 2019 21:14:51 +0100
-X-ME-Helo: belgarion
-X-ME-Auth: amFyem1pay5yb2JlcnRAb3JhbmdlLmZy
-X-ME-Date: Fri, 15 Feb 2019 21:14:51 +0100
-X-ME-IP: 90.76.35.80
-From: Robert Jarzmik <robert.jarzmik@free.fr>
-To: YueHaibing <yuehaibing@huawei.com>
-Subject: Re: [PATCH -next] ARM: pxa: ssp: Fix "WARNING: invalid free of devm_
- allocated data"
-References: <20190129080324.18708-1-yuehaibing@huawei.com>
-X-URL: http://belgarath.falguerolles.org/
-Date: Fri, 15 Feb 2019 21:14:46 +0100
-In-Reply-To: <20190129080324.18708-1-yuehaibing@huawei.com> (YueHaibing's
- message of "Tue, 29 Jan 2019 16:03:24 +0800")
-Message-ID: <877ee0u7ux.fsf@belgarion.home>
-User-Agent: Gnus/5.130008 (Ma Gnus v0.8) Emacs/26 (gnu/linux)
+ id 1gukNE-0007E1-C1; Fri, 15 Feb 2019 20:46:18 +0000
+Received: from ip5f5a6320.dynamic.kabel-deutschland.de ([95.90.99.32]
+ helo=diego.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gukN2-00032O-N0; Fri, 15 Feb 2019 21:46:04 +0100
+From: Heiko =?ISO-8859-1?Q?St=FCbner?= <heiko@sntech.de>
+To: agajjar <Akash_Gajjar@mentor.com>
+Subject: Re: [PATCH 2/4] arm64: dts: rockchip: rockpro64 dts remove unused node
+Date: Fri, 15 Feb 2019 21:46:03 +0100
+Message-ID: <7155828.jr86DZMtXN@diego>
+In-Reply-To: <ac22440d-3b64-1cf2-205c-52ea7c1c23f9@mentor.com>
+References: <20190213170651.3210-1-Akash_Gajjar@mentor.com>
+ <4653141.o6ZdamfZ6d@diego> <ac22440d-3b64-1cf2-205c-52ea7c1c23f9@mentor.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_121459_286520_1B27DA64 
-X-CRM114-Status: GOOD (  11.74  )
+X-CRM114-CacheID: sfid-20190215_124616_563436_0242DBDC 
+X-CRM114-Status: GOOD (  12.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,28 +64,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, linux@armlinux.org.uk,
- daniel@zonque.org, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Shohei Maruyama <cheat.sc.linux@outlook.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ Rob Herring <robh+dt@kernel.org>, Oskari Lemmela <oskari@lemmela.net>,
+ Levin Du <djw@t-chip.com.cn>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-YueHaibing <yuehaibing@huawei.com> writes:
+Am Freitag, 15. Februar 2019, 13:08:16 CET schrieb agajjar:
+> On 2/15/2019 2:48 PM, Heiko St=FCbner wrote:
+> > Am Mittwoch, 13. Februar 2019, 18:06:38 CET schrieb Akash Gajjar:
+> >> lcd panel pinmux and vcc1v8_s3 regulator is redundant and has a no
+> >> impact,
+> >> so removing it.
+> >> =
 
-> Since commit 1c459de1e645 ("ARM: pxa: ssp: use devm_ functions")
-> kfree, iounmap, clk_put etc no need do any more in remove path.
->
-> Fixes: 1c459de1e645 ("ARM: pxa: ssp: use devm_ functions")
-> Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-Sorry for the late reply, I had forgotten to answer.
+> >> Signed-off-by: Akash Gajjar <Akash_Gajjar@mentor.com>
+> =
 
-Queued to pxa/for-next with a small spelling fix in the commit message, thanks.
+> Hi Heiko,
+> =
 
-Cheers.
+> > vcc1v8_s3 is actually also a emmc supply, so I'd like to keep it around
+> > for completenes sake.
+> =
 
---
-Robert
+> Emmc module is supplied by PMIC vcc3v3_s3 (SWITCH_REG1) and vcc_1v8
+> (DCD_REG4).
+> =
+
+> So I believe removing vcc1v8_s3 has no impact on emmc supply line.
+
+looking at the rockpro64 schematics page 10, I see vcca1v8_s3 linked
+to the emmc_vdd_1v8 input and obviously also as reference for the saradc.
+
+So I think we really could keep it around, so that the power-tree resembles
+the schematics more.
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
