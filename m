@@ -2,65 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B89CEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:58:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D347C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:08:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80FF5218AC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:58:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D33DE218FF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:08:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xw7Tu6Q3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80FF5218AC
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zab4gmL8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D33DE218FF
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=olimex.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=diF5qQNw5dcAqD+dCyB1d6Q2y/WF0t+Oa5CijZPycLY=; b=Xw7Tu6Q3afXYad
-	NKz3emvhjfctGgd0D4Y7hqczc3rrw8H9nKMElXw2YEHquvPoAqo/xggZvAe0L5ECDLS2N8sq4PFNj
-	R8I8h0kHhHSe9ANMs63iOGMZwO5Aq89uo3NJ+HVXFN+7rzOzvMED2WK8y9QnPH8hx87ZhoUHD45p4
-	fez34S1rJGBDeWNzMojcc6BuSa9+jVLpMxWJlDR1/nbDyIQnvOSFbq7s6saaBtbt+1K1PpkvqC5JS
-	ZFdMgtC1dwSuOmnSYsvcIJEqi9/MxLoARX382iEROhEneu5ctVW2+SYpBuawJfTrWV217hwmyK/39
-	hZo4cAO2cfTrF7ARe1wA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=7MHZ8DUWRzoRkXr59e101ynneTRAFkOfastUDQzNACM=; b=Zab4gmL829FTyKm3geY72F9Tq
+	GVkUsHFtl5WslvPYU5ahxvZn1ki0ntkwfLBZ7GTIktJMsESwxWDJKb1Gb/JXHMlbZiJPifup6Y+f+
+	6hV1pqfHVhs7vplROwW9DBfoUzJgGl36+mBgoAGT2DTOWouc59r5Zv43hl24lA2VMjkPUuWuSswu1
+	Zrj/JZrWNVzB2+NnM3T1K54m5/W5yE4Eyu1zolfM6wkKwKvkRU8TyRtFg6JG2PuTPZXdjZkklgDq/
+	E5+AiVAOoSbE5qttXLq3pblxYs7oyktscMXfPUX53DvWinUdOIjLd+njVs04CjX8xXG39aohrg11M
+	N7Lxd47+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gue0t-00087N-V7; Fri, 15 Feb 2019 13:58:47 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gue0q-00086K-9l
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:58:45 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DCD1CA78;
- Fri, 15 Feb 2019 05:58:43 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C87F03F575;
- Fri, 15 Feb 2019 05:58:41 -0800 (PST)
-Date: Fri, 15 Feb 2019 13:58:34 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Frank Li <frank.li@nxp.com>
-Subject: Re: [PATCH V3 3/4] dt-bindings: perf: imx8-ddr: add imx8qxp ddr
- performance monitor
-Message-ID: <20190215135834.GA55505@lakrids.cambridge.arm.com>
-References: <1550081533-25000-1-git-send-email-Frank.Li@nxp.com>
- <1550081533-25000-3-git-send-email-Frank.Li@nxp.com>
+	id 1gue9c-0003xd-KP; Fri, 15 Feb 2019 14:07:48 +0000
+Received: from olimex.com ([184.105.72.32])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gue9Z-0003wr-6q
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:07:47 +0000
+Received: from 195.238.85.143 ([195.238.85.143]) by olimex.com with ESMTPSA
+ (ECDHE-RSA-AES128-GCM-SHA256:TLSv1.2:Kx=ECDH:Au=RSA:Enc=AESGCM(128):Mac=AEAD)
+ (SMTP-AUTH username stefan@olimex.com, mechanism PLAIN)
+ for <linux-arm-kernel@lists.infradead.org>; Fri, 15 Feb 2019 06:07:37 -0800
+Subject: Re: [PATCH v2 1/8] leds: Add support for AXP20X CHGLED
+To: Stefan Mavrodiev <stefan@olimex.com>,
+ Jacek Anaszewski <jacek.anaszewski@gmail.com>, Pavel Machek <pavel@ucw.cz>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Chen-Yu Tsai <wens@csie.org>, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Lee Jones <lee.jones@linaro.org>,
+ "open list:LED SUBSYSTEM" <linux-leds@vger.kernel.org>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>,
+ "open list:X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS"
+ <linux-kernel@vger.kernel.org>,
+ "moderated list:ARM/Allwinner sunXi SoC support"
+ <linux-arm-kernel@lists.infradead.org>
+References: <20190215115013.11098-1-stefan@olimex.com>
+ <20190215115013.11098-2-stefan@olimex.com>
+From: Stefan Mavrodiev <stefan@olimex.com>
+Message-ID: <cfc49881-66a4-4c2f-4c18-7a4a2a62d956@olimex.com>
+Date: Fri, 15 Feb 2019 16:07:25 +0200
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1550081533-25000-3-git-send-email-Frank.Li@nxp.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+In-Reply-To: <20190215115013.11098-2-stefan@olimex.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_055844_342260_0289922E 
-X-CRM114-Status: GOOD (  16.88  )
+X-CRM114-CacheID: sfid-20190215_060745_257146_8DE8CF8F 
+X-CRM114-Status: GOOD (  28.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,80 +79,367 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "lznuaa@gmail.com" <lznuaa@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 13, 2019 at 06:12:33PM +0000, Frank Li wrote:
-> Added binding doc for imx8qxp ddr performance monitor
-> 
-> Signed-off-by: Frank Li <Frank.Li@nxp.com>
 
-As a general thing, please put the DT binding earlier in the series than
-the code and/or DTs using it, as per:
-
-  Documentation/devicetree/bindings/submitting-patches.txt
-
+On 2/15/19 1:50 PM, Stefan Mavrodiev wrote:
+> Most of AXP20x PMIC chips have built-in battery charger with LED indicator.
+> The LED can be controlled ether by the charger or manually by a register.
+>
+> The default is (except for AXP209) manual control, which makes this LED
+> useless, since there is no device driver.
+>
+> The driver rely on AXP20X MFD driver.
+>
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
 > ---
-> Change from v2 to v3
-> * ddr_pmu0 -> ddr-pmu
-> 
->  .../devicetree/bindings/perf/fsl-imx-ddr.txt       | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt b/Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
+>   drivers/leds/Kconfig       |  10 ++
+>   drivers/leds/Makefile      |   1 +
+>   drivers/leds/leds-axp20x.c | 291 +++++++++++++++++++++++++++++++++++++
+>   3 files changed, 302 insertions(+)
+>   create mode 100644 drivers/leds/leds-axp20x.c
+>
+> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> index a72f97fca57b..82dce9063d41 100644
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -766,6 +766,16 @@ config LEDS_NIC78BX
+>   	  To compile this driver as a module, choose M here: the module
+>   	  will be called leds-nic78bx.
+>   
+> +config LEDS_AXP20X
+> +	tristate "LED support for X-Powers PMICs"
+> +	depends on MFD_AXP20X
+> +	help
+> +	  This option enables support for CHGLED found on most of X-Powers
+> +	  PMICs.
+> +
+> +	  To compile this driver as a module, choose M here: the module
+> +	  will be called leds-axp20x.
+> +
+>   comment "LED Triggers"
+>   source "drivers/leds/trigger/Kconfig"
+>   
+> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+> index 4c1b0054f379..d3fb76e119d8 100644
+> --- a/drivers/leds/Makefile
+> +++ b/drivers/leds/Makefile
+> @@ -79,6 +79,7 @@ obj-$(CONFIG_LEDS_MT6323)		+= leds-mt6323.o
+>   obj-$(CONFIG_LEDS_LM3692X)		+= leds-lm3692x.o
+>   obj-$(CONFIG_LEDS_SC27XX_BLTC)		+= leds-sc27xx-bltc.o
+>   obj-$(CONFIG_LEDS_LM3601X)		+= leds-lm3601x.o
+> +obj-$(CONFIG_LEDS_AXP20X)		+= leds-axp20x.o
+>   
+>   # LED SPI Drivers
+>   obj-$(CONFIG_LEDS_CR0014114)		+= leds-cr0014114.o
+> diff --git a/drivers/leds/leds-axp20x.c b/drivers/leds/leds-axp20x.c
 > new file mode 100644
-> index 0000000..9d55182
+> index 000000000000..2d5ae1c085f0
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
-> @@ -0,0 +1,22 @@
-> +* Freescale(NXP) IMX8 DDR performance monitor
+> +++ b/drivers/leds/leds-axp20x.c
+> @@ -0,0 +1,291 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +//
+> +// Copyright 2019 Stefan Mavrodiev <stefan@olimex.com>
 > +
-> +Required properties:
-> +
-> +- compatible: (standard compatible string) should be one of:
-> +	"fsl,imx8-ddr-pmu"
-> +	"fsl,imx8m-ddr-pmu"
 
-Please remove the "(standard xxx)" bits, they're just noise.
+The copyright header is wrong. It should be "Copyright 2019 Olimex Ltd.".
 
-Otherwise, this generally looks OK.
+I'd like to fix it before the patchis merged (eventually).
 
-Are the DDR PMU registers part of the DDR controller register block?
+Regards,
+Stefan Mavrodiev
 
-Thanks,
-Mark.
-
+> +#include <linux/module.h>
+> +#include <linux/kernel.h>
+> +#include <linux/leds.h>
+> +#include <linux/mfd/axp20x.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <uapi/linux/uleds.h>
 > +
-> +- reg: (standard registers property) physical address and size
 > +
-> +- interrupts: (standard interrupt property) single interrupt
-> +	generated by the control block
+> +#define AXP20X_CHGLED_CTRL_REG		AXP20X_OFF_CTRL
+> +#define AXP20X_CHGLED_FUNC_MASK			GENMASK(5, 4)
+> +#define AXP20X_CHGLED_FUNC_OFF			(0 << 4)
+> +#define AXP20X_CHGLED_FUNC_1HZ			(1 << 4)
+> +#define AXP20X_CHGLED_FUNC_4HZ			(2 << 4)
+> +#define AXP20X_CHGLED_FUNC_FULL			(3 << 4)
+> +#define AXP20X_CHGLED_CTRL_MASK			BIT(3)
+> +#define AXP20X_CHGLED_CTRL_MANUAL		0
+> +#define AXP20X_CHGLED_CTRL_CHARGER		1
+> +#define AXP20X_CHGLED_CTRL(_ctrl)		(_ctrl << 3)
 > +
-> +Example:
+> +#define AXP20X_CHGLED_MODE_REG		AXP20X_CHRG_CTRL2
+> +#define AXP20X_CHGLED_MODE_MASK			BIT(4)
+> +#define AXP20X_CHGLED_MODE_A			0
+> +#define AXP20X_CHGLED_MODE_B			1
+> +#define AXP20X_CHGLED_MODE(_mode)		(_mode << 4)
 > +
-> +	ddr-pmu@5c020000 {
-> +		compatible = "fsl,imx8-ddr-pmu";
-> +		reg = <0x0 0x5c020000 0x0 0x10000>;
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>;
-> +	};
+> +struct axp20x_led {
+> +	char			name[LED_MAX_NAME_SIZE];
+> +	struct led_classdev	cdev;
+> +	struct mutex		lock;
+> +	u8			mode : 1;
+> +	u8			ctrl : 1;
+> +	u8			ctrl_inverted : 1;
+> +	struct axp20x_dev	*axp20x;
+> +};
 > +
-> -- 
-> 2.5.2
-> 
+> +static inline struct axp20x_led *to_axp20x_led(struct led_classdev *cdev)
+> +{
+> +	return container_of(cdev, struct axp20x_led, cdev);
+> +}
+> +
+> +static int axp20x_led_setup(struct axp20x_led *priv)
+> +{
+> +	int ret;
+> +	u8 val;
+> +
+> +	/* Invert the logic, if necessary */
+> +	val = priv->ctrl ^ priv->ctrl_inverted;
+> +
+> +	mutex_lock(&priv->lock);
+> +	ret = regmap_update_bits(priv->axp20x->regmap, AXP20X_CHGLED_CTRL_REG,
+> +				 AXP20X_CHGLED_CTRL_MASK,
+> +				 AXP20X_CHGLED_CTRL(val));
+> +	if (ret < 0)
+> +		goto out;
+> +
+> +	ret = regmap_update_bits(priv->axp20x->regmap, AXP20X_CHGLED_MODE_REG,
+> +				 AXP20X_CHGLED_MODE_MASK,
+> +				 AXP20X_CHGLED_MODE(priv->mode));
+> +out:
+> +	mutex_unlock(&priv->lock);
+> +	return ret;
+> +}
+> +
+> +static ssize_t control_show(struct device *dev, struct device_attribute *attr,
+> +			    char *buf)
+> +{
+> +	struct led_classdev *cdev = dev_get_drvdata(dev);
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +
+> +	return sprintf(buf, "%u\n", priv->ctrl);
+> +}
+> +
+> +static ssize_t control_store(struct device *dev, struct device_attribute *attr,
+> +			     const char *buf, size_t size)
+> +{
+> +	struct led_classdev *cdev = dev_get_drvdata(dev);
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +	unsigned long val;
+> +	int ret;
+> +
+> +	ret = kstrtoul(buf, 0, &val);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/**
+> +	 * Supported values are:
+> +	 *   - 0 : Manual control
+> +	 *   - 1 : Charger control
+> +	 */
+> +	if (val > 1)
+> +		return -EINVAL;
+> +
+> +	priv->ctrl = val;
+> +
+> +	return axp20x_led_setup(priv) ? : size;
+> +}
+> +static DEVICE_ATTR_RW(control);
+> +
+> +static ssize_t mode_show(struct device *dev, struct device_attribute *attr,
+> +			 char *buf)
+> +{
+> +	struct led_classdev *cdev = dev_get_drvdata(dev);
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +
+> +	return sprintf(buf, "%u\n", priv->mode);
+> +}
+> +
+> +static ssize_t mode_store(struct device *dev, struct device_attribute *attr,
+> +			  const char *buf, size_t size)
+> +{
+> +	struct led_classdev *cdev = dev_get_drvdata(dev);
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +	unsigned long val;
+> +	int ret;
+> +
+> +	ret = kstrtoul(buf, 0, &val);
+> +	if (ret)
+> +		return ret;
+> +	/**
+> +	 * Supported values are:
+> +	 *   - 0 : Mode A
+> +	 *   - 1 : Mode B
+> +	 */
+> +	if (val > 1)
+> +		return -EINVAL;
+> +
+> +	priv->mode = val;
+> +
+> +	return axp20x_led_setup(priv) ? : size;
+> +}
+> +static DEVICE_ATTR_RW(mode);
+> +
+> +static struct attribute *axp20x_led_attrs[] = {
+> +	&dev_attr_control.attr,
+> +	&dev_attr_mode.attr,
+> +	NULL,
+> +};
+> +ATTRIBUTE_GROUPS(axp20x_led);
+> +
+> +enum led_brightness axp20x_led_brightness_get(struct led_classdev *cdev)
+> +{
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +	u32 val;
+> +	int ret;
+> +
+> +	mutex_lock(&priv->lock);
+> +	ret = regmap_read(priv->axp20x->regmap, AXP20X_CHGLED_CTRL_REG, &val);
+> +	mutex_unlock(&priv->lock);
+> +	if (ret < 0)
+> +		return LED_OFF;
+> +
+> +	return (val & AXP20X_CHGLED_FUNC_FULL) ? LED_FULL : LED_OFF;
+> +}
+> +
+> +static int axp20x_led_brightness_set_blocking(struct led_classdev *cdev,
+> +					      enum led_brightness brightness)
+> +{
+> +	struct axp20x_led *priv = to_axp20x_led(cdev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&priv->lock);
+> +	ret = regmap_update_bits(priv->axp20x->regmap,
+> +				 AXP20X_CHGLED_CTRL_REG,
+> +				 AXP20X_CHGLED_FUNC_MASK,
+> +				 (brightness) ?
+> +				 AXP20X_CHGLED_FUNC_FULL :
+> +				 AXP20X_CHGLED_FUNC_OFF);
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return ret;
+> +}
+> +
+> +static int axp20x_led_parse_dt(struct axp20x_led *priv, struct device_node *np)
+> +{
+> +	const char *str;
+> +	u8 value;
+> +	int ret = 0;
+> +
+> +	str = of_get_property(np, "label", NULL);
+> +	if (!str)
+> +		snprintf(priv->name, sizeof(priv->name), "axp20x::");
+> +	else
+> +		snprintf(priv->name, sizeof(priv->name), "axp20x:%s", str);
+> +	priv->cdev.name = priv->name;
+> +
+> +	priv->cdev.default_trigger = of_get_property(np,
+> +						     "linux,default-trigger",
+> +						     NULL);
+> +
+> +	if (!of_property_read_u8(np, "x-powers,charger-mode", &value)) {
+> +		priv->ctrl = AXP20X_CHGLED_CTRL_CHARGER;
+> +		priv->mode = (value < 2) ? value : 0;
+> +	} else {
+> +		priv->ctrl = AXP20X_CHGLED_CTRL_MANUAL;
+> +	}
+> +
+> +	str = of_get_property(np, "default-state", NULL);
+> +	if (str) {
+> +		if (!strcmp(str, "keep")) {
+> +			ret = axp20x_led_brightness_get(&priv->cdev);
+> +			if (ret < 0)
+> +				return ret;
+> +			priv->cdev.brightness = ret;
+> +		} else if (!strcmp(str, "on")) {
+> +			ret = axp20x_led_brightness_set_blocking(&priv->cdev,
+> +								 LED_FULL);
+> +		} else  {
+> +			ret = axp20x_led_brightness_set_blocking(&priv->cdev,
+> +								 LED_OFF);
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct of_device_id axp20x_led_of_match[] = {
+> +	{ .compatible = "x-powers,axp20x-led" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, axp20x_led_of_match);
+> +
+> +static int axp20x_led_probe(struct platform_device *pdev)
+> +{
+> +	struct axp20x_led *priv;
+> +	int ret;
+> +
+> +	if (!of_device_is_available(pdev->dev.of_node))
+> +		return -ENODEV;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(struct axp20x_led),
+> +			    GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	priv->axp20x = dev_get_drvdata(pdev->dev.parent);
+> +	if (!priv->axp20x) {
+> +		dev_err(&pdev->dev, "Failed to get parent data\n");
+> +		return -ENXIO;
+> +	}
+> +
+> +	mutex_init(&priv->lock);
+> +
+> +	priv->cdev.brightness_set_blocking = axp20x_led_brightness_set_blocking;
+> +	priv->cdev.brightness_get = axp20x_led_brightness_get;
+> +	priv->cdev.groups = axp20x_led_groups;
+> +
+> +	ret = axp20x_led_parse_dt(priv, pdev->dev.of_node);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "Failed to set parameters\n");
+> +		return ret;
+> +	}
+> +
+> +	/**
+> +	 * For some reason in AXP209 the bit that controls CHGLED is with
+> +	 * inverted logic compared to all other PMICs.
+> +	 * If the PMIC is actually AXP209, set inverted flag and later use it
+> +	 * when configuring the LED.
+> +	 */
+> +	if (priv->axp20x->variant == AXP209_ID)
+> +		priv->ctrl_inverted = 1;
+> +
+> +	ret =  axp20x_led_setup(priv);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "Failed to configure led");
+> +		return ret;
+> +	}
+> +
+> +	return devm_led_classdev_register(&pdev->dev, &priv->cdev);
+> +}
+> +
+> +static struct platform_driver axp20x_led_driver = {
+> +	.driver = {
+> +		.name	= "axp20x-led",
+> +		.of_match_table = of_match_ptr(axp20x_led_of_match),
+> +	},
+> +	.probe = axp20x_led_probe,
+> +};
+> +
+> +module_platform_driver(axp20x_led_driver);
+> +
+> +MODULE_AUTHOR("Stefan Mavrodiev <stefan@olimex.com");
+> +MODULE_DESCRIPTION("X-Powers PMIC CHGLED driver");
+> +MODULE_LICENSE("GPL");
 
 _______________________________________________
 linux-arm-kernel mailing list
