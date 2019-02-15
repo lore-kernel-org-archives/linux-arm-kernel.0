@@ -2,136 +2,82 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE4F1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:49:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6CAD9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:02:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD03D21927
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:49:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3741821A4C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:02:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r+rtM426";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Y82AD0Fw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD03D21927
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Suw0IbCS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3741821A4C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8Vqu35v0OgzM3LR9GSLBzu8q/l4Hyi+P3MMwsQybrmg=; b=r+rtM426T+VHD8
-	2TVPmCmd7M/IjrULlcq3yyxj8AqevJNU5SUD4zQovRp4Od8I8vJKOoFaRUxo0q6/mh9Hlx/+3o/BA
-	SmpkL3Pf5iBJQl4+DBBI9JYifwHzO9hT3aF7MavsEe3xOAYBXxmZx/ek0B7WRBeASn9b3GNkmvQ6n
-	yfehrivHU6q+Anp2Iuqu/DcVbh1bNQTKGGYE4B9WeQUawm1mGpRjR+j6n7D3FSbhW2Av+GgDyw2Ag
-	JDg8d5Rc0BYA0PknIsaF80X8NWJ3dOCIq8DfBtui/TD9jv78sRp3mzn3s780K2/e5fx9ZS6SHtR76
-	5QGLmeikX0KoXVeIp1XA==;
+	List-Owner; bh=3ZkbdmR7aZG9s+XxJSbaYJxOUDKgzDL6zTdX8+S3Al0=; b=Suw0IbCSR+/IYO
+	5NAM2y4+cK8F47mOtfPyPiGklmYm/rjJGenZ28P484Q9GkrNDhuAzARqtkNRomGcA7AOixAcBFXRm
+	pRIGeNAWxOl5zPnV/RFQIU8GoxCd1N4eq6aAs31JaM0q4RIvCEPYs6XsnWDoGBMIZGDGbXrg3Oxz1
+	l8nZR+XlY3wRdnliIM69V8K75nK0WttjAgW7kfP3CSAUmyw3uTHC92eiPbPEfu+Wh+gM/DownPxei
+	yhn1KAmuZfdlPUMO1ZNb+D8gmqhxYRtim2SZ4K9niy9oPzqgIWFar+1MKZlVRGTSa5b2S7g/F7KZC
+	t5YGzjwmMRAp1AaOw8sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guhc5-0002Mg-FU; Fri, 15 Feb 2019 17:49:25 +0000
-Received: from mail-he1eur01on0625.outbound.protection.outlook.com
- ([2a01:111:f400:fe1e::625]
- helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+	id 1guhoX-0006q0-AV; Fri, 15 Feb 2019 18:02:17 +0000
+Received: from mail-lf1-f66.google.com ([209.85.167.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guhbb-0001Y8-O8
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:48:59 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=dIp1/4qU7H5VkwyXcWHI140IWKCAnVvYk8dEvmy+bTI=;
- b=Y82AD0FwMYpQZ/QYXjW5QQu68jfXY693UiD/QcdxW+quL8DT91EhvhWsVoWyOz6f/vxG6KNGTHxlDtfmsVKF2F1mAnj1ArNAzNbhmN/18yA702AR/1SUpTnPXIUJoyFcFJmQwuGzcscvIWONtcGRJ5oMx6Qf52VzFgh9Ine2QOY=
-Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
- AM0PR04MB5330.eurprd04.prod.outlook.com (52.134.93.154) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Fri, 15 Feb 2019 17:48:46 +0000
-Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
- ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
- ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1601.023; Fri, 15 Feb 2019
- 17:48:46 +0000
-From: Abel Vesa <abel.vesa@nxp.com>
-To: Mike Turquette <mturquette@baylibre.com>, Stephen Boyd <sboyd@kernel.org>, 
- Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
- Lucas
- Stach <l.stach@pengutronix.de>, Angus Ainslie <angus.ainslie@puri.sm>, Rob
- Herring <robh@kernel.org>
-Subject: [PATCH v2 3/3] clk: imx8mq: Add the missing ARM clock
-Thread-Topic: [PATCH v2 3/3] clk: imx8mq: Add the missing ARM clock
-Thread-Index: AQHUxVaygt4K7Vtjfk6EnO4JuLEpZw==
-Date: Fri, 15 Feb 2019 17:48:46 +0000
-Message-ID: <1550252913-24532-4-git-send-email-abel.vesa@nxp.com>
-References: <1550252913-24532-1-git-send-email-abel.vesa@nxp.com>
-In-Reply-To: <1550252913-24532-1-git-send-email-abel.vesa@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: AM6PR0502CA0009.eurprd05.prod.outlook.com
- (2603:10a6:209:1::22) To AM0PR04MB5779.eurprd04.prod.outlook.com
- (2603:10a6:208:131::23)
-x-originating-ip: [95.76.156.53]
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=abel.vesa@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 5d96a003-087a-4786-60c3-08d6936dd533
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605077)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5330; 
-x-ms-traffictypediagnostic: AM0PR04MB5330:
-x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM0PR04MB5330;
- 23:DN/dbthU+h7HIO9Daf5np6YLy7Wazu0I81SUj30?=
- =?iso-8859-1?Q?zebH7n+VxTeke9DXIfD9E0HO8a4p9rXOynpsq1yubnUGt6eMasYLOflDXG?=
- =?iso-8859-1?Q?45D8G9zzJhgfjzGb9vtWn+0TMPUGSpXi+fLtAg/UmvvsaUWFdpXkGD960Z?=
- =?iso-8859-1?Q?r0N2X09Let0wKaQZVDl9IXdH/mY2k2R6zR4YjGTm8rJErWaQBveTB5f4R9?=
- =?iso-8859-1?Q?3zqctu+52TqmcML1E9+c0keMUUmWy+btaBofrr64+AG/VS7DNDF2k1Uscl?=
- =?iso-8859-1?Q?et+H/owQoIIN46aH91jNP+OgfDJy3O84ApYEGvLsceUTmQuExuZB8ckHJR?=
- =?iso-8859-1?Q?8CbiPBpJxxhOM8SYSPn6MDfgcYSNKmNxzbYiFMknQes/lFV8IFu1X1wZUz?=
- =?iso-8859-1?Q?x+m9KFUYy3cWj5U4rTo+ZFsYFUT2ZKfXUCSF5kOK+fKtoao7H7KT3vSs7O?=
- =?iso-8859-1?Q?fbjqjiIwldbSvdY+RhN450F9U4g9qE5zi1/K2DjEyk1IejrNgY2lplb1s2?=
- =?iso-8859-1?Q?vNld1YOftMDEvfFBhd6j8W4nOPqx0/Er6Hi/H/VLkndJNG3zkpu7RObzfx?=
- =?iso-8859-1?Q?5L1wWYtu6/hYvWsSALsvzYnPIWmd46J5wLbpQQBjLhvJ1U/Potf6lRFpJ+?=
- =?iso-8859-1?Q?iA0vOgWELZx0zmSayJWM2+kOhy7cP4YHPAmLmz9ITZ+2VULwW4bo45hUCL?=
- =?iso-8859-1?Q?SlcDKPU1mX7+4ZCkN7qe/w43+zOk5bT6NO3iXNwGupVxcSew8ipL810sSh?=
- =?iso-8859-1?Q?ladF4DADgahxlAWL5Xl98H7yJxl8Sh/eBOVNiL8DV1yZNARON6VTxL8roJ?=
- =?iso-8859-1?Q?xv7IAgOSAL0JmJQdTkZFzY1NSAAPaYw6txLDQ2ng7qjnKUc8CAttLfD/Sv?=
- =?iso-8859-1?Q?Wztdfp/yFHwiopU8adJ1HPTckWANcssv4/kwlBxdInzQ/IG6a8IgJDTSjg?=
- =?iso-8859-1?Q?1svF7+lWtjhpToMmBZZGOjmdwLjnxQ5o2AZ30nxmiU+X6lIP4o0sCylY2F?=
- =?iso-8859-1?Q?C1TVglg1wbYRdCWJtGdb+4upyIbG0c/jehkPJY6Ekos0JsgPfeLCj+Im1U?=
- =?iso-8859-1?Q?OVMvbINmVUjVupDae0xEB7YXfPaQhTDrmYMRjCmuShvhs5HvAZcM3yIExP?=
- =?iso-8859-1?Q?i3OFxv42kLePdTOz3VWrhuTzsU7mGIJznn+4YEsVDBVhzO1Ww/B/iC68zu?=
- =?iso-8859-1?Q?6JDqAhHdXRK2rOwJNx0+G0FB4aIdrHuVe0pngnk7mYb4kGBtdgHwn8/jRQ?=
- =?iso-8859-1?Q?sG1ncneIl1pQ5BLiYH1yNzRG6PRphGoBveGMISQgMzWHjpmAteU00hd31V?=
- =?iso-8859-1?Q?lg=3D?=
-x-microsoft-antispam-prvs: <AM0PR04MB5330C896242B3C5A5F6771B0F6600@AM0PR04MB5330.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09497C15EB
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(366004)(346002)(396003)(376002)(199004)(189003)(6436002)(14454004)(6116002)(3846002)(97736004)(186003)(478600001)(476003)(110136005)(71200400001)(105586002)(106356001)(26005)(71190400001)(11346002)(68736007)(2616005)(86362001)(446003)(6486002)(50226002)(54906003)(316002)(44832011)(486006)(7416002)(99286004)(81166006)(81156014)(8676002)(53936002)(76176011)(8936002)(66066001)(386003)(6506007)(4326008)(36756003)(25786009)(52116002)(2906002)(305945005)(6512007)(256004)(102836004)(4744005)(7736002)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5330;
- H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: oOwAhWkzNwd/nRxqcUwruzeSLTLf9Xa81YnC+bROtY8QJinfJglIwOZmD1zQkaNbXQ0sgVzhjUwh2R8eTsww6IsFpaHw/t1aPkdkNK8H58dJLD6h/rHVX7ossLTfoih4FvOM5++L6XR9ETcc4nFkQzl0kUX8/r5fDjN/LLChqcu5bxM6Sp5gPLFvgklMApJn7aF2rzZ/NlXgAiuJTQmHY2VoV54QxsVurp4EUwbYLrO+8eW2qdbynQW2a3lPCQkIU/hcy43n0OXNzsNJLyRL/vkDfpNlmgFceQZhop68hvs142AEjee4XDd6ZvTzb76GWnDG1uRYR5oV/TScXHxxZPOmwDELWO44AXv8d4imsy2CoAlyek1CAwNjH3By00qcDldIoKdQhufbTjIHDejX+9JFoUpf7+8Jb/uu6LelbtM=
+ id 1guhoR-0006oz-TW
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 18:02:13 +0000
+Received: by mail-lf1-f66.google.com with SMTP id q12so7873806lfm.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 10:02:11 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=a6nB+8VN0gTdBNT8NeBAeCswRcmI7H1hb3v6s4di2ug=;
+ b=gf/htONafEvx+heL5Xx7h/UKCJ/ZxXmv17C7VWfw8t4hZuAhpaJc8MwtbCs39n4Xtm
+ zsAR74A0rPkIyu9vFWNtKpUPYEK6Elf0+F7KoOnfCKAedjfljaA4/KOQnsH6IRatLeXd
+ tlmkv0O84Ibvhgloy5V8TJqBclXlArMOBM5uSpIb9YmxYT7Wg+FPYsT5xw97p5ecBNgp
+ 8O1J7Pkvsk5oXy1Ui031h3rG52S9tAanXlqnC14pYNOlYuD/09RRHYrdkB/tNDfCOYCt
+ PUd4YEZVjCZGuu1BKgTSzWvQTZ3P+lHrhgYHM6vGrIiA+nYFPptxy9FRfv1go0h0NVXr
+ OhDw==
+X-Gm-Message-State: AHQUAuYPXw3gtdBary38+qDtAx0MVDkBAv68F1JHWJUdM1th6+cLpAES
+ 1voslAjAvcyLTZVXSQVAOSYR/JDZqCsUOUjIBBa6Bg==
+X-Google-Smtp-Source: AHgI3Ib/GGJdvOrEwSssCLonQftK7k+huk2mVMHDYkjwhM9ZuB0u2lIt5OiUnCuRMJ2ajNpiEwvWU/GpLFKdCgfFB40=
+X-Received: by 2002:ac2:4154:: with SMTP id c20mr6646225lfi.108.1550253729426; 
+ Fri, 15 Feb 2019 10:02:09 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5d96a003-087a-4786-60c3-08d6936dd533
-X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Feb 2019 17:48:45.0921 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5330
+References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
+ <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
+ <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
+ <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
+ <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
+ <20190213111552.GA8265@dhcp-128-65.nay.redhat.com>
+ <bed51e6e-3dcb-8e07-1d31-9d81bfca20e5@arm.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC03568504@BPXM09GP.gisp.nec.co.jp>
+ <37ed4c14-e4b9-49c0-4816-c289ce65fd76@arm.com>
+In-Reply-To: <37ed4c14-e4b9-49c0-4816-c289ce65fd76@arm.com>
+From: Bhupesh Sharma <bhsharma@redhat.com>
+Date: Fri, 15 Feb 2019 23:31:56 +0530
+Message-ID: <CACi5LpN6gVy4gCTYLGRiWW1VNGrVc-+Ykn919LKsO2bP-v1NHw@mail.gmail.com>
+Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
+ 'MAX_PHYSMEM_BITS' to vmcoreinfo
+To: James Morse <james.morse@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_094856_178505_D4EEC793 
-X-CRM114-Status: GOOD (  11.17  )
+X-CRM114-CacheID: sfid-20190215_100211_983789_2CB9DDBE 
+X-CRM114-Status: GOOD (  37.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -143,45 +89,154 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Abel Vesa <abel.vesa@nxp.com>, Anson Huang <anson.huang@nxp.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, Kazuhito Hagio <k-hagio@ab.jp.nec.com>,
+ "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
+ "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ Steve Capper <Steve.Capper@arm.com>,
+ "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
+ Will Deacon <will.deacon@arm.com>,
+ AKASHI Takahiro <takahiro.akashi@linaro.org>,
+ "anderson@redhat.com" <anderson@redhat.com>,
+ Kristina Martsenko <kristina.martsenko@arm.com>,
+ Borislav Petkov <bp@alien8.de>, Dave Young <dyoung@redhat.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the ARM clock as imx_clk_cpu type.
-Will be used by cpufreq.
+Hi James,
 
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/clk/imx/clk-imx8mq.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+On Fri, Feb 15, 2019 at 11:04 PM James Morse <james.morse@arm.com> wrote:
+>
+> Hi guys,
+>
+> (CC: +Steve, +Kristina) "What's the best way of letting user-space know the MMU
+> config when 52-bit VA and pointer-auth may be in use?"
+>
+> On 13/02/2019 19:52, Kazuhito Hagio wrote:
+> > On 2/13/2019 1:22 PM, James Morse wrote:
+> >> On 13/02/2019 11:15, Dave Young wrote:
+> >>> On 02/12/19 at 11:03pm, Kazuhito Hagio wrote:
+> >>>> On 2/12/2019 2:59 PM, Bhupesh Sharma wrote:
+> >>>>> BTW, in the makedumpfile enablement patch thread for ARMv8.2 LVA
+> >>>>> (which I sent out for 52-bit User space VA enablement) (see [0]), Kazu
+> >>>>> mentioned that the changes look necessary.
+> >>>>>
+> >>>>> [0]. http://lists.infradead.org/pipermail/kexec/2019-February/022431.html
+> >>>>
+> >>>>>>> The increased 'PTRS_PER_PGD' value for such cases needs to be then
+> >>>>>>> calculated as is done by the underlying kernel
+> >>
+> >> Aha! Nothing to do with which-bits-are-pfn in the tables...
+> >>
+> >> You need to know if the top level PGD is 512bytes or bigger. As we use a
+> >> kmem-cache the adjacent data could be some else's page tables.
+> >>
+> >> Is this really a problem though? You can't pull the user-space pgd pointers out
+> >> of no-where, you must have walked some task_struct and struct_mm's to find them.
+> >> In which case you would have the VMAs on hand to tell you if its in the mapped
+> >> user range.
+> >>
+> >> It would be good to avoid putting something arch-specific in here if we can at
+> >> all help it.
+>
+> >>>>>>> (see
+> >>>>>>> 'arch/arm64/include/asm/pgtable-hwdef.h' for details):
+> >>>>>>>
+> >>>>>>> #define PTRS_PER_PGD          (1 << (MAX_USER_VA_BITS - PGDIR_SHIFT))
+> >>>>
+> >>>> Yes, this is the reason why makedumpfile needs the MAX_USER_VA_BITS.
+> >>>> It is used for pgd_index() also in makedumpfile to walk page tables.
+> >>>>
+> >>>> /* to find an entry in a page-table-directory */
+> >>>> #define pgd_index(addr)         (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+> >>>
+> >>> Since Dave mentioned crash tool does not need it, but crash should also
+> >>> travel the pg tables.
+> >
+> > The crash utility is always invoked with vmlinux, so it can read the
+> > vabits_user variable directly from vmcore, but makedumpfile can not.
+>
+> (This sounds fragile. That symbol's name may change, it may disappear
+> completely! ... but I guess crash changes with every kernel release anyway)
+>
+>
+> >>> If this is really necessary it would be good to describe what will
+> >>> happen without the patch, eg. some user visible error from an actual test etc.
+> >>
+> >> Yes please, it would really help if there was a specific example we could discuss.
+> >
+> > With 52-bit user space and 48-bit kernel space configuration,
+> > makedumpfile will not be able to convert a virtual kernel address
+> > to a physical address, and fail to capture a dumpfile, because the
+> > pgd_index() will return a wrong index.
+>
+> Got it, thanks!
+> (all this user stuff had me thinking it was user-space you were trying to walk).
+>
+> Yes, this is because of commit e842dfb5a2d3 ("arm64: mm: Offset TTBR1 to allow
+> 52-bit PTRS_PER_PGD"). The kernel has offset the ttbr1 value, if you try and
+> walk it without knowing the offset you get junk.
+>
+> Ideally we tell you the offset with some 'ttbr1_offset=' in vmcoreinfo, but if
+> the offsetting code disappears, the kernel would still have to provide
+> 'ttbr1_offset=0' for user-space to keep working.
+>
+> I'd like to find something future-proof that always has an unambiguous meaning,
+> and isn't a problem if the kernel variable/symbol/kconfig names change.
+>
+> With pointer-auth in use too you can't guess which bits are address and which
+> bits are data.
+>
+> Taking arch-specific to its extreme, we could expose TCR_EL1, but this is a
+> problem if we ever switch that per task (some new bits may turn up with a new
+> feature). Some of those bits vary per cpu too, so we'd have to mask them out in
+> case user-space tries to conclude something from them.
+>
+>
+> My current best suggestion is to export:
+> from core code:
+> * USER_MMAP_END, the maximum value a user-space can try and mmap().
+> This would normally be TASK_SIZE, but x86 and powerpc also have support for
+> larger VA space, and its plumbed into mm slightly differently. We should have
+> one arch-independent property that covers all these. On arm64 this would be the
+> runtime va bits for user-space's TTBR. (This assumes the value isn't per-task)
+>
+> arch specific:
+> * ARM64_TCR.T1SZ, the va bits mapped by the kernel's TTBR. (We can assume we'll
+> never flip user/kernel space). This has to be arch specific, it will always have
+> a value and its meaning comes from the ARM-ARM (so linux can't change it in the
+> future). It should be the same on every CPU.
+> * ARM64_TTBR1.BADDR, the pa of the kernel page tables, which implicitly has the
+> offset. Again this always has a value, and its meaning comes from the ARM-ARM.
+> If we ever get clever with different page-tables/TCR values on different CPUs,
+> these two should come from the same CPU.
+>
+>
+> I think this gives you what you need if user/kernel may both be using
+> pointer-auth and both may be using 52-bit va. I'm pretty sure the 48:52 bits can
+> be picked at boot time depending on the kernel kconfig and the hardware support.
+>
+> Does anyone have a better idea? (or a corner where this won't work?)
 
-diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
-index 57499ed..8a283cb 100644
---- a/drivers/clk/imx/clk-imx8mq.c
-+++ b/drivers/clk/imx/clk-imx8mq.c
-@@ -558,6 +558,12 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
- 	clks[IMX8MQ_GPT_3M_CLK] = imx_clk_fixed_factor("gpt_3m", "osc_25m", 1, 8);
- 	clks[IMX8MQ_CLK_DRAM_ALT_ROOT] = imx_clk_fixed_factor("dram_alt_root", "dram_alt", 1, 4);
- 
-+	clks[IMX8MQ_CLK_ARM] = imx_clk_cpu("arm", "arm_a53_div",
-+					   clks[IMX8MQ_CLK_A53_DIV],
-+					   clks[IMX8MQ_CLK_A53_SRC],
-+					   clks[IMX8MQ_ARM_PLL_OUT],
-+					   clks[IMX8MQ_SYS1_PLL_800M]);
-+
- 	for (i = 0; i < IMX8MQ_CLK_END; i++)
- 		if (IS_ERR(clks[i]))
- 			pr_err("i.MX8mq clk %u register failed with %ld\n",
--- 
-2.7.4
+I am not sure you got a chance to look at the two regression cases I
+reported here:
+<http://lists.infradead.org/pipermail/kexec/2019-February/022449.html>
 
+Unfortunately the above suggestion doesn't provide any fix for
+ARMv8.2-LPA regression (see text under heading '
+(1). Regression Case 1 (ARMv8.2-LPA enabled kernel)')
+
+After going through the regression reports, I think exporting
+'MAX_USER_VA_BITS' and 'MAX_PHYSMEM_BITS' to vmcoreinfo is sufficient
+for the above regressions (without over-complicating the stuff) as
+ARM64_TCR.T1SZ and friends seem to arch specific as compared to
+VA_BITS + 'MAX_USER_VA_BITS' .
+
+Thanks,
+Bhupesh
 
 _______________________________________________
 linux-arm-kernel mailing list
