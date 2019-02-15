@@ -2,59 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 385AAC10F02
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:35:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D17B1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:36:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E971D21924
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:35:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9DBF921924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:36:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IT2SBCtO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E971D21924
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s4emh1kF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DBF921924
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X4gK/Z4apL5dm7sLUqvzuHw/G0INzJIytVm0LrFbRAY=; b=IT2SBCtON5wWGm
-	b2Ilg8fgagHboqztrs4SKdGDjmwkS4t8RreWnq4k2M3m0Xpe+Aj2Ei28NXogMz2508S8wW92Aqq6E
-	MyeBrysorSRYbL3J3Jnq1cYXulxcgqMuCUsg4DA4+O41tTia+xrb2sBm6asBwBKmVs4jUaINuHkX4
-	zkaovwikcscIcOyF/JnI4e/4+tZMcB+cv+NoJNt2wUgkHr5Vv53beZr4JeepyTuz3dslBpWVAmTCC
-	FrOL64atOn4H9TCcSfEHKq8QJQAoJwjF7pmWCNJ2WsXPIwNxJ9pmctbtVNx1NOapOhrILV09SpgKr
-	Gsm9pPpy8DOn2NxvXyhQ==;
+	List-Owner; bh=DkWb4H04xCy38dEnt8nZjWpMKQYWU3IeXUXzfu1eYiA=; b=s4emh1kFAyA3UQ
+	7HpDu61S7cDE7F7AoDMX5UewcAipjqSFcq9hDq9YOPMPs+4l9WPAdEv6C7CHBIQOiBIIcmGHwW0Aj
+	+lS5wYtjfTaEs6QoV+WbxxXaKibJL5+xoXUkghH2O+ByTvLP0HDztq7dQba80hg+WlXP7uj+qJtvt
+	U8p7PJk6MDkDhlW+nLkVPloqlDJM7kJmBRZrFm8hbISEB6qBwML8hLT9+enMZexhkSJRd2NDdeYpQ
+	exkATjivEdrPMd8+UwLbG4G3cwtD567h4qF4Wk3M4YVSGrAyw451ceTqsElrdKO5xL90RVi28HeeH
+	C/gjjckjEvFubuiDkGRg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufWe-0004ik-N5; Fri, 15 Feb 2019 15:35:40 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gufX8-00057F-4K; Fri, 15 Feb 2019 15:36:10 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufWL-0004IY-5e
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:35:23 +0000
-X-Originating-IP: 90.53.137.203
-Received: from localhost (alyon-652-1-306-203.w90-53.abo.wanadoo.fr
- [90.53.137.203]) (Authenticated sender: gregory.clement@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id 8F50D240011;
- Fri, 15 Feb 2019 15:35:09 +0000 (UTC)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Jonathan Cameron <jic23@kernel.org>
-Subject: Re: [PATCH 5/5] iio:adc:lpc32xx Add scale feature
-In-Reply-To: <20190209172303.43cff3ec@archlinux>
-References: <20190208160944.13281-1-gregory.clement@bootlin.com>
- <20190208160944.13281-6-gregory.clement@bootlin.com>
- <20190209172303.43cff3ec@archlinux>
-Date: Fri, 15 Feb 2019 16:35:08 +0100
-Message-ID: <87va1l2hg3.fsf@FE-laptop>
+ id 1gufWz-00056Y-Bm
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:36:07 +0000
+Received: by mail-qk1-f194.google.com with SMTP id u188so5898596qkh.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 07:36:01 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=rz0OjfHBarvD2PNI74KMI1aetYjLgVDg10C9/+Y9a0Y=;
+ b=jNx7cM6Tv5elL3xRCwUHNLjhqIVWVV8saym25JdKvzR7xY3MIoNp2rLeXWEXEIxjNN
+ XJMDrDDTczinS9c01LiLXHkYLYK+ORCL4Cy9bZ37Ohy+PIULk3agxhIj+WGBrdFHDR3V
+ xwSwJPCcO4PruR3vTR32MOTRIGus3myoXUB1UFldp3pxQhlevVvIChZosH4lN4UpZNiy
+ rzapOwpfRKLjZRDfsKkGbn+Wkv8nJZdy/uFIPDhU5VM9dnW0fVm1R9qicIHeCoX5XtNQ
+ f6VUR+2To3skL4h52l1ZcYYk6rgcD3gYecASKk4kCyjBX3j5I9IGw7Lcss1sPpV64NQ1
+ UdqQ==
+X-Gm-Message-State: AHQUAub7jOiKhUhAjIRdILfXQ+LKwewJyV18dMJ4yqNtnLEr5SmQeiYa
+ LfPRRbdO/LEmMXSmnUczsi7BUhSOxYOnbj21NtM=
+X-Google-Smtp-Source: AHgI3IZju+w6Cnsguljg/WextdJ6M1aT6VdDaoLpQnYihxvqpGYAi9/t4gNRMEl2tK3h8mvfBjrWGPe8pVxPu5HEN78=
+X-Received: by 2002:ae9:d8c2:: with SMTP id u185mr7107627qkf.107.1550244960477; 
+ Fri, 15 Feb 2019 07:36:00 -0800 (PST)
 MIME-Version: 1.0
+References: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
+ <CAK8P3a1K+oUTrq903=8zfguJRXCQDvaXLT+TY-u6P8Obpr3myw@mail.gmail.com>
+In-Reply-To: <CAK8P3a1K+oUTrq903=8zfguJRXCQDvaXLT+TY-u6P8Obpr3myw@mail.gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 16:35:43 +0100
+Message-ID: <CAK8P3a1opCPaXD=8NwR6ZdJUHAKTC+0iOJTuq7g33J-=ryWUuw@mail.gmail.com>
+Subject: Re: [GIT PULL] Qualcomm ARM64 DT updates for 5.1
+To: Andy Gross <andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_073521_499074_A29F1ADE 
-X-CRM114-Status: GOOD (  26.55  )
+X-CRM114-CacheID: sfid-20190215_073601_449125_1C9A9091 
+X-CRM114-Status: GOOD (  11.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,105 +79,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Lars-Peter Clausen <lars@metafoo.de>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Hartmut Knaack <knaack.h@gmx.de>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-arm-msm@vger.kernel.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
+ arm-soc <arm@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
+ Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgSm9uYXRoYW4sCiAKIE9uIHNhbS4sIGbDqXZyLiAwOSAyMDE5LCBKb25hdGhhbiBDYW1lcm9u
-IDxqaWMyM0BrZXJuZWwub3JnPiB3cm90ZToKCj4gT24gRnJpLCAgOCBGZWIgMjAxOSAxNzowOTo0
-NCArMDEwMAo+IEdyZWdvcnkgQ0xFTUVOVCA8Z3JlZ29yeS5jbGVtZW50QGJvb3RsaW4uY29tPiB3
-cm90ZToKPgo+PiBVbnRpbCBub3cgdGhpcyBkcml2ZXIgb25seSBleHBvc2VkIHRoZSByYXcgdmFs
-dWUgb2YgdGhlIGNoYW5uZWxzLiBXaXRoCj4+IHRoaXMgcGF0Y2gsIHRoZSBzY2FsZSB2YWx1ZSBp
-cyBhbHNvIGV4cG9zZWQuCj4+IAo+PiBJdCBkZXBlbmRzIG9mIGEgcmVndWxhdG9yIHN1cHBseSwg
-YW5kIHVubGlrZSBtb3N0IG9mIHRoZSBvdGhlciBkcml2ZXIsIGRvCj4+IG5vdCBoYXZpbmcgdGhp
-cyByZWd1bGF0b3Igd29uJ3QgcHJldmVudCB0byB1c2UgdGhlIGRyaXZlci4gVGhlIHJlYXNvbiBm
-b3IKPj4gaXQgaXMgdG8gYWxsb3cgdG8gY29udGludWUgdG8gdXNlIHRoaXMgZHJpdmVyIHdpdGgg
-YW4gb2xkIGRldmljZSB0cmVlLiBJZgo+PiB0aGVyZSBpcyBubyByZWd1bGF0b3Igc3VwcGx5IHRo
-ZW4gdGhlIHNjYWxlIHdvbid0IGJlIGV4cG9zZWQuCj4+IAo+PiBTaWduZWQtb2ZmLWJ5OiBHcmVn
-b3J5IENMRU1FTlQgPGdyZWdvcnkuY2xlbWVudEBib290bGluLmNvbT4KPiBIaSBHcmVnb3J5LAo+
-Cj4gQSBmZXcgbWlub3IgY29tbWVudHMgaW5saW5lLgo+Cj4gSSdsbCBhZG1pdCB0byBiZWluZyBz
-dXJwcmlzZWQgdG8gc2VlIGFueSBwYXRjaGVzIGF0IGFsbCBmb3IgdGhpcyBkcml2ZXIgZ2l2ZW4K
-PiBob3cgbG9uZyBpdCBoYXMgYmVlbiBzaW5jZSB3ZSBoYWQgYW55IGtub3duIHVzZXJzLiAgV2Ug
-bmVhcmx5IGRyb3BwZWQgaXQgYXMKPiB1bnVzZWQgeWVhcnMgYWdvIElJUkMhICBHb29kIHRoaW5n
-IHdlIGRpZG4ndCBpdCBzZWVtcy4KPgo+IFRoYW5rcywKPgo+IEpvbmF0aGFuCj4KPj4gLS0tCj4+
-ICBkcml2ZXJzL2lpby9hZGMvbHBjMzJ4eF9hZGMuYyB8IDI3ICsrKysrKysrKysrKysrKysrKysr
-KysrLS0tLQo+PiAgMSBmaWxlIGNoYW5nZWQsIDIzIGluc2VydGlvbnMoKyksIDQgZGVsZXRpb25z
-KC0pCj4+IAo+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9paW8vYWRjL2xwYzMyeHhfYWRjLmMgYi9k
-cml2ZXJzL2lpby9hZGMvbHBjMzJ4eF9hZGMuYwo+PiBpbmRleCBmMzkxYzFlMTAxMzYuLmUzNmNh
-MzA3ZjA2NSAxMDA2NDQKPj4gLS0tIGEvZHJpdmVycy9paW8vYWRjL2xwYzMyeHhfYWRjLmMKPj4g
-KysrIGIvZHJpdmVycy9paW8vYWRjL2xwYzMyeHhfYWRjLmMKPj4gQEAgLTE0LDYgKzE0LDcgQEAK
-Pj4gICNpbmNsdWRlIDxsaW51eC9pby5oPgo+PiAgI2luY2x1ZGUgPGxpbnV4L21vZHVsZS5oPgo+
-PiAgI2luY2x1ZGUgPGxpbnV4L3BsYXRmb3JtX2RldmljZS5oPgo+PiArI2luY2x1ZGUgPGxpbnV4
-L3JlZ3VsYXRvci9jb25zdW1lci5oPgo+PiAgCj4+ICAvKgo+PiAgICogTFBDMzJYWCByZWdpc3Rl
-cnMgZGVmaW5pdGlvbnMKPj4gQEAgLTQ1LDYgKzQ2LDcgQEAgc3RydWN0IGxwYzMyeHhfYWRjX3N0
-YXRlIHsKPj4gIAl2b2lkIF9faW9tZW0gKmFkY19iYXNlOwo+PiAgCXN0cnVjdCBjbGsgKmNsazsK
-Pj4gIAlzdHJ1Y3QgY29tcGxldGlvbiBjb21wbGV0aW9uOwo+PiArCXN0cnVjdCByZWd1bGF0b3Ig
-KnZyZWY7Cj4+ICAKPj4gIAl1MzIgdmFsdWU7Cj4+ICB9Owo+PiBAQCAtNTcsNyArNTksOSBAQCBz
-dGF0aWMgaW50IGxwYzMyeHhfcmVhZF9yYXcoc3RydWN0IGlpb19kZXYgKmluZGlvX2RldiwKPj4g
-IHsKPj4gIAlzdHJ1Y3QgbHBjMzJ4eF9hZGNfc3RhdGUgKnN0ID0gaWlvX3ByaXYoaW5kaW9fZGV2
-KTsKPj4gIAlpbnQgcmV0Owo+PiAtCWlmIChtYXNrID09IElJT19DSEFOX0lORk9fUkFXKSB7Cj4+
-ICsKPj4gKwlzd2l0Y2ggKG1hc2spIHsKPj4gKwljYXNlIElJT19DSEFOX0lORk9fUkFXOgo+PiAg
-CQltdXRleF9sb2NrKCZpbmRpb19kZXYtPm1sb2NrKTsKPj4gIAkJcmV0ID0gY2xrX3ByZXBhcmVf
-ZW5hYmxlKHN0LT5jbGspOwo+PiAgCQlpZiAocmV0KSB7Cj4+IEBAIC03Nyw2ICs4MSwxMiBAQCBz
-dGF0aWMgaW50IGxwYzMyeHhfcmVhZF9yYXcoc3RydWN0IGlpb19kZXYgKmluZGlvX2RldiwKPj4g
-IAkJbXV0ZXhfdW5sb2NrKCZpbmRpb19kZXYtPm1sb2NrKTsKPj4gIAo+PiAgCQlyZXR1cm4gSUlP
-X1ZBTF9JTlQ7Cj4+ICsKPj4gKwljYXNlIElJT19DSEFOX0lORk9fU0NBTEU6Cj4+ICsJCSp2YWwg
-PSByZWd1bGF0b3JfZ2V0X3ZvbHRhZ2Uoc3QtPnZyZWYpIC8gMTAwMDsKPj4gKwkJKnZhbDIgPSAg
-Y2hhbi0+c2Nhbl90eXBlLnJlYWxiaXRzOwo+PiArCj4+ICsJCXJldHVybiBJSU9fVkFMX0ZSQUNU
-SU9OQUxfTE9HMjsKPgo+IFBsZWFzZSBhZGQgYSBkZWZhdWx0LCBvdGhlcndpc2Ugd2UgYXJlIGdv
-aW5nIHRvIGdldCBzb21lIGNvbXBpbGVyCj4gd2FybmluZ3MgdGhhdCBhcmUgaXJyaXRhdGluZyBh
-cyBpdCB3aWxsIHRoaW5rIHdlICdmb3Jnb3QnIHRvIGhhbmRsZQo+IHRoZSBvdGhlciBjYXNlcy4K
-ClN1cmUsIEkgd2lsbCBkbyBpdC4KCj4KPj4gIAl9Cj4+ICAKPj4gIAlyZXR1cm4gLUVJTlZBTDsK
-Pj4gQEAgLTkzLDkgKzEwMywxMCBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IGlpb19pbmZvIGxwYzMy
-eHhfYWRjX2lpb19pbmZvID0gewo+PiAgCS5pbmZvX21hc2tfc2VwYXJhdGUgPSBCSVQoSUlPX0NI
-QU5fSU5GT19SQVcpLAlcCj4+ICAJLmFkZHJlc3MgPSBMUEMzMlhYQURfSU4gKiBfaW5kZXgsCQlc
-Cj4+ICAJLnNjYW5faW5kZXggPSBfaW5kZXgsCQkJCVwKPj4gKwkuc2Nhbl90eXBlLnJlYWxiaXRz
-ID0gMTAJCQlcCj4KPiBHaXZlbiBzY2FuX3R5cGUgaXMgb25seSB1c2VkIGluIHRoZSBjb3JlIGlu
-IGJ1ZmZlcmVkIG1vZGVzCj4gdGhhdCB0aGlzIGRyaXZlciBkb2Vzbid0IHN1cHBvcnQgdGhpcyBp
-cyBhIGxpdHRsZSAndW51c3VhbCcuCgpJIGZvdW5kIGl0IGluIG90aGVyIGRyaXZlcnMgYW5kIHRo
-b3VnaHQgaXQgd2FzIGV4cGVjdGVkIHRvIHN0b3JlIHRoZSBiaXQKcmVzb2x1dGlvbiBoZXJlLgoK
-Pgo+IEFsc28sIG9ubHkgb25lIHZhbHVlLCBzbyB3aHkgYm90aGVyIHJhdGhlciB0aGFuIGp1c3Qg
-cHV0dGluZyBpdAo+IGluIHRoZSBvbmUgcGxhY2UgaXQgaXMgdXNlZD8KCk9LIEkgd2lsbCBqdXN0
-IHVzZSBpdCBpbiB0aGUgbHBjMzJ4eF9yZWFkX3JhdyBmdW5jdGlvbiB0aGVuLgoKPgo+PiAgfQo+
-PiAgCj4+IC1zdGF0aWMgY29uc3Qgc3RydWN0IGlpb19jaGFuX3NwZWMgbHBjMzJ4eF9hZGNfaWlv
-X2NoYW5uZWxzW10gPSB7Cj4+ICtzdGF0aWMgc3RydWN0IGlpb19jaGFuX3NwZWMgbHBjMzJ4eF9h
-ZGNfaWlvX2NoYW5uZWxzW10gPSB7Cj4gUGxlYXNlIHByb3ZpZGUgdHdvIGNvbnN0IHZlcnNpb25z
-IGFuZCBwaWNrIGJldHdlZW4gdGhlbSByYXRoZXIgdGhhbgo+IG1vZGlmeWluZyB0aGUgb25lLgo+
-Cj4gQ2xlYXJseSB3ZSBtaWdodCAna25vdycgdGhlcmUgaXMgb25seSBldmVyIG9uZSBzdWNoIEFE
-QyBvbiB0aGVzZSBkZXZpY2VzCj4gYnV0IGl0J3Mgbm90IG9idmlvdXMgdG8gYSByZXZpZXdlciB3
-aG8gaXNuJ3QgZmFtaWxpYXIgd2l0aCB0aGUgaGFyZHdhcmUsCj4gbWFraW5nIHRoaXMgbG9vayBs
-aWtlIGEgYnVnLgoKT0sKCj4KPj4gIAlMUEMzMlhYX0FEQ19DSEFOTkVMKDApLAo+PiAgCUxQQzMy
-WFhfQURDX0NIQU5ORUwoMSksCj4+ICAJTFBDMzJYWF9BRENfQ0hBTk5FTCgyKSwKPj4gQEAgLTEx
-OSw3ICsxMzAsNyBAQCBzdGF0aWMgaW50IGxwYzMyeHhfYWRjX3Byb2JlKHN0cnVjdCBwbGF0Zm9y
-bV9kZXZpY2UgKnBkZXYpCj4+ICAJc3RydWN0IHJlc291cmNlICpyZXM7Cj4+ICAJaW50IHJldHZh
-bCA9IC1FTk9ERVY7Cj4+ICAJc3RydWN0IGlpb19kZXYgKmlvZGV2ID0gTlVMTDsKPj4gLQlpbnQg
-aXJxOwo+PiArCWludCBpcnEsIGk7Cj4+ICAKPj4gIAlyZXMgPSBwbGF0Zm9ybV9nZXRfcmVzb3Vy
-Y2UocGRldiwgSU9SRVNPVVJDRV9NRU0sIDApOwo+PiAgCWlmICghcmVzKSB7Cj4+IEBAIC0xNTks
-NiArMTcwLDE1IEBAIHN0YXRpYyBpbnQgbHBjMzJ4eF9hZGNfcHJvYmUoc3RydWN0IHBsYXRmb3Jt
-X2RldmljZSAqcGRldikKPj4gIAkJcmV0dXJuIHJldHZhbDsKPj4gIAl9Cj4+ICAKPj4gKwlzdC0+
-dnJlZiA9IGRldm1fcmVndWxhdG9yX2dldCgmcGRldi0+ZGV2LCAidnJlZiIpOwo+PiArCWlmIChJ
-U19FUlIoc3QtPnZyZWYpKQo+PiArCQlkZXZfZXJyKCZwZGV2LT5kZXYsCj4+ICsJCQkiTWlzc2lu
-ZyB2cmVmIHJlZ3VsYXRvcjogTm8gc2NhbGluZyBhdmFpbGFibGVcbiIpOwo+PiArCWVsc2UKPj4g
-KwkJZm9yIChpID0gMDsgaSA8ICBBUlJBWV9TSVpFKGxwYzMyeHhfYWRjX2lpb19jaGFubmVscyk7
-IGkrKykKPj4gKwkJCWxwYzMyeHhfYWRjX2lpb19jaGFubmVsc1tpXS5pbmZvX21hc2tfc2hhcmVk
-X2J5X3R5cGUgPQo+PiArCQkJCUJJVChJSU9fQ0hBTl9JTkZPX1NDQUxFKTsKPj4gKwo+PiAgCXBs
-YXRmb3JtX3NldF9kcnZkYXRhKHBkZXYsIGlvZGV2KTsKPj4gIAo+PiAgCWluaXRfY29tcGxldGlv
-bigmc3QtPmNvbXBsZXRpb24pOwo+PiBAQCAtMTc1LDcgKzE5NSw2IEBAIHN0YXRpYyBpbnQgbHBj
-MzJ4eF9hZGNfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPj4gIAkJcmV0dXJu
-IHJldHZhbDsKPj4gIAo+PiAgCWRldl9pbmZvKCZwZGV2LT5kZXYsICJMUEMzMlhYIEFEQyBkcml2
-ZXIgbG9hZGVkLCBJUlEgJWRcbiIsIGlycSk7Cj4+IC0KPiBVbnJlbGF0ZWQgKGFuZCBpbiBteSB2
-aWV3KSBiYWQgd2hpdGVzcGFjZSBjaGFuZ2UuCgpJbmRlZWQsIGl0IHdhcyBhIG1pc3Rha2UuCgpU
-aGFua3MsCgpHcmVnb3J5Cgo+PiAgCXJldHVybiAwOwo+PiAgfQo+PiAgCj4KPgo+IF9fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCj4gbGludXgtYXJtLWtlcm5l
-bCBtYWlsaW5nIGxpc3QKPiBsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKPiBo
-dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
-ZWwKCi0tIApHcmVnb3J5IENsZW1lbnQsIEJvb3RsaW4KRW1iZWRkZWQgTGludXggYW5kIEtlcm5l
-bCBlbmdpbmVlcmluZwpodHRwOi8vYm9vdGxpbi5jb20KCl9fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cmxp
-bnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFk
-Lm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On Fri, Feb 15, 2019 at 3:31 PM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Mon, Feb 4, 2019 at 5:31 AM Andy Gross <andy.gross@linaro.org> wrote:
+> > ----------------------------------------------------------------
+> > Qualcomm ARM64 Updates for v5.1
+> >
+> > * Add MSM8998 RPMCC, I2C, and USB related nodes
+> > * Add MSM8996 rpmpd node
+> > * Fix typo in MSM8996 pin definitions
+> > * Disable MSM8996 VFE smmu to fix security violation
+> > * Add I2C, SPI, rpmcc, uart, and WCN3990 wlan nodes on QCS404
+> > * Enable SDCC1 HS400 support on QCS404
+> > * Add a multitude of nodes on SDM845:
+> >   SD, UFS, USB, LPASS, SCM, QSPI, PDC, DPU, videocc, GPU, RPMh
+> >   bus interconnect, WCN3990 WLAN
+> > * Add gpio ranges to SDM845 TLMM
+> > * Fix regulator load on sdcard on MSM8998-mtp board
+>
+>
+> Pulled into arm/dt, thanks!
+
+I took it out again after running into build breakage:
+
+In file included from ../arch/arm64/boot/dts/qcom/sdm845-mtp.dts:12:
+../arch/arm64/boot/dts/qcom/sdm845.dtsi:16:10: fatal error:
+dt-bindings/power/qcom-rpmpd.h: No such file or directory
+ #include <dt-bindings/power/qcom-rpmpd.h>
+          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+compilation terminated.
+scripts/Makefile.lib:297: recipe for target
+'arch/arm64/boot/dts/qcom/sdm845-mtp.dtb' failed
+
+Please fix and resend.
+
+       Arnd
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
