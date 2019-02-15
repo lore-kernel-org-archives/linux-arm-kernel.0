@@ -2,61 +2,71 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 128B7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB9A1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D777021925
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6DAE4222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:37:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="je/8/wEp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D777021925
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u2hImOkw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DAE4222BE
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=tUAdApeRkvtE4xlPXAH8WQ5cG7kSHAOgnLQfJ9P2CkI=; b=je/8/wEpmNwUoUSiwnw8HIMZw
-	d+RMh4i11LIjBKoHcQOuQkfuKymtfp+zPuIw/LR5lIetL3uItmBEt4ulrtbHWQNlg5ZQxHt3HQynE
-	b6PK50nGJnLksfmXQM9JvBPC30ZEVKzkHDenvZVc8rcShIEFSE7aJ9/m++ra+zxsgW2i+eh8H5cN2
-	NhPlGPeU1MSaWELhlokJOi1bEChGtuLViU9os6g9Q9t8dOm0ld4iPIrPvQXPdDObQCAWipVrvec2V
-	uymZErZhuQvZ1HNeU6Q7E/xHhLi0YiD33Nd6l7F35wd7I471hYb6su4AigvpI4xhxQ+fmJeHono3Q
-	6bJLKJs9A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2Vl/G7XTRrmDRUrhDOEO0jn8vLuucdhifpZbqeQNq1E=; b=u2hImOkwGp3dq7
+	QeUQyfgzCZCh2DyDqMllcsz3245b5XN/QMiEtL91Wiu8fCLI5oiIr31zpyrJ+k8YQEIh8OzczWc90
+	qwhX2/4t9g7NcV321LUUDS4Dl5yKaQHllgJrgG6kwKGrq0HbLq3rBf6gDi8NP5dKtxBst9gvl8kl/
+	q/kI6jDB+RK5gsrKmJoPHJTMY2ksNCDfs0jZ7+HJux+PQ8y/wMnn+pAXzhwe7Q37xU+u3eH1HTPmM
+	5dWcy4cGpKP9cvmBZfzy11ETx95ZE00+bvjI2m1XcHqjsp4gX1LiiMb9tEOKq4SmFDjW3hcLeuB2i
+	McYsBz/Ibe8U3V9LbGeg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugUE-0006dL-5U; Fri, 15 Feb 2019 16:37:14 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugTz-0006LF-Qk; Fri, 15 Feb 2019 16:37:01 +0000
-Received: from localhost (unknown [195.52.228.164])
- by pokefinder.org (Postfix) with ESMTPSA id 2D6B22E3551;
- Fri, 15 Feb 2019 17:36:58 +0100 (CET)
-Date: Fri, 15 Feb 2019 17:36:57 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Hsin-Yi Wang <hsinyi@chromium.org>
-Subject: Re: [PATCH] i2c: mediatek: modify threshold passed to
- i2c_get_dma_safe_msg_buf()
-Message-ID: <20190215163657.fs6t7p3vqez53su3@ninjato>
-References: <20190215090202.157100-1-hsinyi@chromium.org>
- <20190215090959.soxkf3ho3or2geme@ninjato>
- <CAJMQK-jrpnfzKNYh01Pg6QydSSa-=6x44Pj1wwMdXw7G3x-ybA@mail.gmail.com>
- <20190215092500.6q3hqnoufyowiqaz@ninjato>
+	id 1gugUO-0006u0-SY; Fri, 15 Feb 2019 16:37:24 +0000
+Received: from mail-qt1-f171.google.com ([209.85.160.171])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gugU0-0006LT-Uo
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:37:02 +0000
+Received: by mail-qt1-f171.google.com with SMTP id z39so11592348qtz.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 08:37:00 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=c1pz5LION+0bshI+8SkfZhKEhxtU+ZnbkWGAaOcOpY0=;
+ b=FdqN2i15uH5anp4hmiQFVEDi9g/goYhXzwYD0srR4ll9l1yEd74R//FQu1qNfxZF2x
+ gZOZAczIy9dKflNEXgt4bI3oRVVRxUs9lFzOmkMlo0L+5OZePuryyTpve77CBDJmcHm3
+ acLOZ1Sy5JAKk8yJTVKarF0oODJhTWUYQExpRqwFATY9L6+teitVCXou6HpAhYHHJlBw
+ C2cl9tic56SVreAGGvMdtLqo73iKxJFo4Z2R9rKIQ6nqZJwDkq5lKIKCpsF5emxvMjtZ
+ ZIw/luYpqdC17zDvMynvGfwhFNNfyrYsKdK4PMmlalPJ4IKKlKqc8feJmryiKHufz5e8
+ M9kg==
+X-Gm-Message-State: AHQUAuYRlSYaPxGwsNyhsp65iLr6+kvehmSHB+Tr/sgjO+5y+Mpqdspz
+ YeAVc+ItcU1ZhylYHfQC6cZhCdBH/pZfe5wZRZY=
+X-Google-Smtp-Source: AHgI3IYy6la3i/tajgqg/QINmgsRxV1pwVh7f/C8j85B/z9q9o5pQjtSCTAeVol9L2D36whZPkrL/q88xpW2OCHJvqc=
+X-Received: by 2002:a0c:d791:: with SMTP id z17mr7775781qvi.149.1550248619986; 
+ Fri, 15 Feb 2019 08:36:59 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190215092500.6q3hqnoufyowiqaz@ninjato>
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <87womhub5h.fsf@belgarion.home> <87bm3ftjsx.fsf@belgarion.home>
+In-Reply-To: <87bm3ftjsx.fsf@belgarion.home>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 17:36:43 +0100
+Message-ID: <CAK8P3a2UNhTaaBkX51a-jzq4JWGXPkS+QbeSZp9n86Yb4muGBg@mail.gmail.com>
+Subject: Re: [GIT PULL] pxa for v5.1
+To: Robert Jarzmik <robert.jarzmik@free.fr>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_083700_009826_07D30CEB 
-X-CRM114-Status: UNSURE (   7.44  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190215_083700_985633_B130F641 
+X-CRM114-Status: GOOD (  11.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,82 +78,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ryder Lee <ryder.lee@mediatek.com>, Jun Gao <jun.gao@mediatek.com>,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- linux-i2c@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============3827589182559958547=="
+Cc: arm-soc <arm@kernel.org>, Haojian Zhuang <haojian.zhuang@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Daniel Mack <zonque@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Wed, Feb 13, 2019 at 11:17 PM Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+> Robert Jarzmik <robert.jarzmik@free.fr> writes:
+>
+> > Hi Arnd, Kevin, and Olof,
+> >
+> > This is the pxa pull request for 5.1, totally negative diff stat :)
+> > Can you please consider pulling ?
 
---===============3827589182559958547==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="fynakfv4m43e4662"
-Content-Disposition: inline
+Thanks a lot for the reminder. Your original message ended up in my spam
+folder, the second one was still marked as potentially dangerous by gmail,
+but not put into spam, so I managed to find the first.
 
+Nice work at cleaning up the old platform code, pulled into arm/soc now, thanks!
 
---fynakfv4m43e4662
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-
->> > Ok, I can add a check in another patch. Should we return NULL pointer
->> > if msg->len is 0 or print out some warnings? Thanks.
->>=20
->> No warning, msg->len =3D=3D 0 is a valid setting. But interesting questi=
-on:
->> I was about to say NULL, but your driver would assume ENOMEM there and
->> discard the message which is also not correct since msg->len =3D=3D 0 is=
- a
->> valid setting. So, should we just return msg->buf then? Will this work
->> with your driver? Can it handle zero-length transfers?
->=20
-> dma_map_single(i2c->dev, msg->buf , msgs->len, DMA_TO_DEVICE); breaks
-> kernel if msgs->len is 0, so I think it doesn't handle zero-length transf=
-er.
-
-Please don't drop the lists.
-
-Then, the correct solution is to forbid those transfer with this
-controller. Check I2C_AQ_NO_ZERO_LEN. Also, update the functionality
-like this .. (I2C_FUNC_SMBUS_EMUL & ~I2C_FUNC_SMBUS_QUICK).
-
-
---fynakfv4m43e4662
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQIzBAABCAAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxm6qUACgkQFA3kzBSg
-KbbsQw//TKz2pCmEj99gaTnI4oak75P3IW10Xow7DY8Bhv4KTJ6irOVHclR2WoL/
-/o3ASwvfasg2jvE7JBhdZyMXtAs0GhlISv/02ZG3oJ6/i6gmPGlgAlgftFH2YWVg
-xRWLmRaPJCUfEsN1RddKYGBLsdYrELNJLHNqCvKDvnxiM2eUH1o4KVPn908AlzQf
-6XHzsGew3EW/2G470f0qimDDRPcFN00r7FdUnvM8+fGazP39VPCGb7BFk/cm8iss
-RWitHJTHQehSLLN+yKkLS697feeiV83Qi+tj7tkVOL4HJvs4hrLssAndK4eaaoVu
-TIzXgASGfmO5EC/srp3KqZFNaVHe8sGE8B2uAlS1cmArLfUCG0PirLdAzp6mmG9t
-ExfPZOw7pUsaNRdPyiGLu2xD8u//d2WA6WDvPYiD5/2azHKE3Klv+YDvQZlexkpm
-TqhD56l1ohbQmmEpNzC/a5giCZbOujXMrUgz/2C+JtNEIgcq71VBOPtsUOwaTLxP
-npBZxZ4+Lmu0VdvgLa30VmpaFf9s24rhADLuJs9DWQrECIo5c/8CV19x3jupM3e1
-+UkRz2Vt/J7RqeXhOY2lv4pPz9RTx3MJNgUZErVsGsqYhIkzqjVv5Kh2vmoPt2GV
-fnYlXaiiWYoUX2JZ14OBvaHPJA7GqP3T2yJqEOeoLdIVmKYYcng=
-=lS99
------END PGP SIGNATURE-----
-
---fynakfv4m43e4662--
-
-
---===============3827589182559958547==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3827589182559958547==--
-
