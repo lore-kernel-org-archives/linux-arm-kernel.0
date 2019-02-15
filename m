@@ -2,104 +2,84 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 768B9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:58:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A93A2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 22:38:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43AF32192C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:58:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7401F222D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 22:38:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d4eDq373"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43AF32192C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hotmail.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VUOPdMDE";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dvVJ5osn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7401F222D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Onm/EGRpTGkWTbV2gl23pUwbMOUxqWbn7VeWVdzHVMo=; b=d4eDq373AtN3AX
-	U+vpJ9F8Y69MknOdW/FDqT6lylS0AClsdymDZvSjDlfie+WY69BCwC5Vcksfc5tenFaeYp8zOI1Eq
-	faoPa0G7REbrpB3dbHfX3+5Uq/1/e8kKZPafd2oUZzVYihyXrHjI73mg+JLx4842OIqezD0h2kyqQ
-	Fqba9dHgUaFdfez+3ylBM2FUBiScByxPTFyza6LpLthJ/VJDtepuhiFp8F9+zPd+YIKUYDBGCQgsy
-	9x+GSXvs8bp7aLASt3c2NeZxyKF0CWUqJouW4P+lJF9C0FApvIsBEmVtwhUg6t/6q20qbIW/XM7SF
-	S8jvttCFW9ellk1vFmuw==;
+	List-Owner; bh=YZlPF5NDZctW+qMgzqX1sazU/jHVe5CqsfIa0MUnZCE=; b=VUOPdMDEQBmDzQ
+	m6znu2P3Ac902IQaPOXuTTY+4T94dTqwE8BXzkDySC5eo05S2vIWDX7LWeVESOBHdvJeX0P6l3iG3
+	xQBN2T4R2g43j7AVSLYkTRlHmN5+RRgAou5rTJjSen0Pc0z9JFtczG7N6ZIfnJgQlCibXeaKjIdNv
+	8DdRBi6PgtnfT5W6DmuHid4hElPczGEUB30RjMLqddHrM7sfqdadI0GLY65dDGtMGDZ/4MgtXFBP1
+	UCGBVPB795T56deJUTobYcScHkTyavtaDc+MereaXTdx7JQFLRKAamelDcgT9E94tqKqD/cgfCuYT
+	3FRkdOTX7gbJYf1jyBkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gulUi-0003rB-Np; Fri, 15 Feb 2019 21:58:04 +0000
-Received: from mail-oln040092068109.outbound.protection.outlook.com
- ([40.92.68.109] helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+	id 1gum7O-0007th-2N; Fri, 15 Feb 2019 22:38:02 +0000
+Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gulUf-0003qU-3B
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 21:58:03 +0000
-Received: from AM5EUR02FT048.eop-EUR02.prod.protection.outlook.com
- (10.152.8.52) by AM5EUR02HT170.eop-EUR02.prod.protection.outlook.com
- (10.152.9.160) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Fri, 15 Feb
- 2019 21:57:56 +0000
-Received: from VI1PR0702MB3840.eurprd07.prod.outlook.com (10.152.8.55) by
- AM5EUR02FT048.mail.protection.outlook.com (10.152.9.215) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
- 15.20.1580.10 via Frontend Transport; Fri, 15 Feb 2019 21:57:56 +0000
-Received: from VI1PR0702MB3840.eurprd07.prod.outlook.com
- ([fe80::6139:4cf3:fb81:b105]) by VI1PR0702MB3840.eurprd07.prod.outlook.com
- ([fe80::6139:4cf3:fb81:b105%4]) with mapi id 15.20.1622.016; Fri, 15 Feb 2019
- 21:57:56 +0000
-From: Bernd Edlinger <bernd.edlinger@hotmail.de>
-To: Sebastian Andrzej Siewior <bigeasy@linutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: Re: [RFC PATCH] ARM: enable irq in translation/section permission
- fault handlers
-Thread-Topic: [RFC PATCH] ARM: enable irq in translation/section permission
- fault handlers
-Thread-Index: AQHUxWnWUPB2na06qUiuVihk2ZlxqKXhaC0A
-Date: Fri, 15 Feb 2019 21:57:56 +0000
-Message-ID: <VI1PR0702MB3840A772914621B2F026B349E4600@VI1PR0702MB3840.eurprd07.prod.outlook.com>
-References: <20190215200533.ypfrdekg7j4ucu6a@linutronix.de>
-In-Reply-To: <20190215200533.ypfrdekg7j4ucu6a@linutronix.de>
-Accept-Language: en-US, en-GB, de-DE
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: AM6PR10CA0079.EURPRD10.PROD.OUTLOOK.COM
- (2603:10a6:209:8c::20) To VI1PR0702MB3840.eurprd07.prod.outlook.com
- (2603:10a6:803:f::33)
-x-incomingtopheadermarker: OriginalChecksum:E2F5A3C02BA13A07D57263D45A098C5034B7D93680B2AD14D0A718FE19B467D1;
- UpperCasedChecksum:11BB2A1D032816DBD0E4A5F3AF5D2C63BBA551218E352934BC5FA9D57BBDADD0;
- SizeAsReceived:8675; Count:63
-x-ms-exchange-messagesentrepresentingtype: 1
-x-tmn: [xJO74fK82WMgckmuKaezBSPbqIUdjd/e]
-x-microsoft-original-message-id: <5cbb9f26-5244-3afc-1248-a0263cbeceed@hotmail.de>
-x-ms-publictraffictype: Email
-x-incomingheadercount: 63
-x-eopattributedmessage: 0
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(20181119070)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(2017031322404)(2017031323274)(2017031324274)(1601125500)(1603101475)(1701031045);
- SRVR:AM5EUR02HT170; 
-x-ms-traffictypediagnostic: AM5EUR02HT170:
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
- SRVR:AM5EUR02HT170; BCL:0; PCL:0; RULEID:; SRVR:AM5EUR02HT170; 
-x-microsoft-antispam-message-info: 2LZYQd7CvcKstHZTYQKG429kGe55jhXOHRGCaVWcjrmD8fGDGdmdpDZvxH2YKuol
-Content-ID: <BBB1C2B85CB4A646B1F74D6443620BE8@eurprd07.prod.outlook.com>
+ id 1gum7K-0007t2-7V
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 22:38:00 +0000
+Received: by mail-it1-x142.google.com with SMTP id f10so4424847ita.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 14:37:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=uBrEda264CqNMTYOMGS0nexpjUH9Pl0ktn0oy73iTQQ=;
+ b=dvVJ5osnYZfeHX+vNv5He+jERnpxxiU8cBaBi/EvYPQJPjvdhotw33wZ8LpwvflWEV
+ AzGfo5Du+5xxb2rfFJR7JvbOwkD9hfePdm3U4mhGK/7O/OdtRjxkoZtuXdxJe8wNuorH
+ +Drrvo9p7HtG8fT1xOcwRbOb9xpWJjpUthpDax4T7IMLDLqOdAWbB1iSb2detZszkXQY
+ +DhukMk6uz6G4IsRIEiesDLa/kxw2d5XCRne2cuOHwMF298ParMoQo/flFsLFDXKmQLD
+ SURDhyWkIGb4XCOPWLMsZr/UO1M1I5Z/il7jBDt4CsDKjoepqzadPMzGMyAhyPFa2RYn
+ kwNQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=uBrEda264CqNMTYOMGS0nexpjUH9Pl0ktn0oy73iTQQ=;
+ b=EQDObSH+3xlf0idnK3TFLTh4v3U88AX8prrCnsRCvBR7QAkmYZX26aT3IM5gG8C/DY
+ kBAeEh7lwqqaSoLP0WPYLnd3Yk9H7jR/xfXr3NkKOH+Mjfp3WYODoqWJnHSyDWgc7eqi
+ VcyxtudHbaWW7nhZ5IARSq21xg+qN2uAtQbTkeE1/qpOe4bbEv6vchfVQIYctTHPsuBO
+ 0a8g3rzu+eXEHHmep2v7vDihecrAh3+tzbRnx+c+QTRVH8pD4LUyCvFsPWEUtHnEpo7h
+ pFfmgVgLlLah4UCJ+61QV+xrO58cR9espw7TVsBh1QdqgpgTQy3LTlH2q0EGEsKAyqNX
+ CNyw==
+X-Gm-Message-State: AHQUAubn9SBd8M4OCwvFqlH/ZvhOMoJ79Ab1QEZI1Ak33a7h0LbPLYPL
+ 0Qc408HMXma/xiwNuQ1rIhoRkmxgmToc6U/VJwk=
+X-Google-Smtp-Source: AHgI3IahV4OmPcigrKpWwYcnR6p27RifYaIvff/zCE0UzwetuDR1lgFSs4MRjksglvfENytNw9F/oBWqbGbDHB/qteM=
+X-Received: by 2002:a24:d06:: with SMTP id 6mr6982863itx.104.1550270274657;
+ Fri, 15 Feb 2019 14:37:54 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: outlook.com
-X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: d4d70346-2c10-4f39-8c00-e767963926d9
-X-MS-Exchange-CrossTenant-Network-Message-Id: 53d5b2d0-7cda-4140-4c9c-08d69390a40d
-X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: d4d70346-2c10-4f39-8c00-e767963926d9
-X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Feb 2019 21:57:55.2309 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Internet
-X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM5EUR02HT170
+References: <20190214204433.155715-1-dianders@chromium.org>
+ <4238ceb7-d286-9ef9-39b6-b2e0571f2981@arm.com>
+ <CAD=FV=WeBD0bqxWPZcV1dz5Sdn47Ap=FZU3Y+YPbxsVCQEUcLQ@mail.gmail.com>
+In-Reply-To: <CAD=FV=WeBD0bqxWPZcV1dz5Sdn47Ap=FZU3Y+YPbxsVCQEUcLQ@mail.gmail.com>
+From: Rob Clark <robdclark@gmail.com>
+Date: Fri, 15 Feb 2019 17:37:41 -0500
+Message-ID: <CAF6AEGsGc8g--3W_xpR8VUt778WR19v_HOemhd7Jv=f4QBqVgw@mail.gmail.com>
+Subject: Re: [PATCH] iommu/arm-smmu: Allow disabling bypass via kernel config
+To: Doug Anderson <dianders@chromium.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_135801_138871_4ED796DA 
-X-CRM114-Status: GOOD (  24.64  )
+X-CRM114-CacheID: sfid-20190215_143758_297277_68958E93 
+X-CRM114-Status: GOOD (  27.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,119 +91,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Gleixner <tglx@linutronix.de>, Russell King <linux@armlinux.org.uk>,
- Arnd Bergmann <arnd@arndb.de>, "yadi.hu@windriver.com" <yadi.hu@windriver.com>
+Cc: linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
+ Evan Green <evgreen@chromium.org>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <iommu@lists.linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/15/19 9:05 PM, Sebastian Andrzej Siewior wrote:
-> From: "Yadi.hu" <yadi.hu@windriver.com>
-> 
-> Accessing a kernel address in user space causes a SIGSEGV which is sent
-> via
-> -> do_DataAbort
->    -> do_sect_fault || do_translation_fault
->       -> do_bad_area
->          -> __do_user_fault
->             -> force_sig_fault
-> Since commit
-> 
->   02fe2845d6a83 ("ARM: entry: avoid enabling interrupts in prefetch/data abort handlers")
-> 
-> that path is carried out with disabled interrupts. Page/alignment fault
-> do enable interrupts but data abort has been left out.
-> 
-> On -RT the siglock is a sleeping spinlock and requires interrupts to be
-> enabled in order to acquire it.
-> 
-> Enable interrupts in the DataAbort handler if the parent context had
-> interrupts enabled. Move harden_branch_predictor() before interrupts are
-> enabled.
-> 
-> Reported-by: <Bernd Edlinger <bernd.edlinger@hotmail.de>
-> Signed-off-by: Yadi.hu <yadi.hu@windriver.com>
-> [bigeasy: rewrote patch description, reordered patch]
-> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
-> ---
-> I though that the "interrupt enable part" has already been posted and
-> then Bernd complained about a warning from harden_branch_predictor() on
-> -RT so here it is.
-> 
->  arch/arm/mm/fault.c | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 58f69fa07df95..da82967865836 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -161,8 +161,6 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
->  		unsigned int fsr, unsigned int sig, int code,
->  		struct pt_regs *regs)
->  {
-> -	if (addr > TASK_SIZE)
-> -		harden_branch_predictor();
->  
->  #ifdef CONFIG_DEBUG_USER
->  	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
-> @@ -191,6 +189,11 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
->  	struct task_struct *tsk = current;
->  	struct mm_struct *mm = tsk->active_mm;
->  
-> +	if (addr > TASK_SIZE && user_mode(regs))
-> +		harden_branch_predictor();
+On Thu, Feb 14, 2019 at 7:40 PM Doug Anderson <dianders@chromium.org> wrote:
+>
+> Hi,
+>
+> On Thu, Feb 14, 2019 at 1:32 PM Robin Murphy <robin.murphy@arm.com> wrote:
+> >
+> > Hi Doug,
+> >
+> > On 2019-02-14 8:44 pm, Douglas Anderson wrote:
+> > > Right now the only way to disable the iommu bypass for the ARM SMMU is
+> > > with the kernel command line parameter 'arm-smmu.disable_bypass'.
+> > >
+> > > In general kernel command line parameters make sense for things that
+> > > someone would like to tweak without rebuilding the kernel or for very
+> > > basic communication between the bootloader and the kernel, but are
+> > > awkward for other things.  Specifically:
+> > > * Human parsing of the kernel command line can be difficult since it's
+> > >    just a big runon space separated line of text.
+> > > * If every bit of the system was configured via the kernel command
+> > >    line the kernel command line would get very large and even more
+> > >    unwieldly.
+> > > * Typically there are not easy ways in build systems to adjust the
+> > >    kernel command line for config-like options.
+> > >
+> > > Let's introduce a new config option that allows us to disable the
+> > > iommu bypass without affecting the existing default nor the existing
+> > > ability to adjust the configuration via kernel command line.
+> >
+> > I say let's just flip the default - for a while now it's been one of
+> > those "oh yeah, we should probably do that" things that gets instantly
+> > forgotten again, so some 3rd-party demand is plenty to convince me :)
+> >
+> > There are few reasons to allow unmatched stream bypass, and even fewer
+> > good ones, so I'd be happy to shift the command-line burden over to the
+> > esoteric cases at this point, and consider the config option in future
+> > if anyone from that camp pops up and screams hard enough.
+>
+> Sure, I can submit that patch if we want.  I presume I'll get lots of
+> screaming but I'm used to that.  ;-)
+>
+> ...specifically I found that when I turned on "disably bypass" on my
+> board (sdm845-cheza, which is not yet upstream) that a bunch of things
+> that used to work broke.  That's a good thing because all the things
+> that broke need to be fixed properly (by adding the IOMMUs) but
+> presumably my board is not special in relying on the old insecure
+> behavior.
 
-This is somehow inconsisten with do_translation_fault, where
-we have this:
+So one niggly bit, beyond the drivers that aren't but should be using
+iommu, is the case where bootloader lights up the display.  We
+actually still have a lot of work to do for this (in that clk and
+genpd drivers need to be aware of handover, in addition to just
+iommu)..  But I'd rather not make a hard problem harder just yet.
 
-	if (addr < TASK_SIZE)
-		return do_page_fault(addr, fsr, regs);
+(it gets worse, afaict so far on the windows-arm laptops since in that
+case uefi/edk is actually taking the iommu out of bypass and things go
+badly when arm-smmu disables clks after probe..)
 
-> +
-> +	if (interrupts_enabled(regs))
-> +		local_irq_enable();
->  	/*
->  	 * If we are in kernel mode at this point, we
->  	 * have no context to handle this fault with.
-> 
+But I might recommend making the default a kconfig option for now, so
+in the distro kernel case, where display driver is a kernel module,
+you aren't making a hard problem harder.  For cases where bootloader
+isn't enabling display, things are much easier, and I think we could
+switch the default sooner.  But I fear for cases where bootloader is
+enabling display it is a much harder problem :-(
 
-I have seen three different failure modes, pleas see the first 3 calls stacks
-here: https://marc.info/?l=linux-rt-users&m=155016888714927&w=2
-
-I am concerned about this fist issue, because it removes the branch
-predictor hardening after the do_page_fault has executed:
-
-do_DataAbort->do_page_fault(addr>TASK_SIZE)->__do_user_fault
-
-This is reachable because do_page_fault is not only called from
-do_translation_fault but also from here: arch/arm/mm/fsr-2level.c
-and here: arch/arm/mm/fsr-3level.c
-those are callable with addr > TASK_SIZE
-
-And the following code path does enable the hard irqs before do_bad_area:
-do_DataAbort->do_sect_fault->do_bad_area->__do_user_fault
-
-So this function, would need to be rewritten:
-
-do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
-{
-	if (interrupts_enabled(regs))
-		local_irq_enable();
-
-	do_bad_area(addr, fsr, regs);
-	return 0;
-}
+BR,
+-R
 
 
+>
+> I'm about to head on vacation for a week so I'm not sure I'll get to
+> re-post before then.  If not I'll post this sometime after I get back
+> unless someone beats me to it.
+>
+> -Doug
+> _______________________________________________
+> iommu mailing list
+> iommu@lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
 
-BTW, the complete linux tree I am testing right now is here:
-https://github.com/bernd-edlinger/linux-rt
-in the branch: patches-rel-v4.14-rt
-
-
-Thanks
-Bernd.
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
