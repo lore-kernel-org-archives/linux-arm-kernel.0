@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A365C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:54:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E8687C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:54:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7B322190C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:54:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B99552190C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:54:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pnV4yV13";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="emxoL1Kz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7B322190C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ucNqZrOv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LfgTGXGN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B99552190C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=dDOkV6jlUsS08FE8T4N2xl55Rv/6nrXa2cE+qZp+Gd4=; b=pnV4yV13Ypi6/siVnBNG39e3/W
-	LuONQBN3hS8sOrShy1SIhizdg1sZbV8oEJN0RKK9LTf/pwNwbIjAxR/EoU8+AIUN+fW+U26x+1VNg
-	Se0d9vH7LYwke5/Q/fqL5Vy6/C1g5agssxNeeLMea15H5nggOjlLDhc3/3KuD2ugumyFewFAZYabS
-	V+13PA04OUX/KQ3H6yK3PjEPR54DQXZjkeMfw+ZsO1bU3JLYfDRKuQEaQIgf+0WP1I5/IB5EyjH7e
-	SPUEETF3SGSwlm7jwTpgRNvVD2wR4beUgYjniwkCn72XuOpCK5tJRGmXsay4kN0MsOlFXwyoKcOw3
-	o2enL1Hw==;
+	bh=oXEObjJA7ELdTXL2Ezshw9BhWYBYYFsfK3/FooeULhc=; b=ucNqZrOvJ+Y29FAi50aKm3B5F8
+	wtbl/7KWAUUogrKWjZ3R/8FBsliYtO7dPPfSLt2Ou/G8HyE9B+cufL4ZC4F7XpbyvK+dKRZycfMsA
+	YyhlrlvA8jaVO2KjxNvJCjX8FyjKfkR0NxVGx5B6BWtWtgPgXndhhzmyj0Jlvuwr2kSDHiuBczODB
+	+tFniWhZH26cqWKG+qwurkZJX9PuuScQq5y63pHTPE4nJ0bHoKb9w2QOWG9eCEtFxmZa42/N9uP8o
+	FtoNH6F52B0fk80M/vq1ozWS7xl2y2Vsu4Aztm3RsgMiBQAf0LLrv9Qs87lXwEmR4SAW6GAbLMvCW
+	lY+frZDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gufou-00072U-9C; Fri, 15 Feb 2019 15:54:32 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gufp4-0007GN-V9; Fri, 15 Feb 2019 15:54:42 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gufoV-0006Z6-Ut
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:54:12 +0000
-Received: by mail-pl1-x644.google.com with SMTP id c4so102802pls.11
+ id 1gufoZ-0006f8-7E
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:54:20 +0000
+Received: by mail-pg1-x542.google.com with SMTP id h11so2630315pgl.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 07:54:07 -0800 (PST)
+ Fri, 15 Feb 2019 07:54:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=uccmsO0qVZau17wPhnmEOlY4fogBW79/IYa238V6d90=;
- b=emxoL1KzvzBcIgE2xzDLh7qQzKB5SPIhFRdU/nNbfCtvQ3N2E0XxdLeXWEw5rtjIqM
- kRk6rj0ofsbvEBSyjwXDDG8RdvsAZp/t8rRWT0E95HrJuh5q6Vm0SeVxWHqDM0WD7Jn+
- uVBum94XxNDtNnfv8ap3JWNhdkbSBivgcE7W0fPGLEyZWXEtT6CZSa2+VM0uJlsvVWMz
- 2rBn2+BMW3XzTmmS5JUUrlPnK/FTmXjhcGnmeXBvuA+42WEDvUAzGXRDTw8zg1U1ZTPC
- gZY69Q7rtlfVa1gotmkEpvX++r82UIVP94lp53OA+oqI69XmjdmR6oPFSm3yjYZfkU2l
- FHXw==
+ bh=lmPr0f7y3m5+PsytZvDuOz52e0HbFaKrkiyNn/QTcv0=;
+ b=LfgTGXGNz4XzA7myb/CJBlRgbI9FYUnrZGUY31wHWnDKeMnkeVMt/pEbj+lZv0cto/
+ XVvqsoE1QawsMZrFzQbWe/oxetlwuDALWeM394LIdUFDpzDmYtCkFvFa3rnCQA6xMd6K
+ //iRzR40DgXg0ekCM18vY7PYRSVmApSYQ+s1t187bOm4bpl1Zo9Nk7kgwxqaYydNHEtO
+ JQU2hqGunWs6IiRrk0nUZPmiTso++EnbwuTuUWU34cv+rPq/pCbydxXvWqatLK8rf+iH
+ beHo5zrUHjsGezCT+xItEhXvgv1GVvkpYmKu73zJAekOqU677wbpZCQ3+urKEVKEhLaO
+ KWCw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=uccmsO0qVZau17wPhnmEOlY4fogBW79/IYa238V6d90=;
- b=mYStxaa1SvVrLRMSi5frP9tmfDjrmZh6aAA/K2IjSO8IE90HBBAZgX4MKdMJV4tp0T
- uJomimLk/UMKbMEr7PrBu0KfwvbInCfrYNDHC2B9blqL2bxTXMAZ2mkWCwUZc9uV+/21
- j46LeHeF01Kx7zOoLAjxY7rFAEeu5JJHKkzP9SmqXE6bK5ODF7GCY7BsAqhlHhN7zd0h
- 30nsaS2KxIUUFyubUqSr6CobyS6XI2GOJoS0LvanLKzvvPIbhc4TrE+BDrblIh6cxjPE
- osU3WeeylWocjTMzAFWL35g/GwVYI6Zg7oeIXSgNMH2CgAUjcz1GIEjccOX+HeovKvnT
- BxWg==
-X-Gm-Message-State: AHQUAuavVxtHEqYxAOkcLJItYy7ISugIemaeUIkUYGvh6GlOLYpAIz2s
- rZOoXV56I+Eje8b6MYOMbRQ=
-X-Google-Smtp-Source: AHgI3IbrDAhQRuLksuCQbodqFBztTLP/msRY10qRi8FyOrURXineipyQrjlm6aaywNpMUCb9I3dFLQ==
-X-Received: by 2002:a17:902:8346:: with SMTP id
- z6mr6310437pln.74.1550246047408; 
- Fri, 15 Feb 2019 07:54:07 -0800 (PST)
+ bh=lmPr0f7y3m5+PsytZvDuOz52e0HbFaKrkiyNn/QTcv0=;
+ b=NiGKbgZfv4LkeLiS/5qrY7L0iSW68iELk/COhcpjHGYOXjY2gOYqNu3MOHyMEWR5s2
+ lwotByLsYDGQHKfTMLlSdvtyD35JlOOCoMXmB96DHx2oyMZm/JSSfPl5cHZt+iD3weer
+ loBC0xs67dIRi3uQNGLduvTO3vqObH4tw+89WDzfpX3WFoRyQ1wkMbF0e5D0otowK7Ad
+ LIWSNoVpxl0hmPp3Y3vuGUVFZ0S7zR1/hfJVafWSHu34H2MKMJsV3ErniL4O2DTvHRRC
+ syqQ+fCk7NXZuyB61QAvF2HJ+/KkGDNeAJ8QhqEG/3rJQ4JT0s2Q2iFxtYJVNa8JQTVC
+ XN3g==
+X-Gm-Message-State: AHQUAubX8zpbgy26+x6pb2VUoZVxf/NIZbKTk+s4kDi8JPg0YTkbTy4k
+ UIv4OFAfwFk+s6SF6vV6kkb2YfMkdsI=
+X-Google-Smtp-Source: AHgI3IZC/YMxbW52MymaCchdH5AtkZkpgsGvF+MvLIKCfxV1rCXjwN2BXW6AXUfIJ5ZH11vVSIN6OQ==
+X-Received: by 2002:a62:ee0e:: with SMTP id e14mr10498438pfi.201.1550246050734; 
+ Fri, 15 Feb 2019 07:54:10 -0800 (PST)
 Received: from localhost (68.168.130.77.16clouds.com. [68.168.130.77])
- by smtp.gmail.com with ESMTPSA id f2sm6217792pgp.32.2019.02.15.07.54.06
+ by smtp.gmail.com with ESMTPSA id m20sm6256084pgv.93.2019.02.15.07.54.09
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 15 Feb 2019 07:54:06 -0800 (PST)
+ Fri, 15 Feb 2019 07:54:09 -0800 (PST)
 From: Yangtao Li <tiny.windzz@gmail.com>
 To: maxime.ripard@bootlin.com, wens@csie.org, robh+dt@kernel.org,
  mark.rutland@arm.com
-Subject: [PATCH v3 3/4] arm64: dts: allwinner: h6: Add clock to CPU cores
-Date: Fri, 15 Feb 2019 10:53:37 -0500
-Message-Id: <20190215155338.10564-4-tiny.windzz@gmail.com>
+Subject: [PATCH v3 4/4] arm64: dts: allwinner: h6: Add CPU Operating
+ Performance Points table
+Date: Fri, 15 Feb 2019 10:53:38 -0500
+Message-Id: <20190215155338.10564-5-tiny.windzz@gmail.com>
 X-Mailer: git-send-email 2.17.0
 In-Reply-To: <20190215155338.10564-1-tiny.windzz@gmail.com>
 References: <20190215155338.10564-1-tiny.windzz@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_075408_513649_7DA04E77 
-X-CRM114-Status: GOOD (  11.79  )
+X-CRM114-CacheID: sfid-20190215_075411_700807_639C0892 
+X-CRM114-Status: GOOD (  13.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,51 +104,106 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The ARM CPU cores are fed by the CPU clock from the CCU. Add a
-reference to the clock for each CPU core, along with the clock
-transition latency.
+Add an OPP (Operating Performance Points) table for the CPU cores to
+enable DVFS (Dynamic Voltage & Frequency Scaling) on the H6. This
+information comes from github.
+
+When the four CPUs are running at 1.8 GHz, 100% busy, it is easy to heat
+up and make the system restart. And currently H6 does not support the
+thermal driver, can not get the temperature information of the cpu to
+control the highest frequency. So temporarily remove the opp of 1.8GHz.
+
+When the four CPUs operate at 1.4 GHz, 100% busy, the temperature is
+stable at about 90 degrees, and the system can still operate normally.
 
 Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 55 ++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-index d93a7add67e7..723f5d991a74 100644
+index 723f5d991a74..84fb47062fe6 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-@@ -26,6 +26,8 @@
- 			device_type = "cpu";
- 			reg = <0>;
+@@ -28,6 +28,8 @@
  			enable-method = "psci";
-+			clocks = <&ccu CLK_CPUX>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-latency-ns = <244144>; /* 8 32k periods */
++			operating-points-v2 = <&cpu_opp_table>;
++			#cooling-cells = <2>;
  		};
  
  		cpu1: cpu@1 {
-@@ -33,6 +35,8 @@
- 			device_type = "cpu";
- 			reg = <1>;
+@@ -37,6 +39,8 @@
  			enable-method = "psci";
-+			clocks = <&ccu CLK_CPUX>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-latency-ns = <244144>; /* 8 32k periods */
++			operating-points-v2 = <&cpu_opp_table>;
++			#cooling-cells = <2>;
  		};
  
  		cpu2: cpu@2 {
-@@ -40,6 +44,8 @@
- 			device_type = "cpu";
- 			reg = <2>;
+@@ -46,6 +50,8 @@
  			enable-method = "psci";
-+			clocks = <&ccu CLK_CPUX>;
-+			clock-latency-ns = <244144>; /* 8 32k periods */
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-latency-ns = <244144>; /* 8 32k periods */
++			operating-points-v2 = <&cpu_opp_table>;
++			#cooling-cells = <2>;
  		};
  
  		cpu3: cpu@3 {
-@@ -47,6 +53,8 @@
- 			device_type = "cpu";
- 			reg = <3>;
+@@ -55,6 +61,55 @@
  			enable-method = "psci";
-+			clocks = <&ccu CLK_CPUX>;
+ 			clocks = <&ccu CLK_CPUX>;
+ 			clock-latency-ns = <244144>; /* 8 32k periods */
++			operating-points-v2 = <&cpu_opp_table>;
++			#cooling-cells = <2>;
++		};
++	};
++
++	cpu_opp_table: opp_table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp@480000000 {
++			opp-hz = /bits/ 64 <480000000>;
++			opp-microvolt = <800000 800000 880000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@720000000 {
++			opp-hz = /bits/ 64 <720000000>;
++			opp-microvolt = <800000 800000 880000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@816000000 {
++			opp-hz = /bits/ 64 <816000000>;
++			opp-microvolt = <800000 800000 880000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@888000000 {
++			opp-hz = /bits/ 64 <888000000>;
++			opp-microvolt = <800000 800000 940000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@1080000000 {
++			opp-hz = /bits/ 64 <1080000000>;
++			opp-microvolt = <840000 840000 1060000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@1320000000 {
++			opp-hz = /bits/ 64 <1320000000>;
++			opp-microvolt = <900000 900000 1160000>;
++			clock-latency-ns = <244144>; /* 8 32k periods */
++		};
++
++		opp@1488000000 {
++			opp-hz = /bits/ 64 <1488000000>;
++			opp-microvolt = <960000 960000 1160000>;
 +			clock-latency-ns = <244144>; /* 8 32k periods */
  		};
  	};
