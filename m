@@ -2,128 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74161C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80707C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 440F92192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 50CD52192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:42:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rLsMiU/o";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="j9Gw3aw0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 440F92192D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lvL4mmDg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50CD52192D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2V9zRm75x1BO53T/Ge3Xg++Q6mL4SP03qQ5sbP68Kco=; b=rLsMiU/o4k6Cwk
-	cJ3QUTWsiIR0P75IhutuoSj9OST0HtqDM5Kv4WsO1rfXYPbXUfKlniZKJ14CIuVh1Ul+aGIts4na4
-	An/HqemeS6e2pGLerMlao07fRrDhS/GNFhpmKIZ/0il4uH22G8fPSIPt4taal6vNzPrSLGO1gJI7i
-	FNCVCbizHfMdsHJ9scXEIzXdOszZIcjPXuOa6wzf781d+PmYChORTmy2dD0JDlg/Ryjp9V2ShLjSn
-	ADV1hLvRwq/9dzbWIOkRgQjdZgelX5AfxSdqHEt2k5aXMTSR7DfdqDy76R8+O7d5sDIFMOavmIOby
-	rKeCqjdgPQ8lT5OL24Hw==;
+	List-Owner; bh=ERcfzkyHwuoXovn6TwXNEvnEfD4AgYP52iYag8cphRc=; b=lvL4mmDgyIARlm
+	5rqtVoM0uUNrkcp2CstOwfRKWDTvAaoH3dJC6BsuFt9LWpcPrQWjOjvhiTUWo2mo7Za3M4ODUznkk
+	xl3al2WW8xUmNQ3Q9rApHnVdobEK0FuhDd+lji5MSA/RNoWOPym5HF096ndmHGjTafVS6431e3j5d
+	xkxvFuQ9uWfWxxNAAGCmerf8X3KVebp0BWPArFkNYj+BgIBQMxIy3Wy6uL9bvITkOCkKNFuS6Ct7A
+	EvlzKho5W8uXS7N+HamYNu02uyYT54nfkxzk7OYzQ5aKlkc7fox9HC41F9EutmaAmn/pnC2sPBY9e
+	2WEniAniyO439QPheA/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guegd-00031p-Fd; Fri, 15 Feb 2019 14:41:55 +0000
-Received: from mail-db5eur01on0616.outbound.protection.outlook.com
- ([2a01:111:f400:fe02::616]
- helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1guegz-0003Js-7d; Fri, 15 Feb 2019 14:42:17 +0000
+Received: from mail-qt1-f174.google.com ([209.85.160.174])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guegZ-00031F-NU
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:41:53 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=3U7gU+TLwJ9yh/IZqBptRDOJ4Njji7BTTzXJKb8fOIg=;
- b=j9Gw3aw0oU4wgp7e2sQGuzaT6adMO8hl+L8XbsKBxp/K7lvetbNSo0KwTsY1t+mIs2d/gkWpAp7LuZfvyGSQ2RyqkrisgE6NgHPOZc1MckDP4aHLp5siScbaTtoQuSqOKI0FUfNQjeRKQ4fzoZ91TYNENWYJ6U+DfXBzM/evCUg=
-Received: from VI1PR04MB4880.eurprd04.prod.outlook.com (20.177.49.153) by
- VI1PR04MB4174.eurprd04.prod.outlook.com (52.134.30.142) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.17; Fri, 15 Feb 2019 14:41:47 +0000
-Received: from VI1PR04MB4880.eurprd04.prod.outlook.com
- ([fe80::3d48:4560:6982:4c32]) by VI1PR04MB4880.eurprd04.prod.outlook.com
- ([fe80::3d48:4560:6982:4c32%3]) with mapi id 15.20.1601.023; Fri, 15 Feb 2019
- 14:41:47 +0000
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
-To: Andrew Lunn <andrew@lunn.ch>
-Subject: RE: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
- support
-Thread-Topic: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
- support
-Thread-Index: AQHUxRa2xfAoHsNatECZeGrGwDGmUaXg3FCAgAAPfPA=
-Date: Fri, 15 Feb 2019 14:41:47 +0000
-Message-ID: <VI1PR04MB488080895C871B6B3ABA571D96600@VI1PR04MB4880.eurprd04.prod.outlook.com>
-References: <1550225414-12125-1-git-send-email-claudiu.manoil@nxp.com>
- <1550225414-12125-4-git-send-email-claudiu.manoil@nxp.com>
- <20190215133459.GH5699@lunn.ch>
-In-Reply-To: <20190215133459.GH5699@lunn.ch>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=claudiu.manoil@nxp.com; 
-x-originating-ip: [86.34.165.90]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: e18b633c-c1c1-4738-bd77-08d69353b6c0
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605077)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB4174; 
-x-ms-traffictypediagnostic: VI1PR04MB4174:
-x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; VI1PR04MB4174;
- 23:HGabyH9cr78tsrJyumilkISD8DSaQK4Na/2MmrADl?=
- =?us-ascii?Q?i+oPEyC10HpGkYkFgoDuCehNSTvP5I5c+0kolXwFNiRXzfXE5NCoeDR9LYab?=
- =?us-ascii?Q?KWTe8yS6sPLvUFWaZsk0jSQloSiS9zrgxFYrmZTQsM0uSM5wedZvWT1WvfuE?=
- =?us-ascii?Q?SvLZEXHx/o/LXpvVrv84dV/0EEI2ohnC6WT4CZs7H0KmSncuj4jN3aS7WJHN?=
- =?us-ascii?Q?cduYPQjCji4WMb9iapDAuM1G7HhQdd6073I1VcNGpwvpdRWqnMgpTnY4wqCp?=
- =?us-ascii?Q?dYY1K7lIVNWLN9nKtDpwBA/yx0lwjQuX8ob5tolRupyB16Uo/OYsrhtyow09?=
- =?us-ascii?Q?9/x/CiRqDjqXdLWHUuUCT3EJjAm9jkellEageKdpfe0FZRSZ0AW2YXhiH13t?=
- =?us-ascii?Q?8o9J2qPVSLtX9cjmgaInGAGVTtxZv9cuq8E7m5RJqJaNSoGRYIsTlQR4d4/J?=
- =?us-ascii?Q?wmx9MnbMcMAxCT6a2IEUuGdrBVF2tqwkJPL7DTOR6IyqnvBL0lUDQxE207dR?=
- =?us-ascii?Q?zAPGVcOwQW3xJi20Ro/MyAEB4YCZ+4D2ULZZlfI+RWBvo1R2dfvxwaSjwU4N?=
- =?us-ascii?Q?PNTbENl+foiq+wbQefAKi66DZLVO3Xn39i3VimAFMpS+4eWejyx4qRt0r4MI?=
- =?us-ascii?Q?FQnB/R+E7EcGhyhaYmTYZ/0nNhjzeGj/IFd+0PPuxYbYp0m3TSN4AtAB+lZo?=
- =?us-ascii?Q?dVM1dQVI8nU76ytz5q7t/jtQ1FnQV9lQRmr0/UzAIFm34BO86fN4UktsUQdB?=
- =?us-ascii?Q?+NXuChburA1QlEZ9FX1O3EClIMrJVG4ivKb+MtHS/DncN1ue2Fc2l9sKwgzR?=
- =?us-ascii?Q?vcQe9v5Kha1H1vl1dR1I9G17O/UsjiwtI4no6KOYgrr6ekbearp5HeUpa19E?=
- =?us-ascii?Q?v4hHeaTGQ3Wt05Pa5K3PCojR7FBlJpZzI9bUaSGCXM2YLhik08jz914vHlyD?=
- =?us-ascii?Q?ohwccGYv2fnqh4mh//pTcr6Keva3LRXIRK8kuNMP6ytZGuAmIfTCg3Nt2Osa?=
- =?us-ascii?Q?3GhOge9PyDDA7KmCR6frm8EqJG5QpB51BZrA8fJeIyIP8KFUKUQDI5WfttTL?=
- =?us-ascii?Q?vCJK1aoYdIhcQ+f/AS1CvLn5HNc+IJoEssxM5tcKxY4uUKcrFb9oLNqk68of?=
- =?us-ascii?Q?Y3xioPr0iUgX91pK51/xKpFnLCQd3xCWlfU7h5N5cePBq4zIxI3AHe8iu/K3?=
- =?us-ascii?Q?/Z8VAR8VEcKt8CbQGrxLXwz5ecMsY6DAEqq?=
-x-microsoft-antispam-prvs: <VI1PR04MB4174D6E2E2AA227D7FE4E97196600@VI1PR04MB4174.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09497C15EB
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(39860400002)(396003)(376002)(366004)(199004)(189003)(13464003)(8936002)(6436002)(81166006)(8676002)(86362001)(68736007)(305945005)(81156014)(6916009)(478600001)(54906003)(6116002)(3846002)(74316002)(316002)(102836004)(6506007)(26005)(186003)(99286004)(7696005)(76176011)(14454004)(25786009)(256004)(11346002)(486006)(4326008)(476003)(446003)(105586002)(33656002)(55016002)(9686003)(106356001)(53936002)(6246003)(97736004)(71200400001)(71190400001)(7736002)(44832011)(66066001)(229853002)(2906002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4174;
- H:VI1PR04MB4880.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: QdsvHuRuRi1DF9v7DGLl2qYGnYPjNpj2IRzdHCGqZyzjIFwjLU3XGR9A9U84+8SrWqAV43qfYg+irNReW+AtIRNKJaQfGXu88jkwBbnVbI4RX1jo3V3I1G1Fs/E2fzUjokv32KQFlk1RV11B9MZGO0c1hi72+ATJQzeWxf9gIKJUUjdy7QpzNWWD3Ncj00LgPUs0f82xN9aSG7OaGRQX0EGWkB71YAyGEyBDhm0KytDsMCTN359+ZZaF9aNRXgmoiFGxt1Q1MF0E1GztVxJ/zEDLOdhBp2/TalSo4Bbr3vM4kDlRnIO31HGyVrYO9aIgmF9/ZKYk8XZjRZe3T6UtsM8u9rjUFj2i96jzxpTSuRIhUrWcB923GRa1MAMuO5YRXJ1Gc2cxWyaIRTlHG51wMdS7oOA7z9vU3QlOmHe9q8c=
+ id 1guegr-0003Ix-Vb
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:42:11 +0000
+Received: by mail-qt1-f174.google.com with SMTP id p25so10803155qtb.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 06:42:09 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nHeiByyqppvpAPHd1dy0pr5ngtRczwVzajYPyO5noPg=;
+ b=cZtLUAe8udDm+QmFd/3dM0H+aHtfuWaMPktWvYyiXN4JvvCfHewCyK3rE3w22UOrd4
+ 37MUVedb0AIr+YtuCjNlARdyLif467BK/hVm76kkL4BQBtCr/3eIVGPxejgcpRzJ6BZn
+ hkPPw3L+KyvJRWmyokEZN2tvUcJzOHbQTUXmhzbhV2Y+WjXQOboWPYUNTrsIqWUgY424
+ /5qNIVD+c2PWIPT4lwUZw3wC7VcxNSOEosvt52g7Tr+GW2mHeQf3UgQids05JDxX3l7K
+ 0JXxAd/n+n43ZJvvz7qxFXB1xhU6M5ZCLF1f2kjZH70uSU8zarEY2XArx4TlPlAUxQ9L
+ n7lg==
+X-Gm-Message-State: AHQUAuaMKMdnLchcV4ohKgSYHthdD0cdDeDumN0jDzRYam3uOgxuRLxL
+ a+4fONP41/2CkERDuTiriTe9GxsiRISJHpAmUZKfww==
+X-Google-Smtp-Source: AHgI3Iann4cLIT0/2KIGNvtHAbi33GQuWQqUZX+QXzATh5FvsIFZuCklS/ZqSSdgkPngRMi7lrlPRARGo0+b6QS95og=
+X-Received: by 2002:ac8:33f1:: with SMTP id d46mr7675030qtb.319.1550241728854; 
+ Fri, 15 Feb 2019 06:42:08 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e18b633c-c1c1-4738-bd77-08d69353b6c0
-X-MS-Exchange-CrossTenant-originalarrivaltime: 15 Feb 2019 14:41:47.6066 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4174
+References: <20190208102933.3op53lsvppizl6b4@flea>
+In-Reply-To: <20190208102933.3op53lsvppizl6b4@flea>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 15:41:52 +0100
+Message-ID: <CAK8P3a0WDqB=suJz1a59NzYYRStmKQeizuxUrLvDOLGMDkUUwA@mail.gmail.com>
+Subject: Re: [GIT PULL] Allwinner arm64 DT changes for 5.1, take 2
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_064151_767937_3FA180A7 
-X-CRM114-Status: GOOD (  10.55  )
+X-CRM114-CacheID: sfid-20190215_064210_012237_116E770C 
+X-CRM114-Status: UNSURE (   8.69  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -135,57 +79,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "netdev@vger.kernel.org" <netdev@vger.kernel.org>,
- Alexandru Marginean <alexandru.marginean@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Leo Li <leoyang.li@nxp.com>, Shawn Guo <shawnguo@kernel.org>, "David S .
- Miller" <davem@davemloft.net>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Chen-Yu Tsai <wens@csie.org>, arm-soc <arm@kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, Feb 8, 2019 at 11:29 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> Allwinner arm64 DT changes for 5.1, take 2
+>
+> Our usual round of DT changes for the arm64 Allwinner SoCs:
+>   - Enabling of the various power supplies on most a64 boards
+>   - H6 SRAM controller support
+>   - A64 CSI support
 
 
->-----Original Message-----
->From: Andrew Lunn <andrew@lunn.ch>
->Sent: Friday, February 15, 2019 3:35 PM
->To: Claudiu Manoil <claudiu.manoil@nxp.com>
->Cc: Shawn Guo <shawnguo@kernel.org>; Leo Li <leoyang.li@nxp.com>; David S .
->Miller <davem@davemloft.net>; Alexandru Marginean
-><alexandru.marginean@nxp.com>; linux-arm-kernel@lists.infradead.org;
->devicetree@vger.kernel.org; netdev@vger.kernel.org; linux-
->kernel@vger.kernel.org
->Subject: Re: [PATCH net-next v2 3/3] enetc: Add ENETC PF level external MDIO
->support
->
->On Fri, Feb 15, 2019 at 12:10:14PM +0200, Claudiu Manoil wrote:
->> Each ENETC PF has its own MDIO interface, the corresponding
->> MDIO registers are mapped in the ENETC's Port register block.
->> The current patch adds a driver for these PF level MDIO buses,
->> so that each PF can manage directly its own external link.
->>
->> Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
->> Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
->> ---
->> v2 - used readx_poll_timeout()
->>    - added mdio node child to the port node
->
->Hi Claudiu
->
->Please document this in the device tree binding.
->
+Pulled into arm/dt, thanks!
 
-Hi,
-I don't really see what bindings would need to be documented, as the node
-names and properties used so far are common.  Like, the "mdio" node name
-is common, the enetc ports are "pci" nodes, nothing special for these.
-What's missing?
-
-Regards,
-Claudiu
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
