@@ -2,67 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C2A0AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:16:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 04355C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:17:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 918ED222BE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:16:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C91FB21924
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 16:17:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fVatBY6w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 918ED222BE
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T117mfRI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C91FB21924
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=S4FiEyZEp/O6thR6yggr1Fl2gIJnZI3GgSicTKBxADc=; b=fVatBY6wa+yuIQ
-	mF6NA3A9R7uPco5M6qX0FbRCl869OMUoKHBStpgbsqKPgXH/CiblsBrdInd5h6BUTZcNkZ2ZCvNez
-	cPbeK+rXrxu16zjbcwkGiqqNMPhbGoU0CXqQ+vnerVK18LOlN+vOSpWB9iXUSXHujHbI5pwiYwLLT
-	LaZ1w4jhD+vjTzAtFfXlmuYkIBHh6EKZNFLayctQmRB4q2P/pCfG32AiByPnbEPTQlJ//cuDoylG/
-	K9RtSl6LFvIeS4CFCXB8E8oMpS4QAIa/mvv8ouivzEaO2p4V5/a72bZd5UlLHGSJUv192/WKBZD8C
-	mmkG+PAgu6pyU+4MBr3g==;
+	List-Owner; bh=yfWWCAOqmpUp2ZPCumcZWqfc8T+1HsEziQ9vn0s864w=; b=T117mfRIob+ZlJ
+	25spmO67D9MVlFZmftwqIaAg3dn51Ob6xPckiLtYolYf5RbxZ8Z6Mc7ffPdL5Ga9gBt9ef85+p/A5
+	P4YfaH4x/gCsszfNjxZ//UESLFwLpEaA9hVUly9L/z9xAM27AcRSDkbYge8lRefe4JfxTT64VXbz1
+	wOiKZNzIlovW0WxdDiduDuhxlQC8A4q5oZpWENeXvOmg+hejEMuN1XLg3AUK3BzTgKUOppco8knBT
+	n50CZo1OJq5yPCFFLyBL2hu1W9b8XW7xoVPFXIxKU1xyU8yTaytwJEyrSfFl/UL/KqSNwC8CDZvFW
+	VNNI51P7xmMfH9ws/3FQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugAH-00044N-8c; Fri, 15 Feb 2019 16:16:37 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugAE-00043g-5l
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:16:35 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id E1EF580C0;
- Fri, 15 Feb 2019 16:16:42 +0000 (UTC)
-Date: Fri, 15 Feb 2019 08:16:29 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Message-ID: <20190215161629.GK5720@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
- <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
- <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
+	id 1gugBE-0004RA-Kd; Fri, 15 Feb 2019 16:17:36 +0000
+Received: from mail-qt1-f171.google.com ([209.85.160.171])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gugBC-0004Qm-AA
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 16:17:35 +0000
+Received: by mail-qt1-f171.google.com with SMTP id v10so11451679qtp.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 08:17:33 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=A6/BpJuLKEv8Wj0JYOau5ZkmQWEoHZlEV7QxEev32Ps=;
+ b=ZbCUCylkfzckXuqmdgZfeK5Fi24/Ygqe8mWq1wEHAtNxSFQI1ngdCYNG3sDOQe8WEb
+ lfgDU0xwEBAdiI3C50WHai/59DJhyINTasAu05jQ67UQ/eFk0LRYIoaiHkF6+3et54oH
+ YUkMvAdkjz03hfHqVg3TzGH//QFMhQaY+pHXXAirZ8v5KjGgjizgn08CHg50XNY8YKd1
+ JJisro+I8DRiwsoaBR5foe4HMp1//q77/s1haOxwEMGLSbyoelQOmCarOtnz70efM4zp
+ btygSzIaAAfKeFvOAg1kgAuxyFXm4WPF1xSmyOpuYAMJlrt2m7VPSSQwvYiZsqPRIaVn
+ B54A==
+X-Gm-Message-State: AHQUAuas05S3COWtaKYEpiurENPSRBRVsFVr9XyYG1YwsaRAaKX1MXy1
+ LkFN/6qAF4LJj2Fkkbm4ZtSRZB76JlJGM+uxK7g1dA==
+X-Google-Smtp-Source: AHgI3IZpjf9MVXT0200kajy7cX7f7xrQp0Pms6u+pL35RNFSGa6SZtzgTcOcTtTtkAUisjC+ljQ2kmfgvRymc9EXkNU=
+X-Received: by 2002:ac8:4141:: with SMTP id e1mr7865556qtm.96.1550247452344;
+ Fri, 15 Feb 2019 08:17:32 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+References: <9c5f9835-d9ad-a168-7e3f-b71fd6cfda29@monstr.eu>
+In-Reply-To: <9c5f9835-d9ad-a168-7e3f-b71fd6cfda29@monstr.eu>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 17:17:15 +0100
+Message-ID: <CAK8P3a3ANyAASE9qQutoWYhSi+W4sBd018YCtk+NyGLdbDfEmg@mail.gmail.com>
+Subject: Re: [GIT PULL] arm64: dts: Xilinx ZynqMP SoC changes for v5.1
+To: Michal Simek <monstr@monstr.eu>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_081634_249766_D5682FE1 
-X-CRM114-Status: GOOD (  10.76  )
+X-CRM114-CacheID: sfid-20190215_081734_350002_CE02B6E6 
+X-CRM114-Status: UNSURE (   8.05  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,44 +79,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: arm-soc <arm@kernel.org>,
+ Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ Philipp Zabel <p.zabel@pengutronix.de>,
+ linux-arm <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Tue, Feb 12, 2019 at 2:10 PM Michal Simek <monstr@monstr.eu> wrote:
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190214 18:03]:
-> On 2/14/2019 11:16 PM, Tony Lindgren wrote:
-> > But I'd rather have a proper hardware based phandle + index
-> > type mapping in the dts if possible though.
-> 
-> The idea about sysfw here is that Linux is not aware of anything about
-> this device(Interrupt Router). It cannot even access any of its
-> registers. As a user Linux should know who is the parent to which the
-> Interrut router output should be configured. Then query sysfw about the
-> range of gic irqs allocated to it. Now for configuration, Linux should
-> pass the the input to interrupt router, gic irq no, and gic id(by which
-> sysfw uniquely identifies GIC interrupt controller with the SoC).  Based
-> on these parameters Interrupt Router registers gets configured.
+> ----------------------------------------------------------------
+> arm64: zynqmp: SoC changes for v5.1
+>
+> - Extend firmware interface with reset, nvmem,
+>   power management and power domain support
+>
+> - Add reset, nvmem driver, power management and
+>   power domain drivers
 
-If the interrupt router hardawre is hidden away from Linux,
-just leave it out of the device tree completely and have the
-interrupt controller driver request the routing.
+Pulled into arm/drivers, thanks!
 
-The dts node for the interrupt controller should describe a
-proper Linux device, that is with reg entries and so on.
-
-Regards,
-
-Tony
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
