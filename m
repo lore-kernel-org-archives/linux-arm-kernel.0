@@ -2,84 +2,90 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-13.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98E6FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 00:59:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE8B9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 01:40:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 696AA21934
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 00:59:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC98221934
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 01:40:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CO4sTnn4";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="RroLO87p"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 696AA21934
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dpA5lZ8z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dmz7UbHp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC98221934
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Wq/YgkXUV/yy3WRZhRLzvnWysaFs3I0+gZw6T9XTh6E=; b=CO4sTnn4X7fYfp
-	ESOrKSlLuXZl8ujoEzW5sx8PLSsJMHTHFUCptnmohA12rwhwpZL0bDFpZ2aVCmo8Z0hJFUB99t+SL
-	x9kfPPkiWsZWRHZjA8DjSN0MC3mM6Dg/ylNYBVp3nm8fv6Iu84Q1ReBS3Hhb125TLsff4ntQJ1fKO
-	XNMQ9ajUzxMGltMojtnfrmvJ32mD99jPTAWgRQBJQ63/X3QtibKUTysr0TLFvZoIGk6CU3BtijbfQ
-	kJNSrl1SN0Mg0uns9nRBMq6wa02k0n02Ls/ZqbrmKX7bKrEouFgiU1TNd0pvrvAUGg8TV+3N+dfv6
-	1mZ8oAvlJlMtKeYGzf+w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=RfmhpWZzB56DvgL1RhxHW+VohZzpOWoRI1N/vu01OG0=; b=dpA5lZ8z760c0n
+	HgS7eB+QZ3qQnfH0XdLIBGwdax/TUo8ecay5MhmHGpn2Ic2Vgle16swmjvfbYfJMAo9sy1yO5zQeD
+	76lDnslCIxbsL5yvnrNqMbtBwevSyDf3VcViEzCu9fe/Zi7LFAKfWfozwQDmeSqmXVQG/nz4fsrG7
+	XaZC+QXVUuCbCTRIEXtOcKR9QqaWgq5LIcBrHb93pklJ9BQPnlgA/YrnB/ToG2GX8AaCMgvr/jmjT
+	0YhywB4+Hy8f3cTh90c/ocMUEivTrsABnHFUMo2M8+rgQwPjBLAukuvUQPOPbIAn82w17kBjgclJs
+	zV8RoGwNzfTezqgFC2sA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guRqZ-0002SS-Fm; Fri, 15 Feb 2019 00:59:19 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1guSUV-0008St-AW; Fri, 15 Feb 2019 01:40:35 +0000
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guRqX-0002S6-8E
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 00:59:18 +0000
-Received: by mail-wm1-x343.google.com with SMTP id j125so7980840wmj.1
+ id 1guSUR-0008SC-Uk
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 01:40:33 +0000
+Received: by mail-ed1-x543.google.com with SMTP id b3so6719047ede.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 16:59:16 -0800 (PST)
+ Thu, 14 Feb 2019 17:40:29 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=uyivuSNS3T//EPBbYRrQNiWfYaC7QsAANNMOOd/BlNE=;
- b=RroLO87ps+DHsOWieR/cw9j6QcIu7KgHdnwbqby3Hk8A6RbcfrJmZwVgKb/FHjWwer
- 8fpHQ87kEf8OtNKwyQKFYgJMrbMFbhE4cJC60PuHehlC+8qrQidy+lOc8e4i/9IB0aSn
- SfRsu2QuND/YTFn6htfRRiBZn5tV5GroHBvArjXRcvkImgHxL7fkRrr9il/TbDQbv5i4
- 9TfhZAi6xrFHBh37eho7sAKs6w9Nmy89ikFQOjFAfzj7k2alhN1XV1jn7HTGLcgBHTTZ
- tNEKofi5zc71u03cM5XE5D5UrKIAtYQWNhVLjnzGju0eBUWolx0ebsvGZg8W9XUm+Ufv
- K7cg==
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=uwCXhwiC/fPv5tuKoeJDhMs1VaHJk1Bz4OiYh196ZEI=;
+ b=dmz7UbHpHt7I1SGc8Gs/EB6ga54A+68M5SljCar/19SNyBDCsu8+JuLZDU5A7T7amu
+ uIZzrWB8cWyqpm1VeNkeZjmDRe0N6CvUezVXvAjCmX/X81ubQsGodB9e7ENf2PZFGhQ0
+ L9RbPJ6kmT7ZOS2HyP1STiKnDQKMl9fISM6pjelNo3jgscYGnXzCt9rs3/gQZgyiKQaR
+ R2FuFKSgMJtqPXdmhoFCzvFqM8GDrjVbWJvsHjrPrK7igAz6Mw+FtopIXwQ5KasX9uSU
+ CdyGGEy+PjwVa76ugrhk6XhoJg7ha4XjyusyCy5ugk8uLq/ML+znPiZA5dGW2wAVhUtx
+ WjSA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=uyivuSNS3T//EPBbYRrQNiWfYaC7QsAANNMOOd/BlNE=;
- b=j6QI/lt9SdYt0F09DBJBmCi9NOe5yTDt/fhs9wTwT0H4AP2cBnfrMGrPv1IYF/xfe/
- 7fr+ttBTV6ogcImslremKB6aTpLQH9dXDreOWf6Da6H/KmkKtgekK/juX9bTw8r8OXj+
- 53DUOLpL9jgALZUeJ6nkNDU5SQKn6UTg9hGHLYjbzAUgCHK8FVX5Wz1XDByNKIqbx8Lp
- n8Aowutqvw3w0DGFDmJbPYWPPquljzKLoh1vFxb3kIfgJ6HuBcUlzFNz/FVw6R8peVBE
- lL2K326NS0i8f/f/ehHcB1wxF0YU0MqTSKcuZhO0YYMqJwRJySO+1czt9AfTR2S9AlDi
- AhlA==
-X-Gm-Message-State: AHQUAuZfqdfdQqZdWCHF6riGBXNsC4OtgL77Iw2m4Kd4wwUDJc/qQMAU
- W+WjXWhE8xM5mwrMO2UlXYYan2GR9Boz2mhuxd8=
-X-Google-Smtp-Source: AHgI3IYMrWs8hS6iDxd3ygyPPWsKldXVFK1KERDyMi6a+7yHvSzJLbOPh8cM/ufWJ9be5DEwlaPKvgawTY3tOjOFso4=
-X-Received: by 2002:a05:600c:220b:: with SMTP id
- z11mr4382465wml.37.1550192355474; 
- Thu, 14 Feb 2019 16:59:15 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=uwCXhwiC/fPv5tuKoeJDhMs1VaHJk1Bz4OiYh196ZEI=;
+ b=jdyPEj0jiLbuQoKaDTzxq2IeXVA6/fZaFARkaVdV9gTcVMz4m3nqKJuNUpbEUbxXcA
+ t3kRNZhz02GB3GYbmrFgHp3J7MGitr47xsYcK8puUTV3huOWwrf7AF2zL2PAKKuaeDyd
+ LxfKhxq3YFOEJxGvHkeN3Vgd4lJB8GH98uZdXV5A4TVNlX1LM/DP5mzjt9C4FgeTn7mt
+ WGYNq6ub+lai6+p/DvUF6NxJqySTJt7d75FdkuGvEbnCemn/RFk+MjDEv8V5E8r2x+rq
+ D6enKqqisxTf7QUwnlk1u5JqDEfHj5eTIVMHCRaLRXBPFWf2diAyffz9TFcNuHQCt2Ek
+ ey5A==
+X-Gm-Message-State: AHQUAuZQYr2bRN5aqTVAK7kUbrCRllaiysqHDyNlsH6cqB/S9aaASPAY
+ ek9Izo+i9YOX0TXwT2x/lL0=
+X-Google-Smtp-Source: AHgI3IY6h1L+htqNpwMawWWiNbFCgqHnX2tvGsFZ3dowxODW0XHXL8DR9mBSTU+HUnawjSDXPWnzbw==
+X-Received: by 2002:a50:a4ce:: with SMTP id x14mr5288893edb.229.1550194828224; 
+ Thu, 14 Feb 2019 17:40:28 -0800 (PST)
+Received: from localhost.localdomain ([2a01:4f9:2a:1fae::2])
+ by smtp.gmail.com with ESMTPSA id l25sm1090247edr.45.2019.02.14.17.40.26
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 14 Feb 2019 17:40:27 -0800 (PST)
+From: Nathan Chancellor <natechancellor@gmail.com>
+To: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>
+Subject: [PATCH] arm64/neon: Disable -Wincompatible-pointer-types when
+ building with Clang
+Date: Thu, 14 Feb 2019 18:39:59 -0700
+Message-Id: <20190215013959.21320-1-natechancellor@gmail.com>
+X-Mailer: git-send-email 2.21.0.rc1
 MIME-Version: 1.0
-References: <20190104174925.17153-1-andrew.smirnov@gmail.com>
- <20190201162729.GA22030@e107981-ln.cambridge.arm.com>
-In-Reply-To: <20190201162729.GA22030@e107981-ln.cambridge.arm.com>
-From: Andrey Smirnov <andrew.smirnov@gmail.com>
-Date: Thu, 14 Feb 2019 16:59:04 -0800
-Message-ID: <CAHQ1cqENSb0ORrcN0Qh93DGx1C7AVxSqAKhcfJH2qZ8+WuVH+g@mail.gmail.com>
-Subject: Re: [PATCH v2 00/20] i.MX6, DesignWare PCI improvements
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+X-Patchwork-Bot: notify
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_165917_314913_D0E7BB6E 
-X-CRM114-Status: GOOD (  15.92  )
+X-CRM114-CacheID: sfid-20190214_174032_016714_1AF97ED0 
+X-CRM114-Status: GOOD (  10.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,50 +97,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-pci@vger.kernel.org, linux-kernel <linux-kernel@vger.kernel.org>,
- Fabio Estevam <fabio.estevam@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- Bjorn Helgaas <bhelgaas@google.com>, Leonard Crestez <leonard.crestez@nxp.com>,
- Chris Healy <cphealy@gmail.com>, Lucas Stach <l.stach@pengutronix.de>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Kevin Hilman <khilman@baylibre.com>,
+ Nick Desaulniers <ndesaulniers@google.com>, linux-kernel@vger.kernel.org,
+ Mark Brown <broonie@kernel.org>, Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 1, 2019 at 8:27 AM Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
->
-> On Fri, Jan 04, 2019 at 09:49:05AM -0800, Andrey Smirnov wrote:
-> > Everyone:
-> >
-> > This is the series containing various small improvements that I made
-> > while reading the code and researching commit history of pci-imx6.c
-> > and pcie-designware*.c files. All changes are optional, so commits
-> > that don't seem like an improvement can be easily dropped. Hopefully
-> > each patch is self-explanatory.
->
-> Side note: You should trim the CC list, eg I do not think CC LKML is
-> needed at all for this series.
->
+After commit cc9f8349cb33 ("arm64: crypto: add NEON accelerated XOR
+implementation"), Clang builds for arm64 started failing with the
+following error message.
 
-I add it because it's always recommended by scripts/get_maintainer.pl
-and it really simplifies creating lore references to previous versions
-of the patches I sent, that is I don't have to remember which
-tree-specific list that series went to.
+arch/arm64/lib/xor-neon.c:58:28: error: incompatible pointer types
+assigning to 'const unsigned long *' from 'uint64_t *' (aka 'unsigned
+long long *') [-Werror,-Wincompatible-pointer-types]
+                v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 + 6));
+                                         ^~~~~~~~
+/usr/lib/llvm-9/lib/clang/9.0.0/include/arm_neon.h:7538:47: note:
+expanded from macro 'vld1q_u64'
+  __ret = (uint64x2_t) __builtin_neon_vld1q_v(__p0, 51); \
+                                              ^~~~
 
-> @Lucas: May I ask you to consider please which patches you deem
-> worth for inclusion ? I will have a look too but I would be grateful
-> if the driver maintainers can chime in to help.
->
+There has been quite a bit of debate and triage that has gone into
+figuring out what the proper fix is, viewable at the link below, which
+is still ongoing. Ard suggested disabling this warning with Clang with a
+pragma so no neon code will have this type of error. While this is not
+at all an ideal solution, this build error is the only thing preventing
+KernelCI from having successful arm64 defconfig and allmodconfig builds
+on linux-next. Getting continuous integration running is more important
+so new warnings/errors or boot failures can be caught and fixed quickly.
 
-Lorenzo, can you apply the dwc specific patches that are already
-reviewed by Gustavo Pimentel from this series, to keep things moving
-while we are waiting on Lucas? I can also spin them out into a
-separate series if that's perferable.
+Link: https://github.com/ClangBuiltLinux/linux/issues/283
+Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Nathan Chancellor <natechancellor@gmail.com>
+---
+ arch/arm64/include/asm/neon-intrinsics.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-Andrey Smirnov
+diff --git a/arch/arm64/include/asm/neon-intrinsics.h b/arch/arm64/include/asm/neon-intrinsics.h
+index 2ba6c6b9541f..71abfc7612b2 100644
+--- a/arch/arm64/include/asm/neon-intrinsics.h
++++ b/arch/arm64/include/asm/neon-intrinsics.h
+@@ -36,4 +36,8 @@
+ #include <arm_neon.h>
+ #endif
+ 
++#ifdef CONFIG_CC_IS_CLANG
++#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
++#endif
++
+ #endif /* __ASM_NEON_INTRINSICS_H */
+-- 
+2.21.0.rc1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
