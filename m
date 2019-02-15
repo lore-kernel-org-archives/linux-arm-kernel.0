@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB9B5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:51:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CE897C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:51:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A36D2192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:51:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9FB722192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:51:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhaOcTWN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A36D2192D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DqCJhGQP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FB722192D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,50 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8J5MVUEVK4SEkNGYvkuoCjlSGzCM2Nb/G1KRpfAGcVg=; b=QhaOcTWN8zZ/Ur
-	Rnku9t+nyp1z1fOUx6efDXkIqk3WNDKkNwex+Atrl8pIVmDlV6ydiufZApoXVNhrwCSSvwJjmtw96
-	2frmwV1z9v8VKIrxiICPiUIaqgVioAcsYo2EyzYvdatw38rp1qc3dS+CcMUpwu230zxTCtdpeF4ka
-	B5LA+IKNFaNEN+qAR0hr1vOsj154EDXwSN4mUu6ND/aNjGG9yPXDNNW7KEDBwb8cCxflW0TIiq1EG
-	mlPq/nXN+USAqx0u3bUPc87ZH0OiFqqCv5HsgGWpjY5sHbpyYLW0op7C7m2JcsNMhH8McRRCrDIsO
-	Eh4kE8QEha8pm/G4dSKA==;
+	List-Owner; bh=CtAW1EzzBihRWTPEhOGZmuhjEsimMD5OivXzMowIdaw=; b=DqCJhGQP5vFU1n
+	IVeqpkVjsfrOOmqNkPSub7w4ovwnkxlDpdC6HG4aE8VzCwwHqjEzFruMX+RbedhhwPUheXJdHyhKM
+	Gf9A7WKPghUuvAiguRfO46zsJDmUzpJXQJ9t0HaRUdcbS10/RQ7fMKWu7dEGAQ3exvF8ILx0Xc46m
+	J8dFJc6pmYgE61oN/KAFa/lm47sD3CUk0gUHd3jwe7DlylI6oygDxH7VzZt38/rf92yv5xVK5HYDv
+	QI1dx5owPljnhHDvwxWJVaoxkb6BnwLLpp5g09lurtRJicukQgBgrGtxFB7pNB1vNS3Tgv0LBTvEs
+	GecdnhZqcT+WrhyQg3aA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guepN-0007eP-FO; Fri, 15 Feb 2019 14:50:57 +0000
-Received: from mail-qt1-f173.google.com ([209.85.160.173])
+	id 1gueqE-00087L-Rz; Fri, 15 Feb 2019 14:51:50 +0000
+Received: from mail-qt1-f175.google.com ([209.85.160.175])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guepL-0007e8-0y
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:50:56 +0000
-Received: by mail-qt1-f173.google.com with SMTP id v10so11105256qtp.8
+ id 1gueqC-00080h-AL
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:51:49 +0000
+Received: by mail-qt1-f175.google.com with SMTP id d18so1053718qtg.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 06:50:54 -0800 (PST)
+ Fri, 15 Feb 2019 06:51:48 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=O/f2kCEDmnvgFzHZJjqu5GAJNUdBlOOsmoL5cL19hzs=;
- b=ajsOXK+CWsHZO/hBl+K561CFGtmxhZvmk1/CuWAqFLb6bhScRUMBoS4aQ6VuhSHcVS
- ieo7lRpkB2jqliCqjAHz59JGSyLBl7Xh4z2ZVxxTu1hMUPt5mmy0XVtZDarG1+O5UXjx
- jd9gCMzKhPLMY/V4OCs14Y5r2oj4nAtUFoKo7gKJyJTka4X2QFpPGOyGHjL+b/5chRwY
- LF8fuyZWMJHojmkqS2+AR+dWfJQQgA14d5XAlPYEQ/DlKnEDjwWTnFgSec3pRGa5Da1G
- eI8qflWQnWR3iR9ek/T/Z/UiKsxJGMT1J+NJ7EKrUSKCWcvftuojpZ3n1RlNJpyHz7jM
- rboQ==
-X-Gm-Message-State: AHQUAuYwsbQ+urxUOWeo4c9adhu6PXtn02jf0Kjx0dqJGTGq4mDXYqvJ
- NDaPVh7lJaspWzl8Gc8P+ie/t40T6ovZIKYr6vo=
-X-Google-Smtp-Source: AHgI3IZkUdrwFqe4j1CREcQTsRyD6Q9AfhGaWEuwhd7kGMQX4mRlDLPC9DJ+Ijq7nFnl+EXWlhZq1NYHOq5oG0glwQg=
-X-Received: by 2002:ac8:1d12:: with SMTP id d18mr7716453qtl.343.1550242254003; 
- Fri, 15 Feb 2019 06:50:54 -0800 (PST)
+ bh=EygB5+VyTg+5ooks886DNKTWZnRoF/EZbkAQjMwZ3Z8=;
+ b=Cbt2WWOO+NfuTLUADAtYJfgBz5qT+JYweM660QQ5Ta2Bjo9rv+IJsy90t6XxgA2RYI
+ dvWrTecOrKXhZb1T7IKVpk0ZdolzOt/U3wIFwBwugGCe2ssYwY7Hvf7pPZZuNERMn8Al
+ Ipe81rC2hY1enIBDjrzFzCJRZ2FiVRHwZVo1ySJqYuFvZsoVIH1MRw1KdgapIn4zkBZs
+ MqDQR+vUHleP2qpX5ok6TEmLjkYyELEgweH0WIxEWjwCAR4bad7yeSCI24dkjZDTD/ci
+ /pcSnEuxibEHUBU6341zZHG+WDUGyY2LJ/+M/LXcNPEOiRXvn7aRwemT0MFU2mMVJTDg
+ 60DA==
+X-Gm-Message-State: AHQUAuay9rWvE+Bwh+0aph57cMqLtml7EQymFsmi4Uf+txcq+eHBw4Cp
+ hF68UG6FmRQeGQQEl/ze9UrwdI588oEHXm/Aq2DRdw==
+X-Google-Smtp-Source: AHgI3IbSAO5zhKM30FVATChDlBDXcPskBtgF4Nqd+vMvcOPqMC/l/Ihd94706ls0A00vNDEdCihuabp9d+LCcSPt2Xs=
+X-Received: by 2002:a0c:e98f:: with SMTP id z15mr7611467qvn.115.1550242307524; 
+ Fri, 15 Feb 2019 06:51:47 -0800 (PST)
 MIME-Version: 1.0
 References: <20190208150935.32108-1-thierry.reding@gmail.com>
- <20190208150935.32108-4-thierry.reding@gmail.com>
-In-Reply-To: <20190208150935.32108-4-thierry.reding@gmail.com>
+ <20190208150935.32108-8-thierry.reding@gmail.com>
+In-Reply-To: <20190208150935.32108-8-thierry.reding@gmail.com>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 15:50:37 +0100
-Message-ID: <CAK8P3a37UG3EGqmkBeiYQ94LOYB8y2ZQKrfhNj8QwUBH=k_dDA@mail.gmail.com>
-Subject: Re: [GIT PULL 3/9] dt-bindings: tegra: Changes for v5.1-rc1
+Date: Fri, 15 Feb 2019 15:51:30 +0100
+Message-ID: <CAK8P3a0J1yUgZwUXELjrcb+g+UvaopnZ3T5T9S20Hv+fPB4Jjw@mail.gmail.com>
+Subject: Re: [GIT PULL 7/9] ARM: tegra: Device tree changes for v5.1-rc1
 To: Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_065055_063735_77EFECF3 
-X-CRM114-Status: UNSURE (   7.71  )
+X-CRM114-CacheID: sfid-20190215_065148_362520_6B7C1BB6 
+X-CRM114-Status: UNSURE (   7.43  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -89,15 +89,14 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On Fri, Feb 8, 2019 at 4:09 PM Thierry Reding <thierry.reding@gmail.com> wrote:
-> dt-bindings: tegra: Changes for v5.1-rc1
+> ARM: tegra: Device tree changes for v5.1-rc1
 >
-> This contains device tree binding updates for CPU frequency scaling on
-> Tegra210, BPMP support on Tegra210 and support for NVIDIA Shield TV.
-
+> Contains a single patch that adds the "jedec,spi-nor" compatible string
+> where appropriate.
 
 Pulled into arm/dt, thanks!
 
-     Arnd
+    Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
