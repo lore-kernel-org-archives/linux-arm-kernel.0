@@ -2,91 +2,72 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E57F8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:42:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBA6FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:45:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B297721B18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:42:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B2ECB21B18
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 21:45:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qcwrGILS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="P78zfATk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B297721B18
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z3RrlAUH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B2ECB21B18
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=pEcyqt598xI259WpB4nu3pruSWU7hMSsx/OPoo6L+Bc=; b=qcwrGILS/eTdVyqgvJDavAJqQ
-	VcPh23xiZaZSaxDkd/gdoVXdmNDBSDoHMdCNl3Vvm8N9MR03NL9vcxELqAUjlTq5movsiYFl3YBne
-	xI21FfmO8a2KBEiDhS22BiilLFrMqIwWdmC29NRpmvz7Kw4pmfU8GVdybkiGIUbNzmkFtz3mahHAU
-	+40NRTFe+VO0TovNXnfy3DkUqOFoAyLuuvDeFTJlC0yCoQi5VUOu1V3H7LZGsIB4s8v3h4sRnyA/M
-	SXl9/FT5O3S2zuxBxGCe5X5jSsCPfBLcYsQpvGCOUN4e8o1TWD/MjWKK5ocFt9+Mxes0Uzli/8ZX2
-	rlM/udRYA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NbpRYr2QwdfNufXOZrlb5xTT9YD6iujIg0pz3bziPqc=; b=Z3RrlAUHj7pRMH
+	oEdImxI/qSmoGA/HnBeFCy29YehBPZZtRwEVWxKdydYXq9g1pgXZf+fghzrsJVOYr8KNKwaU6R60f
+	+l36fTZXLZoQfJQsMuvgg1eqfomAy3WX50l8TIylY0xsOqVTvuPAtbBc4+KyCppVhc2RuCkg18vxY
+	WnVcLAuGRvhXcwNM2AFqiQiYkp41wH3TNSgO4PKlx2Pt1oo2QlwxvsqWy5kmpqCbjqLvyWoHksi7L
+	0evXH6v2hUhIEqajieyJ5uK1yr0CnzrO3z48gWjKHtMjReyYUaM4Yh7b550SOWuHyRe+ugaXgtyKZ
+	QPjZgaFIIn7s1bodP18A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gulFP-0006zI-5h; Fri, 15 Feb 2019 21:42:15 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gulI6-0007RQ-HR; Fri, 15 Feb 2019 21:45:02 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gulFL-0006yo-Qb
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 21:42:13 +0000
-Received: by mail-wr1-x441.google.com with SMTP id v16so11772397wrn.11
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 13:42:11 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=Zl2ZR9IfKD6QmHBLh1yxrxbATKQ1+0VYAhbSJFfsTv4=;
- b=P78zfATkhv39xpjDe7j7ss+hn4+YlVhOfUmaOMYVIt3OsTWc26jl5DJ7zfWI0r51rV
- ezMWOijnHTBp6kvs3Nd8gwJiTrpHUXZDBvCN2b50NsBEPr2Sp+UszmmzD+RpFDV7mLVV
- 3VTu6spA4rAcsLscTXkZwLJJ0X+Hs+EmuHrzPAXyAHVr0/jFo7eNeF8h0v1B48XfjoQd
- lIn09a2SQbZWsOtXs56wq5MFZlPJLY7baESIv++1I2G6E+sAdLJICAhp1gMGijKEVaEM
- Ys0EUKEq4rvl7StLESUHekGTvn7puXwQCILkaBT1IVsOIkKl+jsCbOqm5PRUzTeOFpve
- zwfw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=Zl2ZR9IfKD6QmHBLh1yxrxbATKQ1+0VYAhbSJFfsTv4=;
- b=cSoqM3MHnRbJpQAjwLkiTUbjpejPEM6djKRqr4DIEak2V0+NacnjlNHjvlpew1bSY/
- dbwkTLOWHQe6chuFs3Kgi750t7TXvjwL/+0tcphA3wLAkpDyOv3fk2kB/15Gp1kHFnT7
- L6lcKvlBPzk3cpSg/9PTGu3wZscxdO4Ry0KqPsNauVcErS1T8KHFj1S78odMcOQTgAkv
- RXX+W/Z0ZLCWOJa8T4X6fIRLekd24Y8otpDcp3uJsEF/pbC6dk0KzzNKYk8VaP10mws7
- Vz1B/Qoz7r9qr2dfXFKZgfkkjpI1GB2L+6x/oFlpyTz4prdSobV6va7wOMYIcb2etTdx
- Nl5A==
-X-Gm-Message-State: AHQUAuaK8jHEit5qTzT9bVdPnNofiSFGMmuxgAfTnmseZQ4/3lCaJ9Lc
- 1+0NBAzR3X74fJY2jGjPcic=
-X-Google-Smtp-Source: AHgI3IZ32AG3ypZ3AY2XS7HyQtxYmbWr3KoQUM6ijz1nt+9O19LMOrZDPRWmdaou2z2/e+qBvBxbnQ==
-X-Received: by 2002:a05:6000:8b:: with SMTP id
- m11mr7961345wrx.243.1550266929625; 
- Fri, 15 Feb 2019 13:42:09 -0800 (PST)
-Received: from localhost (pD9E51D2D.dip0.t-ipconnect.de. [217.229.29.45])
- by smtp.gmail.com with ESMTPSA id u134sm5420289wmf.21.2019.02.15.13.42.08
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 15 Feb 2019 13:42:08 -0800 (PST)
-Date: Fri, 15 Feb 2019 22:42:07 +0100
-From: Thierry Reding <thierry.reding@gmail.com>
-To: Arnd Bergmann <arnd@arndb.de>
-Subject: Re: [GIT PULL 4/9] soc/tegra: Changes for v5.1-rc1
-Message-ID: <20190215214207.GA12838@ulmo>
-References: <20190208150935.32108-1-thierry.reding@gmail.com>
- <20190208150935.32108-5-thierry.reding@gmail.com>
- <CAK8P3a2tSaHsAOarZ8NHO-N4ZcLQL2rD2ti1rAe4meidWbVNEw@mail.gmail.com>
+ id 1gulI2-0007Pv-2b
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 21:45:00 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gulHp-00075a-4b; Fri, 15 Feb 2019 22:44:45 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gulHo-0002hT-6k; Fri, 15 Feb 2019 22:44:44 +0100
+Date: Fri, 15 Feb 2019 22:44:44 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Zhi Li <lznuaa@gmail.com>
+Subject: Re: [PATCH V4 4/4] MAINTAINERS: Added imx DDR performonitor driver
+ maintainer information
+Message-ID: <20190215214444.n2watl6k5ij6ptfs@pengutronix.de>
+References: <1550253761-26841-1-git-send-email-Frank.Li@nxp.com>
+ <1550253761-26841-4-git-send-email-Frank.Li@nxp.com>
+ <20190215200141.pncrzp3oaoja2mnd@pengutronix.de>
+ <CAHrpEqTexakw-OXjUt3nTdroPxv2YVjT-8VmZTUpDeF6e_dZMw@mail.gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <CAK8P3a2tSaHsAOarZ8NHO-N4ZcLQL2rD2ti1rAe4meidWbVNEw@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+Content-Disposition: inline
+In-Reply-To: <CAHrpEqTexakw-OXjUt3nTdroPxv2YVjT-8VmZTUpDeF6e_dZMw@mail.gmail.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_134211_858615_F66D5B2F 
-X-CRM114-Status: GOOD (  18.71  )
+X-CRM114-CacheID: sfid-20190215_134458_275733_3BCB444B 
+X-CRM114-Status: GOOD (  15.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,111 +79,96 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Timo Alho <talho@nvidia.com>,
- "open list:TEGRA ARCHITECTURE SUPPORT" <linux-tegra@vger.kernel.org>,
- arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Jon Hunter <jonathanh@nvidia.com>
-Content-Type: multipart/mixed; boundary="===============5455359163277778729=="
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ Aisheng Dong <aisheng.dong@nxp.com>, "festevam@gmail.com" <festevam@gmail.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Frank Li <frank.li@nxp.com>, "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============5455359163277778729==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="SLDf9lqlvOQaIe6s"
-Content-Disposition: inline
-
-
---SLDf9lqlvOQaIe6s
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Fri, Feb 15, 2019 at 05:25:39PM +0100, Arnd Bergmann wrote:
-> On Fri, Feb 8, 2019 at 4:09 PM Thierry Reding <thierry.reding@gmail.com> =
-wrote:
->=20
-> > ----------------------------------------------------------------
-> > soc/tegra: Changes for v5.1-rc1
+On Fri, Feb 15, 2019 at 03:13:00PM -0600, Zhi Li wrote:
+> On Fri, Feb 15, 2019 at 2:01 PM Uwe Kleine-K=F6nig
+> <u.kleine-koenig@pengutronix.de> wrote:
 > >
-> > This contains a couple of miscellaneous fixes for minor issues and a
-> > largish rework of the PMC driver to make it work on systems where the
-> > PMC has been locked down and can only be accessed from secure firmware.
->=20
-> Pulled into arm/drivers.
->=20
-> > ----------------------------------------------------------------
-> > Jon Hunter (1):
-> >       soc/tegra: pmc: Make tegra_powergate_is_powered() a local function
+> > On Fri, Feb 15, 2019 at 06:03:16PM +0000, Frank Li wrote:
+> > > Add DDR perf counter driver maintainer information
+> > >
+> > > Signed-off-by: Frank Li <Frank.Li@nxp.com>
+> > > ---
+> > > No change from v1 to v4
+> > >
+> > >  MAINTAINERS | 7 +++++++
+> > >  1 file changed, 7 insertions(+)
+> > >
+> > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > index 6ba068e..687be0f 100644
+> > > --- a/MAINTAINERS
+> > > +++ b/MAINTAINERS
+> > > @@ -6163,6 +6163,13 @@ L:     linux-i2c@vger.kernel.org
+> > >  S:   Maintained
+> > >  F:   drivers/i2c/busses/i2c-cpm.c
+> > >
+> > > +FREESCALE IMX DDR Performance Monitor DRIVER
+> > > +M:   Frank Li <Frank.li@nxp.com>
+> > > +L:   linux-arm-kernel@lists.infradead.org
+> > > +S:   Maintained
+> > > +F:   drivers/perf/fsl_imx8_ddr_perf.c
+> > > +F:   Documentation/devicetree/bindings/perf/fsl-imx-ddr.txt
+> > > +
 > >
-> > Joseph Lo (1):
-> >       soc/tegra: fuse: Fix typo in tegra210_init_speedo_data
+> > With da8b7f0fb02b ("MAINTAINERS: add all files matching "imx" and "mxs"
+> > to the IMX entry") that sits currently in next the "ARM/FREESCALE IMX /
+> > MXC ARM ARCHITECTURE" also matches for these two files.
 > >
-> > Mikko Perttunen (1):
-> >       soc/tegra: pmc: Support systems where PMC is marked secure
-> >
-> > Thierry Reding (6):
-> >       soc/tegra: pmc: Use TEGRA186_ prefix for GPIO names
-> >       soc/tegra: pmc: Sort includes alphabetically
-> >       soc/tegra: pmc: Add missing kerneldoc
-> >       soc/tegra: pmc: Pass struct tegra_pmc * where possible
-> >       soc/tegra: pmc: Make alignment consistent
-> >       soc/tegra: pmc: Explicitly initialize all fields
-> >
-> > Timo Alho (1):
-> >       soc/tegra: fuse: Fix illegal free of IO base address
->=20
-> Should that last one have been marked 'Cc:stable' ?
+> > Is this good here or not?
+> =
 
-My understanding is that this currently only happens if we boot the
-system using a DTB from a downstream build where these FUSE and BPMP
-device tree nodes are sorted differently and therefore cause them to
-be probed in the wrong order.
+> Yes! what's do you means?
+> Needn't these entry because da8b7f0fb02b?
 
-Booting an upstream kernel with a downstream DTB isn't known to work
-very well in general. It's something that I hope we'll be able to do
-in some distant future when the gap between upstream and downstream
-DTBs has become sufficiently small, but I don't think we need to
-bother fixing this in stable releases.
+It's just that we then will have two entries that will match. In a tree
+where I have both, this series and da8b7f0fb02b I see:
 
-Adding Timo to clarify whether he thinks this is important enough to
-backport.
+	$ scripts/get_maintainer.pl -f drivers/perf/fsl_imx8_ddr_perf.c
+	Frank Li <Frank.li@nxp.com> (maintainer:FREESCALE IMX DDR Performance Moni=
+tor DRIVER)
+	Will Deacon <will.deacon@arm.com> (maintainer:ARM PMU PROFILING AND DEBUGG=
+ING)
+	Mark Rutland <mark.rutland@arm.com> (maintainer:ARM PMU PROFILING AND DEBU=
+GGING)
+	Shawn Guo <shawnguo@kernel.org> (maintainer:ARM/FREESCALE IMX / MXC ARM AR=
+CHITECTURE)
+	Sascha Hauer <s.hauer@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC =
+ARM ARCHITECTURE)
+	Pengutronix Kernel Team <kernel@pengutronix.de> (reviewer:ARM/FREESCALE IM=
+X / MXC ARM ARCHITECTURE)
+	Fabio Estevam <fabio.estevam@nxp.com> (reviewer:ARM/FREESCALE IMX / MXC AR=
+M ARCHITECTURE)
+	NXP Linux Team <linux-imx@nxp.com> (reviewer:ARM/FREESCALE IMX / MXC ARM A=
+RCHITECTURE)
+	linux-arm-kernel@lists.infradead.org (open list:FREESCALE IMX DDR Performa=
+nce Monitor DRIVER)
+	linux-kernel@vger.kernel.org (open list)
 
-Thierry
+That's not necessarily a bad thing, but something I want people to make
+aware of.
 
---SLDf9lqlvOQaIe6s
-Content-Type: application/pgp-signature; name="signature.asc"
+Best regards
+Uwe
 
------BEGIN PGP SIGNATURE-----
+-- =
 
-iQIzBAABCAAdFiEEiOrDCAFJzPfAjcif3SOs138+s6EFAlxnMisACgkQ3SOs138+
-s6H4wg/5Aa7RYMzZepcEY2x+X6Vk5FWr1FRVrEavfuX0Fu/MJdfZXlwcfN54sW3s
-oLdZGV9uBTwL/WTyLcpWY4JaYZTYClIl3Li3AlveE2xvU2XN1FX3SHR5/xigrAqF
-q3T/3KcJ4XNx0ds0QcaQH3REybadxzih5pGyJYbTL0NxxCaGb52CQbyiLoEQx8KS
-SkxAL36leNUqTxkADYH57jyCMpRNiQf6b8lz3tyeCyt7UIflG9LEDTa/PuocTxre
-St0BmsnBBUJY+ueIBozfKLl0cINk5zNZ3pER+6WO4xtca5BvLo7H1Gz5L6AQabJc
-Go/QmLQ4W0kxk1DLiqsP/8CJR8Jp8l3qw783jPQgaQNntn27fVYC5zfFG3Un8POd
-665ROyKdsAijeJ9nnylS5j2b92IunNC+PRGHXAbPT7h4ISjkmoarlRJzbkUw4bmA
-vVsj3Mw1VGMA2ERO4mHG2yQtagUBN37Zobd8GUMseHFwghZURdpbFghyV3q9uSlI
-13bZhdiS9xlIrjL5pHZIzMGSI7/DC3pnP77CJiNduGsSdAx9U3ICbEFGfZfVMj/d
-cJByyVdI9wZJLNrOnwPK66tKnTkYaOf8T+wR7GMofv3pegjPWY6QL1fZccR+qxiD
-h86mhtWyjy7+8Vhld9ZE+p5BewrqW5YWXT/CMSv7TZsW/YyHSxs=
-=s6w7
------END PGP SIGNATURE-----
-
---SLDf9lqlvOQaIe6s--
-
-
---===============5455359163277778729==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============5455359163277778729==--
-
