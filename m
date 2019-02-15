@@ -2,78 +2,71 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77144C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A323C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 449CF21927
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDC2621927
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 15:59:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rkUrv01k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 449CF21927
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gq4YxA2A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDC2621927
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1nbh+/VtBe14ixKkcrwOn9/DxJSApPm80vMpOIxOOI8=; b=rkUrv01kIRvNIg
-	Z0Js2onGc2VQRHNqjqVFDTR0zDkEVdHWe0M3fGe8sDPk4x9WcXJz87HYSO7XTv1fTiKM7lqMtHEvM
-	KYBHCaAZp7xfP9Jo96T7cWDixsY1NQBkhSTwumVWkg8al70SptyWnAPPrUoaW4b/kmTdbv1Dxyi5E
-	MiC7PXkYAp7JdKsRuYS7AYULyyZ7oXHQuL+OxqvsxIkJjYxbZuxIm8t45FxErlyFjOc+vnXwXWITc
-	dB5Gn8mtkGMHHeiYqZ+6Vga59aDNmwyN8t5h12F/eecf8uP4myX76hO5G0cvpAqys5Ui7VAsxmYT5
-	v9FEk6hhPNgixl59Enqw==;
+	List-Owner; bh=/Urncxmec7yKW9YCTDmCEzBn02qC4mA+5HuDxbjUnfA=; b=gq4YxA2ATpE5Rr
+	MxbJJcPNTmrrY3HeIUkHMPZ5+R9etVl+YY2VmVBrkq7l4KVjKzb4xsT5kEtXDCLWleFokgXxFtL11
+	V3ueVA1l0QQtCCA9cHPQbZEvticvKOIRdPnNlVL1u/0S9l3MhmZSKtl3f0MZ3QB7ZtSUIWvMdGUyk
+	R4CIXKvtUav4scLkkr0qcWg0/dySegfo03u0PNwNd8RqrsRvjyVkPHaOqiIJRhw9FAyzcMTYSjqxZ
+	fNG5wZ9zDFBQYBeLcEGmFdKe7msdQN+723oGCDbFsWpA9qaj66lg6zKkptXw0gIeANtGjRuXXPT3d
+	m68mx0Oqmn4H7WQL9h6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guftq-0002JC-CS; Fri, 15 Feb 2019 15:59:38 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gufu2-0002ZS-CC; Fri, 15 Feb 2019 15:59:50 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guftA-0001gc-Kg
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:59:00 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1FFuZlU000922; Fri, 15 Feb 2019 16:58:51 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qmy1njc1e-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 15 Feb 2019 16:58:51 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id D454C34;
- Fri, 15 Feb 2019 15:58:50 +0000 (GMT)
-Received: from Webmail-eu.st.com (gpxdag5node5.st.com [10.75.127.78])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 7E84F599E;
- Fri, 15 Feb 2019 15:58:50 +0000 (GMT)
-Received: from localhost (10.75.127.49) by GPXDAG5NODE5.st.com (10.75.127.78)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2;
- Fri, 15 Feb 2019 16:58:49 +0100
-From: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Alexandre Torgue
- <alexandre.torgue@st.com>
-Subject: [PATCH v1 3/3] ARM: dts: stm32: enable Vivante GPU support on
- stm32mp157c-dk1 board
-Date: Fri, 15 Feb 2019 16:58:36 +0100
-Message-ID: <1550246316-9747-4-git-send-email-pierre-yves.mordret@st.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1550246316-9747-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1550246316-9747-1-git-send-email-pierre-yves.mordret@st.com>
+ id 1guftE-0001mU-3v
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 15:59:05 +0000
+Received: by mail-qt1-f196.google.com with SMTP id w4so11437894qtc.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 07:58:59 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=im/pGuB5lr//i1kyXF2WH/3DwdPxP9R41thZBnXp7zc=;
+ b=Ey3wcwHgYMu31eb7Ai72hwVV10y3RysrfC2LGX8VhgY7rhY790nDyiXLAwFR9uAkN+
+ DMRqgEWlbqtMk/Wqb5ZXqL++9w8A1PgdvX4oj4Ieoi9xZ4iBXKfCZsArSwrrOPw9DAJL
+ IjtTPgfkS0pu+qxs2qg0bCzLuzsFyu076u0NnyhCMSknXw9WRUjUwrUUWk89K6/9ty0m
+ o4o5K/rQEXmv9XgrgYFPd5HpA8Yyw/bg2j1Oy+YhGH/be6W31veLkuQyUTuxgBaDGLaz
+ eoXGX/cEAFNZJNhoMjMSQZKX0hqLhbBQnvq3BYBZDyhkJgLZKhLi8cNmlgfCJ13foD9d
+ ZwUg==
+X-Gm-Message-State: AHQUAubXDKxcSY42+tGOhYaTamkXmHXDPOxOxLNKrkwLKbYOYBnwfOLj
+ srkG53XStSvbA3eKipUxdSrcq0Lk7WRJKwYtnLx2vw==
+X-Google-Smtp-Source: AHgI3Ia+V89gPadzUlhhVRvoS6HCXOpwZC9KOgGtsuTZHHMSZDpITCEiqUJxFCE/S6OVF7QX3ZtHu1IIPWh4j35dwe0=
+X-Received: by 2002:a0c:c60f:: with SMTP id v15mr7691534qvi.40.1550246338998; 
+ Fri, 15 Feb 2019 07:58:58 -0800 (PST)
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.49]
-X-ClientProxiedBy: SFHDAG5NODE2.st.com (10.75.127.14) To GPXDAG5NODE5.st.com
- (10.75.127.78)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-15_12:, , signatures=0
+References: <20190202172237.11147-1-f.fainelli@gmail.com>
+In-Reply-To: <20190202172237.11147-1-f.fainelli@gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 16:58:42 +0100
+Message-ID: <CAK8P3a06r0cj=e_jA0NyTPmjxQ-nycPSiacwEeTrrvEVGaY9pw@mail.gmail.com>
+Subject: Re: [GIT PULL 1/4] Broadcom defconfig changes for 5.1
+To: Florian Fainelli <f.fainelli@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_075857_623706_358447E1 
-X-CRM114-Status: UNSURE (   9.78  )
+X-CRM114-CacheID: sfid-20190215_075900_711028_532DFC85 
+X-CRM114-Status: UNSURE (   8.87  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,58 +79,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Philippe Cornu <philippe.cornu@st.com>,
- Pierre-Yves MORDRET <pierre-yves.mordret@st.com>, linux-kernel@vger.kernel.org,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Cc: Stefan Wahren <stefan.wahren@i2se.com>, Kevin Hilman <khilman@kernel.org>,
+ Eric Anholt <eric@anholt.net>, arm-soc <arm@kernel.org>,
+ bcm-kernel-feedback-list <bcm-kernel-feedback-list@broadcom.com>,
+ Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable Vivante GPU driver for stm32mp157c-dk1 and dk2 boards.
+On Sat, Feb 2, 2019 at 6:22 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
+> This pull request contains Broadcom ARM-based SoCs defconfig file
+> updates for 5.1, please pull the following:
+>
+> - Stefan enables the MMAL-based V4L2 camera driver for the Raspberry Pi
+>   devices
+>
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
- arch/arm/boot/dts/stm32mp157a-dk1.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+Pulled into arm/defconfig, thanks!
 
-diff --git a/arch/arm/boot/dts/stm32mp157a-dk1.dts b/arch/arm/boot/dts/stm32mp157a-dk1.dts
-index 873a80e..fb2ee06 100644
---- a/arch/arm/boot/dts/stm32mp157a-dk1.dts
-+++ b/arch/arm/boot/dts/stm32mp157a-dk1.dts
-@@ -27,6 +27,17 @@
- 		reg = <0xc0000000 0x20000000>;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		gpu_reserved: gpu@dc000000 {
-+			reg = <0xdc000000 0x4000000>;
-+			no-map;
-+		};
-+	};
-+
- 	led {
- 		compatible = "gpio-leds";
- 		blue {
-@@ -57,6 +68,11 @@
- 	};
- };
- 
-+&gpu {
-+	contiguous-area = <&gpu_reserved>;
-+	status = "okay";
-+};
-+
- &iwdg2 {
- 	timeout-sec = <32>;
- 	status = "okay";
--- 
-2.7.4
-
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
