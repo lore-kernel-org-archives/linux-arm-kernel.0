@@ -2,124 +2,150 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F549C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BA021C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:38:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D4ED1218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:34:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88941222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:38:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iL8xZl5A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D4ED1218D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lri9rLBf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JBkSjydA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88941222BE
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=NWvYTsiCcd3mtrBMNCTgElv1vxP46ZO1xIC02YE4NZs=; b=iL8xZl5AHjFNHAVBiRy9Xlt5Ss
-	JUSN7wC3Lhq+n5vI33slvO8nBoigFdLzfOJCHVuDotH9+9ypZ8B/V/GdKd6Dpkrd8XoFaMaRy87Cw
-	UK9yTClWiYXUM7VIWJAWSs8zuNSav0XIIUlKyc3oNTv5LSA1dJaazsoEITOF8S8ts67L8v55BCVkP
-	9iVyg+GBT/qgcWtba13dqmfy8D1ZCdY9tYO6qDpAfqa+0MXtvwVPn9+J2BHbx4qfhNUR3ALfk/N8v
-	U14t2Y1ecSSIL2TA/EPzUvr3DFjGkf9dn26JD6umsI+vtyDizKlwEKcnOqsD+wLFk3s6w5elQLgBo
-	aK7nSZAw==;
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=R6RCIitIjeb3CbVqAffv9YseAMMzcG6M13qUbNtB0OQ=; b=lri9rLBfkCHN9U
+	eSj1x8urdz3ataZ54YffRV1mSkdPEjOfuiTkrM2RAkL9y9tU0OeKhKYJXms6UcK2wVglJ3ptJeCDE
+	8a/rp8aNAfw2WvfRkqLNChOpRYGptrTGX2tRjhZLolp8i3ysopzvwPqf/w+BHdvDr3iip2MBZGRbF
+	HfnFOmFLn1k1dSwVqhmIJ+maD31cizP3vpROkx8gcWpICyWS+VP0B6IpRzsgk6rkZl6rnMTkeB/yy
+	u0kJJ6yeS2EkhkMsw/jW+7NW3NCWEsdJ4aIOhvVCbNDhAv0VKhanYedRvBvUptEhunESr7hH65Ung
+	0It1wnOyggI+Yl74JNKg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guhNr-0003o2-9I; Fri, 15 Feb 2019 17:34:43 +0000
-Received: from mga05.intel.com ([192.55.52.43])
+	id 1guhRt-0005e7-Oa; Fri, 15 Feb 2019 17:38:53 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guhNZ-0003QX-Vo
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:34:31 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga001.jf.intel.com ([10.7.209.18])
- by fmsmga105.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 15 Feb 2019 09:34:23 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,373,1544515200"; d="scan'208";a="138950984"
-Received: from ray.jf.intel.com (HELO [10.7.201.17]) ([10.7.201.17])
- by orsmga001.jf.intel.com with ESMTP; 15 Feb 2019 09:34:23 -0800
-Subject: Re: [PATCH v3] hugetlb: allow to free gigantic pages regardless of
- the configuration
-To: Alexandre Ghiti <alex@ghiti.fr>, Vlastimil Babka <vbabka@suse.cz>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
- <will.deacon@arm.com>, Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Paul Mackerras <paulus@samba.org>, Michael Ellerman <mpe@ellerman.id.au>,
- Martin Schwidefsky <schwidefsky@de.ibm.com>,
- Heiko Carstens <heiko.carstens@de.ibm.com>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@redhat.com>,
- Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
- x86@kernel.org, Dave Hansen <dave.hansen@linux.intel.com>,
- Andy Lutomirski <luto@kernel.org>, Peter Zijlstra <peterz@infradead.org>,
- Alexander Viro <viro@zeniv.linux.org.uk>,
- Mike Kravetz <mike.kravetz@oracle.com>,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- linuxppc-dev@lists.ozlabs.org, linux-s390@vger.kernel.org,
- linux-fsdevel@vger.kernel.org, linux-mm@kvack.org
-References: <20190214193100.3529-1-alex@ghiti.fr>
-From: Dave Hansen <dave.hansen@intel.com>
+ id 1guhRp-0005dQ-TG
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:38:51 +0000
+Received: by mail-pf1-x443.google.com with SMTP id q1so5150245pfi.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 15 Feb 2019 09:38:49 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=nSPMthbLOf364VKdPkyku5Ql6hieQnQ685si+JY6hpk=;
+ b=JBkSjydANU8nBCOq4k1cPprg13Rl7KfKfoVDHurHsux/j58wJMs9BmUdAttqLe+8PK
+ 4boOQ5AHAOboTdLKY0KR8YyIQo4muL1DAdrraoUslobN0316fqEAQIQpEa1VJaW3e77a
+ BeNUtq1emEoic0GdvThgtqGZ6fH2TlykhRW3+xldrym2pdT7BdfT642XLb0hM35bGgEw
+ rO5rSk7KhJoICcuyhRoCWoGX7JUEKh6qTQ5yZSPSd0tRMRZsqqdDz0J8iNvJ6gihQ23a
+ jynFhTjtzZO9WOqI7/3cseb8qkIEuSWbaBxB5oRSZXVWvTUG6xjj7+tsGQmyd3FNla5B
+ 1Xmg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=nSPMthbLOf364VKdPkyku5Ql6hieQnQ685si+JY6hpk=;
+ b=TQKk3i49rN5QwIF/MrdHV/yhHJljuSgcAkljUSG33Rp4QOqT7zQiLkdV3jF5C7wZi9
+ bpl2cts3WnDGetumiA7m8x+VMesCGJDMtrhmskHsr2thwqmhDbfDQPd/BRiG94XX+LDF
+ NTwNzXRuTj7wRvRz3Vw6L5Uha7WN1J5uTvCkUQsl8u3knSRvijAAf3iXjrKgp/0ujV4d
+ 9EiEGOcI9h28yh3D9o7WPXGIp24ZUGfsRMWfik1hzM9c4MWpKJf6jLyBLftbtts+m+vA
+ vo8aXmJUtM33QYqFfHLPPCkz1ykjS0QnlhOeFxJJz5RbYoi8Rnu71e39Jhk5FPIZaW/N
+ vk6Q==
+X-Gm-Message-State: AHQUAubH67RQaMx48DcafCJrzwmrNmmGtfY3vep8xzBh/W5HFEE3OTyG
+ EKnqsQabxCAIeBYKj3DCjAY=
+X-Google-Smtp-Source: AHgI3IbxeEx3o2x0EN5Fme8DDjbmSTh4ipK47XnHHLN7r3ozBCRUhpxdb7ZBcm52YETbGf6BDh2/7A==
+X-Received: by 2002:a63:2ccb:: with SMTP id s194mr6413069pgs.214.1550252329094; 
+ Fri, 15 Feb 2019 09:38:49 -0800 (PST)
+Received: from [10.67.48.220] ([192.19.223.250])
+ by smtp.googlemail.com with ESMTPSA id w6sm11307724pga.72.2019.02.15.09.38.45
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 15 Feb 2019 09:38:48 -0800 (PST)
+Subject: Re: [PATCH RESEND net] net: phy: xgmiitorgmii: Support generic PHY
+ status read
+To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ netdev@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
+References: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
+From: Florian Fainelli <f.fainelli@gmail.com>
 Openpgp: preference=signencrypt
-Autocrypt: addr=dave.hansen@intel.com; keydata=
- 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
-Message-ID: <c6d9be5f-3b3a-c95b-0045-9f98ea52a5c4@intel.com>
-Date: Fri, 15 Feb 2019 09:34:24 -0800
+Autocrypt: addr=f.fainelli@gmail.com; prefer-encrypt=mutual; keydata=
+ mQGiBEjPuBIRBACW9MxSJU9fvEOCTnRNqG/13rAGsj+vJqontvoDSNxRgmafP8d3nesnqPyR
+ xGlkaOSDuu09rxuW+69Y2f1TzjFuGpBk4ysWOR85O2Nx8AJ6fYGCoeTbovrNlGT1M9obSFGQ
+ X3IzRnWoqlfudjTO5TKoqkbOgpYqIo5n1QbEjCCwCwCg3DOH/4ug2AUUlcIT9/l3pGvoRJ0E
+ AICDzi3l7pmC5IWn2n1mvP5247urtHFs/uusE827DDj3K8Upn2vYiOFMBhGsxAk6YKV6IP0d
+ ZdWX6fqkJJlu9cSDvWtO1hXeHIfQIE/xcqvlRH783KrihLcsmnBqOiS6rJDO2x1eAgC8meAX
+ SAgsrBhcgGl2Rl5gh/jkeA5ykwbxA/9u1eEuL70Qzt5APJmqVXR+kWvrqdBVPoUNy/tQ8mYc
+ nzJJ63ng3tHhnwHXZOu8hL4nqwlYHRa9eeglXYhBqja4ZvIvCEqSmEukfivk+DlIgVoOAJbh
+ qIWgvr3SIEuR6ayY3f5j0f2ejUMYlYYnKdiHXFlF9uXm1ELrb0YX4GMHz7QnRmxvcmlhbiBG
+ YWluZWxsaSA8Zi5mYWluZWxsaUBnbWFpbC5jb20+iGYEExECACYCGyMGCwkIBwMCBBUCCAME
+ FgIDAQIeAQIXgAUCVF/S8QUJHlwd3wAKCRBhV5kVtWN2DvCVAJ4u4/bPF4P3jxb4qEY8I2gS
+ 6hG0gACffNWlqJ2T4wSSn+3o7CCZNd7SLSC5BA0ESM+4EhAQAL/o09boR9D3Vk1Tt7+gpYr3
+ WQ6hgYVON905q2ndEoA2J0dQxJNRw3snabHDDzQBAcqOvdi7YidfBVdKi0wxHhSuRBfuOppu
+ pdXkb7zxuPQuSveCLqqZWRQ+Cc2QgF7SBqgznbe6Ngout5qXY5Dcagk9LqFNGhJQzUGHAsIs
+ hap1f0B1PoUyUNeEInV98D8Xd/edM3mhO9nRpUXRK9Bvt4iEZUXGuVtZLT52nK6Wv2EZ1TiT
+ OiqZlf1P+vxYLBx9eKmabPdm3yjalhY8yr1S1vL0gSA/C6W1o/TowdieF1rWN/MYHlkpyj9c
+ Rpc281gAO0AP3V1G00YzBEdYyi0gaJbCEQnq8Vz1vDXFxHzyhgGz7umBsVKmYwZgA8DrrB0M
+ oaP35wuGR3RJcaG30AnJpEDkBYHznI2apxdcuTPOHZyEilIRrBGzDwGtAhldzlBoBwE3Z3MY
+ 31TOpACu1ZpNOMysZ6xiE35pWkwc0KYm4hJA5GFfmWSN6DniimW3pmdDIiw4Ifcx8b3mFrRO
+ BbDIW13E51j9RjbO/nAaK9ndZ5LRO1B/8Fwat7bLzmsCiEXOJY7NNpIEpkoNoEUfCcZwmLrU
+ +eOTPzaF6drw6ayewEi5yzPg3TAT6FV3oBsNg3xlwU0gPK3v6gYPX5w9+ovPZ1/qqNfOrbsE
+ FRuiSVsZQ5s3AAMFD/9XjlnnVDh9GX/r/6hjmr4U9tEsM+VQXaVXqZuHKaSmojOLUCP/YVQo
+ 7IiYaNssCS4FCPe4yrL4FJJfJAsbeyDykMN7wAnBcOkbZ9BPJPNCbqU6dowLOiy8AuTYQ48m
+ vIyQ4Ijnb6GTrtxIUDQeOBNuQC/gyyx3nbL/lVlHbxr4tb6YkhkO6shjXhQh7nQb33FjGO4P
+ WU11Nr9i/qoV8QCo12MQEo244RRA6VMud06y/E449rWZFSTwGqb0FS0seTcYNvxt8PB2izX+
+ HZA8SL54j479ubxhfuoTu5nXdtFYFj5Lj5x34LKPx7MpgAmj0H7SDhpFWF2FzcC1bjiW9mjW
+ HaKaX23Awt97AqQZXegbfkJwX2Y53ufq8Np3e1542lh3/mpiGSilCsaTahEGrHK+lIusl6mz
+ Joil+u3k01ofvJMK0ZdzGUZ/aPMZ16LofjFA+MNxWrZFrkYmiGdv+LG45zSlZyIvzSiG2lKy
+ kuVag+IijCIom78P9jRtB1q1Q5lwZp2TLAJlz92DmFwBg1hyFzwDADjZ2nrDxKUiybXIgZp9
+ aU2d++ptEGCVJOfEW4qpWCCLPbOT7XBr+g/4H3qWbs3j/cDDq7LuVYIe+wchy/iXEJaQVeTC
+ y5arMQorqTFWlEOgRA8OP47L9knl9i4xuR0euV6DChDrguup2aJVU4hPBBgRAgAPAhsMBQJU
+ X9LxBQkeXB3fAAoJEGFXmRW1Y3YOj4UAn3nrFLPZekMeqX5aD/aq/dsbXSfyAKC45Go0YyxV
+ HGuUuzv+GKZ6nsysJ7kCDQRXG8fwARAA6q/pqBi5PjHcOAUgk2/2LR5LjjesK50bCaD4JuNc
+ YDhFR7Vs108diBtsho3w8WRd9viOqDrhLJTroVckkk74OY8r+3t1E0Dd4wHWHQZsAeUvOwDM
+ PQMqTUBFuMi6ydzTZpFA2wBR9x6ofl8Ax+zaGBcFrRlQnhsuXLnM1uuvS39+pmzIjasZBP2H
+ UPk5ifigXcpelKmj6iskP3c8QN6x6GjUSmYx+xUfs/GNVSU1XOZn61wgPDbgINJd/THGdqiO
+ iJxCLuTMqlSsmh1+E1dSdfYkCb93R/0ZHvMKWlAx7MnaFgBfsG8FqNtZu3PCLfizyVYYjXbV
+ WO1A23riZKqwrSJAATo5iTS65BuYxrFsFNPrf7TitM8E76BEBZk0OZBvZxMuOs6Z1qI8YKVK
+ UrHVGFq3NbuPWCdRul9SX3VfOunr9Gv0GABnJ0ET+K7nspax0xqq7zgnM71QEaiaH17IFYGS
+ sG34V7Wo3vyQzsk7qLf9Ajno0DhJ+VX43g8+AjxOMNVrGCt9RNXSBVpyv2AMTlWCdJ5KI6V4
+ KEzWM4HJm7QlNKE6RPoBxJVbSQLPd9St3h7mxLcne4l7NK9eNgNnneT7QZL8fL//s9K8Ns1W
+ t60uQNYvbhKDG7+/yLcmJgjF74XkGvxCmTA1rW2bsUriM533nG9gAOUFQjURkwI8jvMAEQEA
+ AYkCaAQYEQIACQUCVxvH8AIbAgIpCRBhV5kVtWN2DsFdIAQZAQIABgUCVxvH8AAKCRCH0Jac
+ RAcHBIkHD/9nmfog7X2ZXMzL9ktT++7x+W/QBrSTCTmq8PK+69+INN1ZDOrY8uz6htfTLV9+
+ e2W6G8/7zIvODuHk7r+yQ585XbplgP0V5Xc8iBHdBgXbqnY5zBrcH+Q/oQ2STalEvaGHqNoD
+ UGyLQ/fiKoLZTPMur57Fy1c9rTuKiSdMgnT0FPfWVDfpR2Ds0gpqWePlRuRGOoCln5GnREA/
+ 2MW2rWf+CO9kbIR+66j8b4RUJqIK3dWn9xbENh/aqxfonGTCZQ2zC4sLd25DQA4w1itPo+f5
+ V/SQxuhnlQkTOCdJ7b/mby/pNRz1lsLkjnXueLILj7gNjwTabZXYtL16z24qkDTI1x3g98R/
+ xunb3/fQwR8FY5/zRvXJq5us/nLvIvOmVwZFkwXc+AF+LSIajqQz9XbXeIP/BDjlBNXRZNdo
+ dVuSU51ENcMcilPr2EUnqEAqeczsCGpnvRCLfVQeSZr2L9N4svNhhfPOEscYhhpHTh0VPyxI
+ pPBNKq+byuYPMyk3nj814NKhImK0O4gTyCK9b+gZAVvQcYAXvSouCnTZeJRrNHJFTgTgu6E0
+ caxTGgc5zzQHeX67eMzrGomG3ZnIxmd1sAbgvJUDaD2GrYlulfwGWwWyTNbWRvMighVdPkSF
+ 6XFgQaosWxkV0OELLy2N485YrTr2Uq64VKyxpncLh50e2RnyAJ9Za0Dx0yyp44iD1OvHtkEI
+ M5kY0ACeNhCZJvZ5g4C2Lc9fcTHu8jxmEkI=
+Message-ID: <387ed483-b205-beda-319d-6f2b8ea55601@gmail.com>
+Date: Fri, 15 Feb 2019 09:38:27 -0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <20190214193100.3529-1-alex@ghiti.fr>
+In-Reply-To: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_093426_259707_07D8FFDB 
-X-CRM114-Status: GOOD (  25.18  )
+X-CRM114-CacheID: sfid-20190215_093849_942834_EEEBFD94 
+X-CRM114-Status: GOOD (  19.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,154 +157,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Andrew Lunn <andrew@lunn.ch>, Michal Simek <michal.simek@xilinx.com>,
+ "David S . Miller" <davem@davemloft.net>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -#if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
-> +#ifdef CONFIG_CONTIG_ALLOC
->  /* The below functions must be run on a range from a single zone. */
->  extern int alloc_contig_range(unsigned long start, unsigned long end,
->  			      unsigned migratetype, gfp_t gfp_mask);
-> -extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
->  #endif
-> +extern void free_contig_range(unsigned long pfn, unsigned int nr_pages);
+On 2/15/19 8:32 AM, Paul Kocialkowski wrote:
+> Some PHY drivers like the generic one do not provide a read_status
+> callback on their own but rely on genphy_read_status being called
+> directly.
+> 
+> With the current code, this results in a NULL function pointer call.
+> Call genphy_read_status instead when there is no specific callback.
+> 
+> Fixes: f411a6160bd4 ("net: phy: Add gmiitorgmii converter support")
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+> Added Fixes tag and net label for resend.
 
-There's a lot of stuff going on in this patch.  Adding/removing config
-options.  Please get rid of these superfluous changes or at least break
-them out.
+You would want to use phy_read_status() which encapsulates that check as
+well as checks that the phy_drv pointer is not NULL.
 
->  #ifdef CONFIG_CMA
->  /* CMA stuff */
-> diff --git a/mm/Kconfig b/mm/Kconfig
-> index 25c71eb8a7db..138a8df9b813 100644
-> --- a/mm/Kconfig
-> +++ b/mm/Kconfig
-> @@ -252,12 +252,17 @@ config MIGRATION
->  	  pages as migration can relocate pages to satisfy a huge page
->  	  allocation instead of reclaiming.
+> 
+>  drivers/net/phy/xilinx_gmii2rgmii.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+> index 74a8782313cf..bd6084e315de 100644
+> --- a/drivers/net/phy/xilinx_gmii2rgmii.c
+> +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+> @@ -44,7 +44,10 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+>  	u16 val = 0;
+>  	int err;
 >  
-> +
->  config ARCH_ENABLE_HUGEPAGE_MIGRATION
->  	bool
-
-Like this. :)
-
->  config ARCH_ENABLE_THP_MIGRATION
->  	bool
+> -	err = priv->phy_drv->read_status(phydev);
+> +	if (priv->phy_drv->read_status)
+> +		err = priv->phy_drv->read_status(phydev);
+> +	else
+> +		err = genphy_read_status(phydev);
+>  	if (err < 0)
+>  		return err;
 >  
-> +config CONTIG_ALLOC
-> +	def_bool y
-> +	depends on (MEMORY_ISOLATION && COMPACTION) || CMA
-> +
->  config PHYS_ADDR_T_64BIT
->  	def_bool 64BIT
+> 
 
-Please think carefully though the Kconfig dependencies.  'select' is
-*not* the same as 'depends on'.
 
-This replaces a bunch of arch-specific "select ARCH_HAS_GIGANTIC_PAGE"
-with a 'depends on'.  I *think* that ends up being OK, but it absolutely
-needs to be addressed in the changelog about why *you* think it is OK
-and why it doesn't change the functionality of any of the patched
-architetures.
-
-> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-> index afef61656c1e..e686c92212e9 100644
-> --- a/mm/hugetlb.c
-> +++ b/mm/hugetlb.c
-> @@ -1035,7 +1035,6 @@ static int hstate_next_node_to_free(struct hstate *h, nodemask_t *nodes_allowed)
->  		((node = hstate_next_node_to_free(hs, mask)) || 1);	\
->  		nr_nodes--)
->  
-> -#ifdef CONFIG_ARCH_HAS_GIGANTIC_PAGE
->  static void destroy_compound_gigantic_page(struct page *page,
->  					unsigned int order)
->  {
-
-Whats the result of this #ifdef removal?  A universally larger kernel
-even for architectures that do not support runtime gigantic page
-alloc/free?  That doesn't seem like a good thing.
-
-> @@ -1058,6 +1057,12 @@ static void free_gigantic_page(struct page *page, unsigned int order)
->  	free_contig_range(page_to_pfn(page), 1 << order);
->  }
->  
-> +static inline bool gigantic_page_runtime_allocation_supported(void)
-> +{
-> +	return IS_ENABLED(CONFIG_CONTIG_ALLOC);
-> +}
-
-Why bother having this function?  Why don't the callers just check the
-config option directly?
-
-> +#ifdef CONFIG_CONTIG_ALLOC
->  static int __alloc_gigantic_page(unsigned long start_pfn,
->  				unsigned long nr_pages, gfp_t gfp_mask)
->  {
-> @@ -1143,22 +1148,15 @@ static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
->  static void prep_new_huge_page(struct hstate *h, struct page *page, int nid);
->  static void prep_compound_gigantic_page(struct page *page, unsigned int order);
->  
-> -#else /* !CONFIG_ARCH_HAS_GIGANTIC_PAGE */
-> -static inline bool gigantic_page_supported(void) { return false; }
-> +#else /* !CONFIG_CONTIG_ALLOC */
->  static struct page *alloc_gigantic_page(struct hstate *h, gfp_t gfp_mask,
->  		int nid, nodemask_t *nodemask) { return NULL; }
-> -static inline void free_gigantic_page(struct page *page, unsigned int order) { }
-> -static inline void destroy_compound_gigantic_page(struct page *page,
-> -						unsigned int order) { }
->  #endif
->  
->  static void update_and_free_page(struct hstate *h, struct page *page)
->  {
->  	int i;
->  
-> -	if (hstate_is_gigantic(h) && !gigantic_page_supported())
-> -		return;
-
-I don't get the point of removing this check.  Logically, this reads as
-checking if the architecture supports gigantic hstates and has nothing
-to do with allocation.
-
->  	h->nr_huge_pages--;
->  	h->nr_huge_pages_node[page_to_nid(page)]--;
->  	for (i = 0; i < pages_per_huge_page(h); i++) {
-> @@ -2276,13 +2274,20 @@ static int adjust_pool_surplus(struct hstate *h, nodemask_t *nodes_allowed,
->  }
->  
->  #define persistent_huge_pages(h) (h->nr_huge_pages - h->surplus_huge_pages)
-> -static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
-> +static int set_max_huge_pages(struct hstate *h, unsigned long count,
->  						nodemask_t *nodes_allowed)
->  {
->  	unsigned long min_count, ret;
->  
-> -	if (hstate_is_gigantic(h) && !gigantic_page_supported())
-> -		return h->max_huge_pages;
-> +	if (hstate_is_gigantic(h) &&
-> +		!gigantic_page_runtime_allocation_supported()) {
-
-The indentation here is wrong and reduces readability.  Needs to be like
-this:
-
-	if (hstate_is_gigantic(h) &&
-	    !gigantic_page_runtime_allocation_supported()) {
-
-> +		spin_lock(&hugetlb_lock);
-> +		if (count > persistent_huge_pages(h)) {
-> +			spin_unlock(&hugetlb_lock);
-> +			return -EINVAL;
-> +		}
-> +		goto decrease_pool;
-> +	}
-
-Needs comments.
-
-	/* Gigantic pages can be freed but not allocated */
-
-or something.
+-- 
+Florian
 
 _______________________________________________
 linux-arm-kernel mailing list
