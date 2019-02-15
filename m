@@ -2,57 +2,63 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FAA6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:32:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 289C3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:34:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2DBE921920
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:32:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E7CBF206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:34:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ozlDGNYC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DBE921920
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ucw.cz
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="it0AiXS2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E7CBF206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=39sw9FgxM7m6f86qtuWVNEJFf1so95A8cWwoGy6GcjM=; b=ozlDGNYC9KlY3LAH5eljI/ZbT
-	qgK6spT9b0b5R8Hr65Q1ikkCL41kM0nvh+PW1eSTIgw9B4k6324XtzInGdklbfO84FZ+kuKy61WNu
-	NLAhof4AY9YqSl4Jv1lihGkvl9SGr/gRH7Ar/qAvoDKdzvqP8r3qZMMjwJ2vzhJGVS+0CzLkpsh9e
-	wYSrIl/ViY9woO/G+33YRMNNhvGd5uDQ1eSHwQMNUtsNLn9oQZ8bH++zrLrbYaYyHnK8LaAtXPWq9
-	Ak6nR6RpZaBEVSE2QFRw2xoAj8qiTic9DXEj6loX2pvunTbyZ9Bm9qTUXfyc8T83iBwgjEBDM8Qle
-	vEp5pjQDg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=JEqNsUIOBnW649mfqWq3/rX+oGMYS18eI0PjS46yND0=; b=it0AiXS2XlDGhJ
+	PCNxatY7O6ZL1k+5GaNDN6K54y+LixWefA0p3MMqMiH0bP68UtaCbQy3mUGiXimRRpLVzj3ywNlVV
+	wAMjnlAr8IBjbvwoVsEYBh8Kq/ZhcBDBRm1Q3My0gNcQNBt+BUqw2XV0Zfv56Ra0ossdQTrM4yA14
+	1jXeR+jJxx3VHxGXptOt+dOJJpNTT/hBl4+8pybCytrqNm6TXrt6A7qfELVDNY7ZYvHchDhbnMeLI
+	rcX6EjTGx+k326I3rsqnSUylkLXYoOn5thMtUtbtv+NTNw3sFisR5DWn02G7dXY19ZEc8ykctbrzz
+	6EVe6Zub5ArXF3glHVOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guiI5-0004tq-ON; Fri, 15 Feb 2019 18:32:49 +0000
-Received: from atrey.karlin.mff.cuni.cz ([195.113.26.193])
+	id 1guiJx-0005DW-4j; Fri, 15 Feb 2019 18:34:45 +0000
+Received: from relay6-d.mail.gandi.net ([217.70.183.198])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guiI2-0004sS-JP
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 18:32:48 +0000
-Received: by atrey.karlin.mff.cuni.cz (Postfix, from userid 512)
- id 0BF9E8043F; Fri, 15 Feb 2019 19:32:33 +0100 (CET)
-Date: Fri, 15 Feb 2019 19:32:40 +0100
-From: Pavel Machek <pavel@ucw.cz>
-To: Maxime Ripard <maxime.ripard@bootlin.com>
-Subject: Re: [PATCH v2 1/8] leds: Add support for AXP20X CHGLED
-Message-ID: <20190215183239.GB3280@amd>
-References: <20190215115013.11098-1-stefan@olimex.com>
- <20190215115013.11098-2-stefan@olimex.com>
- <20190215155732.nmtshldcjk2qyhx4@flea>
+ id 1guiJs-0005CY-U9
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 18:34:42 +0000
+X-Originating-IP: 77.128.107.220
+Received: from aptenodytes (220.107.128.77.rev.sfr.net [77.128.107.220])
+ (Authenticated sender: paul.kocialkowski@bootlin.com)
+ by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id AB420C0006;
+ Fri, 15 Feb 2019 18:34:28 +0000 (UTC)
+Message-ID: <38f6708476e9beca4583ccc2a62e238a4981b735.camel@bootlin.com>
+Subject: Re: [PATCH RESEND net] net: phy: xgmiitorgmii: Support generic PHY
+ status read
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: Florian Fainelli <f.fainelli@gmail.com>, netdev@vger.kernel.org, 
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Date: Fri, 15 Feb 2019 19:34:28 +0100
+In-Reply-To: <387ed483-b205-beda-319d-6f2b8ea55601@gmail.com>
+References: <20190215163220.20041-1-paul.kocialkowski@bootlin.com>
+ <387ed483-b205-beda-319d-6f2b8ea55601@gmail.com>
+Organization: Bootlin
+User-Agent: Evolution 3.30.5 
 MIME-Version: 1.0
-In-Reply-To: <20190215155732.nmtshldcjk2qyhx4@flea>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_103246_793665_93C427E9 
-X-CRM114-Status: GOOD (  20.30  )
+X-CRM114-CacheID: sfid-20190215_103441_120821_96B26037 
+X-CRM114-Status: GOOD (  19.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,118 +70,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Stefan Mavrodiev <stefan@olimex.com>,
- "open list:X-POWERS MULTIFUNCTION PMIC DEVICE DRIVERS"
- <linux-kernel@vger.kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>,
- Jacek Anaszewski <jacek.anaszewski@gmail.com>,
- Lee Jones <lee.jones@linaro.org>,
- "open list:LED SUBSYSTEM" <linux-leds@vger.kernel.org>,
- "moderated list:ARM/Allwinner sunXi SoC support"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: multipart/mixed; boundary="===============1108368515233363802=="
+Cc: Andrew Lunn <andrew@lunn.ch>, Michal Simek <michal.simek@xilinx.com>,
+ "David S . Miller" <davem@davemloft.net>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Heiner Kallweit <hkallweit1@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi,
 
---===============1108368515233363802==
-Content-Type: multipart/signed; micalg=pgp-sha1;
-	protocol="application/pgp-signature"; boundary="ADZbWkCsHQ7r3kzd"
-Content-Disposition: inline
+On Fri, 2019-02-15 at 09:38 -0800, Florian Fainelli wrote:
+> On 2/15/19 8:32 AM, Paul Kocialkowski wrote:
+> > Some PHY drivers like the generic one do not provide a read_status
+> > callback on their own but rely on genphy_read_status being called
+> > directly.
+> > 
+> > With the current code, this results in a NULL function pointer call.
+> > Call genphy_read_status instead when there is no specific callback.
+> > 
+> > Fixes: f411a6160bd4 ("net: phy: Add gmiitorgmii converter support")
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> > Added Fixes tag and net label for resend.
+> 
+> You would want to use phy_read_status() which encapsulates that check as
+> well as checks that the phy_drv pointer is not NULL.
 
+Well, this driver is a bit different and our priv->phy_drv != phydev-
+>drv, so we can't use the helper directly. I should probably have
+mentionned it in the commit message, sorry!
 
---ADZbWkCsHQ7r3kzd
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+As I was mentionning to Andrew in the initial submission of this patch,
+this driver is a bit unusual since it represents a GMII to RGMII
+bridge, so it's not actually a PHY driver on its own -- it just sticks
+itself in between the actual PHY and the MAC.
 
-Hi!
+Cheers and thanks for the review,
 
-> On Fri, Feb 15, 2019 at 01:50:06PM +0200, Stefan Mavrodiev wrote:
+Paul
 
-> > +static ssize_t control_store(struct device *dev, struct device_attribu=
-te *attr,
-> > +			     const char *buf, size_t size)
-> > +{
-> > +	struct led_classdev *cdev =3D dev_get_drvdata(dev);
-> > +	struct axp20x_led *priv =3D to_axp20x_led(cdev);
-> > +	unsigned long val;
-> > +	int ret;
-> > +
-> > +	ret =3D kstrtoul(buf, 0, &val);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	/**
-> > +	 * Supported values are:
-> > +	 *   - 0 : Manual control
-> > +	 *   - 1 : Charger control
-> > +	 */
-=2E..
-> > +static struct attribute *axp20x_led_attrs[] =3D {
-> > +	&dev_attr_control.attr,
-> > +	&dev_attr_mode.attr,
-> > +	NULL,
-> > +};
-> > +ATTRIBUTE_GROUPS(axp20x_led);
->=20
-> I can't really say whether adding sysfs handles for this is the right
-> thing to do, but if it is you should document the interface.
+> >  drivers/net/phy/xilinx_gmii2rgmii.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/net/phy/xilinx_gmii2rgmii.c b/drivers/net/phy/xilinx_gmii2rgmii.c
+> > index 74a8782313cf..bd6084e315de 100644
+> > --- a/drivers/net/phy/xilinx_gmii2rgmii.c
+> > +++ b/drivers/net/phy/xilinx_gmii2rgmii.c
+> > @@ -44,7 +44,10 @@ static int xgmiitorgmii_read_status(struct phy_device *phydev)
+> >  	u16 val = 0;
+> >  	int err;
+> >  
+> > -	err = priv->phy_drv->read_status(phydev);
+> > +	if (priv->phy_drv->read_status)
+> > +		err = priv->phy_drv->read_status(phydev);
+> > +	else
+> > +		err = genphy_read_status(phydev);
+> >  	if (err < 0)
+> >  		return err;
+> >  
+> > 
+> 
+> 
+-- 
+Paul Kocialkowski, Bootlin
+Embedded Linux and kernel engineering
+https://bootlin.com
 
-It is not. See "Add Intel Cherry Trail Whiskey Cove PMIC LEDs" thread
-in the last few days.
-
-> > +	if (!of_property_read_u8(np, "x-powers,charger-mode", &value)) {
-> > +		priv->ctrl =3D AXP20X_CHGLED_CTRL_CHARGER;
-> > +		priv->mode =3D (value < 2) ? value : 0;
-> > +	} else {
-> > +		priv->ctrl =3D AXP20X_CHGLED_CTRL_MANUAL;
-> > +	}
->=20
-> I'm not sure we want to make this a property of the device
-> tree. Changing the device tree isn't an option for some users, so we
-> need to make sure we can change it even if we can't change the device
-> tree.
-
-We want this to be configurable at run time. It can get default from
-the device tree.
-
-If we go for the "hardware" trigger, you'll get it for free.
-
-Best regards,
-								Pavel
---=20
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blo=
-g.html
-
---ADZbWkCsHQ7r3kzd
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: Digital signature
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iEYEARECAAYFAlxnBccACgkQMOfwapXb+vKlTgCgwIfqaui3iA1stvAe0/CTXIh8
-KCIAn1R8vkC9KvroWOwgGcFWmxzzS7wT
-=5x+c
------END PGP SIGNATURE-----
-
---ADZbWkCsHQ7r3kzd--
-
-
---===============1108368515233363802==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============1108368515233363802==--
-
