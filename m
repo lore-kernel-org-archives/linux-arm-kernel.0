@@ -3,112 +3,70 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2302C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:58:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC722C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:20:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E7402192C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 18:58:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CE5E21B18
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 19:20:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gellrRZq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E7402192C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vlpm5w2U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CE5E21B18
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=M4h+K4rySsBg3NhSxvZ25FIwYeI4VQqJOWFar/cX0Y0=; b=gellrRZqL1nHrx
-	+KFXnuLMY7Bjx0Gq1VQEEJeMOPf3JxCSoNw+XZ2DpDw1cFpqCvIvSARUemccRiWl6sN4fY8s2Q8+a
-	znwVcd7NnO3dvYMy9g11jIIadAwJUIBccsXc2neHbsV+Lri2ntfiT09KRnY0E8/BFjqEu6rAayrl8
-	xK87CJsbpcKTUvZYBKZ/9Z2TL21bAGYdjZlnCf2mQr+R1ybpkojX+28dHdA8kQGpBJ2Cz7/+OBD+h
-	OPHEEpyZWk71O4/ojCSW8lc8TSGc2QuxPuy0l1k3hymRZiRQvaauDj7VLcq4a3Jcxh8LhIZP9b2iT
-	/gWRtflY4osWxw2zAS8A==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=AEMxd96BrfqkVglnPJBqjVMWzx1yPJ2N+VjmZNLRaM0=; b=Vlpm5w2U8THg8r
+	Ry4Sn2SElHLtqTlzJnOoivUHfJxA0J8B9+Tg+SKzShyKZVebKMQBAQeO5iO21qpkrJaIo/xuVz7nA
+	ujEuDBj8Lz4FOp2OgNIDhkymNV3cfT0C66lkqy6tzhx1fT1TEUgC8ePJ0uhrmDcrZzdZk0PrjvG1x
+	05ClL9CHQx1i3YAESPTYHD/ogxAfft4muVrScVw09q4KhagRk1NWAOEPdL1T2So7IWvO7sArHg2yR
+	JnLeu8wzRXjQcMyequVdopGRnJ3rkChB6KBhxOk2s9Ndsyti7YZ/z0uPqAZ+BLkwY7MXqUSAKfgBn
+	ifa4bIdVTl0ZsVSX8pOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guihD-0000zA-Vx; Fri, 15 Feb 2019 18:58:47 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
+	id 1guj1y-0000eT-VG; Fri, 15 Feb 2019 19:20:14 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guihA-0000yZ-2T; Fri, 15 Feb 2019 18:58:45 +0000
-Received: from smtp.corp.redhat.com (int-mx06.intmail.prod.int.phx2.redhat.com
- [10.5.11.16])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 891FF3D1E0;
- Fri, 15 Feb 2019 18:58:42 +0000 (UTC)
-Received: from llong.remote.csb (dhcp-17-59.bos.redhat.com [10.18.17.59])
- by smtp.corp.redhat.com (Postfix) with ESMTP id 52DD15C21E;
- Fri, 15 Feb 2019 18:58:35 +0000 (UTC)
-Subject: Re: [PATCH v4 0/3] locking/rwsem: Rwsem rearchitecture part 0
-To: Will Deacon <will.deacon@arm.com>, Peter Zijlstra <peterz@infradead.org>
-References: <1550095217-12047-1-git-send-email-longman@redhat.com>
- <20190214103715.GI32494@hirez.programming.kicks-ass.net>
- <20190215184056.GC15084@fuggles.cambridge.arm.com>
-From: Waiman Long <longman@redhat.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=longman@redhat.com; prefer-encrypt=mutual; keydata=
- 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
- weim8xU=
-Organization: Red Hat
-Message-ID: <a45d8b68-5623-d6fe-8080-072994f7625e@redhat.com>
-Date: Fri, 15 Feb 2019 13:58:34 -0500
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+ id 1guj1v-0000FN-An; Fri, 15 Feb 2019 19:20:12 +0000
+Received: by mail-qt1-f194.google.com with SMTP id p48so12199866qtk.2;
+ Fri, 15 Feb 2019 11:20:08 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=fY5V1ZOnjn5yJlmWyUYeHJkYJ00V+PIatpO6G+Gkb7o=;
+ b=Vvv7skI0XMKXvwwydrtMmK+sYtFfMziZAq/owq3QUBMV4MNkn7kBkUD3e69icZEt+b
+ 3OFFAJUBQ6d0OvoNQmf5l6WJjnIAjRDtlrzVWpNRaw8bLoNDpw2X2IdUmh5/2XnYX4ix
+ KDsc5CbTgFvEETJFuDk1SIfKUH0V5UONnimgGNCnVRr3fxvVpwYxJcGU5EqCgtONXptA
+ mkKexh6KwMUGh/6bH6PqeT2fB1hFKHlbV7q2MrtUjHsh09WDy8Gjuo0t3ra5t69LKqi4
+ u+i3ITx2Q+wTS4G3daDURCn2GHhkOHMx5S/LY3RaXG2qZPcyH1pTx78GS/nOgv8dl1rY
+ W5jQ==
+X-Gm-Message-State: AHQUAub5+Du6ecfKGO40WQ3e2XyXCKi0U6SlLWDhrOj36VBaQ1V8MVIT
+ cOgTi9Q0yeDOmWmYT5dM4RdVYN7GLlQ8pckCi/y3vw==
+X-Google-Smtp-Source: AHgI3IbH7d2ez3RKASnq++9b+6+8Q1VPxJqveanvSz88H9C31dXz8dAnN1vThdW3T0qXRKK6fNawUFmmjLdCNndsYaU=
+X-Received: by 2002:ac8:2c34:: with SMTP id d49mr8943854qta.152.1550258407186; 
+ Fri, 15 Feb 2019 11:20:07 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190215184056.GC15084@fuggles.cambridge.arm.com>
-Content-Language: en-US
-X-Scanned-By: MIMEDefang 2.79 on 10.5.11.16
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.26]); Fri, 15 Feb 2019 18:58:43 +0000 (UTC)
+References: <7484850.KS8GUYnfXV@phil> <23121360.LiWTZRSn6P@phil>
+ <CAK8P3a0Oa4B_r3mAu6udmJPyKBnOwswTwOGsOuX0ruhfexqbxg@mail.gmail.com>
+ <1707879.5psMmg8Cs2@diego>
+In-Reply-To: <1707879.5psMmg8Cs2@diego>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 15 Feb 2019 20:19:50 +0100
+Message-ID: <CAK8P3a3+6RuTEo=C0jkdiBswHrrKCSoxvYi3r60j45Sn6rhL3g@mail.gmail.com>
+Subject: Re: [GIT PULL 2/2] Rockchip arm64 devicetree fixes for 5.0
+To: =?UTF-8?Q?Heiko_St=C3=BCbner?= <heiko@sntech.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_105844_152465_AAAE59C3 
-X-CRM114-Status: GOOD (  18.09  )
+X-CRM114-CacheID: sfid-20190215_112011_373419_88DAB200 
+X-CRM114-Status: GOOD (  11.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,68 +78,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-ia64@vger.kernel.org, linux-sh@vger.kernel.org,
- linux-mips@vger.kernel.org, "H. Peter Anvin" <hpa@zytor.com>,
- sparclinux@vger.kernel.org, linux-riscv@lists.infradead.org,
- linux-arch@vger.kernel.org, linux-s390@vger.kernel.org,
- Davidlohr Bueso <dave@stgolabs.net>, linux-c6x-dev@linux-c6x.org,
- linux-hexagon@vger.kernel.org, x86@kernel.org, Ingo Molnar <mingo@redhat.com>,
- uclinux-h8-devel@lists.sourceforge.jp, linux-xtensa@linux-xtensa.org,
- Arnd Bergmann <arnd@arndb.de>, linux-um@lists.infradead.org,
- linux-m68k@lists.linux-m68k.org, openrisc@lists.librecores.org,
- Borislav Petkov <bp@alien8.de>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org, Tim Chen <tim.c.chen@linux.intel.com>,
- linux-parisc@vger.kernel.org, Linus Torvalds <torvalds@linux-foundation.org>,
- linux-kernel@vger.kernel.org, linux-alpha@vger.kernel.org,
- nios2-dev@lists.rocketboards.org, Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev@lists.ozlabs.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "open list:ARM/Rockchip SoC support" <linux-rockchip@lists.infradead.org>,
+ arm-soc <arm@kernel.org>, Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 02/15/2019 01:40 PM, Will Deacon wrote:
-> On Thu, Feb 14, 2019 at 11:37:15AM +0100, Peter Zijlstra wrote:
->> On Wed, Feb 13, 2019 at 05:00:14PM -0500, Waiman Long wrote:
->>> v4:
->>>  - Remove rwsem-spinlock.c and make all archs use rwsem-xadd.c.
->>>
->>> v3:
->>>  - Optimize __down_read_trylock() for the uncontended case as suggested
->>>    by Linus.
->>>
->>> v2:
->>>  - Add patch 2 to optimize __down_read_trylock() as suggested by PeterZ.
->>>  - Update performance test data in patch 1.
->>>
->>> The goal of this patchset is to remove the architecture specific files
->>> for rwsem-xadd to make it easer to add enhancements in the later rwsem
->>> patches. It also removes the legacy rwsem-spinlock.c file and make all
->>> the architectures use one single implementation of rwsem - rwsem-xadd.c.
->>>
->>> Waiman Long (3):
->>>   locking/rwsem: Remove arch specific rwsem files
->>>   locking/rwsem: Remove rwsem-spinlock.c & use rwsem-xadd.c for all
->>>     archs
->>>   locking/rwsem: Optimize down_read_trylock()
->> Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
->>
->> with the caveat that I'm happy to exchange patch 3 back to my earlier
->> suggestion in case Will expesses concerns wrt the ARM64 performance of
->> Linus' suggestion.
-> Right, the current proposal doesn't work well for us, unfortunately. Which
-> was your earlier suggestion?
->
-> Will
-
-In my posting yesterday, I showed that most of the trylocks done were
-actually uncontended. Assuming that pattern hold for the most of the
-workloads, it will not that bad after all.
-
--Longman
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRnJpLCBGZWIgMTUsIDIwMTkgYXQgNzozOCBQTSBIZWlrbyBTdMO8Ym5lciA8aGVpa29Ac250
+ZWNoLmRlPiB3cm90ZToKPgo+IEFtIEZyZWl0YWcsIDE1LiBGZWJydWFyIDIwMTksIDEzOjQyOjQ4
+IENFVCBzY2hyaWViIEFybmQgQmVyZ21hbm46Cj4gPiBPbiBGcmksIEZlYiAxLCAyMDE5IGF0IDEy
+OjE0IFBNIEhlaWtvIFN0dWVibmVyIDxoZWlrb0BzbnRlY2guZGU+IHdyb3RlOgo+ID4gPiAtLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tCj4gPiA+IEZpeCBmb3IgbmV3IGR0YyBncmFwaCB3YXJuaW5ncyBhbmQgYSByZWd1bGF0b3Ig
+Zml4IGZvciByb2NrNjQuCj4gPiA+Cj4gPiA+IC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KPiA+ID4KPiA+ID4gRG1pdHJ5IFZv
+eXRpayAoMSk6Cj4gPiA+ICAgICAgIGFybTY0OiBkdHM6IHJvY2tjaGlwOiBlbmFibGUgdXNiLWhv
+c3QgcmVndWxhdG9ycyBhdCBib290IG9uCj4gPiA+ICAgICAgIHJrMzMyOC1yb2NrNjQKPiA+Cj4g
+PiBQdWxsZWQgaW50byBhcm0vZml4ZXMsIHRoYW5rcyEKPiA+Cj4gPiBOb3RlOiBzaW5jZSB3ZSBh
+bHdheXMgaGF2ZSBvbmx5IGEgc2luZ2xlIGZpeGVzIGJyYW5jaCwgc2VuZGluZyB0aGUKPiA+IDMy
+LWJpdCBhbmQgNjQtYml0IGZpeGVzIHRvZ2V0aGVyIHdvdWxkIGJlIHNsaWdodGx5IGVhc2llci4K
+Pgo+IE5vIHByb2JsZW0sIEknbGwga2VlcCAzMis2NGJpdCBmaXhlcyB0b2dldGhlciBpbiB0aGUg
+ZnV0dXJlLgo+IEkgZ3Vlc3MgcmVndWxhciBjaGFuZ2VzIGZvciB0aGUgbWVyZ2Utd2luZG93IHNo
+b3VsZCBjb250aW51ZQo+IGJlaW5nIHNlcGFyYXRlZCwgcmlnaHQ/CgpZZXMsIHVubGVzcyB0aGV5
+IGFyZSBsb2dpY2FsbHkgY29ubmVjdGVkLiBZb3UgY2FuIGFsc28gaGF2ZQptb3JlIHRoYW4gdHdv
+IERUIHB1bGwgcmVxdWVzdHMgaWYgdGhhdCBtYWtlcyBhIGJldHRlciBzcGxpdC4KU29tZSBTb0Nz
+IGhhdmUgc2VwYXJhdGUgZHQtYmluZGluZ3MgcHVsbCByZXF1ZXN0cyAoc2hhcmVkCndpdGggZHJp
+dmVycyksIG9yIHNwbGl0IG91dCBzdHVmZiBieSBTb0Mgc3ViZmFtaWx5IGlmIGl0IGdldHMgdG9v
+CmJpZyAocHJvYmFibHkgbm90IG5lY2Vzc2FyeSBmb3Igcm9ja2NoaXBzLCB3aGljaCBzZWVtIG1v
+cmUKdW5pZm9ybSkuCgogICAgICAgQXJuZAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJt
+LWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21h
+aWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
