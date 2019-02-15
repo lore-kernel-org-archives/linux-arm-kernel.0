@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AFD2EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:01:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A9773C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:01:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7C44121A80
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:01:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6A63821A80
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:01:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NhTVRjiF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7C44121A80
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eJ5L7Srf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A63821A80
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,50 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oQWDP1B58lzosattF1msoChgWSQZN/Sku5PfyDGnNcY=; b=NhTVRjiFsIgX4i
-	G14kuoHpEGrztznltrS3TB3E1Yl/pkhvvN+pkpSEaYkQlpyvRHqLRPsgBbHhzWl4P458hvBijc5dH
-	Y6vRtLyIM1S+ECwfAM1KxH3OlDhm9o6ObYBgAAebTFFlAGU72UZ3RCybKT0QvFw9a7YeDmn4QH4zi
-	6ofI3MNMcFaIz/WnL5Zw6ip/W6KWNLBm2xiVQRrQ/y7YTTl2kMzrwH1YGXQZAnYbLz52RSEbLyH7A
-	rQWx1KqNJ/qI8AOR0nUkgCJ51Xxd6YZBqzv92DKWe5gRekXNDtUG4uUVEDn+FrEYe+V7U/FareBUo
-	CUokeJ7hQlG59Dbo9HHQ==;
+	List-Owner; bh=LDBYRpudzlDMMsRqSH7d7YSc1CTrep4U1zFnlwts0Tk=; b=eJ5L7Srf1pymxu
+	j+1BsD1dLxiQw8m+nuyBX0KuB36AMGpVlJFdTDBGjCztmDoEymclKnUQM2RZ8LQGnXEwH1byNqZtc
+	cDu2RdZyb5yqn1ZSlEpOFsqKXTqw/OHDf5xu/DKjoXp8tudZeyXcHVY11qOrDiWzBPPr2x7qGuuQu
+	tpjoFvAXQJXiz4APwavUhPH0vlXBbPFI0EjzU4p9aEax2Z+vV32AfY1KazxLAlgfcDuCxE90RSs6g
+	Qdx82S8H+uPfPUNEfrN+2t4hjLcBYZyiFLu8Bget+I53PctkahfE/7CxdfCdQ391t2VoJ4ch07wDb
+	fB1YQbe3jLtmYnWcfT2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gud7C-000365-JH; Fri, 15 Feb 2019 13:01:14 +0000
-Received: from mail-qt1-f169.google.com ([209.85.160.169])
+	id 1gud7b-0003Vu-IN; Fri, 15 Feb 2019 13:01:39 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gud79-00035k-5S
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:01:12 +0000
-Received: by mail-qt1-f169.google.com with SMTP id p48so10735816qtk.2
+ id 1gud7W-0003L7-6w
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:01:37 +0000
+Received: by mail-qt1-f193.google.com with SMTP id j36so10696934qta.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 05:01:10 -0800 (PST)
+ Fri, 15 Feb 2019 05:01:33 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=iwZSLWG6N0dVyehNTxcLzRHSQMS5U/2CMMnAGmYh0P4=;
- b=Ch0S6LFPPFiFbp/mqSGvLO9t6XqFCIQWNpW54GZOX+4Aw8K8itEBFQFUB/LTJAoN8W
- v0H873H7tV1XFb1jcSjByU5e7I9ahnnQVc/IjaBR66IsApLTnwahPpf/7pEX9nymDv55
- 51xGlDm+8WLHDCciNAY+YjWTNntKJF0Gx3ygE6gmDcDF8c+FMv0aijuJ2IL11E7/Wm9i
- TvZs2ipgq58bIjQyrpE3alTvbgkBjfA1u5LASnSc5dPB+JLCj8hWZPC3dp+WPBA/3MUG
- A2N0ZeUMfGrKRi4bslGPRkU8EhUnNG1NKG2F7ggyV2wFJn7uGpRo8OSYxdZL8TuJE918
- 6Dpg==
-X-Gm-Message-State: AHQUAuaR1j1lgIJke0WBeeiBKHl2mbngRPDPWcGR/hLL/+ZhwMnoewSf
- FJcT269UZ5uUQGgxT+iHvQ5z34hwM8lgqQThVgU=
-X-Google-Smtp-Source: AHgI3IYtEgd1d8p+M7sAbT3co5/WeWcIQ2lZkMpNJrKPJSeYog0JMAWVWUbj27gomQt6ZTYmmTZSgcyyv/e9OIfxXIA=
-X-Received: by 2002:ac8:4141:: with SMTP id e1mr7117691qtm.96.1550235669728;
- Fri, 15 Feb 2019 05:01:09 -0800 (PST)
+ bh=59rGykRaqTTeXVnkdX2/2MVXVd6+dMRocQTpBUXta5k=;
+ b=aFSDsYnJ+4DhaKlt8rji42On9oNWrxHhUWWaAbS9f/EseFi2svpJGPT0m/TH1FAH18
+ 7eUwIC9LYZqB/owTTKlnQsydGSIAWKfDRfZ1Z58EPnUguju1gXiQM/jDHHLiiBgDO+g5
+ KR2l2W9fNyadaAR48y0Zx3knGeD8zJa8acVs383cwlH+h2OTQvxz3mDZghVXSCO0x+E7
+ zIHgrlV+x7oCHSJT0f3vpa8vKJaOjQ+QpdQzxGf9Au0JtlU9yZaaKvFQpOAH11jtRTjN
+ p4LSTHoKJk+mNjsX4zrs2dBq+iwQOzpqK5psmLR+op/WDuSguQFFTgZRBtTf+3lPMWT0
+ CPZg==
+X-Gm-Message-State: AHQUAuZE9yblAaFQSITyrizyzSwrG029cXHTRS8GdCk0fGrZhyKfXdUN
+ IDYD0ECkw49UxT3iCxpf2VfplaYcp59jonveSFuavQ==
+X-Google-Smtp-Source: AHgI3IadOoAmQ16Q5YsyVGgZ4dRMTdO+LFyCdKSERcsAoOgR4RDu7A3B5hJQKMadmqxSij+506CqKcZReghUUdNwjSM=
+X-Received: by 2002:ac8:33f1:: with SMTP id d46mr7268400qtb.319.1550235693081; 
+ Fri, 15 Feb 2019 05:01:33 -0800 (PST)
 MIME-Version: 1.0
 References: <pull-1548951676-587288@atomide.com>
- <pull-1548951676-587288@atomide.com-2>
-In-Reply-To: <pull-1548951676-587288@atomide.com-2>
+ <pull-1548951676-587288@atomide.com-3>
+In-Reply-To: <pull-1548951676-587288@atomide.com-3>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 14:00:52 +0100
-Message-ID: <CAK8P3a3ZvwrypNE4WAkqFXL3FELPJWccMtUGEGLXHhgoQoxCcw@mail.gmail.com>
-Subject: Re: [GIT PULL 2/3] dts changes for ti81xx for v5.1
+Date: Fri, 15 Feb 2019 14:01:16 +0100
+Message-ID: <CAK8P3a1VbccFL6tSwt-HqMw=1V7H73QSgZaJbu0ME6KeyoqzSg@mail.gmail.com>
+Subject: Re: [GIT PULL 3/3] dts changes for omaps for v5.1
 To: Tony Lindgren <tony@atomide.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_050111_208465_4CCE11EF 
-X-CRM114-Status: UNSURE (   9.69  )
+X-CRM114-CacheID: sfid-20190215_050134_248220_1FEED022 
+X-CRM114-Status: UNSURE (   9.49  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -88,16 +88,24 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On Thu, Jan 31, 2019 at 5:24 PM Tony Lindgren <tony@atomide.com> wrote:
-> dts updates for ti81xx for v5.1 merge window
+> dts updates for omap variants for v5.1 merge window
 >
-> Two changes to add support for McGill University's IceBoard telescope
-> ARM + FPGA instrumentation board. This board is used for several
-> telescopes around the world, see the related device tree commit for
-> some interesting links for more information.
+> This series contains board specific dts updates and few minor
+> clean-up changes:
 >
-> Note that these changes are based on the related ti81xx soc changes.
+> - add stdout-path for am335x-chiliboard
+>
+> - add wlcore wakeirq for omap3-evm, pandaboard and omap4-droid4
+>
+> - remove unnecessary address-cells and io-cells for am33xx
+>
+> - replace deprecated linux,wakeup with wakeup-source property
+>
+> - use spdx license for am335x-shc
+>
+> - configure ethernet pins for omap4-sdp
 
-Pulled into arm/dt, thanks
+Pulled into arm/dt, thanks!
 
       Arnd
 
