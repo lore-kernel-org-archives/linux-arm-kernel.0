@@ -2,100 +2,85 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18592C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DB946C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:50:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D90C021B1C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AB604206DD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:50:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rxxt5+Jx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HZx+M/Xf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D90C021B1C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eVf8rt6k";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="JNb4B/fp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AB604206DD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zSdQj8LsvvzBhI2qYTuLXXvd18PoPsQc4DHImCTQDzA=; b=Rxxt5+Jxa0XtfK
-	VUUzTCvL47B6DZkU4vf7u2RMcbb3yg3w0u9CQ9IbeRry7T6f5q0Xus9I7mWL3+UhDY/KAKtyjJUPr
-	FXzrlu8/+97hvOP0FTcrXhU+AXJkFHjPG/YksHOFoqQJ1XSur2EszGv+KVnDmTMkAhasZk3iJVIrR
-	5NgSrKE+sFmvEPX0YysoMuZ+DJRjfe7X9UiLtc/jyHC4dS0PJWlNcGwMRaQEaXTuWxfI1fMZXWNlJ
-	5NvCPbJybkwzedHcHbHBSUYBfaQzBgOvHMxhj2v0CMvvINNBC3h5MP2pjq1xQxRl5VmMQGkdmQF/N
-	luBlcDmmeSNtxHa23tkA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=qwBsw+4SfgEoC1eNBzNxuHQHdDh/mqvmcKrcwMCA60k=; b=eVf
+	8rt6k7rPMhzBwEi/DB47uS9zZ9OXhh15Fnjw4me8Jw4KISIu8mr3zEPVHLHn+ffO/f8ZvLGDkowM7
+	rK4s0MLjmfV1i6b8bmbDSZojYGkR/BLW/fZk1sIXE0WcAZReteDf9dOxC2TM2aATM4Paxsb//59Be
+	MjmSoBgVdflUWkf477GRsrFzhrk1q5ANqFWiCFEehfpsYx3KpQsTy1oID/9+pJe6mxbPga9g8lb1S
+	iiYUhoiAxpChsYUzhOCjKaDwaDUTESk+Q57d9k/kj59PaNqM7NjhYyuWOa7JbgHigoET+TS+ViFyZ
+	zqroCx6tR4cyrL8vLVzoeo4g4vFDfdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guVxL-0000mk-Em; Fri, 15 Feb 2019 05:22:35 +0000
-Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
+	id 1guWO5-0001ec-Vx; Fri, 15 Feb 2019 05:50:13 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guVli-0003gU-6G
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 05:10:38 +0000
-Received: by mail-pf1-x443.google.com with SMTP id v21so1255861pfm.12
+ id 1guWO1-0001bi-Rk
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 05:50:11 +0000
+Received: by mail-pg1-x544.google.com with SMTP id y4so4259717pgc.12
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 21:10:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=t0ArzoJQn0oHXDNAHgLtx/X1H+X8HY2qzxjqcsB9+Oc=;
- b=HZx+M/XfP82BRjqpcJPU2qJdp2nmvOrH6bQcUwqJxgXLXAWBklVfpVW5aSjXvnBUYr
- W9sGtgMCWRT8J6wAjXYk743N6fcde+93pkZh7GlKyaSIDqQ1FlbKC50Q26HaGSQ2XkRC
- /nJDNZFVt76MZZctvjgeDenbI3NuhZtedb2Epea5l0Fa1n6vAns61yPNj6exsGrTo6cK
- rWZy26H0rF4KS659h/moVr/cGpNIqNEn3ivExNOaLHoeR/uuW3uBl1+3CsoEUZwZKVJn
- fWN0cBTBsqJ4vQYtJq3gUk5kX5jyw3GpcA7a1zAzBK3rcFpWx3KjguTQlOYgYoVlnHUC
- pHeg==
+ Thu, 14 Feb 2019 21:50:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=sA+Vvw2lTBR5S/ltw5LqkxhREnc4rL79BcJlCx913Ig=;
+ b=JNb4B/fpHLj62Zeod3pjootybp0V8HQEoT/qq4aowBL+QWEDF4twDiYatyOanqFQNn
+ 2NnB56bN1ltY2kXMdGvM5VRXVfjt3XPnrEThQg8MaNWC1ItF+7jwlDbKDQS4g3nm78Ai
+ m6UmRWfPXtMhaDxpi2RkSyi49V84c2W7VnIDywMKjhbkV9xZjOVcjTyPbemeHfr8v3PJ
+ qIYPFUpyVCQIMxpGVL9eIjoYEX7z6wPVhccbwmZZNjNH5DVW+O0DGJHurHXawOUpGocc
+ 6mHqyFBA69+zcGT/IZLz4ljc4oharL11p1J95+BloeUJeIckhyWb8zrUI1LTBmapiAeE
+ gXzQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=t0ArzoJQn0oHXDNAHgLtx/X1H+X8HY2qzxjqcsB9+Oc=;
- b=I5OSZkrazLYcUlNfNf27ApZmmTSlkaw9zIqXC5Mq+nOlNDlpVlZRPs1D6unRDzGn1d
- Mk8e5qWKoZedUk9TB0pFl7uxF/KG8kkYvydm6vEreN6yhqQQxldf2GU6zPHVume4zE/D
- QuDum11vL3Wtjr98Um339xy4hWZ2q/jrJ/F0NNs3moK69TYuNIfgZthd3EWn5QsQvDFu
- 5leldbZIkp1CtyTonVzgMRQlx3uZOoxLbvibxap++uW6tDYZxvMgWiBjiAxFMJFzvIa4
- wqlOlYjrbm47+LvvWnJOtV0jB+J2Tw9hHiNthpUhER1jbdr5kzsZHEold3Lb9W/bocNu
- a4Og==
-X-Gm-Message-State: AHQUAuZQf5YSA3GAFncoZk3nJCIvNAuLs8YwwDBZ5PiNqYH/GMcQ3Aq4
- WU90c4pwbDIfDkMxskSTXno=
-X-Google-Smtp-Source: AHgI3IZrmdPthtTnu8fR7wKBTEbuCapy3IvXmNTKnoUdJV1tqd0BFYs1DHZVzzS5eZabXWheFcHZ9w==
-X-Received: by 2002:a63:4913:: with SMTP id w19mr3584773pga.394.1550207433708; 
- Thu, 14 Feb 2019 21:10:33 -0800 (PST)
-Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
- [216.71.213.236])
- by smtp.gmail.com with ESMTPSA id m9sm4900442pgr.7.2019.02.14.21.10.32
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=sA+Vvw2lTBR5S/ltw5LqkxhREnc4rL79BcJlCx913Ig=;
+ b=izI4DwA9H/zXg7Pse4Fx6TkZhX96wz4Pula59weae6vTtOO+xoWTdrcbU5i5VkbJ8q
+ hW7ePHyv9genirRef4MIveueqRB++hOAaJuPf3r2GIKmg2YYmNQgAHY/A+7ILMeexBje
+ iPhizbVx5EPTWmmi0RCU77ZDRAS3O6qc58AJ4WuVOUC58BJWUJYG2fzUycmLpwDy1iV7
+ LqtI6Xom+QIc0qHyDI7P6TW3mwde9t8FWZ7wXUMBeIrIXIy4CC+JGiAFMLioICLpLEXk
+ RLteVOpuT75GS0+6STXR981KqOAsnFsFdGM6Mr0f7531VRZFMowSm3CZR01DKZqXshtZ
+ /U0w==
+X-Gm-Message-State: AHQUAubX+7FQ/e5Ikw2BbYrLF2oVVGO12YI4zcKX/v0A+QqLMnheVjBC
+ cXQuZouORsUGbHeuR4Nz1Xx3
+X-Google-Smtp-Source: AHgI3IYnhhtSWSqEIIt7sbopij2F37mKuELKqF4CkPI8oU4iCud9g9++vtwPp4r7sf0/1L9ck9QhQw==
+X-Received: by 2002:a62:2702:: with SMTP id n2mr8266930pfn.29.1550209808703;
+ Thu, 14 Feb 2019 21:50:08 -0800 (PST)
+Received: from localhost.localdomain ([2409:4072:98a:c91:14c4:f458:9909:7fad])
+ by smtp.gmail.com with ESMTPSA id
+ c18sm6160810pfc.63.2019.02.14.21.50.03
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 21:10:33 -0800 (PST)
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Thierry Reding <thierry.reding@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Archit Taneja <architt@codeaurora.org>,
- Andrzej Hajda <a.hajda@samsung.com>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
- dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v3 11/11] arm64: allwinner: a64: enable LCD-related hardware
- for Pinebook
-Date: Thu, 14 Feb 2019 21:09:57 -0800
-Message-Id: <20190215050957.20755-12-anarsoul@gmail.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190215050957.20755-1-anarsoul@gmail.com>
-References: <20190215050957.20755-1-anarsoul@gmail.com>
-MIME-Version: 1.0
+ Thu, 14 Feb 2019 21:50:07 -0800 (PST)
+From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+To: p.zabel@pengutronix.de,
+	xuwei5@hisilicon.com,
+	robh+dt@kernel.org
+Subject: [PATCH v2 0/2] Add Reset controller support for HI3670 SoC
+Date: Fri, 15 Feb 2019 11:19:53 +0530
+Message-Id: <20190215054955.788-1-manivannan.sadhasivam@linaro.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_211034_448607_949E60E8 
-X-CRM114-Status: GOOD (  13.68  )
+X-CRM114-CacheID: sfid-20190214_215009_902443_FE2EBD8E 
+X-CRM114-Status: GOOD (  11.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,147 +92,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: devicetree@vger.kernel.org, guodong.xu@linaro.org,
+ linux-kernel@vger.kernel.org, john.stultz@linaro.org,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Icenowy Zheng <icenowy@aosc.io>
+Hello,
 
-Pinebook has an ANX6345 bridge connected to the RGB666 LCD output and
-eDP panel input. The bridge is controlled via I2C that's connected to
-R_I2C bus.
+This patchset adds Reset controller support for HiSilicon HI3670 SoC.
+HI3670 SoC is architecturally same as HI3660 SoC, hence the same driver
+is reused.
 
-There're pinebooks with 3 different panels in the wild, all 3 with
-different timings. Add all the compatibles to panel node and hope that
-we can get correct timings from EDID. If reading EDID fails it's up to
-firmware to fixup compatible string.
+This patchset has been tested on HiKey970 board.
 
-Enable all this hardware in device tree.
+Thanks,
+Mani
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- .../dts/allwinner/sun50i-a64-pinebook.dts     | 76 +++++++++++++++++++
- 1 file changed, 76 insertions(+)
+Changes in v2:
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index d22736a62481..0d9280bafc12 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -63,6 +63,19 @@
- 		};
- 	};
- 
-+	edp_panel: edp-panel {
-+		compatible = "boe,hb140wx1-501", "innolux,n116bge",
-+			     "neweast,wjfh116008a", "simple-panel";
-+		backlight = <&backlight>;
-+		power-supply = <&reg_dc1sw>;
-+
-+		port {
-+			panel_in_edp: endpoint {
-+				remote-endpoint = <&anx6345_out_panel>;
-+			};
-+		};
-+	};
-+
- 	reg_vcc3v3: vcc3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc3v3";
-@@ -102,6 +115,10 @@
- 	status = "okay";
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	phys = <&usbphy 0>;
- 	phy-names = "usb";
-@@ -112,6 +129,10 @@
- 	status = "okay";
- };
- 
-+&mixer0 {
-+	status = "okay";
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
-@@ -163,6 +184,46 @@
- 	status = "okay";
- };
- 
-+&r_i2c {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&r_i2c_pins_a>;
-+	status = "okay";
-+
-+	anx6345: anx6345@38 {
-+		compatible = "analogix,anx6345";
-+		reg = <0x38>;
-+		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
-+		dvdd25-supply = <&reg_dldo2>;
-+		dvdd12-supply = <&reg_fldo1>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			anx6345_in: port@0 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <0>;
-+				anx6345_in_tcon0: endpoint@0 {
-+					reg = <0>;
-+					remote-endpoint = <&tcon0_out_anx6345>;
-+				};
-+			};
-+
-+			anx6345_out: port@1 {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				reg = <1>;
-+
-+				anx6345_out_panel: endpoint@0 {
-+					reg = <0>;
-+					remote-endpoint = <&panel_in_edp>;
-+				};
-+			};
-+		};
-+	};
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
-@@ -334,6 +395,21 @@
- 			"MIC2", "Internal Microphone Right";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
-+	no-strict-clock-check;
-+
-+	status = "okay";
-+};
-+
-+&tcon0_out {
-+	tcon0_out_anx6345: endpoint@0 {
-+		reg = <0>;
-+		remote-endpoint = <&anx6345_in_tcon0>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+* Used the DT compatible fallback approach instead of adding a new one
+  for HI3670
+
+Manivannan Sadhasivam (2):
+  dt-bindings: reset: Add HI3670 reset controller binding
+  arm64: dts: hisilicon: hi3670: Add reset controller support
+
+ .../devicetree/bindings/reset/hisilicon,hi3660-reset.txt   | 7 ++++---
+ arch/arm64/boot/dts/hisilicon/hi3670.dtsi                  | 6 ++++++
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
 -- 
-2.20.1
+2.17.1
 
 
 _______________________________________________
