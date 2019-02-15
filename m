@@ -2,89 +2,79 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CA7CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:16:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B7D68C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:34:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 086D9222D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:16:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8308B2192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 23:34:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aPfJh5ho";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="IGu5/K7t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 086D9222D0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l7SgmEla";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="gJ8+B91g"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8308B2192D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LW6m2r9z+XyqanX96xjaKtYIMQlUU2OQ4+FnZkDlRJg=; b=aPfJh5hoOu8WNO
-	nAtGK/IanQfWmBT8WehVXNKMvKOet6URr0XcWmIMfk2Zv2oTD/Zn+PDQWJ+fPzIBjU3xakvI312Q0
-	j28ZUXAI1u3zcas27TNiL2/6T6SNs6t5PBn021cGK/KjsINwYCn7ky4uKboPGhuKeDa+0OKXHgds2
-	JbjSFBAx7GYaBf52a1VUdTvPQrw+4OqJMbwn7zV+5+kSsWDnmCVo+fY43RmhdC00W3A4Y7ZAsRVyO
-	YbICDicgx2sQ2cIWHUt705r/2ookQJTm9/+MDBzxPdHbbzKUklsocJ796M8d6Ed+G0L02twG7GzUo
-	UcWgH3nghlkH9bRUKoFA==;
+	List-Owner; bh=X5Au4bw2wMPbmZciS852T83LqvNTF8nzfpF8fZAo3GY=; b=l7SgmElaeF/8Az
+	Qj9zljkVjZTTiAfV2w/OTja4cvQhZO7f4AN/p8nO44tjaNGx18uoP48YXDk9T+hykUSZFIY8M15Rs
+	JvYPXZ1h2jL1hR4fu3RwCUIhLhI0ZPG0Ho5gU64Cq1chzOeeNkpGeqagwd1GOFFeuntl+hu1GFwzC
+	M1ga4os6kGrxGYYLFvPTe896ffMlfqyGhkwiIGjSMNT/fkB1u+ycE3tuqri8Y6edtkr0dakv+laGg
+	dRDZEVXLpUMTFUTEx/yzMRUKuxrpLYsq/5F1DIZSkuu3UkvuZ9oHghPQH6IUSNtWUuSzyYrN0d1bV
+	QuYS4vjqM6PUeIvwd2hQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gumiD-0004kS-GB; Fri, 15 Feb 2019 23:16:05 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gumzx-0000lm-Al; Fri, 15 Feb 2019 23:34:25 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gumi6-0004iw-HR
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 23:16:02 +0000
-Received: by mail-pf1-x441.google.com with SMTP id q17so5524020pfh.10
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 15:15:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=a/xCWpPO4dz3VeuOc/NfK8EyXiCDOjR5lA+mhjZkfV4=;
- b=IGu5/K7tG7NeesRq1DAVK/bnQcwgiQBlaBY0fH3YdE+0oIUiza42BuiYbMqif4fnbI
- GSlCN+UjV1WUhA56a9u2AKY4IIRy+0A/EhVemyCijnOMSY6AV8C1Ou4PBRXMSUfEWJRK
- Tf2gZzKHrhHo1FdQrdpOXWglZxFM3530pfp+uyCFaKRLYwYod+3RNaGlafmJroJNvnH/
- DOpm9tkPCANp47Km3nZX0XRGdEpWVOo+4FH5s/lSqWI9IINnMn8dmExN+vjqyX+G3uWT
- r2mcp0I9WZpYncPS/SUc0ox6t+4rr395nHu2yKy48oU66p1JA9na+4Nrn1AHmcFzCXbZ
- YR3g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=a/xCWpPO4dz3VeuOc/NfK8EyXiCDOjR5lA+mhjZkfV4=;
- b=egnUUFeEBOjUgHE0gylzUz44IkThsV2kcw88khRtyE5YtKWWuOmp7K4PR92b6NIRj1
- xl3RX3xTMdLxqyQsY+d0OVuknIBhVDMBetThaEfGdIwJztuOAQ9TmoYkU/xc5mx0Lo2r
- WulzO9GCDOQGedIpOEYSymrtg/88GKppckKsZZEgjc2nh60/p9LxFrb4qdqgkj3t6A3D
- THUgoXMky5sCP8PCv79Gs6b9Lq4Si9/6EQm4+6RzMhoBfiBBwDOGIDcaZDL5BUUbQx7m
- NR5Amy3v9nTcGKDX2gD8l/Byi91LMmMtcvShlSRqtao+/RPNRlop1UAVUXHZTxENFd1E
- p2gw==
-X-Gm-Message-State: AHQUAuaLyCVSyWFhCujrjRSVlhtZel7tqIMzbYyEPmogh7grj/HT0qYJ
- 9l/l4PunnaUwHXVT5qPgLJULO+Tv4tw=
-X-Google-Smtp-Source: AHgI3IZX1O7yQLtX4uzcrYuO7zkypczEXlHzmOIX5x/DBGa0Bkf1VA8/KOLURGHWNzGp83wlrlepRA==
-X-Received: by 2002:a65:6210:: with SMTP id d16mr7507604pgv.34.1550272557734; 
- Fri, 15 Feb 2019 15:15:57 -0800 (PST)
-Received: from localhost ([2601:602:9200:a1a5:100f:5904:cb2b:8631])
- by smtp.googlemail.com with ESMTPSA id c4sm17086739pfm.151.2019.02.15.15.15.56
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 15 Feb 2019 15:15:56 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Julien Masson <jmasson@baylibre.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Subject: Re: [PATCH v2] tty: serial: meson_uart: Add support for kernel
- debugger
-In-Reply-To: <86k1ibv74r.fsf@baylibre.com>
-References: <86k1ibv74r.fsf@baylibre.com>
-Date: Fri, 15 Feb 2019 15:15:56 -0800
-Message-ID: <7htvh4iqxf.fsf@baylibre.com>
+ id 1gumzv-0000lg-Ah
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 15 Feb 2019 23:34:23 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=nVQLj5CzH3ARZ3awrPXkfkuEJlM5GS3tZKINsGe2czY=; b=gJ8+B91gvkOOjVS0jqcZHqSRm
+ EEjhdJngH8wAM5ZFeL0iVeyEHG5ihfrSwXBIz7Kwl8wmA4niNgGvFsgjEfgbEfXidf6VVnfJuHnRR
+ jTPw1oC6FQHAk3PkbVG6BI3CH+FnGZ/z1VzlCixVBAmMeYyM/8negH1SqDNbaN4JD3SAwYEZpU95U
+ B5kpuwSafu3pC9RJlesJvNNQtakNM9hTeorcEgizT7AWrVEApaxHir3X3n4fyPkV5JKsY6eTdhEGb
+ vu40uMaKQL7HMoHnII7OL+qznN5UNW+UhBh7a6R3/6ojfP92gVmstPkhzvr8Pf1lWrueE76hdE38T
+ +jecRHt3w==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gumzp-0004Ob-0h; Fri, 15 Feb 2019 23:34:17 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 53617201A8972; Sat, 16 Feb 2019 00:34:14 +0100 (CET)
+Date: Sat, 16 Feb 2019 00:34:14 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Linus Torvalds <torvalds@linux-foundation.org>
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+Message-ID: <20190215233414.GS32534@hirez.programming.kicks-ass.net>
+References: <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+ <CAMzpN2hg+CY+AuF=BtetS2HrMQYdxhBZL9QMvJX4LjAs7vwwAw@mail.gmail.com>
+ <20190214193432.GR32477@hirez.programming.kicks-ass.net>
+ <CAHk-=wgj9yUAhTz8n__s-gHnHJw4fznBbLAfne4EO4n6RukgcA@mail.gmail.com>
+ <20190215174034.GP32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_151600_108051_0B12E59A 
-X-CRM114-Status: UNSURE (   9.03  )
-X-CRM114-Notice: Please train this message.
+Content-Disposition: inline
+In-Reply-To: <20190215174034.GP32494@hirez.programming.kicks-ass.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,28 +86,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Masson <jmasson@baylibre.com>, linux-kernel@vger.kernel.org,
- linux-serial@vger.kernel.org, Jiri Slaby <jslaby@suse.com>,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: Denys Vlasenko <dvlasenk@redhat.com>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Julien Thierry <julien.thierry@arm.com>, Brian Gerst <brgerst@gmail.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Andy Lutomirski <luto@amacapital.net>, valentin.schneider@arm.com,
+ Ingo Molnar <mingo@redhat.com>, James Morse <james.morse@arm.com>,
+ Andy Lutomirski <luto@kernel.org>, Catalin Marinas <catalin.marinas@arm.com>,
+ Borislav Petkov <bp@alien8.de>, Thomas Gleixner <tglx@linutronix.de>,
+ Ingo Molnar <mingo@kernel.org>,
+ "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Julien Masson <jmasson@baylibre.com> writes:
+On Fri, Feb 15, 2019 at 06:40:34PM +0100, Peter Zijlstra wrote:
+> On Fri, Feb 15, 2019 at 09:18:00AM -0800, Linus Torvalds wrote:
+> > On Thu, Feb 14, 2019 at 11:34 AM Peter Zijlstra <peterz@infradead.org> wrote:
+> > >
+> > > Something like the below, right?
+> > >
+> > > +       frame->flags = 0;
+> > > +       frame->flags = 0;
+> > 
+> > Those are not valid flag values.
+> > 
+> > Can you popf them? Yes.
+> > 
+> > Do they make sense? No.
+> > 
+> > It has the IF flag clear, for example. Is that intentional? If it is,
+> 
+> Uhmm. yeah, that's bonkers. We should have interrupts disabled here.
+> I'll go read up on the eflags and figure out what they _should_ be right
+> about there.
 
-> The kgdb invokes the poll_put_char and poll_get_char when communicating
-> with the host. This patch implement the serial polling hooks for the
-> meson_uart to be used for KGDB debugging over serial line.
->
-> Signed-off-by: Julien Masson <jmasson@baylibre.com>
+I misread (I'm forever confused about what way around IF goes), but you
+said it right; IF=0 is interrupts disabled and we very much have that in
+the middle of context switch.
 
-Looks good, and very useful thanks!
+(just for giggles I set IF for the initial flags value; and it comes
+unstuck _real_ quick)
 
-I'm adding this to a testing branch which will get included into the
-'integ' branch of my amlogic tree for some broader testing.
+Now, EFLAGS bit 1 is supposedly always 1, but it really doesn't seem to
+matter for POPF.
 
-Kevin
+I went through the other flags, and aside from VIP/VIF (I've no clue),
+they looks like 0 should be just fine.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
