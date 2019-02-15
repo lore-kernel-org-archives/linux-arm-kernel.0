@@ -2,76 +2,65 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D652C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:13:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E1465C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:20:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 596512192D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:13:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A84942192D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 14:20:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ile1r5tP";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="0hQsKfTw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 596512192D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZOWtKJ/2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A84942192D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=hVeYAGkG8YOACi1K8iJbVGlFLOFToSX4+0+4BI7Ia0s=; b=Ile1r5tP2BdIC2waagNDJwUKr
-	jvsa+dgYN4yybiA8VVbeFUS5PSWsLU623QuVInSoA91b5/7QEuoiW+fwZ6cW8pWgxZc/dPZJUIU3c
-	BJWHViCTAjyY/7IbOwNSnOELb/dl8DdgLM+/FcS2kq2kANYA+CvIwYkaVtG+2GGRqUCB2Qbmn1Y81
-	Ra02hlXMfGj/7J9HDUfFUsTc7fr68aO9VUcdQQHuM2HUMqZv+l0SP549uMUCn8clVQn06NeGyy5eF
-	nQiF8YHsPkjVneQMOcAgJg8PbYPr/9ZXXoTkjjjdPgp77V9JuMQf875w6j32JKiAwmVvNK8qiTBzy
-	zzoUe52SQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=pfbzuX5gcR/etfsOPwXyIfA6uZXCZIyPClFzkTL4ym8=; b=ZOWtKJ/2kZAnBE
+	OifRxbvWURuraC0GRlgJYN6bNiMV7381KUnm6fDSdgD8y1yN8ELa0LWrLq+s80zKvtqnRLlWTgn6A
+	UgBMcWgnsROy3V74oEF88Dy+8K0hLOMfE1DxxbjekdofCSFHJdwy7iguddYGF8zMm4Q4n8emje29s
+	y1M82f3cfPIehG4T9IkrHicTiOJdOvD7QPpWkK3onWUhpcVsElWEjkwRlU73ySWfq7j/HLtv0l/LK
+	WIGbV3XP6rdG1F7mTizO/Q07sdvFOPlxcu0DTb8plqGyY4bsZqZMfbjDqANl9lRyCVKskbVsuRpa1
+	2yielLNFkD7jh+luMqZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gueF0-00075P-Vg; Fri, 15 Feb 2019 14:13:22 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gueM1-0001ga-Rk; Fri, 15 Feb 2019 14:20:37 +0000
+Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gueEz-000752-AF
- for linux-arm-kernel@bombadil.infradead.org; Fri, 15 Feb 2019 14:13:21 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=uSkxX4HD9wRNqP9N0Xp0VUwh8qNMlMLIO3mvOB/AlKY=; b=0hQsKfTw5raYMPmfD04uGUmEm
- l5BDSFzicLVbBP8oirlc0IMOVupN5GSQdyOdmfu658N3XwAR0FbdqxAhtKXVPIplSHNpTbcG5a/wF
- MHmfYbTFsn7z/5csBJj5NPKQMU5Mb6yyfjK/B34dxiUqKeOp+Qnpc54e4pS1AS1A2Sm0nPH048ETc
- atNHJTs519YXVAhZ/30c2i7hOqU659ziIn/9zYCTCz4CxOsr0wa22TBJZZ2IBSp9x0jHNezHvUiYB
- irNyWjuczMUyu7X4qszxfWYTdfLqm8AmbqjR4wR7CLfqcz8ofIGRcKyVXJgMcAD4F/A7ix4+e8/fX
- LJkfVag0g==;
-Received: from relay10.mail.gandi.net ([217.70.178.230])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gueEv-00058a-PQ
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:13:19 +0000
-Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay10.mail.gandi.net (Postfix) with ESMTPSA id 21CC724000E;
- Fri, 15 Feb 2019 14:12:44 +0000 (UTC)
-Date: Fri, 15 Feb 2019 15:12:44 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- Sean Paul <seanpaul@chromium.org>
-Subject: Re: [PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
-Message-ID: <20190215141244.5jrrqkykna6enbtp@flea>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
+ id 1gueLy-0001fn-KR
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 14:20:36 +0000
+Received: by newverein.lst.de (Postfix, from userid 2005)
+ id B5A7C68D93; Fri, 15 Feb 2019 15:20:29 +0100 (CET)
+Date: Fri, 15 Feb 2019 15:20:29 +0100
+From: Torsten Duwe <duwe@lst.de>
+To: Harald Geyer <harald@ccbib.org>
+Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
+Message-ID: <20190215142029.GB32618@lst.de>
+References: <20190211153945.e34fpwkuk67l7lc6@flea>
+ <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
+ <20190212083850.7genwc6ipnxtl7eo@flea>
+ <E1gtUZn-0000NW-MA@stardust.g4.wien.funkfeuer.at>
+ <20190212100929.iqsxu443qrkl6myf@flea>
+ <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
+ <20190213094442.da2dy6d5bb527nft@flea>
+ <E1gtsx9-0000RP-08@stardust.g4.wien.funkfeuer.at>
+ <20190213155311.ovkpim3lxwyvuhhj@flea>
+ <E1gu4dx-0000Sy-2B@stardust.g4.wien.funkfeuer.at>
 MIME-Version: 1.0
-In-Reply-To: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
-User-Agent: NeoMutt/20180716
+Content-Disposition: inline
+In-Reply-To: <E1gu4dx-0000Sy-2B@stardust.g4.wien.funkfeuer.at>
+User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_091317_935987_10B2077A 
-X-CRM114-Status: GOOD (  12.43  )
+X-CRM114-CacheID: sfid-20190215_062034_821340_40992DA3 
+X-CRM114-Status: GOOD (  19.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,70 +72,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel@lists.freedesktop.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============8709504760930897282=="
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ info@olimex.com, Maxime Ripard <maxime.ripard@bootlin.com>,
+ Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+This is becoming big; can we please split this thread into 3 separate issues?
+AFAICS there's the original request to have DT audio nodes for Teres-I,
+then a discussion about gpio/pinctrl properties, and one about formal 
+device tree verification.
 
---===============8709504760930897282==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="7z64yynb7vmc57zv"
-Content-Disposition: inline
+Nonetheless I'll add to points 1 and 3 here :)
 
+On Thu, Feb 14, 2019 at 01:12:44AM +0100, Harald Geyer wrote:
+> Hi Maxime!
+> 
+> Maxime Ripard writes:
+> > On Wed, Feb 13, 2019 at 12:43:46PM +0100, Harald Geyer wrote:
+> > > Maxime Ripard writes:
+> > > > On Tue, Feb 12, 2019 at 08:37:36PM +0100, Harald Geyer wrote:
 
---7z64yynb7vmc57zv
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+[ GPIO discussion ]
 
-On Mon, Feb 11, 2019 at 03:41:21PM +0100, Maxime Ripard wrote:
-> Hi,
->=20
-> Here is a series implementing the burst mode support for DSI.
->=20
-> It's been tested on an A33 board with the panel supported on the last
-> patch, which should remove all quirks due to a different SoC from the
-> equation.
+> I believe it should be possible to tell if a DT is valid, just be looking
+> at the binding documentation. Without looking on the linux source code
+> or other side channel information.
+> 
+> As you write below, people are putting DTs into ROM. Which means that
+> IMO the DTs should actually be OS independent, so that people can use
+> different OSes on their equipment. This in turn requires the binding
+> documentation to be comprehensive.
 
-I should have sent that mail yesterday, but patches 1-4 and 6-7 were
-merged. Patch 5 was discarded since it was not consistent with the
-rest of the driver, and 8 had some comments.
+From my view device trees are maintained in the linux kernel source just
+because it's the most active, vivid community, with established procedures
+on how to review and make changes. So yes, DTs should be OS agnostic, and
+ideally comply with a binding spec (sic!). It's simply pragmatic to do this
+on kernel.org.
 
-Maxime
+And yes, some DT formal verification spinning off of this would be a really
+good idea, to take ARM (et al.), Linux, and U-Boot further.
 
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+[...]
 
---7z64yynb7vmc57zv
-Content-Type: application/pgp-signature; name="signature.asc"
+> > > > > But we need a way to control the mux from userspace and aside from
+> > > > > unbinding the ideas proposed thus far are:
+> > > > >
+> > > > > a) control the gpio directly
+> > > > > b) control the gpio via leds-gpio
+> > > > > 
+> > > > > (a) was dismissed because we can't set a default from DT
+> > > > > (b) was dismissed because some rogue app might try to blink it
 
------BEGIN PGP SIGNATURE-----
+Hey, this is a debugging hack. If some rogue app tries to blink it, so be it.
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGbI3AAKCRDj7w1vZxhR
-xZhSAQDOUEbEuRKbbMOWQfb9seF5itixvyxQwgLf3llGIBB6lgEA/2zcSptDLLoj
-M/4BMrxXM8XeRnXVrhCVmqkI7yUMGgg=
-=TlP2
------END PGP SIGNATURE-----
+> I suspect some distributions will pick up the patch I posted anyway, if
+> it doesn't get merged mainline. (This is how I forgot missing backlight
+> support - it just worked for too many people ...) If we ship
+> sun50i-a64-teres-i.dts with the proper nodes (but disabled), their
+> patches will be much easier to maintain as the official DT evolves.
 
---7z64yynb7vmc57zv--
+As I wrote (held by the list admin), I consider the whole console mux
+GPIO an U-Boot hack, and would put it into sun50i-a64-teres-i-u-boot.dtsi.
+(As a LED, see above :-)
 
+Would you care to submit a patch version without that GPIO handled?
+I think it's very useful and has the pontential to be agreed upon.
 
---===============8709504760930897282==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+	Torsten
+
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8709504760930897282==--
-
