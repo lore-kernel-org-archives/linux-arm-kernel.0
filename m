@@ -2,72 +2,64 @@ Return-Path: <SRS0=7SPH=QW=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 921A4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:04:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3A5CAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:10:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5BF62206C2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:04:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE3AC21B18
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 13:10:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OqOIb8+g"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BF62206C2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JVTLK5Uk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE3AC21B18
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=U0dMwT1870XunbnK4XU9cel5sm4z32FJPsEv+ZbPwnI=; b=OqOIb8+gYRhHx6
-	plIo0iIfH9pVc/FhWJqPyjVvfDCyUrDQjiLzXqF2D/s1z+VwP+sZ8++7wjjRCO/eis+T0iEP7GDZe
-	Qimv0+bigh1Z/F2ldcROjRJZikkqsQ9abfpOOLbUSxoOvvhurhFknjnXbaPWi3An5wIJwyq+FToEn
-	16ZYiNF5zt5Mc5lzcZMJbM1SJqy90Ji9ieVlX5i5YIWMFnvSOtmLeXRv7I7GC96hFWzNxuKpKUQRw
-	SY+TEpwI7nmaqaw6ZU1mOPgv5MoS91fN8I7gbtW4QZfj7a4506cW0v6gDu6/cbUubkNLqmaub01sL
-	3Fpw9YmfmhECjMt2CVdw==;
+	List-Owner; bh=ZFHoVhB3YIg/WxcQLFnOmDw5RworTnAsSfZQXG/ijOo=; b=JVTLK5UkY9S0Td
+	9LTinHuGKIq1pWTNh3B8TFuWNH2Tkqn4gKpidl46Guh7mVd4zOyVeuywMq7kD7AZtyCgzeHLwCl5n
+	vJhg1rerY3lYmw/6vFz+26m3pt7p2eoC7EtmfnuQawAxdrSzw9c6QHNlYbsLCzKy/MeEi9pDf5uqp
+	yzJIWPg8jZ2uetH1bKaZkz63PDkgQfMo3esnatj34u6qhNI9q6OuiMBI/e7aXNVdLGVL6h7JyfwKf
+	JrAlkBMwMicEspdNmUSOPpJBAo0FdncBu3y5Ba46o8HfY46fw3gJaAFitEN8uaJJh6g7LBgyRRE8m
+	0ZThnohnYRPNiDQ34iZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gud9n-0004FA-SK; Fri, 15 Feb 2019 13:03:55 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gud9g-0004Er-TK
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:03:54 +0000
-Received: by mail-qk1-f193.google.com with SMTP id h28so1783440qkk.7
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 05:03:48 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=lElDiBMdOy1Uxgz5GkTFkzXq4enoL2Me24zFn0nM/oM=;
- b=Tyzecs+F8hNaN+R39PfEqQ/o+atUIRvYFxEpD2JHqxNgLsrjraoRWBjDfEAWWOEjlY
- siP2Tcz5McLa8W5lDzFRsDSH7P7zdHZLbuQNyTiBhsGFV7CRR651YLqAMPUHwqxC7nnY
- xN3HW0U3GMuEADjyG+m9yPYwrYp2Zs0uWx/6nuLauZ2f3ZT+GY9FsKSD1/q1Y4Yzgpo/
- 5rJK1Xo+2Ef4seja8QH+Qj8NM4ldzVTxwqObDWUb2hw3byJnF5dkhfqhKrxnYgvsOlj2
- kWTWy+NX1RfIX7UUihsecuHQQ1lfRb3ZdvFkmAj4xVs2CgeSQcNWVJ2pqQ0OcCto/dBP
- 0Ctw==
-X-Gm-Message-State: AHQUAuZ/WgBiv+h8u8JY99COeFtsLdImWCIC10eMZoY+DO3AO292ucke
- KmSkEiZh86Lf775c2P1pNvBZX24M3VHcEoVnx50fig==
-X-Google-Smtp-Source: AHgI3IbyT/8zx1lmqW3H8Jor8BGf/NgX8Qdq6GRV76BqW/4/UgX+Zg8f3bBhdeKh1UiYSKmXVJb9CFRmNJ4FJv2SgWc=
-X-Received: by 2002:ae9:d8c2:: with SMTP id u185mr6556210qkf.107.1550235827589; 
- Fri, 15 Feb 2019 05:03:47 -0800 (PST)
+	id 1gudFd-00064Q-FT; Fri, 15 Feb 2019 13:09:57 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gudFZ-00063i-Qd
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 13:09:55 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5EA9EA78;
+ Fri, 15 Feb 2019 05:09:51 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3BE993F575;
+ Fri, 15 Feb 2019 05:09:45 -0800 (PST)
+Date: Fri, 15 Feb 2019 13:09:42 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Khalid Aziz <khalid.aziz@oracle.com>
+Subject: Re: [RFC PATCH v8 08/14] arm64/mm: disable section/contiguous
+ mappings if XPFO is enabled
+Message-ID: <20190215130942.GD53520@lakrids.cambridge.arm.com>
+References: <cover.1550088114.git.khalid.aziz@oracle.com>
+ <0b9624b6c1fe5a31d73a6390e063d551bfebc321.1550088114.git.khalid.aziz@oracle.com>
 MIME-Version: 1.0
-References: <7a019c48-b470-1897-44de-a63642e7717c@ti.com>
-In-Reply-To: <7a019c48-b470-1897-44de-a63642e7717c@ti.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 14:03:31 +0100
-Message-ID: <CAK8P3a2X6TdXw+nnncCxbw6LicDOAz3DmHb7qpx2fGU2rqmH8g@mail.gmail.com>
-Subject: Re: [GIT PULL] arm64: dts: TI AM65x changes for v5.1
-To: Tero Kristo <t-kristo@ti.com>
+Content-Disposition: inline
+In-Reply-To: <0b9624b6c1fe5a31d73a6390e063d551bfebc321.1550088114.git.khalid.aziz@oracle.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_050348_941361_B69BCE10 
-X-CRM114-Status: UNSURE (   7.14  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190215_050953_871889_8B758094 
+X-CRM114-Status: GOOD (  21.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,25 +71,114 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>, "tony@atomide.com" <tony@atomide.com>,
- arm-soc <arm@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Faiz Abbas <faiz_abbas@ti.com>
+Cc: mhocko@suse.com, Tycho Andersen <tycho@docker.com>,
+ kernel-hardening@lists.openwall.com, peterz@infradead.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, dave.hansen@intel.com,
+ deepa.srinivasan@oracle.com, steven.sistare@oracle.com, tglx@linutronix.de,
+ tycho@tycho.ws, ak@linux.intel.com, kirill.shutemov@linux.intel.com,
+ x86@kernel.org, jmorris@namei.org, hch@lst.de, kanth.ghatraju@oracle.com,
+ jsteckli@amazon.de, labbott@redhat.com, pradeep.vincent@oracle.com,
+ konrad.wilk@oracle.com, jcm@redhat.com, liran.alon@oracle.com, luto@kernel.org,
+ boris.ostrovsky@oracle.com, chris.hyser@oracle.com,
+ linux-arm-kernel@lists.infradead.org, jmattson@google.com, linux-mm@kvack.org,
+ juergh@gmail.com, andrew.cooper3@citrix.com, linux-kernel@vger.kernel.org,
+ tyhicks@canonical.com, john.haxby@oracle.com, oao.m.martins@oracle.com,
+ keescook@google.com, akpm@linux-foundation.org, torvalds@linux-foundation.org,
+ dwmw@amazon.co.uk
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 1, 2019 at 11:25 AM Tero Kristo <t-kristo@ti.com> wrote:
-> ----------------------------------------------------------------
-> AM65x DT changes for v5.1. Includes:
->
-> - EMMC support for am654-evm board
->
+Hi,
 
-Pulled into arm/dt, thanks!
+On Wed, Feb 13, 2019 at 05:01:31PM -0700, Khalid Aziz wrote:
+> From: Tycho Andersen <tycho@docker.com>
+> 
+> XPFO doesn't support section/contiguous mappings yet, so let's disable it
+> if XPFO is turned on.
+> 
+> Thanks to Laura Abbot for the simplification from v5, and Mark Rutland for
+> pointing out we need NO_CONT_MAPPINGS too.
+> 
+> CC: linux-arm-kernel@lists.infradead.org
+> Signed-off-by: Tycho Andersen <tycho@docker.com>
+> Reviewed-by: Khalid Aziz <khalid.aziz@oracle.com>
 
-     Arnd
+There should be no point in this series where it's possible to enable a
+broken XPFO. Either this patch should be merged into the rest of the
+arm64 bits, or it should be placed before the rest of the arm64 bits.
+
+That's a pre-requisite for merging, and it significantly reduces the
+burden on reviewers.
+
+In general, a patch series should bisect cleanly. Could you please
+restructure the series to that effect?
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/mm/mmu.c  | 2 +-
+>  include/linux/xpfo.h | 4 ++++
+>  mm/xpfo.c            | 6 ++++++
+>  3 files changed, 11 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index d1d6601b385d..f4dd27073006 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -451,7 +451,7 @@ static void __init map_mem(pgd_t *pgdp)
+>  	struct memblock_region *reg;
+>  	int flags = 0;
+>  
+> -	if (debug_pagealloc_enabled())
+> +	if (debug_pagealloc_enabled() || xpfo_enabled())
+>  		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+>  
+>  	/*
+> diff --git a/include/linux/xpfo.h b/include/linux/xpfo.h
+> index 1ae05756344d..8b029918a958 100644
+> --- a/include/linux/xpfo.h
+> +++ b/include/linux/xpfo.h
+> @@ -47,6 +47,8 @@ void xpfo_temp_map(const void *addr, size_t size, void **mapping,
+>  void xpfo_temp_unmap(const void *addr, size_t size, void **mapping,
+>  		     size_t mapping_len);
+>  
+> +bool xpfo_enabled(void);
+> +
+>  #else /* !CONFIG_XPFO */
+>  
+>  static inline void xpfo_kmap(void *kaddr, struct page *page) { }
+> @@ -69,6 +71,8 @@ static inline void xpfo_temp_unmap(const void *addr, size_t size,
+>  }
+>  
+>  
+> +static inline bool xpfo_enabled(void) { return false; }
+> +
+>  #endif /* CONFIG_XPFO */
+>  
+>  #endif /* _LINUX_XPFO_H */
+> diff --git a/mm/xpfo.c b/mm/xpfo.c
+> index 92ca6d1baf06..150784ae0f08 100644
+> --- a/mm/xpfo.c
+> +++ b/mm/xpfo.c
+> @@ -71,6 +71,12 @@ struct page_ext_operations page_xpfo_ops = {
+>  	.init = init_xpfo,
+>  };
+>  
+> +bool __init xpfo_enabled(void)
+> +{
+> +	return !xpfo_disabled;
+> +}
+> +EXPORT_SYMBOL(xpfo_enabled);
+> +
+>  static inline struct xpfo *lookup_xpfo(struct page *page)
+>  {
+>  	struct page_ext *page_ext = lookup_page_ext(page);
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
