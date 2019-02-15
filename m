@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FC96C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:00:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D277C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 01E4C21924
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:00:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CAD0222BE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 17:02:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LHLImu/w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01E4C21924
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ojfxqZvX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CAD0222BE
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IdYvEkGJiv3/ORs9TC47gK4JvmIAi+O5+P7rjdC/lkI=; b=LHLImu/w1f+LXo
-	qt/QSuIgVN2+YLM46D8sLKVkUzx7wPH0ody6eQEnapQ0K1MWVyWyzJpInOPgsTCsQqiMxgzyFgoKq
-	8X6IaJJnlRiNP9tm6IRwQkY4gAAkiUk9VRYtCnkaId7DLLPpi6HbnF8+SemjbDLReGeIS9QGc4xuA
-	nltvmOLYodj12ZXy23ihGTN6N+QgoCBuUre7mopqHjtZHYO/I5Jls0RfVYlp+jJ4VWNimt48TG28L
-	AxHbcqtHi1pQh8FgmPwSd+2WfASLtQrcer03gb1A7GVFlbGncz742OkomXn4E1gTjYUsrv2GPhiCV
-	GxqTMtqAoP2m1+HJkNlQ==;
+	List-Owner; bh=sqL2xHiKKPhz0xua1BHiFSQwDNTL+eI9PZfJx06mObQ=; b=ojfxqZvXc/x3/o
+	KH0flApJ3m4kCEpROuDdyPDuxogF4n3iOFyWliijG48MtOKTpOnuAKaiFdF4sciEanghZCu7vhAP4
+	ZyBJHVRkkDJGjsi4Uv36Pfl5mInPpp+9/WeGIkWnAkTcXAbiYoHQP/QDFgVRVO96RwRXIGy2/qfrJ
+	1RUOw6B5v1B4cCpH7YeIOTv2vksfSAtqwRfIylomw+G/Ulz63HrWJQ1QCPbsQSuXotvT/uFDcIQEy
+	yr3wz+T8E7SQyO50iEHOYm1GynSlf12j2ku4RPABRoQ0C7quuykF8Ze+gX9U8c2Umlo+Bb4KCIA6c
+	EaudEQ4p2vDh4anZ/rwQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gugqx-0002Cz-Da; Fri, 15 Feb 2019 17:00:43 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
+	id 1gugsB-0002pE-LT; Fri, 15 Feb 2019 17:01:59 +0000
+Received: from mail-qk1-f194.google.com ([209.85.222.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gugqu-0002CN-HN
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:00:41 +0000
-Received: by mail-qk1-f193.google.com with SMTP id o125so6105234qkf.3
+ id 1gugs8-0002oT-Tv
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 17:01:58 +0000
+Received: by mail-qk1-f194.google.com with SMTP id x6so6094537qki.6
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 15 Feb 2019 09:00:40 -0800 (PST)
+ Fri, 15 Feb 2019 09:01:56 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=rKSV/1aGqCX5VkWxOgycdQ/IPOcGG769GPa/YIco05g=;
- b=WoOkvrR3PY9YSeh1O6KQXATZY3mrjhoI7nYbxU9brPdp57KHFG6ahGgOM4gfGGAlfo
- FzJ+zPnx7kcQFG8gmCMISWBiZuHtLEME+FEd1GB4RQ8diEt4u03Y3zF53plm8tGL6O/w
- KVp6tsf3eV8QCqZ+KvO8cScgb43VOj2ObQSsZAu8CEFvo8llSZgVgiS/S6Cm4vZ98VfL
- OxcPQYE+FK39cPkaLZ4zztteGk57zZqdD1t6SrVT+FAEU0NahIotyYF7ajpuNkFbWZs+
- OEpCz0qGD3eTYWmVc0Rs3DOJrOtX+HyflrUg+Iv/8eqk0Ub5Cga34D2naryJI91FEYIU
- 9P6Q==
-X-Gm-Message-State: AHQUAuaZRUBzOpnAoOwzrDunbEOmZkjOpHHzjudV8UVfPeZYDPybrNCn
- IZWKKBFFQsIilKqzLlpFMtVHiKcb1L9uVqG3bP4=
-X-Google-Smtp-Source: AHgI3IakXn6H6Gv1TVp6CxaFPmEVeC+4QZFVxoX41RoBK/bXrL7JsYcuIsBqgEvFVeeXWWdPbh7DzYyU0CjB5lRwf2E=
-X-Received: by 2002:a37:bdc6:: with SMTP id n189mr7578286qkf.330.1550250039542; 
- Fri, 15 Feb 2019 09:00:39 -0800 (PST)
+ bh=d4gAd08wOsXQrZ9OvoS8VQeefIqyEOS+mJjDr7SN3gk=;
+ b=cjCHMGOKaPXA4Pv7QAqwPbqXQU2r0/+a2c9krHU6yEQDflsySKaZl7ZWWs9XAD9RrR
+ gR+eM5ouO/dkm9xGEEU3u/wiwmFGA/3gHD6Fb3+yFTnuUCe53kj1+NZzh0zOhOb4cp/2
+ 6oRkkKRgApJ30Sqqcnay3l2UeF2xYmqf94GXMrzkJeB/J5vlh5VOJ7JtrYz8fD7WF9aY
+ wkvyApUwWao8q4VMlAkmzXwxH7S/tsornXqHWNhMEzqBI7WnadqCsZ/k1o0cktDJ9Z2r
+ kfPc0GaQwGbrhjd2OC26HpAeiKb/uDNLxsNpMmcDy5Ovdp6Az76d9TRaHsDC4LvhQSg9
+ vO0g==
+X-Gm-Message-State: AHQUAuaYYeyLqrLBcls0KupB8Rp+A3NbOU4uBiHRFpUjzhz1sa8hIW6B
+ P8Gz+7U0esAdwALNJOJLYjzeJ0GdpyWiwnlVV6I=
+X-Google-Smtp-Source: AHgI3IYZI+gde6ffO3ZFrKXlq4Ihb0V5LyR1p7rojW/wqOS4MZ0/K+KlIVMHW6LQlXU2wIP6BwVG6DWdWYGfFE9lx5g=
+X-Received: by 2002:a05:620a:12a5:: with SMTP id
+ x5mr7782510qki.291.1550250112070; 
+ Fri, 15 Feb 2019 09:01:52 -0800 (PST)
 MIME-Version: 1.0
-References: <1549254680-1282-1-git-send-email-andy.gross@linaro.org>
- <1549254680-1282-2-git-send-email-andy.gross@linaro.org>
-In-Reply-To: <1549254680-1282-2-git-send-email-andy.gross@linaro.org>
+References: <20190202172237.11147-1-f.fainelli@gmail.com>
+ <20190202172237.11147-4-f.fainelli@gmail.com>
+In-Reply-To: <20190202172237.11147-4-f.fainelli@gmail.com>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Fri, 15 Feb 2019 18:00:23 +0100
-Message-ID: <CAK8P3a0ooqY6Y2m+DFrNMWtP687CyCGg9=0kGZ6T6u1typPY2g@mail.gmail.com>
-Subject: Re: [GIT PULL] Qualcomm Driver updates for 5.1
-To: Andy Gross <andy.gross@linaro.org>
+Date: Fri, 15 Feb 2019 18:01:35 +0100
+Message-ID: <CAK8P3a1P1ZmZWJQcc1_OnSqettXkXhV6W6tOdZ855P9nnRB5sA@mail.gmail.com>
+Subject: Re: [GIT PULL 4/4] Broadcom drivers changes for 5.1
+To: Florian Fainelli <f.fainelli@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_090040_577700_AA077A7E 
-X-CRM114-Status: GOOD (  11.99  )
+X-CRM114-CacheID: sfid-20190215_090156_964035_4CE49385 
+X-CRM114-Status: GOOD (  17.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,44 +81,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, Bjorn Andersson <bjorn.andersson@linaro.org>,
- arm-soc <arm@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
+Cc: Stefan Wahren <stefan.wahren@i2se.com>, Rob Herring <robh@kernel.org>,
+ Scott Branden <scott.branden@broadcom.com>, Kevin Hilman <khilman@kernel.org>,
+ Phil Elwell <phil@raspberrypi.org>, Eric Anholt <eric@anholt.net>,
+ arm-soc <arm@kernel.org>, Wei Yongjun <weiyongjun1@huawei.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
  Olof Johansson <olof@lixom.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+ bcm-kernel-feedback-list <bcm-kernel-feedback-list@broadcom.com>,
+ Guenter Roeck <linux@roeck-us.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 4, 2019 at 5:31 AM Andy Gross <andy.gross@linaro.org> wrote:
+On Sat, Feb 2, 2019 at 6:22 PM Florian Fainelli <f.fainelli@gmail.com> wrote:
 >
 > The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
 >
 >   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
 >
-> are available in the git repository at:
+> are available in the Git repository at:
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-5.1
+>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-5.1/drivers
 >
-> for you to fetch changes up to 4e2256d31f0f24107c36dae35a1d84dff0fced30:
+> for you to fetch changes up to 50de64947f40f869dc5b9306891b750f317135ef:
 >
->   soc: qcom: smd-rpm: Add sdm660 compatible (2019-02-01 16:08:58 -0600)
+>   Merge tag 'tags/bcm2835-drivers-next-2019-02-01' into drivers/next (2019-02-01 11:29:21 -0800)
 >
 > ----------------------------------------------------------------
-> Qualcomm ARM Based Driver Updates for v5.1
+> This pull request contains Broadcom ARM/ARM64/MIPS based SoCs changes
+> for 5.1, please pull the following:
 >
-> * Add Qualcomm RPMh power domain driver and related changes
-> * Fix issues with sleep/wake sets and batch API in RPMh
-> * Update MAINTAINERS Qualcomm entry
-> * Fixup RMTFS-mem sysfs and uevents
-> * Fix error handling in GSBI
-> * Add SMD-RPM compatible entry for SDM660
+> - Stefan updates the BCM2835 SoC driver with downstream properties and
+>   uses that to implement a reboot notifier to tell the VC4 firmware when
+>   Linux on the ARM CPU is rebooting
 >
-
+> - Eric adds a proper power domain driver for the BCM283x SoCs and
+>   updates a bunch of drivers to have a better and clearer Device Tree
+>   definition to support power domains/breaking up of functionality. This
+>   requires converting the existing watchdog driver into a MFD and then
+>   breaking up the functionality into separate drivers and finally
+>   updating the DTS files to leverage the power domains information.
+>
+> - Wei provides a fix for making a symbol static
 
 Pulled into arm/drivers, thanks!
 
-      Arnd
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
