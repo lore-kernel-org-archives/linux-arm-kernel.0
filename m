@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6CB8EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18592C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1DD2621B1C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D90C021B1C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 15 Feb 2019 05:22:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DOyTI1go";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="X9zxOUs7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DD2621B1C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rxxt5+Jx";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HZx+M/Xf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D90C021B1C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,53 +27,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8Ld8llFmimyXl6LDyGPIToWm1+wUaomj6FaAOfLjniI=; b=DOyTI1gouDIhtw
-	uGDdcsHqJiOBTmZvBfOqgJ377u/yKfURTeXHX2/qA5FZ3GDk5GIJtmsufc+psUC28bYoG4hFDm3WX
-	0ieL4AIdjO9zLC2H0O9Aha3c5OFWwILlVp+lq2BJ+VtFLXu2/BRgZnPNP3Jgy7Dsm7nR1azJSZBp9
-	5xok1JcJFvloFaY0MEMzlqpwzMDp4B5oSYBIufHNZCTwINHA7PbdGlk7c82XtgC5XULS3KiUEUVP6
-	KO/hc5EjtD2/wg5vM93KnhOLEI9UhKVolRIO6EJlm8dtpqAqXatFJJmSgRB79iR4Ze+ewLraGAGbx
-	gLmmH27iyqoXSAVbwxvQ==;
+	List-Owner; bh=zSdQj8LsvvzBhI2qYTuLXXvd18PoPsQc4DHImCTQDzA=; b=Rxxt5+Jxa0XtfK
+	VUUzTCvL47B6DZkU4vf7u2RMcbb3yg3w0u9CQ9IbeRry7T6f5q0Xus9I7mWL3+UhDY/KAKtyjJUPr
+	FXzrlu8/+97hvOP0FTcrXhU+AXJkFHjPG/YksHOFoqQJ1XSur2EszGv+KVnDmTMkAhasZk3iJVIrR
+	5NgSrKE+sFmvEPX0YysoMuZ+DJRjfe7X9UiLtc/jyHC4dS0PJWlNcGwMRaQEaXTuWxfI1fMZXWNlJ
+	5NvCPbJybkwzedHcHbHBSUYBfaQzBgOvHMxhj2v0CMvvINNBC3h5MP2pjq1xQxRl5VmMQGkdmQF/N
+	luBlcDmmeSNtxHa23tkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guVxC-0000b8-8j; Fri, 15 Feb 2019 05:22:26 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1guVxL-0000mk-Em; Fri, 15 Feb 2019 05:22:35 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guVld-0003ZK-HU
- for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 05:10:36 +0000
-Received: by mail-pg1-x543.google.com with SMTP id h11so1865869pgl.0
+ id 1guVli-0003gU-6G
+ for linux-arm-kernel@lists.infradead.org; Fri, 15 Feb 2019 05:10:38 +0000
+Received: by mail-pf1-x443.google.com with SMTP id v21so1255861pfm.12
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 14 Feb 2019 21:10:29 -0800 (PST)
+ Thu, 14 Feb 2019 21:10:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=1x7jSjNuOcqa7ELWz+osBF2DU9XbsTzajqJhiKYtai4=;
- b=X9zxOUs73Ork+6lEicbg0/nmY9WaidSQ2Mw07uOa+DjZPI41URBA+jrIAYC+fGzXQW
- fQTMZ8X1Mlj6COlYJiZLeNTvLc62ifeQ9oxLhFDtjinGylI8xMI1HKi9uxRZc7zzrnuh
- 8qDADLG6CgIWqc/ItWC3mKPtsMWyb8JY5xsnXP2o97pqFzRhrBdwkAlLuMpuoBPdOXyr
- WB7hidzlL6p9/e3yqxhGox5Q5q7EScyk5Th1bpN85bGw+cC5e/Qb/g6q3Qoeg4Ursu+Z
- uUHnyvPqYrQHtj7GCTZ+lZM+2XnGKWQ9+nR6WHt/8ayZwkKebjL2djOO+JS1hEOhD9zs
- z3ng==
+ bh=t0ArzoJQn0oHXDNAHgLtx/X1H+X8HY2qzxjqcsB9+Oc=;
+ b=HZx+M/XfP82BRjqpcJPU2qJdp2nmvOrH6bQcUwqJxgXLXAWBklVfpVW5aSjXvnBUYr
+ W9sGtgMCWRT8J6wAjXYk743N6fcde+93pkZh7GlKyaSIDqQ1FlbKC50Q26HaGSQ2XkRC
+ /nJDNZFVt76MZZctvjgeDenbI3NuhZtedb2Epea5l0Fa1n6vAns61yPNj6exsGrTo6cK
+ rWZy26H0rF4KS659h/moVr/cGpNIqNEn3ivExNOaLHoeR/uuW3uBl1+3CsoEUZwZKVJn
+ fWN0cBTBsqJ4vQYtJq3gUk5kX5jyw3GpcA7a1zAzBK3rcFpWx3KjguTQlOYgYoVlnHUC
+ pHeg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=1x7jSjNuOcqa7ELWz+osBF2DU9XbsTzajqJhiKYtai4=;
- b=e3jXJB98rZnBe0LGCFpgqyBulTlq3fMCcpIvH+jBNCKRxfGuy1KS4qn6jJuBGU5a2Y
- rrr+6rPOd4u08d3fVLNq2XqbIDOrsshebebya58JARpZXMoohDpPmhgaYBs4pMDZpDl+
- WYVBuPVmNVcw7Xy9eQ5HP2DHgKOqgm+ot2VWmlFiNyBineTg5V8CStij/A/qxbo0alXf
- qs+VHegls7/Eyey1XAN7PFeNzhGU7E145p9jVoPt1jsifB8xfth91adC2h8V9d1q0S7g
- tHQl+NOwQJAOHVWpcimUXUfSKBltAhJIAT3r+Pxuw8dx19zG3ylvAFVEFYDQOXgayJCd
- QqYQ==
-X-Gm-Message-State: AHQUAuaGyhnm65ZrKjXCe2kfJgy7jOLUJgkhMEspt6OjXV1qDbClqtPc
- pi1R2P5XpMZd5yseVPTY93A=
-X-Google-Smtp-Source: AHgI3IZv1qI2L0UQZeeRuPafi5VstAfM3R54ImAq8UBPipjgBAEuJilRDTMRd6Zv2eJpZstjeZNfhg==
-X-Received: by 2002:a62:be0b:: with SMTP id l11mr8183471pff.52.1550207428676; 
- Thu, 14 Feb 2019 21:10:28 -0800 (PST)
+ bh=t0ArzoJQn0oHXDNAHgLtx/X1H+X8HY2qzxjqcsB9+Oc=;
+ b=I5OSZkrazLYcUlNfNf27ApZmmTSlkaw9zIqXC5Mq+nOlNDlpVlZRPs1D6unRDzGn1d
+ Mk8e5qWKoZedUk9TB0pFl7uxF/KG8kkYvydm6vEreN6yhqQQxldf2GU6zPHVume4zE/D
+ QuDum11vL3Wtjr98Um339xy4hWZ2q/jrJ/F0NNs3moK69TYuNIfgZthd3EWn5QsQvDFu
+ 5leldbZIkp1CtyTonVzgMRQlx3uZOoxLbvibxap++uW6tDYZxvMgWiBjiAxFMJFzvIa4
+ wqlOlYjrbm47+LvvWnJOtV0jB+J2Tw9hHiNthpUhER1jbdr5kzsZHEold3Lb9W/bocNu
+ a4Og==
+X-Gm-Message-State: AHQUAuZQf5YSA3GAFncoZk3nJCIvNAuLs8YwwDBZ5PiNqYH/GMcQ3Aq4
+ WU90c4pwbDIfDkMxskSTXno=
+X-Google-Smtp-Source: AHgI3IZrmdPthtTnu8fR7wKBTEbuCapy3IvXmNTKnoUdJV1tqd0BFYs1DHZVzzS5eZabXWheFcHZ9w==
+X-Received: by 2002:a63:4913:: with SMTP id w19mr3584773pga.394.1550207433708; 
+ Thu, 14 Feb 2019 21:10:33 -0800 (PST)
 Received: from anarsoul-thinkpad.lan (216-71-213-236.dyn.novuscom.net.
  [216.71.213.236])
- by smtp.gmail.com with ESMTPSA id m9sm4900442pgr.7.2019.02.14.21.10.27
+ by smtp.gmail.com with ESMTPSA id m9sm4900442pgr.7.2019.02.14.21.10.32
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 14 Feb 2019 21:10:28 -0800 (PST)
+ Thu, 14 Feb 2019 21:10:33 -0800 (PST)
 From: Vasily Khoruzhick <anarsoul@gmail.com>
 To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
@@ -85,17 +85,17 @@ To: David Airlie <airlied@linux.ie>, Daniel Vetter <daniel@ffwll.ch>,
  Icenowy Zheng <icenowy@aosc.io>, Sean Paul <seanpaul@chromium.org>,
  dri-devel@lists.freedesktop.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v3 06/11] drm/sun4i: rgb: Add DT property to disable strict
- clock rate check
-Date: Thu, 14 Feb 2019 21:09:52 -0800
-Message-Id: <20190215050957.20755-7-anarsoul@gmail.com>
+Subject: [PATCH v3 11/11] arm64: allwinner: a64: enable LCD-related hardware
+ for Pinebook
+Date: Thu, 14 Feb 2019 21:09:57 -0800
+Message-Id: <20190215050957.20755-12-anarsoul@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190215050957.20755-1-anarsoul@gmail.com>
 References: <20190215050957.20755-1-anarsoul@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190214_211030_260953_8DB01B00 
-X-CRM114-Status: GOOD (  14.70  )
+X-CRM114-CacheID: sfid-20190214_211034_448607_949E60E8 
+X-CRM114-Status: GOOD (  13.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,85 +112,140 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
-Validate the clock rate") prevents some panel and bridges from working with
-sun4i driver.
+From: Icenowy Zheng <icenowy@aosc.io>
 
-Unfortunately, dotclock frequency for some modes are not achievable on
-sunxi hardware, and there's a slight deviation in rate returned by
-clk_round_rate(), so they fail this check.
+Pinebook has an ANX6345 bridge connected to the RGB666 LCD output and
+eDP panel input. The bridge is controlled via I2C that's connected to
+R_I2C bus.
 
-Experiments show that panels and bridges work fine with this slight
-deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
-requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
-fine.
+There're pinebooks with 3 different panels in the wild, all 3 with
+different timings. Add all the compatibles to panel node and hope that
+we can get correct timings from EDID. If reading EDID fails it's up to
+firmware to fixup compatible string.
 
-This patch adds DT property to disable strict clock rate check
+Enable all this hardware in device tree.
 
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 2 ++
- drivers/gpu/drm/sun4i/sun4i_rgb.c                            | 5 +++++
- drivers/gpu/drm/sun4i/sun4i_tcon.c                           | 3 +++
- drivers/gpu/drm/sun4i/sun4i_tcon.h                           | 1 +
- 4 files changed, 11 insertions(+)
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 76 +++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index f426bdb42f18..18c8b053a28d 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -63,6 +63,8 @@ Required properties:
-     Documentation/devicetree/bindings/media/video-interfaces.txt. The
-     first port should be the input endpoint. The second should be the
-     output, usually to an HDMI connector.
-+  - no-strict-clock-check: don't reject timings if exact dot clock can't be
-+    reached.
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index d22736a62481..0d9280bafc12 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -63,6 +63,19 @@
+ 		};
+ 	};
  
- DWC HDMI TX Encoder
- -------------------
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index f4a22689eb54..b392d4b1ebd3 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -94,7 +94,12 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
- 
- 	tcon->dclk_min_div = 6;
- 	tcon->dclk_max_div = 127;
++	edp_panel: edp-panel {
++		compatible = "boe,hb140wx1-501", "innolux,n116bge",
++			     "neweast,wjfh116008a", "simple-panel";
++		backlight = <&backlight>;
++		power-supply = <&reg_dc1sw>;
 +
-+	if (tcon->no_strict_clock_check)
-+		return MODE_OK;
++		port {
++			panel_in_edp: endpoint {
++				remote-endpoint = <&anx6345_out_panel>;
++			};
++		};
++	};
 +
- 	rounded_rate = clk_round_rate(tcon->dclk, rate);
+ 	reg_vcc3v3: vcc3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc3v3";
+@@ -102,6 +115,10 @@
+ 	status = "okay";
+ };
+ 
++&de {
++	status = "okay";
++};
 +
- 	if (rounded_rate < rate)
- 		return MODE_CLOCK_LOW;
+ &ehci0 {
+ 	phys = <&usbphy 0>;
+ 	phy-names = "usb";
+@@ -112,6 +129,10 @@
+ 	status = "okay";
+ };
  
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index cf45d0f940f9..f5f7f479332b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -1108,6 +1108,9 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	tcon->id = engine->id;
- 	tcon->quirks = of_device_get_match_data(dev);
- 
-+	tcon->no_strict_clock_check = of_property_read_bool(dev->of_node,
-+						"no-strict-clock-check");
++&mixer0 {
++	status = "okay";
++};
 +
- 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
- 	if (IS_ERR(tcon->lcd_rst)) {
- 		dev_err(dev, "Couldn't get our reset line\n");
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index b5214d71610f..ab510b80004a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -258,6 +258,7 @@ struct sun4i_tcon {
- 	struct reset_control		*lvds_rst;
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -163,6 +184,46 @@
+ 	status = "okay";
+ };
  
- 	struct drm_panel		*panel;
-+	bool				no_strict_clock_check;
++&r_i2c {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_i2c_pins_a>;
++	status = "okay";
++
++	anx6345: anx6345@38 {
++		compatible = "analogix,anx6345";
++		reg = <0x38>;
++		reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
++		dvdd25-supply = <&reg_dldo2>;
++		dvdd12-supply = <&reg_fldo1>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			anx6345_in: port@0 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <0>;
++				anx6345_in_tcon0: endpoint@0 {
++					reg = <0>;
++					remote-endpoint = <&tcon0_out_anx6345>;
++				};
++			};
++
++			anx6345_out: port@1 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				reg = <1>;
++
++				anx6345_out_panel: endpoint@0 {
++					reg = <0>;
++					remote-endpoint = <&panel_in_edp>;
++				};
++			};
++		};
++	};
++};
++
+ &r_rsb {
+ 	status = "okay";
  
- 	/* Platform adjustments */
- 	const struct sun4i_tcon_quirks	*quirks;
+@@ -334,6 +395,21 @@
+ 			"MIC2", "Internal Microphone Right";
+ };
+ 
++&tcon0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&lcd_rgb666_pins>;
++	no-strict-clock-check;
++
++	status = "okay";
++};
++
++&tcon0_out {
++	tcon0_out_anx6345: endpoint@0 {
++		reg = <0>;
++		remote-endpoint = <&anx6345_in_tcon0>;
++	};
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.20.1
 
