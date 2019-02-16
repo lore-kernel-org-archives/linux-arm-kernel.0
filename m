@@ -2,85 +2,85 @@ Return-Path: <SRS0=BOBm=QX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0068C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:47:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E4181C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:49:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC43221B1C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:47:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A9DE321B26
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:49:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xx2lJrOQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ccbib.org header.i=@ccbib.org header.b="CW1pw5Cf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC43221B1C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ccbib.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Js3Amv4A";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="M/g7RmCE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A9DE321B26
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:Content-ID:MIME-Version
-	:References:In-reply-to:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P9RpdC6Ve3GioIJBhVy7wuJEebMUT6dk+sE97o3JKtg=; b=Xx2lJrOQ4CI7QZ
-	6MOSkcwl8jX4Skv+JHX/iP+o6s0XNJZIbyMd2mvQl1iqiImiiIBW6nkpK9RodTRhwywKGln5z0L4K
-	OkN81JaT8sHmz2oxUrY6PTvcBQZKbgd+fc2XT3UaxrqZW9OZgu7mro9qtPmQOMFmJ8nKOFa+5eu7e
-	/JSkA+Igq5nV28gQyX3hu65xNlIOTw1yYbNDh7WGJYWIzHbxoxVNFnyxzbf45GSuuiefun19HNhM/
-	xxcGxm7AsZ3S+LfHUeIDyN0GrJwDRSKxss5dtnwub+pc73XQUjrwU9hHI7vwuQs2/Whh7A4jUTC3O
-	HggKmXGNj8kqvdo2Dj0w==;
+	List-Owner; bh=Uu+mTo1lX0iQvwm7aOsz4wDJk2FLbjpQCPGZw6pnjNY=; b=Js3Amv4AULX2OP
+	uKGiTCH7OoGWBIOy85AGuTgKSvUSJSxPeE2DxqANQYGW6Y0YTkzmmEUn+YlJVCUymWGPv5NRIVXeE
+	EKD/lhZieDS0aRMv8XJHyfWfR1KGEzq+d76teU8NjscrFBsnVSlShsrmk5atp4754Tq0KIXqYSoTb
+	3bEEvwt1lklbEN3Nyk1vQwaQCqJy/aboXNK4OODcqBHgu7ZKLo5UEcfUT29DmrRJNcYr7K4t++y5t
+	IKubN4jqp7vjsPziRIhEC7vTIF3iI7nRPazORhgLrOqjr9WisawJYSP+wU2CbyEJgbE4di81JLdkO
+	L7MeIpjmvSoJwMvg0rpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gv6rv-0007xv-BV; Sat, 16 Feb 2019 20:47:27 +0000
-Received: from mail.cosmopool.net ([2a01:4f8:160:20c1::10:107])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gv6rr-0007xI-ED
- for linux-arm-kernel@lists.infradead.org; Sat, 16 Feb 2019 20:47:25 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail.cosmopool.net (Postfix) with ESMTP id 7BDCA90279A;
- Sat, 16 Feb 2019 21:47:20 +0100 (CET)
-Received: from mail.cosmopool.net ([127.0.0.1])
- by localhost (mail.b.radempa.de [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id EEB-AAMvpIlV; Sat, 16 Feb 2019 21:47:19 +0100 (CET)
-Received: from stardust.g4.wien.funkfeuer.at (213162072206.public.t-mobile.at
- [213.162.72.206])
- by mail.cosmopool.net (Postfix) with ESMTPSA id EB2789004DD;
- Sat, 16 Feb 2019 21:47:17 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=ccbib.org; s=201902;
- t=1550350039; bh=tdcDAXssQeeYxbIohrk0ql0KxzaOzlkt01D+A5OYnMQ=;
- h=From:To:cc:Subject:In-reply-to:References:Date:From;
- b=CW1pw5CfHJ/YSgAoU9bkSCOeG/vcD72rQVgc3Ri8CqDGxBfk9dLUbo88C0HbfYauc
- NWFmq9weSF03hKA2r5ggXK/HnPzFbS87cDlpcvOi3Qca/qlpuQlshoRqrgW1OiBg7F
- uTBPwIfXZ/sbjFDl6En7DA0auiEOJT99HBQ4Mo9M=
-Received: from lambda by stardust.g4.wien.funkfeuer.at with local (Exim 4.89)
- (envelope-from <harald@ccbib.org>)
- id 1gv6rh-0000Km-U8; Sat, 16 Feb 2019 21:47:13 +0100
-From: Harald Geyer <harald@ccbib.org>
-To: Torsten Duwe <duwe@lst.de>
-Subject: Re: [PATCH RFC] arm64: dts: allwinner: a64: teres-i: Enable audio
-In-reply-to: <20190215142029.GB32618@lst.de>
-References: <20190211153945.e34fpwkuk67l7lc6@flea>
- <E1gtHJj-0000iY-G8@stardust.g4.wien.funkfeuer.at>
- <20190212083850.7genwc6ipnxtl7eo@flea>
- <E1gtUZn-0000NW-MA@stardust.g4.wien.funkfeuer.at>
- <20190212100929.iqsxu443qrkl6myf@flea>
- <E1gtds8-0000NB-Re@stardust.g4.wien.funkfeuer.at>
- <20190213094442.da2dy6d5bb527nft@flea>
- <E1gtsx9-0000RP-08@stardust.g4.wien.funkfeuer.at>
- <20190213155311.ovkpim3lxwyvuhhj@flea>
- <E1gu4dx-0000Sy-2B@stardust.g4.wien.funkfeuer.at>
- <20190215142029.GB32618@lst.de>
-Comments: In-reply-to Torsten Duwe <duwe@lst.de>
- message dated "Fri, 15 Feb 2019 15:20:29 +0100."
+	id 1gv6tZ-0008ES-Hn; Sat, 16 Feb 2019 20:49:09 +0000
+Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gv6tX-0008E3-1B
+ for linux-arm-kernel@lists.infradead.org; Sat, 16 Feb 2019 20:49:08 +0000
+Received: by mail-ot1-x342.google.com with SMTP id n71so22269002ota.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 16 Feb 2019 12:49:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=YMmQ03+dXddxGDg9ETm4Op8AJX8eyXOLPBQLceLux0w=;
+ b=M/g7RmCEcfBZgMHi82WvNoz90q6lqPPd5cOrFjH5tS6iagfjLaraQ9DO3h+KHWv3X5
+ r7Z6Zh1u9NEtuGED7y92m+17UycEeZlcA5M2CfTPu0Z7Sah1dRPXDnDqZFTJ/e5+BCfi
+ 9yjpELGcqSRqWsYsgj+1DrfOP272tGlOP67SiFjZz0ZHClyavEp8fEPfwrI9auu+k7a0
+ EtD9kWfaWbogNilBoLPs28fruXQqOCa7RSTxHraCDoDKKQAEIeZU7oCmgVCjUJvzFbIK
+ MzG85WImq3TkImGkXvYq+yH37jEyoioeyb3AAWk6SFJOtqXmTPcSOfLs5dynVmVcehfe
+ 0ALw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=YMmQ03+dXddxGDg9ETm4Op8AJX8eyXOLPBQLceLux0w=;
+ b=tTuyU3SDv8B7860drGSGr62SaOgomXVEeRL4Rv1JstrmxefgblcZHaMWKB7LqHKS+4
+ uRjBdwReQesq5GokqNgXw8rEo2wD8Lm7ACx0Fn3NrveGblKUGJWj1jhAOTUS/6hm01/3
+ IR6Vnrouv8WOJy9Qkj8VdBGR3Y8/Ylj2wIT/lqNWRuyGbBIBYJvNW7vRMrZvfKQ4fFPO
+ VlFbFrxCWl2EaArk1BCOMf3NxZ/6+Odrl+pBe8A/xajWisNb6EBbdTIZ1RgtsPdebbpx
+ GwVwoWCgOiEDnTh0UrmkOZTlwxgNzTwBmbwVNxaIrVXO6LZSN6uSir7EyPHKnkxERnRC
+ LbxQ==
+X-Gm-Message-State: AHQUAuYmOcDawDezjCfkaXxOcGpvD4YgR85dVPSrj9+bbLkYvkqZSLCv
+ vUfhQTV/+qwG2PNId2Vm2o1rsLJ//cJpj4cYg34=
+X-Google-Smtp-Source: AHgI3IYgzEsuQzvH6dc2DoraxDM8oGBy7z42HMhXISwot50qzJopFtH5pepH5YmLuB6peCXhpm/y5OuZnaTTwEyBHRk=
+X-Received: by 2002:aca:550f:: with SMTP id j15mr9224180oib.145.1550350145660; 
+ Sat, 16 Feb 2019 12:49:05 -0800 (PST)
 MIME-Version: 1.0
-Content-ID: <1286.1550350033.1@stardust.g4.wien.funkfeuer.at>
-Date: Sat, 16 Feb 2019 21:47:13 +0100
-Message-Id: <E1gv6rh-0000Km-U8@stardust.g4.wien.funkfeuer.at>
+References: <20190215050957.20755-1-anarsoul@gmail.com>
+ <20190215050957.20755-9-anarsoul@gmail.com>
+ <20190216204327.GB22791@ravnborg.org>
+In-Reply-To: <20190216204327.GB22791@ravnborg.org>
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Sat, 16 Feb 2019 12:48:39 -0800
+Message-ID: <CA+E=qVdtSsYd3YadDT3Biie4mDDLp3gi9yC4i+wf=RCVjMdbKQ@mail.gmail.com>
+Subject: Re: [PATCH v3 08/11] drm/panel: simple: Add BOE HB140WX1-501 panel
+ support
+To: Sam Ravnborg <sam@ravnborg.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190216_124723_940461_6AB76B91 
-X-CRM114-Status: GOOD (  14.75  )
+X-CRM114-CacheID: sfid-20190216_124907_076045_DC492E26 
+X-CRM114-Status: GOOD (  26.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,62 +92,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- info@olimex.com, Maxime Ripard <maxime.ripard@bootlin.com>,
- Mark Brown <broonie@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, ibu@radempa.de,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Torsten!
+On Sat, Feb 16, 2019 at 12:43 PM Sam Ravnborg <sam@ravnborg.org> wrote:
+>
+> Hi Vasily.
 
-Torsten Duwe writes:
+Hi Sam,
 
-> > > > > > But we need a way to control the mux from userspace and aside from
-> > > > > > unbinding the ideas proposed thus far are:
-> > > > > >
-> > > > > > a) control the gpio directly
-> > > > > > b) control the gpio via leds-gpio
-> > > > > > 
-> > > > > > (a) was dismissed because we can't set a default from DT
-> > > > > > (b) was dismissed because some rogue app might try to blink it
-> 
-> Hey, this is a debugging hack. If some rogue app tries to blink it, so be it.
-> 
-> > I suspect some distributions will pick up the patch I posted anyway, if
-> > it doesn't get merged mainline. (This is how I forgot missing backlight
-> > support - it just worked for too many people ...) If we ship
-> > sun50i-a64-teres-i.dts with the proper nodes (but disabled), their
-> > patches will be much easier to maintain as the official DT evolves.
-> 
-> As I wrote (held by the list admin), I consider the whole console mux
-> GPIO an U-Boot hack, and would put it into sun50i-a64-teres-i-u-boot.dtsi.
-> (As a LED, see above :-)
+> On Thu, Feb 14, 2019 at 09:09:54PM -0800, Vasily Khoruzhick via dri-devel wrote:
+> > This commit adds support for the BOE HB140WX1-501 14" WXGA TFT LCD
+> > panel.
+> >
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> >  .../display/panel/boe,hb140wx1-501.txt        |  7 +++++
+> >  drivers/gpu/drm/panel/panel-simple.c          | 26 +++++++++++++++++++
+> >  2 files changed, 33 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/panel/boe,hb140wx1-501.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/panel/boe,hb140wx1-501.txt b/Documentation/devicetree/bindings/display/panel/boe,hb140wx1-501.txt
+> > new file mode 100644
+> > index 000000000000..fc6f085eb8d1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/display/panel/boe,hb140wx1-501.txt
+> > @@ -0,0 +1,7 @@
+> > +BOE HB140WX1-501 14" WXGA (1366x768) TFT LCD panel
+> > +
+> > +Required properties:
+> > +- compatible: should be "boe,hb140wx1-501"
+> > +
+> > +This binding is compatible with the simple-panel binding, which is specified
+> > +in simple-panel.txt in this directory.
+>
+> boe must be added to vendor-prefixes.txt
+> (It is not present in the file I checked, but I may have been added later)
 
-The thing is, one of the quite strict rules in kernel development is:
-Never break userspace. That means: If we provide a way to userspace to
-do something (ie switch between debug and audio), we are expected to
-keep it around forever. So since there is a decent chance that someday
-somebody might write a driver that handles this situation properly, we
-don't want chain ourselves to some dirty hack.
+It's been there for quite a while, it's added in 27d23b30a561b which
+was included
+in 4.5.
 
-(I'm not totally against writing such a driver myself, if there are
-enough use cases. However, I think that TERES alone is not enough.)
+> It is usual practice to split the patch in a dt-bindings: patch and a driver patch.
+> And for the dt-bindings patch follow the submission rules laid out
+> in Documentation/devicetree/bindings/submitting-patches.txt
 
-> Would you care to submit a patch version without that GPIO handled?
-> I think it's very useful and has the potential to be agreed upon.
+I checked git log for drivers/gpu/drm/panel/panel-simple.c and looks
+like recent commits
+for this file added binding and timings in a single commit. I can
+split it into separate file
+if maintainers insist though.
 
-That would enable audio from the internal speakers but select debug
-output on the HP jack by default. I would be okay with that, despite
-still thinking that audio on the head phones should be the default.
+> > diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> > index 9c69e739a524..9a4c9dd02c6c 100644
+> > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > @@ -828,6 +828,29 @@ static const struct panel_desc bananapi_s070wv20_ct16 = {
+> >       },
+> >  };
+> >
+> > +static const struct drm_display_mode boe_hb140wx1_mode = {
+> > +     .clock = 72300,
+> > +     .hdisplay = 1366,
+> > +     .hsync_start = 1366 + 48,
+> > +     .hsync_end = 1366 + 48 + 32,
+> > +     .htotal = 1366 + 48 + 32 + 80,
+> > +     .vdisplay = 768,
+> > +     .vsync_start = 768 + 3,
+> > +     .vsync_end = 768 + 3 + 6,
+> > +     .vtotal = 768 + 3 + 6 + 13,
+> > +     .vrefresh = 60,
+> > +     .flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_NVSYNC,
+>
+> +1 for specifying .flags.
+>
+> > +};
+> > +
+> > +static const struct panel_desc boe_hb140wx1 = {
+> > +     .modes = &boe_hb140wx1_mode,
+> > +     .num_modes = 1,
+> > +     .size = {
+> > +             .width = 310,
+> > +             .height = 170,
+> > +     },
+> > +};
+> No .bus_format and no .bus_flags specified.
+> Are they not used by this panel or are you lucky and the default works?
 
-Maxime and Wens are the maintainers, so it's their call in the end.
+This is eDP panel, it doesn't need bus_format or bus_flags.
 
-HTE,
-Harald
+> > +
+> >  static const struct drm_display_mode boe_hv070wsa_mode = {
+> >       .clock = 42105,
+> >       .hdisplay = 1024,
+> > @@ -2541,6 +2564,9 @@ static const struct of_device_id platform_of_match[] = {
+> >       }, {
+> >               .compatible = "bananapi,s070wv20-ct16",
+> >               .data = &bananapi_s070wv20_ct16,
+> > +     }, {
+> > +             .compatible = "boe,hb140wx1-501",
+> > +             .data = &boe_hb140wx1
+> It is common practice to end the line with a "," so one do not need to modify
+> this line if an extra line is required.
+
+OK, will do.
+
+>
+> With the comments addressed you can add my:
+> Reviewed-by: Sam Ravnborg <sam@ravnborg.org>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
