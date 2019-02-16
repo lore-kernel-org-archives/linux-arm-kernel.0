@@ -2,84 +2,70 @@ Return-Path: <SRS0=BOBm=QX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E741EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 03:37:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AC211C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 04:07:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AEF3E21917
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 03:37:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AEC8222A1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 04:07:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mha5W05a";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="IXS0fpTO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEF3E21917
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W1missY4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AEC8222A1
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zytor.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Xr7Vm3VtiyT2M59Wjqof0/PwbN3ndcpyUvugnSns0e8=; b=Mha5W05ayOyoua
-	0Se2RwiegPsc98P04YFm8kFq8smM9BW7fBAV+p4nuVGjqRdO1ywlmdQPFFBfvTNwnhHjSNXUveiQY
-	xU8G3BqRHkAord7bKUKvJUy6PGFwVN2K1cRNSaAHvCPvWiUK5Ryg8mJy/GycQ+OVwOGCN+V11yPPv
-	ZP7C+4wNeGkuqjRzytNc75PdYBRYpNoqNQ2DZldk96O0PHGabiBXraALsy0vb72wT34eMTuth1/YC
-	krru8XZbzoybMTHx5CrbREr5p52CY5car3aocUZeHK7I4CQHsehIdFluXJ9WTHeFP5QzAxrRudsuk
-	1kqwUhl6lTM5SECkmTOw==;
+	List-Archive:List-Unsubscribe:List-Id:Message-ID:From:To:Subject:MIME-Version
+	:References:In-Reply-To:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/cVrw2g11icShIvQuK2LBIr5Mm++d7SfUJcXZFxFJYo=; b=W1missY4jt58ZO
+	okTA5DnwQKPZeFwBeDCSFqDcEBRlh+IOL+wJGLepVILzstx6U35hePe3A22lgKbgtFoMLMGqQ5Wlg
+	0DeJL3latPkoZRy5R7TBh1gP65tQCuw+/vWajT+0F8TuCvkIvkXcGZDS7YXpSwzZKVn3RHwhpQUwm
+	H/xpBKEHrKv+2XqJ+27k+4iL4MSThyAKwXnqSq73YrQZHaSqlSwrol2meSWC7XmzqmXKuiU4w6c1G
+	aTDpZl8jCPvo7ozxdYe4aSSee+e9r924dGEoxltYHqMAJXhMZVSJkkQ7RwVZpPKFIjCtiTHyQf+kt
+	Ehl0A0b/JOHI9aU9BS8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1guqnL-0003Lv-4Y; Sat, 16 Feb 2019 03:37:39 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gurGM-0003Hl-FB; Sat, 16 Feb 2019 04:07:38 +0000
+Received: from terminus.zytor.com ([198.137.202.136] helo=mail.zytor.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1guqnH-0003Lc-Ts
- for linux-arm-kernel@lists.infradead.org; Sat, 16 Feb 2019 03:37:37 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1G3bJfc064879;
- Fri, 15 Feb 2019 21:37:19 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550288239;
- bh=ri6mOkmvnBM0Ul83HKA3eS1/DP2iHYkFNApn9s0T9eA=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=IXS0fpTOUexnAoc/+0MY6HoQmiVD1W52ew5FuZKDRXn87u6GkPCPzCcYiafUTmtKz
- mvxA6yCGCuPkaFUXUCA7xovGGOAreB7evKAu9A5lT/sXAHsUqBQEPs5TNhjxVTkDAE
- HC/gku8BYSsLvkhQNFmWLDx+ia6jaJBuS5GXEbtc=
-Received: from DLEE112.ent.ti.com (dlee112.ent.ti.com [157.170.170.23])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1G3bJNR085478
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Fri, 15 Feb 2019 21:37:19 -0600
-Received: from DLEE100.ent.ti.com (157.170.170.30) by DLEE112.ent.ti.com
- (157.170.170.23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Fri, 15
- Feb 2019 21:37:19 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Fri, 15 Feb 2019 21:37:19 -0600
-Received: from [172.22.218.182] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1G3bDcn024612;
- Fri, 15 Feb 2019 21:37:14 -0600
-Subject: Re: [PATCH v5 00/10] Add support for TISCI irqchip drivers
-To: <marc.zyngier@arm.com>, Tony Lindgren <tony@atomide.com>, Nishanth Menon
- <nm@ti.com>, Santosh Shilimkar <ssantosh@kernel.org>, Rob Herring
- <robh+dt@kernel.org>, <tglx@linutronix.de>, <jason@lakedaemon.net>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <a14f77bd-63cf-adb2-39c4-a8f45070ee9a@ti.com>
-Date: Sat, 16 Feb 2019 09:07:12 +0530
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gurGJ-0003HQ-MT
+ for linux-arm-kernel@lists.infradead.org; Sat, 16 Feb 2019 04:07:37 +0000
+Received: from [IPv6:2601:646:8680:2bb1:4d04:7df8:9f95:eec1]
+ ([IPv6:2601:646:8680:2bb1:4d04:7df8:9f95:eec1])
+ (authenticated bits=0)
+ by mail.zytor.com (8.15.2/8.15.2) with ESMTPSA id x1G477Q71484064
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
+ Fri, 15 Feb 2019 20:07:09 -0800
+Date: Fri, 15 Feb 2019 20:06:56 -0800
+User-Agent: K-9 Mail for Android
+In-Reply-To: <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+References: <1c2429a4-9df9-40a3-98e0-51577de4bd6a@arm.com>
+ <20190213131720.GU32494@hirez.programming.kicks-ass.net>
+ <20190213140025.GB6346@brain-police>
+ <20190213142524.GW32494@hirez.programming.kicks-ass.net>
+ <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
+ <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
-In-Reply-To: <20190212074237.2875-1-lokeshvutla@ti.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+To: Peter Zijlstra <peterz@infradead.org>,
+ Andy Lutomirski <luto@amacapital.net>
+From: hpa@zytor.com
+Message-ID: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190215_193736_042123_9393637B 
-X-CRM114-Status: GOOD (  18.34  )
+X-CRM114-CacheID: sfid-20190215_200735_765216_858E8AF0 
+X-CRM114-Status: GOOD (  13.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,87 +77,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Device Tree Mailing List <devicetree@vger.kernel.org>,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, Sekhar Nori <nsekhar@ti.com>,
- linux-kernel@vger.kernel.org, Tero Kristo <t-kristo@ti.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: dvlasenk@redhat.com, Julien Thierry <julien.thierry@arm.com>,
+ catalin.marinas@arm.com, jpoimboe@redhat.com,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ valentin.schneider@arm.com, mingo@redhat.com, james.morse@arm.com,
+ luto@kernel.org, brgerst@gmail.com, bp@alien8.de, tglx@linutronix.de,
+ torvalds@linux-foundation.org, Ingo Molnar <mingo@kernel.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marc,
-
-On 2/12/2019 1:12 PM, Lokesh Vutla wrote:
-> TI AM65x SoC based on K3 architecture introduced support for Events
-> which are message based interrupts with minimal latency. These events
-> are not compatible with regular interrupts and are valid only through
-> an event transport lane. An Interrupt Aggregator(INTA) is introduced
-> to convert these events to interrupts. INTA can also group 64 events
-> into a single interrupt. Now the SoC has many peripherals and a large
-> number of event sources (time sync or DMA), the use of events is
-> completely dependent on a user's specific application, which drives a
-> need for maximum flexibility in which event sources are used in the
-> system. It is also completely up to software control as to how the
-> events are serviced.
-> 
-> Because of the huge flexibility there are certain standard peripherals
-> (like GPIO etc)where all interrupts cannot be directly corrected to host
-> interrupt controller. For this purpose, Interrupt Router(INTR) is
-> introduced in the SoC. INTR just does a classic interrupt redirection.
-> 
-> So the SoC has 3 types of interrupt controllers:
-> - GIC500
-> - Interrupt Router
-> - Interrupt Aggregator
-> 
-> Below is a diagrammatic view of how SoC integration of these interrupt
-> controllers:(https://pastebin.ubuntu.com/p/9ngV3jdGj2/)
-> 
-> Device Index-x               Device Index-y
->            |                         |
->            |                         |
->                       ....
->             \                       /
->              \                     /
->               \  (global events)  /
->           +---------------------------+   +---------+
->           |                           |   |         |
->           |             INTA          |   |  GPIO   |
->           |                           |   |         |
->           +---------------------------+   +---------+
->                          |   (vint)            |
->                          |                     |
->                         \|/                    |
->           +---------------------------+        |
->           |                           |<-------+
->           |           INTR            |
->           |                           |
->           +---------------------------+
->                          |
->                          |
->                         \|/ (gic irq)
->           +---------------------------+
->           |                           |
->           |             GIC           |
->           |                           |
->           +---------------------------+
-> 
-> While at it, TISCI abstracts the handling of all above IRQ routes where
-> interrupt sources are not directly connected to host interrupt controller.
-> That would be configuration of Interrupt Aggregator and Interrupt Router.
-> 
-> This series adds support for:
-> - TISCI commands needed for IRQ configuration
-> - Interrupt Router(INTR) and Interrupt Aggregator(INTA) drivers
-
-Sorry to bother you again. Any chance you can take a quick look at the
-series?
-
-Thanks and regards,
-Lokesh
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gRmVicnVhcnkgMTQsIDIwMTkgMjoxNDoyOSBBTSBQU1QsIFBldGVyIFppamxzdHJhIDxwZXRl
+cnpAaW5mcmFkZWFkLm9yZz4gd3JvdGU6Cj5PbiBXZWQsIEZlYiAxMywgMjAxOSBhdCAwMjo0OTo0
+N1BNIC0wODAwLCBBbmR5IEx1dG9taXJza2kgd3JvdGU6Cj4KPj4gRG8gd2UgbmVlZCB0byBiYWNr
+cG9ydCB0aGlzIHRoaW5nPwo+Cj5Qb3NzaWJseSwganVzdCB0byBiZSBzYWZlLgo+Cj4+IFRoZSBw
+cm9ibGVtIGNhbuKAmXQgYmUgdG9vIHdpZGVzcHJlYWQgb3Igd2Ugd291bGQgaGF2ZSBoZWFyZCBv
+ZiBpdAo+YmVmb3JlLgo+Cj5ZZXMsIHNvIGZhciB3ZSd2ZSBiZWVuIGx1Y2t5Lgo+Cj4tLS0KPlN1
+YmplY3Q6IHNjaGVkL3g4NjogU2F2ZSBbRVJdRkxBR1Mgb24gY29udGV4dCBzd2l0Y2gKPkZyb206
+IFBldGVyIFppamxzdHJhIDxwZXRlcnpAaW5mcmFkZWFkLm9yZz4KPkRhdGU6IFRodSBGZWIgMTQg
+MTA6MzA6NTIgQ0VUIDIwMTkKPgo+RWZmZWN0aXZlbHkgcmV2ZXJ0IGNvbW1pdDoKPgo+ICAyYzc1
+NzdhNzU4MzcgKCJzY2hlZC94ODZfNjQ6IERvbid0IHNhdmUgZmxhZ3Mgb24gY29udGV4dCBzd2l0
+Y2giKQo+Cj5TcGVjaWZpY2FsbHkgYmVjYXVzZSBTTUFQIHVzZXMgRkxBR1MuQUMgd2hpY2ggaW52
+YWxpZGF0ZXMgdGhlIGNsYWltCj50aGF0IHRoZSBrZXJuZWwgaGFzIGNsZWFuIGZsYWdzLgo+Cj5J
+biBwYXJ0aWN1bGFyOyB3aGlsZSBwcmVlbXB0aW9uIGZyb20gaW50ZXJydXB0IHJldHVybiBpcyBm
+aW5lICh0aGUKPklSRVQgZnJhbWUgb24gdGhlIGV4Y2VwdGlvbiBzdGFjayBjb250YWlucyBGTEFH
+UykgaXQgYnJlYWtzIGFueSBjb2RlCj50aGF0IGRvZXMgc3luY2hvbm91cyBzY2hlZHVsaW5nLCBp
+bmNsdWRpbmcgcHJlZW1wdF9lbmFibGUoKS4KPgo+VGhpcyBoYXMgYmVjb21lIGEgc2lnbmlmaWNh
+bnQgaXNzdWUgZXZlciBzaW5jZSBjb21taXQ6Cj4KPjViMjRhN2EyYWEyMCAoIkFkZCAndW5zYWZl
+JyB1c2VyIGFjY2VzcyBmdW5jdGlvbnMgZm9yIGJhdGNoZWQKPmFjY2Vzc2VzIikKPgo+cHJvdmlk
+ZWQgZm9yIG1lYW5zIG9mIGhhdmluZyAnbm9ybWFsJyBDIGNvZGUgYmV0d2VlbiBTVEFDIC8gQ0xB
+QywKPmV4cG9zaW5nIHRoZSBGTEFHUy5BQyBzdGF0ZS4gU28gZmFyIHRoaXMgaGFzbid0IGxlZCB0
+byB0cm91YmxlLAo+aG93ZXZlciBmaXggaXQgYmVmb3JlIGl0IGNvbWVzIGFwYXJ0Lgo+Cj5GaXhl
+czogNWIyNGE3YTJhYTIwICgiQWRkICd1bnNhZmUnIHVzZXIgYWNjZXNzIGZ1bmN0aW9ucyBmb3Ig
+YmF0Y2hlZAo+YWNjZXNzZXMiKQo+QWNrZWQtYnk6IEFuZHkgTHV0b21pcnNraSA8bHV0b0BhbWFj
+YXBpdGFsLm5ldD4KPlJlcG9ydGVkLWJ5OiBKdWxpZW4gVGhpZXJyeSA8anVsaWVuLnRoaWVycnlA
+YXJtLmNvbT4KPlNpZ25lZC1vZmYtYnk6IFBldGVyIFppamxzdHJhIChJbnRlbCkgPHBldGVyekBp
+bmZyYWRlYWQub3JnPgo+LS0tCj4gYXJjaC94ODYvZW50cnkvZW50cnlfMzIuUyAgICAgICAgfCAg
+ICAyICsrCj4gYXJjaC94ODYvZW50cnkvZW50cnlfNjQuUyAgICAgICAgfCAgICAyICsrCj4gYXJj
+aC94ODYvaW5jbHVkZS9hc20vc3dpdGNoX3RvLmggfCAgICAxICsKPiAzIGZpbGVzIGNoYW5nZWQs
+IDUgaW5zZXJ0aW9ucygrKQo+Cj4tLS0gYS9hcmNoL3g4Ni9lbnRyeS9lbnRyeV8zMi5TCj4rKysg
+Yi9hcmNoL3g4Ni9lbnRyeS9lbnRyeV8zMi5TCj5AQCAtNjUwLDYgKzY1MCw3IEBAIEVOVFJZKF9f
+c3dpdGNoX3RvX2FzbSkKPiAJcHVzaGwJJWVieAo+IAlwdXNobAklZWRpCj4gCXB1c2hsCSVlc2kK
+PisJcHVzaGZsCj4gCj4gCS8qIHN3aXRjaCBzdGFjayAqLwo+IAltb3ZsCSVlc3AsIFRBU0tfdGhy
+ZWFkc3AoJWVheCkKPkBAIC02NzIsNiArNjczLDcgQEAgRU5UUlkoX19zd2l0Y2hfdG9fYXNtKQo+
+ICNlbmRpZgo+IAo+IAkvKiByZXN0b3JlIGNhbGxlZS1zYXZlZCByZWdpc3RlcnMgKi8KPisJcG9w
+ZmwKPiAJcG9wbAklZXNpCj4gCXBvcGwJJWVkaQo+IAlwb3BsCSVlYngKPi0tLSBhL2FyY2gveDg2
+L2VudHJ5L2VudHJ5XzY0LlMKPisrKyBiL2FyY2gveDg2L2VudHJ5L2VudHJ5XzY0LlMKPkBAIC0y
+OTEsNiArMjkxLDcgQEAgRU5UUlkoX19zd2l0Y2hfdG9fYXNtKQo+IAlwdXNocQklcjEzCj4gCXB1
+c2hxCSVyMTQKPiAJcHVzaHEJJXIxNQo+KwlwdXNoZnEKPiAKPiAJLyogc3dpdGNoIHN0YWNrICov
+Cj4gCW1vdnEJJXJzcCwgVEFTS190aHJlYWRzcCglcmRpKQo+QEAgLTMxMyw2ICszMTQsNyBAQCBF
+TlRSWShfX3N3aXRjaF90b19hc20pCj4gI2VuZGlmCj4gCj4gCS8qIHJlc3RvcmUgY2FsbGVlLXNh
+dmVkIHJlZ2lzdGVycyAqLwo+Kwlwb3BmcQo+IAlwb3BxCSVyMTUKPiAJcG9wcQklcjE0Cj4gCXBv
+cHEJJXIxMwo+LS0tIGEvYXJjaC94ODYvaW5jbHVkZS9hc20vc3dpdGNoX3RvLmgKPisrKyBiL2Fy
+Y2gveDg2L2luY2x1ZGUvYXNtL3N3aXRjaF90by5oCj5AQCAtNDAsNiArNDAsNyBAQCBhc21saW5r
+YWdlIHZvaWQgcmV0X2Zyb21fZm9yayh2b2lkKTsKPiAgKiBvcmRlciBvZiB0aGUgZmllbGRzIG11
+c3QgbWF0Y2ggdGhlIGNvZGUgaW4gX19zd2l0Y2hfdG9fYXNtKCkuCj4gICovCj4gc3RydWN0IGlu
+YWN0aXZlX3Rhc2tfZnJhbWUgewo+Kwl1bnNpZ25lZCBsb25nIGZsYWdzOwo+ICNpZmRlZiBDT05G
+SUdfWDg2XzY0Cj4gCXVuc2lnbmVkIGxvbmcgcjE1Owo+IAl1bnNpZ25lZCBsb25nIHIxNDsKClRo
+aXMgaW1wbGllcyB3ZSBpbnZva2Ugc2NoZWR1bGUgLS0gYSByZXN0cmljdGVkIG9wZXJhdGlvbiAo
+Y29uc2lkZXIgbWF5X3NsZWVwKSBkdXJpbmcgZXhlY3V0aW9uIG9mIFNUQUMtZW5hYmxlZCBjb2Rl
+LCBidXQgKm5vdCogYXMgYW4gZXhjZXB0aW9uIG9yIGludGVycnVwdCwgc2luY2UgdGhvc2UgcHJl
+c2VydmUgdGhlIGZsYWdzLgoKSSBoYXZlIHNlcmlvdXMgY29uY2VybnMgYWJvdXQgdGhpcy4gVGhp
+cyBpcyBtb3JlIG9yIGxlc3Mgc2F5aW5nIHRoYXQgd2UgaGF2ZSBsZWZ0IGFuIHVubGltaXRlZCBn
+YXAgYW5kIGhhdmUgaGFkIEFDIGVzY2FwZS4KCkRvZXMgKmFueW9uZSogc2VlIGEgbmVlZCB0byBh
+bGxvdyB0aGlzPyBJIGdvdCBhIHF1ZXN0aW9uIGF0IExQQyBmcm9tIHNvbWVvbmUgYWJvdXQgdGhp
+cywgYW5kIHdoYXQgdGhleSB3ZXJlIHRyeWluZyB0byBkbyBvbmNlIGFsbCB0aGUgbGF5ZXJzIGhh
+ZCBiZWVuIHVud291bmQgd2FzIHNvIGZhciBkb3duIHRoZSB3cm9uZyB0cmFjayBmb3IgYSByb290
+IHByb2JsZW0gdGhhdCBhY3R1YWxseSBoYXMgYSB2ZXJ5IHNpbXBsZSBzb2x1dGlvbi4KCi0tIApT
+ZW50IGZyb20gbXkgQW5kcm9pZCBkZXZpY2Ugd2l0aCBLLTkgTWFpbC4gUGxlYXNlIGV4Y3VzZSBt
+eSBicmV2aXR5LgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
+bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
+bGludXgtYXJtLWtlcm5lbAo=
