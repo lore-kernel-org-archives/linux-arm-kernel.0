@@ -2,71 +2,69 @@ Return-Path: <SRS0=BOBm=QX=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69D88C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 19:52:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8116AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:21:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 244BF21A4C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 19:52:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 46E7721A4C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 16 Feb 2019 20:21:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gidEIub6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 244BF21A4C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g+h8LXWg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 46E7721A4C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pq9PbExT2YlJwLWDxvOxMBwkfn8eKznUbgrqSRREQj8=; b=gidEIub6JDm5aJ
-	NGdceL+zy6SMzTMrMqS8x8iZ1Q87dB2j4CPCieXycnASa2OesecnUA+8jpt5XBhbrjd80bqlztCAe
-	kB35IQ9y0/pWruY/uGjnDxDf0DE/Wr+qQju060/4v7Lji9rnWgEmheZRDeZuUhi7W15aJaUqVGxim
-	rTNhj8EEe0IAfZk6Dl2pJzp//od+6TFEa5/Bla4k5reqxMd9iNVzqr/D0HgjBQq8X3nu81YzV24pE
-	WuR2Bjl/8s734qiMD1evNRYWZ2gR26gxBWyhnOGuW7enpe4RLIW19gkdseb/sxoVKL/RONY7ROBa9
-	ditEq2lJtjjmoYkpBvBg==;
+	MIME-Version:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=4diOg+gMUR6fPbo/qYecXv4scOqEw8vkAtpqnii9wHc=; b=g+h8LXWgx5syrp
+	GwsXqt5RSdlG0y2VtEgfiWaX6umJhYxunwl1WKK6s5RmaQZgzD71zT+9HlLCP3djkBuEP8Pm2/t9o
+	bxbTsS3pkAs2nDreBng7wV7LC4ZUopPMELN1q7MPf53sdV6Dv9Kfp67iDDM0ohD+f0rXm+gyLb7nM
+	m52YojYdc1KDoFnVmnJxBte33cM8uit6l2suXDf8QlxcZIqQ46pWyaMsSYwWe85aeHJW9UtZakK5S
+	sqzHc3f3mrkO0VMNkXMmoVIwum/vG2a2sI/Yg6ekKf3PSDLHlRDYuZ+Wvv1cX2QVr13cgioGejhzi
+	EZ+UzROD+fmRfy+RqOPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gv60A-0007vO-N2; Sat, 16 Feb 2019 19:51:54 +0000
-Received: from mail-qt1-f177.google.com ([209.85.160.177])
+	id 1gv6SV-0007xi-9P; Sat, 16 Feb 2019 20:21:11 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gv606-0007uv-L2; Sat, 16 Feb 2019 19:51:52 +0000
-Received: by mail-qt1-f177.google.com with SMTP id v10so14908321qtp.8;
- Sat, 16 Feb 2019 11:51:47 -0800 (PST)
+ id 1gv6SR-0007wZ-5Z
+ for linux-arm-kernel@lists.infradead.org; Sat, 16 Feb 2019 20:21:08 +0000
+Received: by mail-qt1-f194.google.com with SMTP id v10so14972102qtp.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 16 Feb 2019 12:21:06 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=njXwxkS0txA8lz/bGGfp6ktEK6fmngMr3jyVbxBDkbI=;
- b=cFV+6uOGCytchl9H8OB8M5v6YFsCN2FBeHOx+GAXLGOxNSqykV6Jemekw0lf3IXyu0
- QxIy7gyyimAVpdmAx9TtudFJZpwHb/2esy1eyNO5oBoF0x24kAHgq2io8HNDCyK4W3+0
- 2Kg77eQm49iVhwCHdwzjHh2iifqe7b/BpmIWKsupdjGiKM1rKg7itV2KLIsnmBXgtbAW
- xmNiusw++QnbehHMvy21gYe1wjHbN18Owy3HPorKAqd4Zh5bkV8fRj/DxrhrpL4CF5XS
- gCTIse1AU7Z8cN6ZXkCHmbawhu0WsVuohc65/UjxSCaa/JN7UCiDuqiZsWHVtTwsrHfv
- F6Aw==
-X-Gm-Message-State: AHQUAubAsp6uTvf/Rrw/fG3//DGSC2wE+tMvizCBV+gpg23/99BLnXBb
- 8JAw1COFJT7qYitx2jGmhTSPSiFTH3lTPN5uq2k=
-X-Google-Smtp-Source: AHgI3IbUHLN4M1lERdvomXtfJja8MNAMmkBYOKWtbaxPSnJKfIe9EQYdSWDoZix03IxSnjAftIET69iWwOZgYB8ZUI8=
-X-Received: by 2002:ac8:445a:: with SMTP id m26mr12440777qtn.212.1550346706664; 
- Sat, 16 Feb 2019 11:51:46 -0800 (PST)
+ h=x-gm-message-state:mime-version:from:date:message-id:subject:to:cc;
+ bh=OAYI86GP7FBxDrkNOtDB+j4T8A5VXyFEaWAq+fHWQ0k=;
+ b=NjsnRcUpjjp5bnIqSw/Ic1auTII2KyS8a2GbuGAiupKXa+WlurJhTkxEdK0DSL5VLW
+ mBiz/DRfFtNjR3ilD0a3GQEDg4XARLrRLsf4JPe7lIc8/kokPa9MxKGlB3HkBoJKqi97
+ b9qeSEpvttxe3y4s/kEUHG7NWVVguOKrUKci/yqLlyxc9iS4XttTsHFoZy0y1SBS/EDr
+ EFkHSMj56WDxUOQRbOqk5nrxtejCzgbe40SUJddLbd+JJAzBli9KNqxTb/oZlCRiX+gY
+ kijFbUEWev0pAkXR+M6060KAJsxVYs0gPAkRziANbWYmasod9Gfw4S4pAtN6/V6fx4Sa
+ 8zow==
+X-Gm-Message-State: AHQUAubyWAZvGEw1ghnOvGVrNJXbzCG5dP/gzrTVBR98FF5q5iZ4Xr3W
+ kepDMv45cviVauCpJ43JSsI4zOzsrmNz2+OUOR4=
+X-Google-Smtp-Source: AHgI3Ia/2rsWZ8K/2zWyynt4pkoPhVdkNlUkukzVf6+l9kZ2DcdzJfacPmVF8o7JBsFlpp7UcyJdnPYTp0KubJa/xKs=
+X-Received: by 2002:a0c:81ee:: with SMTP id 43mr11897047qve.180.1550348465878; 
+ Sat, 16 Feb 2019 12:21:05 -0800 (PST)
 MIME-Version: 1.0
-References: <7c3dc195-68eb-e78d-3f7d-806546608d2c@gmail.com>
- <CAK8P3a1Y55XZkULdvaSctZwEDKEpr4eWA60UQJPsk5JzGwA0mg@mail.gmail.com>
- <1550298056.17036.9.camel@mtkswgap22>
-In-Reply-To: <1550298056.17036.9.camel@mtkswgap22>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Sat, 16 Feb 2019 20:51:30 +0100
-Message-ID: <CAK8P3a2c6XgS1QKFPEKUHWCNOeH1v0QoD5dPzShK81bjtqBc_A@mail.gmail.com>
-Subject: Re: [GIT PULL] Mediatek SoC updates for v5.1
-To: Ryder Lee <ryder.lee@mediatek.com>
+Date: Sat, 16 Feb 2019 21:20:48 +0100
+Message-ID: <CAK8P3a1d4VMFCOq=G_Qwcoof=eXQK75TCewDMWb_tRda+EQoPw@mail.gmail.com>
+Subject: [GIT PULL] ARM: SoC fixes for 5.0
+To: Linus Torvalds <torvalds@linux-foundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190216_115150_704965_7665F8F5 
-X-CRM114-Status: GOOD (  14.38  )
+X-CRM114-CacheID: sfid-20190216_122107_210787_72C19233 
+X-CRM114-Status: GOOD (  12.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,57 +76,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Matthias Brugger <matthias.bgg@gmail.com>, arm-soc <arm@kernel.org>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-mediatek@lists.infradead.org>, Weiyi Lu <weiyi.lu@mediatek.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: soc@kernel.org, arm-soc <arm@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Feb 16, 2019 at 7:21 AM Ryder Lee <ryder.lee@mediatek.com> wrote:
->
-> On Fri, 2019-02-15 at 17:46 +0100, Arnd Bergmann wrote:
-> > On Fri, Feb 8, 2019 at 9:00 PM Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> >
-> > >   arm: mediatek: add MT7629 smp bring up code (2019-02-07 17:59:16 +0100)
-> > >
-> > > ----------------------------------------------------------------
-> > > mt8173: minor typo in scpsys header file
-> > > mt7629: add smp bringup code
-> > > mt7623a: delete unused smp bringup code
-> >
-> > Pulled into arm/soc, but please elaborate on the mt7629 chip as I could
-> > not find any information on it but would like to include some text about
-> > all newly added SoCs in my pull request to Linus.
-> >
-> > Is this a variant of mt7623, or something else?
-> >
-> >      Arnd
->
-> The IPs differ in MT7615 compared to MT7623.  I haven't submitted
-> mt7629.dtsi as I still wait for the PCIe part be taken through the -next
-> tree first.
->
-> Overview
->
-> MT7629 is a highly integrated wireless network router system-on-chip
-> and integrates an CA7 Dual-Core operating up to 1.25GHz and DRAM
-> DDR2/DDR3(L).
->
-> It includes SGMII, PCIe2.0, USB2.0 and USB3.0 and implements two 2.5Gbps
-> HSGMII interfaces and a 5-ports 10/100 Ethernet switch.
->
-> Otherwise, The MT7761 is an 802.11n 3x3 RF chip, and the MT7762 is an
-> 802.11ac 3x3 RF chip.  When the two RF chips and MT7629 are combined
-> together, they provide dual-band concurrent chipset solution for WiFi
-> AC1900 wireless router platform.
->
+The following changes since commit d13937116f1e82bf508a6325111b322c30c85eb9:
 
-Ok, thanks a lot for the extra information!
+  Linux 5.0-rc6 (2019-02-10 14:42:20 -0800)
 
-     Arnd
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/soc/soc.git tags/armsoc-fixes
+
+for you to fetch changes up to 410d7360541c0e21b58e56b64e5bcdbec9c1d285:
+
+  Merge tag 'omap-for-v5.0/fixes-rc5' of
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into
+arm/fixes (2019-02-15 20:39:46 +0100)
+
+----------------------------------------------------------------
+This week is a much smaller update, containing fixes only for TI OMAP,
+NXP i.MX and Rockchips platforms:
+
+ - omap4 had problems with lost timer interrupts
+ - another IRQ handling issue with OMAP5
+ - A workaround for a regression in the pwm-omap-dmtimer driver
+
+ - eMMC was broken on the new imx8mq-evk board
+
+ - a fix for new dtc graph warnings and a regulator fix for rock64
+ - USB support broke on rk3328-rock64
+
+----------------------------------------------------------------
+Arnd Bergmann (5):
+      Merge tag 'omap-for-v5.0/fixes-rc4' of
+git://git.kernel.org/.../tmlind/linux-omap into fixes
+      Merge tag 'v5.0-rockchip-dts32fixes-1' of
+git://git.kernel.org/.../mmind/linux-rockchip into arm/fixes
+      Merge tag 'v5.0-rockchip-dts64fixes-1' of
+git://git.kernel.org/.../mmind/linux-rockchip into arm/fixes
+      Merge tag 'imx-fixes-5.0-3' of
+git://git.kernel.org/.../shawnguo/linux into arm/fixes
+      Merge tag 'omap-for-v5.0/fixes-rc5' of
+git://git.kernel.org/.../tmlind/linux-omap into arm/fixes
+
+Carlo Caione (1):
+      arm64: dts: imx8mq: Fix boot from eMMC
+
+Dmitry Voytik (1):
+      arm64: dts: rockchip: enable usb-host regulators at boot on rk3328-rock64
+
+Enric Balletbo i Serra (1):
+      arm64: dts: rockchip: fix graph_port warning on rk3399 bob kevin
+and excavator
+
+Johan Jonker (1):
+      ARM: dts: rockchip: remove qos_cif1 from rk3188 power-domain
+
+Russell King (1):
+      ARM: OMAP2+: fix lack of timer interrupts on CPU1 after hotplug
+
+Tony Lindgren (5):
+      clocksource: timer-ti-dm: Fix pwm dmtimer usage of fck reparenting
+      ARM: OMAP5+: Fix inverted nirq pin interrupts with irq_set_type
+      bus: ti-sysc: Fix timer handling with drop pm_runtime_irq_safe()
+      ARM: dts: Configure clock parent for pwm vibra
+      Merge branch 'pwm-dmtimer-fixes' into omap-for-v5.0/fixes-v2
+
+Yizhuo (1):
+      ARM: OMAP2+: Variable "reg" in function omap4_dsi_mux_pads()
+could be uninitialized
+
+ arch/arm/boot/dts/omap4-droid4-xt894.dts           | 11 ++++++
+ arch/arm/boot/dts/omap5-board-common.dtsi          |  9 +++--
+ arch/arm/boot/dts/omap5-cm-t54.dts                 | 12 +++++-
+ arch/arm/boot/dts/rk3188.dtsi                      |  1 -
+ arch/arm/mach-omap2/cpuidle44xx.c                  | 16 ++------
+ arch/arm/mach-omap2/display.c                      |  7 +++-
+ arch/arm/mach-omap2/omap-wakeupgen.c               | 36 +++++++++++++++++-
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts       | 44 +++++++++++-----------
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi          |  2 +
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts     |  2 +
+ arch/arm64/boot/dts/rockchip/rk3399-gru-bob.dts    |  2 +-
+ arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts  |  2 +-
+ .../dts/rockchip/rk3399-sapphire-excavator.dts     |  2 +-
+ drivers/bus/ti-sysc.c                              |  6 +--
+ drivers/clocksource/timer-ti-dm.c                  |  5 ++-
+ 15 files changed, 109 insertions(+), 48 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
