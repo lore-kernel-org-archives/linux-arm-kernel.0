@@ -2,71 +2,89 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E78D8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:22:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFE6DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:25:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ABA5521925
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:22:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8AF942192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:25:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SEDJtNZ3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABA5521925
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nX674hrH";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="Im2qsK9N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AF942192C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lD4MSNyfTzbIbFuKuK/8OCsXQoyG69VGoZVWG2SKKTw=; b=SEDJtNZ3miCBWU
-	IdZY9U8v+MnECgcC7bh/xt1D2O/PVYPo/hTj5GZHxQHivcPSr/Gbdmmgyy+j57nCM9K/R8+u6YR0R
-	KLenSttKdVLI8dBEQgLN4b90L9ZwEZaRJNBjKzlm4tM4lSnhhJwjWf/DeYvt72i4MrMP+uQ9AwzJ+
-	CwMkpRn/n2mMlxUodJBF6jCinYklQgsJL0edDXz6ISbAdtFgW0BRntuWRgr58ZaDKCe+8V/yDsZV/
-	MvzpJ0h2o3kM7xnjsi7/VC4BKqMEWDnT72+QNCihlx/W0SFDEl47yuLJ+TZx9j3KdRm7i6QzVHAZU
-	U0xqdYwxzZAHKOflJilQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=n3Kqir4iGCRhh0OQ9wYSLuMrlfilgOtnKZO5VMHjNyE=; b=nX674hrHYkk+O25UF7YOheoj1
+	V4jHyN0fBB6i2G+yG4IMR76O5Sqf0GS2an0efjfkU6xae1lVIRnQ3GD3lG74/H4PE8irF9zVs3z0p
+	JiK3XLBdTWplFWs6DyJAvTeXrFIQfSsPu6tn4J+jT9DNloKBsAVUNb34wPImpWb2HQuMu0wIL0QrE
+	Fm3UNM/wdQkLwvlfApP8OjlqW3cfU9H9DmY4RK7traSm1bYNQMinERjN/ZONMJjv+bMhEALmgxz69
+	ElssMwrEER7Bxy+EqAxmi6iv0xvN6+tfNCpNbH8c2XVdLvhkLez6VmEJcRScQw41HBQVmL9MzmCIk
+	XMBnK0XPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvIep-0005d9-Dv; Sun, 17 Feb 2019 09:22:43 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gvIhp-0007Fz-FA; Sun, 17 Feb 2019 09:25:49 +0000
+Received: from vern.gendns.com ([98.142.107.122])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvITB-0008Pm-Nw; Sun, 17 Feb 2019 09:11:01 +0000
-X-UUID: d7766ed914c8459db9f71e9d499b3b82-20190217
-X-UUID: d7766ed914c8459db9f71e9d499b3b82-20190217
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
- (envelope-from <yong.wu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 222060789; Sun, 17 Feb 2019 01:09:10 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 01:09:09 -0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 17:09:03 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sun, 17 Feb 2019 17:09:02 +0800
-From: Yong Wu <yong.wu@mediatek.com>
-To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
- Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v6 16/22] memory: mtk-smi: Add bus_sel for mt8183
-Date: Sun, 17 Feb 2019 17:04:54 +0800
-Message-ID: <1550394300-17420-17-git-send-email-yong.wu@mediatek.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
-References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
+ id 1gvIhk-0005tN-Tg
+ for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 09:25:46 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=9D0vDs8zpCOFsGv0bn/E+pWXy79DwmOoD1oDq9oBe94=; b=Im2qsK9NAXr+fvkgTc1dcCJCvj
+ soHdfpKs7XYP+4lqY0ZkEhqTVYytSsbvGhvgFaeY/DvQeHTKlIbbgWCx4brM7JhysKdX5+fb63NPq
+ FPe3L/FxuWAu7PZNCyKSI2NkVye7D4m3wQogFBMd7KDLgAVslUgoTPky8b9KXFH09iL/U9NmbOKq2
+ uy5e/JCu2aL9qp8Qpepbb4Iew6wq+/3ncuhHKDD9BiTarxOx+WUUMACReESya9RntTCn6bvOjFIYh
+ eKikRb4sg3gXs+aMi4gFYdRJAFefCpzgSuqy8wl3gQhF6aHVUU7VHfwNhAaEmxIxCNr7LERJu7hEz
+ 61bibqUw==;
+Received: from [185.122.190.68] (port=56265 helo=gerda-5.local)
+ by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
+ (Exim 4.91) (envelope-from <david@lechnology.com>)
+ id 1gvIgr-0003lE-F4; Sun, 17 Feb 2019 04:24:49 -0500
+Subject: Re: [PATCH v4 03/37] ARM: davinci: aintc: use irq domain
+To: Bartosz Golaszewski <brgl@bgdev.pl>,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
+References: <20190214145231.8750-1-brgl@bgdev.pl>
+ <20190214145231.8750-4-brgl@bgdev.pl>
+From: David Lechner <david@lechnology.com>
+Message-ID: <1146c248-5143-ae59-1b2a-4f8f4179745b@lechnology.com>
+Date: Sun, 17 Feb 2019 10:24:56 +0100
+User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
+ Gecko/20100101 Thunderbird/60.5.0
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 3809A0B3FBF2460047979D43386B31E7E4C916FDAB1F58F506FB898D91E94B932000:8
-X-MTK: N
+In-Reply-To: <20190214145231.8750-4-brgl@bgdev.pl>
+Content-Language: en-US
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - vern.gendns.com
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - lechnology.com
+X-Get-Message-Sender-Via: vern.gendns.com: authenticated_id:
+ davidmain+lechnology.com/only user confirmed/virtual account not confirmed
+X-Authenticated-Sender: vern.gendns.com: davidmain@lechnology.com
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_011041_929369_AD7F76CE 
-X-CRM114-Status: GOOD (  15.26  )
+X-CRM114-CacheID: sfid-20190217_012545_057262_6857058B 
+X-CRM114-Status: UNSURE (   7.70  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,117 +96,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
- Nicolas Boichat <drinkcat@chromium.org>, srv_heupstream@mediatek.com, Will
- Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Evan Green <evgreen@chromium.org>, Tomasz Figa <tfiga@google.com>,
- iommu@lists.linux-foundation.org, Matthias Kaehlcke <mka@chromium.org>,
- linux-mediatek@lists.infradead.org, yong.wu@mediatek.com,
- yingjoe.chen@mediatek.com, anan.sun@mediatek.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There are 2 mmu cells in a M4U HW. we could adjust some larbs entering
-mmu0 or mmu1 to balance the bandwidth via the smi-common register
-SMI_BUS_SEL(0x220)(Each larb occupy 2 bits).
 
-In mt8183, For better performance, we switch larb1/2/5/7 to enter
-mmu1 while the others still keep enter mmu0.
 
-In mt8173 and mt2712, we don't get the performance issue,
-Keep its default value(0x0), that means all the larbs enter mmu0.
+On 2/14/19 8:51 AM, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> We need to create an irq domain if we want to select SPARSE_IRQ. The
+> cp-intc driver already supports it, but aintc doesn't. Use the helpers
+> provided by the generic irq chip abstraction.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
 
-Note: smi gen1(mt2701/mt7623) don't have this bus_sel.
-
-And, the base of smi-common is completely different with smi_ao_base
-of gen1, thus I add new variable for that.
-
-CC: Matthias Brugger <matthias.bgg@gmail.com>
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
- drivers/memory/mtk-smi.c | 22 ++++++++++++++++++++--
- 1 file changed, 20 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 9790801..08cf40d 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -49,6 +49,12 @@
- #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
- #define F_MMU_EN		BIT(0)
- 
-+/* SMI COMMON */
-+#define SMI_BUS_SEL			0x220
-+#define SMI_BUS_LARB_SHIFT(larbid)	((larbid) << 1)
-+/* All are MMU0 defaultly. Only specialize mmu1 here. */
-+#define F_MMU1_LARB(larbid)		(0x1 << SMI_BUS_LARB_SHIFT(larbid))
-+
- enum mtk_smi_gen {
- 	MTK_SMI_GEN1,
- 	MTK_SMI_GEN2
-@@ -57,6 +63,7 @@ enum mtk_smi_gen {
- struct mtk_smi_common_plat {
- 	enum mtk_smi_gen gen;
- 	bool             has_gals;
-+	u32              bus_sel; /* Balance some larbs to enter mmu0 or mmu1 */
- };
- 
- struct mtk_smi_larb_gen {
-@@ -72,8 +79,8 @@ struct mtk_smi {
- 	struct clk			*clk_apb, *clk_smi;
- 	struct clk			*clk_gals0, *clk_gals1;
- 	struct clk			*clk_async; /*only needed by mt2701*/
--	void __iomem			*smi_ao_base;
--
-+	void __iomem			*smi_ao_base; /* only for gen1 */
-+	void __iomem			*base;	      /* only for gen2 */
- 	const struct mtk_smi_common_plat *plat;
- };
- 
-@@ -410,6 +417,8 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
- static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
- 	.gen      = MTK_SMI_GEN2,
- 	.has_gals = true,
-+	.bus_sel  = F_MMU1_LARB(1) | F_MMU1_LARB(2) | F_MMU1_LARB(5) |
-+		    F_MMU1_LARB(7),
- };
- 
- static const struct of_device_id mtk_smi_common_of_ids[] = {
-@@ -482,6 +491,11 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
- 		ret = clk_prepare_enable(common->clk_async);
- 		if (ret)
- 			return ret;
-+	} else {
-+		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		common->base = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(common->base))
-+			return PTR_ERR(common->base);
- 	}
- 	pm_runtime_enable(dev);
- 	platform_set_drvdata(pdev, common);
-@@ -497,6 +511,7 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
- static int __maybe_unused mtk_smi_common_resume(struct device *dev)
- {
- 	struct mtk_smi *common = dev_get_drvdata(dev);
-+	u32 bus_sel = common->plat->bus_sel;
- 	int ret;
- 
- 	ret = mtk_smi_clk_enable(common);
-@@ -504,6 +519,9 @@ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
- 		dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
- 		return ret;
- 	}
-+
-+	if (common->plat->gen == MTK_SMI_GEN2 && bus_sel)
-+		writel(bus_sel, common->base + SMI_BUS_SEL);
- 	return 0;
- }
- 
--- 
-1.9.1
+Reviewed-by: David Lechner <david@lechnology.com>
 
 
 _______________________________________________
