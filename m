@@ -2,60 +2,63 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A849BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 22:36:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4420AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 23:34:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 779AB2184E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 22:36:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 139F32184E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 23:34:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y6ZXKS+M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 779AB2184E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=canonical.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eW4tSCF2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 139F32184E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=TYI0KLHFhgqjulNJT2KEuUJlwJ5K7HFom+XbeGFJE/4=; b=Y6ZXKS+MqLBc33
-	uh67j41iSa9BTO3e9Pay2YVitYHkKp49PtOu7cEXf2YN4Y/cIhunRVUGJmRbE6QPbgIPydviM3QCW
-	POB4LO7bsG1f6RcowMj0t+02/VVeqZ7B1RbF3rN4/IgRMl0EuvscrQIAyV/yypkTiwabAOFCNqxvy
-	F1vfqueiqRTqe+FiGqUU2QI764/fA45E5JJGWhvJUfc+3bOpAZKo0phx13wd4vLd1wzsIQgbjYD0C
-	F4ZIslW4s6/ZSL3EjGl9pAO9aB7mPUGcttyNQpW/Xs+ujT4tdNmYkSqSD0HBek818o3GQ8JTX5t+E
-	bTyZ8cx/5uhS64ZCBBNA==;
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/78vJEbytFgJBUhl40r4YJ3kTcQEeBspx5SZK2QtK64=; b=eW4tSCF2kbRsfL
+	GkrwIvJUHyzCJ6ydogv3BgabN0calpYEIIOezHFsMjMnXwZh0Erh8ATz+WUEApMfDvFpXHUmUnKOc
+	XBdRviZQ4EnzrN0Ec2PkltjbQWAW09I0pnWv26hK3pFgbRfGqnFQ9ccZa27m9pRJUjoTWpyJKzWEC
+	s8xt6LC7PiHgVTiZ2q2sG/F1zP5BZq3Ho8fQdaRN1mebLbxgxL2Z9+Kv/WtMoBCMsMcGZ6ZOe7iwO
+	5B10cgTaAG+KAbFIDt4xZkjvUGY+3+XdxRmk7Ru6+LYdSZeSyBzVqCnneP0ask12Nk+PhKPNtl53l
+	o3Rc0LPwlc5jfzgdcwqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvV36-0005WJ-3o; Sun, 17 Feb 2019 22:36:36 +0000
-Received: from youngberry.canonical.com ([91.189.89.112])
+	id 1gvVx2-0004tq-D6; Sun, 17 Feb 2019 23:34:24 +0000
+Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvV32-0005VJ-9K
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 22:36:34 +0000
-Received: from cpc129250-craw9-2-0-cust139.know.cable.virginm.net
- ([82.43.126.140] helo=localhost)
- by youngberry.canonical.com with esmtpsa (TLS1.0:RSA_AES_256_CBC_SHA1:32)
- (Exim 4.76) (envelope-from <colin.king@canonical.com>)
- id 1gvV2w-0007sJ-TV; Sun, 17 Feb 2019 22:36:26 +0000
-From: Colin King <colin.king@canonical.com>
-To: Christoffer Dall <christoffer.dall@arm.com>,
- Marc Zyngier <marc.zyngier@arm.com>, linux-arm-kernel@lists.infradead.org,
- kvmarm@lists.cs.columbia.edu
-Subject: [PATCH] KVM: arm/arm64: fix spelling mistake: "auxilary" ->
- "auxiliary"
-Date: Sun, 17 Feb 2019 22:36:26 +0000
-Message-Id: <20190217223626.16686-1-colin.king@canonical.com>
-X-Mailer: git-send-email 2.20.1
-MIME-Version: 1.0
+ id 1gvVwz-0004t1-BR
+ for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 23:34:22 +0000
+Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
+ (using TLSv1 with cipher AES256-SHA (256/256 bits))
+ (Client did not present a certificate)
+ (Authenticated sender: davem-davemloft)
+ by shards.monkeyblade.net (Postfix) with ESMTPSA id AEEFE12294510;
+ Sun, 17 Feb 2019 15:34:13 -0800 (PST)
+Date: Sun, 17 Feb 2019 15:34:13 -0800 (PST)
+Message-Id: <20190217.153413.776181738897663074.davem@davemloft.net>
+To: maxime.chevallier@bootlin.com
+Subject: Re: [PATCH net-next] net: phy: marvell10g: Don't explicitly set
+ Pause and Asym_Pause
+From: David Miller <davem@davemloft.net>
+In-Reply-To: <20190215083347.5886-1-maxime.chevallier@bootlin.com>
+References: <20190215083347.5886-1-maxime.chevallier@bootlin.com>
+X-Mailer: Mew version 6.8 on Emacs 26.1
+Mime-Version: 1.0
+X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
+ (shards.monkeyblade.net [149.20.54.216]);
+ Sun, 17 Feb 2019 15:34:14 -0800 (PST)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_143632_462122_E391EC56 
-X-CRM114-Status: UNSURE (   9.51  )
+X-CRM114-CacheID: sfid-20190217_153421_392505_5FB60F36 
+X-CRM114-Status: UNSURE (   6.24  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -68,37 +71,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org
+Cc: andrew@lunn.ch, f.fainelli@gmail.com, antoine.tenart@bootlin.com,
+ netdev@vger.kernel.org, gregory.clement@bootlin.com, linux@armlinux.org.uk,
+ linux-kernel@vger.kernel.org, thomas.petazzoni@bootlin.com,
+ miquel.raynal@bootlin.com, linux-arm-kernel@lists.infradead.org,
+ hkallweit1@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Date: Fri, 15 Feb 2019 09:33:47 +0100
 
-There is a spelling mistake in a kvm_err error message. Fix it.
+> The PHY core expects PHY drivers not to set Pause and Asym_Pause bits,
+> unless the driver only wants to specify one of them due to HW
+> limitation. In the case of the Marvell10g driver, we don't need to set
+> them.
+> 
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+> Suggested-by: Andrew Lunn <andrew@lunn.ch>
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- virt/kvm/arm/arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 7fcc1c8c4020..99c37384ba7b 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1563,7 +1563,7 @@ static int init_hyp_mode(void)
- 
- 	err = hyp_map_aux_data();
- 	if (err)
--		kvm_err("Cannot map host auxilary data: %d\n", err);
-+		kvm_err("Cannot map host auxiliary data: %d\n", err);
- 
- 	return 0;
- 
--- 
-2.20.1
-
+Applied, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
