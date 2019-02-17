@@ -5,18 +5,18 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 051F0C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:09:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09D5AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C06A421900
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:09:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C503B21A4A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nBppFEDJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C06A421900
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GhONZgEG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C503B21A4A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HavL4ET795/94ckXgEtqeY1LdL5G1ZxULWLMIYNvGQk=; b=nBppFEDJfZFwmq
-	N42DXDG8n6HNv0nMPVEiEASiBNHj6zKP49imCB5KKa56EmQVW3iOajTJgt02drKp1xgL8gU43MPJb
-	wfNc6ACAjNnuva0YlheN5DTvVnRanXlrkWzx2wsGNM1F58XqROJYAXlmOjOqON68rXjcJx0IOsPxo
-	TcAf4T+C3NU15CGnVVH8vi1SetnvX4y0IVNPc3g62+jH9IFyG1VmfWA0AhuI8UICSDqDrRDdJJX/O
-	r2pnWE1G3VI30NaZrZ11GmB+3bH4yz02NFPwUqV4TH3u5Nym2iwMjx+5hYtWIb1mgDN3XkT3vz3mk
-	w7jktkyrEirOgux7RO1g==;
+	List-Owner; bh=RLjnofK09D4sQsXSiV6sh3scGTYfwa73eXwLXXAtqnw=; b=GhONZgEGxSu/n7
+	zdnqwhbGyZm0T51gMxGFVEDpXq/WDG48jXMwoHdY9SgrbpwmrdjzAl0VZy0XoowLBYcz5tqP4P4IK
+	4dRYLa1l2n7Xp/jkc9Pp2Drj4ljkwwVoip2YvQrZgDJyQ5ED65CO+KrphJrByXs5GLshhgud1o7tJ
+	mNR4LqQvUHOqEdCNpVPQ39V5nIqpLXoPsFFXoClNLelYzuV/7f3/a4vQ8UVmro0xb4tsyorUkFGQ1
+	HxN9+zjzhlkQ7iYUNkCPJKQttBhCOhbnPa9YqeMCT3usXUFAW0LIxQBLa8i6QxrtKi9Mr1iCpfNZT
+	s71QiHUyCvg2UgM8V+fw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvISM-0006jO-Ng; Sun, 17 Feb 2019 09:09:50 +0000
+	id 1gvISi-0007mB-QK; Sun, 17 Feb 2019 09:10:12 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvIS1-0006R2-JS; Sun, 17 Feb 2019 09:09:46 +0000
-X-UUID: 036e6f3f39d442fdb7b5d69a01c4b023-20190217
-X-UUID: 036e6f3f39d442fdb7b5d69a01c4b023-20190217
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ id 1gvIS4-0006Ud-Ke; Sun, 17 Feb 2019 09:09:48 +0000
+X-UUID: 23943a51e1a944fd9ff389983be41b99-20190217
+X-UUID: 23943a51e1a944fd9ff389983be41b99-20190217
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1573004926; Sun, 17 Feb 2019 01:09:25 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 01:09:23 -0800
+ with ESMTP id 860364945; Sun, 17 Feb 2019 01:09:31 -0800
+Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 17 Feb 2019 01:09:29 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 17:09:22 +0800
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 17 Feb 2019 17:09:27 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sun, 17 Feb 2019 17:09:21 +0800
+ Transport; Sun, 17 Feb 2019 17:09:26 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v6 19/22] iommu/mediatek: Add shutdown callback
-Date: Sun, 17 Feb 2019 17:04:57 +0800
-Message-ID: <1550394300-17420-20-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v6 20/22] iommu/mediatek: Rename enable_4GB to dram_is_4gb
+Date: Sun, 17 Feb 2019 17:04:58 +0800
+Message-ID: <1550394300-17420-21-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
+X-TM-SNTS-SMTP: 5B0FB1D48A92A447B225EC4968B7729CBEFB9D291F130389DD051641658FA1BE2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_010929_876311_8B6B8981 
-X-CRM114-Status: GOOD (  10.25  )
+X-CRM114-CacheID: sfid-20190217_010933_244388_F86BA138 
+X-CRM114-Status: GOOD (  13.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,64 +91,68 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch only improve the shutdown flow. The shutdown callback will
-mute the M4U HW when the system shutdown.
+This patch only rename the variable name from enable_4GB to
+dram_is_4gb for readable.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/iommu/mtk_iommu.c    | 6 ++++++
- drivers/iommu/mtk_iommu_v1.c | 6 ++++++
- 2 files changed, 12 insertions(+)
+ drivers/iommu/mtk_iommu.c | 10 +++++-----
+ drivers/iommu/mtk_iommu.h |  2 +-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index b02854c..8742841 100644
+index 8742841..0277396 100644
 --- a/drivers/iommu/mtk_iommu.c
 +++ b/drivers/iommu/mtk_iommu.c
-@@ -702,6 +702,11 @@ static int mtk_iommu_remove(struct platform_device *pdev)
- 	return 0;
- }
+@@ -382,7 +382,7 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
+ 	int ret;
  
-+static void mtk_iommu_shutdown(struct platform_device *pdev)
-+{
-+	mtk_iommu_remove(pdev);
-+}
-+
- static int __maybe_unused mtk_iommu_suspend(struct device *dev)
- {
- 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
-@@ -783,6 +788,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
- static struct platform_driver mtk_iommu_driver = {
- 	.probe	= mtk_iommu_probe,
- 	.remove	= mtk_iommu_remove,
-+	.shutdown = mtk_iommu_shutdown,
- 	.driver	= {
- 		.name = "mtk-iommu",
- 		.of_match_table = of_match_ptr(mtk_iommu_of_ids),
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index 4f15043..dd84eea 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -660,6 +660,11 @@ static int mtk_iommu_remove(struct platform_device *pdev)
- 	return 0;
- }
+ 	/* The "4GB mode" M4U physically can not use the lower remap of Dram. */
+-	if (data->plat_data->has_4gb_mode && data->enable_4GB)
++	if (data->plat_data->has_4gb_mode && data->dram_is_4gb)
+ 		paddr |= BIT_ULL(32);
  
-+static void mtk_iommu_shutdown(struct platform_device *pdev)
-+{
-+	mtk_iommu_remove(pdev);
-+}
-+
- static int __maybe_unused mtk_iommu_suspend(struct device *dev)
- {
- 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
-@@ -697,6 +702,7 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
- static struct platform_driver mtk_iommu_driver = {
- 	.probe	= mtk_iommu_probe,
- 	.remove	= mtk_iommu_remove,
-+	.shutdown = mtk_iommu_shutdown,
- 	.driver	= {
- 		.name = "mtk-iommu-v1",
- 		.of_match_table = mtk_iommu_of_ids,
+ 	spin_lock_irqsave(&dom->pgtlock, flags);
+@@ -554,13 +554,13 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+ 
+ 	if (data->plat_data->m4u_plat == M4U_MT8173)
+-		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
++		regval = (data->protect_base >> 1) | (data->dram_is_4gb << 31);
+ 	else
+ 		regval = lower_32_bits(data->protect_base) |
+ 			 upper_32_bits(data->protect_base);
+ 	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+ 
+-	if (data->enable_4GB && data->plat_data->has_vld_pa_rng) {
++	if (data->dram_is_4gb && data->plat_data->has_vld_pa_rng) {
+ 		/*
+ 		 * If 4GB mode is enabled, the validate PA range is from
+ 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+@@ -611,8 +611,8 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	data->protect_base = ALIGN(virt_to_phys(protect), MTK_PROTECT_PA_ALIGN);
+ 
+-	/* Whether the current dram is over 4GB */
+-	data->enable_4GB = !!(max_pfn > (BIT_ULL(32) >> PAGE_SHIFT));
++	/* Whether the current dram is 4GB. */
++	data->dram_is_4gb = !!(max_pfn > (BIT_ULL(32) >> PAGE_SHIFT));
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	data->base = devm_ioremap_resource(dev, res);
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+index dedf05c..90e98a6 100644
+--- a/drivers/iommu/mtk_iommu.h
++++ b/drivers/iommu/mtk_iommu.h
+@@ -66,7 +66,7 @@ struct mtk_iommu_data {
+ 	struct mtk_iommu_domain		*m4u_dom;
+ 	struct iommu_group		*m4u_group;
+ 	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
+-	bool                            enable_4GB;
++	bool                            dram_is_4gb;
+ 	bool				tlb_flush_active;
+ 
+ 	struct iommu_device		iommu;
 -- 
 1.9.1
 
