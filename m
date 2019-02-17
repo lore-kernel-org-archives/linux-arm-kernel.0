@@ -2,89 +2,82 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 296B4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:07:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E867C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:30:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAE2E2195D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:07:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D66B21B69
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:30:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ws61GQ0u";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aZc+YWiZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAE2E2195D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HKmPJWEg";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="IpScjLrT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D66B21B69
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xrTZBlhBBtUWKVOYT29fZOJ+6mDfeW8/W0DQ+GNTV08=; b=Ws61GQ0u4dRvpA
-	9cbMJALdDszjP2bUWW2Fl3clJ/oB643qO7/Xif2aHe/7Zt62+6AyoAAwBfyZP35tgTEAT4OY9dzva
-	VGkVdtYIG2Lt6Wy4X/Ysx8YYFknqaZcjVe4Uqe3rzSDuxp6sxV1cD9AcRWaJiLUgyq7sSgHApygFK
-	NTLL+Es5Cb7ZTH14Eefl9n+v5X2ekSPUl27J94+P1DlooykInTMBTk1LZc9ZikURz95/02hc9+XxR
-	l81wftcfp00BkoVzTFYX7jbzFuKr6OPvqt6xMrD74+uI9SVyxLRiI1CN49aFI8iN3x2Aeuols7cKD
-	L2QMLiryzQlr4KTodWTg==;
+	List-Owner; bh=38FNiD+lBjBYUdnA0KLIq4Udh/e7u4PBR8V9KfI0G5Y=; b=HKmPJWEgwpJaDA
+	SeVHqv3xWnc03h8P5a0u7kur6YFdDyfvewicF+ttHyIAkzfqOvhbaJy8uS0J+Mkj0I8iGCaz2VhVH
+	WztXw5aMl26J26RgBfWArKNPJDZsNHxuwhPrX32NyHX2VSSl0J+VEte5nkRgnCxGCDCzJ55cxghZs
+	z5xNHb43viY1e0fml9gvcKocVIIrQ3U+FLuUy375XF7mfmIV7SoEaGo97YJ4fJ7aO0gLesE1mj9dn
+	rUio9xfSJGUFOKh6H7EPKvEz1T/J78RT6653Tw+nBgt+omCcr1uvNB2aUvqlQtGP6jRmzr6JR4ZJP
+	SCNBFzDkrIpESkyMgC3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvGXh-0007c7-WD; Sun, 17 Feb 2019 07:07:14 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gvGuT-0006Ws-KG; Sun, 17 Feb 2019 07:30:45 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvGXe-0007aq-QF; Sun, 17 Feb 2019 07:07:12 +0000
-Received: by mail-pl1-x641.google.com with SMTP id bj4so7147364plb.7;
- Sat, 16 Feb 2019 23:07:09 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:content-transfer-encoding:in-reply-to
- :user-agent; bh=It5OEgJ4iYIMPI81go7NiHuDVjtSj5HVzsbxnYSlOe0=;
- b=aZc+YWiZzUUe0tTPkDcAUfqJ63RPBIhmPpH78AnM7ubdbgLf4TxT0FIapEealbMdIA
- 8/F0Teqbas+ATEy3A1lS8KE8ui3UMKo3bnLgUPMAwNXJ9jEPn+OBZBOmFFfyrqW3pDTa
- p54YaZ6rAT/yLr7q/CX5lPmnxLTozqOK1vYJNSaCLB5AdFE3nqFOfw59/35KwGvvciAj
- 1fWcR/XEUm6kz9ZGKqaIRprkM4vuDdZvVG9w7qxz5qkpa89e9uaYqGF9j8k666/uNg35
- SRzqoP7xQJcfSjC08epHN88GnNiCjGO0RE+0PGSfBSIUpUgJH3O2v2TZQnEH6epXSbnz
- 76PA==
+ id 1gvGuQ-0006WZ-4V
+ for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 07:30:43 +0000
+Received: by mail-it1-x141.google.com with SMTP id d125so8920059ith.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 16 Feb 2019 23:30:38 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=nB8m/G/yjJJ5tRJEh/5vp8eT+5HSD9oX2DbxFowzUq0=;
+ b=IpScjLrTWaIKybjutJv/qZutcf7GeOJ4wdG44uFSpR9ZvywHEiKPM77HVvndjrkPqa
+ Bl9H/MDGFJq2Cae4tElfomB5ShsOCpU/bNbT6Z55lGwLniUaIfRaxvfMJz1x+/MgWFVh
+ w719tOL26PCZST5CVDi0XSQNlm/gEUyaqVklE/kID5STHsYY0KUX1jJFYGH1asGWZLjc
+ 8F9K5uDP0xNp1vbZKspRISycpyicihKJGYDe7s6GHKcZ9EZzWDJfw5tkZZNUafvo+CSM
+ /t/U8877Bzwnf6blEXtMtZdEUl+ccXuxx/NqoOrosmTaHCVkmtViGlDscK177ap6NOpz
+ swHw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:content-transfer-encoding
- :in-reply-to:user-agent;
- bh=It5OEgJ4iYIMPI81go7NiHuDVjtSj5HVzsbxnYSlOe0=;
- b=C7PAnIHAxEXv3a4MO6Vp2/14H7jYOIW77PsF8DzO/8HZ2jyR2sVKXWSuvINm2Mb7ht
- h6Go5ItMVus1KoPQiyaOFQ9UX9ldKDbaRyQypXc5Rozzy6Abh3dj5gb/CQJ179MsF21N
- WgPnfpIrBznR3TLUhOH9DiqZXQ2fButXHiMfF/jaqffDJypEmSxaLK9ienAUY5E1BlPQ
- +Gecb/TomfiOrOTvHy9Uk5Iv/3Ni35Xa4SCpTCFLoMMEqrkkxkE3MPOVGy8+6LdzwIdR
- iNXyutvinPHsrbbGxUAP5xsXdfAWyB711qK5h42by0aVoz5gq7jW7mq3JzXDnAkTSdf6
- oe0A==
-X-Gm-Message-State: AHQUAuaio7IYKNL7sBDKZfmIBS9jN+C4Olpb0cWsvNEdN5r+nOGFZmfb
- jKz4YL4ba4RV1RThLJomnWU=
-X-Google-Smtp-Source: AHgI3IYr6DW5xEyBkZoA2bWxKRmAM6CS+vmr/dyrrPkIUVkEW2uJNmmrx58yLGTrEraZZTLgdLxJTw==
-X-Received: by 2002:a17:902:8e8a:: with SMTP id
- bg10mr18866625plb.192.1550387228616; 
- Sat, 16 Feb 2019 23:07:08 -0800 (PST)
-Received: from dtor-ws ([2620:15c:202:201:3adc:b08c:7acc:b325])
- by smtp.gmail.com with ESMTPSA id u13sm2947298pfa.169.2019.02.16.23.07.07
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sat, 16 Feb 2019 23:07:07 -0800 (PST)
-Date: Sat, 16 Feb 2019 23:07:06 -0800
-From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-To: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
-Subject: Re: [PATCH v3 0/3] input: goodix - support Goodix gt5688
-Message-ID: <20190217070527.GC148958@dtor-ws>
-References: <cover.1550239328.git.agx@sigxcpu.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=nB8m/G/yjJJ5tRJEh/5vp8eT+5HSD9oX2DbxFowzUq0=;
+ b=Ip2dW2US7Sw3C4QJekeaOGdwZQdwrSI/rHpquIeA1FixqWdGBcWJrVUCMXbtcCRq+U
+ blp6LDohTWCdjtf7Rbs/jR4Q1dHO6h34YPCXOc5EkQfPpQzLu45dhjB8pBxJuF+R5zcZ
+ 7YEQ/ROpWlyhgUw31zZFRuGZFdIHEy6bR0oTOJBtZLaP4LSvHfdfb9gQYU8JX2tFtfJ9
+ Qd6da5EUzvXzAhuF6BYapZb6bKkR5ZVCUNWznbjCjAJ2n8OSw4axh++Ckg0kzFAjpnNQ
+ n6QQy7lxFnrGqkJm+CdD5p/ZWYpSuqWEOer02ui/2JX/Z2zLujYLplfhT159afxKs0T7
+ VKUA==
+X-Gm-Message-State: AHQUAuaFnZEaAB3g25qXDY1Wg9EqCQ8dB5LlHR9cyOqw0OZ1Z0t4VOb3
+ PvfAPYxgBdSYpW+10TEKHL5TLPblapzjvUivSq69cw==
+X-Google-Smtp-Source: AHgI3IZz3NiMhZ6+RJejFNWSPS04S4qmtJR0hLYMDQfWhvtgILLIS1ZNbRcZIxb881FrmQ0uevlc9V4wyOpbBWAUrZk=
+X-Received: by 2002:a6b:6b18:: with SMTP id g24mr9180689ioc.282.1550388637986; 
+ Sat, 16 Feb 2019 23:30:37 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1550239328.git.agx@sigxcpu.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <20190217043434.46233-1-cai@lca.pw>
+In-Reply-To: <20190217043434.46233-1-cai@lca.pw>
+From: Dmitry Vyukov <dvyukov@google.com>
+Date: Sun, 17 Feb 2019 08:30:25 +0100
+Message-ID: <CACT4Y+ZYd0LFLJTwBbPRXpS1SorgPjN6c6woUB+25Vd6GuStsw@mail.gmail.com>
+Subject: Re: [PATCH] trace: skip hwasan
+To: Qian Cai <cai@lca.pw>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190216_230710_875310_1187BD26 
-X-CRM114-Status: GOOD (  12.96  )
+X-CRM114-CacheID: sfid-20190216_233042_202732_612F3218 
+X-CRM114-Status: GOOD (  22.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,39 +89,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, Bastien Nocera <hadess@hadess.net>,
- linux-input@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
+ Steven Rostedt <rostedt@goodmis.org>, Ingo Molnar <mingo@redhat.com>,
+ kasan-dev <kasan-dev@googlegroups.com>,
+ Andrey Konovalov <andreyknvl@google.com>,
+ Andrey Ryabinin <aryabinin@virtuozzo.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 03:11:50PM +0100, Guido G=FCnther wrote:
-> Besides the support for gt5688 two more minimal changes piled up so I'm
-> folding these in here. One is a doc update for the goodix bindings, the
-> other one makes it a bit simpler to figure out configuration problems
-> (like lack of touchscreen-size-{x,y} in the device tree.
-> =
+On Sun, Feb 17, 2019 at 5:34 AM Qian Cai <cai@lca.pw> wrote:
+>
+> Enabling function tracer with CONFIG_KASAN_SW_TAGS=y (hwasan) tracer
+> causes the whole system frozen on ThunderX2 systems with 256 CPUs,
+> because there is a burst of too much pointer access, and then KASAN will
+> dereference each byte of the shadow address for the tag checking which
+> will kill all the CPUs.
 
-> I've kept the original subject to (hopefully) not break the series for
-> patchwork. All patches can be applied independently. Series is based on
-> next-20190208.
-> =
+Hi Qian,
 
-> Changes from v2
-> * Add 'dt-bindings: input: Refer to touchscreen.txt for goodix ts'
-> * Add 'input: goodix: Print values in case of inconsistencies'
->   (sent out separtely before, no comments so far)
-> * Collect 'Reviewed-By' on 'input: goodix - support Goodix gt5688'
+Could you please elaborate what exactly happens and who/why kills
+CPUs? Number of memory accesses should not make any difference.
+With hardware support (MTE) it won't be possible to disable
+instrumentation (loads and stores check tags themselves), so it would
+be useful to keep track of exact reasons we disable instrumentation to
+know how to deal with them with hardware support.
+It would be useful to keep this info in the comment in the Makefile.
 
-Applied the lot, thank you.
+Thanks
 
--- =
-
-Dmitry
+> Signed-off-by: Qian Cai <cai@lca.pw>
+> ---
+>  kernel/trace/Makefile | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/kernel/trace/Makefile b/kernel/trace/Makefile
+> index c2b2148bb1d2..fdd547a68385 100644
+> --- a/kernel/trace/Makefile
+> +++ b/kernel/trace/Makefile
+> @@ -28,6 +28,11 @@ ifdef CONFIG_GCOV_PROFILE_FTRACE
+>  GCOV_PROFILE := y
+>  endif
+>
+> +# Too much pointer access will kill hwasan.
+> +ifdef CONFIG_KASAN_SW_TAGS
+> +KASAN_SANITIZE := n
+> +endif
+> +
+>  CFLAGS_trace_benchmark.o := -I$(src)
+>  CFLAGS_trace_events_filter.o := -I$(src)
+>
+> --
+> 2.17.2 (Apple Git-113)
+>
+> --
+> You received this message because you are subscribed to the Google Groups "kasan-dev" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to kasan-dev+unsubscribe@googlegroups.com.
+> To post to this group, send email to kasan-dev@googlegroups.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/kasan-dev/20190217043434.46233-1-cai%40lca.pw.
+> For more options, visit https://groups.google.com/d/optout.
 
 _______________________________________________
 linux-arm-kernel mailing list
