@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 09D5AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0266C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C503B21A4A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B09C621900
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:10:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GhONZgEG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C503B21A4A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pBe6oJLE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B09C621900
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RLjnofK09D4sQsXSiV6sh3scGTYfwa73eXwLXXAtqnw=; b=GhONZgEGxSu/n7
-	zdnqwhbGyZm0T51gMxGFVEDpXq/WDG48jXMwoHdY9SgrbpwmrdjzAl0VZy0XoowLBYcz5tqP4P4IK
-	4dRYLa1l2n7Xp/jkc9Pp2Drj4ljkwwVoip2YvQrZgDJyQ5ED65CO+KrphJrByXs5GLshhgud1o7tJ
-	mNR4LqQvUHOqEdCNpVPQ39V5nIqpLXoPsFFXoClNLelYzuV/7f3/a4vQ8UVmro0xb4tsyorUkFGQ1
-	HxN9+zjzhlkQ7iYUNkCPJKQttBhCOhbnPa9YqeMCT3usXUFAW0LIxQBLa8i6QxrtKi9Mr1iCpfNZT
-	s71QiHUyCvg2UgM8V+fw==;
+	List-Owner; bh=H1VeyutdNKYgHo7syag70ZDeZsC+AGlovHYVf4Z8RQY=; b=pBe6oJLEB0g5A3
+	gacNQ+EJKt/yf6l+QPva3ypKaMpxJefGhNN8lL/iJcitx2okEvTD+/hP6vFX/2JyoZ3FsbNqsZn3R
+	E3vgJ1IuYjKAcX47Plx4f+2KLRKOMqicGjdbiTntSr8tLxtjEXcjbhRNTdlSeNaLqLu0tXBPHkMkC
+	xn/1oTd9WB8+fR3f6H0uK23OVZfWB2X1heJrAc61UufU7BJbwFY8kM8z5GsfRHTmgduCIbFHbOwT0
+	6qouerK9uEE7wKwhGzlajshjyJJdq77u5YRVFpxrGQ5WVyD98qsSls6JpT8XlYVh4GEMmDoIRpe4m
+	OQWtx0TjdvNxHtdEKUuA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvISi-0007mB-QK; Sun, 17 Feb 2019 09:10:12 +0000
+	id 1gvISu-0008Rg-Hk; Sun, 17 Feb 2019 09:10:24 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvIS4-0006Ud-Ke; Sun, 17 Feb 2019 09:09:48 +0000
-X-UUID: 23943a51e1a944fd9ff389983be41b99-20190217
-X-UUID: 23943a51e1a944fd9ff389983be41b99-20190217
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
+ id 1gvISJ-0006R2-0S; Sun, 17 Feb 2019 09:10:06 +0000
+X-UUID: 5e0ce8773f214b818ab8ab39179dddce-20190217
+X-UUID: 5e0ce8773f214b818ab8ab39179dddce-20190217
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 860364945; Sun, 17 Feb 2019 01:09:31 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
+ with ESMTP id 729120376; Sun, 17 Feb 2019 01:08:33 -0800
+Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 01:09:29 -0800
+ 15.0.1395.4; Sun, 17 Feb 2019 01:08:31 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 17:09:27 +0800
+ mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 17 Feb 2019 17:08:30 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sun, 17 Feb 2019 17:09:26 +0800
+ Transport; Sun, 17 Feb 2019 17:08:29 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v6 20/22] iommu/mediatek: Rename enable_4GB to dram_is_4gb
-Date: Sun, 17 Feb 2019 17:04:58 +0800
-Message-ID: <1550394300-17420-21-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v6 12/22] memory: mtk-smi: Add gals support
+Date: Sun, 17 Feb 2019 17:04:50 +0800
+Message-ID: <1550394300-17420-13-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 5B0FB1D48A92A447B225EC4968B7729CBEFB9D291F130389DD051641658FA1BE2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_010933_244388_F86BA138 
-X-CRM114-Status: GOOD (  13.24  )
+X-CRM114-CacheID: sfid-20190217_010947_187630_E1FD3B21 
+X-CRM114-Status: GOOD (  16.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,68 +90,138 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch only rename the variable name from enable_4GB to
-dram_is_4gb for readable.
+In some SoCs like mt8183, SMI add GALS(Global Async Local Sync) module
+which can help synchronize for the modules in different clock frequency.
+It can be seen as a "asynchronous fifo". This is a example diagram:
 
+            M4U
+             |
+         ----------
+         |        |
+     gals0-rx   gals1-rx
+         |        |
+         |        |
+     gals0-tx   gals1-tx
+         |        |
+        ------------
+         SMI Common
+        ------------
+             |
+  +-----+--------+-----+- ...
+  |     |        |     |
+  |  gals-rx  gals-rx  |
+  |     |        |     |
+  |     |        |     |
+  |  gals-tx  gals-tx  |
+  |     |        |     |
+larb1 larb2   larb3  larb4
+
+GALS only help transfer the command/data while it doesn't have the
+configuring register, thus it has the special "smi" clock and doesn't
+have the "apb" clock. From the diagram above, we add "gals0" and
+"gals1" clocks for smi-common and add a "gals" clock for smi-larb.
+
+This patch adds gals clock supporting in the SMI. Note that some larbs
+may still don't have the "gals" clock like larb1 and larb4 above.
+
+This is also a preparing patch for mt8183 which has GALS.
+
+CC: Matthias Brugger <matthias.bgg@gmail.com>
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/iommu/mtk_iommu.c | 10 +++++-----
- drivers/iommu/mtk_iommu.h |  2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/memory/mtk-smi.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 8742841..0277396 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -382,7 +382,7 @@ static int mtk_iommu_map(struct iommu_domain *domain, unsigned long iova,
- 	int ret;
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 8a2f968..91634d7 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -56,6 +56,7 @@ enum mtk_smi_gen {
  
- 	/* The "4GB mode" M4U physically can not use the lower remap of Dram. */
--	if (data->plat_data->has_4gb_mode && data->enable_4GB)
-+	if (data->plat_data->has_4gb_mode && data->dram_is_4gb)
- 		paddr |= BIT_ULL(32);
+ struct mtk_smi_common_plat {
+ 	enum mtk_smi_gen gen;
++	bool             has_gals;
+ };
  
- 	spin_lock_irqsave(&dom->pgtlock, flags);
-@@ -554,13 +554,13 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+ struct mtk_smi_larb_gen {
+@@ -63,11 +64,13 @@ struct mtk_smi_larb_gen {
+ 	int port_in_larb[MTK_LARB_NR_MAX + 1];
+ 	void (*config_port)(struct device *);
+ 	unsigned int larb_direct_to_common_mask;
++	bool             has_gals;
+ };
  
- 	if (data->plat_data->m4u_plat == M4U_MT8173)
--		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
-+		regval = (data->protect_base >> 1) | (data->dram_is_4gb << 31);
- 	else
- 		regval = lower_32_bits(data->protect_base) |
- 			 upper_32_bits(data->protect_base);
- 	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+ struct mtk_smi {
+ 	struct device			*dev;
+ 	struct clk			*clk_apb, *clk_smi;
++	struct clk			*clk_gals0, *clk_gals1;
+ 	struct clk			*clk_async; /*only needed by mt2701*/
+ 	void __iomem			*smi_ao_base;
  
--	if (data->enable_4GB && data->plat_data->has_vld_pa_rng) {
-+	if (data->dram_is_4gb && data->plat_data->has_vld_pa_rng) {
- 		/*
- 		 * If 4GB mode is enabled, the validate PA range is from
- 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
-@@ -611,8 +611,8 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	data->protect_base = ALIGN(virt_to_phys(protect), MTK_PROTECT_PA_ALIGN);
+@@ -99,8 +102,20 @@ static int mtk_smi_enable(const struct mtk_smi *smi)
+ 	if (ret)
+ 		goto err_disable_apb;
  
--	/* Whether the current dram is over 4GB */
--	data->enable_4GB = !!(max_pfn > (BIT_ULL(32) >> PAGE_SHIFT));
-+	/* Whether the current dram is 4GB. */
-+	data->dram_is_4gb = !!(max_pfn > (BIT_ULL(32) >> PAGE_SHIFT));
++	ret = clk_prepare_enable(smi->clk_gals0);
++	if (ret)
++		goto err_disable_smi;
++
++	ret = clk_prepare_enable(smi->clk_gals1);
++	if (ret)
++		goto err_disable_gals0;
++
+ 	return 0;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	data->base = devm_ioremap_resource(dev, res);
-diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index dedf05c..90e98a6 100644
---- a/drivers/iommu/mtk_iommu.h
-+++ b/drivers/iommu/mtk_iommu.h
-@@ -66,7 +66,7 @@ struct mtk_iommu_data {
- 	struct mtk_iommu_domain		*m4u_dom;
- 	struct iommu_group		*m4u_group;
- 	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
--	bool                            enable_4GB;
-+	bool                            dram_is_4gb;
- 	bool				tlb_flush_active;
++err_disable_gals0:
++	clk_disable_unprepare(smi->clk_gals0);
++err_disable_smi:
++	clk_disable_unprepare(smi->clk_smi);
+ err_disable_apb:
+ 	clk_disable_unprepare(smi->clk_apb);
+ err_put_pm:
+@@ -110,6 +125,8 @@ static int mtk_smi_enable(const struct mtk_smi *smi)
  
- 	struct iommu_device		iommu;
+ static void mtk_smi_disable(const struct mtk_smi *smi)
+ {
++	clk_disable_unprepare(smi->clk_gals1);
++	clk_disable_unprepare(smi->clk_gals0);
+ 	clk_disable_unprepare(smi->clk_smi);
+ 	clk_disable_unprepare(smi->clk_apb);
+ 	pm_runtime_put_sync(smi->dev);
+@@ -310,6 +327,15 @@ static int mtk_smi_larb_probe(struct platform_device *pdev)
+ 	larb->smi.clk_smi = devm_clk_get(dev, "smi");
+ 	if (IS_ERR(larb->smi.clk_smi))
+ 		return PTR_ERR(larb->smi.clk_smi);
++
++	if (larb->larb_gen->has_gals) {
++		/* The larbs may still haven't gals even if the SoC support.*/
++		larb->smi.clk_gals0 = devm_clk_get(dev, "gals");
++		if (PTR_ERR(larb->smi.clk_gals0) == -ENOENT)
++			larb->smi.clk_gals0 = NULL;
++		else if (IS_ERR(larb->smi.clk_gals0))
++			return PTR_ERR(larb->smi.clk_gals0);
++	}
+ 	larb->smi.dev = dev;
+ 
+ 	if (larb->larb_gen->need_larbid) {
+@@ -402,6 +428,16 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	if (IS_ERR(common->clk_smi))
+ 		return PTR_ERR(common->clk_smi);
+ 
++	if (common->plat->has_gals) {
++		common->clk_gals0 = devm_clk_get(dev, "gals0");
++		if (IS_ERR(common->clk_gals0))
++			return PTR_ERR(common->clk_gals0);
++
++		common->clk_gals1 = devm_clk_get(dev, "gals1");
++		if (IS_ERR(common->clk_gals1))
++			return PTR_ERR(common->clk_gals1);
++	}
++
+ 	/*
+ 	 * for mtk smi gen 1, we need to get the ao(always on) base to config
+ 	 * m4u port, and we need to enable the aync clock for transform the smi
 -- 
 1.9.1
 
