@@ -2,22 +2,21 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2591CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 10:02:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE954C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 10:58:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E68122196E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 10:02:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A02132192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 10:58:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hns4phdi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lechnology.com header.i=@lechnology.com header.b="Vxknrb1t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E68122196E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lechnology.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VGxUQLpp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A02132192C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=katsuster.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
@@ -25,67 +24,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=iPm2BndqI9TaLcogiKp3u2RuApH7fRq/Uf74MRITdMA=; b=hns4phdiVOewd3omEVyoRiJsN
-	lEtDXQ3iJHAv2/MxxhQakH0lrWBCFQ8YC3Wvh+ueJScpLFS2SyOrtkdsl9jlR76D5hVfT22C8X7cT
-	jaOgd0V/EZ1uENDnw9VnVm6zvsNJZgxYPCvpDyR9Mk6S/oPKThIWQJ7kyLf2uu9XOWDFAne14yDkl
-	WMb1vPoxGv91VcjCGiJEq31KBoxZBGLg4d27sClx+PM3KMmwATVHAJBArGKsc9c62Du9iAzbcl+Kp
-	gG+mHGz7u/JIXbgW6QK5A8c125z0CSmwTyD1vC3v0dN8lqSdYyitZSbV0HL737bCLUiWT/bOfkPiE
-	jlAA0w51g==;
+	 bh=B5eCDYXXkFdOg4gHmFgYHO7I1FkmtMu1HWE3HiPNDy0=; b=VGxUQLpphsziYoDRfXjioVxeM
+	QmG7ET0Pi/u8JGm/0MI8+0A5frS8BRR8rEF2lSbYLY9eg180ueVp1KWjzGnnjhwGMdmCOQavGPnov
+	Dhc8VGjTBpYnTNB2IZE4XNA74gjsVX1IRC9/P//hgm/SE7D4fKe7gALOd46QZtkEI9ussfghfIKrT
+	5lXNGy+QbAZwGG+J3wWUutmtfY8F3BhTsSJjd1tnf8bdZOuN0ERNAvR/7Z0JQeI5MNaMi/CGgF+cg
+	u1lDbGVhb0P45VXUFe0HeG4OwQgj5JqBSTM3YHd2ZYC9RT78cFarpnfne4WuVVXscwZaOKwwVOdAM
+	BwyNem77w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvJHc-00050A-5k; Sun, 17 Feb 2019 10:02:48 +0000
-Received: from vern.gendns.com ([98.142.107.122])
+	id 1gvK9t-0003oL-D9; Sun, 17 Feb 2019 10:58:53 +0000
+Received: from www1102.sakura.ne.jp ([219.94.129.142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvJHU-0004yx-N3
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 10:02:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=lechnology.com; s=default; h=Content-Transfer-Encoding:Content-Type:
- In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=xgNX1DKblGaGC2VVnV82eoj/wo9co1Ey0MrSpCK0GfE=; b=Vxknrb1th/YrDZG03a0cWqDszb
- wMtSR3xmLg3X1W0L1g34A/OGcohJRxqbmNb+cSPYSYflV5vG0pwtAQaxLEKmE61tR2p91YNL9Togi
- 9GrJH0RD1gEWfPkw6PtLKJ97lTJQH5uuer2xYU39z+2Qn+rObaGZ8gvxdn1wx6oys9cgRM9YZ5f/h
- AYlmvVQ0lMX8aUOqNUHQsCnUgMUD8Pigogg/vwydmQc4qDnz5AsN/tjaDrMLGKINlAdzp4Mqp5KKi
- aAo1NmpwqTIAJt6a+289yL2qdYJmauxgyOV3dBBwdqTQ917vqieWshmdgf4QFcJHSKj3hTFNvBUGn
- 1R1FdYfw==;
-Received: from [185.122.190.68] (port=58783 helo=gerda-5.local)
- by vern.gendns.com with esmtpsa (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128)
- (Exim 4.91) (envelope-from <david@lechnology.com>)
- id 1gvJHI-0001Au-UZ; Sun, 17 Feb 2019 05:02:29 -0500
-Subject: Re: [PATCH v4 37/37] ARM: davinci: remove intc related fields from
- davinci_soc_info
-To: Bartosz Golaszewski <brgl@bgdev.pl>,
- Dmitry Torokhov <dmitry.torokhov@gmail.com>, Sekhar Nori <nsekhar@ti.com>,
- Kevin Hilman <khilman@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
- Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>
-References: <20190214145231.8750-1-brgl@bgdev.pl>
- <20190214145231.8750-38-brgl@bgdev.pl>
-From: David Lechner <david@lechnology.com>
-Message-ID: <e0aad134-6bca-3f29-0a6c-2369f57a5a17@lechnology.com>
-Date: Sun, 17 Feb 2019 11:02:36 +0100
-User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:60.0)
- Gecko/20100101 Thunderbird/60.5.0
+ id 1gvK9p-0003nx-TZ; Sun, 17 Feb 2019 10:58:51 +0000
+Received: from fsav103.sakura.ne.jp (fsav103.sakura.ne.jp [27.133.134.230])
+ by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTP id x1HAwakg030582;
+ Sun, 17 Feb 2019 19:58:37 +0900 (JST)
+ (envelope-from katsuhiro@katsuster.net)
+Received: from www1102.sakura.ne.jp (219.94.129.142)
+ by fsav103.sakura.ne.jp (F-Secure/fsigk_smtp/530/fsav103.sakura.ne.jp);
+ Sun, 17 Feb 2019 19:58:36 +0900 (JST)
+X-Virus-Status: clean(F-Secure/fsigk_smtp/530/fsav103.sakura.ne.jp)
+Received: from [192.168.1.2] (119.104.232.153.ap.dti.ne.jp [153.232.104.119])
+ (authenticated bits=0)
+ by www1102.sakura.ne.jp (8.15.2/8.15.2) with ESMTPSA id x1HAwaEH030577
+ (version=TLSv1.2 cipher=AES256-SHA bits=256 verify=NO);
+ Sun, 17 Feb 2019 19:58:36 +0900 (JST)
+ (envelope-from katsuhiro@katsuster.net)
+Subject: Re: [PATCH] arm64: dts: rockchip: add HDMI sound node for
+ rk3328-rock64
+To: =?UTF-8?Q?Heiko_St=c3=bcbner?= <heiko@sntech.de>
+References: <20190202043444.9308-1-katsuhiro@katsuster.net>
+ <1970132.3b67tCGWFf@phil>
+ <c4ce7f7a-c791-ae0a-ad3d-02b2efa41709@katsuster.net>
+ <2275914.n7pQDzs7mT@diego>
+From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Message-ID: <16f4fcf0-e9c2-e925-e463-282cfff088c7@katsuster.net>
+Date: Sun, 17 Feb 2019 19:58:36 +0900
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-In-Reply-To: <20190214145231.8750-38-brgl@bgdev.pl>
+In-Reply-To: <2275914.n7pQDzs7mT@diego>
 Content-Language: en-US
-X-AntiAbuse: This header was added to track abuse,
- please include it with any abuse report
-X-AntiAbuse: Primary Hostname - vern.gendns.com
-X-AntiAbuse: Original Domain - lists.infradead.org
-X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
-X-AntiAbuse: Sender Address Domain - lechnology.com
-X-Get-Message-Sender-Via: vern.gendns.com: authenticated_id:
- davidmain+lechnology.com/only user confirmed/virtual account not confirmed
-X-Authenticated-Sender: vern.gendns.com: davidmain@lechnology.com
-X-Source: 
-X-Source-Args: 
-X-Source-Dir: 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_020240_827730_30D1F57E 
-X-CRM114-Status: UNSURE (   7.28  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190217_025850_188361_A6AF1D34 
+X-CRM114-Status: GOOD (  15.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,26 +79,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/14/19 8:52 AM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> The fields related to the two davinci interrupt controllers are no
-> longer used. Remove them.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
-
-Reviewed-by: David Lechner <david@lechnology.com>
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGVsbG8gSGVpa28sCgpPbiAyMDE5LzAyLzEyIDIwOjEyLCBIZWlrbyBTdMO8Ym5lciB3cm90ZToK
+PiBIaSwKPiAKPiBBbSBNb250YWcsIDQuIEZlYnJ1YXIgMjAxOSwgMTM6NTk6MzcgQ0VUIHNjaHJp
+ZWIgS2F0c3VoaXJvIFN1enVraToKPj4gT24gMjAxOS8wMi8wMyAxODowNiwgSGVpa28gU3R1ZWJu
+ZXIgd3JvdGU6Cj4+PiBBbSBTYW1zdGFnLCAyLiBGZWJydWFyIDIwMTksIDA1OjM0OjQ0IENFVCBz
+Y2hyaWViIEthdHN1aGlybyBTdXp1a2k6Cj4+Pj4gVGhpcyBwYXRjaCBhZGRzIEhETUkgc291bmQg
+KEkyUzApIG5vZGUgYW5kIHJlbW92ZSBkbWEgcHJvcGVydGllcwo+Pj4+IGZyb20gVUFSVDIgbm9k
+ZSBmb3Igcm9jazY0Lgo+Pj4+Cj4+Pj4gVGhlIERNQUMgb2YgcmszMzI4IGNhbiB1c2UgOCBjaGFu
+bmVscyBhdCBzYW1lIHRpbWUuIEN1cnJlbnRseSwgdG90YWwKPj4+Pgo+Pj4+IDcgY2hhbm5lbHMg
+YXJlIHVzZWQgYXMgZm9sbG93czoKPj4+PiAgICAgLSBJMlMxICAyY2gKPj4+PiAgICAgLSBVQVJU
+MiAyY2gKPj4+PiAgICAgLSBTUERJRiAxY2gKPj4+PiAgICAgLSBTUEkwICAyY2gKPj4+Pgo+Pj4+
+IEhETUkgYXVkaW8gdXNpbmcgSTJTMCB0aGF0IHJlcXVpcmVzIDJjaCBidXQgRE1BQyBoYXMgb25s
+eSAxIGNoYW5uZWwuCj4+Pj4KPj4+PiBVQVJUMiBjYW4gd29yayB3aXRob3V0IERNQSByZXNvdXJj
+ZXMsIHNvIHRoaXMgcGF0Y2ggcmVtb3ZlcyBkbWEKPj4+PiBhbGxvY2F0aW9uIGZvciBVQVJUMiBh
+bmQgcmV1c2VzIGl0IHRvIEkyUzAuCj4+Pgo+Pj4gSSBkb24ndCBmb2xsb3cgdGhhdCBkZXNjcmlw
+dGlvbi4gSG93IGNhbiBpMnMwIHJlLXVzZSB0aGUgdWFydDIgZG1hCj4+PiBjaGFubmVscz8gTG9v
+a2luZyBhdCB0aGUgZG1hIHRhYmxlIGluIHRoZSBUUk0sIHVhcnQyIGhhcyBjaGFubmVscyA2KzcK
+Pj4+IHdoaWxlIGkyczAgdXNlcyBjaGFubmVscyAxMSsxMi4gVGhleSBzaG91bGQganVzdCBydW4g
+Y29uY3VycmVudGx5Pwo+Pgo+PiBTb3JyeSBmb3IgY29uZnVzaW5nLi4uIDYgb3IgNyBpcyBhcyBJ
+RCBudW1iZXIgb2Ygc2xhdmUgRE1BIGNoYW5uZWwuCj4+IFRSTSBjYWxscyBpdCAnUmVxIG51bWJl
+cicuIFJlcSBudW1iZXIgNis3IGFuZCAxMSsxMiBjYW4gd29yawo+PiBjb25jdXJyZW50bHkgYnV0
+IFRSTSBzYXlzIERNQUMgY2FuIHRyYW5zZmVyIDggRE1BIGNoYW5uZWxzIGF0IHNhbWUKPj4gdGlt
+ZS4gU28gYWxsIDE2IFJlcSBudW1iZXJzIGNhbm5vdCBhY3RpdmF0ZSBhdCBzYW1lIHRpbWUuIEl0
+IHNob3VsZAo+PiBiZSBrZWVwIGxlc3Mgb3IgZXF1YWwgdGhhbiA4IG51bWJlcnMuCj4gCj4gQnV0
+IHRoYXQgInNob3J0Y29taW5nIiBvZiBoYXZpbmcgbW9yZSByZXF1ZXN0cyB0aGFuIGNoYW5uZWxz
+IGlzIG5vdAo+IHNvbWV0aGluZyBzcGVjaWZpYyB0byB0aGUgcGwzMzAsIGluc3RlYWQgbW9zdCBk
+bWEgY29udHJvbGxlcnMgaGF2ZSB0aGF0Cj4gInByb2JsZW0iLCB3aGljaCBzZWVtcyB0byBnZXQg
+c29sdmVkIGJ5IHRoZSB2aXJ0LWRtYSBtZWNoYW5pc20gb2YKPiBkbWFlbmdpbmUgLSB3aGljaCBw
+bDMzMCBkb2Vzbid0IHVzZSBzbyBmYXIuIChidXQgc2VlIHBsMDgwIGZvciBleGFtcGxlKQo+IAoK
+SSB1bmRlcnN0YW5kLiBJIGRyb3AgdGhlc2UgcGF0Y2hlcy4KCgo+IFRoZSBkZXZpY2V0cmVlIG9u
+bHkgZGVzY3JpYmVzIHRoZSBoYXJkd2FyZSBhbmQgaXMgbmV2ZXIgbWVhbnQgYXMgYQo+IGNvbmZp
+Z3VyYXRpb24gc3BhY2UgZm9yIGtlcm5lbC1jb2RlIHNob3J0Y29taW5ncy4KPiAKClllcywgcmln
+aHQuIEkgZG9uJ3Qgd2FudCB0byB1c2UgZGV2aWNlLXRyZWUgYXMgY29uZmlndXJhdGlvbiBzcGFj
+ZSwKc28gd2hpY2ggaXMgYmV0dGVyPwoKLSBGaXggdGhlIHBsMzMwIGRyaXZlciBmaXJzdCBhbmQg
+YWZ0ZXIgdGhhdCBhZGQgSERNSS1zb3VuZCBub2RlCiAgIHRvIGRldmljZS10cmVlLgotIEp1c3Qg
+YWRkIEhETUktc291bmQgbm9kZSB0byBkZXZpY2UtdHJlZS4gSWYgc29tZW9uZSAoaW5jbHVkZSBt
+ZSkKICAgd2FudCB0byBzdXBwb3J0IHZpcnQtZG1hIG9uIHBsMzMwIGRyaXZlciwgdGhleSB3aWxs
+IGZpeCBpdC4KICAgKFBMMzMwIHdpbGwgZmFjZSBlcnJvciBidXQgYWxsIHNvdW5kcyB3b3JrcyBm
+aW5lIGFuZCBVQVJUIHN0aWxsCiAgIHdvcmtzIGZpbmUgd2l0aCBETUEgZXJyb3IpCgo+IAo+IEhl
+aWtvCj4gCj4gCj4gCgpCZXN0IFJlZ2FyZHMsCkthdHN1aGlybyBTdXp1a2kKCl9fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
+bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
+dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
