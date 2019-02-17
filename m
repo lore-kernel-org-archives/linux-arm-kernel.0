@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CCB53C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:12:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E78D8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:22:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AEC7218FF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:12:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABA5521925
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:22:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tasN+TV6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AEC7218FF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SEDJtNZ3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABA5521925
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=p0nOHKS+htbFXEgbIaFjJs81o6ZDOckjcAbJl4csLtc=; b=tasN+TV6INWnwy
-	ud/+oEFjgEO6Dx94UiBy4hoQhv6H+UtItOIX738NXAuHUWQY7xhZCxcyc3Z3RZDNrlKv/QLcPRiWm
-	hBAclxHQo8ZwH3RHXWr2UkUMiXh/zPggA5+KHlO9iFU7vA1AKvMmhEkIQJ2OFbbfCmxM/Ns9Q4ENK
-	evzUXp4LuZmQlW/WHHC2i3IfvNlO8cmxlC3ztGfTb3G8JwoKnL+mGi8QJ13ohu3uxR0cydiIZukJC
-	diRjtHZkn8vcMD1IQwOSv8iZSbPl7Bv5HPQCtLKRjkWgoKcSXPjgaW8jkukS8SnuP/9/iYI9/HA61
-	6x2B2bIHnHleG7uTdwNg==;
+	List-Owner; bh=lD4MSNyfTzbIbFuKuK/8OCsXQoyG69VGoZVWG2SKKTw=; b=SEDJtNZ3miCBWU
+	IdZY9U8v+MnECgcC7bh/xt1D2O/PVYPo/hTj5GZHxQHivcPSr/Gbdmmgyy+j57nCM9K/R8+u6YR0R
+	KLenSttKdVLI8dBEQgLN4b90L9ZwEZaRJNBjKzlm4tM4lSnhhJwjWf/DeYvt72i4MrMP+uQ9AwzJ+
+	CwMkpRn/n2mMlxUodJBF6jCinYklQgsJL0edDXz6ISbAdtFgW0BRntuWRgr58ZaDKCe+8V/yDsZV/
+	MvzpJ0h2o3kM7xnjsi7/VC4BKqMEWDnT72+QNCihlx/W0SFDEl47yuLJ+TZx9j3KdRm7i6QzVHAZU
+	U0xqdYwxzZAHKOflJilQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvIV2-0002U5-3T; Sun, 17 Feb 2019 09:12:36 +0000
+	id 1gvIep-0005d9-Dv; Sun, 17 Feb 2019 09:22:43 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvITu-0008RB-KD; Sun, 17 Feb 2019 09:11:56 +0000
-X-UUID: 7ebb5299a37d480dbb4cba4647dca6a3-20190217
-X-UUID: 7ebb5299a37d480dbb4cba4647dca6a3-20190217
+ id 1gvITB-0008Pm-Nw; Sun, 17 Feb 2019 09:11:01 +0000
+X-UUID: d7766ed914c8459db9f71e9d499b3b82-20190217
+X-UUID: d7766ed914c8459db9f71e9d499b3b82-20190217
 Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1746359455; Sun, 17 Feb 2019 01:09:10 -0800
+ with ESMTP id 222060789; Sun, 17 Feb 2019 01:09:10 -0800
 Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
  MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Sun, 17 Feb 2019 01:09:09 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
  mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 17:08:48 +0800
+ 15.0.1395.4; Sun, 17 Feb 2019 17:09:03 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sun, 17 Feb 2019 17:08:47 +0800
+ Transport; Sun, 17 Feb 2019 17:09:02 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v6 14/22] iommu/mediatek: Add mmu1 support
-Date: Sun, 17 Feb 2019 17:04:52 +0800
-Message-ID: <1550394300-17420-15-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v6 16/22] memory: mtk-smi: Add bus_sel for mt8183
+Date: Sun, 17 Feb 2019 17:04:54 +0800
+Message-ID: <1550394300-17420-17-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 634CB8E523EDCAC4A3AAD411909856D3EA8AF57486584BE8F2A0BE018B8556A12000:8
+X-TM-SNTS-SMTP: 3809A0B3FBF2460047979D43386B31E7E4C916FDAB1F58F506FB898D91E94B932000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_011127_101494_FA5D839D 
-X-CRM114-Status: GOOD (  13.08  )
+X-CRM114-CacheID: sfid-20190217_011041_929369_AD7F76CE 
+X-CRM114-Status: GOOD (  15.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,121 +91,101 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Normally the M4U HW connect EMI with smi. the diagram is like below:
-              EMI
-               |
-              M4U
-               |
-            smi-common
-               |
-       -----------------
-       |    |    |     |    ...
-    larb0 larb1  larb2 larb3
+There are 2 mmu cells in a M4U HW. we could adjust some larbs entering
+mmu0 or mmu1 to balance the bandwidth via the smi-common register
+SMI_BUS_SEL(0x220)(Each larb occupy 2 bits).
 
-Actually there are 2 mmu cells in the M4U HW, like this diagram:
+In mt8183, For better performance, we switch larb1/2/5/7 to enter
+mmu1 while the others still keep enter mmu0.
 
-              EMI
-           ---------
-            |     |
-           mmu0  mmu1     <- M4U
-            |     |
-           ---------
-               |
-            smi-common
-               |
-       -----------------
-       |    |    |     |    ...
-    larb0 larb1  larb2 larb3
+In mt8173 and mt2712, we don't get the performance issue,
+Keep its default value(0x0), that means all the larbs enter mmu0.
 
-This patch add support for mmu1. In order to get better performance,
-we could adjust some larbs go to mmu1 while the others still go to
-mmu0. This is controlled by a SMI COMMON register SMI_BUS_SEL(0x220).
+Note: smi gen1(mt2701/mt7623) don't have this bus_sel.
 
-mt2712, mt8173 and mt8183 M4U HW all have 2 mmu cells. the default
-value of that register is 0 which means all the larbs go to mmu0
-defaultly.
+And, the base of smi-common is completely different with smi_ao_base
+of gen1, thus I add new variable for that.
 
-This is a preparing patch for adjusting SMI_BUS_SEL for mt8183.
-
+CC: Matthias Brugger <matthias.bgg@gmail.com>
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/iommu/mtk_iommu.c | 46 +++++++++++++++++++++++++++++-----------------
- 1 file changed, 29 insertions(+), 17 deletions(-)
+ drivers/memory/mtk-smi.c | 22 ++++++++++++++++++++--
+ 1 file changed, 20 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index bdf8dea..84f18bd 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -72,26 +72,32 @@
- #define F_INT_CLR_BIT				BIT(12)
+diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+index 9790801..08cf40d 100644
+--- a/drivers/memory/mtk-smi.c
++++ b/drivers/memory/mtk-smi.c
+@@ -49,6 +49,12 @@
+ #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
+ #define F_MMU_EN		BIT(0)
  
- #define REG_MMU_INT_MAIN_CONTROL		0x124
--#define F_INT_TRANSLATION_FAULT			BIT(0)
--#define F_INT_MAIN_MULTI_HIT_FAULT		BIT(1)
--#define F_INT_INVALID_PA_FAULT			BIT(2)
--#define F_INT_ENTRY_REPLACEMENT_FAULT		BIT(3)
--#define F_INT_TLB_MISS_FAULT			BIT(4)
--#define F_INT_MISS_TRANSACTION_FIFO_FAULT	BIT(5)
--#define F_INT_PRETETCH_TRANSATION_FIFO_FAULT	BIT(6)
-+						/* mmu0 | mmu1 */
-+#define F_INT_TRANSLATION_FAULT			(BIT(0) | BIT(7))
-+#define F_INT_MAIN_MULTI_HIT_FAULT		(BIT(1) | BIT(8))
-+#define F_INT_INVALID_PA_FAULT			(BIT(2) | BIT(9))
-+#define F_INT_ENTRY_REPLACEMENT_FAULT		(BIT(3) | BIT(10))
-+#define F_INT_TLB_MISS_FAULT			(BIT(4) | BIT(11))
-+#define F_INT_MISS_TRANSACTION_FIFO_FAULT	(BIT(5) | BIT(12))
-+#define F_INT_PRETETCH_TRANSATION_FIFO_FAULT	(BIT(6) | BIT(13))
++/* SMI COMMON */
++#define SMI_BUS_SEL			0x220
++#define SMI_BUS_LARB_SHIFT(larbid)	((larbid) << 1)
++/* All are MMU0 defaultly. Only specialize mmu1 here. */
++#define F_MMU1_LARB(larbid)		(0x1 << SMI_BUS_LARB_SHIFT(larbid))
++
+ enum mtk_smi_gen {
+ 	MTK_SMI_GEN1,
+ 	MTK_SMI_GEN2
+@@ -57,6 +63,7 @@ enum mtk_smi_gen {
+ struct mtk_smi_common_plat {
+ 	enum mtk_smi_gen gen;
+ 	bool             has_gals;
++	u32              bus_sel; /* Balance some larbs to enter mmu0 or mmu1 */
+ };
  
- #define REG_MMU_CPE_DONE			0x12C
+ struct mtk_smi_larb_gen {
+@@ -72,8 +79,8 @@ struct mtk_smi {
+ 	struct clk			*clk_apb, *clk_smi;
+ 	struct clk			*clk_gals0, *clk_gals1;
+ 	struct clk			*clk_async; /*only needed by mt2701*/
+-	void __iomem			*smi_ao_base;
+-
++	void __iomem			*smi_ao_base; /* only for gen1 */
++	void __iomem			*base;	      /* only for gen2 */
+ 	const struct mtk_smi_common_plat *plat;
+ };
  
- #define REG_MMU_FAULT_ST1			0x134
-+#define F_REG_MMU0_FAULT_MASK			GENMASK(6, 0)
-+#define F_REG_MMU1_FAULT_MASK			GENMASK(13, 7)
+@@ -410,6 +417,8 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
+ static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
+ 	.gen      = MTK_SMI_GEN2,
+ 	.has_gals = true,
++	.bus_sel  = F_MMU1_LARB(1) | F_MMU1_LARB(2) | F_MMU1_LARB(5) |
++		    F_MMU1_LARB(7),
+ };
  
--#define REG_MMU_FAULT_VA			0x13c
-+#define REG_MMU0_FAULT_VA			0x13c
- #define F_MMU_FAULT_VA_WRITE_BIT		BIT(1)
- #define F_MMU_FAULT_VA_LAYER_BIT		BIT(0)
- 
--#define REG_MMU_INVLD_PA			0x140
--#define REG_MMU_INT_ID				0x150
--#define F_MMU0_INT_ID_LARB_ID(a)		(((a) >> 7) & 0x7)
--#define F_MMU0_INT_ID_PORT_ID(a)		(((a) >> 2) & 0x1f)
-+#define REG_MMU0_INVLD_PA			0x140
-+#define REG_MMU1_FAULT_VA			0x144
-+#define REG_MMU1_INVLD_PA			0x148
-+#define REG_MMU0_INT_ID				0x150
-+#define REG_MMU1_INT_ID				0x154
-+#define F_MMU_INT_ID_LARB_ID(a)			(((a) >> 7) & 0x7)
-+#define F_MMU_INT_ID_PORT_ID(a)			(((a) >> 2) & 0x1f)
- 
- #define MTK_PROTECT_PA_ALIGN			128
- 
-@@ -210,13 +216,19 @@ static irqreturn_t mtk_iommu_isr(int irq, void *dev_id)
- 
- 	/* Read error info from registers */
- 	int_state = readl_relaxed(data->base + REG_MMU_FAULT_ST1);
--	fault_iova = readl_relaxed(data->base + REG_MMU_FAULT_VA);
-+	if (int_state & F_REG_MMU0_FAULT_MASK) {
-+		regval = readl_relaxed(data->base + REG_MMU0_INT_ID);
-+		fault_iova = readl_relaxed(data->base + REG_MMU0_FAULT_VA);
-+		fault_pa = readl_relaxed(data->base + REG_MMU0_INVLD_PA);
+ static const struct of_device_id mtk_smi_common_of_ids[] = {
+@@ -482,6 +491,11 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 		ret = clk_prepare_enable(common->clk_async);
+ 		if (ret)
+ 			return ret;
 +	} else {
-+		regval = readl_relaxed(data->base + REG_MMU1_INT_ID);
-+		fault_iova = readl_relaxed(data->base + REG_MMU1_FAULT_VA);
-+		fault_pa = readl_relaxed(data->base + REG_MMU1_INVLD_PA);
-+	}
- 	layer = fault_iova & F_MMU_FAULT_VA_LAYER_BIT;
- 	write = fault_iova & F_MMU_FAULT_VA_WRITE_BIT;
--	fault_pa = readl_relaxed(data->base + REG_MMU_INVLD_PA);
--	regval = readl_relaxed(data->base + REG_MMU_INT_ID);
--	fault_larb = F_MMU0_INT_ID_LARB_ID(regval);
--	fault_port = F_MMU0_INT_ID_PORT_ID(regval);
-+	fault_larb = F_MMU_INT_ID_LARB_ID(regval);
-+	fault_port = F_MMU_INT_ID_PORT_ID(regval);
++		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++		common->base = devm_ioremap_resource(dev, res);
++		if (IS_ERR(common->base))
++			return PTR_ERR(common->base);
+ 	}
+ 	pm_runtime_enable(dev);
+ 	platform_set_drvdata(pdev, common);
+@@ -497,6 +511,7 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
+ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+ {
+ 	struct mtk_smi *common = dev_get_drvdata(dev);
++	u32 bus_sel = common->plat->bus_sel;
+ 	int ret;
  
- 	fault_larb = data->plat_data->larbid_remap[fault_larb];
+ 	ret = mtk_smi_clk_enable(common);
+@@ -504,6 +519,9 @@ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+ 		dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
+ 		return ret;
+ 	}
++
++	if (common->plat->gen == MTK_SMI_GEN2 && bus_sel)
++		writel(bus_sel, common->base + SMI_BUS_SEL);
+ 	return 0;
+ }
  
 -- 
 1.9.1
