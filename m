@@ -2,23 +2,22 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70869C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 05:26:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 296B4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:07:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E9D521B69
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 05:26:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EAE2E2195D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 07:07:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lYwqWAxY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gn2XQv/e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E9D521B69
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ws61GQ0u";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aZc+YWiZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAE2E2195D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,66 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dkp2OYvX3+G3s+P1e/flgVOmcyMzW+7V3xw1e2W2SSQ=; b=lYwqWAxYH7k+bU
-	/R15lzzvJylg9V5L96G5XMpKbIPneX0Iubbs+Ib5kKGBgiRuIuVIB1iRo3CKp1CnF/gc9qW+ZNba4
-	7esu/XctKGnfPoN3widmoa6Ais8JZSZn/jGceY+YCZI+F2bZkPcQOokmNpVNcuCcZ+p4juhhI0bHy
-	rhnFAZ7/IPk7BBKlT4KEW+cPlV/68zUm+z67yLm7RpaRoxA0RDATEAbqWr0PcwAFJPQFYaQDZtDyR
-	1B4Eh/KAFManzJo2TYFfTbwmgJYgGolmKV9fwvsGi46/L3bVF79k8Elm9iVM2h6a7EUxUmLHZ2mOT
-	K1B1l3OvM9ZhjEBU6yug==;
+	List-Owner; bh=xrTZBlhBBtUWKVOYT29fZOJ+6mDfeW8/W0DQ+GNTV08=; b=Ws61GQ0u4dRvpA
+	9cbMJALdDszjP2bUWW2Fl3clJ/oB643qO7/Xif2aHe/7Zt62+6AyoAAwBfyZP35tgTEAT4OY9dzva
+	VGkVdtYIG2Lt6Wy4X/Ysx8YYFknqaZcjVe4Uqe3rzSDuxp6sxV1cD9AcRWaJiLUgyq7sSgHApygFK
+	NTLL+Es5Cb7ZTH14Eefl9n+v5X2ekSPUl27J94+P1DlooykInTMBTk1LZc9ZikURz95/02hc9+XxR
+	l81wftcfp00BkoVzTFYX7jbzFuKr6OPvqt6xMrD74+uI9SVyxLRiI1CN49aFI8iN3x2Aeuols7cKD
+	L2QMLiryzQlr4KTodWTg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvEyR-0002Px-82; Sun, 17 Feb 2019 05:26:43 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gvGXh-0007c7-WD; Sun, 17 Feb 2019 07:07:14 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvEyN-0002Pe-JI
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 05:26:41 +0000
-Received: by mail-pg1-x544.google.com with SMTP id h11so4466245pgl.0
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 16 Feb 2019 21:26:37 -0800 (PST)
+ id 1gvGXe-0007aq-QF; Sun, 17 Feb 2019 07:07:12 +0000
+Received: by mail-pl1-x641.google.com with SMTP id bj4so7147364plb.7;
+ Sat, 16 Feb 2019 23:07:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=xfnRCat7M1mkzZzhlFs9ZZ5CDTR9Y8VW/uLrQG/qHF0=;
- b=gn2XQv/erYDPT1dJbK+jMKWSDHSRapRGVGF2ZW8pEnKT6Bb0XwABc9i5/jh0HniZmQ
- Y7jsaY6FYDOPPwxHdDViKkwkJnCFV1z2JGw0Asb9jTNXbfqKnmL1S+1LrXDxcO0Emz77
- iehBcbIFxrD+xbpHUGjRabxMkdh5uEGaFavVXAyFlHaX+BmAiX+A1dQyEOoINQzLXshj
- YGVZRRnQjY/ZisLdgV3VZoPemul/qeIGTGC0DD6pBS9grbDC0EZFXm/FQcKrLQx8VJNY
- 1yHVRHfHvd/ixtvDm1464s5oWsJWWNVaVJZ1uKWV4jT4SCNzzSeNUlsJD3y82U3A1oe0
- A/cw==
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=It5OEgJ4iYIMPI81go7NiHuDVjtSj5HVzsbxnYSlOe0=;
+ b=aZc+YWiZzUUe0tTPkDcAUfqJ63RPBIhmPpH78AnM7ubdbgLf4TxT0FIapEealbMdIA
+ 8/F0Teqbas+ATEy3A1lS8KE8ui3UMKo3bnLgUPMAwNXJ9jEPn+OBZBOmFFfyrqW3pDTa
+ p54YaZ6rAT/yLr7q/CX5lPmnxLTozqOK1vYJNSaCLB5AdFE3nqFOfw59/35KwGvvciAj
+ 1fWcR/XEUm6kz9ZGKqaIRprkM4vuDdZvVG9w7qxz5qkpa89e9uaYqGF9j8k666/uNg35
+ SRzqoP7xQJcfSjC08epHN88GnNiCjGO0RE+0PGSfBSIUpUgJH3O2v2TZQnEH6epXSbnz
+ 76PA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=xfnRCat7M1mkzZzhlFs9ZZ5CDTR9Y8VW/uLrQG/qHF0=;
- b=PVhao7VReBunhzfJIcjIeo/Nb+vl35hqVmrv+VoVsd5dpouiGmvZ1i/472cy2NXvN5
- Xyog515e+wgf9JR8W5lT6LhFxSt9oNkp4J51gvA+qtZflsfs0krhiIufH8v1+s1wrnXu
- ziED+M34p4Sb7NGHnMHT1pvezcG9ob44og4v/4Z0vQ1a3w1D5i24jO/OTxKSXll6srsO
- V2HOjBpjo92FvNOZpXh9zOKP+Zu6pYS50+c+GZyf1BCJWY9y2GSnnR4bLJEOLzKdIVUV
- zuC6aMxTlsETvztdYyIfonunA7jh5hgnlsKT31+mx4EPWXmnJrHxyA/eGEelt2moauO8
- 8Q9A==
-X-Gm-Message-State: AHQUAubBs2wEhVI5Fw6UzWdRuD+Chj0dfwWL1zzfJv30MD4nsrUqcMsy
- F6hzrIjn4GHr0YW3tWN2b+w=
-X-Google-Smtp-Source: AHgI3IYrlQY7K+I6VV8/JJGX/+sRRVxvoRhDe6awPZP0A4Ra4rgzOrdWJpRgeeMqc/ZBWbfB5ywzHw==
-X-Received: by 2002:a62:2bc4:: with SMTP id r187mr17845355pfr.25.1550381196891; 
- Sat, 16 Feb 2019 21:26:36 -0800 (PST)
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=It5OEgJ4iYIMPI81go7NiHuDVjtSj5HVzsbxnYSlOe0=;
+ b=C7PAnIHAxEXv3a4MO6Vp2/14H7jYOIW77PsF8DzO/8HZ2jyR2sVKXWSuvINm2Mb7ht
+ h6Go5ItMVus1KoPQiyaOFQ9UX9ldKDbaRyQypXc5Rozzy6Abh3dj5gb/CQJ179MsF21N
+ WgPnfpIrBznR3TLUhOH9DiqZXQ2fButXHiMfF/jaqffDJypEmSxaLK9ienAUY5E1BlPQ
+ +Gecb/TomfiOrOTvHy9Uk5Iv/3Ni35Xa4SCpTCFLoMMEqrkkxkE3MPOVGy8+6LdzwIdR
+ iNXyutvinPHsrbbGxUAP5xsXdfAWyB711qK5h42by0aVoz5gq7jW7mq3JzXDnAkTSdf6
+ oe0A==
+X-Gm-Message-State: AHQUAuaio7IYKNL7sBDKZfmIBS9jN+C4Olpb0cWsvNEdN5r+nOGFZmfb
+ jKz4YL4ba4RV1RThLJomnWU=
+X-Google-Smtp-Source: AHgI3IYr6DW5xEyBkZoA2bWxKRmAM6CS+vmr/dyrrPkIUVkEW2uJNmmrx58yLGTrEraZZTLgdLxJTw==
+X-Received: by 2002:a17:902:8e8a:: with SMTP id
+ bg10mr18866625plb.192.1550387228616; 
+ Sat, 16 Feb 2019 23:07:08 -0800 (PST)
 Received: from dtor-ws ([2620:15c:202:201:3adc:b08c:7acc:b325])
- by smtp.gmail.com with ESMTPSA id p6sm9162926pgd.69.2019.02.16.21.26.35
+ by smtp.gmail.com with ESMTPSA id u13sm2947298pfa.169.2019.02.16.23.07.07
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sat, 16 Feb 2019 21:26:36 -0800 (PST)
-Date: Sat, 16 Feb 2019 21:26:34 -0800
+ Sat, 16 Feb 2019 23:07:07 -0800 (PST)
+Date: Sat, 16 Feb 2019 23:07:06 -0800
 From: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-To: gabriel.fernandez@st.com
-Subject: Re: [PATCH v1] Input: st-keyscan - fix potential zalloc NULL
- dereference
-Message-ID: <20190217052634.GA107793@dtor-ws>
-References: <20190212153055.3925-1-gabriel.fernandez@st.com>
+To: Guido =?iso-8859-1?Q?G=FCnther?= <agx@sigxcpu.org>
+Subject: Re: [PATCH v3 0/3] input: goodix - support Goodix gt5688
+Message-ID: <20190217070527.GC148958@dtor-ws>
+References: <cover.1550239328.git.agx@sigxcpu.org>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190212153055.3925-1-gabriel.fernandez@st.com>
+In-Reply-To: <cover.1550239328.git.agx@sigxcpu.org>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190216_212639_662792_1D79786D 
-X-CRM114-Status: GOOD (  15.80  )
+X-CRM114-CacheID: sfid-20190216_230710_875310_1187BD26 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,60 +96,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nate Drude <nate.drude@ohmlinxelectronics.com>,
- linux-kernel@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- giuseppe.condorelli@st.com, linux-input@vger.kernel.org,
- Dan Carpenter <dan.carpenter@oracle.com>, linux-clk@vger.kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, Bastien Nocera <hadess@hadess.net>,
+ linux-input@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 12, 2019 at 04:30:55PM +0100, gabriel.fernandez@st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> This patch fixes the following static checker warning:
-> 
-> drivers/input/keyboard/st-keyscan.c:156 keyscan_probe()
-> error: potential zalloc NULL dereference: 'keypad_data->input_dev'
-> 
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+On Fri, Feb 15, 2019 at 03:11:50PM +0100, Guido G=FCnther wrote:
+> Besides the support for gt5688 two more minimal changes piled up so I'm
+> folding these in here. One is a doc update for the goodix bindings, the
+> other one makes it a bit simpler to figure out configuration problems
+> (like lack of touchscreen-size-{x,y} in the device tree.
+> =
 
-Applied, thank you.
+> I've kept the original subject to (hopefully) not break the series for
+> patchwork. All patches can be applied independently. Series is based on
+> next-20190208.
+> =
 
-> ---
->  drivers/input/keyboard/st-keyscan.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/input/keyboard/st-keyscan.c b/drivers/input/keyboard/st-keyscan.c
-> index babcfb165e4f..3b85631fde91 100644
-> --- a/drivers/input/keyboard/st-keyscan.c
-> +++ b/drivers/input/keyboard/st-keyscan.c
-> @@ -153,6 +153,8 @@ static int keyscan_probe(struct platform_device *pdev)
->  
->  	input_dev->id.bustype = BUS_HOST;
->  
-> +	keypad_data->input_dev = input_dev;
-> +
->  	error = keypad_matrix_key_parse_dt(keypad_data);
->  	if (error)
->  		return error;
-> @@ -168,8 +170,6 @@ static int keyscan_probe(struct platform_device *pdev)
->  
->  	input_set_drvdata(input_dev, keypad_data);
->  
-> -	keypad_data->input_dev = input_dev;
-> -
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	keypad_data->base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(keypad_data->base))
-> -- 
-> 2.17.0
-> 
+> Changes from v2
+> * Add 'dt-bindings: input: Refer to touchscreen.txt for goodix ts'
+> * Add 'input: goodix: Print values in case of inconsistencies'
+>   (sent out separtely before, no comments so far)
+> * Collect 'Reviewed-By' on 'input: goodix - support Goodix gt5688'
 
--- 
+Applied the lot, thank you.
+
+-- =
+
 Dmitry
 
 _______________________________________________
