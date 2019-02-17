@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11F87C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:07:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D30C0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:08:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C2F5121900
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:07:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A4A6021900
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 09:08:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l3T8BlyD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C2F5121900
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eVvO+LIw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A4A6021900
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mZJFDNu14wdfVFQZa40jWwvdZWQ78SbYrGR0uNq2KbA=; b=l3T8BlyDAnD0W9
-	swgcWAG3H6cjygKkUORJc3X9Qgh4zxJRR46VuWNXkp+JhaRSaTqW8iWEt2m7d3+gLP1/LjasgkhPa
-	rZrJ48AfoauLq61cWPhejI2Y8nektXACzyCQE5KANrEiY58O+3Ln9d1L4FZjfYzZBFZTZsoJb76Li
-	U0tDGrE+wVX9HnR+iy6mFXfsom54zY/NJ2Il/najbuSCrUEZoG4e+qRnoxs9m8g6IRWPjhrb8Op4F
-	QBuhFVPflTdWIafJVHAoJZNmzYkVJxhnbIIL3p1tT8pEQjXs78EAbk4+lkI1ugfvSf2PeX6pOA0UM
-	+T/OxnGpo7fjt7mcWOCg==;
+	List-Owner; bh=R/b2g/ENtoI4BHYi9sRyeV0Of3XTYyvjbptbB2fOLBw=; b=eVvO+LIwauuuDS
+	NDYzlALEJAziHZgdFnUX3UXZFmfKyDUJl8K3+G1kC6ZkuOumEprz04eXkdjUbRjgkcsPeYcdDiXrG
+	EG/OQxSoCcdJAHh3iBDaDdXUwSs80LvL+AOA0YzlonABbausxzJNXo6J3kw7ZAGSlb+NpCEKYkmK+
+	scnCfXx4EcaFaWPAxbxOACHKu9HuHj3vwed27IUCfeveVkD3lohDBQ0B/mYzDKtz/wPcwACYiuFlY
+	pxhtWd8x2u38d+lotCqR+rb4KWo4qELjZHE1jdmDdB8DJ7YLeDKFY6YlK3DR8viKd8z0pMue9ahIq
+	yEMrN2DfI+Mcdbz8+1jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvIQQ-0004Vf-6W; Sun, 17 Feb 2019 09:07:50 +0000
+	id 1gvIQn-0004x7-GW; Sun, 17 Feb 2019 09:08:13 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvIQ9-0004Bm-75; Sun, 17 Feb 2019 09:07:34 +0000
-X-UUID: 854980d1b34c46dc8d4494f20289b6ce-20190217
-X-UUID: 854980d1b34c46dc8d4494f20289b6ce-20190217
+ id 1gvIQA-0004Bm-L2; Sun, 17 Feb 2019 09:07:36 +0000
+X-UUID: ab9fb80375464b0182694b06ec325e79-20190217
+X-UUID: ab9fb80375464b0182694b06ec325e79-20190217
 Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
  (envelope-from <yong.wu@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1798240881; Sun, 17 Feb 2019 01:07:08 -0800
+ with ESMTP id 471426282; Sun, 17 Feb 2019 01:07:08 -0800
 Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 01:07:06 -0800
+ 15.0.1395.4; Sun, 17 Feb 2019 01:07:07 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
  mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 17 Feb 2019 17:06:52 +0800
+ 15.0.1395.4; Sun, 17 Feb 2019 17:07:02 +0800
 Received: from localhost.localdomain (10.17.3.153) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Sun, 17 Feb 2019 17:06:51 +0800
+ Transport; Sun, 17 Feb 2019 17:07:01 +0800
 From: Yong Wu <yong.wu@mediatek.com>
 To: Joerg Roedel <joro@8bytes.org>, Matthias Brugger <matthias.bgg@gmail.com>, 
  Robin Murphy <robin.murphy@arm.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v6 03/22] memory: mtk-smi: Use a general config_port interface
-Date: Sun, 17 Feb 2019 17:04:41 +0800
-Message-ID: <1550394300-17420-4-git-send-email-yong.wu@mediatek.com>
+Subject: [PATCH v6 04/22] memory: mtk-smi: Use a struct for the platform data
+ for smi-common
+Date: Sun, 17 Feb 2019 17:04:42 +0800
+Message-ID: <1550394300-17420-5-git-send-email-yong.wu@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: D92796D9E122B8D3BBA5A18BAAC1D8F89FB6142A4E174207C62064ADCB3797C22000:8
+X-TM-SNTS-SMTP: 793914FBF9E5BA9BE66C56DCABD90D347F379D8652DEB48678673336EB5066562000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_010733_257507_8687E298 
-X-CRM114-Status: GOOD (  15.20  )
+X-CRM114-CacheID: sfid-20190217_010734_844197_66CC2F95 
+X-CRM114-Status: GOOD (  13.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,67 +92,117 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The config_port of mt2712 and mt8183 are the same. Use a general
-config_port interface instead.
+Use a struct as the platform special data instead of the enumeration.
 
-In addition, in mt2712, larb8 and larb9 are the bdpsys larbs which
-are not the normal larb, their register space are different from the
-normal one. thus, we can not call the general config_port. In mt8183,
-IPU0/1 and CCU connect with smi-common directly, they also are not
-the normal larb. Hence, we add a "larb_direct_to_common_mask" for these
-larbs which connect to smi-commmon directly.
+Also there is a minor change that moving the position of
+"enum mtk_smi_gen" definition, this is because we expect define
+"struct mtk_smi_common_plat" before it is referred.
 
-This is also a preparing patch for adding mt8183 SMI support.
+This is a preparing patch for mt8183.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
 Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/memory/mtk-smi.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+ drivers/memory/mtk-smi.c | 35 ++++++++++++++++++++++++-----------
+ 1 file changed, 24 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index 8f2d152..9fd6b3d 100644
+index 9fd6b3d..8a2f968 100644
 --- a/drivers/memory/mtk-smi.c
 +++ b/drivers/memory/mtk-smi.c
-@@ -53,6 +53,7 @@ struct mtk_smi_larb_gen {
+@@ -49,6 +49,15 @@
+ #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
+ #define F_MMU_EN		BIT(0)
+ 
++enum mtk_smi_gen {
++	MTK_SMI_GEN1,
++	MTK_SMI_GEN2
++};
++
++struct mtk_smi_common_plat {
++	enum mtk_smi_gen gen;
++};
++
+ struct mtk_smi_larb_gen {
  	bool need_larbid;
  	int port_in_larb[MTK_LARB_NR_MAX + 1];
- 	void (*config_port)(struct device *);
-+	unsigned int larb_direct_to_common_mask;
+@@ -61,6 +70,8 @@ struct mtk_smi {
+ 	struct clk			*clk_apb, *clk_smi;
+ 	struct clk			*clk_async; /*only needed by mt2701*/
+ 	void __iomem			*smi_ao_base;
++
++	const struct mtk_smi_common_plat *plat;
  };
  
- struct mtk_smi {
-@@ -176,17 +177,13 @@ void mtk_smi_larb_put(struct device *larbdev)
- 	return -ENODEV;
- }
+ struct mtk_smi_larb { /* larb: local arbiter */
+@@ -72,11 +83,6 @@ struct mtk_smi_larb { /* larb: local arbiter */
+ 	u32				*mmu;
+ };
  
--static void mtk_smi_larb_config_port_mt2712(struct device *dev)
-+static void mtk_smi_larb_config_port_gen2_general(struct device *dev)
+-enum mtk_smi_gen {
+-	MTK_SMI_GEN1,
+-	MTK_SMI_GEN2
+-};
+-
+ static int mtk_smi_enable(const struct mtk_smi *smi)
  {
- 	struct mtk_smi_larb *larb = dev_get_drvdata(dev);
- 	u32 reg;
- 	int i;
- 
--	/*
--	 * larb 8/9 is the bdpsys larb, the iommu_en is enabled defaultly.
--	 * Don't need to set it again.
--	 */
--	if (larb->larbid == 8 || larb->larbid == 9)
-+	if (BIT(larb->larbid) & larb->larb_gen->larb_direct_to_common_mask)
- 		return;
- 
- 	for_each_set_bit(i, (unsigned long *)larb->mmu, 32) {
-@@ -261,7 +258,8 @@ static void mtk_smi_larb_config_port_gen1(struct device *dev)
- 
- static const struct mtk_smi_larb_gen mtk_smi_larb_mt2712 = {
- 	.need_larbid = true,
--	.config_port = mtk_smi_larb_config_port_mt2712,
-+	.config_port                = mtk_smi_larb_config_port_gen2_general,
-+	.larb_direct_to_common_mask = BIT(8) | BIT(9),      /* bdpsys */
+ 	int ret;
+@@ -351,18 +357,26 @@ static int mtk_smi_larb_remove(struct platform_device *pdev)
+ 	}
  };
  
- static const struct of_device_id mtk_smi_larb_of_ids[] = {
++static const struct mtk_smi_common_plat mtk_smi_common_gen1 = {
++	.gen = MTK_SMI_GEN1,
++};
++
++static const struct mtk_smi_common_plat mtk_smi_common_gen2 = {
++	.gen = MTK_SMI_GEN2,
++};
++
+ static const struct of_device_id mtk_smi_common_of_ids[] = {
+ 	{
+ 		.compatible = "mediatek,mt8173-smi-common",
+-		.data = (void *)MTK_SMI_GEN2
++		.data = &mtk_smi_common_gen2,
+ 	},
+ 	{
+ 		.compatible = "mediatek,mt2701-smi-common",
+-		.data = (void *)MTK_SMI_GEN1
++		.data = &mtk_smi_common_gen1,
+ 	},
+ 	{
+ 		.compatible = "mediatek,mt2712-smi-common",
+-		.data = (void *)MTK_SMI_GEN2
++		.data = &mtk_smi_common_gen2,
+ 	},
+ 	{}
+ };
+@@ -372,13 +386,13 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct mtk_smi *common;
+ 	struct resource *res;
+-	enum mtk_smi_gen smi_gen;
+ 	int ret;
+ 
+ 	common = devm_kzalloc(dev, sizeof(*common), GFP_KERNEL);
+ 	if (!common)
+ 		return -ENOMEM;
+ 	common->dev = dev;
++	common->plat = of_device_get_match_data(dev);
+ 
+ 	common->clk_apb = devm_clk_get(dev, "apb");
+ 	if (IS_ERR(common->clk_apb))
+@@ -394,8 +408,7 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+ 	 * clock into emi clock domain, but for mtk smi gen2, there's no smi ao
+ 	 * base.
+ 	 */
+-	smi_gen = (enum mtk_smi_gen)of_device_get_match_data(dev);
+-	if (smi_gen == MTK_SMI_GEN1) {
++	if (common->plat->gen == MTK_SMI_GEN1) {
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 		common->smi_ao_base = devm_ioremap_resource(dev, res);
+ 		if (IS_ERR(common->smi_ao_base))
 -- 
 1.9.1
 
