@@ -2,63 +2,64 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B66FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:16:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 713EFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:16:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 33D77222E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:16:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42CD9222ED
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:16:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PhTCNH2E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33D77222E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pn5Kf80q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42CD9222ED
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=qX9fH74FTta6wIswaok30QVCRm0REtxw0rI0nvk2eiQ=; b=PhTCNH2EJoo1n6
-	DKHjkq2iYgTxktxOvcArAchH1u2LkOi49mpcgt3wDXe3pYRm9k5f0l29k6jshZd3LV9ftrjnkGaGQ
-	LOa8wgdmveeHmU7NQhJ8G9llhZzNuYND0WpWAGrrGIl9BbkpFdUyzjEeEXc8UNTlEYylD+YwqcBfV
-	DJ8UlZnjLaKEKkhdCCgXMF3c1pFY1hwkZGRBwDkwnq0nu/bBaO0lGh4Z0ZXtOO/cnWldvPXVN2GuR
-	q3hTEmITXrGADGaqnuTbbWEXhK3cLXmTWSbCHF5aggXbzKsKHB+ihquRSoFBnFzVWSZEgAMzfcdej
-	66oytvzGLUffAG3f5pwg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=to2PArEPoUlDqbs1sWVqp3bymWxiahPXL79AHhBZOKY=; b=Pn5Kf80qj88AQ6
+	3x6Wx/YjOO2gYE67N9tbSzCc2KfJIPKHEXccFzWMg92JaUiM5LvIpK/tCRFdjNlMbyZZua4nRcGCF
+	8ncpeg0K4xpK6dg52qnTZUlCRD9i6yJZA5WMT0H+L3KJ2rRTiYVfnlDd5bTo1QFwhHKSRjIcueL+m
+	cE6PG2neBqzgMHufGFYdrzl3DK8625DIvZ5njZBAvoF/anKEWXE2qJVz9JI7cAM8ULSWOqvfTMghu
+	uGOlXBXWN5W+dCuMvCAcpuA06IJDc+Ma82TxHy8cXFLvjNN1fEsGUOcxnbYHIQmZr0FaPBcXCjj+n
+	aDmu+Y3iI8atiVlusa9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvLMs-0007AC-9w; Sun, 17 Feb 2019 12:16:22 +0000
+	id 1gvLN3-0007NM-LT; Sun, 17 Feb 2019 12:16:33 +0000
 Received: from avasout06.plus.net ([212.159.14.18])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvLMo-00077t-EG
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 12:16:20 +0000
+ id 1gvLMq-000781-34
+ for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 12:16:21 +0000
 Received: from localhost.localdomain ([87.114.170.31]) by smtp with ESMTP
- id vLLzgM2tCHd2LvLM0gaQA4; Sun, 17 Feb 2019 12:15:29 +0000
+ id vLLzgM2tCHd2LvLM8gaQAQ; Sun, 17 Feb 2019 12:15:37 +0000
 X-CM-Score: 0.00
 X-CNFS-Analysis: v=2.3 cv=FK01Odgs c=1 sm=1 tr=0
- a=IwDniP0DpuMObaUqJdRMiQ==:117 a=IwDniP0DpuMObaUqJdRMiQ==:17 a=V5NFcaBHAAAA:8
- a=0NS0URispb6Ii0WxUNAA:9 a=sJ-dsXpog5ekix5Z:21 a=WKcxsw4WtVgA:10
- a=hpaLWXtm7LEA:10 a=AIFGTXQOaoIMFke0skzX:22
+ a=IwDniP0DpuMObaUqJdRMiQ==:117 a=IwDniP0DpuMObaUqJdRMiQ==:17
+ a=qyKJLktWOQhn6OkCE7gA:9 a=ltk_qqI1dF5I-_NL:21 a=Q6soJdELGrPS4MJB:21
 From: David Summers <beagleboard@davidjohnsummers.uk>
 To: heiko@sntech.de,
 	robh+dt@kernel.org,
 	mark.rutland@arm.com
-Subject: [PATCH 0/3] ARM: dts: rk3288 Tinker Board (S) updates
-Date: Sun, 17 Feb 2019 12:15:10 +0000
-Message-Id: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
+Subject: [PATCH 1/3] ARM: dts: rk3288 Tinker Board (S) sdcard changes
+Date: Sun, 17 Feb 2019 12:15:11 +0000
+Message-Id: <20190217121513.22965-2-beagleboard@davidjohnsummers.uk>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
+References: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
 MIME-Version: 1.0
-X-CMAE-Envelope: MS4wfHXtZ7GeeRFtYWlPgE5diYJM8CJJ9NsocycdcWIvZ1f2kmzw7F2LSvCHKLTYz47RytzAfKdlqxDHYd93ZW6gtCNwvgCdHf1dUY/n0lq3U6iIvpZulQrw
- tY4sLBW27iLJ2d/oX098efujCyOF8aj+n4tbK4rZh7B9HnvHcuViQEpC9YsQthA4wWacGcjANjWtUI3JslbOSokIzOPb2VIKO1g=
+X-CMAE-Envelope: MS4wfIW+p07NV00SDPjke0JokRGo/JUIiMUldPYL6vNcBNYI25W/O+aaQZDpkEE1XTcJ7pQYGS09Up9Bw6d9LnEM19gDMVktu6Knnv0OJSlvrAFc8zB3xuUo
+ cIod8oRuTSrkBFAvs2DjA8ztNP1fRMkZjpFJ4u1wPAimV9sCFmxqCtxOEi5bT0jHXMvPk0vYHqfMfFQMaMSB+Tni4veflrX7OZ8=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_041618_619672_F3C71B2C 
-X-CRM114-Status: UNSURE (   5.67  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190217_041620_273076_9981213D 
+X-CRM114-Status: GOOD (  15.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,24 +79,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Find in the following patches 3 sets of updates to the rk3288 ASUS
-Tinker Board (S) device tree. The patches consist of:
+This patch makes some minor changes to how the sd card is
+described in the device tree for the ASUS Tinker Board (S). In
+particular on the Tinker Board S, when booted from the eMMC, and with
+no card in the sd slot, and the log has endless messages about not
+being able to detect the card.
 
-       1) Changes to sd card, to remove error
-       2) Add WiFi to the device tree
-       3) Add an outline for Bluetooth to the device tree
+Several methods to remove this error have been tried, the only one
+that works is the broken-cd and so that is what is applied here.
 
-The patches have been developed by both Stefan and myself, and hence
-have both our sign off.
+Alas the ASUS schematic is not clear enough to indicate if the card
+detect is wired up to the cpu, the schematic does not show internal
+wiring on the Tinker Board!
 
-The patches have been extensivly tested by TheSaint on ArchLinux Arm
-Forum, details:
+Now this error didn't show up on the Tinker Board, as that machine
+only boots where there is a sd card installed. However as the TB and
+TBS are so similar it is expected that the Tinker Board also doesn't
+have a functioning card detect. Hence the change here is made to the
+dtsi file, so it applies to both TB and TBS.
 
-https://archlinuxarm.org/forum/viewtopic.php?f=44&t=13064&start=90
+The disable-wp is also removed, it doesnt seem needed on the micro
+sdcard slots, and without thisn the card can still be written
+to. Hence this flag is also removed.
 
-Each patch has more details on what is covered.
+Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
+---
+ arch/arm/boot/dts/rk3288-tinker.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-David.
+diff --git a/arch/arm/boot/dts/rk3288-tinker.dtsi b/arch/arm/boot/dts/rk3288-tinker.dtsi
+index 2b38075a2917..fceaeed44e34 100644
+--- a/arch/arm/boot/dts/rk3288-tinker.dtsi
++++ b/arch/arm/boot/dts/rk3288-tinker.dtsi
+@@ -432,9 +432,7 @@
+ 	bus-width = <4>;
+ 	cap-mmc-highspeed;
+ 	cap-sd-highspeed;
+-	card-detect-delay = <200>;
+-	disable-wp;			/* wp not hooked up */
++	broken-cd;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
+ 	status = "okay";
+-- 
+beagleboard@davidjohnsummers.uk
 
 
 _______________________________________________
