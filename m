@@ -2,65 +2,59 @@ Return-Path: <SRS0=tnMb=QY=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58379C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:17:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BD16C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 13:17:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 27A60222E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 12:17:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4A9BB2192C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 13:17:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qYd9rYHB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27A60222E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sLBUxlDP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A9BB2192C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=sntech.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5Azuv6JRYouPHUuNXHA1sG6OK+e2s+cyQKmr2DwUWUI=; b=qYd9rYHB2b1hyO
-	WPdevxCAHXD+U213WIytuxWXjuvg9dg6Q2Vhb6Z4PWX3pVwAIWD+V1V8G8tp7dOrj0pJj8BjJyhqE
-	d+FAu73giRB/ih1MJzRenx5aWw9UU3w0d3at6kiaeTs+jkYFcsglM8TUWZioesAA25BR6aJmXe8VD
-	KJMYd7d4ZFS/DzTOOG8Ut6gBS0lfUuU077OTVHPei4NE6Cy2Lv95H17tz+zi3NXrU/NqxvI/mJikE
-	pVbvWrGQqE6/e8k3Wu34S31cDKTKr0D0PN9sCEymSL4ZpnRpTi461Ek9RSFEjLodYXSFp1iVl6cG6
-	2g2nf9IxveeMyDKBhMVg==;
+	List-Owner; bh=b2mkVpA9nnlUvx52/88S3G+LMbZwUTVlHKCUDNvbkw8=; b=sLBUxlDP2lWTNi
+	bu7Ebj8sBX7TS4JqYc9T65wq2UTe1vOrmdjapMG4DLIzQWpGFTyFHufsHdk4AAutOJydYMGgwVuqf
+	TV8LBYNqZe5orO+foY7svwOW7DZSeUA9B9POSAwYKlqcwggqT5tFHy/yeI7Un1zGkTXbHtcdkV3rF
+	4ndWfKOkdwuIx9aUpWo9uLpbd4aGK2Jd+r1KMt4XTH0tAVN+0qc9OgbapZARTm45OLFcktEKNqvFc
+	Rfn8XhrKnA2Eo+ExCsfw3QIqxu3SZk9NmEztRWR4UbRmNWqlYd62AH0k2vo9pITPtgd9HWXySHAS1
+	/RntTKhfWNZ57eD1BT/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvLNb-00081p-4e; Sun, 17 Feb 2019 12:17:07 +0000
-Received: from avasout06.plus.net ([212.159.14.18])
+	id 1gvMK2-0001G4-Jg; Sun, 17 Feb 2019 13:17:30 +0000
+Received: from gloria.sntech.de ([185.11.138.130])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvLN5-00078M-18
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 12:16:56 +0000
-Received: from localhost.localdomain ([87.114.170.31]) by smtp with ESMTP
- id vLLzgM2tCHd2LvLMNgaQAy; Sun, 17 Feb 2019 12:15:52 +0000
-X-CM-Score: 0.00
-X-CNFS-Analysis: v=2.3 cv=FK01Odgs c=1 sm=1 tr=0
- a=IwDniP0DpuMObaUqJdRMiQ==:117 a=IwDniP0DpuMObaUqJdRMiQ==:17
- a=X63dCvaKAAAA:20 a=TkpssyMGhm8DTbAZXSUA:9 a=NnB7W_RyFDSnDlNr:21
- a=n5Fje-ibHYVCOY7u:21 a=zA7_2-WrKBG-IMKZYL8h:22
-From: David Summers <beagleboard@davidjohnsummers.uk>
-To: heiko@sntech.de,
-	robh+dt@kernel.org,
-	mark.rutland@arm.com
-Subject: [PATCH 3/3] ARM: dts: rk3288 Tinker Board (S) add bluetooth
-Date: Sun, 17 Feb 2019 12:15:13 +0000
-Message-Id: <20190217121513.22965-4-beagleboard@davidjohnsummers.uk>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
-References: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
+ id 1gvMJy-0001FF-0c; Sun, 17 Feb 2019 13:17:27 +0000
+Received: from p5b127a91.dip0.t-ipconnect.de ([91.18.122.145]
+ helo=phil.localnet)
+ by gloria.sntech.de with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <heiko@sntech.de>)
+ id 1gvMJr-000220-Ox; Sun, 17 Feb 2019 14:17:19 +0100
+From: Heiko Stuebner <heiko@sntech.de>
+To: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+Subject: Re: [PATCH] arm64: dts: rockchip: add HDMI sound node for
+ rk3328-rock64
+Date: Sun, 17 Feb 2019 14:17:18 +0100
+Message-ID: <15054640.NB91u9fWWK@phil>
+In-Reply-To: <16f4fcf0-e9c2-e925-e463-282cfff088c7@katsuster.net>
+References: <20190202043444.9308-1-katsuhiro@katsuster.net>
+ <2275914.n7pQDzs7mT@diego>
+ <16f4fcf0-e9c2-e925-e463-282cfff088c7@katsuster.net>
 MIME-Version: 1.0
-X-CMAE-Envelope: MS4wfKsWF66wGX/1ob0yUw6pZb1Ra+A7Mb3vvE0UNWPIhTnYXJPCQHrNK+z1j9v4p0vQcjNSNuG7JWq0sEtbSEhcrzLJInFj2vWBECkVi85a92z3OUw6l4Z1
- rBmKb6lRLfho7cV2svTVtLNv/STLEGdf8r1UavPww8viHMX65mVcj1498zYq/41Jmzvj8hj3TIBv1GRhJQuox1CRWL3eFOJVaX4hKiYApvpGpC57pAlnQmzM
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_041635_693287_7E007B0F 
-X-CRM114-Status: GOOD (  15.53  )
+X-CRM114-CacheID: sfid-20190217_051726_214504_B0F5654C 
+X-CRM114-Status: GOOD (  20.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,80 +66,85 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org,
- David Summers <beagleboard@davidjohnsummers.uk>,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch is to add Bluetooth to the ASUS Tinker Board (S) device
-tree.
+Am Sonntag, 17. Februar 2019, 11:58:36 CET schrieb Katsuhiro Suzuki:
+> Hello Heiko,
+> =
 
-This patch is more contraversal - so probably view it as a request for
-comments.
+> On 2019/02/12 20:12, Heiko St=FCbner wrote:
+> > Hi,
+> > =
 
-The reason behind this, is this patch does not currently set Bluetooth
-working on the these boards. The problem is that the
-bluetooth/hci_h5.c driver, that is used for Realtek serial devices,
-depends on ACPI. Unfortantly ACPI can not be enabled on armv7 machines
-such as the TB(S). And so the kernel module for the RTL8723BS
-Bluetooth can not be loaded.
+> > Am Montag, 4. Februar 2019, 13:59:37 CET schrieb Katsuhiro Suzuki:
+> >> On 2019/02/03 18:06, Heiko Stuebner wrote:
+> >>> Am Samstag, 2. Februar 2019, 05:34:44 CET schrieb Katsuhiro Suzuki:
+> >>>> This patch adds HDMI sound (I2S0) node and remove dma properties
+> >>>> from UART2 node for rock64.
+> >>>>
+> >>>> The DMAC of rk3328 can use 8 channels at same time. Currently, total
+> >>>>
+> >>>> 7 channels are used as follows:
+> >>>>     - I2S1  2ch
+> >>>>     - UART2 2ch
+> >>>>     - SPDIF 1ch
+> >>>>     - SPI0  2ch
+> >>>>
+> >>>> HDMI audio using I2S0 that requires 2ch but DMAC has only 1 channel.
+> >>>>
+> >>>> UART2 can work without DMA resources, so this patch removes dma
+> >>>> allocation for UART2 and reuses it to I2S0.
+> >>>
+> >>> I don't follow that description. How can i2s0 re-use the uart2 dma
+> >>> channels? Looking at the dma table in the TRM, uart2 has channels 6+7
+> >>> while i2s0 uses channels 11+12. They should just run concurrently?
+> >>
+> >> Sorry for confusing... 6 or 7 is as ID number of slave DMA channel.
+> >> TRM calls it 'Req number'. Req number 6+7 and 11+12 can work
+> >> concurrently but TRM says DMAC can transfer 8 DMA channels at same
+> >> time. So all 16 Req numbers cannot activate at same time. It should
+> >> be keep less or equal than 8 numbers.
+> > =
 
-However this patch is believed to be an accurate description of the
-Tinker Board (S) wiring. It is strongly based on the ASUS patch:
+> > But that "shortcoming" of having more requests than channels is not
+> > something specific to the pl330, instead most dma controllers have that
+> > "problem", which seems to get solved by the virt-dma mechanism of
+> > dmaengine - which pl330 doesn't use so far. (but see pl080 for example)
+> > =
 
-https://github.com/TinkerBoard/debian_kernel/commit/6a3128ade33f758887048578ada61a4b7ab8e678
+> =
 
-As the Bluetooth is connected via a UART and this is wired into uart0,
-this has been described as a SerDev.
+> I understand. I drop these patches.
+> =
 
-The ASUS patch mentions the UART_CTS, but not the _RTS. Now as the
-RTL8723BS has both CTS and RTS on the uart, it has been assumed both
-are wired into uart0 on the cpu.
+> =
 
-The Bluetooth connection has several wake up pins both device and host
-and a reset pin. The wiring of these has been described; however how
-the kernel driver will use these isn't clear. E.g. should HOST_WAKE be
-an interupt?
+> > The devicetree only describes the hardware and is never meant as a
+> > configuration space for kernel-code shortcomings.
+> > =
 
-The main reason for asking for comments, is that when it comes time to
-make the changes to the bluetooth uart code, and add compatible flags,
-robh has indicated that this will only be accepted with a valid
-example. So the code below is that example. So I would like comments
-that this approach is valid, which can be used when the later
-submission comes. 
+> =
 
-Signed-off-by: David Summers <beagleboard@davidjohnsummers.uk>
----
- arch/arm/boot/dts/rk3288-tinker.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> Yes, right. I don't want to use device-tree as configuration space,
+> so which is better?
+> =
 
-diff --git a/arch/arm/boot/dts/rk3288-tinker.dtsi b/arch/arm/boot/dts/rk3288-tinker.dtsi
-index e1796f340eef..931b4c652fdc 100644
---- a/arch/arm/boot/dts/rk3288-tinker.dtsi
-+++ b/arch/arm/boot/dts/rk3288-tinker.dtsi
-@@ -481,6 +481,17 @@
- 
- &uart0 {
- 	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_xfer>, <&uart0_cts>, <&uart0_rts>;
-+
-+	bluetooth {
-+		clocks = <&rk808 RK808_CLKOUT1>;
-+		reset-gpios = <&gpio4 RK_PD5 GPIO_ACTIVE_LOW>;
-+		device-wake-gpios = <&gpio4 RK_PD2 GPIO_ACTIVE_HIGH>;
-+		host-wake-gpios = <&gpio4 RK_PD7 GPIO_ACTIVE_HIGH>;
-+		vcc-18-supply = <&vcc_18>;
-+		vcc-io-supply = <&vcc_io>;
-+	};
- };
- 
- &uart1 {
--- 
-beagleboard@davidjohnsummers.uk
+> - Fix the pl330 driver first and after that add HDMI-sound node
+>    to device-tree.
+> - Just add HDMI-sound node to device-tree. If someone (include me)
+>    want to support virt-dma on pl330 driver, they will fix it.
+>    (PL330 will face error but all sounds works fine and UART still
+>    works fine with DMA error)
+
+I'd go with this second option :-) .
+
+Heiko
+
 
 
 _______________________________________________
