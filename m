@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA043C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 16:23:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71BF8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 16:23:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88B61222ED
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 16:23:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3D2C820665
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 17 Feb 2019 16:23:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="clscpTSY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Sr4lF3z8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88B61222ED
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WVfJ5exM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="H1RNXBQy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D2C820665
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,63 +28,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=1/DziZi4IvpCJyuV734hsx9kCTbDbtTu1CPO7w1xueQ=; b=clscpTSYnAF7mhBMX2qPAxW6r5
-	prUs8mG9y8+vYjQxXZt0HbNCvGHpLAiRGDMjJmPI/v18ojYsa2hZqcCEstvmunGtvaJfx9oKmWxJz
-	rxFuokta9pHjegXiX1rPDqRSBoza/QAUt2eAguDH8EUh9RqfTsK/H+PF+XO5KoIqk/mlcQmEIfhT4
-	94JlqVJEQ2h4cNNGV/iMCueuz2HxWfbhoBB0ECK7hRYg0bTHR84WmI/eU4rav/eNTTidCiSZoIg+o
-	VMjRHyA5Xm1ZhBDS8JO671P1pQ/OiANDRU3ak8ttjf1tIclkZd5Ao/KINhzsz4IwczW6WhZmrJWxd
-	QuSA7mhw==;
+	bh=1FRbC4KBq9NlxOINLiF1L0DdFkb/lpBwYYjcV2eieHE=; b=WVfJ5exM0mV81gJetMn/lbvTOR
+	rLIFpaZN7ZXd3/T0WT/jbErJQO0rovOjytDUnvCduLjivktG8aLkI4KXleNnuLFpbarcGPXfGrRXu
+	VTjprwiC4hCNqOCF55RDng4zI+ZTwNDFiD8qF+6nCVRzmkIbE2q0BMZMbJ0sneHx+DmguL2gyXDxK
+	b/dI3GbpSemhd4X/yv4UZGXyqUbRjBMvdfivE8W0e9k1IsPHqFVHywp254K/ghGDGquMyJoGqdL2h
+	wubMa/0RQT5cfsxxOoy8AfokhWb/KjGWNE/mlogPTRKQepYoegNmqLdG6rLlp6nRAcAcp+zoksyaP
+	Ze6F0xEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvPEC-0002Jq-Ah; Sun, 17 Feb 2019 16:23:40 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gvPEL-0002Wp-V8; Sun, 17 Feb 2019 16:23:49 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvPE2-00027I-9l
- for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 16:23:32 +0000
-Received: by mail-pf1-x442.google.com with SMTP id b7so7286653pfi.8
+ id 1gvPE7-0002DU-4u
+ for linux-arm-kernel@lists.infradead.org; Sun, 17 Feb 2019 16:23:37 +0000
+Received: by mail-pl1-x643.google.com with SMTP id y10so7513719plp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 17 Feb 2019 08:23:29 -0800 (PST)
+ Sun, 17 Feb 2019 08:23:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=EPBS2GhpwmpEDgTVr1WkimnFnbT2vpcS3OkFjG9Zg54=;
- b=Sr4lF3z8Eo0Yjl+jXh463UV/0xgjxSvWVaxWccrn8/t2BlKS3+NU3uAPnFngoNNJwo
- elfzOoAfOvf+85iumwEi63sApLylsD/KCPHPtXyY9723O2RQUtfrTCNAxQkxOuHbt6jr
- ldqrpQ01Nz/Xwy/Z01a+zhldxkTT1tEvsxgtPB6KXeD60ppfYv6C5kFhq/BJQ+MOQFNA
- IAeUDtaFwC1yCS/czWFtPK2zEEHjLHssbKowVuJIxylvA1PkllB8zHkDxD7lJqhN5llH
- 1a37IlIPcBEkhjoA5x5KwuQmuwYOlGesg9I/UBwYt4Th8l70Ht1RqGoTi4K+7HUCNc3z
- il1g==
+ bh=l0Z1b8BC2pttHCDOIu6v+lf74XsTzc0qioBaG3nshfk=;
+ b=H1RNXBQyWwvUvFimsnQaKsApwBgZZRoA48sVue+RJ/bohxA/tPVw/7Wu68+shB4ytR
+ IkztkblLHEI3PV0Qm7JY+0kMgUz4Wc0N0PH0HfJjF8yDSxyFg2ZVl845X4H2iFyTSfZO
+ ZUOs9+EYZJJ1eASZQW+LE2Zy7RmHZpzQ2VsrbHOnk/5XPD347SuQ7QG3MDrXgPmaIqeP
+ 2yulNvyME88OSBPdqtVcqhHW9WiUUBqS6J1AiNLaAdEF/8cVf1LJH79Ihiai3xD+MP2L
+ PZ54teH89F+2KnLwrp28Pi58fZRGTn4DS+TPK/q0n0F05VbnsfOM3D7YQG+UFMlTkbxr
+ A68g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=EPBS2GhpwmpEDgTVr1WkimnFnbT2vpcS3OkFjG9Zg54=;
- b=DpX00kzMlAaeApMLPeEmds0Nx1DE78f5D9PXP7ZxXqiGqvJihmOaxh/r2RnYL5Ymm4
- 46lWCpbWJ7U0OH6Ek0oNsJcUwKMuV4iPIbJSCVIKHAdSI83oeDdWj9nTQRuUG2wegZpl
- 9AKi7ZsZXcxHsEuDtXJQacOguuuZfLbWhpsSEQAXXl3G6u6hBkIzwXOMA+gbChUzIzc1
- zvwtJ4vrT3VfJdgzJ4IAmIdRyr0P8ToMGmixAwA4z8z5K+eajraISXJTJF4tTxywCmIu
- cA35H55w+MeKwCrYt6tP8L9bz22uggIVQTXW/H7CECQ9UCeDc1qNLsKWrCEhoTDwKTHJ
- LRRg==
-X-Gm-Message-State: AHQUAuZw46uU7K/cuHylA5R10hfjZX85fYOTev7NH8DPphuqnidvvpP4
- nFdT7eVqRmPG9QX8nUp1jNU=
-X-Google-Smtp-Source: AHgI3IbTN4cYherFmGvph39bWwD1EtdaeRVZCpQV3H51+TIeDB0ZWYBPmaHvkENyPWilGd6s89koYg==
-X-Received: by 2002:a62:f51d:: with SMTP id n29mr12736853pfh.21.1550420609462; 
- Sun, 17 Feb 2019 08:23:29 -0800 (PST)
+ bh=l0Z1b8BC2pttHCDOIu6v+lf74XsTzc0qioBaG3nshfk=;
+ b=Fc56SvPhoCuJO0QtdyIWVXpGLfN3FK4kELxwkeHrMvmg74lcwNfOzvCe3X1lEiaQSX
+ xS4Zm/fQ64VWa1lIt97VY735lHqlBeSYmuWpYQ9chcss2rSqGWfAJC0M6/3smIkVFjnz
+ XBbDidoAe3EoiPp2W4OoXgRdTMJGDDOk+/S6A0qtzGVNXceL477E8llS8/Nw2V4W/iQG
+ +noOoqxSbQ4WIw2f1N4I2+Eq0hOrU9VZlSDRd73OtgXe4Hky1efhxOG+QPh+SWiwhblc
+ sEzLtK+WJ/wMSLbM2FzNXaAChn8gIk8C7Jv5WYNzsK8i76xgCJIyYm5cVGJK254bsO00
+ 4E0A==
+X-Gm-Message-State: AHQUAuabn7D6LZbRi+LI0CGlKnfsoKcmRlj+6YwkgNYRmN/iIDd55aY5
+ /0BYTP4za2MDMWwdzM+TF7U=
+X-Google-Smtp-Source: AHgI3IatCozi52BBjxYj9wpcWegsHycTPpd+H3xV8EpBNaBUTb92zGixVALQES0YRocPtZTjcjg/fg==
+X-Received: by 2002:a17:902:2aa8:: with SMTP id
+ j37mr19969310plb.226.1550420614357; 
+ Sun, 17 Feb 2019 08:23:34 -0800 (PST)
 Received: from localhost (68.168.130.77.16clouds.com. [68.168.130.77])
- by smtp.gmail.com with ESMTPSA id l28sm18060247pfi.178.2019.02.17.08.23.28
+ by smtp.gmail.com with ESMTPSA id x11sm12541697pgp.88.2019.02.17.08.23.33
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sun, 17 Feb 2019 08:23:28 -0800 (PST)
+ Sun, 17 Feb 2019 08:23:33 -0800 (PST)
 From: Yangtao Li <tiny.windzz@gmail.com>
 To: srinivas.kandagatla@linaro.org, robh+dt@kernel.org, mark.rutland@arm.com,
  maxime.ripard@bootlin.com, wens@csie.org
-Subject: [PATCH 1/5] nvmem: sunxi-sid: fix wrong description in kernel doc
-Date: Sun, 17 Feb 2019 11:23:12 -0500
-Message-Id: <20190217162316.14111-2-tiny.windzz@gmail.com>
+Subject: [PATCH 2/5] nvmem: sunxi-sid: add support for H5's SID controller
+Date: Sun, 17 Feb 2019 11:23:13 -0500
+Message-Id: <20190217162316.14111-3-tiny.windzz@gmail.com>
 X-Mailer: git-send-email 2.17.0
 In-Reply-To: <20190217162316.14111-1-tiny.windzz@gmail.com>
 References: <20190217162316.14111-1-tiny.windzz@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_082330_584488_BED53BD8 
-X-CRM114-Status: GOOD (  12.83  )
+X-CRM114-CacheID: sfid-20190217_082335_381817_34D6E06F 
+X-CRM114-Status: GOOD (  11.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -104,26 +105,35 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-qfprom->sunxi-sid
+Add support for H5's SID controller.
 
 Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
 ---
- Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/nvmem/sunxi_sid.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-index 99c4ba6a3f61..d37017e343b1 100644
---- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-+++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-@@ -12,7 +12,7 @@ Required properties:
- - reg: Should contain registers location and length
+diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+index 570a2e354f30..036029e90921 100644
+--- a/drivers/nvmem/sunxi_sid.c
++++ b/drivers/nvmem/sunxi_sid.c
+@@ -219,11 +219,17 @@ static const struct sunxi_sid_cfg sun50i_a64_cfg = {
+ 	.size = 0x100,
+ };
  
- = Data cells =
--Are child nodes of qfprom, bindings of which as described in
-+Are child nodes of sunxi-sid, bindings of which as described in
- bindings/nvmem/nvmem.txt
- 
- Example for sun4i:
++static const struct sunxi_sid_cfg sun50i_h5_cfg = {
++	.value_offset = 0x200,
++	.size = 0x100,
++};
++
+ static const struct of_device_id sunxi_sid_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-sid", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun7i-a20-sid", .data = &sun7i_a20_cfg },
+ 	{ .compatible = "allwinner,sun8i-h3-sid", .data = &sun8i_h3_cfg },
+ 	{ .compatible = "allwinner,sun50i-a64-sid", .data = &sun50i_a64_cfg },
++	{ .compatible = "allwinner,sun50i-h5-sid", .data = &sun50i_h5_cfg },
+ 	{/* sentinel */},
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
 -- 
 2.17.0
 
