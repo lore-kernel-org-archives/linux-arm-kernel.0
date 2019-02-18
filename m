@@ -2,63 +2,159 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 66E3AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:11:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A74A9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:12:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35D742147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:11:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7829220855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:12:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fzh3GSdZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35D742147A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KtHiEfGR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="zkrdyJWe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7829220855
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4PmZacXkps0zjpo9ZfZG6aerMcdwsBb9OGzZW/JGz0g=; b=fzh3GSdZLLSVah
-	1dqpxcr9JvGTX05g9Hodi5UxjwbZSDpw4Cdu2MPn0ur+BuikBOAoU7fjiatDmvzUb4p+p+2xOwQML
-	w4NyoMqpoBK/Bi7ls+JzTOvDFHCblhfaRCaA7l2C8TxGSw0AxoGrhkNdS38l2dneKGY3YGwg2Xvs3
-	GwNINJ6+WOTwrST196+43J2r6Zrx+KHEE+eft+qjRXBfw7UIu5JiuDuyIreoF/34MzdDQxb7VUT8t
-	/rE/mq9w+S8OtvAanAfThqWCXsEEZImo87V4UFRPv+em7Lv1nML6cohoukqb/FMFOfKQuTK2H1tsP
-	WXCXPF+gcQNX+5it11fw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=luoMTbRlIbzseXVEMc3Mjudy/pYH9gKKQsMfdSYJ/BI=; b=KtHiEfGRq6OUYd
+	iQj6AB65IeCPiQgp9289ckYYLKUOsir4+3x8T6VoJPEzDBxWJEozotWUjvrrLAXuhU20AqzROoklv
+	IUtpmZDoX3W0nMsoXP46BT3s9rsh0OZN50w0/3EsA1nmDz+SgRrKyRBVaRGeXDpwmt5fLELR22sPO
+	7F1RtNpfWd+t6+P66YPrPvI+Mxi97Vt0VNetf+i2D2q5MzP7dN03ODfkgLXVAp6eynBwGkXtXx6Cq
+	2Lvv407XmoE/XnfZEcr/STUNbie6tcklr1LjXOR6d0g55Gn12iCAPMWQnbM/N0VF8laTFiVWYpXnd
+	Y81QrBe6IcpVz12NfaEQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvfte-00066j-Cd; Mon, 18 Feb 2019 10:11:34 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvfta-00066G-9Y
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:11:32 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AB9CC80D;
- Mon, 18 Feb 2019 02:11:28 -0800 (PST)
-Received: from localhost (unknown [10.37.6.16])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E6E983F720;
- Mon, 18 Feb 2019 02:11:27 -0800 (PST)
-Date: Mon, 18 Feb 2019 10:11:26 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v2 5/5] KVM: arm/arm64: support chained PMU counters
-Message-ID: <20190218101125.GG54124@e119886-lin.cambridge.arm.com>
-References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
- <1549299218-44714-6-git-send-email-andrew.murray@arm.com>
- <11a8c800-5c1d-08ce-9d85-402ca89727a3@arm.com>
+	id 1gvfuK-0006ZI-29; Mon, 18 Feb 2019 10:12:16 +0000
+Received: from mail-eopbgr690069.outbound.protection.outlook.com
+ ([40.107.69.69] helo=NAM04-CO1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvfuG-0006Yj-Rj
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:12:14 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=sFqXhlNDT/QnBqNCeY7xR9fb2DRIYnhfJRvF/FeAby0=;
+ b=zkrdyJWeW5sJa39Gko/Dk8Th8OsZMD5bpE2kxMW88Cm2vrJjEHePzVBKdyEx3woVxA8sai3RCKqrruswQ/7ORyKisuHjLWIsony1nztX1GclDMjQACtchgw1VbsXb9NV1w5/mjapDzBZSgJqp62E+6QRllBvzb8eHk/bA1aBJXk=
+Received: from BYAPR02CA0034.namprd02.prod.outlook.com (2603:10b6:a02:ee::47)
+ by BYAPR02MB4630.namprd02.prod.outlook.com (2603:10b6:a03:5f::29)
+ with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1622.19; Mon, 18 Feb
+ 2019 10:12:09 +0000
+Received: from SN1NAM02FT012.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::201) by BYAPR02CA0034.outlook.office365.com
+ (2603:10b6:a02:ee::47) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1622.16 via Frontend
+ Transport; Mon, 18 Feb 2019 10:12:09 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; 163.com; dkim=none (message not signed)
+ header.d=none;163.com; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
+Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
+ 149.199.60.83 as permitted sender) receiver=protection.outlook.com;
+ client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
+Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
+ SN1NAM02FT012.mail.protection.outlook.com (10.152.72.95) with Microsoft SMTP
+ Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1643.11
+ via Frontend Transport; Mon, 18 Feb 2019 10:12:09 +0000
+Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
+ by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gvfuC-0002ZT-Mi; Mon, 18 Feb 2019 02:12:08 -0800
+Received: from [127.0.0.1] (helo=localhost)
+ by xsj-pvapsmtp01 with smtp (Exim 4.63)
+ (envelope-from <michal.simek@xilinx.com>)
+ id 1gvfu7-0008CB-Ht; Mon, 18 Feb 2019 02:12:03 -0800
+Received: from xsj-pvapsmtp01 (maildrop.xilinx.com [149.199.38.66])
+ by xsj-smtp-dlp1.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1IABtaR026781; 
+ Mon, 18 Feb 2019 02:11:55 -0800
+Received: from [172.30.17.111] by xsj-pvapsmtp01 with esmtp (Exim 4.63)
+ (envelope-from <michals@xilinx.com>)
+ id 1gvfty-00084u-U4; Mon, 18 Feb 2019 02:11:55 -0800
+Subject: Re: [PATCH] i2c: cadence: try reset when master receive arbitration
+ lost
+To: Shikai Wang <sxauwsk@163.com>, Shubhrajyoti Datta
+ <shubhrajyoti.datta@xilinx.com>
+References: <20190218094132.5226-1-sxauwsk@163.com>
+From: Michal Simek <michal.simek@xilinx.com>
+Message-ID: <4731eba7-7d85-62b9-2252-24ad55d75a0c@xilinx.com>
+Date: Mon, 18 Feb 2019 11:11:53 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <11a8c800-5c1d-08ce-9d85-402ca89727a3@arm.com>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
+In-Reply-To: <20190218094132.5226-1-sxauwsk@163.com>
+Content-Language: en-US
+X-RCIS-Action: ALLOW
+X-TM-AS-Product-Ver: IMSS-7.1.0.1224-8.2.0.1013-23620.005
+X-TM-AS-User-Approved-Sender: Yes;Yes
+X-EOPAttributedMessage: 0
+X-MS-Office365-Filtering-HT: Tenant
+X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
+ SFV:NSPM;
+ SFS:(10009020)(396003)(39860400002)(376002)(346002)(136003)(2980300002)(189003)(199004)(106002)(31686004)(4744005)(5660300002)(50466002)(31696002)(63266004)(6246003)(110136005)(2486003)(65956001)(65806001)(4326008)(106466001)(316002)(54906003)(58126008)(230700001)(11346002)(47776003)(44832011)(14444005)(486006)(126002)(229853002)(2616005)(476003)(36386004)(9786002)(36756003)(8676002)(446003)(81166006)(76176011)(23676004)(426003)(478600001)(65826007)(356004)(305945005)(26005)(64126003)(336012)(2906002)(77096007)(186003)(6636002)(81156014)(8936002)(107986001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR02MB4630; H:xsj-pvapsmtpgw01; FPR:;
+ SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; MX:1; A:1; 
+X-MS-PublicTrafficType: Email
+X-MS-Office365-Filtering-Correlation-Id: 96c46e19-f2d0-4294-7076-08d695898aeb
+X-Microsoft-Antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4608103)(4709054)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060);
+ SRVR:BYAPR02MB4630; 
+X-MS-TrafficTypeDiagnostic: BYAPR02MB4630:
+X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
+X-Microsoft-Exchange-Diagnostics: 1; BYAPR02MB4630;
+ 20:M/0UIXnG5jzqkrUMhjvScF4Qlp/H5YVg3xXvRY5hjxbEwlS8Id3zG9Kc1LsKsfn3kBTbQGxCWvwJPN5DcCt2+w77m8nrkxfh5QXQ3oeCTwwZIj8U2eTpFSx6Zj1KwNh0dOvS2HV9TCWtLvjpLJbnj9C+enItC40r3PuAjIG7cCMYIhYZ0sIDDG8P3dKcpepeHnQNWImOMtG2u4u0heT5VvGHfHgj9SqT/0UOVevR2TQYfFN+FKlNZsTqte9O99rPsdZ20cOUTWd0eVMQLd/h+28koFxbOWEBGHcWy/KgJKTNqyKSFQOeZY78gpoFLwGfMD9QD1OwAIN/nGwApBeCgqHP39erYS3H1+fITbmRbt7sSMKSktMk2y/4tKLQCrK5kSyUcOT9YxNu7nyyP0xY1G+9+5ViElMTE3evYrMaq0A1m/a+itfXiiwi9PvrHmT1QwKq+4C9yirs/fZFdsoTJThbCU3HPBmCv0QsJNdtGX0iV/ilh1n0fowcAMw6jgWz
+X-Microsoft-Antispam-PRVS: <BYAPR02MB46301982C637748DC052F94CC6630@BYAPR02MB4630.namprd02.prod.outlook.com>
+X-Forefront-PRVS: 09525C61DB
+X-Microsoft-Exchange-Diagnostics: =?utf-8?B?MTtCWUFQUjAyTUI0NjMwOzIzOm5aek4zanp1ZWQxUGh1RWtXQXc0UHJOS0JH?=
+ =?utf-8?B?c29KdTlQeWNxd0V1OXJJOTY0V2wwSXNTakhzT1NySDd5ZlpXa0F4MXV6dXJ0?=
+ =?utf-8?B?cG1EbFN0cGlMamdnTW5PQnMyem5SeGo2eG85akd6YUpCemJVWGVYSmFrWmQ4?=
+ =?utf-8?B?OTdxYnVLL2puV0hGRUVjK1VKTHBMTDRtZ0FyS3oxYXg0YkZ2bUpUemI3MkJu?=
+ =?utf-8?B?R0I5eUtRdWc5dVNUbGRZRG5QTUkwcXg3dTJrT3NpZUNOQVZjR0tCVWlaZW51?=
+ =?utf-8?B?UDJiK05sZ3BMZ3N2MHVmNXMzTFNDcWt5VmNwUGErTEMyYWlDc2RwTUpZTU5t?=
+ =?utf-8?B?Y054TXBWNmp6Wm9NWWNOVmYySHRaT0k3TDMvRHBjR1pHNVVtd0h3cXZ6dXBu?=
+ =?utf-8?B?ZktXNWd5L1ljTG1YUDd4bVVqcDJSZ0R1cXlIMERoOTJ0SkJpNEt5SUtWeGx6?=
+ =?utf-8?B?R01WYWN3YkpnejhPbGpST1Vaa3oyTTFIclZLVCtZMEVDNUJGY3k0akVnRGRY?=
+ =?utf-8?B?elM3UDcyLzR0TGVZa2dpaFRCeTJiaWd3bWlYQWNoUWg4TFBRNHFBMVo1aCtK?=
+ =?utf-8?B?cnl0VXNlM295TXhUTXBHWWFwRDF6Y0FkallPWnEvYlE1Q3d4VjZnRVFyNmZx?=
+ =?utf-8?B?YjRsTGcvMVpaZnJvNVVSOFpSRzZ1M21FREFuTHdaVU1hdkR0eFBqY2pjTHQz?=
+ =?utf-8?B?dDV5cUpTbGNsLzJSV0x3OUtDdkhvWTlhTnVSdzJ3VVMxUUthb2MwbkNGbXNa?=
+ =?utf-8?B?anZPS0kwUCtYNDJWVU9oYnlHeU40SGdJYjNoRW5pRlArUy9tRXBpTlBubWxO?=
+ =?utf-8?B?Qjg2b3M0enNUUU81QUY5SFpDeXpMZ2VjandNR0xEbmNUMG81N3JmSnRHVUNm?=
+ =?utf-8?B?bC8xK2F6RDRKMW9pUGJuTnh5eWZKeVFLMCtvQldGMUhVd0ZjazhLRzBmRFJJ?=
+ =?utf-8?B?Kzd0QThwS3JrbzZhdEZrSGNZKzRZSnE2aFNaRWRQK1daVGZ1b1Q3WTRYTzd1?=
+ =?utf-8?B?clpBTVpnZUZGNzY0UEdDSVJ5b09OcU4wWHNaV2VaL0Z6SmNmZDhVQnd5RlNn?=
+ =?utf-8?B?QW5ZbVVTTWx4NDRoRmw4VWhsQjhzZXVVM1BxSUtvSnVGYkVFNUNQQ3RyZzhs?=
+ =?utf-8?B?WmpOKzI1Y1o4RkFuWGN2NDdmZWVmWVRtaThPM2EybytSNTdZVVlJdTh5aWhE?=
+ =?utf-8?B?MGMyRlVJeS9nK0szTFpLVWdDSEh0MlhrUVk5bXFoYWt1RGRaZFJ5MlVZcEJF?=
+ =?utf-8?B?VmRPRnlTQzNhWWtWeGl1eHl5ZEs3NUxjTnM3aU9yRjN4V2I0Z0tScmFja2R5?=
+ =?utf-8?B?d1ZVbzQ2aTVDRDV4YmM5bk5LZ0E3NllYYmZDRGhLdVNEcXU3WEpPeHhKOHpV?=
+ =?utf-8?B?NS9qbkNwRlVqWEFPZlZOMk9vbHVsWmU5UVBOTUF0VWVzNUM2QjdSRU5TclRm?=
+ =?utf-8?B?QkhQaXdPakw2YkpOUTA4OFMwQWc3eWNJcy8xTi8yVkdpcWZFQzZHMW5DV0Ji?=
+ =?utf-8?B?eVNHVzU5ZWwxZEloOHlrR0ZVSlkxeDdTMDRxbnBWTzgxa21UK0VJN0thZnBE?=
+ =?utf-8?B?N1htU25QRG1vWHJ3MFQrNmdCS0RycHBNMFhURTBPZ01aOTFTZkxkNFR4Q21Y?=
+ =?utf-8?B?bTVjKzdNWGlqMEplYnZoeVpwZDdtZmhJSDZnalZUSnFmY2grck1UWXFnZy8z?=
+ =?utf-8?Q?2HKAucLnZM+laPsJLdZ96JJdL5MV8wBIeBDlcdD?=
+X-MS-Exchange-SenderADCheck: 1
+X-Microsoft-Antispam-Message-Info: QdwkLUz629VzmHN7FfusJN3CVLGg0gMJELmAMvBBfmBboFjm/JMjrto7VfY2s2X5dtCw2VVMQ4LJtHSnRtXW8UHEIzzY8pCReNyRCrGdrbvUBf4K/orKIspGdVlyPWTkI+8oq1SjHGd0JYcjSTD4vDOWcrG6AtND/n+tlBvs99TBj1redzjRtSLbQvCV9LGRYrh+fLLyhi595EPpCfOJTliyIICmhUgAjdhhuqB6UsjMqabdkjcRYqBcb+dch9oun6a+8I44+a8Y/EpcQSJnZ+gR1ORA72/q+8oH1Jw/KJPe6yUurWDma8hFwy1iUre7i4lqL0fK9qKup2TfLCFzP/m62fOhqenZd0xDQ9FasRWKFsXx6YEPy9eAnuy3210KrsBN9H5RlAkLWigREEzJeuZlW+cCx8RIHw6jkNBcZBo=
+X-OriginatorOrg: xilinx.com
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 18 Feb 2019 10:12:09.1235 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 96c46e19-f2d0-4294-7076-08d695898aeb
+X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
+X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
+ Helo=[xsj-pvapsmtpgw01]
+X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR02MB4630
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_021130_351284_46204E7B 
-X-CRM114-Status: GOOD (  35.38  )
+X-CRM114-CacheID: sfid-20190218_021212_941947_9BE7A3D8 
+X-CRM114-Status: GOOD (  12.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,515 +166,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>, suzuki.poulose@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Cc: linux-kernel@vger.kernel.org, Michal Simek <michal.simek@xilinx.com>,
+ linux-arm-kernel@lists.infradead.org, linux-i2c@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 05, 2019 at 02:33:03PM +0000, Julien Thierry wrote:
-> Hi Andrew,
+On 18. 02. 19 10:41, Shikai Wang wrote:
+> When the adapter receive arbitration lost error interrupts,
+> cdns_i2c_master_xfer return to the caller directly instead of resetting
+> the adapter which resulted in the adapter being out of control.
 > 
-> On 04/02/2019 16:53, Andrew Murray wrote:
-> > Emulate chained PMU counters by creating a single 64 bit event counter
-> > for a pair of chained KVM counters.
-> > 
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> > ---
-> >  include/kvm/arm_pmu.h |   1 +
-> >  virt/kvm/arm/pmu.c    | 321 +++++++++++++++++++++++++++++++++++++++++---------
-> >  2 files changed, 269 insertions(+), 53 deletions(-)
-> > 
-> > diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> > index b73f31b..8e691ee 100644
-> > --- a/include/kvm/arm_pmu.h
-> > +++ b/include/kvm/arm_pmu.h
-> > @@ -29,6 +29,7 @@ struct kvm_pmc {
-> >  	u8 idx;	/* index into the pmu->pmc array */
-> >  	struct perf_event *perf_event;
-> >  	u64 bitmask;
-> > +	u64 overflow_count;
-> >  };
-> >  
-> >  struct kvm_pmu {
-> > diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> > index a64aeb2..9318130 100644
-> > --- a/virt/kvm/arm/pmu.c
-> > +++ b/virt/kvm/arm/pmu.c
-> > @@ -24,9 +24,25 @@
-> >  #include <kvm/arm_pmu.h>
-> >  #include <kvm/arm_vgic.h>
-> >  
-> > +#define ARMV8_PMUV3_PERFCTR_CHAIN 0x1E
+> So when driver detect err_status such as arbitration lost,
+> then try to repair and fix it.
 > 
-> I find it a bit awkward to have this redefined here.
-> 
-> Maybe we could define a helper in kvm_host.h:
-> bool kvm_pmu_typer_is_chain(u64 typer);
-> 
-> That would always return false for arm32?
-> 
-> > +static void kvm_pmu_stop_release_perf_event_pair(struct kvm_vcpu *vcpu,
-> > +					    u64 pair_low);
-> > +static void kvm_pmu_stop_release_perf_event(struct kvm_vcpu *vcpu,
-> > +					      u64 select_idx);
-> > +static void kvm_pmu_sync_counter_enable_pair(struct kvm_vcpu *vcpu, u64 pair_low);
-> >  static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu, u64 select_idx);
-> >  static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx);
-> > -static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
-> > +
-> > +/**
-> > + * kvm_pmu_counter_is_high_word - is select_idx high counter of 64bit event
-> > + * @pmc: The PMU counter pointer
-> > + * @select_idx: The counter index
-> > + */
-> > +static inline bool kvm_pmu_counter_is_high_word(struct kvm_pmc *pmc)
-> > +{
-> > +	return ((pmc->perf_event->attr.config1 & 0x1)
-> > +		&& (pmc->idx % 2));
-> > +}
-> >  
-> >  /**
-> >   * kvm_pmu_get_counter_value - get PMU counter value
-> > @@ -35,22 +51,70 @@ static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc);
-> >   */
-> >  u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
-> >  {
-> > -	u64 counter, reg, enabled, running;
-> > +	u64 counter_idx, reg, enabled, running, incr;
-> >  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> >  	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> >  
-> >  	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
-> >  	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
-> > -	counter = __vcpu_sys_reg(vcpu, reg);
-> > +	counter_idx = __vcpu_sys_reg(vcpu, reg);
-> 
-> I'm not sure I understand the "_idx" suffix for this variable. This
-> holds a counter value, not and index. Right?
+> Signed-off-by: Shikai Wang <sxauwsk@163.com>
 
-Yes it holds a counter value. The reason for the '_idx' suffix was to indicate
-that this holds the counter value as selected by 'select_idx'. Also in the
-case of a chained counter, this value is only the high or low part and so I
-reserve 'counter' for representing the entire chained counter value.
+ok. This is much better.
 
-I'll change this such that 'counter_idx' becomes 'counter' again. And 'counter'
-(introduced by this patch) becomes 'counter_full' - does that make it clearer?
+> Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
 
-> 
-> 
-> >  
-> >  	/* The real counter value is equal to the value of counter register plus
-> >  	 * the value perf event counts.
-> >  	 */
-> > -	if (pmc->perf_event)
-> > -		counter += perf_event_read_value(pmc->perf_event, &enabled,
-> > +	if (pmc->perf_event) {
-> > +		incr = perf_event_read_value(pmc->perf_event, &enabled,
-> >  						 &running);
-> >  
-> > -	return counter & pmc->bitmask;
-> > +		if (kvm_pmu_counter_is_high_word(pmc)) {
-> > +			u64 counter_low, counter;
-> > +
-> > +			reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
-> > +			      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx - 1;
-> > +			counter_low = __vcpu_sys_reg(vcpu, reg);
-> > +			counter = lower_32_bits(counter_low) | (counter_idx << 32);
-> > +			counter_idx = upper_32_bits(counter + incr);
-> > +		} else {
-> > +			counter_idx += incr;
-> > +		}
-> > +	}
-> > +
-> > +	return counter_idx & pmc->bitmask;
-> > +}
-> > +
-> > +/**
-> > + * kvm_pmu_counter_is_enabled - is a counter active
-> > + * @vcpu: The vcpu pointer
-> > + * @select_idx: The counter index
-> > + */
-> > +static bool kvm_pmu_counter_is_enabled(struct kvm_vcpu *vcpu, u64 select_idx)
-> > +{
-> > +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-> > +
-> > +	return (__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) &&
-> > +	       (__vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask & BIT(select_idx));
-> > +}
-> > +
-> > +/**
-> > + * kvnm_pmu_event_is_chained - is a pair of counters chained and enabled
-> > + * @vcpu: The vcpu pointer
-> > + * @select_idx: The low counter index
-> > + */
-> > +static bool kvm_pmu_event_is_chained(struct kvm_vcpu *vcpu, u64 pair_low)
-> > +{
-> > +	u64 eventsel, reg;
-> > +
-> > +	reg = (pair_low + 1 == ARMV8_PMU_CYCLE_IDX)
-> > +	      ? PMCCFILTR_EL0 : PMEVTYPER0_EL0 + pair_low + 1;
-> > +	eventsel = __vcpu_sys_reg(vcpu, reg) & ARMV8_PMU_EVTYPE_EVENT;
-> > +	if (eventsel != ARMV8_PMUV3_PERFCTR_CHAIN)
-> > +		return false;
-> > +
-> > +	if (kvm_pmu_counter_is_enabled(vcpu, pair_low) !=
-> > +	    kvm_pmu_counter_is_enabled(vcpu, pair_low + 1))
-> > +		return false;
-> > +
-> > +	return true;
-> >  }
-> >  
-> >  /**
-> > @@ -61,29 +125,45 @@ u64 kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u64 select_idx)
-> >   */
-> >  void kvm_pmu_set_counter_value(struct kvm_vcpu *vcpu, u64 select_idx, u64 val)
-> >  {
-> > -	u64 reg;
-> > -	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > -	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> > +	u64 reg, pair_low;
-> >  
-> >  	reg = (select_idx == ARMV8_PMU_CYCLE_IDX)
-> >  	      ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + select_idx;
-> >  	__vcpu_sys_reg(vcpu, reg) += (s64)val - kvm_pmu_get_counter_value(vcpu, select_idx);
-> >  
-> > -	kvm_pmu_stop_counter(vcpu, pmc);
-> > -	kvm_pmu_sync_counter_enable(vcpu, select_idx);
-> > +	pair_low = (select_idx % 2) ? select_idx - 1 : select_idx;
-> > +
-> > +	/* Recreate the perf event to reflect the updated sample_period */
-> > +	if (kvm_pmu_event_is_chained(vcpu, pair_low)) {
-> > +		kvm_pmu_stop_release_perf_event_pair(vcpu, pair_low);
-> > +		kvm_pmu_sync_counter_enable_pair(vcpu, pair_low);
-> > +	} else {
-> > +		kvm_pmu_stop_release_perf_event(vcpu, select_idx);
-> > +		kvm_pmu_sync_counter_enable(vcpu, select_idx);
-> > +	}
-> >  }
-> >  
-> >  /**
-> >   * kvm_pmu_release_perf_event - remove the perf event
-> >   * @pmc: The PMU counter pointer
-> >   */
-> > -static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
-> > +static void kvm_pmu_release_perf_event(struct kvm_vcpu *vcpu,
-> > +				       struct kvm_pmc *pmc)
-> >  {
-> > -	if (pmc->perf_event) {
-> > -		perf_event_disable(pmc->perf_event);
-> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +	struct kvm_pmc *pmc_alt;
-> > +	u64 pair_alt;
-> > +
-> > +	pair_alt = (pmc->idx % 2) ? pmc->idx - 1 : pmc->idx + 1;
-> > +	pmc_alt = &pmu->pmc[pair_alt];
-> > +
-> > +	if (pmc->perf_event)
-> >  		perf_event_release_kernel(pmc->perf_event);
-> > -		pmc->perf_event = NULL;
-> > -	}
-> > +
-> > +	if (pmc->perf_event == pmc_alt->perf_event)
-> > +		pmc_alt->perf_event = NULL;
-> > +
-> > +	pmc->perf_event = NULL;
-> >  }
-> >  
-> >  /**
-> > @@ -91,22 +171,65 @@ static void kvm_pmu_release_perf_event(struct kvm_pmc *pmc)
-> >   * @vcpu: The vcpu pointer
-> >   * @pmc: The PMU counter pointer
-> >   *
-> > - * If this counter has been configured to monitor some event, release it here.
-> > + * If this counter has been configured to monitor some event, stop it here.
-> >   */
-> >  static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu, struct kvm_pmc *pmc)
-> >  {
-> >  	u64 counter, reg;
-> >  
-> >  	if (pmc->perf_event) {
-> > +		perf_event_disable(pmc->perf_event);
-> >  		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
-> >  		reg = (pmc->idx == ARMV8_PMU_CYCLE_IDX)
-> >  		       ? PMCCNTR_EL0 : PMEVCNTR0_EL0 + pmc->idx;
-> >  		__vcpu_sys_reg(vcpu, reg) = counter;
-> > -		kvm_pmu_release_perf_event(pmc);
-> >  	}
-> >  }
-> >  
-> >  /**
-> > + * kvm_pmu_stop_release_perf_event_pair - stop and release a pair of counters
-> > + * @vcpu: The vcpu pointer
-> > + * @pmc_low: The PMU counter pointer for lower word
-> > + * @pmc_high: The PMU counter pointer for higher word
-> > + *
-> > + * As chained counters share the underlying perf event, we stop them
-> > + * both first before discarding the underlying perf event
-> > + */
-> > +static void kvm_pmu_stop_release_perf_event_pair(struct kvm_vcpu *vcpu,
-> > +					    u64 idx_low)
-> > +{
-> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +	struct kvm_pmc *pmc_low = &pmu->pmc[idx_low];
-> > +	struct kvm_pmc *pmc_high = &pmu->pmc[idx_low + 1];
-> > +
-> > +	/* Stopping a counter involves adding the perf event value to the
-> > +	 * vcpu sys register value prior to releasing the perf event. As
-> > +	 * kvm_pmu_get_counter_value may depend on the low counter value we
-> > +	 * must always stop the high counter first
-> > +	 */
-> > +	kvm_pmu_stop_counter(vcpu, pmc_high);
-> > +	kvm_pmu_stop_counter(vcpu, pmc_low);
-> > +
-> > +	kvm_pmu_release_perf_event(vcpu, pmc_high);
-> > +	kvm_pmu_release_perf_event(vcpu, pmc_low);
-> > +}
-> > +
-> > +/**
-> > + * kvm_pmu_stop_release_perf_event - stop and release a counter
-> > + * @vcpu: The vcpu pointer
-> > + * @select_idx: The counter index
-> > + */
-> > +static void kvm_pmu_stop_release_perf_event(struct kvm_vcpu *vcpu,
-> > +					      u64 select_idx)
-> > +{
-> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> > +
-> > +	kvm_pmu_stop_counter(vcpu, pmc);
-> > +	kvm_pmu_release_perf_event(vcpu, pmc);
-> > +}
-> > +
-> > +/**
-> >   * kvm_pmu_vcpu_reset - reset pmu state for cpu
-> >   * @vcpu: The vcpu pointer
-> >   *
-> > @@ -117,7 +240,7 @@ void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
-> >  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> >  
-> >  	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
-> > -		kvm_pmu_stop_counter(vcpu, &pmu->pmc[i]);
-> > +		kvm_pmu_stop_release_perf_event(vcpu, i);
-> >  		pmu->pmc[i].idx = i;
-> >  		pmu->pmc[i].bitmask = 0xffffffffUL;
-> >  	}
-> > @@ -134,7 +257,7 @@ void kvm_pmu_vcpu_destroy(struct kvm_vcpu *vcpu)
-> >  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> >  
-> >  	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++)
-> > -		kvm_pmu_release_perf_event(&pmu->pmc[i]);
-> > +		kvm_pmu_release_perf_event(vcpu, &pmu->pmc[i]);
-> >  }
-> >  
-> >  u64 kvm_pmu_valid_counter_mask(struct kvm_vcpu *vcpu)
-> > @@ -167,53 +290,115 @@ static void kvm_pmu_enable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
-> >  }
-> >  
-> >  /**
-> > + * kvm_pmu_sync_counter_enable - reenable a counter if it should be enabled
-> > + * @vcpu: The vcpu pointer
-> > + * @select_idx: The counter index
-> > + */
-> > +static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu,
-> > +					    u64 select_idx)
-> > +{
-> > +	kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
-> > +}
-> > +
-> > +/**
-> > + * kvm_pmu_sync_counter_enable_pair - reenable a pair if they should be enabled
-> > + * @vcpu: The vcpu pointer
-> > + * @pair_low: The low counter index
-> > + */
-> > +static void kvm_pmu_sync_counter_enable_pair(struct kvm_vcpu *vcpu, u64 pair_low)
-> > +{
-> > +	kvm_pmu_enable_counter_mask(vcpu, BIT(pair_low) | BIT(pair_low + 1));
-> > +}
-> > +
-> > +/**
-> > + * kvm_pmu_enable_counter_pair - enable counters pair at a time
-> > + * @vcpu: The vcpu pointer
-> > + * @val: counters to enable
-> > + * @pair_low: The low counter index
-> > + */
-> > +static void kvm_pmu_enable_counter_pair(struct kvm_vcpu *vcpu, u64 val,
-> > +					u64 pair_low)
-> > +{
-> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +	struct kvm_pmc *pmc_low = &pmu->pmc[pair_low];
-> > +	struct kvm_pmc *pmc_high = &pmu->pmc[pair_low + 1];
-> > +
-> > +	if (kvm_pmu_event_is_chained(vcpu, pair_low)) {
-> > +		if (pmc_low->perf_event != pmc_high->perf_event)
-> > +			kvm_pmu_stop_release_perf_event_pair(vcpu, pair_low);
-> > +	}
-> > +
-> > +	if (val & BIT(pair_low))
-> > +		kvm_pmu_enable_counter(vcpu, pair_low);
-> > +
-> > +	if (val & BIT(pair_low+1))
-> 
-> Style nit: I think there should be spaces around the '+', might be worth
-> running checkpatch to check for other style stuff.
+I haven't see that Shubhrajyoti gave you this line that he is coauthor
+of this.
+It means you shouldn't add this SoB line if he didn't work on this.
+He reviewed it that's why you should wait what he is going to sent.
 
-Thanks - for some reason checkpatch doesn't pick this one up.
+Anyway based on email I see that this is 3rd version but I can't see any
+version in subject and also description of changes.
 
-Andrew Murray
+That's why please take a look at this
+Documentation/process/submitting-patches.rst
 
-> 
-> > +		kvm_pmu_enable_counter(vcpu, pair_low + 1);
-> > +}
-> > +
-> > +/**
-> >   * kvm_pmu_enable_counter_mask - enable selected PMU counters
-> >   * @vcpu: The vcpu pointer
-> > - * @val: the value guest writes to PMCNTENSET register
-> > + * @val: the value guest writes to PMCNTENSET register or a subset
-> >   *
-> >   * Call perf_event_enable to start counting the perf event
-> >   */
-> >  void kvm_pmu_enable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
-> >  {
-> >  	int i;
-> > +	u64 mask = kvm_pmu_valid_counter_mask(vcpu);
-> > +	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0) & mask;
-> >  
-> >  	if (!(__vcpu_sys_reg(vcpu, PMCR_EL0) & ARMV8_PMU_PMCR_E) || !val)
-> >  		return;
-> >  
-> > -	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
-> > -		if (!(val & BIT(i)))
-> > -			continue;
-> > -
-> > -		kvm_pmu_enable_counter(vcpu, i);
-> > -	}
-> > +	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i += 2)
-> > +		kvm_pmu_enable_counter_pair(vcpu, val & set, i);
-> >  }
-> >  
-> >  /**
-> > - * kvm_pmu_sync_counter_enable - reenable a counter if it should be enabled
-> > + * kvm_pmu_disable_counter - disable selected PMU counter
-> >   * @vcpu: The vcpu pointer
-> >   * @select_idx: The counter index
-> >   */
-> > -static void kvm_pmu_sync_counter_enable(struct kvm_vcpu *vcpu,
-> > -					    u64 select_idx)
-> > +static void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
-> >  {
-> > -	u64 set = __vcpu_sys_reg(vcpu, PMCNTENSET_EL0);
-> > +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> >  
-> > -	if (set & BIT(select_idx))
-> > -		kvm_pmu_enable_counter_mask(vcpu, BIT(select_idx));
-> > +	if (pmc->perf_event) {
-> > +		perf_event_disable(pmc->perf_event);
-> > +		if (pmc->perf_event->state != PERF_EVENT_STATE_ACTIVE)
-> > +			kvm_debug("fail to enable perf event\n");
-> > +	}
-> >  }
-> >  
-> >  /**
-> > - * kvm_pmu_disable_counter - disable selected PMU counter
-> > - * @vcpu: The vcpu pointer
-> > - * @pmc: The counter to disable
-> > + * kvm_pmu_disable_counter_pair - disable counters pair at a time
-> > + * @val: counters to disable
-> > + * @pair_low: The low counter index
-> >   */
-> > -static void kvm_pmu_disable_counter(struct kvm_vcpu *vcpu, u64 select_idx)
-> > +static void kvm_pmu_disable_counter_pair(struct kvm_vcpu *vcpu, u64 val,
-> > +					 u64 pair_low)
-> >  {
-> >  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > -	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> > +	struct kvm_pmc *pmc_low = &pmu->pmc[pair_low];
-> > +	struct kvm_pmc *pmc_high = &pmu->pmc[pair_low + 1];
-> > +
-> > +	if (!kvm_pmu_event_is_chained(vcpu, pair_low)) {
-> > +		if (pmc_low->perf_event == pmc_high->perf_event) {
-> > +			if (pmc_low->perf_event) {
-> > +				kvm_pmu_stop_release_perf_event_pair(vcpu,
-> > +								pair_low);
-> > +				kvm_pmu_sync_counter_enable_pair(vcpu, pair_low);
-> > +			}
-> > +		}
-> > +	}
-> >  
-> > -	if (pmc->perf_event)
-> > -		perf_event_disable(pmc->perf_event);
-> > +	if (val & BIT(pair_low))
-> > +		kvm_pmu_disable_counter(vcpu, pair_low);
-> > +
-> > +	if (val & BIT(pair_low + 1))
-> > +		kvm_pmu_disable_counter(vcpu, pair_low + 1);
-> >  }
-> >  
-> >  /**
-> > @@ -230,12 +415,8 @@ void kvm_pmu_disable_counter_mask(struct kvm_vcpu *vcpu, u64 val)
-> >  	if (!val)
-> >  		return;
-> >  
-> > -	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i++) {
-> > -		if (!(val & BIT(i)))
-> > -			continue;
-> > -
-> > -		kvm_pmu_disable_counter(vcpu, i);
-> > -	}
-> > +	for (i = 0; i < ARMV8_PMU_MAX_COUNTERS; i += 2)
-> > +		kvm_pmu_disable_counter_pair(vcpu, val, i);
-> >  }
-> >  
-> >  static u64 kvm_pmu_overflow_status(struct kvm_vcpu *vcpu)
-> > @@ -346,6 +527,17 @@ static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-> >  
-> >  	__vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(idx);
-> >  
-> > +	if (kvm_pmu_event_is_chained(vcpu, idx)) {
-> > +		struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> > +		struct kvm_pmc *pmc_high = &pmu->pmc[idx + 1];
-> > +
-> > +		if (!(--pmc_high->overflow_count)) {
-> > +			__vcpu_sys_reg(vcpu, PMOVSSET_EL0) |= BIT(idx + 1);
-> > +			pmc_high->overflow_count = U32_MAX + 1UL;
-> > +		}
-> > +
-> > +	}
-> > +
-> >  	if (kvm_pmu_overflow_status(vcpu)) {
-> >  		kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
-> >  		kvm_vcpu_kick(vcpu);
-> > @@ -440,6 +632,10 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
-> >  	    select_idx != ARMV8_PMU_CYCLE_IDX)
-> >  		return;
-> >  
-> > +	/* Handled by even event */
-> > +	if (eventsel == ARMV8_PMUV3_PERFCTR_CHAIN)
-> > +		return;
-> > +
-> >  	memset(&attr, 0, sizeof(struct perf_event_attr));
-> >  	attr.type = PERF_TYPE_RAW;
-> >  	attr.size = sizeof(attr);
-> > @@ -452,6 +648,9 @@ static void kvm_pmu_create_perf_event(struct kvm_vcpu *vcpu, u64 select_idx)
-> >  	attr.config = (select_idx == ARMV8_PMU_CYCLE_IDX) ?
-> >  		ARMV8_PMUV3_PERFCTR_CPU_CYCLES : eventsel;
-> >  
-> > +	if (kvm_pmu_event_is_chained(vcpu, select_idx))
-> > +		attr.config1 |= 0x1;
-> 
-> I'm not very familiar with the usage of perf attributes configs, but is
-> there any chance we could name this flag? Even if only for the local
-> file? Something like PERF_ATTR_CFG1_KVM_PMU_CHAINED (unless there is an
-> existing naming convention for event attributes).
-> 
-> Thanks,
-> 
-> -- 
-> Julien Thierry
+And send proper version. I would suggest to use v2 or v3.
+
+Thanks,
+Michal
 
 _______________________________________________
 linux-arm-kernel mailing list
