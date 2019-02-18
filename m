@@ -2,156 +2,90 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E0FFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:12:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E0FFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:16:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0138D218AD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:12:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDC3B218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:16:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iV8EFSmP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="mN7zAin8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0138D218AD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G8BgvPv6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="u0wYuFCr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDC3B218AD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Dz6P+KIcsazynQUdKlH2qNaCTggTi0F1SXtasqrDIkA=; b=iV8EFSmPa3zHUN
-	rlkSwep7onM3u98EAgvdmswb29WZ6+eqcpEer/jHxlQrrMdrilWO1sqMhpiW6xJCaElYWhXlE1Agc
-	+k6wInSMyc7ZvBTdIjJ9PaZOzJkmC7nEcwkTl1B1T5iLQ4dQAXZdL9fWMX24kFIjUFuQnWHzLlXCP
-	eOFYMguizSOmyPAxk0/qLP9XmvvgYI7iRBTcoUic8g9P7t6lB9sLhoUxKVqJf7XxisWNLcT56WXpg
-	m8xq6ulMPGP1Xoo3+XshTAqIC2qh/7k87zYPDhZDs6U8IZC523f119ozIrlWONPWBJ7KhxSiYg6z0
-	6F2Arrn/Ikt9gPPexSKg==;
+	List-Owner; bh=nzPCppSEoJPmKr/2Dx0MYMASh0vW/L1BDcUQRIrbYfI=; b=G8BgvPv6ns6Bo8
+	aXpE/lfApqN9yUzmpYCVZKmU44OqeYru0cYd4pieVMyVtWTTztKyaJeN4hWyaa4/17z4Zro3SeUV8
+	8miTtLeDAqC/dca0Gy3L+XPwHACXrJZulVZKjfsNGK9GO9qpyMeEgJLAOCMiBMudXrL9R39e3/lZV
+	/Y5nefSWVp53ww3/mnp7HnXVByQAKege+yhYTuacW6ScpKsOEWD8YuyQhsUwSQHr7eVtICBhCtUx4
+	Tp9gIA/rRQSJLx1ITKM/HM78qymyTYsXFYDlO88rQorRZTbNBDJSndVRgAxGNF9hGgank8FMrhMMj
+	CIwdhpvd/sC8zeJVPCFw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvc9s-0004Ki-7s; Mon, 18 Feb 2019 06:12:04 +0000
-Received: from mail-eopbgr10058.outbound.protection.outlook.com ([40.107.1.58]
- helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+	id 1gvcDy-0006SF-49; Mon, 18 Feb 2019 06:16:18 +0000
+Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvc9o-0004KI-8m
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 06:12:02 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=qMXo+Mq1YJoMpr8sdX7SztR5/Av6FO/miJ3193kxtZ0=;
- b=mN7zAin8Z/iWw0YrZT9+gbAB4cgjeZSsNF686ehPefzRK4hgomargGplU8iUU19Fpcb3Ct+yb9MxXTKWKLx2BfLnUgvEcstllM1gFmJd5wTQov15Wbt3rryvHcksG25ufNZ3hgxgsYiee8PJWJ8xVnf4NldWGqBkUZixkcRqdQg=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3849.eurprd04.prod.outlook.com (52.134.71.16) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Mon, 18 Feb 2019 06:11:51 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Mon, 18 Feb 2019
- 06:11:51 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: Guenter Roeck <linux@roeck-us.net>, "robh+dt@kernel.org"
- <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "festevam@gmail.com" <festevam@gmail.com>, "catalin.marinas@arm.com"
- <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
- "wim@linux-watchdog.org" <wim@linux-watchdog.org>, Aisheng Dong
- <aisheng.dong@nxp.com>, "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- Daniel Baluta <daniel.baluta@nxp.com>, Andy Gross <andy.gross@linaro.org>,
- "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>, "heiko@sntech.de"
- <heiko@sntech.de>, "arnd@arndb.de" <arnd@arndb.de>,
- "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>,
- "jagan@amarulasolutions.com" <jagan@amarulasolutions.com>,
- "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
- "marc.w.gonzalez@free.fr" <marc.w.gonzalez@free.fr>, "olof@lixom.net"
- <olof@lixom.net>, "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-watchdog@vger.kernel.org"
- <linux-watchdog@vger.kernel.org>
-Subject: RE: [PATCH V2 0/4] Add i.MX8QXP system controller watchdog support
-Thread-Topic: [PATCH V2 0/4] Add i.MX8QXP system controller watchdog support
-Thread-Index: AQHUxy3SjzHfKLwYjUOtmItPpKm1yKXlA9AAgAAOxaA=
-Date: Mon, 18 Feb 2019 06:11:50 +0000
-Message-ID: <DB3PR0402MB3916CB0E548CB6294DCFF7EFF5630@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1550454997-4398-1-git-send-email-Anson.Huang@nxp.com>
- <02ea476f-d055-ac12-d1b6-c6caffb14614@roeck-us.net>
-In-Reply-To: <02ea476f-d055-ac12-d1b6-c6caffb14614@roeck-us.net>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-originating-ip: [119.31.174.68]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: d1c1b3e2-c99f-4b18-47ea-08d69567f8f5
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3849; 
-x-ms-traffictypediagnostic: DB3PR0402MB3849:
-x-ms-exchange-purlcount: 1
-x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtEQjNQUjA0MDJNQjM4NDk7MjM6K1VkMTFGcm9QN2dlMVJDVUp0K0RwMXZw?=
- =?utf-8?B?RHRVWWtpelp2bVVJNkRCMmhlU1Q1am0wRkc4ZkFNcWZhdFN2NkNuL2dlV0NQ?=
- =?utf-8?B?QlRtZFFwWlJka2tYcmNSZDhxNmQxLzN6S25lZ3NVRGFLUUlSSDlLVytiZ2xo?=
- =?utf-8?B?dkFvanNRRUdqWUtwQlZjQm5WM2Zxczd5Um5EOG4zTENZblZjWFpxVzIzeFVG?=
- =?utf-8?B?aWtwK3A3dGFCYklTNnIyOXdtQm5rdE1HZkQ4M2NFM0xWRVR0YjBNVHd0dXdR?=
- =?utf-8?B?VDROR1hLRlgxT0FsOXU5UWhHTHpBMk1zeXVzYzJyYTU3NkdMcEVpWlNDVmlT?=
- =?utf-8?B?Q09BamRTci9CcXBwdDhMaTJJcytoampIV0swckQzbTBDRXZYNlhyM2VyMm0y?=
- =?utf-8?B?cWR0cGpxMmkxY3VyZklBcEc4MTlsc1RFdmw2Q2ZUSlgvWnZiaDB3VFFEc0FF?=
- =?utf-8?B?MzJnNXc5dENUblNEZldhWUJla0JqOHdVRS9mMEo1ZVVWV1RJalpwemJ2N2Nt?=
- =?utf-8?B?MXJyc2NRM2R0bzhMMmdIV1FPT3g0Q1puWUZzTDBmYmpzRmVBdXc2N0Q3WWVO?=
- =?utf-8?B?RHlrWk1XaGVkYzgzd1ZqaXVYNyttRHYxVFQ1Y3FDbG1qRC9DZDZydXZBbFB5?=
- =?utf-8?B?SlRjVTlrUzBXOU1kVHd2TlJvRTZrenJJN2RqUWxaWWZiZFRWRWpLQkxPM3lN?=
- =?utf-8?B?RHhTL2llYnlXcmZoeFJOcGU4cS9RZDRkL2tTaDVyb2sxR2p0QmhLU2FuMVE5?=
- =?utf-8?B?aEJYZjB5Nm0xSGMxSmdqTHRkaXJpVXc0L2JCaHh0OE5RNC9UQXNveWYxZWN5?=
- =?utf-8?B?cXpWVWxxSUpLdkdFcmJwc1ovSndPU0tLSG03OXgxKzZWYXVLUm9yaVlaeWZp?=
- =?utf-8?B?aVNXa2UvaEdDVlB5ZndYK2JUMEpyb3hsM0lleGttTDVvUzJDK085S01YMHJy?=
- =?utf-8?B?TVZiZUdwVTl2eHlqN3ZFVmFGNXBmNUw0aTN3ck1ocHNHS2FoTUdWSVU2OTZO?=
- =?utf-8?B?UUwzUFpNZEc0VDA2K0d2bUhTMGwrNkZSYnc1empGT3c4S3U1SnhqckZBandY?=
- =?utf-8?B?Y0xEdWlWUitJckFtMGJXNlVXeUF5MkllYXdNdnhwemtuVFdHTUdMTWdobGpm?=
- =?utf-8?B?a0I3Q2s4YXd0MFRvcmpjaFd6VUJpSEEvMDZuRWtCWkVSMFh4UnFCeExHR2Zq?=
- =?utf-8?B?NlhwVUNDRy9rbDZrOThRTHhndmxDUy9MTkZQOTZFZW03MFE4cnUzQUd5UW9O?=
- =?utf-8?B?QW54ajA3bk5rK0xXNm1zaitEVGV2VitZeDZHbjFIYXhjeEVqcjRQSjFNa203?=
- =?utf-8?B?Qmd3RSsrRkxzMC93R3hxZVMxUXIzM0dXQVZ4d2ZoenY1ZENvYjAzUithVTkz?=
- =?utf-8?B?Rjg3bjRueUp1b2hGK3JvZGZhZGJHRk4vOFh3bTRkdXUrL2dTWk1ITlY1cTJt?=
- =?utf-8?B?ODdZSEZhZmtudU5iYUQxdUZBMDQzZDQvSzhhaW9CWmJhYmplUGJmVHg2eXBt?=
- =?utf-8?B?NHcwdFVrcFNJSmN2d1VqS0ppSndvdWg5WFhLZnpnZ3B6V0JQVTNjMUdOMkZy?=
- =?utf-8?B?V2JxMUdiOXQ2a3YzSTJIMGprQzdXdWpycmNhemlEazF0V0kzYTZWYUl4M2hO?=
- =?utf-8?B?Y3NPeVJNNDZzQVd6a1NyTFZVaVRJUm9OeENvMXBEQmFhMjk0dGUzcHpoV3dK?=
- =?utf-8?B?M21vS2syeDNickxseEMzc1ZoSmkxejE5cnF3cCtqOXVpVCtITExoMWQ5NFZn?=
- =?utf-8?B?Z3YxS0NJZjJJK3hqWnJDMlhCcnU1WGNJWEZMb1FFd1ZuSVZCd09OMGNTUjJW?=
- =?utf-8?B?L3NkWEZ2K2FRamlSRzNvdGhxaFg3UWZWbWxPWEFtZEc5YlFGUXRIMlFITUQ4?=
- =?utf-8?B?UkU3SmMyc2lGSjh0N1NWUS9wRVVMNkpkQTlRSGpja1IvSWV5djRrQUxOd2RR?=
- =?utf-8?B?UUlJcjRjMUpBTDU1RmxoMDlYVkY3Q2ptS3dQYzZkb2syTjVxVWRHSzBNZnhT?=
- =?utf-8?Q?hXPAQJwi?=
-x-microsoft-antispam-prvs: <DB3PR0402MB384980187A1E791D604B9639F5630@DB3PR0402MB3849.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09525C61DB
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(366004)(396003)(136003)(39860400002)(199004)(189003)(54534003)(13464003)(25786009)(3846002)(6116002)(478600001)(4326008)(2501003)(14454004)(74316002)(229853002)(305945005)(5660300002)(2906002)(316002)(966005)(106356001)(68736007)(110136005)(7736002)(105586002)(45080400002)(7696005)(76176011)(99286004)(102836004)(26005)(256004)(81156014)(446003)(11346002)(6506007)(6246003)(53546011)(14444005)(186003)(55016002)(53936002)(44832011)(476003)(33656002)(486006)(71200400001)(97736004)(66066001)(71190400001)(8676002)(9686003)(8936002)(6306002)(2201001)(6436002)(81166006)(86362001)(7416002)(921003)(15866825006)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3849;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: oPsg4wL1PfaYuHqw/EFFP2l9qWHv5LnewIc8A2tnElx4MUtFZWMZvy925uFjihoKVFJzy9yyWmgVPSDbMKa0S/VRBMkrFkGxBwQ5dOAwzc5FGY9h2VJ2dbEQXUUd9Tqlm2/l47Wfd+vUp7xzrSem3RMNKR6xQBqrD4uloFtt/iKK+1NPFxhnSXR2KumsGlqBMwf/pQaOer3vm4goK4R/XpfpnBPte0UMVdEDEA7n4fAELWMSoaDyFBt9vHR/FJ0A6YkFhnyxTt1Rl+fUAroMHNi6B7oCXcEBYcR/vSoJ0ZxV80s+za9zX8EESGz1lyLEMdUupTLQ3k43L5f0oBZw9bPQy+auxTCZ1VDwCuTu28I3+M2Qujc8F638BtLsQMh9vg9OJlEs9TUjb8N+BnrtW8Y6SueLScZtwKQaJ7Ympt4=
+ id 1gvcDu-0006Rk-GO
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 06:16:16 +0000
+Received: by mail-pf1-x442.google.com with SMTP id b7so8002670pfi.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sun, 17 Feb 2019 22:16:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=7HmJzfmEj9xsQYL5N418Naa1i0UMoglBgv9NHMmbkso=;
+ b=u0wYuFCrQ3JpIshn7VtaCh9AO/+vjnQRnM+3SBXbL8JssbeCcgD9IXKVyfNz0uGYPp
+ xaB/Lfcy7QYOH83IZHbos0EmyCUxk6QgSfmMPuZsRjm4bQ53Y4zdOitf6ldq3i95szAl
+ 1AwUDn6PLT5h1ONdIx6wfmaVbff/yd8tX0E/P80cYejQbxByLKnf52GO3Z0ah2twOKTe
+ ZWOYZcKq0nKFLH7oh85WY0razVknpZfGUXrIFp21GhSYgJgjbcjuD9JeOPDijvF+jWrW
+ 9Lrvigo3WkpIcDnyl7n8PODNGh70i8gklKtlo32G5H1a/3oHr2DcDbJLg+SUgmCMnC74
+ GDyg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=7HmJzfmEj9xsQYL5N418Naa1i0UMoglBgv9NHMmbkso=;
+ b=HonPz/OS1vzaypN5IybytDK7m40GDcYNfAVscbUwVHp0B3VsJdYtN1r3pTuuTSl9DN
+ M+bm0WLdKCqd5u9b+5dlfCWETIGpTfyZPMFhPInPuwin8vYGzk5FD9VJl+PcMOwZjX0B
+ 1XJrc0nc7LYrg1JD6zeXuIxMzU+fceTcXoNlKfYtXfvnxe5fuM3DkpsBg92IiuGtFQFK
+ iUqnnWkW5X3n66gJj5Ii5+fo8zV3n1DasiFjM6U9QB1m9qAdXh+ymC/jxH0rRfts2ws3
+ 1bbRR5a/Mj2yV6SMBxGv+jdB+/F6DgqVf+iGaNlF7gj4Y5t4A3PI77ulCRRUpWJNzlsA
+ lAkw==
+X-Gm-Message-State: AHQUAubPKlQS8QzOVlen9mi3CXo/JSWRjfSdWZjPbWjJLO+/U/7tE55i
+ f0p49gmd3LvRBKyfiM2FPLlXlPzdXSY=
+X-Google-Smtp-Source: AHgI3IaFZ0aCjQk8ePhCtVb1GFZ4f398NUPYKnOhFYn5oY1LZ0Ma65w9Rcm9u7fs0oTIqzQWrf486g==
+X-Received: by 2002:a62:b286:: with SMTP id z6mr22587501pfl.106.1550470573467; 
+ Sun, 17 Feb 2019 22:16:13 -0800 (PST)
+Received: from localhost ([122.172.102.63])
+ by smtp.gmail.com with ESMTPSA id o6sm5219529pgo.27.2019.02.17.22.16.12
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 17 Feb 2019 22:16:12 -0800 (PST)
+Date: Mon, 18 Feb 2019 11:46:10 +0530
+From: Viresh Kumar <viresh.kumar@linaro.org>
+To: Bartosz Golaszewski <brgl@bgdev.pl>
+Subject: Re: [PATCH] cpufreq: davinci: move configuration to
+ include/linux/platform_data
+Message-ID: <20190218061610.cwvwij7aoemi2gbe@vireshk-i7>
+References: <20190214170505.27251-1-brgl@bgdev.pl>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d1c1b3e2-c99f-4b18-47ea-08d69567f8f5
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 06:11:50.8636 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3849
+Content-Disposition: inline
+In-Reply-To: <20190214170505.27251-1-brgl@bgdev.pl>
+User-Agent: NeoMutt/20180323-120-3dd1ac
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_221200_311193_C5AF5E5A 
-X-CRM114-Status: GOOD (  19.82  )
+X-CRM114-CacheID: sfid-20190217_221614_552035_95EF46DA 
+X-CRM114-Status: GOOD (  22.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -163,69 +97,141 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-pm@vger.kernel.org, Sekhar Nori <nsekhar@ti.com>,
+ Kevin Hilman <khilman@kernel.org>, "Rafael J . Wysocki" <rjw@rjwysocki.net>,
+ linux-kernel@vger.kernel.org, Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksIEd1ZW50ZXINCg0KQmVzdCBSZWdhcmRzIQ0KQW5zb24gSHVhbmcNCg0KPiAtLS0tLU9yaWdp
-bmFsIE1lc3NhZ2UtLS0tLQ0KPiBGcm9tOiBHdWVudGVyIFJvZWNrIFttYWlsdG86Z3JvZWNrN0Bn
-bWFpbC5jb21dIE9uIEJlaGFsZiBPZiBHdWVudGVyDQo+IFJvZWNrDQo+IFNlbnQ6IDIwMTnlubQy
-5pyIMTjml6UgMTM6MTYNCj4gVG86IEFuc29uIEh1YW5nIDxhbnNvbi5odWFuZ0BueHAuY29tPjsg
-cm9iaCtkdEBrZXJuZWwub3JnOw0KPiBtYXJrLnJ1dGxhbmRAYXJtLmNvbTsgc2hhd25ndW9Aa2Vy
-bmVsLm9yZzsgcy5oYXVlckBwZW5ndXRyb25peC5kZTsNCj4ga2VybmVsQHBlbmd1dHJvbml4LmRl
-OyBmZXN0ZXZhbUBnbWFpbC5jb207IGNhdGFsaW4ubWFyaW5hc0Bhcm0uY29tOw0KPiB3aWxsLmRl
-YWNvbkBhcm0uY29tOyB3aW1AbGludXgtd2F0Y2hkb2cub3JnOyBBaXNoZW5nIERvbmcNCj4gPGFp
-c2hlbmcuZG9uZ0BueHAuY29tPjsgdWxmLmhhbnNzb25AbGluYXJvLm9yZzsgRGFuaWVsIEJhbHV0
-YQ0KPiA8ZGFuaWVsLmJhbHV0YUBueHAuY29tPjsgQW5keSBHcm9zcyA8YW5keS5ncm9zc0BsaW5h
-cm8ub3JnPjsNCj4gaG9ybXMrcmVuZXNhc0B2ZXJnZS5uZXQuYXU7IGhlaWtvQHNudGVjaC5kZTsg
-YXJuZEBhcm5kYi5kZTsNCj4gYmpvcm4uYW5kZXJzc29uQGxpbmFyby5vcmc7IGphZ2FuQGFtYXJ1
-bGFzb2x1dGlvbnMuY29tOw0KPiBlbnJpYy5iYWxsZXRib0Bjb2xsYWJvcmEuY29tOyBtYXJjLncu
-Z29uemFsZXpAZnJlZS5mcjsgb2xvZkBsaXhvbS5uZXQ7DQo+IGRldmljZXRyZWVAdmdlci5rZXJu
-ZWwub3JnOyBsaW51eC1rZXJuZWxAdmdlci5rZXJuZWwub3JnOyBsaW51eC1hcm0tDQo+IGtlcm5l
-bEBsaXN0cy5pbmZyYWRlYWQub3JnOyBsaW51eC13YXRjaGRvZ0B2Z2VyLmtlcm5lbC5vcmcNCj4g
-Q2M6IGRsLWxpbnV4LWlteCA8bGludXgtaW14QG54cC5jb20+DQo+IFN1YmplY3Q6IFJlOiBbUEFU
-Q0ggVjIgMC80XSBBZGQgaS5NWDhRWFAgc3lzdGVtIGNvbnRyb2xsZXIgd2F0Y2hkb2cNCj4gc3Vw
-cG9ydA0KPiANCj4gT24gMi8xNy8xOSA2OjAxIFBNLCBBbnNvbiBIdWFuZyB3cm90ZToNCj4gPiBp
-Lk1YOFFYUCBpcyBhbiBBUk12OCBDb3J0ZXgtQTM1IFNvQyB3aXRoIGEgQ29ydGV4LU00IHN5c3Rl
-bSBjb250cm9sbGVyDQo+ID4gaW5zaWRlLCB0aGUgc3lzdGVtIGNvbnRyb2xsZXIgbWFuYWdlcyBv
-dmVyYWxsIHBvd2VyLCBjbG9jaywgc2VjdXJlIFJUQw0KPiA+IGFuZCB3YXRjaGRvZyBldGMuLCBz
-byBMaW51eCBrZXJuZWwgcnVubmluZyBvbiBBMzUgbmVlZHMgdG8gY29tbXVuaWNhdGUNCj4gPiB3
-aXRoIHN5c3RlbSBjb250cm9sbGVyIGZvciB3YXRjaGRvZyBvcGVyYXRpb24sIHRoaXMgc3lzdGVt
-IGNvbnRyb2xsZXINCj4gPiB3YXRjaGRvZyB3aWxsIGNhbGwgU01DIHRvIHRyYXAgdG8gRUwzIHNl
-Y3VyZSB3b3JsZA0KPiA+IEFSTS1UcnVzdGVkLUZpcm13YXJlIGFuZCB0aGVuIGl0IHdpbGwgcmVx
-dWVzdCBzeXN0ZW0gY29udHJvbGxlciB0byBkbyB0aGUNCj4gd2F0Y2hkb2cgb3BlcmF0aW9uIHZp
-YSBJUEMuDQo+ID4NCj4gPg0KPiBBbmQgeW91IGV4cGVjdCBJJ2xsIHNwZW5kIHRoZSB0aW1lIGNv
-bXBhcmluZyB0aGlzIHZlcnNpb24gb2YgdGhlIHBhdGNoIHNlcmllcw0KPiBhZ2FpbnN0IHZlcnNp
-b24gMSBhbmQgZmlndXJlIG91dCBteXNlbGYgd2hhdCBleGFjdGx5IGNoYW5nZWQgPw0KPiANCj4g
-R3VlbnRlcg0KDQpTb3JyeSwgSSBwbGFubmVkIHRvIHJlcGx5IHlvdXIgcmV2aWV3IG1haWwgYnV0
-IGZvcmdvdCwgSSBhZGRyZXNzZWQgYWxsIHlvdXIgY29tbWVudHMNCmluIFYyIHBhdGNoIHNldCwg
-SSB3aWxsIGFkZCB0aGUgY2hhbmdlIGxvZyBpbiBWMiB3YXRjaGRvZyBkcml2ZXIgcGF0Y2ggYW5k
-IHJlc2VuZC4NCg0KQW5zb24uDQoNCj4gDQo+IEJlbG93IGFyZSB0aGUgcGF0Y2ggZGVwZW5kZW5j
-eToNCj4gPg0KPiA+IFRoZSBkdC1iaW5kaW5nIGFuZCBpbXg4cXhwLmR0c2kgcGF0Y2ggYXJlIGJh
-c2VkIG9uIG15IHRoZXJtYWwgcGF0Y2gNCj4gc2VyaWVzIGFzIGJlbG93Og0KPiA+DQo+IGh0dHBz
-Oi8vZW1lYTAxLnNhZmVsaW5rcy5wcm90ZWN0aW9uLm91dGxvb2suY29tLz91cmw9aHR0cHMlM0El
-MkYlMkZwYXQNCj4gPg0KPiBjaHdvcmsua2VybmVsLm9yZyUyRnBhdGNoJTJGMTA4MDA2OTklMkYm
-YW1wO2RhdGE9MDIlN0MwMSU3Q2Fuc28NCj4gbi5odWFuZw0KPiA+ICU0MG54cC5jb20lN0M2MzBl
-NmM1ZDdlZDA0YTkxMmY3NzA4ZDY5NTYwM2NiMiU3QzY4NmVhMWQzYmMyYjQNCj4gYzZmYTkyY2Q5
-DQo+ID4NCj4gOWM1YzMwMTYzNSU3QzAlN0MwJTdDNjM2ODYwNjM3OTAzOTg0MjY4JmFtcDtzZGF0
-YT1hMjVxSnMlMkZiNGUNCj4gMmE5RXk3N1UNCj4gPiBnVE5LQUdDUThJV1JjVUtiNEcwbEslMkJr
-amMlM0QmYW1wO3Jlc2VydmVkPTANCj4gPg0KPiA+IEFuc29uIEh1YW5nICg0KToNCj4gPiAgICBk
-dC1iaW5kaW5nczogZnNsOiBzY3U6IGFkZCB3YXRjaGRvZyBiaW5kaW5nDQo+ID4gICAgd2F0Y2hk
-b2c6IGlteF9zYzogQWRkIGkuTVggc3lzdGVtIGNvbnRyb2xsZXIgd2F0Y2hkb2cgc3VwcG9ydA0K
-PiA+ICAgIGFybTY0OiBkZWZjb25maWc6IGFkZCBzdXBwb3J0IGZvciBpLk1YIHN5c3RlbSBjb250
-cm9sbGVyIHdhdGNoZG9nDQo+ID4gICAgYXJtNjQ6IGR0czogZnJlZXNjYWxlOiBpbXg4cXhwOiBh
-ZGQgd2F0Y2hkb2cgc3VwcG9ydA0KPiA+DQo+ID4gICAuLi4vZGV2aWNldHJlZS9iaW5kaW5ncy9h
-cm0vZnJlZXNjYWxlL2ZzbCxzY3UudHh0ICB8ICAxMCArDQo+ID4gICBhcmNoL2FybTY0L2Jvb3Qv
-ZHRzL2ZyZWVzY2FsZS9pbXg4cXhwLmR0c2kgICAgICAgICB8ICAgNCArDQo+ID4gICBhcmNoL2Fy
-bTY0L2NvbmZpZ3MvZGVmY29uZmlnICAgICAgICAgICAgICAgICAgICAgICB8ICAgMSArDQo+ID4g
-ICBkcml2ZXJzL3dhdGNoZG9nL0tjb25maWcgICAgICAgICAgICAgICAgICAgICAgICAgICB8ICAx
-MyArKw0KPiA+ICAgZHJpdmVycy93YXRjaGRvZy9NYWtlZmlsZSAgICAgICAgICAgICAgICAgICAg
-ICAgICAgfCAgIDEgKw0KPiA+ICAgZHJpdmVycy93YXRjaGRvZy9pbXhfc2Nfd2R0LmMgICAgICAg
-ICAgICAgICAgICAgICAgfCAyMTANCj4gKysrKysrKysrKysrKysrKysrKysrDQo+ID4gICA2IGZp
-bGVzIGNoYW5nZWQsIDIzOSBpbnNlcnRpb25zKCspDQo+ID4gICBjcmVhdGUgbW9kZSAxMDA2NDQg
-ZHJpdmVycy93YXRjaGRvZy9pbXhfc2Nfd2R0LmMNCj4gPg0KDQpfX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
-dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
-ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On 14-02-19, 18:05, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> 
+> The header containing the configuration structure for davinci cpufreq
+> driver lives in mach-davinci/include/mach/. This is fine for now but
+> if we want to make davinci part of the multi_v5 build, no code external
+> to mach-davinci should include machine-specific headers.
+> 
+> Move the configuration structure to include/linux/platform_data.
+> 
+> While we're at it: convert the GPL-2.0 boilerplate to a proper SPDX
+> license identifier.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/da850.c                 |  2 +-
+>  arch/arm/mach-davinci/include/mach/cpufreq.h  | 26 -------------------
+>  drivers/cpufreq/davinci-cpufreq.c             |  5 +---
+>  include/linux/platform_data/davinci-cpufreq.h | 19 ++++++++++++++
+>  4 files changed, 21 insertions(+), 31 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/cpufreq.h
+>  create mode 100644 include/linux/platform_data/davinci-cpufreq.h
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index e7b78df2bfef..a02ff431ba47 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/mfd/da8xx-cfgchip.h>
+>  #include <linux/platform_data/clk-da8xx-cfgchip.h>
+>  #include <linux/platform_data/clk-davinci-pll.h>
+> +#include <linux/platform_data/davinci-cpufreq.h>
+>  #include <linux/platform_data/gpio-davinci.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> @@ -29,7 +30,6 @@
+>  #include <asm/mach/map.h>
+>  
+>  #include <mach/common.h>
+> -#include <mach/cpufreq.h>
+>  #include <mach/cputype.h>
+>  #include <mach/da8xx.h>
+>  #include <mach/irqs.h>
+> diff --git a/arch/arm/mach-davinci/include/mach/cpufreq.h b/arch/arm/mach-davinci/include/mach/cpufreq.h
+> deleted file mode 100644
+> index 3c089cfb6cd6..000000000000
+> --- a/arch/arm/mach-davinci/include/mach/cpufreq.h
+> +++ /dev/null
+> @@ -1,26 +0,0 @@
+> -/*
+> - * TI DaVinci CPUFreq platform support.
+> - *
+> - * Copyright (C) 2009 Texas Instruments, Inc. http://www.ti.com/
+> - *
+> - * This program is free software; you can redistribute it and/or
+> - * modify it under the terms of the GNU General Public License as
+> - * published by the Free Software Foundation version 2.
+> - *
+> - * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> - * kind, whether express or implied; without even the implied warranty
+> - * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - */
+> -#ifndef _MACH_DAVINCI_CPUFREQ_H
+> -#define _MACH_DAVINCI_CPUFREQ_H
+> -
+> -#include <linux/cpufreq.h>
+> -
+> -struct davinci_cpufreq_config {
+> -	struct cpufreq_frequency_table *freq_table;
+> -	int (*set_voltage) (unsigned int index);
+> -	int (*init) (void);
+> -};
+> -
+> -#endif
+> diff --git a/drivers/cpufreq/davinci-cpufreq.c b/drivers/cpufreq/davinci-cpufreq.c
+> index d54a27c99121..940fe85db97a 100644
+> --- a/drivers/cpufreq/davinci-cpufreq.c
+> +++ b/drivers/cpufreq/davinci-cpufreq.c
+> @@ -23,13 +23,10 @@
+>  #include <linux/init.h>
+>  #include <linux/err.h>
+>  #include <linux/clk.h>
+> +#include <linux/platform_data/davinci-cpufreq.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/export.h>
+>  
+> -#include <mach/hardware.h>
+> -#include <mach/cpufreq.h>
+> -#include <mach/common.h>
+> -
+>  struct davinci_cpufreq {
+>  	struct device *dev;
+>  	struct clk *armclk;
+> diff --git a/include/linux/platform_data/davinci-cpufreq.h b/include/linux/platform_data/davinci-cpufreq.h
+> new file mode 100644
+> index 000000000000..3fbf9f2793b5
+> --- /dev/null
+> +++ b/include/linux/platform_data/davinci-cpufreq.h
+> @@ -0,0 +1,19 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * TI DaVinci CPUFreq platform support.
+> + *
+> + * Copyright (C) 2009 Texas Instruments, Inc. http://www.ti.com/
+> + */
+> +
+> +#ifndef _MACH_DAVINCI_CPUFREQ_H
+> +#define _MACH_DAVINCI_CPUFREQ_H
+> +
+> +#include <linux/cpufreq.h>
+> +
+> +struct davinci_cpufreq_config {
+> +	struct cpufreq_frequency_table *freq_table;
+> +	int (*set_voltage)(unsigned int index);
+> +	int (*init)(void);
+> +};
+> +
+> +#endif /* _MACH_DAVINCI_CPUFREQ_H */
+
+Applied. Thanks.
+
+-- 
+viresh
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
