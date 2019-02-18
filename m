@@ -2,64 +2,77 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 31D80C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:00:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06B90C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:08:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0012B2146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:00:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CCE0521479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:08:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xnun2GnF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0012B2146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kRY0W1cK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CCE0521479
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
+	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=x37xtWghSlZ2xJDEq9HG4cwuZesB3j2Tg4QVoV0YsoM=; b=Xnun2GnFjJ0eE6
-	hZDgg+OBnR84STjfAwxOHjJ9P5yFLFGuyphNXRt76bxinGwKdPYD4EjmEDast+665U/GTwiLca++X
-	otS5WQUxNKfx8GE0lFYZgt5NzQpEpMPZAtZzBH7b67Wd1QtMyiq3UI4kzCvzoY+SawOnQ25UwoHvn
-	cfcsqln3p5UKS6NhBgX4JNDTXNvpX1cVuCkOFn+QHRKVLUy1+DAH+PS70b1y8cmImQDyGIIvWenTA
-	Dhxt/wCblQ5nRgKMma6k3hh+HjmjjcQDvinA+kGqxYtgwSwi4WzjdfeTQ8tjo32IgJIbBbVfUdWQO
-	hO7tqI3v9oiuyXfy14zg==;
+	List-Owner; bh=Cwn7M+Sqzrr5imO5sAANwdjPW8XY0snOEg7qqKwomZ0=; b=kRY0W1cKB2zLyu
+	vnuA8aK/7H9TQPb080CzDqLkkJSMHh/9gHItG+y+0uBdtcU5XpPcGtXSuz62GsMxaBqeb070NTI5C
+	oPqYgMYexM6FvHgn+DesMxCcB68E/1CC/oytjd7LQ34GuXV4BpsPYCDe9pllAANJ+0lCQIhz6n+2j
+	t8Y1ot83upocq+ZVVKpfgJ496WlozgaYcSZDw0OhkSSKFnAaYBusG14qXrmO+W2/LajZi6me8D5Zk
+	Mt2RXeJIXZHjbVbyHFruO4leCkdGPwyVjWGa2SZ5/9wIzMU9rj5gDh7YAUsT0ToQRfwcTndXr5xVe
+	OAQJRNsXQxspeJ/SEJVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvqxf-0006oP-Fn; Mon, 18 Feb 2019 22:00:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvqxb-0006ny-Ax
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 22:00:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2FA9580D;
- Mon, 18 Feb 2019 14:00:22 -0800 (PST)
-Received: from localhost (e113682-lin.copenhagen.arm.com [10.32.144.41])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 94ADB3F675;
- Mon, 18 Feb 2019 14:00:21 -0800 (PST)
-Date: Mon, 18 Feb 2019 23:00:19 +0100
-From: Christoffer Dall <christoffer.dall@arm.com>
-To: Andrew Murray <andrew.murray@arm.com>
-Subject: Re: [PATCH v10 5/5] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-Message-ID: <20190218220019.GB28113@e113682-lin.lund.arm.com>
-References: <1547482308-29839-1-git-send-email-andrew.murray@arm.com>
- <1547482308-29839-6-git-send-email-andrew.murray@arm.com>
+	id 1gvr5f-0000it-ED; Mon, 18 Feb 2019 22:08:43 +0000
+Received: from mout.kundenserver.de ([212.227.126.130])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvr5b-0000hn-OE
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 22:08:41 +0000
+Received: from oxbaltgw06.schlund.de ([172.19.246.12]) by
+ mrelayeu.kundenserver.de (mreue009 [213.165.67.97]) with ESMTPSA (Nemesis) id
+ 1MjjGV-1hJKHD0Mkl-00lCIV; Mon, 18 Feb 2019 23:08:24 +0100
+Date: Mon, 18 Feb 2019 23:08:21 +0100 (CET)
+From: Stefan Wahren <stefan.wahren@i2se.com>
+To: Vasily Khoruzhick <anarsoul@gmail.com>, Rob Herring <robh@kernel.org>
+Message-ID: <1245842044.588056.1550527701604@email.ionos.de>
+In-Reply-To: <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com> <20190218211035.GA28145@bogus>
+ <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1547482308-29839-6-git-send-email-andrew.murray@arm.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+X-Priority: 3
+Importance: Medium
+X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
+X-Originating-Client: open-xchange-appsuite
+X-Provags-ID: V03:K1:hpiBGz7VzNd13L68dk3OIE0bSiUdUGgES2sdD0Ta2wZeLgL5O9P
+ zb3uOfjlIVcJm2T021uSg53MjpH3YJg6q7/tlDVBD0ijj8Vdd08mMP+Hs3Qur5oEtESBuLj
+ 4car7rYsT70uRdSsajUY2MhNLdUSJHMUNl4kGtre1OvF6sB2pg9GIenw8K7ujfSB++VpubN
+ lYrKbpP8hBKIf1cd80Qow==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:EoZFOG9CfBM=:31fPYIbn5PGOn6ENVizar8
+ qWenbuUUgl/rJFpH86fYCsbTpEqRXyMTD01AsTVNv0xXGoixRxI9Uh1dDUoxfh9VMc/gGtcSY
+ 8+8pOSNqVLE042BO7rboeaAv4Ek1BoJokqO3d+E0LTL13JZrJyOmWGoujg6p28HtfCu3GjoNB
+ kmyCjcRCbDPkCHyg6kU4tOCuFsTemNwhhQHuYbin21OdTNxgemqhgIvDJ3+QzBW1XllADJ/rS
+ Sd8tRiMeqknS8IUBoLrsgYqw4VAo1SDmGWcKPAwdBA74A7qYiY7EK/tnb4ZX/0WB+Fe3F/EKH
+ joyjdqAAAjlAzuKEAjFl/1EW9PglO3cHw6w7kWrlVYSffGzohDIBppHT0iyG9QOCpphmOMGac
+ FNr7ztrLsJiWyaRT4nSXsXTL75w7BtktaPWCT1y3fxR62yBir7gzW+EsnUGAnC2GCMbpEwRO8
+ NUmMBn6RHODL5L4VQ7SsmiXrS8+nMqPOSfVLIZFmlv7O3PyYYz+KKQ9M0fFdJaRKuui+/ynRj
+ xGEc+gLsQqqNT35+u3IcA7tshfoEpyNokYQHpBIP1enT2XpID6hkV204YYVQG52HpyrhxjJTK
+ 19pP+nD3tls7uyHwGnCGeNX8nNF2Nw0Fn/XtbiyPRITJjYJZ1teSVZSOUFowcUJ7SPmDA+Hc1
+ ntTpit5YyDaK8UR8eYm/4ejYJUAJ5r6cMmiAMf1Bi+vkDrRKUP1K5MGoYEOXH1akKfOK7yb2i
+ PH/MOippCldM4DI/p1Ci5vsvIKI82veH7yzDF6Nw68C22H+i4SmGUnRNkHw=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_140023_389380_0AF75519 
-X-CRM114-Status: GOOD (  26.07  )
+X-CRM114-CacheID: sfid-20190218_140840_085058_39832E1E 
+X-CRM114-Status: GOOD (  19.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,164 +85,67 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+ devicetree <devicetree@vger.kernel.org>,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Marcel Holtmann <marcel@holtmann.org>, beagleboard@davidjohnsummers.uk,
+ linux-bluetooth@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 14, 2019 at 04:11:48PM +0000, Andrew Murray wrote:
-> Enable/disable event counters as appropriate when entering and exiting
-> the guest to enable support for guest or host only event counting.
+Hi Vasily,
+
+> Vasily Khoruzhick <anarsoul@gmail.com> hat am 18. Februar 2019 um 22:24 geschrieben:
 > 
-> For both VHE and non-VHE we switch the counters between host/guest at
-> EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
-
-I don't think the last part is strictly true as per the former patch on
-a non-vhe system if you have the :h modifier, so maybe just leave that
-out of the commit message.
-
 > 
-> The PMU may be on when we change which counters are enabled however
-> we avoid adding an isb as we instead rely on existing context
-> synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
-> the eret from the hvc in kvm_call_hyp.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  arch/arm64/kvm/hyp/switch.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index b0b1478..9018fb3 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -357,6 +357,54 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->  	return true;
->  }
->  
-> +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
-> +{
-> +	struct kvm_host_data *host;
-> +	struct kvm_pmu_events *pmu;
-> +	u32 clr, set;
-> +
-> +	host = container_of(host_ctxt, struct kvm_host_data, host_ctxt);
-> +	pmu = &host->pmu_events;
-> +
-> +	/* We can potentially avoid a sysreg write by only changing bits that
-> +	 * differ between the guest/host. E.g. where events are enabled in
-> +	 * both guest and host
-> +	 */
+> On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
+> >
+> > On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+> > > Add binding document for bluetooth part of RTL8723BS/RTL8723CS
+> > >
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > ---
+> > >  .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+> > >  1 file changed, 35 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > > new file mode 100644
+> > > index 000000000000..8357f242ae4c
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > > @@ -0,0 +1,35 @@
+> > > +RTL8723BS/RTL8723CS Bluetooth
+> > > +---------------------
+> > > +
+> > > +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+> > > +BT is connected over serial. It speaks H5 protocol with few extra commands
+> > > +to upload firmware and change module speed.
+> > > +
+> > > +Required properties:
+> > > +
+> > > + - compatible: should be one of the following:
+> > > +   * "realtek,rtl8723bs-bt"
+> > > +   * "realtek,rtl8723cs-bt"
+> > > +Optional properties:
+> > > +
+> > > + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+> > > + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+> > > + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+> > > + - firmware-postfix: firmware postfix to be used for firmware config
+> >
 
-super nit: kernel coding style requires 'wings' on both side of a
-multi-line comment.  Only if you respin anyhow.
+sorry, i didn't noticed your great series before. David and i working at the same stuff but for the Asus Tinker Board.
 
-> +	clr = pmu->events_host & ~pmu->events_guest;
-> +	set = pmu->events_guest & ~pmu->events_host;
-> +
-> +	if (clr)
-> +		write_sysreg(clr, pmcntenclr_el0);
-> +
-> +	if (set)
-> +		write_sysreg(set, pmcntenset_el0);
-> +
-> +	return (clr || set);
-> +}
-> +
-> +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
-> +{
-> +	struct kvm_host_data *host;
-> +	struct kvm_pmu_events *pmu;
-> +	u32 clr, set;
-> +
-> +	host = container_of(host_ctxt, struct kvm_host_data, host_ctxt);
-> +	pmu = &host->pmu_events;
-> +
-> +	/* We can potentially avoid a sysreg write by only changing bits that
-> +	 * differ between the guest/host. E.g. where events are enabled in
-> +	 * both guest and host
-> +	 */
+I created a similiar yet untested patch version for hci_h5 [1]. Maybe it's useful.
 
-ditto
+Just a comment about the binding. It's really necessary to add the reset-gpio? Can't we use the enable-gpio with inverse polarity for this?
 
-> +	clr = pmu->events_guest & ~pmu->events_host;
-> +	set = pmu->events_host & ~pmu->events_guest;
-> +
-> +	if (clr)
-> +		write_sysreg(clr, pmcntenclr_el0);
-> +
-> +	if (set)
-> +		write_sysreg(set, pmcntenset_el0);
-> +}
-> +
->  /*
->   * Return true when we were able to fixup the guest exit and should return to
->   * the guest, false when we should restore the host state and return to the
-> @@ -464,12 +512,15 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm_cpu_context *host_ctxt;
->  	struct kvm_cpu_context *guest_ctxt;
-> +	bool pmu_switch_needed;
->  	u64 exit_code;
->  
->  	host_ctxt = vcpu->arch.host_cpu_context;
->  	host_ctxt->__hyp_running_vcpu = vcpu;
->  	guest_ctxt = &vcpu->arch.ctxt;
->  
-> +	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-> +
->  	sysreg_save_host_state_vhe(host_ctxt);
->  
->  	/*
-> @@ -511,6 +562,9 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
->  
->  	__debug_switch_to_host(vcpu);
->  
-> +	if (pmu_switch_needed)
-> +		__pmu_switch_to_host(host_ctxt);
-> +
->  	return exit_code;
->  }
->  
-> @@ -519,6 +573,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm_cpu_context *host_ctxt;
->  	struct kvm_cpu_context *guest_ctxt;
-> +	bool pmu_switch_needed;
->  	u64 exit_code;
->  
->  	vcpu = kern_hyp_va(vcpu);
-> @@ -527,6 +582,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	host_ctxt->__hyp_running_vcpu = vcpu;
->  	guest_ctxt = &vcpu->arch.ctxt;
->  
-> +	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-> +
->  	__sysreg_save_state_nvhe(host_ctxt);
->  
->  	__activate_vm(kern_hyp_va(vcpu->kvm));
-> @@ -573,6 +630,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
->  	 */
->  	__debug_switch_to_host(vcpu);
->  
-> +	if (pmu_switch_needed)
-> +		__pmu_switch_to_host(host_ctxt);
-> +
->  	return exit_code;
->  }
->  
-> -- 
-> 2.7.4
-> 
-
-Thanks,
-
-    Christoffer
+Stefan
 
 _______________________________________________
 linux-arm-kernel mailing list
