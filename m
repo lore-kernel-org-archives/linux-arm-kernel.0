@@ -2,77 +2,72 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DD93C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:41:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 303EFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:45:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D28920855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:41:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F3864217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:45:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q1IKufnj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D28920855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o60SW8py"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3864217F9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qwZTdf+5db7cbJnAoKWdi/QcXO98X4g58i3ioAmnl38=; b=Q1IKufnjyuCc6I
-	NWADnRqfQDHThHXrSup/bREyPS8T22Wte0s0qqgLEtY5u8o0O4UOa6c+YyGr+oJle40QKTd1Se6M+
-	f+3tXH3waGm0Ge/ZpQl4B7FoqIm+eTUjVTusyXW9rWXvU/WXYBaKD83ZTHrl1Oce6vxO5q6CSBUK7
-	IM7AJf3mWwmtIHbLQRx1gD+SiYahV1UhcBrp9T+NLjhd9jXIb5MSMDssaXZ7JHhsX0IKfCs3nvCQu
-	B9Nzn7jplVjGkVu9aPWQbsqYrb7PRfkID2TshcbJgTdm6A3xYo1qtK93I54pRGgsIB+An8Kht67yR
-	jhJ8ClBsnrmNrtJc7rQw==;
+	List-Owner; bh=Yz1WrLyXsKDfrIvLKErCaoPpTRpi+K8llCsR/KK9jEw=; b=o60SW8pyzjR/j/
+	67LkAMhy5pdTimTqBC3cMkmBuBfVtjjioPpTCNDIvqrkdkrU8XCdOlzH05+BXrz0MI2nyVvR0ilVP
+	nuh07ydAu7dUYWhQYGU7B9iZNdwnBe4IMv1f9VHe7w3kl3aBcLXaluiE0A74nP5cNB4U6qJU8IOVN
+	DXeTvpwfLXoQqFQXUhFhGWZTLZygq1xHEm4rgCZhINc8wzUvlflZMbwn3RYXJ1F/rVkMtLOPJhhhp
+	b3z0C80V3LfYGDGkuWulBtRG9gD2EzqEC9LNOhcPKUFCn6NzFkskt0x0xFXY1KEGtdK2L35DmCWEp
+	tuwtpCat2eBk/gZ4Lwkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvfQD-0005an-Lf; Mon, 18 Feb 2019 09:41:09 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
+	id 1gvfU7-0007xR-4T; Mon, 18 Feb 2019 09:45:11 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvfQA-0005aM-1K
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:41:07 +0000
-Received: by mail-qk1-f193.google.com with SMTP id a15so9626474qkc.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 01:41:05 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=rrcSbkomEh6gHuieQRX+3/MkTgpA7tlVku4hUeWDcSM=;
- b=UCwymjrWj4mZEmr04nPv3PrIxtDserU/FDCRBRdNO8rGNjrclELyn0FWmoYUGpcOBQ
- g0QRxf+U+fYS+E06e21zmpOBpJ7l0AsANZW9VexoGkKa/uQ2D1EpyjP7i3YbzQ6IniaW
- GhfUNEr3jfxMm5sTBsEFkCE1JBh8+wnfWdPKkqVi9a8wmUu55h+iUWzp81qSpdbhv8Y1
- cNOVKt9XRd00P56WqcX4b68nQQH1YLI8zH5O5801EwIxIxLDV6cidqThOuksCko5vRaI
- Iu7K6B2rsk/f3pkrtLXzVIuW/AO209N0KJZg1xkoeObXqHMBZduNAoBDdL5d8/qymPVF
- 0Pug==
-X-Gm-Message-State: AHQUAuZi/NA3qi3VDsos3Py0nJ9qsGbwVhzo1So5EmoVqe+Qo1jCc7oq
- l8THIbfaiPQzK3jzzDKl7LCikHegg86Uvzwp2H8=
-X-Google-Smtp-Source: AHgI3IbrtAqAO2SvPa6Fao9Kr/nTOzuBhLlXNichKv7FMapZ7ztTe9PB3nS8iMNfxR626Cxd9Y6L4NIbVgfafqqGBXk=
-X-Received: by 2002:ae9:d8c2:: with SMTP id
- u185mr15249701qkf.107.1550482864589; 
- Mon, 18 Feb 2019 01:41:04 -0800 (PST)
+ id 1gvfU3-0007En-Ni; Mon, 18 Feb 2019 09:45:09 +0000
+X-UUID: 685f296465e2426db935343b13b035ca-20190218
+X-UUID: 685f296465e2426db935343b13b035ca-20190218
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ (envelope-from <zhiyong.tao@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1097959251; Mon, 18 Feb 2019 01:44:59 -0800
+Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 18 Feb 2019 01:44:58 -0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs08n2.mediatek.inc
+ (172.21.101.56) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 18 Feb 2019 17:44:50 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Mon, 18 Feb 2019 17:44:49 +0800
+Message-ID: <1550483089.4739.28.camel@mhfsdcap03>
+Subject: Re: [PATCH v7 3/6] dt-bindings: pinctrl: mt8183: add binding document
+From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>
+Date: Mon, 18 Feb 2019 17:44:49 +0800
+In-Reply-To: <2b221339-3933-2a25-ab60-d4d772d2873a@gmail.com>
+References: <1550210558-30516-1-git-send-email-erin.lo@mediatek.com>
+ <1550210558-30516-4-git-send-email-erin.lo@mediatek.com>
+ <2b221339-3933-2a25-ab60-d4d772d2873a@gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-References: <20190203214205.13594-1-linus.walleij@linaro.org>
- <20190203214205.13594-5-linus.walleij@linaro.org>
- <ffc97649-bfc2-e411-149f-cd5ed9e8c77e@arm.com>
- <CACRpkdZK7OU9rb-qw9tTjJLNvfQG-VmN_VBXUz9DPqVV11zuww@mail.gmail.com>
- <20190211221156.10036ad8@why.wild-wind.fr.eu.org> <m3k1hxvan4.fsf@t19.piap.pl>
- <CACRpkdYuvZEPzmeKo552g4DR3wxQZtw24jX3ONbmdoD_6bUSPw@mail.gmail.com>
-In-Reply-To: <CACRpkdYuvZEPzmeKo552g4DR3wxQZtw24jX3ONbmdoD_6bUSPw@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 10:40:47 +0100
-Message-ID: <CAK8P3a1Y2kLeDYKGMGpuLk8rxUxFwuPvjMRoLj-c2a8Bnwi56w@mail.gmail.com>
-Subject: Re: [PATCH 04/17 v1] irqchip: Add driver for IXP4xx
-To: Linus Walleij <linus.walleij@linaro.org>
+X-TM-SNTS-SMTP: 1A9433D5840063B29BBFEB270657F77A0E77F67969A4B8B2DE3F18A08D8795122000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_014106_079281_B006EEB9 
-X-CRM114-Status: GOOD (  13.90  )
+X-CRM114-CacheID: sfid-20190218_014507_785715_95702F5F 
+X-CRM114-Status: GOOD (  29.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,40 +79,195 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
- Tim Harvey <tharvey@gateworks.com>,
- =?UTF-8?Q?Krzysztof_Ha=C5=82asa?= <khalasa@piap.pl>,
- Olof Johansson <olof@lixom.net>, Thomas Gleixner <tglx@linutronix.de>,
- Imre Kaloz <kaloz@openwrt.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Linus Walleij <linus.walleij@linaro.org>, Jason Cooper <jason@lakedaemon.net>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, mars.cheng@mediatek.com,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ Erin Lo <erin.lo@mediatek.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-mediatek@lists.infradead.org, linux-serial@vger.kernel.org,
+ yingjoe.chen@mediatek.com, Thomas Gleixner <tglx@linutronix.de>,
+ eddie.huang@mediatek.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gTW9uLCBGZWIgMTgsIDIwMTkgYXQgODoxNyBBTSBMaW51cyBXYWxsZWlqIDxsaW51cy53YWxs
-ZWlqQGxpbmFyby5vcmc+IHdyb3RlOgo+Cj4gT24gTW9uLCBGZWIgMTgsIDIwMTkgYXQgODowNiBB
-TSBLcnp5c3p0b2YgSGHFgmFzYSA8a2hhbGFzYUBwaWFwLnBsPiB3cm90ZToKPiA+IE1hcmMgWnlu
-Z2llciA8bWFyYy56eW5naWVyQGFybS5jb20+IHdyaXRlczoKPiA+Cj4gPiA+IEl0J3Mgc3BlbGxl
-ZCBCRTMyISA7LSkgSSB2YWd1ZWx5IHJlbWVtYmVyIGRvaW5nIHNvbWUgb2YgdGhhdCBvbiB2dWxj
-YW4sCj4gPiA+IGJ1dCB0aGF0J3MgYSBkZWNhZGUgYWdvLCBhbmQgSSd2ZSBwYWdlZCBpdCBvdXQu
-Li4gOy0pCj4gPgo+ID4gUmlnaHQuIEl0J3MgYWxzbyBjYWxsZWQgdmFsdWUtcHJlc2VydmluZyAo
-d2hlcmUgdGhlICJ2YWx1ZSIgbXVzdCAzMi1iaXQKPiA+IGFuZCBhbGlnbmVkIG9uIDMyLWJpdCBi
-b3VuZGFyeSkgb3IgKGRvdWJsZSkgd29yZCBpbnZhcmlhbnQuCj4gPgo+ID4gU2luY2UgbW9zdCBv
-ZiB0aGVzZSBhY2Nlc3NlcyBhcmUgbmF0dXJhbCAzMi1iaXQgcmVnaXN0ZXJzIGFuZCAoYWxtb3N0
-KQo+ID4gbm9uZSBhcmUgQVNDSUkvYnl0ZS1zdHlsZSwgaXQgbWFrZXMgc2Vuc2UuIElJUkMgdGhl
-IFBDSSBoYXMgaXRzIG93bgo+ID4gcnVsZXMsIHRob3VnaC4KPgo+IElJVUMgUENJIHNob3VsZCBh
-bHdheXMgYmUgTEUgYW5kIHJlYWRsKCkgd3JpdGVsKCkgYWx3YXlzIHJlYWQvd3JpdGUKPiBpbiBM
-RS4gQnV0IEkgc2VlIFBDSSBvbiB0aGUgSVhQNHh4IGlzIGEgc3BlY2lhbCBoaXN0b3J5IHNvIEkg
-YW0gZ29pbmcgdG8KPiBleHBlcmllbmNlIGl0IGluIGFsbCBpdHMgZ2xvcnkgbm93IHRoYXQgSSBz
-dGFydCBsb29raW5nIGF0IGl0LgoKSSBmb3VuZCBhIGRvY3VtZW50IHRoYXQgZXhwbGFpbnMgc29t
-ZSBvZiB0aGUgbW9yZSBvYnNjdXJlIGRldGFpbHMKb2YgdGhpcyBjaGlwIChhbW9uZyBhIGxvdCBv
-ZiB0aGUgZ2VuZXJhbCBjb25jZXB0cyksIGluIHBhcnRpY3VsYXIgaG93CnlvdSBjYW4gY29uZmln
-dXJlIG1lbW9yeSByZWdpb25zIGFzIGVpdGhlciBCRSwgTEUtZGF0YS1jb2hlcmVudCBvcgpMRS1h
-ZGRyZXNzLWNvaGVyZW50LCBhbmQgdGhlIGJ5dGUgc3dhcCBvbiBQQ0kgZGVwZW5kaW5nIG9uIHRo
-YXQ6CgpodHRwczovL3d3dy5pbnRlbC5jb20vY29udGVudC93d3cvdXMvZW4vaW50ZWxsaWdlbnQt
-c3lzdGVtcy9wcmV2aW91cy1nZW5lcmF0aW9uL2l4cDR4eC1peGMxMTAwLWJpZy1lbmRpYW4tbGl0
-dGxlLWVuZGlhbi1tb2Rlcy1hcHAtbm90ZS5odG1sCgogICAgICBBcm5kCgpfX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxp
-bmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3Rz
-LmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Fri, 2019-02-15 at 10:35 +0100, Matthias Brugger wrote:
+> 
+> On 15/02/2019 07:02, Erin Lo wrote:
+> > From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > 
+> > The commit adds mt8183 compatible node in binding document.
+> > 
+> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 115 +++++++++++++++++++++
+> >  1 file changed, 115 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > new file mode 100644
+> > index 0000000..364e673
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > @@ -0,0 +1,115 @@
+> > +* Mediatek MT8183 Pin Controller
+> > +
+> > +The Mediatek's Pin controller is used to control SoC pins.
+> > +
+> > +Required properties:
+> > +- compatible: value should be one of the following.
+> > +	"mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
+> > +- gpio-controller : Marks the device node as a gpio controller.
+> > +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> > +  binding is used, the amount of cells must be specified as 2. See the below
+> > +  mentioned gpio binding representation for description of particular cells.
+> > +- gpio-ranges : gpio valid number range.
+> > +- reg: physicall address base for gpio base registers. There are nine
+> 
+> s/physicall/physical
+
+==>we will modify it.
+> 
+> > +  physicall address base in mt8183. They are 0x10005000, 0x11F20000,
+> > +  0x11E80000, 0x11E70000, 0x11E90000, 0x11D30000, 0x11D20000, 0x11C50000,
+> > +  0x11F30000.
+> > +
+> > +	Eg: <&pio 6 0>
+> > +	<[phandle of the gpio controller node]
+> > +	[line number within the gpio controller]
+> > +	[flags]>
+> > +
+> > +	Values for gpio specifier:
+> > +	- Line number: is a value between 0 to 202.
+> > +	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
+> > +            Only the following flags are supported:
+> > +            0 - GPIO_ACTIVE_HIGH
+> > +            1 - GPIO_ACTIVE_LOW
+> > +
+> > +Optional properties:
+> > +- reg-names: gpio base register names. There are nine gpio base register
+> > +  names in mt8183. They are "iocfg0", "iocfg1", "iocfg2", "iocfg3", "iocfg4",
+> > +  "iocfg5", "iocfg6", "iocfg7", "iocfg8".
+> > +- interrupt-controller: Marks the device node as an interrupt controller
+> > +- #interrupt-cells: Should be two.
+> > +- interrupts : The interrupt outputs from the controller.
+> 
+> we are missing interrupt-parent here.
+
+==> we will add it in next version. we will add like this:
+- interrupts-parents : The interrupt connector. In mt8183, it is sysirq.
+
+> 
+> > +
+> > +Please refer to pinctrl-bindings.txt in this directory for details of the
+> > +common pinctrl bindings used by client devices.
+> > +
+> > +Subnode format
+> > +A pinctrl node should contain at least one subnodes representing the
+> > +pinctrl groups available on the machine. Each subnode will list the
+> > +pins it needs, and how they should be configured, with regard to muxer
+> > +configuration, pullups, drive strength, input enable/disable and input schmitt.
+> > +
+> > +    node {
+> > +	pinmux = <PIN_NUMBER_PINMUX>;
+> > +	GENERIC_PINCONFIG;
+> > +    };
+> > +
+> > +Required properties:
+> > +- pinmux: integer array, represents gpio pin number and mux setting.
+> > +    Supported pin number and mux varies for different SoCs, and are defined
+> > +    as macros in boot/dts/<soc>-pinfunc.h directly.
+> > +
+> > +Optional properties:
+> > +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
+> > +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+> > +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+> > +
+> > +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+> > +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+> > +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
+> > +    it support arguments for those special pins.
+> 
+> I wonder if we should mention which this special pins are. A look at the driver
+> told me that it is not possible to know that by reading the source code neither.
+> Linus, what do you think?
+> 
+> What about mediatek,tdsel and mediatek,rdsel? They are not supported?
+> 
+> Wouldn't it make sense to have one binding description for paris and then just
+> create SoC specifics bindings?
+==> It can support mediatek,tdsel and mediatek,rdsel in mt8183 design.
+I will try to create one new binding description and separate it from
+soc specifics bindings.
+
+> 
+> > +
+> > +    When config drive-strength, it can support some arguments, such as
+> > +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+> 
+> It can support all drive strength defined in that header file, 2, 4, 6, 8, 10,
+> 12, 14, 16, 20, 24, 28 and 32 mA?
+
+==>It can only support drive strength 2,4,6,8,10,12,14,16mA in mt8183. 
+
+> 
+> > +
+> > +Examples:
+> > +
+> > +#include "mt8183-pinfunc.h"
+> > +
+> > +...
+> > +{
+> > +	pio: pinctrl@10005000 {
+> > +		compatible = "mediatek,mt8183-pinctrl";
+> > +		reg = <0 0x10005000 0 0x1000>,
+> > +		      <0 0x11F20000 0 0x1000>,
+> > +		      <0 0x11E80000 0 0x1000>,
+> > +		      <0 0x11E70000 0 0x1000>,
+> > +		      <0 0x11E90000 0 0x1000>,
+> > +		      <0 0x11D30000 0 0x1000>,
+> > +		      <0 0x11D20000 0 0x1000>,
+> > +		      <0 0x11C50000 0 0x1000>,
+> > +		      <0 0x11F30000 0 0x1000>;
+> > +		reg-names = "iocfg0", "iocfg1", "iocfg2",
+> > +			    "iocfg3", "iocfg4", "iocfg5",
+> > +			    "iocfg6", "iocfg7", "iocfg8";
+> > +		gpio-controller;
+> > +		#gpio-cells = <2>;
+> > +		gpio-ranges = <&pio 0 0 192>;
+> > +		interrupt-controller;
+> > +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-parent = <&gic>;
+> > +		#interrupt-cells = <2>;
+> > +
+> > +		i2c0_pins_a: i2c0 {
+> > +			pins1 {
+> > +				pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
+> > +					 <PINMUX_GPIO49__FUNC_SDA5>;
+> > +				mediatek,pull-up-adv = <11>;
+> > +			};
+> > +		};
+> > +
+> > +		i2c1_pins_a: i2c1 {
+> > +			pins {
+> > +				pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
+> > +					 <PINMUX_GPIO51__FUNC_SDA3>;
+> > +				mediatek,pull-down-adv = <10>;
+> > +			};
+> > +		};
+> > +		...
+> > +	};
+> > +};
+> > 
+
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
