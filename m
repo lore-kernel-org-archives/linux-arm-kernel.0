@@ -2,74 +2,65 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D16CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:32:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 82855C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:55:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C0C92173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:32:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 529BF2184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:55:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s5Vsb/Q0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="Av+uPNv5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C0C92173C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iwQEydu/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 529BF2184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xGGXKz7yTthn24PqjhUVfSvTGXF3cXgZmmNZC3KkTYA=; b=s5Vsb/Q05osx0PSzzRAxwXtu8
-	qa0TORrOPAxVT2ZSzhhTq3ERyr/kNrAEAF54k0m3aJ+ZCVAZRxnzBTYVTqdCPGYS5EYlYvtr8zrm1
-	R0KEx5S6RGWDQgkrhTkg6yGM6TmJus/FgCLz8fUfesJQ8AFpy0tz2yIDjByaV5qRJ8+Fy5T0GOpg3
-	pufZq+DYMGgrS6xkE+s0qPSzSOcUTIxkX/7VkG2HNfpDugFw0jh61GAhL1Uqo2E4Z2LN9UHKn+Mmw
-	TxL3aweLKuiGWsFDIGgPk9NR6ZPLnXCeZAePQpjo/eFm9qg1RLbRGTmlDbDmAW99XqNyF8FPY61Z1
-	OJwQBxLoA==;
+	 bh=x73CNr96E8KWBrtyc5MwUvnYaY4S0Smb1bonDBHMJNg=; b=iwQEydu/WRt0K1Fxlz46MwMQ2
+	EDo9F2vGvfagLUxqSRkvkGjBYUiWKw8WaGOA0qC+aGmBJiYSde5+K8niueq2oKUUutjkh1nNsVmRg
+	lJbIZtx1LCupsItBvUBw/MIq3t5aQNazM/dHGCrM0hd6zw2vb3Gx2Tv1734OONfsfAg2yR+QpjSfO
+	3gQzLuBXkZpoaoBn0sxkv5JcuA/CiAQknC4A4HzD2tuhwF/8TaD6iXL9pbsSJU1Jwo137l2PFOz+g
+	GPMdZggGmfsVHdu1sBg6Zmc1tBEPHRedh2HzHy/yiu/ULdlNZD9NCXKTqcpNPr3kYDlundRBO3xQ8
+	hH5TgtipQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvh9x-0002WM-RX; Mon, 18 Feb 2019 11:32:29 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvh9s-0002VA-0h
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 11:32:27 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=iPvEHPP2LSGvubraJpXbu7wXWqSeB4PNpHW98Smh0GI=; b=Av+uPNv5njhzfbHFJQLv1UNuR
- 6fqSrgVG43wlcnykmhMxzzQpweE9o9VBKRId10IkOcEUIkJSjkxeZy862JdmyjTob6HfMnVf62YsS
- Hj9+Wb7PHrhwJ+ikX02BuLZek0TYp7dEOL2qyJn3Cin+CQF/g4apHJnyOezJNlbXus85g=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gvh9m-0008Bm-5O; Mon, 18 Feb 2019 11:32:18 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 8890D1128008; Mon, 18 Feb 2019 11:32:17 +0000 (GMT)
-Date: Mon, 18 Feb 2019 11:32:17 +0000
-From: Mark Brown <broonie@kernel.org>
-To: Thierry Reding <treding@nvidia.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Jassi Brar <jaswinder.singh@linaro.org>
-Subject: Re: next-20190215 build: 2 failures 19 warnings (next-20190215)
-Message-ID: <20190218113217.GA10794@sirena.org.uk>
-References: <E1gukSa-0003kX-JD@optimist>
+	id 1gvhWA-0002T9-L8; Mon, 18 Feb 2019 11:55:26 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvhVF-0001Av-B2; Mon, 18 Feb 2019 11:55:24 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B701C80D;
+ Mon, 18 Feb 2019 03:54:22 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7C9933F720;
+ Mon, 18 Feb 2019 03:54:11 -0800 (PST)
+Subject: Re: [PATCH 1/3] ARM: dts: rk3288 Tinker Board (S) sdcard changes
+To: David Summers <beagleboard@davidjohnsummers.uk>, heiko@sntech.de,
+ robh+dt@kernel.org, mark.rutland@arm.com
+References: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
+ <20190217121513.22965-2-beagleboard@davidjohnsummers.uk>
+ <e83b0404-bd32-a5d5-2e32-e0f49b122b95@arm.com>
+ <2d8ac4e6-b825-dca7-d3cb-57cb32b3230b@davidjohnsummers.uk>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <6a15343b-554b-6059-09af-f6511e740866@arm.com>
+Date: Mon, 18 Feb 2019 11:54:09 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <E1gukSa-0003kX-JD@optimist>
-X-Cookie: Take an astronaut to launch.
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <2d8ac4e6-b825-dca7-d3cb-57cb32b3230b@davidjohnsummers.uk>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_033224_292867_4E073275 
-X-CRM114-Status: UNSURE (   7.96  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190218_035523_091568_8EFCDCA4 
+X-CRM114-Status: GOOD (  29.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,67 +72,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linaro-kernel@lists.linaro.org,
- linux-next@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- kernel-build-reports@lists.linaro.org
-Content-Type: multipart/mixed; boundary="===============2059302755894988631=="
+Cc: linux-rockchip@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ devicetree@vger.kernel.org
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 17/02/2019 15:19, David Summers wrote:
+> On 17/02/2019 14:00, Robin Murphy wrote:
+>> Hi David,
+>>
+>> On 2019-02-17 12:15 pm, David Summers wrote:
+>>> This patch makes some minor changes to how the sd card is
+>>> described in the device tree for the ASUS Tinker Board (S). In
+>>> particular on the Tinker Board S, when booted from the eMMC, and with
+>>> no card in the sd slot, and the log has endless messages about not
+>>> being able to detect the card.
+>>>
+>>> Several methods to remove this error have been tried, the only one
+>>> that works is the broken-cd and so that is what is applied here.
+>>
+>> I don't have a Tinker Board, but the symptom sounds instantly familiar 
+>> from hacking on another RK3288 box; have you tried adding 
+>> "regulator-always-on" to the vccio_sd regulator?
+>>
+>> With the reference design (which I would assume the Tinker Board has 
+>> no reason to deviate from in this area), the CD pin is either wired 
+>> directly to the SoC with no external pull-up, or explicitly pulled up 
+>> to VCCIO_SD. Either way, when the dwmmc driver probes and discovers 
+>> there is no card present, it sets the currently-unnecessary 
+>> vqmmc-supply as inactive, and thus the regulator core turns off 
+>> VCCIO_SD entirely. Unfortunately, this removes the voltage from the 
+>> entire I/O domain including the internal pull-up, which ends up 
+>> leaving the CD pin floating and generating spurious events.
+>>
+>> Robin.
+> 
+> Hi Robin,
+> 
+> An interesting suggestion - no it hasn't been tried to always set the 
+> vccio_sd regulator on. Will give it a go on ArchLinux Arm.
+> 
+> I guess this would explain why the Tinker Board booting from sd doesn't 
+> see the error, as its enabled probably in uboot and then keeps working.
+> 
+> IIRC though, if booting the TBS from eMMC, then inserting an sd card and 
+> the errors stop. I guess this wouldn't happen if the power wasn't applied?
 
---===============2059302755894988631==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="FL5UXtIhxfXey3p5"
-Content-Disposition: inline
+That's the fun part of this scenario - the presence of a card is 
+unambiguous, it's only the absence of one which depends on the pull-up 
+state, so whenever as a card is inserted everything does work correctly. 
+  Assuming they are the same errors I was seeing, they're from the 
+driver *thinking* a card is inserted due to CD floating low, then 
+failing to communicate with it, after which it powers down the I/O 
+interface again and the whole cycle begins anew.
 
+> I guess also that "regulator-always-on" is a quick test - but that for 
+> submission to kernel it would be better done via "mmc-pwrseq-simple"?
 
---FL5UXtIhxfXey3p5
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+No, it's a valid description of the hardware to say "disabling this 
+regulator makes something fail to work as expected" if that is truly the 
+case. Besides, pwrseq is about how to initialise a detected present 
+card, not how to correctly detect that presence in the first place.
 
-On Fri, Feb 15, 2019 at 08:51:48PM +0000, Build bot for Mark Brown wrote:
+> Anyway I set up a test - so we can confirm this.
 
-The build failure with mbox_fush() in the tegra-tcu driver that was
-initially reported two weeks ago is still present in -next (this report
-is from Friday but it's also present today):
+Great - there is of course still the possibility that the pin really 
+isn't wired up at all, in which case ignoring CD and taking the CPU 
+overhead of polling would be the only option, but the vendor DT doesn't 
+have any signs to suggest that's the case, and makes me lean more 
+towards the pull-up issue.
 
-> 	arm64-allmodconfig
-> ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
->=20
-> 	arm-allmodconfig
-> ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
-
-Is there any progress on getting a fix merged?
-
---FL5UXtIhxfXey3p5
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCgAdFiEEreZoqmdXGLWf4p/qJNaLcl1Uh9AFAlxql74ACgkQJNaLcl1U
-h9DmWQf+Jwn7t3M0/f1ZRBUbAIw+nDhllLRpfiRToLELVVl8fYmtpxBeNvCeeyJE
-nldgoWfQ5jg52ABt352S1DhLKtOn1bKo9vvk2FPe2hRQ4TN/2B/b0X7/FZdmHT6D
-yIaDjCqTbWR5qNKLwNWNHPbRY3rewUZIqBKe6q0OAANwO0L3Q6/hZHRPdMvwq3P9
-GkqRDyAI5TT7WvwnQ0DkgmkNQqH3r0/sYfw9EB0o7JBVepihX/lVcxKmQJpNfhCn
-uP5fCWjwyjd2MGikbmPUzy5hWvYUS9e9Qk3J1VhoEZf0Oxu3qNr6bIgIbpIZyL17
-wZsECJXoQ+9Fgo09uy4ptnFPArhDxg==
-=1XPq
------END PGP SIGNATURE-----
-
---FL5UXtIhxfXey3p5--
-
-
---===============2059302755894988631==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2059302755894988631==--
-
