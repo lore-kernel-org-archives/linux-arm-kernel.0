@@ -2,20 +2,21 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC1FBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:29:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 513BCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:31:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9ACC92173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:29:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E5F62173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:31:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g8CiqeYt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9ACC92173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rlBQbbUK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E5F62173C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,31 +25,31 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aSFXSrEXCm8G6TkDe6Ev6hFXzaFCyUHErAiVpOkyxRY=; b=g8CiqeYtldK5e9
-	d8o0Mwq47qaweUQgtqTDui+dkDdjeWx2iD3IIDrtC+quT3gSCIB6U+nImgQeQGC49w6LtuIE4bjFY
-	BxcpS1MSrqHIk+DbrbGCG0DnihoXK25shsPa+rpWw6qd+hV6VcowbaSQ1bFkJxipgN4mIj0G9XJhx
-	Mxl6UbqHWocQWewIpEvakuRwxzAcv1qGpMP5W4FfGcbXpc/VFO+MOLCCwI4rREf2xyzdkWsjDwqzf
-	JqTc5MsODYpujxmBxaxFgiUbV/ED2QozXYsRYnVG0KkBIHuQOsT9FMn2GSfNU1h+fDVNdTmXxS83y
-	O1LxDhxOvm6vyDZmYJdA==;
+	List-Owner; bh=iMZ1xys2mi8TQh8CwrAoDigOzqfq8OieR/jN5SiYpUk=; b=rlBQbbUKvaMjVB
+	5bGrQZS43rqM5bMBn40u2J2sPim7fco2Q7K6IzgtcHIWDecH0zoHtraWSoKDVsIVBXdWr7+a/v1ff
+	mVyNlgBa0bJn6jAg2S9U62pCiiXpVnyrGpLiOFVazzUQVLCbOE3JZ51s0Pme645eFCQiz4rVDy98c
+	wk1nAWSBYexKTQLfE8bvX2f1bgu8/2zyN6CrITsoaU1rkH6U2v8MXuvb4Xq6wfknDRQdgzvs6J8S6
+	Yqcatxw9gm2orgE2jL8F7T3WzvJsC8BXfnYce73atRMYJCtZSVLD9conbh7LhPtqVT4l4VbfYkyFg
+	J1evin5Y2Whzws7z/SJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvh71-0000Gw-RW; Mon, 18 Feb 2019 11:29:27 +0000
+	id 1gvh9B-0001tP-RC; Mon, 18 Feb 2019 11:31:41 +0000
 Received: from j217100.upc-j.chello.nl ([24.132.217.100]
  helo=hirez.programming.kicks-ass.net)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvh6z-0000Gc-DF; Mon, 18 Feb 2019 11:29:25 +0000
+ id 1gvh96-0001st-Ep; Mon, 18 Feb 2019 11:31:38 +0000
 Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id A14E423EAF75C; Mon, 18 Feb 2019 12:29:22 +0100 (CET)
-Date: Mon, 18 Feb 2019 12:29:22 +0100
+ id E8BBF23EAF75C; Mon, 18 Feb 2019 12:31:34 +0100 (CET)
+Date: Mon, 18 Feb 2019 12:31:34 +0100
 From: Peter Zijlstra <peterz@infradead.org>
 To: Steven Price <steven.price@arm.com>
-Subject: Re: [PATCH 01/13] arm64: mm: Add p?d_large() definitions
-Message-ID: <20190218112922.GT32477@hirez.programming.kicks-ass.net>
+Subject: Re: [PATCH 03/13] mm: Add generic p?d_large() macros
+Message-ID: <20190218113134.GU32477@hirez.programming.kicks-ass.net>
 References: <20190215170235.23360-1-steven.price@arm.com>
- <20190215170235.23360-2-steven.price@arm.com>
+ <20190215170235.23360-4-steven.price@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190215170235.23360-2-steven.price@arm.com>
+In-Reply-To: <20190215170235.23360-4-steven.price@arm.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -63,48 +64,63 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: x86@kernel.org, Arnd Bergmann <arnd@arndb.de>,
  Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, kirill@shutemov.name,
  Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
  linux-kernel@vger.kernel.org, linux-mm@kvack.org,
  =?iso-8859-1?B?Suly9G1l?= Glisse <jglisse@redhat.com>,
  Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
  Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
  James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+ linux-arm-kernel@lists.infradead.org, kan.liang@linux.intel.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 05:02:22PM +0000, Steven Price wrote:
+On Fri, Feb 15, 2019 at 05:02:24PM +0000, Steven Price wrote:
+> From: James Morse <james.morse@arm.com>
+> 
+> Exposing the pud/pgd levels of the page tables to walk_page_range() means
+> we may come across the exotic large mappings that come with large areas
+> of contiguous memory (such as the kernel's linear map).
+> 
+> For architectures that don't provide p?d_large() macros, provided a
+> does nothing default.
 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index de70c1eabf33..09d308921625 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -428,6 +428,7 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  				 PMD_TYPE_TABLE)
->  #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
->  				 PMD_TYPE_SECT)
-> +#define pmd_large(x)		pmd_sect(x)
->  
->  #if defined(CONFIG_ARM64_64K_PAGES) || CONFIG_PGTABLE_LEVELS < 3
->  #define pud_sect(pud)		(0)
-> @@ -435,6 +436,7 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
->  #else
->  #define pud_sect(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
->  				 PUD_TYPE_SECT)
-> +#define pud_large(x)		pud_sect(x)
->  #define pud_table(pud)		((pud_val(pud) & PUD_TYPE_MASK) == \
->  				 PUD_TYPE_TABLE)
+Kan was going to fix that for all archs I think..
+
+See:
+
+  http://lkml.kernel.org/r/20190204105409.GA17550@hirez.programming.kicks-ass.net
+
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Steven Price <steven.price@arm.com>
+> ---
+>  include/asm-generic/pgtable.h | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/include/asm-generic/pgtable.h b/include/asm-generic/pgtable.h
+> index 05e61e6c843f..7630d663cd51 100644
+> --- a/include/asm-generic/pgtable.h
+> +++ b/include/asm-generic/pgtable.h
+> @@ -1186,4 +1186,14 @@ static inline bool arch_has_pfn_modify_check(void)
+>  #define mm_pmd_folded(mm)	__is_defined(__PAGETABLE_PMD_FOLDED)
 >  #endif
-
-So on x86 p*d_large() also matches p*d_huge() and thp, But it is not
-clear to me this p*d_sect() thing does so, given your definitions.
-
-See here why I care:
-
-  http://lkml.kernel.org/r/20190201124741.GE31552@hirez.programming.kicks-ass.net
+>  
+> +#ifndef pgd_large
+> +#define pgd_large(x)	0
+> +#endif
+> +#ifndef pud_large
+> +#define pud_large(x)	0
+> +#endif
+> +#ifndef pmd_large
+> +#define pmd_large(x)	0
+> +#endif
+> +
+>  #endif /* _ASM_GENERIC_PGTABLE_H */
+> -- 
+> 2.20.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
