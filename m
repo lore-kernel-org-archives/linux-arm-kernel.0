@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA4CCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:20:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D8FB6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:20:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB391218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:20:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F1D0218A6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:20:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Li1au+xT";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="WzEL4kWC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB391218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SukD6jZy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="cLDsfNsx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F1D0218A6
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,70 +26,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gG7mJYauJTsz2rOJUaTYAv2PsG1tEEvtMyZ7v/Mwi4g=; b=Li1au+xTwq0/ed
-	tKbz26K8Cp/GA/4SuaDpKF6LfJsKOAHRJbrzGnPMYHVBPvYhguOQVdQrHlNPAr6NzY7xWb6M1RzkJ
-	/zn3kOV3PDTBkLpTVjBBgwledS54/cmo37uXlNobiv5qsYdrqIMJw/SprGuSPRquxr54pF97UiiTP
-	tpbj6TH+17YDLhqJYi9Ju6nzc+M6NzBQmS4cm4GLAs1PiB3g4qv52eZI6aBSXubJultqQ12t8+6OB
-	S4HTG7pOXS+jQdReuIQMIGvnHosEzwpWpE2lSQdp3hv+z4u3u2yRDxgihxQe1odlRVaAkyDIvujD7
-	SlLpQqwR0rvN3hL2J+Cg==;
+	List-Owner; bh=7WPvb8eTWBGVkUpINCwVjNSoRGFiesrw1+lu4TIgLxU=; b=SukD6jZyabzZWc
+	38H7NR2kg1CDy4SGsSgyeYqWyzL9TySNujZvimfvsikt0JX6D/5/e0f3NVmqwXZWLB8Cv2TJEHQ1w
+	fm9FkPVNpIFxyDyUqkSZktjobQDKdBtMAarZbhz9hcBo6d0I3jVFW8EWGI43LJ4QtFPttS6hYFhuT
+	BhZHF9q8M+/aNzZUCOjewo7KIi3oMx3+WdZvmQaeRvowgNCmyQuu1a2hRPmCBfrt9etQkae3CmEeR
+	mq6l4qJ4i1NfTC/eLl9N7mrW8B67TqadM2fnG5D/mG2pi7Zd2AuWXlcAqghC9/MkQOOWC5I/jdLIj
+	t/GSMpDv0FTtaP0Pks2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvWfY-0003aa-IA; Mon, 18 Feb 2019 00:20:24 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gvWfg-0003k2-Se; Mon, 18 Feb 2019 00:20:32 +0000
+Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvWep-0001Zf-OU
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 00:19:47 +0000
-Received: by mail-pg1-x541.google.com with SMTP id u9so3990056pgo.7
+ id 1gvWev-0001io-LI
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 00:19:49 +0000
+Received: by mail-pg1-x542.google.com with SMTP id y4so7509224pgc.12
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 17 Feb 2019 16:19:39 -0800 (PST)
+ Sun, 17 Feb 2019 16:19:45 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=7AXM5gfuoADBg0BFzphcMP4lLAjmgxuvX7FX0op9rJ8=;
- b=WzEL4kWCx33847OA62oJO2Wr9cM2nJ70TgNnaqK8kNY8pt5dl6BwVdjYoffp2DEfLM
- XT9um9KQ782bFnUcUBez6Azds+lfhwXa11qb6R1DJ7hMIl6aAunvy4FlFCnt7p48UETQ
- dhEkEwt4EE3YJUExN0fP0J5sM/ezttnJE+8BvH3H8SMNAARvXDChNsQksp4KtcC7yR1Q
- 14p2faN0pVd7wGQChe3awiNYPgyHU2N0TEz8GJEZBJJwTXIrD5WnYHOj5/EOB+MyLTuq
- at8e+Gh8yyAxV2ygRGUuhY88sXvkqbyNCRjjm8H1g7v5Lar1jkoW8WlvEYP6jS/UbJvi
- lE0g==
+ bh=AfjyKjJ4BPDlX5QQ+sFj1fRVuO9lVs7F3NH6shrTHtY=;
+ b=cLDsfNsx13o5jVbpfVJM1rGKKUV/63W8NmOQz/8GkyEPs8GYLjJarohBh8aVUh5J+s
+ qYaKYdoDeAymcZqFK7Y2dulSPWNelR3dY4eFhyXHpuWH+aSiaqP60pcyGK2DdCNEoe0R
+ L6fb153r6bLrAUThs5k0InFu+iTYQPUwjffXXTIeZZJKSUqrrWPRsEfYYNvEuI/HBGFk
+ 020PIrw/pRWhdmcz51jjErVI7JZ640M5LPgWyvUQkeyFH4hre7sQm/EMNdhPixoeYh/l
+ HO94JHYUQbAcnZhW40fwFiQmgym35S6ynrmeuLGf2d3pvs7IUxNb1YuHgnA3vCPyd56v
+ W6CQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=7AXM5gfuoADBg0BFzphcMP4lLAjmgxuvX7FX0op9rJ8=;
- b=EabcwEEt0H5V9U9lc3YJ2twe47+mQtt4GwIV9QLvgu+JyHs2W7HLQbsPdF3Nk4Nc45
- 0mblBqS47u6mHpcgtXGXaLs/JzFCGc/f16NfqnSkY6i+UzjdO/lattgI+QKkwF9yikBm
- DyH9L3UN3ieqV7t+id76jJ+EQMVLWVwcFO8WXYTj0A4ecDFqf2G/0AcR8mubSyHPJXuW
- ICKa6zdrl7jVn2cIgGNP+Va0WxEvIeGAWn9Al+d872Ur7jZdAv7ijcbVAPIYrK64jq6T
- 2gzUt2Xn38gCDjQmNcrbYxyZ9RKo7SjjOwC3qiO1ZqZ+kfhlAXHqb2yFKTee4s0AzVKg
- zR6A==
-X-Gm-Message-State: AHQUAuZD/N8wZ8aad7miHVm51MCfX/axPXnUFGAj2JuQxC22lZ5ufmLW
- 63yn4U2H4t9PU4+glldN8L51kAsb
-X-Google-Smtp-Source: AHgI3IbFVYQxk+UFZWL1I+XcGnUftENqMcDIkh5oC5TY5Lbla+3d4kjnIpLE+JKYOIQkawf+o4YdUQ==
-X-Received: by 2002:a62:d281:: with SMTP id
- c123mr17106376pfg.210.1550449178969; 
- Sun, 17 Feb 2019 16:19:38 -0800 (PST)
+ bh=AfjyKjJ4BPDlX5QQ+sFj1fRVuO9lVs7F3NH6shrTHtY=;
+ b=kEuTW7tWBfdAHAhVmNtYrrobgfqKu6i0aQPVZjgOhMsYlonDebYz6rxEqvc+ig9FeF
+ mUeXUn5jvGHTESwUPRCLdTpKk9b13432+alM9otCGJG5eKGQ+aeX9EF9NI6hYmvq6ERJ
+ Ixjz+gzrRj/FhZVXzAiRg1No1YjwfSqGxMPMs+luSh230E7RLOz2jBdEV3KW+iA5BQ4B
+ eZdGcNx3zASFZwRS/u/MZB+GyNMECfiOUKqtW2Y+xsQADQPgSCVVpYwbJbbpX6mGQH5b
+ sx7U56YYXEZC9gg3mFhqgFl9i4Ds/qNVyYQL9ktpA3pX0aruw9HyAOkQJd4JDbCPhb/U
+ mOgA==
+X-Gm-Message-State: AHQUAubYFDdJU+QKDTkqVSsYpxGu+lCo5H+6NUNki2V0WRHoFCOxGdww
+ avmK5Wvy+ffnCE+5YTHQlog=
+X-Google-Smtp-Source: AHgI3IZaCtIC5CyA4/pgD49BKesPmkzS/NPioMK8YCwl06w0fhCsm3mqwWP81/cedYiGA1P3nOfozw==
+X-Received: by 2002:a63:8441:: with SMTP id k62mr15388177pgd.219.1550449185279; 
+ Sun, 17 Feb 2019 16:19:45 -0800 (PST)
 Received: from localhost.localdomain (ppp91-79-175-49.pppoe.mtu-net.ru.
  [91.79.175.49])
- by smtp.gmail.com with ESMTPSA id s73sm31518071pfi.124.2019.02.17.16.19.33
+ by smtp.gmail.com with ESMTPSA id s73sm31518071pfi.124.2019.02.17.16.19.39
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 17 Feb 2019 16:19:38 -0800 (PST)
+ Sun, 17 Feb 2019 16:19:44 -0800 (PST)
 From: Dmitry Osipenko <digetx@gmail.com>
 To: Russell King <linux@armlinux.org.uk>,
  Thierry Reding <thierry.reding@gmail.com>,
  Jonathan Hunter <jonathanh@nvidia.com>, Robert Yang <decatf@gmail.com>,
  =?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?= <mirq-linux@rere.qmqm.pl>
-Subject: [PATCH v4 3/8] ARM: trusted_foundations: Provide information about
- whether firmware is registered
-Date: Mon, 18 Feb 2019 03:17:21 +0300
-Message-Id: <20190218001726.16785-4-digetx@gmail.com>
+Subject: [PATCH v4 4/8] ARM: tegra: Set up L2 cache using Trusted Foundations
+ firmware
+Date: Mon, 18 Feb 2019 03:17:22 +0300
+Message-Id: <20190218001726.16785-5-digetx@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190218001726.16785-1-digetx@gmail.com>
 References: <20190218001726.16785-1-digetx@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_161940_189736_22BB0AC6 
-X-CRM114-Status: GOOD (  12.65  )
+X-CRM114-CacheID: sfid-20190217_161945_770613_1E654191 
+X-CRM114-Status: GOOD (  14.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,60 +107,46 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a helper that provides information about whether Trusted Foundations
-firmware operations have been registered.
+On Tegra30 L2 cache should be initialized using firmware call if CPU is
+running in insecure mode. Initialize L2 cache and set up the outer-cache
+callbacks early during boot using the firmware API.
 
 Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
 ---
- arch/arm/firmware/trusted_foundations.c    | 5 +++++
- arch/arm/include/asm/trusted_foundations.h | 7 +++++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-tegra/tegra.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index c496f4cc49cb..d795ed83a3cd 100644
---- a/arch/arm/firmware/trusted_foundations.c
-+++ b/arch/arm/firmware/trusted_foundations.c
-@@ -172,3 +172,8 @@ void of_register_trusted_foundations(void)
- 		panic("Trusted Foundation: missing version-minor property\n");
- 	register_trusted_foundations(&pdata);
- }
-+
-+bool trusted_foundations_registered(void)
+diff --git a/arch/arm/mach-tegra/tegra.c b/arch/arm/mach-tegra/tegra.c
+index f9587be48235..67d8ae60ac67 100644
+--- a/arch/arm/mach-tegra/tegra.c
++++ b/arch/arm/mach-tegra/tegra.c
+@@ -38,6 +38,7 @@
+ #include <soc/tegra/fuse.h>
+ #include <soc/tegra/pmc.h>
+ 
++#include <asm/firmware.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+@@ -70,9 +71,18 @@ u32 tegra_uart_config[3] = {
+ 	0,
+ };
+ 
++static void __init tegra_trusted_foundations_l2x0_cache_init(void)
 +{
-+	return firmware_ops == &trusted_foundations_ops;
++	if (IS_ENABLED(CONFIG_CACHE_L2X0) &&
++	    IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) &&
++	    of_machine_is_compatible("nvidia,tegra30"))
++		call_firmware_op(l2x0_init);
 +}
-diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
-index cdd48ab7d191..3f23fa493db6 100644
---- a/arch/arm/include/asm/trusted_foundations.h
-+++ b/arch/arm/include/asm/trusted_foundations.h
-@@ -31,6 +31,7 @@
- #include <linux/of.h>
- #include <linux/cpu.h>
- #include <linux/smp.h>
-+#include <linux/types.h>
- 
- #define TF_PM_MODE_LP0			0
- #define TF_PM_MODE_LP1			1
-@@ -47,6 +48,7 @@ struct trusted_foundations_platform_data {
- 
- void register_trusted_foundations(struct trusted_foundations_platform_data *pd);
- void of_register_trusted_foundations(void);
-+bool trusted_foundations_registered(void);
- 
- #else /* CONFIG_TRUSTED_FOUNDATIONS */
- 
-@@ -74,6 +76,11 @@ static inline void of_register_trusted_foundations(void)
- 	if (of_find_compatible_node(NULL, NULL, "tlm,trusted-foundations"))
- 		register_trusted_foundations(NULL);
- }
 +
-+static inline bool trusted_foundations_registered(void)
-+{
-+	return false;
-+}
- #endif /* CONFIG_TRUSTED_FOUNDATIONS */
+ static void __init tegra_init_early(void)
+ {
+ 	of_register_trusted_foundations();
++	tegra_trusted_foundations_l2x0_cache_init();
+ 	tegra_cpu_reset_handler_init();
+ }
  
- #endif
 -- 
 2.20.1
 
