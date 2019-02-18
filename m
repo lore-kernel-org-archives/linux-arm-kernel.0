@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7ABF2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:49:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81D98C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:52:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4F5D42177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:49:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F5332177E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:52:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZZhGUpRv";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="G0kq8j3f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F5D42177E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HpVPBWis";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="xf5SY8Bu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F5332177E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
 	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=owXx07kHFmEZTTcGjUT6xGuRFFB3BBYTpLkzeo253HA=; b=ZZh
-	GUpRvPOdhpDSgk/pATr+8v8UY7IupoLcyx+9nOD1HqL5sB5zrHZC+JamtMSqP26yISFYz52RjOy5H
-	BmSucO9fynG032iZCpNW0gbZD+D/JuNirujuwHMsyWvBslwVf9WODxt5aR8iAENS5K3EOpohmiMSz
-	voR25Sq2XOxSfsYDN0Amd8zwWcAW7l/HtsocAv/HIf1ANduv6CkbzFalY2q3V/zYZqoWA5YiSOF0v
-	pGoz+XzOGWc5UHoGM2iPqh4ziqQNQTF1MS8V4tSV/aqlPMdD8MVvfP3ko4WSMFfDr3HFhvZLCV+mo
-	51fD9uc+zykcDIkQG2z/HXrGNUdQWHQ==;
+	References:List-Owner; bh=owXx07kHFmEZTTcGjUT6xGuRFFB3BBYTpLkzeo253HA=; b=HpV
+	PBWisq9TgzVw4BBKXAsdJWQDV4ApNO6Gpwr8JDvFDD+tJ5bgSLawMk7rUAJXBkO+R+PaktOtB6xn/
+	inZMrqrSvKA2OxsH4Hcz5Z+UxSv7XUxJ4+3EOF42za7FL6VfzpR71uLjDg7/iYO8OEi7MLX3PbDuC
+	7+iFc7oB8S6LDcFLPIZ1S7JqI/0tqCAKwHdm0q9HGzXGKCkqHzJJeqnoVDHdEX8wtaHOG5MuLM7dD
+	ZO0LUA8QY8WwhE2OteZLKdyUqwS1qyUejGAI4gy+hYp0Of8Az9hB7ly8uYB/wpnnHdsdWYUJx934q
+	nSvIIBYDZ2CgkGT9SrKnf6M/bJ09zxQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvnyv-00058h-Gz; Mon, 18 Feb 2019 18:49:33 +0000
+	id 1gvo1s-0006lt-JJ; Mon, 18 Feb 2019 18:52:36 +0000
 Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvnys-00057u-6t
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 18:49:32 +0000
+ id 1gvo1o-0006l2-HD
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 18:52:34 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
  Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
  Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
  Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
  List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=39BnjRBP3mAF1mj98V17S7lBxoprAgwGQFFxs8scGXw=; b=G0kq8j3fA/nT
- WsohoCUvuOH3V2iTvkp3rNj/ClOXcSjW0TSr0qalCpXG1LLzr5+ohQbOjJ7Cs3iJnmJFwPSU9sU8a
- dlPagFXxQz9tYBwYjZN+tKio7ezI1gXfn2jfHQRjCHpRBVXMaSkbEBPPeKhgNaPGrqKpQsHpZBupB
- y6hTI=;
+ List-Archive; bh=39BnjRBP3mAF1mj98V17S7lBxoprAgwGQFFxs8scGXw=; b=xf5SY8Bu22cO
+ j3Y/61hUhcYes/SWLwWKtyz3XmfARfNF/OUIYAziaWhlsOZKEvfDyMTWBh6EQHK9GUNMrBZWqgzfD
+ YWZuk4xKWa5bla25HTSh1O8YGBz5G+z0XBqU795stltU6IgfLYm6VR+e34Md4P3D9UrYudiqKhbAB
+ Wcdbk=;
 Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
  ([82.37.168.47] helo=debutante.sirena.org.uk)
  by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
  (envelope-from <broonie@sirena.org.uk>)
- id 1gvnyg-0001dc-CQ; Mon, 18 Feb 2019 18:49:18 +0000
+ id 1gvo1h-0001iU-Sq; Mon, 18 Feb 2019 18:52:25 +0000
 Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id CDEC21128008; Mon, 18 Feb 2019 18:49:17 +0000 (GMT)
+ id 691B01128008; Mon, 18 Feb 2019 18:52:25 +0000 (GMT)
 From: Mark Brown <broonie@kernel.org>
 To: YueHaibing <yuehaibing@huawei.com>
 Subject: Applied "ASoC: stm32: sai: remove set but not used variables 'mask,
  cr1'" to the asoc tree
 In-Reply-To: <20190218145026.142805-1-yuehaibing@huawei.com>
 X-Patchwork-Hint: ignore
-Message-Id: <20190218184917.CDEC21128008@debutante.sirena.org.uk>
-Date: Mon, 18 Feb 2019 18:49:17 +0000 (GMT)
+Message-Id: <20190218185225.691B01128008@debutante.sirena.org.uk>
+Date: Mon, 18 Feb 2019 18:52:25 +0000 (GMT)
 X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_104930_397132_EBF472D6 
-X-CRM114-Status: GOOD (  14.96  )
+X-CRM114-CacheID: sfid-20190218_105232_718097_5FB7313B 
+X-CRM114-Status: GOOD (  15.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
