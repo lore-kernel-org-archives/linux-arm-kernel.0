@@ -2,72 +2,67 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94403C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:09:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4041C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:10:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64C53217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:09:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 698F22077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:10:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OPZLTzG+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64C53217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mi9/b3O/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="1nah7a5v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 698F22077B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QRd7eBVM1ftxcnZ/+xHqfEVpsz87bO5h3ZVDqENYRNI=; b=OPZLTzG+X0YwT4
-	J2KT4g+ugVHxweOXBoSbpDIYZb+DoijC6CiIbGTS1w9lfHt6tRagjpewAqJoZ0y6Fx1ufVW72PLCI
-	l/SQ1ecJuTinkY4pRsE6+6QPv+xMUa9+kr+Gt9yHhMJracHu70HJDykmuFb2Gdfu0WVHkaJZsO/0/
-	lVk49qXXNUd6dtqODezopPz0Lje4ps3W4FkGxGzqRoqY4d4UDptqDS305PxoYO/LpnrBsQ+rowvnD
-	UdMzRm+iGaykOtBYv1Chu9MHa51ieUM1xGyGUddNw8IdHb3xOaHVcU2Zi9hvmIeHHgxW/jOHEv6O1
-	DNLi6iM6shlFrTtZRA+Q==;
+	List-Owner; bh=FdGkP/oAdo4gjbD+pPRom0fKPRNkIhL12tJsr7W2lAM=; b=Mi9/b3O/EYu07T
+	xcPdgV1ZRn7A15z0WFt4Ty2m/N7OcwJvxzuEYya2oYEV0LN/B/sVsJONDietsWVHHqNkiRl0DOnvs
+	Bn5QdJo1fAPmPtnCR9/KndpJNhOa8NgsrYHThP1dNK7W3QykpqsF6WalghzFfVSfkJDyvfBd5A0ZM
+	XJpPJt0Y63fvsIaq97VQFTvoi/ebTAzRSPHTwLaCmmAgnQq9QmtW50wEcuC2GQu8ffPPE7lK9wmNB
+	X4pK+fL+28gRROuS/z1r0W1SwFyl9jaWDC5n5zEeRaN+4QNoyroGakPttIx8GsZgh5vVi8vymZH9o
+	8a2dTiylW1yMHryc/mGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvhk4-00083b-AM; Mon, 18 Feb 2019 12:09:48 +0000
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
+	id 1gvhkn-00016d-0z; Mon, 18 Feb 2019 12:10:33 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvhk1-00083F-Ma
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:09:46 +0000
-Received: by mail-qt1-f195.google.com with SMTP id b8so18807790qtr.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 04:09:45 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=Rt8Onk5ZFIivNapcSYBDIp/BG20u3QyBL4v88MFsEog=;
- b=Y25jL9m3cOrcUEy7X+25N2RppyxI6tKVQakjXs20yT1F8A38MHQmOGmo7YDjip2YGz
- XGJu5+70sgyqr9VnvSjegpoCB4Jnha+ThIIEyfvTK9MZ932Ny+oY/N9ctWrJYTznlOHY
- HeGC+I8FNaEcHnYK9Hm0rBmDeLJW5srW/P3uYxMXAF92B+qauI9taTJoYDex8NJ2uNT3
- Q+E4VEHE4R5XPsYSCjVLs81onXRUQIk60Wtd7f3ZNjc9RQ+dkVUPi9dgVitoJpRsGa/o
- 7gafF/bFW01PTWY/IOIoRtUvnFBq+HN91La10YQLwaiiu17ieeZuCLrZ4s23EZpwojjS
- qV3Q==
-X-Gm-Message-State: AHQUAuYg2nYrO9E4k3u2looxMkxjcI9jl0VuP8g76V2Ikg5buK7Ao8dO
- h6qN3OaJDTVrUedaEiJ00HeDSY1/Iu5YisiqOp4=
-X-Google-Smtp-Source: AHgI3IZ0H0QTGO2yfAXRK+DPKf1as5oE2i77Ox29VXi8tqA+s+QDSxx+jObbrp6qXqoWG80ldg63pd71KtD8FpcjdxI=
-X-Received: by 2002:ac8:33f1:: with SMTP id d46mr17699767qtb.319.1550491784457; 
- Mon, 18 Feb 2019 04:09:44 -0800 (PST)
+ id 1gvhkf-00015W-AG
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:10:31 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9536F2077B;
+ Mon, 18 Feb 2019 12:10:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550491824;
+ bh=A6Y3qaXf+pA491fWP51Z3P7/jPhiPA49fnNMRE0l/AU=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=1nah7a5vXokx8aztzMsfGjpxCjItqrhsMvGm+W0EJYFqrmDfRWZ8+ia01haYvnzBa
+ wu+Bz6d40QywGZYkMB5WwycayLgdSoPt9r+rlANjPoumLlJo1aM0jCUFLQa9aN9BjK
+ gX+GjiTJAuY8d7f8vgtK/+vaCLBdSiszAjFfN0yc=
+Date: Mon, 18 Feb 2019 13:09:21 +0100
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Mark Brown <broonie@kernel.org>
+Subject: Re: next-20190215 build: 2 failures 19 warnings (next-20190215)
+Message-ID: <20190218120921.GA11524@kroah.com>
+References: <E1gukSa-0003kX-JD@optimist> <20190218113217.GA10794@sirena.org.uk>
 MIME-Version: 1.0
-References: <1549628920-32623-1-git-send-email-sugaya.taichi@socionext.com>
-In-Reply-To: <1549628920-32623-1-git-send-email-sugaya.taichi@socionext.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 13:09:27 +0100
-Message-ID: <CAK8P3a15mLEgVAh1+jQ+GqOcQa0zhrePWofo8iGkTs5_bd=TmQ@mail.gmail.com>
-Subject: Re: [PATCH v2 13/15] ARM: dts: milbeaut: Add device tree set for the
- Milbeaut M10V board
-To: Sugaya Taichi <sugaya.taichi@socionext.com>
+Content-Disposition: inline
+In-Reply-To: <20190218113217.GA10794@sirena.org.uk>
+User-Agent: Mutt/1.11.3 (2019-02-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_040945_741087_18069582 
-X-CRM114-Status: GOOD (  11.62  )
+X-CRM114-CacheID: sfid-20190218_041025_900489_1E270602 
+X-CRM114-Status: GOOD (  11.41  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,37 +74,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linaro-kernel@lists.linaro.org, kernel-build-reports@lists.linaro.org,
+ Jassi Brar <jaswinder.singh@linaro.org>, linux-next@vger.kernel.org,
+ linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 1:28 PM Sugaya Taichi
-<sugaya.taichi@socionext.com> wrote:
-> +
-> +       aliases {
-> +               serial1 = &uart1;
-> +       };
+On Mon, Feb 18, 2019 at 11:32:17AM +0000, Mark Brown wrote:
+> On Fri, Feb 15, 2019 at 08:51:48PM +0000, Build bot for Mark Brown wrote:
+> 
+> The build failure with mbox_fush() in the tegra-tcu driver that was
+> initially reported two weeks ago is still present in -next (this report
+> is from Friday but it's also present today):
+> 
+> > 	arm64-allmodconfig
+> > ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
+> > 
+> > 	arm-allmodconfig
+> > ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
+> 
+> Is there any progress on getting a fix merged?
 
-Maybe start with serial0 here? It seems unusual to start
-counting at 1.
-
-> +       chosen {
-> +               bootargs = "init=/sbin/finit rootwait earlycon";
-
-The /sbin/finit argument seems user space specific, so you probably don't
-want this in the dts file but rather pass it from the boot loader.
-Possible drop the bootargs entirely.
-
-     Arnd
+I can take the fix in my tty tree if I get an ack from the mbox
+maintainer...
 
 _______________________________________________
 linux-arm-kernel mailing list
