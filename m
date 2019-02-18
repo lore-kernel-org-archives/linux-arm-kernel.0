@@ -2,69 +2,140 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28259C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:50:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C22FAC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:52:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ED09A218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:50:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9123F218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:52:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rti53Dgh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=163.com header.i=@163.com header.b="HoXJ+lXF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ED09A218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=163.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h56qeLRp";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="cLQPeMWo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="eo1c6LyL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9123F218D3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ODwYA6rhc589QWdbALbZ8kf2IJyEweP1Nv1PRBoMRoQ=; b=Rti53Dghdz/TLD
-	3uGNdkkEvnThSbJC08CH5g+9SqgmXkgZLEcP0lSOKYZ8fJzAb1oXdm3NYfe7L01Gm4Qs4HLBvaTh2
-	T1ApaAe0Nddh2KPlBnmcyj+RhBfW7rhDp2C8orVWjyh6IlKjsv06L4A1qx3MXtZAZA3pIpIPDVZ/3
-	9IqQAs5nvB0s6gCFQK7mF1GedMMh6RpEQV73qERoinjmbuJ/bFfLCAmM1ZTTFC45UDWtyKPWJa+MH
-	ZiBGWxGTvBHYQb5RLR5F74HHgU/1ioDvIVxx8H/gvxDIVUZwUGZx9ZjDbuze/0Yo4QWxFCl/m12kr
-	vPx792F3emruPHwKbHNg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2KLX8B7U58eWDSYNNDRjprCs2TkyMjutpo+7Kz+vdmk=; b=h56qeLRpz6sd0g
+	J9GwCJQnbyP9i1X3st+cILGMDOZ2MqsdTv+iWb0v3xtr29kU3XDtmsye+pSAdCHybWJgOp7S9E+Wq
+	2cxl2T7yBezXah8WKGF5ZzjzqFsccJPIG/hrsNRrE6blEdw6TifmaJ/le1vTz+tuP516SBT1bdg2i
+	1SiMxod2oOK10Y+4BZcM93aALFIUYMdDan0qKtUGY3e9nPkPSuhkRpX2m0JMnlJ5cvz6AT2yJmZEg
+	Il1IdQfkLFNfiktCd8HHYrd0VS7OVsAyUnZsTncj0yOqTj4WKEoYUWr68PExky4JR4wGaLjtOV/lf
+	EIwjoWBDnDyxoHOo73TQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvfZV-0001lE-Oo; Mon, 18 Feb 2019 09:50:45 +0000
-Received: from m12-14.163.com ([220.181.12.14])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvfZS-0001kZ-0g
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:50:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=163.com;
- s=s110527; h=From:Subject:Date:Message-Id:MIME-Version; bh=P2vcV
- 6f8loVaf/ZIiX2dpDXisvZU04xacdx/G8A6NQo=; b=HoXJ+lXF3jE+cgyInkc8G
- GC/NTw6YVxqDMdPLEt3vzoSAaMvSL04q8gBvDZ0n8qR4wzS3wJzmrvM19VLqs+4H
- GhU0Iq0xiklmAImmaw+LTX0YNVMAZ0t+C3HWRoz4dXHqEqj6pFNqIrf00kx0Nusk
- Q2u2yl4bJtbviuES75Iu9I=
-Received: from localhost.localdomain (unknown [202.100.35.16])
- by smtp10 (Coremail) with SMTP id DsCowADnYA_vf2pcFKt1GQ--.1550S3;
- Mon, 18 Feb 2019 17:50:40 +0800 (CST)
-From: Shikai Wang <sxauwsk@163.com>
-To: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
-Subject: [PATCH] i2c: cadence: try reset when master receive arbitration lost
-Date: Mon, 18 Feb 2019 17:41:32 +0800
-Message-Id: <20190218094132.5226-1-sxauwsk@163.com>
-X-Mailer: git-send-email 2.19.2
+	id 1gvfbE-0002Ai-Tw; Mon, 18 Feb 2019 09:52:32 +0000
+Received: from mx0b-0016f401.pphosted.com ([67.231.156.173])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvfbA-00028A-BW
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:52:31 +0000
+Received: from pps.filterd (m0045851.ppops.net [127.0.0.1])
+ by mx0b-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1I9qE5f025142; Mon, 18 Feb 2019 01:52:24 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
+ h=from : to : cc :
+ subject : date : message-id : references : in-reply-to : content-type :
+ content-transfer-encoding : mime-version; s=pfpt0818;
+ bh=tU6PuN2duHKzBXHAYGpkSYO1zEgzSldYz7FyzRR3jFk=;
+ b=cLQPeMWovKdhxWr0jQxiJouNgMcongEwsaQ63uKsAZERCzt0zoxn/y4ojXOLel231aCl
+ /r4niFd8li4G0p98Obi9yfUxwbdXlugmufRgSqLf+OG/HcaaaJfiYHhtEwVvBJnsGIb7
+ K1YN+AeWKPXN4mMxuKMlq9BrN66sEf30DB/kkkG4Sy2UiEGUowlaP2Nc76f0MdKUiuqu
+ Ng6XaoRzVYASyud89hcdX0RjMIRsp1N53AsTuXei4YvhJyMBl2/mMPW++gt/HwXlvI7q
+ EteaS7MuIT03R/E5IZzSo0bKQralHRtO2wFQtgQUPVvWPK4aVZWUKhsfCDgDv9EB+QUm mg== 
+Received: from sc-exch02.marvell.com ([199.233.58.182])
+ by mx0b-0016f401.pphosted.com with ESMTP id 2qpjwpw14e-8
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
+ Mon, 18 Feb 2019 01:52:24 -0800
+Received: from SC-EXCH04.marvell.com (10.93.176.84) by SC-EXCH02.marvell.com
+ (10.93.176.82) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Mon, 18 Feb
+ 2019 01:52:21 -0800
+Received: from NAM02-CY1-obe.outbound.protection.outlook.com (104.47.37.59) by
+ SC-EXCH04.marvell.com (10.93.176.84) with Microsoft SMTP Server
+ (TLS) id
+ 15.0.1367.3 via Frontend Transport; Mon, 18 Feb 2019 01:52:20 -0800
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=marvell.onmicrosoft.com; s=selector1-marvell-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=tU6PuN2duHKzBXHAYGpkSYO1zEgzSldYz7FyzRR3jFk=;
+ b=eo1c6LyLt1lt2qFxHM4/Vqq4jWO8/hriqbMBWgkXRn+oa6ww0KRhgDJ6+yErwAhc5pa0z620aP8T7VZvuFb5CQUUePAR2xDF/3mlwZIsw2DpcWAmcP+e0LaKrwsrfCYr3OqdFhs1qnwiTj1JCy9ogaN+9IrhMY6ffw+lAycZUoM=
+Received: from CY4PR18MB1112.namprd18.prod.outlook.com (10.173.183.147) by
+ CY4PR18MB0968.namprd18.prod.outlook.com (10.173.182.149) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.18; Mon, 18 Feb 2019 09:52:17 +0000
+Received: from CY4PR18MB1112.namprd18.prod.outlook.com
+ ([fe80::7561:d13b:e106:12b4]) by CY4PR18MB1112.namprd18.prod.outlook.com
+ ([fe80::7561:d13b:e106:12b4%4]) with mapi id 15.20.1622.020; Mon, 18 Feb 2019
+ 09:52:17 +0000
+From: Vadim Lomovtsev <vlomovtsev@marvell.com>
+To: "sgoutham@cavium.com" <sgoutham@cavium.com>, "rric@kernel.org"
+ <rric@kernel.org>, "davem@davemloft.net" <davem@davemloft.net>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "netdev@vger.kernel.org"
+ <netdev@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH v2 6/8] net: thunderx: add mutex to protect mailbox from
+ concurrent calls for same VF
+Thread-Topic: [PATCH v2 6/8] net: thunderx: add mutex to protect mailbox from
+ concurrent calls for same VF
+Thread-Index: AQHUx2+hTIFyMZfLski+mfyZ4KOVlg==
+Date: Mon, 18 Feb 2019 09:52:15 +0000
+Message-ID: <20190218095159.3847-7-vlomovtsev@marvell.com>
+References: <20190218095159.3847-1-vlomovtsev@marvell.com>
+In-Reply-To: <20190218095159.3847-1-vlomovtsev@marvell.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [4.28.12.78]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: f83702a8-6e69-4564-50eb-08d69586c4c9
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR18MB0968; 
+x-ms-traffictypediagnostic: CY4PR18MB0968:
+x-microsoft-exchange-diagnostics: 1; CY4PR18MB0968;
+ 20:zC0tjJAALaCXEL8o23yREOWMBiFFJRzY/T9q52icU8OBoW56rbEGNPJ2fIiGW+lcRLowjU/CJRVJWszbYcTx4nzuWt1wnWD46OtB97uU5gPzSCu+70rXLrGhgBWzWTx1W0G7SOFFOsd7J/SpMTcNpmmJz0XHAF0TF4agqjH02i0=
+x-microsoft-antispam-prvs: <CY4PR18MB09688AFD86B1298A2039B4A5CD630@CY4PR18MB0968.namprd18.prod.outlook.com>
+x-forefront-prvs: 09525C61DB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39850400004)(396003)(376002)(366004)(346002)(136003)(199004)(189003)(486006)(7736002)(305945005)(316002)(4326008)(110136005)(54906003)(25786009)(99286004)(8936002)(476003)(5660300002)(186003)(2616005)(76176011)(81166006)(81156014)(6436002)(446003)(11346002)(14454004)(2906002)(8676002)(71190400001)(71200400001)(14444005)(6506007)(256004)(68736007)(1076003)(2501003)(2201001)(36756003)(6486002)(53936002)(86362001)(106356001)(102836004)(26005)(15650500001)(97736004)(3846002)(105586002)(66066001)(6116002)(478600001)(6512007)(107886003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR18MB0968;
+ H:CY4PR18MB1112.namprd18.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: marvell.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: zlYKT9DnuuzahpllPqnjUTsd3trjG7A+R7QU5EIOagHV5MCTqP858t3m98xZ5oOXeMgJg026q/fjWRh5Mh4xxxLPDlsqjyC6lDMcr2GlIGlVBZUq5o7h2RSU3RtuHsbykFVo6k8betnlWA3VaiQKK5SqG/BC97yGDSLctcH5DCCRKuqNJ2VpzYOc+rDS+lWL3PqoW+s3x0h6Z3mfdFprit5woHCcu6l40Qieiy9QyRHYf38GWaNE4mwgp9EUDC5fYqrkBTqB1KqTYrcL/6qtk1oYon/Ulx41J+dYVmNgcqqaEJK2akxInhI8noDzZMYp3hv+B6mnurQXssn/OcjZWT3VjfU23IFTXAR66M1aOUPPoEFul4Gq+1qGRz+qwDzI0G4kHzHbmieDIdGAutXMpTj5mooGeifkbD0REoXuKWA=
 MIME-Version: 1.0
-X-CM-TRANSID: DsCowADnYA_vf2pcFKt1GQ--.1550S3
-X-Coremail-Antispam: 1Uf129KBjvJXoW7tr1xGw4UZr1DAr4rKFy7trb_yoW8Gw15pa
- 1DGrZIkrW0qr4IqFs7Ar17ZF98uwsYga4jkF4Fk34q9F15CrWDtFy3tF98XF4xCryrX34a
- qrZ0y39rG3W2vFJanT9S1TB71UUUUUUqnTZGkaVYY2UrUUUUjbIjqfuFe4nvWSU5nxnvy2
- 9KBjDUYxBIdaVFxhVjvjDU0xZFpf9x07jc_-PUUUUU=
-X-Originating-IP: [202.100.35.16]
-X-CM-SenderInfo: 5v0d34lvn6il2tof0z/xtbBzxBfJlaD1XcVlAAAsQ
+X-MS-Exchange-CrossTenant-Network-Message-Id: f83702a8-6e69-4564-50eb-08d69586c4c9
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 09:52:15.9391 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR18MB0968
+X-OriginatorOrg: marvell.com
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-18_07:, , signatures=0
+X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=588 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1902180075
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_015042_848920_125058B9 
-X-CRM114-Status: GOOD (  10.89  )
+X-CRM114-CacheID: sfid-20190218_015229_065284_2C149F8F 
+X-CRM114-Status: GOOD (  14.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,59 +147,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, sxauwsk@163.com,
- Michal Simek <michal.simek@xilinx.com>, linux-arm-kernel@lists.infradead.org,
- linux-i2c@vger.kernel.org
+Cc: "dnelson@redhat.com" <dnelson@redhat.com>,
+ Vadim Lomovtsev <vlomovtsev@marvell.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When the adapter receive arbitration lost error interrupts,
-cdns_i2c_master_xfer return to the caller directly instead of resetting
-the adapter which resulted in the adapter being out of control.
+In some cases it could happen that nicvf_send_msg_to_pf() could be called
+concurrently for the same NIC VF, and thus re-writing mailbox contents and
+breaking messaging sequence with PF by re-writing NICVF data.
 
-So when driver detect err_status such as arbitration lost,
-then try to repair and fix it.
+This commit is to implement mutex for NICVF to protect mailbox registers
+and NICVF messaging control data from concurrent access.
 
-Signed-off-by: Shikai Wang <sxauwsk@163.com>
-Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+Signed-off-by: Vadim Lomovtsev <vlomovtsev@marvell.com>
 ---
- drivers/i2c/busses/i2c-cadence.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h        |  2 ++
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 13 ++++++++++---
+ 2 files changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index b13605718291..595b0d56ff1a 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -548,10 +548,6 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
- 	cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
- 			  CDNS_I2C_IDR_OFFSET);
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 227343625e83..86cda3f4b37b 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -329,6 +329,8 @@ struct nicvf {
+ 	spinlock_t              rx_mode_wq_lock;
+ 	/* workqueue for handling kernel ndo_set_rx_mode() calls */
+ 	struct workqueue_struct *nicvf_rx_mode_wq;
++	/* mutex to protect VF's mailbox contents from concurrent access */
++	struct mutex            rx_mode_mtx;
  
--	/* If it is bus arbitration error, try again */
--	if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
--		return -EAGAIN;
--
- 	return 0;
+ 	/* PTP timestamp */
+ 	struct cavium_ptp	*ptp_clock;
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+index 30c7f54b4f17..a05e2989ec76 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
+@@ -124,6 +124,9 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
+ {
+ 	int timeout = NIC_MBOX_MSG_TIMEOUT;
+ 	int sleep = 10;
++	int ret = 0;
++
++	mutex_lock(&nic->rx_mode_mtx);
+ 
+ 	nic->pf_acked = false;
+ 	nic->pf_nacked = false;
+@@ -136,7 +139,8 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
+ 			netdev_err(nic->netdev,
+ 				   "PF NACK to mbox msg 0x%02x from VF%d\n",
+ 				   (mbx->msg.msg & 0xFF), nic->vf_id);
+-			return -EINVAL;
++			ret = -EINVAL;
++			break;
+ 		}
+ 		msleep(sleep);
+ 		if (nic->pf_acked)
+@@ -146,10 +150,12 @@ int nicvf_send_msg_to_pf(struct nicvf *nic, union nic_mbx *mbx)
+ 			netdev_err(nic->netdev,
+ 				   "PF didn't ACK to mbox msg 0x%02x from VF%d\n",
+ 				   (mbx->msg.msg & 0xFF), nic->vf_id);
+-			return -EBUSY;
++			ret = -EBUSY;
++			break;
+ 		}
+ 	}
+-	return 0;
++	mutex_unlock(&nic->rx_mode_mtx);
++	return ret;
  }
  
-@@ -624,6 +620,12 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
- 		if (id->err_status) {
- 			cdns_i2c_master_reset(adap);
+ /* Checks if VF is able to comminicate with PF
+@@ -2211,6 +2217,7 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 							nic->vf_id);
+ 	INIT_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
+ 	spin_lock_init(&nic->rx_mode_wq_lock);
++	mutex_init(&nic->rx_mode_mtx);
  
-+			/* If it is bus arbitration error, try again */
-+			if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
-+				ret = -EAGAIN;
-+				goto out;
-+			}
-+
- 			if (id->err_status & CDNS_I2C_IXR_NACK) {
- 				ret = -ENXIO;
- 				goto out;
+ 	err = register_netdev(netdev);
+ 	if (err) {
 -- 
-2.19.2
-
-
+2.17.2
 
 _______________________________________________
 linux-arm-kernel mailing list
