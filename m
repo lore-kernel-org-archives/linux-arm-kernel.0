@@ -2,78 +2,80 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E7855C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:40:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB1CBC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:43:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A83482177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:40:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99A9C21848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:43:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fvT3c7sR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A83482177E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rjl3fnHe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="tA43GiiS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99A9C21848
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Subject:References:
-	In-Reply-To:Message-ID:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ks5SkJfwzEcrgm0+E130ZK9uV0r/jojeG2CogmvvPWE=; b=fvT3c7sRusCEqg
-	pgLFOh8/YSnpe5aRuSeBcCl9loyU1YxzsH4/llwVQ8eoYE190Enetb8Bh/hISSLF7wDy1JdCOskrq
-	5zVC6+h2TRgDzOfIEuMKXrwkqLbqGwut4y1f+uizko2Ww0skBeYJ6+xYG5X3DALv6YSvQ7P1zVwWU
-	lgcSLtXGcoJeKGEG+cbe5N4D0EnfIAo/UmiMsI8slQ8bHXRqWeGwsdRquQDbv8X6NpnKJ+KMvNLfa
-	IDnfF1txMX/iIbcogSSFhkO3oPJQW61Dz//lqdzomRK0o05zQeFuhtPeq+lfHntvsVtYz6FTS6a4Y
-	o5T20bwPmajfId+RnBjQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:From:Subject:Mime-Version:Message-Id
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=acUmXAY+cRSInv+nIFCaF5GbQbmP98G6Zfc2sdrthKQ=; b=rjl3fnHe/LGy0p
+	E51xyZb7zEFWoc71Af6667mzjkFldBx7atdAzu4oMDMQZb4t5xqh4Kr20ow/fErm35ZumUCsSRy0X
+	UinzauuHfAa6YruG27B1ME+1KBox0h2OelKjubHXiJxMYRZsESNPhCKjETotp/qq33twC7K0FOVwz
+	y9f4lVCBbfEtmgtOoGEBVzaGjTvyyjlyTUuIAtzKmC/Cx0sUUPCfFRgCNSmHAv39Px2a5D5beAnyH
+	Wt6fzGIcFU8Mi6KUWyfSN5ScwhLGm55Ey0tq/ntT8GKRCsxVoipFAC4hITlf7RZkcjELIHHhDzHcy
+	wZa/fmMB73EfykcfZUiA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvqeB-0006Mt-Du; Mon, 18 Feb 2019 21:40:19 +0000
-Received: from mout.kundenserver.de ([217.72.192.75])
+	id 1gvqh7-0007Vt-HA; Mon, 18 Feb 2019 21:43:21 +0000
+Received: from mail-yb1-xb4a.google.com ([2607:f8b0:4864:20::b4a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvqe8-0006LX-0V; Mon, 18 Feb 2019 21:40:18 +0000
-Received: from oxbaltgw06.schlund.de ([172.19.246.12]) by
- mrelayeu.kundenserver.de (mreue106 [213.165.67.113]) with ESMTPSA (Nemesis)
- id 1MPoTl-1ghuQL42l9-00Mx23; Mon, 18 Feb 2019 22:40:10 +0100
-Date: Mon, 18 Feb 2019 22:40:09 +0100 (CET)
-From: Stefan Wahren <stefan.wahren@i2se.com>
-To: David Summers <beagleboard@davidjohnsummers.uk>, heiko@sntech.de,
- robh+dt@kernel.org, mark.rutland@arm.com
-Message-ID: <2132367523.587775.1550526009519@email.ionos.de>
-In-Reply-To: <d5b6ffaf-cf7a-22af-f2fc-c085897ef95f@davidjohnsummers.uk>
-References: <20190217121513.22965-1-beagleboard@davidjohnsummers.uk>
- <20190217121513.22965-4-beagleboard@davidjohnsummers.uk>
- <2003821439.343814.1550437552156@email.ionos.de>
- <d5b6ffaf-cf7a-22af-f2fc-c085897ef95f@davidjohnsummers.uk>
-Subject: Re: [PATCH 3/3] ARM: dts: rk3288 Tinker Board (S) add bluetooth
-MIME-Version: 1.0
-X-Priority: 3
-Importance: Medium
-X-Mailer: Open-Xchange Mailer v7.8.4-Rev47
-X-Originating-Client: open-xchange-appsuite
-X-Provags-ID: V03:K1:f5h8Ym19bitzcERUIzspFW2xIoI06SyjlISYSzNyuElpPw9s/yg
- NfVCLp0K5wFbCYDu32VnCAQ5LYqDYU+xgGMbici7VVAkIVHn6Y6qvUjnwARsEtMSN706Ec1
- LP5WgjMCG1JAxXN4p0dZttCucuPqLXV7w0TFUufgPLb/nIokE1DqZjBajivcLwHeT9TX/Im
- vcILd1Zz+Fv5wE9jyY+3A==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:LvwPnkPfUAE=:xqfdixVntCszdSIzm4IqpI
- ywDtLA2sh7ZNo+QESbLdKhmR3NllAwfizFQMccCCX+ExaRoTi3FpCC9wfpyIyP06pJJNgXH/t
- hX9kpp655ldpFVKKUuGMjkjIvkLPei8dCUKBa3pacaRrg/mFbFiFZc6sYkOUxVOjOe3Mtru9E
- jlRIB8d0FRT90PQaRQSi64JeTirF+MGsWfn9DITz5tlLkSD9UTVWqMUP/0sQjuDa4dO5R5hH0
- 9qhT4MndgotizLSnwuY7PmdNxo/Mspw0WRSEpm6+/7e3O6ApdFrau+A4S00C4ZoY8onoJNNX/
- WsRDrKtC7rAG3R8F+fqbXk1XwTz/UjmW4DYl618SjtkB/UOKgKTeuYV+Rz2pUw+cJBirxXaD2
- O1GchDA7OrERrBk8BEYgVr2C8IJEpvuYIP085oRvmhpiaUMpuuGPEFBnrkrQjNDK0pKW3/K/k
- hbsVi2G5xYRIGmUCzmSWG85WficU6zi7qoPtdtVQgxtNrR1iG64oFeAnhfB3RqYGNPAasfhAs
- r9x8o++Hef7xaQH3zPNbNO7zzaoB6sOM13+9Jpvi6BNPJZyicA1b6b8/eqxmaX+fuPSTHz2Au
- c+X5GG4KuHmgqrGmtwlQXHwlXIfaHCycspyQWAI/iHjAJaS7Px6IjrqeGAgonsDtcjQ/jX7DN
- ENACvfuynstZ0M7AO/yKOb2mFsb14SKGCktLK5EqGig+wjSuQjrMtigZzwL0j6it4gO1uqgAf
- 9pgvhSc23PUk0cFcOFnNgQkPnvX0Iik9Rv936X18w2NHRE950B293eCXEvE=
+ id 1gvqh4-0007U7-6r
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 21:43:19 +0000
+Received: by mail-yb1-xb4a.google.com with SMTP id t128so11938387ybf.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 13:43:17 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=date:message-id:mime-version:subject:from:to:cc;
+ bh=nczg+7QUtes2Fh3C29CPunHu3OPe6LiRWzK630XjV4w=;
+ b=tA43GiiSLoJGWxf2igP3CH2mgYlDyKliVemoFw5JVnpvlNYCKg3RdeT7ytpL74DuEG
+ GiXHe3kuSFhEeVcRVbpoixWPO7GcDWmD65EZLNyIZkjD7TnOCTUFSL2Mp78Ss5nh5tLk
+ W7BpoALQ4YESMpoG5WvyI3J3Rk7pDDlSNutM8Ol1iAtG8XF146LBaKxSld5MRUwIFbcm
+ BBCjD91Q09bgWQx60dGwoP1iy4NY0jEXQfpSj5bCgJHnmdCDe7po9xlTTRw4EL2MZLD8
+ t5nL/DfUIBY6IExgHOb9UgDUKL/eJVpan3hjx6cVESa5CMM2/I7VQpzz51b3ORAzKe/C
+ Ey2w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:message-id:mime-version:subject:from:to:cc;
+ bh=nczg+7QUtes2Fh3C29CPunHu3OPe6LiRWzK630XjV4w=;
+ b=Fa7nUwGGcggZLA63PjlUSG3wHTkJDqRWXCVMFQukxxvdOnJD6mH/ah/S9k0aphFgfY
+ PoV0UH89FW10ru1u/pz1k6cZiE/cCEEFAgJlusLw5e38lKKfxpoR9ZVaCTCSsry5JQ4I
+ xwILeTzqWJgXjmy/BFhChowOsvnULRL3i8gUzo1osB1VjRVFiGDJsu6x3Rs1eKdkACAp
+ 1m6gJ9OmWejtkJ7RRqlrCL2FY3fhfmseVDtNzyKlHZ+a3kLeOLULLobS0NI2nRKQu74x
+ jVJWwC5loXbgJHtLsvsQb0UclvOOqyloSEwyOwBivQQS+W3K1mQhCEoYAlLzmNa3l7o1
+ Y75w==
+X-Gm-Message-State: AHQUAubVaMc0CtI8ciN4dQeHj5KE/VVtgf5o19nMMqpBQ+V1yC7qIYkB
+ ky+Zirv9o3eAG+XaeBnuLJfc3HDNag==
+X-Google-Smtp-Source: AHgI3IbA7cgyVHRbhKFdKSJfO5KKFkvEQERB0U2tMu97Jn4k3vnlX28TAaUiou6zNuly4Ulh0x5EqqZAUg==
+X-Received: by 2002:a25:2acd:: with SMTP id q196mr11133435ybq.57.1550526196177; 
+ Mon, 18 Feb 2019 13:43:16 -0800 (PST)
+Date: Mon, 18 Feb 2019 22:43:09 +0100
+Message-Id: <20190218214309.29985-1-jannh@google.com>
+Mime-Version: 1.0
+X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
+Subject: [PATCH] firmware: xilinx: fix debugfs write handler
+From: Jann Horn <jannh@google.com>
+To: Michal Simek <michal.simek@xilinx.com>, jannh@google.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_134016_357077_0085B6AC 
-X-CRM114-Status: GOOD (  20.09  )
+X-CRM114-CacheID: sfid-20190218_134318_279762_290BEF94 
+X-CRM114-Status: GOOD (  13.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,63 +87,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-rockchip@lists.infradead.org, Marcel Holtmann <marcel@holtmann.org>,
- linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Jolly Shah <jollys@xilinx.com>, Rajan Vaja <rajanv@xilinx.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgRGF2aWQsCgo+IERhdmlkIFN1bW1lcnMgPGJlYWdsZWJvYXJkQGRhdmlkam9obnN1bW1lcnMu
-dWs+IGhhdCBhbSAxOC4gRmVicnVhciAyMDE5IHVtIDIxOjQ3IGdlc2NocmllYmVuOgo+IAo+IAo+
-IE9uIDE3LzAyLzIwMTkgMjE6MDUsIFN0ZWZhbiBXYWhyZW4gd3JvdGU6Cj4gPiBIaSBEYXZpZCwK
-PiA+Cj4gPj4gRGF2aWQgU3VtbWVycyA8YmVhZ2xlYm9hcmRAZGF2aWRqb2huc3VtbWVycy51az4g
-aGF0IGFtIDE3LiBGZWJydWFyIDIwMTkgdW0gMTM6MTUgZ2VzY2hyaWViZW46Cj4gPj4KPiA+PiAr
-KysgYi9hcmNoL2FybS9ib290L2R0cy9yazMyODgtdGlua2VyLmR0c2kKPiA+PiBAQCAtNDgxLDYg
-KzQ4MSwxNyBAQAo+ID4+ICAgCj4gPj4gICAmdWFydDAgewo+ID4+ICAgCXN0YXR1cyA9ICJva2F5
-IjsKPiA+PiArCXBpbmN0cmwtbmFtZXMgPSAiZGVmYXVsdCI7Cj4gPj4gKwlwaW5jdHJsLTAgPSA8
-JnVhcnQwX3hmZXI+LCA8JnVhcnQwX2N0cz4sIDwmdWFydDBfcnRzPjsKPiA+PiArCj4gPj4gKwli
-bHVldG9vdGggewo+ID4+ICsJCWNsb2NrcyA9IDwmcms4MDggUks4MDhfQ0xLT1VUMT47Cj4gPiBB
-cyB3ZSBhbHJlYWR5IGxpbmtlZCB0aGUgUks4MDggY2xvY2sgaW4gdGhlIHNkaW8gcHdyc2VxLCB3
-ZSBzaG91bGRuJ3QgZG8gdGhpcyBoZXJlIGFnYWluLgo+ID4KPiA+PiArCQlyZXNldC1ncGlvcyA9
-IDwmZ3BpbzQgUktfUEQ1IEdQSU9fQUNUSVZFX0xPVz47Cj4gPiByZXNldC1ncGlvcyBpc24ndCBj
-b21wYXRpYmxlIHRvIGhjaV9oNSwgcGxlYXNlIHVzZSBteSBwcmVsaW1pbmFyeSBkdC1iaW5kaW5n
-Cj4gPgo+ID4+ICsJCWRldmljZS13YWtlLWdwaW9zID0gPCZncGlvNCBSS19QRDIgR1BJT19BQ1RJ
-VkVfSElHSD47Cj4gPj4gKwkJaG9zdC13YWtlLWdwaW9zID0gPCZncGlvNCBSS19QRDcgR1BJT19B
-Q1RJVkVfSElHSD47Cj4gPiBBRkFJSyBoY2lfaDUgZG9lc24ndCBzdXBwb3J0IGhvc3Qtd2FrZSB5
-ZXQuIFNvIGlmIHlvdSB3YW50IHRvIGtlZXAgZm9yIHRoZSBmdXR1cmUgd2Ugc2hvdWxkIG1ha2Ug
-YSBjb21tZW50Lgo+ID4KPiA+PiArCQl2Y2MtMTgtc3VwcGx5ID0gPCZ2Y2NfMTg+Owo+ID4+ICsJ
-CXZjYy1pby1zdXBwbHkgPSA8JnZjY19pbz47Cj4gPiBQbGVhc2UgZHJvcCB0aGVzZSBhcyB0aGUg
-ZHJpdmVyIGRvZXNuJ3QgdXNlIGl0IGFuZCBpdCdzIGFscmVhZHkgbGlua2VkIGluIHRoZSBzZGlv
-IHB3cnNlcS4KPiA+Cj4gPiBUaGFua3MgU3RlZmFuCj4gPgo+ID4+ICsJfTsKPiA+IFsxXSAtIGh0
-dHBzOi8vZ2lzdC5naXRodWIuY29tL2xhdGVnb29kYnllLzc5YmFjOTlkNGYxMTU4YTcxOWE0OGVh
-M2M0NWViN2YxI2ZpbGUtMDAwMi1kdC1iaW5kaW5ncy1hZGQtc3VwcG9ydC1mb3ItcmVhbHRlay1i
-bHVldG9vdGgtc2VyaWFsLXBhdGNoCj4gCj4gU29ycnkgSSBkaXNhZ3JlZSBoZXJlLgo+IAo+IExh
-c3QgdGltZSBJIHBvc3RlZCBhbiBleGFtcGxlIHBhdGNoIGxpa2UgdGhpcyByb2JoIHNhaWQgY2xl
-YXJseSB0aGF0IAo+IHRoZXNlIHNob3VsZCBnaXZlIGNsb2NrcywgcG93ZXIsIGV0YzoKPiAKPiBo
-dHRwczovL3d3dy5zcGluaWNzLm5ldC9saXN0cy9saW51eC1ibHVldG9vdGgvbXNnNzg1NDUuaHRt
-bAo+IGh0dHBzOi8vd3d3LnNwaW5pY3MubmV0L2xpc3RzL2xpbnV4LWJsdWV0b290aC9tc2c3ODU4
-NS5odG1sIAo+IDxodHRwczovL3d3dy5zcGluaWNzLm5ldC9saXN0cy9saW51eC1ibHVldG9vdGgv
-bXNnNzg1ODUuaHRtbD4KPiAKPiBhbmQgYXMgaGUgaXMgbWFpbnRhaW5lciBoZSB3aW5zLgo+IAo+
-IEkgY2FuIHVuZGVyc3RhbmQgUm9icyBwb3NpdGlvbiwgZGV2aWNlIHRyZWUgYXJlIGZvciBkZXNj
-cmliaW5nIGhhcmR3YXJlLCAKPiB0aGV5IGFyZW4ndCBwcmltYXJpbHkgZm9yIGhlbHBpbmcgY29k
-ZSB0byBsb2FkLiBZZXMgdGhhdCBpcyBhIHNlY29uZCAKPiBlZmZlY3QsIGl0cyBzbyBpdCBrbm93
-cyB3aGF0IGlzIGluwqAgdGhlIGhhcmR3YXJlLiBJbiB0aGlzIGNhc2Ugd2hhdCBpZiAKPiBzb21l
-b25lIHdhbnRlZCBCbHVldG9vdGgsIGJ1dCBub3QgV2lGaSAtIHRoZW4gdGhlIEJsdWV0b290aCBz
-aG91bGQga25vdyAKPiB3aGF0IHBvd2VyIGFuZCBjbG9ja3MgYXJlIG5lZWRlZC4gTm93IHRoYXQg
-dGhlIGRyaXZlciBkb2Vzbid0IHVuZGVyc3RhbmQgCj4gdGhlc2UgdGhpbmdzIGlzIHNlY29uZGFy
-eS4gTWF5YmUgdGhhdCB3aWxsIGJlIGN1cmVkIGluIGZ1dHVyZT8KPgoKeW91IG5lZWQgdG8gY29u
-c2lkZXIgdG8gY29udGV4dCBvZiB0aGUgZGlzY3Vzc2lvbi4gVGhlIGxpbmsgcG9pbnRlZCB0byBh
-IGRpc2N1c3Npb24gYWJvdXQgdGhlIGR0LWJpbmRpbmcuIEEgYmluZGluZyBzaG91bGQgZGVzY3Jp
-YmUgYWxsIHBhcnRzIChldmVuIG9wdGlvbmFsKSBvZiB0aGUgaGFyZHdhcmUgYW5kIHRoYXQgaXMg
-dGhlIHJlYXNvbiB3aHkgaSBleHBsYWluZWQgaW4gQXJjaCBib2FyZCB0aGF0IHdlIG5lZWQgMyBw
-YXJ0cyBmb3IgYmx1ZXRvb3RoIChkdC1iaW5kaW5nLCBkcml2ZXIgY2hhbmdlIGFuZCBmaW5hbGx5
-IHRoZSBkdHMgY2hhbmdlKS4gU2luY2UgeW91IGF2b2lkIHRoYXQgYW5kIHNlbmQgb25seSB0aGUg
-bGFzdCBwYXJ0IHdpdGhvdXQgY29tcGF0aWJsZXMgY2F1c2VzIGNvbmZ1c2lvbi4KCldlIHVzdWFs
-bHkgZG9uJ3QgY2hhbmdlIERUUyBwcm9wZXJ0aWVzIGJlY2F1c2UgaXQncyBjb25zaWRlcmVkIGFz
-IGFuIEFCSSwgd2hpY2ggbWVhbnMgd2Ugc2hvdWxkIGRvIGl0IHByb3Blcmx5IGluIHRoZSBmaXJz
-dCBydW4uIFNvIGxldHMgbWFrZSB0aGUgc3RlcCBvbmUgKHRlc3QgYmx1ZXRvb3RoKSBhbmQgbm90
-IHN0ZXAgZm91ciAuLi4KClJlZ2FyZHMKU3RlZmFuCgpfX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51
-eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5v
-cmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+ - Userspace wants to write a string with `len` bytes, not counting the
+   terminating NULL, so we should allocate `len+1` bytes. It looks like the
+   current code relied on having a nullbyte directly behind `kern_buff`,
+   which happens to work reliably as long as `len` isn't one of the kmalloc
+   size classes.
+ - strncpy_from_user() is completely wrong here; userspace is giving us a
+   (not necessarily null-terminated) buffer and its length.
+   strncpy_from_user() is for cases in which we don't know the length.
+ - Don't let broken userspace allocate arbitrarily big kmalloc allocations.
+
+Just use memdup_user_nul(), which is designed precisely for things like
+this.
+
+Signed-off-by: Jann Horn <jannh@google.com>
+---
+WARNING: completely untested patch
+
+drivers/firmware/xilinx/zynqmp-debug.c | 15 ++++-----------
+ 1 file changed, 4 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/firmware/xilinx/zynqmp-debug.c b/drivers/firmware/xilinx/zynqmp-debug.c
+index 2771df6df379..90b66cdbfd58 100644
+--- a/drivers/firmware/xilinx/zynqmp-debug.c
++++ b/drivers/firmware/xilinx/zynqmp-debug.c
+@@ -163,21 +163,14 @@ static ssize_t zynqmp_pm_debugfs_api_write(struct file *file,
+ 
+ 	strcpy(debugfs_buf, "");
+ 
+-	if (*off != 0 || len == 0)
++	if (*off != 0 || len <= 1 || len > PAGE_SIZE - 1)
+ 		return -EINVAL;
+ 
+-	kern_buff = kzalloc(len, GFP_KERNEL);
+-	if (!kern_buff)
+-		return -ENOMEM;
+-
++	kern_buff = memdup_user_nul(ptr, len);
++	if (IS_ERR(kern_buff))
++		return PTR_ERR(kern_buff);
+ 	tmp_buff = kern_buff;
+ 
+-	ret = strncpy_from_user(kern_buff, ptr, len);
+-	if (ret < 0) {
+-		ret = -EFAULT;
+-		goto err;
+-	}
+-
+ 	/* Read the API name from a user request */
+ 	pm_api_req = strsep(&kern_buff, " ");
+ 
+-- 
+2.21.0.rc0.258.g878e2cd30e-goog
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
