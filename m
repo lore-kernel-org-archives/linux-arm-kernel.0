@@ -3,69 +3,74 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A6EA3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:07:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 08879C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:18:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BFBB206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:07:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CE35C218B0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:18:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aVfFkTEg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BFBB206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FDhVK9oU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE35C218B0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=grRotkcUy71IsbiiAmp/Ubvl2Bqf236nGCkQRlViu7c=; b=aVfFkTEgZTxitj
-	eZgHB0tx16Vxf24GQuowoLIHDR4DQr721QTGPA9MUb9n8dg8SBHtjG0oRWfyYW8Ysw4XCOJeFC6BD
-	Hp0j4GuRvxyo4bDI7pvmYFc4uUHj3hfLo5YJ/uEV1MOg1xe8io4wNGU+FuLYXg2rT9/FD9GaaJpzA
-	4Bt4vfraE3i3FqtgNK1S3fyQU8hgpyRkfh1hBChVdh/Ww8CHWuPXwtAK4nW6djMK+SJc7KK59NxyF
-	qahCRBSzjJudrcjrl6Qk+nhQIXbIs8KynEXNzI7/zGA/5duK+Lq8n16BzpTul0cuOqIJlgiPNMgh4
-	8qzhCpoywsc/ndbaBR6A==;
+	List-Owner; bh=tnUNyjgXvYuqOcwpM4CrmqtmXcyFk1z8f8hqpptd6VI=; b=FDhVK9oUdGvxrk
+	jRZc4PsqED/ptBvmv1rxL07mbgJBDHAhaSAvxnrlXMqp+0vpfcKEsWhoQwPxAxhdK9Vk4uMRB/NB0
+	mIaWbexw5E/zK1kVNAVDV50liQUMg8BKERd6fBn1iT/jVWZVyl+mu4KMKvovZlQtOE6NjyVXcRqfz
+	hjYZdCi6uVt0dawxQvBU4TaFqXpYeFavLlpOxwHHPVYfW77xR3dwN4A7iSYQ5m3CE/dJlj0OARxst
+	uIfcXA0MmEsf15RUXCDa+gNcSMf5PyYiPeBXutwJ5qIr1gZvhJoUWFLJr1J86yp5733FBMNWQCucr
+	dcyfO5dMkCxlEsvkDBKg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvetq-0007ph-1o; Mon, 18 Feb 2019 09:07:42 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvetm-0007p9-DS
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:07:39 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 73AADA78;
- Mon, 18 Feb 2019 01:07:37 -0800 (PST)
-Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 17C5E3F589;
- Mon, 18 Feb 2019 01:07:35 -0800 (PST)
-Date: Mon, 18 Feb 2019 09:07:31 +0000
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Dave Martin <Dave.Martin@arm.com>, Andre Przywara <andre.przywara@arm.com>
-Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
- firmware workaround state
-Message-ID: <20190218090731.3d313d81@why.wild-wind.fr.eu.org>
-In-Reply-To: <20190215172558.GO3567@e103592.cambridge.arm.com>
-References: <20190107120537.184252-1-andre.przywara@arm.com>
- <20190107120537.184252-2-andre.przywara@arm.com>
- <20190122151714.GG3578@e103592.cambridge.arm.com>
- <20190125144657.3db91c91@donnerap.cambridge.arm.com>
- <20190129213223.GB3567@e103592.cambridge.arm.com>
- <20190130113900.10089070@donnerap.cambridge.arm.com>
- <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
- <864l95s2fw.wl-marc.zyngier@arm.com>
- <20190215172558.GO3567@e103592.cambridge.arm.com>
-Organization: ARM Ltd
-X-Mailer: Claws Mail 3.14.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
+	id 1gvf4N-0002d8-RA; Mon, 18 Feb 2019 09:18:35 +0000
+Received: from mail-qt1-f195.google.com ([209.85.160.195])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvf4K-0002ck-2H
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:18:33 +0000
+Received: by mail-qt1-f195.google.com with SMTP id v10so18402041qtp.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 01:18:31 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=2c6geFCKX+YzsXq6SlYnnZvqPcfkuNDgdgXGbErWd9Q=;
+ b=mxv7N5CYIyiYBebPGYhZFIFFhiWOpXuhK/i42XrGhSjeY5h518ufP9Km4Es+Gjs//x
+ vRwhQw315NV6YodWlwd3r6VrwS9i2/We6G733FduOIWLMiwxz+DER3LaDRQozG2pN9Y5
+ RtS6AwwaAe/wmYS2NdeOwCYWaAJlYUPzkO/UoTy4Kaa07UxVlrRjaFVJxID8gwbjla5f
+ xpOqRaHWetvur9e758Bvq+JZ2tqloLQ6zAMp2st3Q1oWcZcLIN4Es3ySR/JD2LUbvpjT
+ ePaB/HOKhjpdxZWjUoAGRr1/DVo2xYTRdsw2/EYba3Rgu3epLxiTT0vs53/H5Ubrpf7+
+ XPDg==
+X-Gm-Message-State: AHQUAuaN6kKebyNUPiDnn5cG8ipSU7VxREPxZCAnnt3q/kFNHwEHxLXf
+ k+V2vP0hQJGHKyKDceJEhNbK+h/yq5RLgKxSvOs=
+X-Google-Smtp-Source: AHgI3IaacCv+bdgkEzYs/kvGAG8Gwl+McqUCDpdFY+CKTC0yBHgWXfZ+wGxf0Xfo7G4DeSZRgLMnxUTG5UcZ+0g6Yng=
+X-Received: by 2002:ac8:33f1:: with SMTP id d46mr17216321qtb.319.1550481510433; 
+ Mon, 18 Feb 2019 01:18:30 -0800 (PST)
 MIME-Version: 1.0
+References: <20190203214205.13594-1-linus.walleij@linaro.org>
+ <20190203214205.13594-5-linus.walleij@linaro.org>
+ <ffc97649-bfc2-e411-149f-cd5ed9e8c77e@arm.com>
+ <CACRpkdZK7OU9rb-qw9tTjJLNvfQG-VmN_VBXUz9DPqVV11zuww@mail.gmail.com>
+ <20190211221156.10036ad8@why.wild-wind.fr.eu.org>
+In-Reply-To: <20190211221156.10036ad8@why.wild-wind.fr.eu.org>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 18 Feb 2019 10:18:14 +0100
+Message-ID: <CAK8P3a0L0AsuqdiZ+RTWpV8EnO5xsVVkbmzJit4yi23nR0jrvw@mail.gmail.com>
+Subject: Re: [PATCH 04/17 v1] irqchip: Add driver for IXP4xx
+To: Marc Zyngier <marc.zyngier@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_010738_466712_8AC4AC25 
-X-CRM114-Status: GOOD (  28.32  )
+X-CRM114-CacheID: sfid-20190218_011832_101813_116DAF65 
+X-CRM114-Status: GOOD (  20.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,95 +82,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu,
- kvm@vger.kernel.org
+Cc: Jason Cooper <jason@lakedaemon.net>,
+ Linus Walleij <linus.walleij@linaro.org>, Krzysztof Halasa <khalasa@piap.pl>,
+ Olof Johansson <olof@lixom.net>, Thomas Gleixner <tglx@linutronix.de>,
+ Imre Kaloz <kaloz@openwrt.org>, Tim Harvey <tharvey@gateworks.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 15 Feb 2019 17:26:02 +0000
-Dave Martin <Dave.Martin@arm.com> wrote:
+On Mon, Feb 11, 2019 at 11:12 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> On Mon, 11 Feb 2019 21:58:41 +0100
+> Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+> > On Mon, Feb 11, 2019 at 4:30 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
+>
+> [...]
+>
+> > > How about using something that enforces the endianness of the accesses,
+> > > as I suspect the bus is hardcoded to BE?
+> >
+> > So, IIUC (Krzysztof can confirm) IXP4xx works like this that when the
+> > CPU is brought up in LE mode, all bytes on the address bus are
+> > swizzled so that the access can always use the CPU native
+> > endianness.
+> >
+> > Isn't it crazy :D
+>
+> It's spelled BE32! ;-) I vaguely remember doing some of that on vulcan,
+> but that's a decade ago, and I've paged it out... ;-)
+>
+> > This means __raw_writel() will always do the right thing, because
+> > that uses native endianness, and that is why it is used quite a lot
+> > in IXP4xx drivers.
+>
+> OK, it now makes some sense. Maybe a comment somewhere will help if
+> someone tries to reverse engineer it again in the next decade!
 
-> On Fri, Feb 15, 2019 at 11:42:27AM +0000, Marc Zyngier wrote:
-> > On Fri, 15 Feb 2019 09:58:57 +0000,
-> > Andre Przywara <andre.przywara@arm.com> wrote:  
-> > > 
-> > > On Wed, 30 Jan 2019 11:39:00 +0000
-> > > Andre Przywara <andre.przywara@arm.com> wrote:
-> > > 
-> > > Peter, Marc, Christoffer,
-> > > 
-> > > can we have an opinion on whether it's useful to introduce some
-> > > common scheme for firmware workaround system registers (parts of
-> > > KVM_REG_ARM_FW_REG(x)), which would allow checking them for
-> > > compatibility between two kernels without specifically knowing about
-> > > them?
-> > > Dave suggested to introduce some kind of signed encoding in the 4
-> > > LSBs for all those registers (including future ones), where 0 means
-> > > UNKNOWN and greater values are better. So without knowing about the
-> > > particular register, one could judge whether it's safe to migrate.
-> > > I am just not sure how useful this is, given that QEMU seems to ask
-> > > the receiving kernel about any sysreg, and doesn't particularly care
-> > > about the meaning of those registers. And I am not sure we really
-> > > want to introduce some kind of forward looking scheme in the kernel
-> > > here, short of a working crystal ball. I think the kernel policy was
-> > > always to be as strict as possible about those things.  
-> > 
-> > I honestly don't understand how userspace can decide whether a given
-> > configuration is migratable or not solely based on the value of such a
-> > register. In my experience, the target system has a role to play, and
-> > is the only place where we can find out about whether migration is
-> > actually possible.  
-> 
-> Both origin and target system need to be taken into account.  I don't
-> think that's anything new.
+I think the best way forward would be to change all the
+__raw_readl()/__raw_writel() in ixp4xx specific drivers to a new
+accessor that is defined as a trivial wrapper around __raw_readl()/
+__raw_writel() but that is explicitly defined as
 
-Well, that was what I understood from Andre's question.
+- always accessing a 32-bit word in native endianess
+- only valid on ixp4xx on-chip registers (not PCI)
+- containing the required barriers (if any)
 
-> 
-> > As you said, userspace doesn't interpret the data, nor should it. It
-> > is only on the receiving end that compatibility is assessed and
-> > whether some level of compatibility can be safely ensured.
-> > 
-> > So to sum it up, I don't believe in this approach as a general way of
-> > describing the handling or errata.  
-> 
-> For context, my idea attempted to put KVM, not userspace, in charge of
-> the decision: userspace applies fixed comparison rules determined ahead
-> of time, but KVM supplies the values compared (and hence determines the
-> result).
-> 
-> My worry was that otherwise we may end up with a wild-west tangle of
-> arbitrary properties that userspace needs specific knowledge about.
+In my mental model of the I/O accessors, readl/writel are used
+for (little-endian) MMIO register accesses, while __raw_readl()/__raw_writel()
+can only be used in portable code on byte streams in memory behind
+a bus, not on registers. The way ixp4xx works fits into neither of those
+two, so we should not use them here. I also think it's a bug to
+use 8-bit or 16-bit accessors for internal registers on ixp4xx, so
+having a pair of special helpers makes it impossible to do so.
 
-And this is where our understanding differs. I do not think userspace
-has to care at all. All it has to do is to provide the saved register
-values to the target system, and let KVM accept or refuse these
-settings. I can't see what providing a set of predefined values back to
-userspace gains us.
-
-An unknown register on the target system fails the restore phase:
-that's absolutely fine, as we don't want to run on a system that
-doesn't know about the mitigation.
-
-An incompatible value fails the restore as well, as KVM itself finds
-that this is a service it cannot safely provide.
-
-No userspace involvement, no QEMU upgrade required. Only the kernel
-knows about it.
-
-> We can tolerate a few though.  If we accumulate a significant number
-> of errata/vulnerability properties that need to be reported to
-> userspace, this may be worth revisiting.  If not, it doesn't matter.
-
-Andre: if you want this to make it into 5.1, the time is now.
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
