@@ -3,21 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3688C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:10:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ECACEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:11:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7030E2070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:10:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BDF192070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:11:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WIllImXX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7030E2070D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KGgJkQ53"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDF192070D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,39 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/XrQPCpfUcNoDWw19Ttjlk39Fb8/RjT3NtVz+Yk3wP4=; b=WIllImXXPvsbMm
-	lOe72eo7vayO0kbABDFyqrvx2Ggtwy1cD+GXGJSwUWk/sBOoeBO8f6utKrdFwM5A/WwJMKXc7h7RY
-	Vzh5iTAOqo61QyY2eTglxz2Oba8B/yv4lR9bb5m9MxRSBFcJBSra9koxhglYABA0PxIEXboAG+y9F
-	KVEDZAq9/KLumGzk90OtJ7APhkwO1o8TSpSSGDOsGXYRbl2b0qQ+EwXdfx7kiuqwD3TIZYxziLcLO
-	GaA5qC/x9eGoSfQJbxj7d1CNrzv64ijM+IEbMKyeVhS3dSFsL5/67DbTYM/mdA5jYVLfVxXIG/aRs
-	+8ZOO8+JYBZKu2DRf1Jw==;
+	List-Owner; bh=SZWwYjVPoxHSz/LrJwNdr4Y1ccagdHd0kNKz470DAdw=; b=KGgJkQ53mI5w+x
+	O8FLZsRn8W/FDOdOGsMMJpirbx20lRXwzgXmRc3Q51kRUoy8nwikLx6o2zJNewjo3WT/c177FUs5E
+	ncXim8RvYFCiVsDrqQXv0A9qExC63GgIlO+aMzw/8eGELfsRnyQurc2vZLNKNDw1DbG7Z5ELALhP2
+	oNoT8X4o8LcccqNaXlcXInoISZ8+mDs9Jh1uEzkjMNkUvvv+vbgDIZj+x15XVv3cDrcmyqhX+I7pr
+	RsceR9FC3EsQTSOZfoRYYEodm57bqk01vCNK7WlbiG0oDhgRDnNEJ3Pm7VQ2K66SvuuPTY6Ft8TgW
+	05NwLuhToV3hBhSlGcJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvqB7-0000Qw-0P; Mon, 18 Feb 2019 21:10:17 +0000
-Received: from relay11.mail.gandi.net ([217.70.178.231])
+	id 1gvqBv-0001Sp-76; Mon, 18 Feb 2019 21:11:07 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvq9L-000675-P4
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 21:08:43 +0000
-Received: from localhost (lfbn-lyo-1-149-219.w86-202.abo.wanadoo.fr
- [86.202.231.219])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id 15EDA100003;
- Mon, 18 Feb 2019 21:08:11 +0000 (UTC)
-Date: Mon, 18 Feb 2019 22:08:11 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Claudiu.Beznea@microchip.com
-Subject: Re: [PATCH v2 1/3] clk: at91: sckc: add support to specify registers
- bit offsets
-Message-ID: <20190218210811.GV10129@piout.net>
-References: <1550146447-1441-1-git-send-email-claudiu.beznea@microchip.com>
- <1550146447-1441-2-git-send-email-claudiu.beznea@microchip.com>
+ id 1gvqBS-0001D6-3u
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 21:10:48 +0000
+Received: by mail-ot1-f66.google.com with SMTP id s5so30631784oth.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 13:10:37 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=vfh9VEg4/DD5W56HTE1UyJO7PeETQccNa3gxtKG5ZfU=;
+ b=MQrVMvzmsHz+i1CJJyfvs1ygwmFc8QP0hACov7iehrI4TkRdfi3bQYhq1hKkcsQswN
+ 6KDsIoIGxm7i51Irvusj0I/pmLCfk9/nTQCPEULKm7zEAQXUQC7FJbPx+jshFbvtQuuL
+ sHPhM+vDVhI8zSJhpLSs+9EXZDDcy3sw9OsjnLlpSsgNE0LW/UnKkkfS1zZfWFcbrVh+
+ qjG5/AELyXJeFl9jMNGskD1j3w/qUFPimeYLz/XdZrxgvxGqCORl2WVV+3kBxpfZAO+i
+ q+88xGx8p0HVdaGEoFX2ohfyEm9dpy83jAtFZKG56pP1Zblp7wcrO629eYFkbay13aop
+ tX+g==
+X-Gm-Message-State: AHQUAubgz176zkzJFliGBPe97ik21yv7t3YAfhjVYtTURDm+4D4OyQee
+ WgL8XCSKZtTOLmYoQh2SRQ==
+X-Google-Smtp-Source: AHgI3IaBxXUPWP1IeKYNVsruYCspdQ3LnjBv1J7NyA3zKPf1UcF887+r635FYe1HPhnH9k5lbjcAmQ==
+X-Received: by 2002:a9d:2f64:: with SMTP id h91mr15620192otb.14.1550524236851; 
+ Mon, 18 Feb 2019 13:10:36 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id d11sm4453324otp.18.2019.02.18.13.10.36
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 18 Feb 2019 13:10:36 -0800 (PST)
+Date: Mon, 18 Feb 2019 15:10:35 -0600
+From: Rob Herring <robh@kernel.org>
+To: Vasily Khoruzhick <anarsoul@gmail.com>
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
+Message-ID: <20190218211035.GA28145@bogus>
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1550146447-1441-2-git-send-email-claudiu.beznea@microchip.com>
+In-Reply-To: <20190118170232.16142-4-anarsoul@gmail.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_130828_829708_211599C8 
-X-CRM114-Status: GOOD (  22.90  )
+X-CRM114-CacheID: sfid-20190218_131038_264237_4E08277D 
+X-CRM114-Status: GOOD (  16.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,394 +86,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, sboyd@kernel.org,
- mturquette@baylibre.com, linux-kernel@vger.kernel.org,
- Ludovic.Desroches@microchip.com, robh+dt@kernel.org, linux-clk@vger.kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Marcel Holtmann <marcel@holtmann.org>, linux-bluetooth@vger.kernel.org,
+ Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On 14/02/2019 12:14:28+0000, Claudiu.Beznea@microchip.com wrote:
-> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+> Add binding document for bluetooth part of RTL8723BS/RTL8723CS
 > 
-> Different IPs uses different offsets in registers for the same
-> functionality, thus adapt the driver to support this.
-> 
-> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > ---
->  drivers/clk/at91/sckc.c | 112 +++++++++++++++++++++++++++++++++---------------
->  1 file changed, 77 insertions(+), 35 deletions(-)
+>  .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
 > 
-> diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-> index ab6ecefc49ad..b7163d3a2269 100644
-> --- a/drivers/clk/at91/sckc.c
-> +++ b/drivers/clk/at91/sckc.c
-> @@ -22,15 +22,25 @@
->  #define SLOWCK_SW_TIME_USEC	((SLOWCK_SW_CYCLES * USEC_PER_SEC) / \
->  				 SLOW_CLOCK_FREQ)
->  
-> -#define	AT91_SCKC_CR			0x00
-> -#define		AT91_SCKC_RCEN		(1 << 0)
-> -#define		AT91_SCKC_OSC32EN	(1 << 1)
-> -#define		AT91_SCKC_OSC32BYP	(1 << 2)
-> -#define		AT91_SCKC_OSCSEL	(1 << 3)
-> +#define	AT91_SCKC_CR		0x00
-> +#define		AT91_SCKC_RCEN(off)	(1 << (off)->cr_rcen)
-> +#define		AT91_SCKC_OSC32EN(off)	(1 << (off)->cr_osc32en)
-> +#define		AT91_SCKC_OSC32BYP(off)	(1 << (off)->cr_osc32byp)
-> +#define		AT91_SCKC_OSCSEL(off)	(1 << (off)->cr_oscsel)
-
-You don't need those macros if you store BIT(off) instead of off in the
-members of clk_slow_offsets.
-
+> diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> new file mode 100644
+> index 000000000000..8357f242ae4c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> @@ -0,0 +1,35 @@
+> +RTL8723BS/RTL8723CS Bluetooth
+> +---------------------
 > +
-> +#define AT91_SCKC_OFFSET_INVALID        (32)
+> +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+> +BT is connected over serial. It speaks H5 protocol with few extra commands
+> +to upload firmware and change module speed.
 > +
-
-This would also remove the need for that define as 0 would mean that the
-bit doesn't exist.
-
-> +struct clk_slow_offsets {
-> +	u8 cr_rcen;
-> +	u8 cr_osc32en;
-> +	u8 cr_osc32byp;
-> +	u8 cr_oscsel;
-> +};
->  
->  struct clk_slow_osc {
->  	struct clk_hw hw;
->  	void __iomem *sckcr;
-> +	const struct clk_slow_offsets *offsets;
->  	unsigned long startup_usec;
->  };
->  
-> @@ -39,6 +49,7 @@ struct clk_slow_osc {
->  struct clk_sama5d4_slow_osc {
->  	struct clk_hw hw;
->  	void __iomem *sckcr;
-> +	const struct clk_slow_offsets *offsets;
->  	unsigned long startup_usec;
->  	bool prepared;
->  };
-> @@ -48,6 +59,7 @@ struct clk_sama5d4_slow_osc {
->  struct clk_slow_rc_osc {
->  	struct clk_hw hw;
->  	void __iomem *sckcr;
-> +	const struct clk_slow_offsets *offsets;
->  	unsigned long frequency;
->  	unsigned long accuracy;
->  	unsigned long startup_usec;
-> @@ -58,6 +70,7 @@ struct clk_slow_rc_osc {
->  struct clk_sam9x5_slow {
->  	struct clk_hw hw;
->  	void __iomem *sckcr;
-> +	const struct clk_slow_offsets *offsets;
->  	u8 parent;
->  };
->  
-> @@ -69,10 +82,11 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
->  	void __iomem *sckcr = osc->sckcr;
->  	u32 tmp = readl(sckcr);
->  
-> -	if (tmp & (AT91_SCKC_OSC32BYP | AT91_SCKC_OSC32EN))
-> +	if (tmp & (AT91_SCKC_OSC32BYP(osc->offsets) |
-> +		   AT91_SCKC_OSC32EN(osc->offsets)))
->  		return 0;
->  
-> -	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
-> +	writel(tmp | AT91_SCKC_OSC32EN(osc->offsets), sckcr);
->  
->  	usleep_range(osc->startup_usec, osc->startup_usec + 1);
->  
-> @@ -85,10 +99,10 @@ static void clk_slow_osc_unprepare(struct clk_hw *hw)
->  	void __iomem *sckcr = osc->sckcr;
->  	u32 tmp = readl(sckcr);
->  
-> -	if (tmp & AT91_SCKC_OSC32BYP)
-> +	if (tmp & AT91_SCKC_OSC32BYP(osc->offsets))
->  		return;
->  
-> -	writel(tmp & ~AT91_SCKC_OSC32EN, sckcr);
-> +	writel(tmp & ~AT91_SCKC_OSC32EN(osc->offsets), sckcr);
->  }
->  
->  static int clk_slow_osc_is_prepared(struct clk_hw *hw)
-> @@ -97,10 +111,10 @@ static int clk_slow_osc_is_prepared(struct clk_hw *hw)
->  	void __iomem *sckcr = osc->sckcr;
->  	u32 tmp = readl(sckcr);
->  
-> -	if (tmp & AT91_SCKC_OSC32BYP)
-> +	if (tmp & AT91_SCKC_OSC32BYP(osc->offsets))
->  		return 1;
->  
-> -	return !!(tmp & AT91_SCKC_OSC32EN);
-> +	return !!(tmp & AT91_SCKC_OSC32EN(osc->offsets));
->  }
->  
->  static const struct clk_ops slow_osc_ops = {
-> @@ -114,7 +128,8 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
->  			   const char *name,
->  			   const char *parent_name,
->  			   unsigned long startup,
-> -			   bool bypass)
-> +			   bool bypass,
-> +			   const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_slow_osc *osc;
->  	struct clk_hw *hw;
-> @@ -137,9 +152,11 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
->  	osc->hw.init = &init;
->  	osc->sckcr = sckcr;
->  	osc->startup_usec = startup;
-> +	osc->offsets = offsets;
->  
->  	if (bypass)
-> -		writel((readl(sckcr) & ~AT91_SCKC_OSC32EN) | AT91_SCKC_OSC32BYP,
-> +		writel((readl(sckcr) & ~AT91_SCKC_OSC32EN(osc->offsets)) |
-> +					AT91_SCKC_OSC32BYP(osc->offsets),
->  		       sckcr);
->  
->  	hw = &osc->hw;
-> @@ -153,7 +170,8 @@ at91_clk_register_slow_osc(void __iomem *sckcr,
->  }
->  
->  static void __init
-> -of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr)
-> +of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr,
-> +				 const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_hw *hw;
->  	const char *parent_name;
-> @@ -167,7 +185,7 @@ of_at91sam9x5_clk_slow_osc_setup(struct device_node *np, void __iomem *sckcr)
->  	bypass = of_property_read_bool(np, "atmel,osc-bypass");
->  
->  	hw = at91_clk_register_slow_osc(sckcr, name, parent_name, startup,
-> -					 bypass);
-> +					bypass, offsets);
->  	if (IS_ERR(hw))
->  		return;
->  
-> @@ -195,7 +213,7 @@ static int clk_slow_rc_osc_prepare(struct clk_hw *hw)
->  	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
->  	void __iomem *sckcr = osc->sckcr;
->  
-> -	writel(readl(sckcr) | AT91_SCKC_RCEN, sckcr);
-> +	writel(readl(sckcr) | AT91_SCKC_RCEN(osc->offsets), sckcr);
->  
->  	usleep_range(osc->startup_usec, osc->startup_usec + 1);
->  
-> @@ -207,14 +225,14 @@ static void clk_slow_rc_osc_unprepare(struct clk_hw *hw)
->  	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
->  	void __iomem *sckcr = osc->sckcr;
->  
-> -	writel(readl(sckcr) & ~AT91_SCKC_RCEN, sckcr);
-> +	writel(readl(sckcr) & ~AT91_SCKC_RCEN(osc->offsets), sckcr);
->  }
->  
->  static int clk_slow_rc_osc_is_prepared(struct clk_hw *hw)
->  {
->  	struct clk_slow_rc_osc *osc = to_clk_slow_rc_osc(hw);
->  
-> -	return !!(readl(osc->sckcr) & AT91_SCKC_RCEN);
-> +	return !!(readl(osc->sckcr) & AT91_SCKC_RCEN(osc->offsets));
->  }
->  
->  static const struct clk_ops slow_rc_osc_ops = {
-> @@ -230,7 +248,8 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
->  			      const char *name,
->  			      unsigned long frequency,
->  			      unsigned long accuracy,
-> -			      unsigned long startup)
-> +			      unsigned long startup,
-> +			      const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_slow_rc_osc *osc;
->  	struct clk_hw *hw;
-> @@ -252,6 +271,7 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
->  
->  	osc->hw.init = &init;
->  	osc->sckcr = sckcr;
-> +	osc->offsets = offsets;
->  	osc->frequency = frequency;
->  	osc->accuracy = accuracy;
->  	osc->startup_usec = startup;
-> @@ -267,7 +287,8 @@ at91_clk_register_slow_rc_osc(void __iomem *sckcr,
->  }
->  
->  static void __init
-> -of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr)
-> +of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr,
-> +				    const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_hw *hw;
->  	u32 frequency = 0;
-> @@ -281,7 +302,7 @@ of_at91sam9x5_clk_slow_rc_osc_setup(struct device_node *np, void __iomem *sckcr)
->  	of_property_read_u32(np, "atmel,startup-time-usec", &startup);
->  
->  	hw = at91_clk_register_slow_rc_osc(sckcr, name, frequency, accuracy,
-> -					    startup);
-> +					   startup, offsets);
->  	if (IS_ERR(hw))
->  		return;
->  
-> @@ -299,14 +320,14 @@ static int clk_sam9x5_slow_set_parent(struct clk_hw *hw, u8 index)
->  
->  	tmp = readl(sckcr);
->  
-> -	if ((!index && !(tmp & AT91_SCKC_OSCSEL)) ||
-> -	    (index && (tmp & AT91_SCKC_OSCSEL)))
-> +	if ((!index && !(tmp & AT91_SCKC_OSCSEL(slowck->offsets))) ||
-> +	    (index && (tmp & AT91_SCKC_OSCSEL(slowck->offsets))))
->  		return 0;
->  
->  	if (index)
-> -		tmp |= AT91_SCKC_OSCSEL;
-> +		tmp |= AT91_SCKC_OSCSEL(slowck->offsets);
->  	else
-> -		tmp &= ~AT91_SCKC_OSCSEL;
-> +		tmp &= ~AT91_SCKC_OSCSEL(slowck->offsets);
->  
->  	writel(tmp, sckcr);
->  
-> @@ -319,7 +340,7 @@ static u8 clk_sam9x5_slow_get_parent(struct clk_hw *hw)
->  {
->  	struct clk_sam9x5_slow *slowck = to_clk_sam9x5_slow(hw);
->  
-> -	return !!(readl(slowck->sckcr) & AT91_SCKC_OSCSEL);
-> +	return !!(readl(slowck->sckcr) & AT91_SCKC_OSCSEL(slowck->offsets));
->  }
->  
->  static const struct clk_ops sam9x5_slow_ops = {
-> @@ -331,7 +352,8 @@ static struct clk_hw * __init
->  at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->  			      const char *name,
->  			      const char **parent_names,
-> -			      int num_parents)
-> +			      int num_parents,
-> +			      const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_sam9x5_slow *slowck;
->  	struct clk_hw *hw;
-> @@ -353,7 +375,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->  
->  	slowck->hw.init = &init;
->  	slowck->sckcr = sckcr;
-> -	slowck->parent = !!(readl(sckcr) & AT91_SCKC_OSCSEL);
-> +	slowck->offsets = offsets;
-> +	slowck->parent = !!(readl(sckcr) & AT91_SCKC_OSCSEL(slowck->offsets));
->  
->  	hw = &slowck->hw;
->  	ret = clk_hw_register(NULL, &slowck->hw);
-> @@ -366,7 +389,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
->  }
->  
->  static void __init
-> -of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr)
-> +of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr,
-> +			     const struct clk_slow_offsets *offsets)
->  {
->  	struct clk_hw *hw;
->  	const char *parent_names[2];
-> @@ -382,7 +406,7 @@ of_at91sam9x5_clk_slow_setup(struct device_node *np, void __iomem *sckcr)
->  	of_property_read_string(np, "clock-output-names", &name);
->  
->  	hw = at91_clk_register_sam9x5_slow(sckcr, name, parent_names,
-> -					    num_parents);
-> +					   num_parents, offsets);
->  	if (IS_ERR(hw))
->  		return;
->  
-> @@ -406,10 +430,18 @@ static const struct of_device_id sckc_clk_ids[] __initconst = {
->  	{ /*sentinel*/ }
->  };
->  
-> +static const struct clk_slow_offsets at91sam9x5_offsets = {
-> +	.cr_rcen = 0,
-> +	.cr_osc32en = 1,
-> +	.cr_osc32byp = 2,
-> +	.cr_oscsel = 3,
-> +};
+> +Required properties:
 > +
->  static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
->  {
->  	struct device_node *childnp;
-> -	void (*clk_setup)(struct device_node *, void __iomem *);
-> +	void (*clk_setup)(struct device_node *np, void __iomem *io,
-> +			  const struct clk_slow_offsets *offsets);
->  	const struct of_device_id *clk_id;
->  	void __iomem *regbase = of_iomap(np, 0);
->  
-> @@ -421,7 +453,7 @@ static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
->  		if (!clk_id)
->  			continue;
->  		clk_setup = clk_id->data;
-> -		clk_setup(childnp, regbase);
-> +		clk_setup(childnp, regbase, &at91sam9x5_offsets);
->  	}
->  }
->  CLK_OF_DECLARE(at91sam9x5_clk_sckc, "atmel,at91sam9x5-sckc",
-> @@ -438,7 +470,7 @@ static int clk_sama5d4_slow_osc_prepare(struct clk_hw *hw)
->  	 * Assume that if it has already been selected (for example by the
->  	 * bootloader), enough time has aready passed.
->  	 */
-> -	if ((readl(osc->sckcr) & AT91_SCKC_OSCSEL)) {
-> +	if ((readl(osc->sckcr) & AT91_SCKC_OSCSEL(osc->offsets))) {
->  		osc->prepared = true;
->  		return 0;
->  	}
-> @@ -461,6 +493,13 @@ static const struct clk_ops sama5d4_slow_osc_ops = {
->  	.is_prepared = clk_sama5d4_slow_osc_is_prepared,
->  };
->  
-> +static const struct clk_slow_offsets at91sama5d4_offsets = {
-> +	.cr_rcen = AT91_SCKC_OFFSET_INVALID,
-> +	.cr_osc32en = AT91_SCKC_OFFSET_INVALID,
-> +	.cr_osc32byp = AT91_SCKC_OFFSET_INVALID,
-> +	.cr_oscsel = 3,
-> +};
+> + - compatible: should be one of the following:
+> +   * "realtek,rtl8723bs-bt"
+> +   * "realtek,rtl8723cs-bt"
+> +Optional properties:
 > +
+> + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+> + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+> + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+> + - firmware-postfix: firmware postfix to be used for firmware config
 
-I don't think you need to change the sama5d4 part as it is not affected
-by any change in the sam9x5 part.
+How is this used?
 
->  static void __init of_sama5d4_sckc_setup(struct device_node *np)
->  {
->  	void __iomem *regbase = of_iomap(np, 0);
-> @@ -498,9 +537,11 @@ static void __init of_sama5d4_sckc_setup(struct device_node *np)
->  	osc->hw.init = &init;
->  	osc->sckcr = regbase;
->  	osc->startup_usec = 1200000;
-> +	osc->offsets = &at91sama5d4_offsets;
->  
->  	if (bypass)
-> -		writel((readl(regbase) | AT91_SCKC_OSC32BYP), regbase);
-> +		writel((readl(regbase) | AT91_SCKC_OSC32BYP(osc->offsets)),
-> +		       regbase);
->  
->  	hw = &osc->hw;
->  	ret = clk_hw_register(NULL, &osc->hw);
-> @@ -509,7 +550,8 @@ static void __init of_sama5d4_sckc_setup(struct device_node *np)
->  		return;
->  	}
->  
-> -	hw = at91_clk_register_sam9x5_slow(regbase, "slowck", parent_names, 2);
-> +	hw = at91_clk_register_sam9x5_slow(regbase, "slowck", parent_names, 2,
-> +					   &at91sama5d4_offsets);
->  	if (IS_ERR(hw))
->  		return;
->  
-> -- 
-> 2.7.4
-> 
+Rob
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
