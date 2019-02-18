@@ -4,69 +4,68 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CDB9AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:31:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D182C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:40:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 995B72146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:31:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F867218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 22:40:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="V0O8q4F2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 995B72146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zytor.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aSEqz7tn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F867218AD
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codesourcery.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tZs0z+YOYKyK6qnPzYk63rcAXwomgPMByQuQ6E5cG2A=; b=V0O8q4F2qymdQp
-	2+Ca5o2KYSbqL0dVQhSTMZpETlO2z1wCMzRsx24MxlyYo7uL1vtYl3Dyw08QSd/bZsIfpv1cwMg5e
-	wKOvC8lPJWyRVYlyqU0ySzbZkopcaku3EwCAtVDIKBprjniRbE+k9jCNCPg2164qXOTWkxDV3CoO/
-	GtAgihUgFsFlkKCL6SAYEiCNTRRL9jtnBHvdj6ISnSAh1NOVEHWsZm0clZ6tIBiGwmPTzz2y47zJI
-	nFNUwpadWhkwSveVhB+596lrVt093Z9p626wRAJMmpuTN4VkpAAK8l2bo+nDof7hZBfMH78PB1msH
-	TT0NbI0pbFtJyeWWqUMg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=l7jWxECvHaT1KxUnLQ7cUIrRhVif3P6m4coDqXNSRIE=; b=aSEqz7tnCfneU6
+	/RRByvk1bDBwtqM8ZWr4FuPskhNQHxOFQYlqo7NrinT1M2y4DzSSFB59ZOmPouTpKm4GHZIlvihaj
+	CXoFfpy9MDVzQF7mnM6PGCbun/VPR477iSWheGijSoET+o9SCLXDZotUQa0j+PQlyz5nLNK9E3wUn
+	TVgnLPZWCzmJeBEGYAEvz5M1CD4NY226WkhTza3y1MmrWhSpX0B7umgvWYclTUwqI0DzHYB/BRViD
+	PWOyvsw1iIHIFx/SgCv9gIpoCg+TUyrbaQCi8NVM0Yix8PGKAUguFO/Vo97HFKRVsNR5UmXPDoe02
+	IO0DwQWF9fO+8MF5HR6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvrRI-0002Go-92; Mon, 18 Feb 2019 22:31:04 +0000
-Received: from terminus.zytor.com ([198.137.202.136] helo=mail.zytor.com)
+	id 1gvraf-0005mU-6E; Mon, 18 Feb 2019 22:40:45 +0000
+Received: from relay1.mentorg.com ([192.94.38.131])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvrRE-0002GO-Dr
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 22:31:01 +0000
-Received: from carbon-x1.hos.anvin.org
- ([IPv6:2601:646:8680:2bb1:1b64:2c6c:6ec3:aa41])
- (authenticated bits=0)
- by mail.zytor.com (8.15.2/8.15.2) with ESMTPSA id x1IMURDP2770168
- (version=TLSv1.3 cipher=TLS_AES_128_GCM_SHA256 bits=128 verify=NO);
- Mon, 18 Feb 2019 14:30:27 -0800
-Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
-To: Peter Zijlstra <peterz@infradead.org>
-References: <20190213140025.GB6346@brain-police>
- <20190213142524.GW32494@hirez.programming.kicks-ass.net>
- <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
- <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
- <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
- <20190213222146.GC32494@hirez.programming.kicks-ass.net>
- <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
- <20190214101429.GD32494@hirez.programming.kicks-ass.net>
- <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
-From: "H. Peter Anvin" <hpa@zytor.com>
-Message-ID: <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
-Date: Mon, 18 Feb 2019 14:30:21 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gvrab-0005lF-0F; Mon, 18 Feb 2019 22:40:42 +0000
+Received: from nat-ies.mentorg.com ([192.94.31.2]
+ helo=SVR-IES-MBX-03.mgc.mentorg.com)
+ by relay1.mentorg.com with esmtps (TLSv1.2:ECDHE-RSA-AES256-SHA384:256)
+ id 1gvraO-00041R-DK from joseph_myers@mentor.com ;
+ Mon, 18 Feb 2019 14:40:28 -0800
+Received: from digraph.polyomino.org.uk (137.202.0.90) by
+ SVR-IES-MBX-03.mgc.mentorg.com (139.181.222.3) with Microsoft SMTP Server
+ (TLS) id 15.0.1320.4; Mon, 18 Feb 2019 22:40:25 +0000
+Received: from jsm28 (helo=localhost)
+ by digraph.polyomino.org.uk with local-esmtp (Exim 4.90_1)
+ (envelope-from <joseph@codesourcery.com>)
+ id 1gvraK-0000is-Ij; Mon, 18 Feb 2019 22:40:24 +0000
+Date: Mon, 18 Feb 2019 22:40:24 +0000
+From: Joseph Myers <joseph@codesourcery.com>
+X-X-Sender: jsm28@digraph.polyomino.org.uk
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 7/8] csky: Use latest system call ABI
+In-Reply-To: <20190218210712.3503891-8-arnd@arndb.de>
+Message-ID: <alpine.DEB.2.21.1902182239510.480@digraph.polyomino.org.uk>
+References: <20190218210712.3503891-1-arnd@arndb.de>
+ <20190218210712.3503891-8-arnd@arndb.de>
+User-Agent: Alpine 2.21 (DEB 202 2017-01-01)
 MIME-Version: 1.0
-In-Reply-To: <20190216103044.GR32494@hirez.programming.kicks-ass.net>
-Content-Language: en-US
+X-Originating-IP: [137.202.0.90]
+X-ClientProxiedBy: svr-ies-mbx-01.mgc.mentorg.com (139.181.222.1) To
+ SVR-IES-MBX-03.mgc.mentorg.com (139.181.222.3)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_143100_473210_77C8FEF3 
-X-CRM114-Status: GOOD (  19.39  )
+X-CRM114-CacheID: sfid-20190218_144041_073852_99A4EE49 
+X-CRM114-Status: UNSURE (   7.97  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,71 +77,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, jpoimboe@redhat.com,
- Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
- valentin.schneider@arm.com, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Andy Lutomirski <luto@amacapital.net>,
- mingo@redhat.com, james.morse@arm.com, luto@kernel.org, brgerst@gmail.com,
- bp@alien8.de, tglx@linutronix.de, torvalds@linux-foundation.org,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: linux-arch@vger.kernel.org, uclinux-h8-devel@lists.sourceforge.jp,
+ yury.norov@gmail.com, y2038@lists.linaro.org, linux-api@vger.kernel.org,
+ Palmer Dabbelt <palmer@sifive.com>, linux-kernel@vger.kernel.org,
+ linux-riscv@lists.infradead.org, Vineet Gupta <vgupta@synopsys.com>,
+ Guo Ren <guoren@kernel.org>, Greentime Hu <green.hu@gmail.com>,
+ linux-hexagon@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ Guan Xuetao <gxt@pku.edu.cn>, Stafford Horne <shorne@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/16/19 2:30 AM, Peter Zijlstra wrote:
-> On Fri, Feb 15, 2019 at 08:06:56PM -0800, hpa@zytor.com wrote:
->> This implies we invoke schedule -- a restricted operation (consider
->> may_sleep) during execution of STAC-enabled code, but *not* as an
->> exception or interrupt, since those preserve the flags.
-> 
-> Meet preempt_enable().
+On Mon, 18 Feb 2019, Arnd Bergmann wrote:
 
-I believe this falls under "doctor, it hurts when I do that." And it hurts for
-very good reasons. See below.
+> We don't yet have an upstream glibc port for csky, so there is no user
 
->> I have serious concerns about this. This is more or less saying that
->> we have left an unlimited gap and have had AC escape.
-> 
-> Yes; by allowing normal C in between STAC and CLAC this is so.
-> 
->> Does *anyone* see a need to allow this? I got a question at LPC from
->> someone about this, and what they were trying to do once all the
->> layers had been unwound was so far down the wrong track for a root
->> problem that actually has a very simple solution.
-> 
-> Have you read the rest of the thread?
-> 
-> All it takes for this to explode is a call to a C function that has
-> tracing on it in between the user_access_begin() and user_access_end()
-> things. That is a _very_ easy thing to do.
-> 
-> Heck, GCC is allowed to generate that broken code compiling
-> lib/strnlen_user.c; it doesn't _have_ to inline do_strnlen_user (esp.
-> with CONFIG_OPTIMIZE_INLINING), and making that a function call would
-> get us fentry hooks and ftrace and *BOOM*.
-> 
-> (Now, of course, its a static function with a single caller, and GCC
-> isn't _THAT_ stupid, but it could, if it wanted to)
-> 
-> Since the bar is _that_ low for mistakes, I figure we'd better fix it.
-> 
+We do.  It's in 2.29.
 
-The question is what "fix it" means. I'm really concerned about AC escapes,
-and everyone else should be, too.
-
-For an issue specific to tracing, it would be more appropriate to do the
-appropriate things in the tracing entry/exit than in schedule. Otherwise, we
-don't want to silently paper over mistakes which could mean that we run a
-large portion of the kernel without protection we thought we had.
-
-In that sense, calling schedule() with AC set is in fact a great place to have
-a WARN() or even BUG(), because such an event really could imply that the
-kernel has been security compromised.
-
-Does that make more sense?
-
-	-hpa
+-- 
+Joseph S. Myers
+joseph@codesourcery.com
 
 _______________________________________________
 linux-arm-kernel mailing list
