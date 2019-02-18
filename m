@@ -2,60 +2,78 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 62949C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:35:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3E7E9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:36:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32F1321736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:35:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00E6221736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:36:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DqQQNGs4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32F1321736
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lkt9UDGm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="s4WIVSFW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00E6221736
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mc2Zkz3o9boUm5z7eInc5fV4Tei02+HLvv3CP6l3+D0=; b=DqQQNGs4xRTkwy
-	3d5sbJHgGN5BdO6Y7xMU7Y3skCGpmmYXMXqqWh2h6IT+bid7Loe4FeUhXUx36AK9KGAGxRuo+rWYo
-	kF464/eGZoqmQFZ81Tshk4RG8KGnc0mjIFdArWdmxgH3T5WG8o1Gfunj0vjyIQ/RuZ5QiPI8AmM9F
-	qBjE4nwgg1dEDoWmwVI+9RgkX5C9Ex8gmPiv+xl9tjQ10whZyJJYWU1YwboMH+583OPFRYD2Sl+cQ
-	mlZFdcIpOw0pSXItAg8wWbs6joUWEU6TYBZjMPKzG8HInqXwNgV8JiAcauuIDVsbtNMSyBtHwFUT8
-	rJvVzG5aUV52LuRUZ4iw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=rzRA4A07yHtaVEvtalGcuqAOKqb9mfBLaPifVopMkQ4=; b=Lkt9UDGmHct/Qa
+	9ehCIqItHtlD/VxkBkMtx1KZMHCKnEaG2eDzK+uQmGHxM+SN/4fxYGA8E651CJGPV8t63hOiV+mpY
+	FjMs3LBqrSx6ezsVMuH1Y3OGOnAAl5mNkPZ61SvUYWO7amEuNkgY3AEWzg7ll31u86KbD4TKOgTaD
+	/W3bOkxJdw+k+QEyxGggGL+SsgCnaQh5u/rxm+Hl4Y/d8smAHcoB1e5uJypTH2lExu4GUrWE710Bw
+	5QyvSQ8C+Odc2av4AKVaR0Nq7PPaWxfhKm4AV91fUPXGYCBW1Q9YNgXN7Obk9WRSTXPCtTfslMGFy
+	LaKzO2KH5VAJkmz4FytQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvk0p-00079T-Lb; Mon, 18 Feb 2019 14:35:15 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvk0m-000799-9g
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:35:13 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 6230B80E4;
- Mon, 18 Feb 2019 14:35:21 +0000 (UTC)
-Date: Mon, 18 Feb 2019 06:35:08 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Message-ID: <20190218143508.GD15711@atomide.com>
-References: <20190212074237.2875-1-lokeshvutla@ti.com>
- <20190212074237.2875-6-lokeshvutla@ti.com>
- <41a9780b-d971-2b20-1ecb-c55852292563@ti.com>
+	id 1gvk1n-0007UJ-Gk; Mon, 18 Feb 2019 14:36:15 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvk1j-0007TS-Ti
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:36:13 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1IEa4Qi033508;
+ Mon, 18 Feb 2019 08:36:04 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550500564;
+ bh=6vYqoDu2rMkL5jTn2vFvyKesd0NRV9A/2dnW3TyKlaU=;
+ h=From:To:CC:Subject:Date;
+ b=s4WIVSFWhzTEP00QwIOQ1JsXZKmxjqmHwNovSqMycWf40w5X+RCdyn+DEqNchE6b4
+ 3vII7c3eEi/w15xLEK3F9z1aR5IdvGzYafuk8HUETAxc1OAyyxSy6njHx7tTpjH9B/
+ eaToCTobPF9RFluXRfXPjp3L3C15EXUqCcwk2U5U=
+Received: from DFLE108.ent.ti.com (dfle108.ent.ti.com [10.64.6.29])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1IEa4Mo109748
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 18 Feb 2019 08:36:04 -0600
+Received: from DFLE110.ent.ti.com (10.64.6.31) by DFLE108.ent.ti.com
+ (10.64.6.29) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Mon, 18
+ Feb 2019 08:36:04 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DFLE110.ent.ti.com
+ (10.64.6.31) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Mon, 18 Feb 2019 08:36:04 -0600
+Received: from feketebors.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1IEa1dq009865;
+ Mon, 18 Feb 2019 08:36:01 -0600
+From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+To: <tony@atomide.com>
+Subject: [PATCH 0/2] ARM: dts: am335x-evm/evmsk: Fix PHY mode for ethernet
+Date: Mon, 18 Feb 2019 16:36:27 +0200
+Message-ID: <20190218143629.28392-1-peter.ujfalusi@ti.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <41a9780b-d971-2b20-1ecb-c55852292563@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_063512_372125_D1DAB0FF 
-X-CRM114-Status: GOOD (  16.39  )
+X-CRM114-CacheID: sfid-20190218_063611_997702_B1486CA7 
+X-CRM114-Status: GOOD (  16.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,52 +85,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, grygorii.strashko@ti.com,
+ marc.w.gonzalez@free.fr, netdev@vger.kernel.org, nsekhar@ti.com,
+ vkoul@kernel.org, f.fainelli@gmail.com, bcousson@baylibre.com,
+ niklas.cassel@linaro.org, linux-omap@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
-> On 2/12/2019 1:12 PM, Lokesh Vutla wrote:
-> > +TISCI Interrupt Router Node:
-> > +----------------------------
-> > +- compatible:		Must be "ti,sci-intr".
-> > +- interrupt-controller:	Identifies the node as an interrupt controller
-> > +- #interrupt-cells:	Specifies the number of cells needed to encode an
-> > +			interrupt source. The value should be 4.
-> > +			First cell should contain the TISCI device ID of source
-> > +			Second cell should contain the interrupt source offset
-> > +			within the device
-> > +			Third cell specifies the trigger type as defined
-> > +			in interrupts.txt in this directory.
-> > +			Fourth cell should be 1 if the irq is coming from
-> > +			interrupt aggregator else 0.
-> > +- ti,sci:		Phandle to TI-SCI compatible System controller node.
-> > +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
->
-> Please help me here. As said this is the TISCI device id for the host
-> interrupt controller. While sending message to the system co-processor
-> this ID needs to be specified so that the irq route gets discovered and
-> configured. Atleast with the current design device Ids are not
-> discoverable. Can you mention what can be improved here? Is there any
-> such example where a firmware supports querying the deivce ids?
-> 
-> Also do you have any further comments on this patch?
+Hi,
 
-No reg property above. So if the interrupt router is not accessible
-by Linux like you're saying, you should not set up a dts node for
-it at all.
+cd28d1d6e52e: ("net: phy: at803x: Disable phy delay for RGMII mode") broke the
+ethernet networking on evmsk (and most likely on the evm as well):
+https://patchwork.ozlabs.org/patch/1028527/
+
+v1 patch to fix the situation:
+https://patchwork.ozlabs.org/patch/1040617/
+
+It turned out that the at803x driver is actually broken and need to be fixed
+along with the DT data.
+
+The following series is proposed to fix the driver:
+https://patchwork.ozlabs.org/project/netdev/list/?series=92611
+
+but the PHT mode needs to be switched to rgmii-id from rgmii-txid:
+The rx delay is enabled by default and the driver never disabled it so when
+asking rgmii-txid it actually got rgmii-id.
+
+The patch can be backported to stable, I have tested that it is not causing
+regression with the old, broken driver.
 
 Regards,
+Peter
+---
+Peter Ujfalusi (2):
+  ARM: dts: am335x-evmsk: Fix PHY mode for ethernet
+  ARM: dts: am335x-evm: Fix PHY mode for ethernet
 
-Tony
+ arch/arm/boot/dts/am335x-evm.dts   | 2 +-
+ arch/arm/boot/dts/am335x-evmsk.dts | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+-- 
+Peter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+
 
 _______________________________________________
 linux-arm-kernel mailing list
