@@ -2,64 +2,148 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-4.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AC61C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:35:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E79E7C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:37:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 395C621872
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:35:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B62C521872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:37:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QZoLJJlk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 395C621872
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B40focLw";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=aampusa.onmicrosoft.com header.i=@aampusa.onmicrosoft.com header.b="VIzNH7c2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B62C521872
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=aampglobal.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=N0uoW5eAqOZFeLfB0eli9E4E43wUhDcFjXlx5YxZImk=; b=QZoLJJlkgZzI/u
-	jY9IH2hYWkpekZPaVBmqdTFrfRwG0fdENI4STcih1hMreaCoEC/In2X5o88OuWC+YPzS3zlt3biLn
-	7tmVgmYPz8p3etwGoJviMHW4xxP2yOhNJ+JQA/nKOkn8kOOkRu2zG6pxPBvIgcfv+rZ1mGJ1CU20f
-	yeMqiiiDLlaRPcwOY9dodJeLxcoCNm2jLtzByfyIG2JqwOfJjSSBbWpgwqiLnFByqxMxg9CBnZ48C
-	gzSisNpV1ZN98ssLcrOcj74TRrknbuJl/azkN8qOSQ8/w1hO2Xm4vsb+P4cDOpIOS8kzrgNgYIzvI
-	U8F6oGyuE1UUuZkVX7mQ==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XS3bYewtCBzBT0wtmhjTk1aHtfPZh/ovzQfBuuCjfNY=; b=B40focLw8/Zx7w
+	P+wqanOm249bsNmo9azzoINBtIubN/cXjLxfrX4XPtBZoyS5mxCnQFdFgQcXBaHsLWt4M4pMk9GYU
+	lQuD0bJ/6AxoPdbtRcUHwAVAeTLX05OsaF7bwz4BM/fqc8BbupusP3D6cnvBi5nn23J1rry7kXcx2
+	gSKPYCyzB9PYuTO+cEkvMyU0owh4S7xKYp9IsBZ2YSC6iKnlMdpBkYOSj+GyDKvGTT4H6jcaaasQ1
+	Q6APCL7hFJSER+EJanEcqEWi7RQ8Qs1PBn1DZ85dUZIEgRY89kmAxjNmQY68TqdAGU5KDe5D2rA18
+	lDh1WgiN2YFvShralpbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvj4g-00026Y-7r; Mon, 18 Feb 2019 13:35:10 +0000
-Received: from szxga04-in.huawei.com ([45.249.212.190] helo=huawei.com)
+	id 1gvj71-0002Pq-06; Mon, 18 Feb 2019 13:37:35 +0000
+Received: from mail-cys01nam02on071c.outbound.protection.outlook.com
+ ([2a01:111:f400:fe45::71c]
+ helo=NAM02-CY1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvj4c-0000wK-3c
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 13:35:08 +0000
-Received: from DGGEMS402-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id 7AF8BF86022478F3F1CF;
- Mon, 18 Feb 2019 21:35:00 +0800 (CST)
-Received: from localhost.localdomain.localdomain (10.175.113.25) by
- DGGEMS402-HUB.china.huawei.com (10.3.19.202) with Microsoft SMTP Server id
- 14.3.408.0; Mon, 18 Feb 2019 21:34:50 +0800
-From: YueHaibing <yuehaibing@huawei.com>
-To: Olivier Moysan <olivier.moysan@st.com>, Arnaud Pouliquen
- <arnaud.pouliquen@st.com>, Liam Girdwood <lgirdwood@gmail.com>, Mark Brown
- <broonie@kernel.org>, Jaroslav Kysela <perex@perex.cz>, Takashi Iwai
- <tiwai@suse.com>, Maxime Coquelin <mcoquelin.stm32@gmail.com>
-Subject: [PATCH -next] ASoC: stm32: sai: remove set but not used variables
- 'mask, cr1'
-Date: Mon, 18 Feb 2019 13:48:36 +0000
-Message-ID: <20190218134836.107220-1-yuehaibing@huawei.com>
-X-Mailer: git-send-email 2.20.1
+ id 1gvj6x-0002P9-Tw
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 13:37:33 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=aampusa.onmicrosoft.com; s=selector1-aampglobal-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=BDL0LXv003l1zaQkyjeDEe56RMRZbJYrQPF32f3wauY=;
+ b=VIzNH7c2A02OiwvnhaMr/rPxVOtt+FTkL4aFF93RVfqoD+1QR1ezO4At8d/ieRoQF/nnU5iYUONYI11iiNmQixT1KdAUquz718CuE0lacZFKzFMUAIHzgJ6nulG4NW+mudNYFApSlIOMyKWJ8bVG177aMAtsB8+qJ9tuLs9V5b8=
+Received: from BL0PR07MB4115.namprd07.prod.outlook.com (52.132.10.149) by
+ BL0PR07MB5426.namprd07.prod.outlook.com (10.167.241.215) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.19; Mon, 18 Feb 2019 13:37:27 +0000
+Received: from BL0PR07MB4115.namprd07.prod.outlook.com
+ ([fe80::5516:87b1:344e:a27f]) by BL0PR07MB4115.namprd07.prod.outlook.com
+ ([fe80::5516:87b1:344e:a27f%6]) with mapi id 15.20.1622.018; Mon, 18 Feb 2019
+ 13:37:27 +0000
+From: Ken Sloat <KSloat@aampglobal.com>
+To: "Eugen.Hristev@microchip.com" <Eugen.Hristev@microchip.com>,
+ "linux-media@vger.kernel.org" <linux-media@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "mchehab@kernel.org" <mchehab@kernel.org>,
+ "Nicolas.Ferre@microchip.com" <Nicolas.Ferre@microchip.com>,
+ "sakari.ailus@iki.fi" <sakari.ailus@iki.fi>, "hverkuil@xs4all.nl"
+ <hverkuil@xs4all.nl>
+Subject: RE: [PATCH] media: atmel: atmel-isc: reworked driver and formats
+Thread-Topic: [PATCH] media: atmel: atmel-isc: reworked driver and formats
+Thread-Index: AQHUxQm2DhFZfyQ1n0i/a5kxwOkcZ6Xlk30w
+Date: Mon, 18 Feb 2019 13:37:26 +0000
+Message-ID: <BL0PR07MB4115ECEE3BED0B46C342F4A9AD630@BL0PR07MB4115.namprd07.prod.outlook.com>
+References: <1550219467-9532-1-git-send-email-eugen.hristev@microchip.com>
+In-Reply-To: <1550219467-9532-1-git-send-email-eugen.hristev@microchip.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=KSloat@aampglobal.com; 
+x-originating-ip: [96.59.174.230]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 8551840e-27a2-4799-23f6-08d695a638db
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
+ SRVR:BL0PR07MB5426; 
+x-ms-traffictypediagnostic: BL0PR07MB5426:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; BL0PR07MB5426;
+ 23:Y602/6T7cuxJtjqqFgLNmKM56VkfZxYgfkDan/V/J?=
+ =?us-ascii?Q?QMY0jFQmZQsKMNOQvI2rmlmdXzyfS0UfBp7eT2dxe7WvWXNjYPef0EFaa2Ia?=
+ =?us-ascii?Q?GGtH1D7FQfWZsyuFDAZN6i8lV47XW3PYKqrdcFFUdocpnZFcytM55Gd7Xy8J?=
+ =?us-ascii?Q?FKV488Tn+q6BnGIP/eC3RavXja2xfW6nrDyo8U7MDkmKteuBhGQCzT4dLzJA?=
+ =?us-ascii?Q?7I5wCQ5cgfeE3oio89bvXV6EjPmqdLxWh87KkFIsiaRdMBKomz0qRYlzTbYZ?=
+ =?us-ascii?Q?RCAKZlh9OtZ911hIL9yQJtc+M38+iL2eOuT5sn1hTm6EEA5kuBlhVOoNOKM1?=
+ =?us-ascii?Q?I9vXQ8+al60kF+yeQdIMVF8t5m9GHqPn/wUEHVPJLYIDjo2YFtmnzIagLJlO?=
+ =?us-ascii?Q?U2itEwRZjGn546pSrvc9oEbvUcUqewPSaT0lDR+1XS5G6L+LIBAFt+Xbk4Vd?=
+ =?us-ascii?Q?tN3LX2w/L0N1fYe0GMruD9szsbh22hVFiG9z3A/9z+ufzAT92HVg0u+PpT+B?=
+ =?us-ascii?Q?/p+vja+liSTGBvGgKWdzRNI1DUMy6PkPX2F6OuD5fjRoi030PPC05qkEAMtR?=
+ =?us-ascii?Q?ELrbbdMB4T5UW0OV4z/eYZElgUnge4X/XfMUNtLMcQJtitI546efYpKnCgg2?=
+ =?us-ascii?Q?T6a8kMqrXvI3x1UN9IPVh06OIMVelTuIKpnr/hwQoOW/HoVgI1KM4CoovVOg?=
+ =?us-ascii?Q?1wAKVMKRf6Lp3uS9klU+xANyFbBzmS1SZrnL0LThnyyK3/iq7oT4+IDdnMSe?=
+ =?us-ascii?Q?vlZLGKsqlk/FZ6APiK1OTHrzvm2CR3W0fCrO41PDKydynUcHUH+vMYbnQ/jc?=
+ =?us-ascii?Q?7rneMWXv7balMpF8PPefVSQItx6pjMKON36GW83jSCjhNR425TqeMNF/Wpwt?=
+ =?us-ascii?Q?Ck5CVxG0Y70QK9PvcWOD+WDFcxWz7Hiif0dv4h4Pa6SB25vx+hpiZpFEiPmG?=
+ =?us-ascii?Q?F60zYdy/y93WR/Th5VDcYZtvhKBfZg15K1GTepqFo+zCYgkdWafpOUMTPc0/?=
+ =?us-ascii?Q?oze2Aeur8uBspr13BNabXsF6r550PfKCzs5lh8FBjJBJqCL2vAoaA1w2XefC?=
+ =?us-ascii?Q?zPSMietbE2xZicjVN3LfLK0MHMgotx+DDNndbH/EOAaUc1hd1XAxcWjmW/vj?=
+ =?us-ascii?Q?hEVhPvTDiotq4UKJUxRzVWzMNpsdCFVi4UPZfAAoR7OwstY17wr2pOjQGVN4?=
+ =?us-ascii?Q?Ac4QrBRUhvmIt7164N5qgMFPYTlO70+q38wjS6A5KLQM/tay5cGH+4N4iJMT?=
+ =?us-ascii?Q?wO8A6CiTJexVveLmzIVY/vLZwSDmL15p+9T+OZ75/JI+ulRnWFZczOarK9Vb?=
+ =?us-ascii?B?dz09?=
+x-microsoft-antispam-prvs: <BL0PR07MB5426C23CFC6C0F17AFF13BBFAD630@BL0PR07MB5426.namprd07.prod.outlook.com>
+x-forefront-prvs: 09525C61DB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(376002)(396003)(366004)(39840400004)(136003)(346002)(189003)(199004)(13464003)(53546011)(71190400001)(25786009)(5660300002)(6116002)(6436002)(26005)(2201001)(86362001)(71200400001)(6506007)(102836004)(229853002)(53936002)(6246003)(9686003)(3846002)(14454004)(97736004)(68736007)(55016002)(446003)(105586002)(106356001)(72206003)(478600001)(2501003)(186003)(66066001)(80792005)(33656002)(476003)(76176011)(305945005)(99286004)(7696005)(8936002)(74316002)(486006)(81166006)(11346002)(81156014)(316002)(110136005)(7736002)(256004)(14444005)(2906002)(8676002);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:BL0PR07MB5426;
+ H:BL0PR07MB4115.namprd07.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: aampglobal.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: NhJ83JBr5/c6Ul2Qv3Y15+0Wzzlt+QXIjFOOfppaucJZM6ETqihkn9xP0boWSvhKmH9C6C6z5qGTFY53XaUfCAvZzbvwekuEvD0C3bPuzepbEHyU7sTa9k5kX+XV6xKiTfMbzIOO6ogWg00lTM2po3yZjSDnERpRi6NxM+v7zd9qqETe/ySlN2pKx/Qp7yb/aL9UBhl7Pij78WW3BhPMm46JDP5PqIo0wzWiOmF5M8q/rau++1ZJyJIKH8z2BDtNVPNAe7qy+6HW4D3AojgcHyVnoSOoSGeR8zVZ7p4MwexMa1R+VThIZp9FNcCgqfuYp8DrIHok5JHTbrqPf7dwq9dHDUxPirDSEBIs0qrIJ1E7/a2FsDL4QOSQROaMrSnw8gD0eOk9aVK1UgW7xuQyOFAca4NK5Wn2XFSxLkj7L1k=
 MIME-Version: 1.0
-X-Originating-IP: [10.175.113.25]
-X-CFilter-Loop: Reflected
+X-OriginatorOrg: aampglobal.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 8551840e-27a2-4799-23f6-08d695a638db
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 13:37:26.8868 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: e20e3a66-8b9e-46e9-b859-cb654c1ec6ea
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BL0PR07MB5426
+X-MS-Exchange-CrossPremises-AuthAs: Internal
+X-MS-Exchange-CrossPremises-AuthMechanism: 04
+X-MS-Exchange-CrossPremises-AuthSource: BL0PR07MB4115.namprd07.prod.outlook.com
+X-MS-Exchange-CrossPremises-TransportTrafficType: Email
+X-MS-Exchange-CrossPremises-TransportTrafficSubType: 
+X-MS-Exchange-CrossPremises-SCL: 1
+X-MS-Exchange-CrossPremises-messagesource: StoreDriver
+X-MS-Exchange-CrossPremises-BCC: 
+X-MS-Exchange-CrossPremises-originalclientipaddress: 96.59.174.230
+X-MS-Exchange-CrossPremises-transporttraffictype: Email
+X-MS-Exchange-CrossPremises-transporttrafficsubtype: 
+X-MS-Exchange-CrossPremises-antispam-scancontext: DIR:Originating; SFV:NSPM;
+ SKIP:0; 
+X-MS-Exchange-CrossPremises-processed-by-journaling: Journal Agent
+X-OrganizationHeadersPreserved: BL0PR07MB5426.namprd07.prod.outlook.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_053507_137040_38EE045C 
-X-CRM114-Status: GOOD (  10.24  )
+X-CRM114-CacheID: sfid-20190218_053732_011440_A40B2978 
+X-CRM114-Status: GOOD (  16.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,56 +155,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, YueHaibing <yuehaibing@huawei.com>,
- kernel-janitors@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Fixes gcc '-Wunused-but-set-variable' warning:
+> -----Original Message-----
+> From: Eugen.Hristev@microchip.com <Eugen.Hristev@microchip.com>
+> Sent: Friday, February 15, 2019 3:38 AM
+> To: linux-media@vger.kernel.org; linux-arm-kernel@lists.infradead.org; linux-
+> kernel@vger.kernel.org; mchehab@kernel.org;
+> Nicolas.Ferre@microchip.com; Ken Sloat <KSloat@aampglobal.com>;
+> sakari.ailus@iki.fi; hverkuil@xs4all.nl
+> Cc: Eugen.Hristev@microchip.com
+> Subject: [PATCH] media: atmel: atmel-isc: reworked driver and formats
+> 
+> From: Eugen Hristev <eugen.hristev@microchip.com>
+> 
+> This change is a redesign in the formats and the way the ISC is configured
+> w.r.t. sensor format and the output format from the ISC.
+> I have changed the splitting between sensor output (which is also ISC input)
+> and ISC output.
+> The sensor format represents the way the sensor is configured, and what ISC
+> is receiving.
+> The format configuration represents the way ISC is interpreting the data and
+> formatting the output to the subsystem.
+> Now it's much easier to figure out what is the ISC configuration for input, and
+> what is the configuration for output.
+> The non-raw format can be obtained directly from sensor or it can be done
+> inside the ISC. The controller format list will include a configuration for each
+> format.
+> The old supported formats are still in place, if we want to dump the sensor
+> format directly to the output, the try format routine will detect and configure
+> the pipeline accordingly.
+> This also fixes the previous issues when the raw format was NULL which
+> resulted in many crashes for sensors which did not have the expected/tested
+> formats.
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> ---
+> Hello Ken and possibly others using ISC driver,
+> 
+> I would appreciate if you could test this patch with your sensor, because I do
+> not wish to break anything in your setups.
+> Feedback is appreciated if any errors appear, so I can fix them.
+> I tested with ov5640, ov7670, ov7740(only in 4.19 because on latest it's
+> broken for me...) Rebased this patch on top of mediatree.git/master Thanks!
+> 
+> Eugen
+> 
+Hi Eugen,
 
-sound/soc/stm/stm32_sai_sub.c: In function 'stm32_sai_configure_clock':
-sound/soc/stm/stm32_sai_sub.c:902:11: warning:
- variable 'mask' set but not used [-Wunused-but-set-variable]
-sound/soc/stm/stm32_sai_sub.c:902:6: warning:
- variable 'cr1' set but not used [-Wunused-but-set-variable]
+No problem I will try to test sometime this week on my setup. I appreciate you keeping me in the loop.
 
-It's not used any more after 8307b2afd386 ("ASoC: stm32: sai: set sai as
-mclk clock provider")
-
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
----
- sound/soc/stm/stm32_sai_sub.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index d4825700b63f..a00640f1df06 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -898,7 +898,7 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
- 				     struct snd_pcm_hw_params *params)
- {
- 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
--	int cr1, mask, div = 0;
-+	int div = 0;
- 	int sai_clk_rate, mclk_ratio, den;
- 	unsigned int rate = params_rate(params);
- 
-@@ -944,8 +944,7 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
- 			if (sai->mclk_rate) {
- 				mclk_ratio = sai->mclk_rate / rate;
- 				if (mclk_ratio == 512) {
--					mask = SAI_XCR1_OSR;
--					cr1 = SAI_XCR1_OSR;
-+					;
- 				} else if (mclk_ratio != 256) {
- 					dev_err(cpu_dai->dev,
- 						"Wrong mclk ratio %d\n",
-
-
-
+Thanks,
+Ken
 
 _______________________________________________
 linux-arm-kernel mailing list
