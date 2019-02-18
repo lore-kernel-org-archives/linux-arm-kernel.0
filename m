@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28592C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E25DCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EA26F21900
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:07:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B394E21872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HcslyyaY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA26F21900
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JiWhEXLp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B394E21872
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,50 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZRmeZs8P9DCwlgR2CJodmQPCgW02jGKrMT/Jct+Wjbc=; b=HcslyyaYVtV/eA
-	JXhXQz7ybkSKmS5oT+nOwtkOMnRvH2INsQEdocsGkOj44w9JLZOSrp5ZDGIIEdRB0pQo7XLc+Ttkw
-	j+4C5KGBfmMQw4OiMYuKR3Lub1j8RElGcWY1UfTCfZ2JL9/+x05SDvC3RDYSqdixmKYpZUt6OX3q1
-	2ZBJAQJBDftLufIoj4OL1j1pWWqbfvaVE/4tpXR9Z8VpraxTFMhXu++mkQujHzQKerReiRTAVcPW4
-	DQolb0qkqLO8aYwBK8FWi/+qAMr5gHHxAJAEtIZJyi8ugWdq/Fn07pzHD/VHwgpR7pZxxdVFvYVqo
-	3ANNQbueaK0NTiXjLjtQ==;
+	List-Owner; bh=w6xA1XwnL/XGvVkveDG4QR4ZSs4gRUTahQPQW5T+RxQ=; b=JiWhEXLpTOZrOv
+	fm0YljfJZ02L5dTcVhwAR7lmZQ0fhMVejGT3IAF2aMrn309fL0aKx663PIRUKBZH1cZjSV6b6+O0o
+	xIxOtJcP649RWTkHUTPPXkF0CZmPUFTSg3r5l/3IUhlHmV36fAwC3BOcgX5FDi4e2iP1urkZNF2d2
+	h/m8PTiLWyhNCjOau/8cW088ROgzrREJnGVv58YET7F2jFfM5dyVRDPdKVM2O79qkAeDrGKFrz/NS
+	WiTwlXmiKEYtCvHXB14QBN222wiG9VpSRw+C7tI5pUqZUF3k94+EICT9vh7DKNxAeIaKV8fPS9XZn
+	DnBMO1fb4T/KfjTCi+QQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvq8p-0005R1-Kr; Mon, 18 Feb 2019 21:07:55 +0000
+	id 1gvq91-0005fD-BQ; Mon, 18 Feb 2019 21:08:07 +0000
 Received: from mout.kundenserver.de ([217.72.192.75])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvq8l-0005OY-WF; Mon, 18 Feb 2019 21:07:53 +0000
+ id 1gvq8m-0005OZ-11; Mon, 18 Feb 2019 21:07:53 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue106 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1MYvHa-1gZvZR2VSy-00UtS6; Mon, 18 Feb 2019 22:07:29 +0100
+ 1MwPjf-1hESyz1HV7-00sQM3; Mon, 18 Feb 2019 22:07:28 +0100
 From: Arnd Bergmann <arnd@arndb.de>
 To: y2038@lists.linaro.org
-Subject: [PATCH 7/8] csky: Use latest system call ABI
-Date: Mon, 18 Feb 2019 22:07:11 +0100
-Message-Id: <20190218210712.3503891-8-arnd@arndb.de>
+Subject: [PATCH 5/8] unicore32: Fix __ARCH_WANT_STAT64 definition
+Date: Mon, 18 Feb 2019 22:07:09 +0100
+Message-Id: <20190218210712.3503891-6-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20190218210712.3503891-1-arnd@arndb.de>
 References: <20190218210712.3503891-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:b9uGlJZjYWR0TeRDyLkO0y46fjRMT6X+cqSqFO9XKVQTCBbYU4k
- lqAzapNVCiizm6JQu9hlZXLd9zdDa9NpI6N+vWtguD18PgqQWTdIUMiNfWHZyyu1VhmCnZO
- YuhMkgj/O//KHs+9BWKQAluN3GvcadruPhi2m7LWm2ED2/epAJVhzvFqPEA0jiBJGkYNa1z
- ef5UNsDCjbuUd1nCxCBzA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:yfd0sA9GaOs=:n7pkNDVjGX9jsrtkpjCKIV
- MvNdGj/B2VYYToKFb9TuPve71L7+IOm3/m1RCEuBcNbHVzfi8Emh1bkaa7pEB3XdxI2f5Xxah
- G3P7RlCMPGJOigz8xG+g16DXO5WzQQ20cohHSra7HNSngbL/jBCaI9WidivWeqYD7j3r12zyi
- bFtTj44bzd4yQwNOgdkzzGMaGYuuoaTCzXqDHYAiFUL+U+dcSFJOYQW18COw8vtgi7+/H4jwA
- PKmhKUdYYTMIXfsn9UB1Ix8R+2u07rBRyPa1alYMR4rbphJdyYznT/nG8r9NkKjYVufKkeToA
- tX76RZ/OzwNr2xSpl60cgLFDy0w9YOGKAIz79D2zDSAt+ekxc/+GahpvAUk41+PZsPV/CR9am
- 5ww8qcFJ7KxnfkAg9SpVSwIxHzGV0kw3SiR46FdF4IvPSMgcbpI3PX1vszcTMaNtrcMP7Ft2y
- kaiaWtwZHtdM6WnewsRAfHQJsBwF1oia3pggtfzbltLG6MkoBRjc5GAsPW4Aa/WktuMjUqbD9
- 3f3eu1XmnOAQUL3mq3GJhP85UdM1qoiANVdgpWg1eFVcbc4z8NmNlIoNmIvZz387xvq69rxpQ
- YfIWJj9/ZKhwjAYQSbD/HD/MBzzwAlnybqjHn1pSWtB5hnIgVJuIDq9Kg63l/eaU4Aks2tgwv
- pAfKYIFDhID4rHBl2cJFxxCAZDvVSk3zFn2/2SWyPszeYuNF+KMp7tqDwEHKFSnpmrS8rRwlG
- vY3wB1GLQ7Vv12T2FIyyPgLmxKnAad1RKx+GDg==
+X-Provags-ID: V03:K1:e5iV7jAPMPcGjRPi5MYNZ2dkznZ8Mrfx++9ngOzQfg3eN/TiQ1R
+ 189AXFIfz0cS7YjZUjf7xpRIC+5HGDzQrVDpbwnWeWZYnSH6gDE4OS2+d9PddhFkBcsqNC3
+ gkSMnhQ/1X5TPh7cDtrVgQk3tG6Ere1m238Mf0fY6tAGIKRw+GnPuguBJ/QmmtfBExPQkwj
+ K2FyVc6iNYGZicULIu0mw==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:gI5wfFjSFEE=:LWNxFn7RL5I+WsBjHLIVXM
+ omzfoUukQpkdif1Aifk2CaM+uCLu97sodQrVqAKEmJNvL8vU6Rz9au8I7/6LYLLZ2Xefe1eyV
+ yLVyxmJITR7cFaGJFSJZd1M+8eGYej0R3l54Fv/8S8RG9V6H+NHo+21tr+XgtPZI1lIZyCX0V
+ 7+2ZkslAxXFR1f9dW/f+LURiJgEol+sc9RxYBxrPxZmBSXpOXmIAIHIEUaLPlX3lQmfG7INRy
+ 6t/+5EEqHWX8EiwZ+IzrT7I4TV5KQwHVLcFvL1bUEHe7VJdUTsEuTWu0cnXqpwfffnPGKU2LE
+ fwCgv2n584SKNZjerSO2/h38m3glzmb+jAPCsjG531KFMC3DxlWx/ODxizOg2YBQaaWJAGOrM
+ O5DJRP/rCYfLXHLEXJznQHzpFW0iXSrQUdPx8Fqy6+JmUP87frzv0lqxkUp9DBTYzIcAnL23M
+ PevSFPAOiAyZDx8D76O37xtLpeUKAZ3WqrhLhuR6rScgKhDLYRZhQAn2LU0ZCuh0pKi2EwSP4
+ P0RK0vT6L/LizZRXGqGbc+xOyK0lTz1D1TR1UDUD7KuKGcgcde5rioT/7YltNq2n4OdsmcFkG
+ YPsdOCZDgRO/gIiVXOoFxrCLvlhT3KuPIu2ZmnZyKHx7c+72B0dzBTBCtMVIQ96cojUzrxUL/
+ g2+5u37brMmdGBJ2Snq66VsTdJMLw2bBbRfwT1aOBa/kfbVBefs52sMhbLLuIaM1hKxxDc79r
+ lj/4nMMwaxinhvIehCaknN+7V1PQlxYngbqhyw==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_130752_353325_E5C79ABC 
-X-CRM114-Status: UNSURE (   9.19  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190218_130752_369831_932AB812 
+X-CRM114-Status: GOOD (  10.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,40 +92,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We don't yet have an upstream glibc port for csky, so there is no user
-space for the existing ABI, and we can remove the definitions for 32-bit
-time_t, off_t and struct resource.
+The __ARCH_WANT_STAT64 macro must be defined before including
+asm-generic/unistd.h. I got this right for everything except
+unicore32.
 
+Fixes: bf4b6a7d371e ("y2038: Remove stat64 family from default syscall set")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/csky/Kconfig                   | 1 -
- arch/csky/include/uapi/asm/unistd.h | 2 --
- 2 files changed, 3 deletions(-)
+ arch/unicore32/include/uapi/asm/unistd.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
-index 6959e0b1e956..398113c845f5 100644
---- a/arch/csky/Kconfig
-+++ b/arch/csky/Kconfig
-@@ -1,6 +1,5 @@
- config CSKY
- 	def_bool y
--	select ARCH_32BIT_OFF_T
- 	select ARCH_HAS_SYNC_DMA_FOR_CPU
- 	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
- 	select ARCH_USE_BUILTIN_BSWAP
-diff --git a/arch/csky/include/uapi/asm/unistd.h b/arch/csky/include/uapi/asm/unistd.h
-index ec60e49cea66..224c9a9ab45b 100644
---- a/arch/csky/include/uapi/asm/unistd.h
-+++ b/arch/csky/include/uapi/asm/unistd.h
-@@ -2,8 +2,6 @@
- // Copyright (C) 2018 Hangzhou C-SKY Microsystems co.,ltd.
+diff --git a/arch/unicore32/include/uapi/asm/unistd.h b/arch/unicore32/include/uapi/asm/unistd.h
+index 4e5e624f5d7e..54a7378a70b1 100644
+--- a/arch/unicore32/include/uapi/asm/unistd.h
++++ b/arch/unicore32/include/uapi/asm/unistd.h
+@@ -13,9 +13,9 @@
  
- #define __ARCH_WANT_SYS_CLONE
--#define __ARCH_WANT_SET_GET_RLIMIT
--#define __ARCH_WANT_TIME32_SYSCALLS
+ #define __ARCH_WANT_RENAMEAT
+ #define __ARCH_WANT_SET_GET_RLIMIT
++#define __ARCH_WANT_STAT64
+ #define __ARCH_WANT_TIME32_SYSCALLS
+ 
+ /* Use the standard ABI for syscalls. */
  #include <asm-generic/unistd.h>
- 
- #define __NR_set_thread_area	(__NR_arch_specific_syscall + 0)
+-#define __ARCH_WANT_STAT64
+ #define __ARCH_WANT_SYS_CLONE
 -- 
 2.20.0
 
