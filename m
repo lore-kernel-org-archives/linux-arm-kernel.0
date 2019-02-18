@@ -2,131 +2,87 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9065BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 07:41:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18445C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 07:59:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 591B52184A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 07:41:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8256208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 07:59:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t5j8uKVd";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="JjP2ZR7u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 591B52184A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="szEuQin3";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HWBZCA5p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8256208E4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BK8MRwHiMK3n7hbk8ZH1/K/dpH3mT0YKB0EJMRh4o5M=; b=t5j8uKVd8XTLRw
-	Qxt1oRYhJzGf/bwJBUTvca8IhJ7O9bQS3uQ/aRS9VMI0udmJ6lPjzrpZTuBu/+lU1/XIEFVwq/6ff
-	0nK445Vf0m81aO45zZisdP+wElSrvzDhmpJXChNqPZz7v6BamN3MWFdacAXax/aNNmg9sW+s//OQ6
-	QFo0ZMSVLrDEnmO1QRIFia8CQ/QOJQbWdkM4ww7h2Tuett6ijzmvgIq5SKNSNbD2ThLgRUiPn/KNP
-	UaE5a4mUaFsTRLgOLcnlLrtcVf8YTl7qEkUMzTtL7eGz4/7qodzJlWduXnUkfXCZPqFtSSbGyAYZK
-	R1vuv8YnNbLWYl5jGM5Q==;
+	List-Owner; bh=eOcqKVV4ZB9i58Eiu+PQT3GkSPHR48yjoLfnIpeGOM8=; b=szEuQin3n/5i6S
+	ULR6T2jcHz8puxSlz++TthK8tF4EEjPdGl4QTQOnVNeda53HyaRMMtOWBVXDsJanqRIw4wSZ5kaXk
+	vOihc6LGfM0SAlTcgjJTVq0nAQOHX4rk+eUvdRGvpH3pLPGoeWx8B4vXOE/k61wcwEBbEVUNHBvBy
+	W8Jkm1rx9V2QyMrOp8/9JB9V8nNnVBydHfy4isjF207afndvhMWRGBeZjDIU/NpUcKJIkhGnObZLb
+	lI9Me7wWk69sEx9ukKAcoi/RxhFld4/wCC+wXd3BJsd1b3NmcJb3N+D3mUR3UWAGHIgxEiU5KUYwh
+	OauADKsTokHGukMyb7HQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvdYa-0000Zv-5U; Mon, 18 Feb 2019 07:41:40 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gvdpm-0005fp-Ne; Mon, 18 Feb 2019 07:59:26 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvdYW-0000ZU-5M
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 07:41:38 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190218074133euoutp02ebbce55bd8d9cbe89b4128a4562e8460~EZW2cpwFa0288002880euoutp02d
+ id 1gvdpj-0005fP-Cu
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 07:59:25 +0000
+Received: by mail-wr1-x441.google.com with SMTP id n2so5041599wrw.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 07:41:33 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20190218074133euoutp02ebbce55bd8d9cbe89b4128a4562e8460~EZW2cpwFa0288002880euoutp02d
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1550475693;
- bh=ihsef7MhKQ6odCvg1Y/6R/PqabYPjRxZUCEPgL2b0tg=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=JjP2ZR7uEMPtNwmYHvlkB9fXxg8rNsN2G6/KayVULLmG8I4heJRWe7j9nRsM0u44B
- lRETSpjRJxY7rp5TQf7OXVW6joZ1Y9qgrPhWUzMO/pips1OHq7bxifUVA4xO8iaqmH
- 14gfK+kCrGiApcpKDeTvVP6q8OtBcrU6KXrybiV4=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190218074132eucas1p192dcb42602b3889a7ec1333c4961882c~EZW2DcJpr0892708927eucas1p1s;
- Mon, 18 Feb 2019 07:41:32 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 8B.5C.04294.CA16A6C5; Mon, 18
- Feb 2019 07:41:32 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190218074131eucas1p27a8e0e27609d5eaadcacf8391849838d~EZW07DWDW1862918629eucas1p2j;
- Mon, 18 Feb 2019 07:41:31 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190218074131eusmtrp2ce99e1f63fa616ebdb45b1369df100a2~EZW0sbU6G3044530445eusmtrp2P;
- Mon, 18 Feb 2019 07:41:31 +0000 (GMT)
-X-AuditID: cbfec7f4-835ff700000010c6-9d-5c6a61ace0a0
-Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 90.C9.04284.BA16A6C5; Mon, 18
- Feb 2019 07:41:31 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20190218074130eusmtip10c443650976ee59f3f3f8b8be140d16d~EZW0NpTWh2838228382eusmtip1x;
- Mon, 18 Feb 2019 07:41:30 +0000 (GMT)
-Subject: Re: [PATCH 3/5] clocksource: exynos_mct: Increase priority over ARM
- arch timer
-To: Daniel Lezcano <daniel.lezcano@linaro.org>,
- linux-samsung-soc@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <7b994b86-9a84-39a7-e88d-203c64b30de8@samsung.com>
-Date: Mon, 18 Feb 2019 08:41:30 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ Sun, 17 Feb 2019 23:59:23 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=UFe9jHX1HoWKU6FMk5WMii4IqtK2zof/9fuLaWJERV4=;
+ b=HWBZCA5pfGGENevoLmdMKxYCCXasF0r78JIHjqLOuLTtdQdw/g6i5Pg8FV0MSjfFnU
+ SCUuacO6uSw1lzOqn4P+LQYDgf5ppcFBYO0ZACKVSI5PIsnVFVniQlWKhGTavSbbNmqn
+ 02ag7wchNxBw7bxIhetlvvb1Em5PW55J0/v2obfTi/+Y6qozA9VIm9ktvPiLUcve7Ai+
+ 438saAYNPgr1ocPhyLhs5R6RpiwxTv5vUmvGOeWPi1E8S5psHCsf+JQbQ7bc17+8R02Q
+ 1CfUgzXcsR2VGsIsqfdccUis9xU7PZc3g9V1HCTOc5p27JUva1f/85vUmBRExQ8apvS0
+ xsag==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=UFe9jHX1HoWKU6FMk5WMii4IqtK2zof/9fuLaWJERV4=;
+ b=NdxFZxegMXC2NGBAxbYwWdBoVE9WoUXpRdsYrlxRuFKYNcphIqZoGPrrNjJfoUH7My
+ NxQ6j326kzo9lGWTMQbwiXkNovtFY1djTbJBq8XuqbHPSgusvHgqUoNPG8BBAH/IeNnr
+ lE6dIa8N7/R5hwMaKALBkcmTn5abQce5jhLAsO9sJLydYzQKOo0GOT4/lzD1Uo4k9E4P
+ utekdphihVCuF6CvkQeLqx5IP7vUi20FzC+WCyg2+eLEzaFZYM/KTtElN2V+3U5OBYn2
+ K934QSkYlTP+aw2cGyx408hR1seRDtBN7qMtbzpfJcG4vYwkLShbDCv0MfrJLB+8TWpr
+ eAzw==
+X-Gm-Message-State: AHQUAuYBnOgfOOWS7BOHKJkta/6RfpMCDXH/OfFAAQpqGm7BMY2ugsgr
+ jYHYwK+YAoNV2vWbiB6onNdRLaN8RKAOfxCdZ7o=
+X-Google-Smtp-Source: AHgI3IZgCo+GoduJYr+RXl7qY26d13sbMdRcyVlbVNRfmJd5jyZrmSXQV5by647b8pIYR6W0F5ShsSqc0d65HOcfk4w=
+X-Received: by 2002:a5d:4147:: with SMTP id c7mr16597764wrq.235.1550476761629; 
+ Sun, 17 Feb 2019 23:59:21 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <01569ba7-2e3e-5811-81e1-ca51cacbcb95@linaro.org>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrPKsWRmVeSWpSXmKPExsWy7djP87prErNiDG63ylpsnLGe1eL6l+es
- FvM+y1qcP7+B3WLT42usFjPO72Oy2LxpKrMDu8emVZ1sHneu7WHzeHfuHLvH5iX1Hn1bVjF6
- fN4kF8AWxWWTkpqTWZZapG+XwJXRPE+5YJZ4xb4DE9kbGDcLdzFyckgImEjM6n7C1sXIxSEk
- sIJRYuqtY0wQzhdGiZuzX7BAOJ8ZJbpefWeFaVm97wZU1XJGiTM7/kH1v2eUmHSqDaxKWCBS
- 4sr68+wgtohApcS5tinsIEXMAusZJdYumAdWxCZgKNH1tosNxOYVsJOYdPgoM4jNIqAqcXLa
- YrBmUYEYiSnnjrBD1AhKnJz5hAXE5gSqn7b+JZjNLCAvsf3tHGYIW1zi1pP5YOdJCGxjlzh6
- 6Sg7xN0uEgu/7GSBsIUlXh3fAhWXkfi/E6ahmVGifcYsdginh1Fi65wdbBBV1hKHj18EOpsD
- aIWmxPpd+hBhR4nvba/AwhICfBI33gpCHMEnMWnbdGaIMK9ER5sQRLWaxKzj6+DWHrxwiXkC
- o9IsJK/NQvLOLCTvzELYu4CRZRWjeGppcW56arFRXmq5XnFibnFpXrpecn7uJkZgMjr97/iX
- HYy7/iQdYhTgYFTi4f1QlhkjxJpYVlyZe4hRgoNZSYQ3KDYrRog3JbGyKrUoP76oNCe1+BCj
- NAeLkjhvNcODaCGB9MSS1OzU1ILUIpgsEwenVAPjsqe/zURXqt7UVDrSxX27NUfmhW5HqMDt
- /i9VIidYSkuV05657ru26ZEo05KNadWTlnDaBHJ6v9++73k11+8YnUsH1H5H2ZSETy3eseHT
- 1kyHRoPj/mV7pf+3KJbnyZRkWh70tfsbJFZy+NIvwRur8tY6Zcxd6Nul7yHXxpbaNz3tP9dO
- 5jAlluKMREMt5qLiRAAV1HV7QgMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrPIsWRmVeSWpSXmKPExsVy+t/xu7qrE7NiDK484rXYOGM9q8X1L89Z
- LeZ9lrU4f34Du8Wmx9dYLWac38dksXnTVGYHdo9NqzrZPO5c28Pm8e7cOXaPzUvqPfq2rGL0
- +LxJLoAtSs+mKL+0JFUhI7+4xFYp2tDCSM/Q0kLPyMRSz9DYPNbKyFRJ384mJTUnsyy1SN8u
- QS+jeZ5ywSzxin0HJrI3MG4W7mLk5JAQMJFYve8GUxcjF4eQwFJGifnX5rNBJGQkTk5rYIWw
- hSX+XOtigyh6yyix6OR/JpCEsECkxJX159m7GDk4RAQqJSYtywapYRZYzyjxef1lRoiGn4wS
- c44eBJvEJmAo0fW2C2wDr4CdxKTDR5lBbBYBVaBti8EGiQrESFw9xwhRIihxcuYTFhCbE6h8
- 2vqXYDazgLrEn3mXmCFseYntb+dA2eISt57MZ5rAKDQLSfssJC2zkLTMQtKygJFlFaNIamlx
- bnpusaFecWJucWleul5yfu4mRmDkbTv2c/MOxksbgw8xCnAwKvHwfijLjBFiTSwrrsw9xCjB
- wawkwhsUmxUjxJuSWFmVWpQfX1Sak1p8iNEU6LeJzFKiyfnApJBXEm9oamhuYWlobmxubGah
- JM573qAySkggPbEkNTs1tSC1CKaPiYNTqoGx9s+F/o3filpTvrWrXnn6rt8jbLa6gnHu2qkv
- fniXGfrEJnycmJHQw7FnSZSS8Ba37XrfQnZkR9U/KJylKJr8d2/jD+ed3XmvDMUuMN6/dlgl
- +OvPBu1YgSVTtCd7XK6U3x3JIXT99yOXFX7pSxvlvYR/7rpzVHvJSr8DZxYE3pn+9+K376Wn
- lViKMxINtZiLihMBrXrCCtICAAA=
-X-CMS-MailID: 20190218074131eucas1p27a8e0e27609d5eaadcacf8391849838d
-X-Msg-Generator: CA
-X-RootMTR: 20190215125239eucas1p2d9167af42f2d04e462c56a070c3371c2
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190215125239eucas1p2d9167af42f2d04e462c56a070c3371c2
-References: <20190215125229.30180-1-m.szyprowski@samsung.com>
- <CGME20190215125239eucas1p2d9167af42f2d04e462c56a070c3371c2@eucas1p2.samsung.com>
- <20190215125229.30180-4-m.szyprowski@samsung.com>
- <01569ba7-2e3e-5811-81e1-ca51cacbcb95@linaro.org>
+References: <20190129195214.30272-1-sxauwsk@163.com>
+ <CAKfKVtELqoNNJB0qB88ghGoVrdV2-Ez1DjvmT3dZifntdV0GQg@mail.gmail.com>
+ <2019021615501780626817@163.com>
+ <CAKfKVtGu3dzSR71-Rsp8SR8nq8-XhY5FrgDvxv9iu_L-TyL5+Q@mail.gmail.com>
+ <2019021815163582329937@163.com>
+In-Reply-To: <2019021815163582329937@163.com>
+From: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
+Date: Mon, 18 Feb 2019 13:29:10 +0530
+Message-ID: <CAKfKVtH7Sui0RWTk_unh3vfbtC7b_CnqAjmMF5s3fPHccRnYsw@mail.gmail.com>
+Subject: Re: Re: [PATCH] i2c: cadence: try reset when master receive error
+ interrupts
+To: "sxauwsk@163.com" <sxauwsk@163.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_234136_503448_CEC604D8 
-X-CRM114-Status: GOOD (  18.21  )
+X-CRM114-CacheID: sfid-20190217_235923_956793_978F3854 
+X-CRM114-Status: GOOD (  21.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,89 +94,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Chanwoo Choi <cw00.choi@samsung.com>, Thomas Gleixner <tglx@linutronix.de>,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Cc: linux-kernel <linux-kernel@vger.kernel.org>,
+ Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
+ "michal.simek" <michal.simek@xilinx.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-i2c <linux-i2c@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Daniel,
-
-On 2019-02-15 17:35, Daniel Lezcano wrote:
-> On 15/02/2019 13:52, Marek Szyprowski wrote:
->> Exynos Multi-Core Timer driver (exynos_mct) must be started before ARM
->> Architected Timers (arch_timer), because they both share some common
->> hardware blocks (global system counter) and turning on MCT is needed
->> to get ARM Architected Timer working properly. Increase MCT timer rating
->> and hotplug priority over ARM Archictected timer driver to achieve that.
-> This is a hack.
+On Mon, Feb 18, 2019 at 12:48 PM sxauwsk@163.com <sxauwsk@163.com> wrote:
 >
-> There are mechanisms to handle this kind of dependency.
+> Hi , Shubhrajyoti
 >
-> eg. https://www.kernel.org/doc/html/v4.15/driver-api/device_link.html
-
-Sorry, but this is not a hack, but proper way to handle this in
-clocksource/timers framework. The ratings assigned to each driver and
-cpu hotplug priority list are exactly for managing the requested order
-of operations if more than one driver has been registered.
-
-Device links operates on the 'kernel device' objects, which are created
-and managed much later than clocksource/timers are initialized. I see no
-use of device links in this context.
-
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  drivers/clocksource/exynos_mct.c | 4 ++--
->>  include/linux/cpuhotplug.h       | 2 +-
->>  2 files changed, 3 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 49413900b24c..58090f57ada3 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -211,7 +211,7 @@ static void exynos4_frc_resume(struct clocksource *cs)
->>  
->>  static struct clocksource mct_frc = {
->>  	.name		= "mct-frc",
->> -	.rating		= 400,
->> +	.rating		= 450,
->>  	.read		= exynos4_frc_read,
->>  	.mask		= CLOCKSOURCE_MASK(32),
->>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
->> @@ -465,7 +465,7 @@ static int exynos4_mct_starting_cpu(unsigned int cpu)
->>  	evt->set_state_oneshot_stopped = set_state_shutdown;
->>  	evt->tick_resume = set_state_shutdown;
->>  	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
->> -	evt->rating = 450;
->> +	evt->rating = 500;
->>  
->>  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
->>  
->> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
->> index fd586d0301e7..bdd544f21102 100644
->> --- a/include/linux/cpuhotplug.h
->> +++ b/include/linux/cpuhotplug.h
->> @@ -115,10 +115,10 @@ enum cpuhp_state {
->>  	CPUHP_AP_PERF_ARM_ACPI_STARTING,
->>  	CPUHP_AP_PERF_ARM_STARTING,
->>  	CPUHP_AP_ARM_L2X0_STARTING,
->> +	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>  	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
->>  	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
->>  	CPUHP_AP_JCORE_TIMER_STARTING,
->> -	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>  	CPUHP_AP_ARM_TWD_STARTING,
->>  	CPUHP_AP_QCOM_TIMER_STARTING,
->>  	CPUHP_AP_ARMADA_TIMER_STARTING,
->>
+> >Hi ,
+> >On Sat, Feb 16, 2019 at 1:21 PM sxauwsk@163.com <sxauwsk@163.com> wrote:
+> >>
+> >> >Hi Sxauwsk,
+> >> >
+> >> >On Wed, Jan 30, 2019 at 3:13 PM sxauwsk <sxauwsk@163.com> wrote:
+> >> >>
+> >> >> When the adapter receive error interrupts, such as NACK, arbitration lost,
+> >> >> cdns_i2c_master_xfer return to the caller directly instead of resuming
+> >> >> the adapter which resulted in the adapter being out of control.
+> >> >>
+> >> >> So when driver detect err_status then try to repair and fix it.
+> >> >>
+> >> >> Signed-off-by: sxauwsk <sxauwsk@163.com>
+> >> >> ---
+> >> >>  drivers/i2c/busses/i2c-cadence.c | 12 +++++++-----
+> >> >>  1 file changed, 7 insertions(+), 5 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+> >> >> index b13605718291..e10048d7524a 100644
+> >> >> --- a/drivers/i2c/busses/i2c-cadence.c
+> >> >> +++ b/drivers/i2c/busses/i2c-cadence.c
+> >> >> @@ -548,10 +548,6 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+> >> >>         cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
+> >> >>                           CDNS_I2C_IDR_OFFSET);
+> >> >>
+> >> >> -       /* If it is bus arbitration error, try again */
+> >> >> -       if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
+> >> >> -               return -EAGAIN;
+> >> >> -
+> >> >>         return 0;
+> >> >>  }
+> >> >>
+> >> >> @@ -617,13 +613,19 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+> >> >>                         id->bus_hold_flag = 0;
+> >> >>
+> >> >>                 ret = cdns_i2c_process_msg(id, msgs, adap);
+> >> >> -               if (ret)
+> >> >> +               if (!ret)
+> >> >>                         goto out;
+> >> >>
+> >> >In case  the Arbitration error happend  the cdns_i2c_process_msg would return 0
+> >> >and we will miss the check  below.
+> >> >
+> >> >Am I missing something ?
+> >> >
+> >> >>                 /* Report the other error interrupts to application */
+> >> >>                 if (id->err_status) {
+> >> >>                         cdns_i2c_master_reset(adap);
+> >> >>
+> >> >> +                       /* If it is bus arbitration error, try again */
+> >> >> +                       if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
+> >> >> +                               ret = -EAGAIN;
+> >> >> +                               goto out;
+> >> >> +                       }
+> >> >> +
+> >> >>                         if (id->err_status & CDNS_I2C_IXR_NACK) {
+> >> >>                                 ret = -ENXIO;
+> >> >>                                 goto out;
+> >> >> --
+> >> >> 2.19.2
+> >> >>
+> >> >>
+> >>
+> >> In cdns_i2c_process_msg process, when detect arbitration lost error return -EAGAIN to  cdns_i2c_master_xfer,  not return 0
+> >> that mean cdns_i2c_process_msg  just go out ignore error check and  problem occur, So we should do something when arbitration error detect.
+> >
+> >Arbitration lost is fine how about other errors like NACK.
 >
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> >> >>                 ret = cdns_i2c_process_msg(id, msgs, adap);
+> >> >> -               if (ret)
+> >> >> +               if (!ret)
+> >> >>                         goto out;
+>
+> Yes, you're right,  This place I should't make any change,  perfect solution!
+>
+> >> >>
+> >> >> -       /* If it is bus arbitration error, try again */
+> >> >> -       if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
+> >> >> -               return -EAGAIN;
+> >> >> -
+> >> >>         return 0;
+> >> >>  }
+>
+>
+> >> >>                 /* Report the other error interrupts to application */
+> >> >>                 if (id->err_status) {
+> >> >>                         cdns_i2c_master_reset(adap);
+> >> >>
+> >> >> +                       /* If it is bus arbitration error, try again */
+> >> >> +                       if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
+> >> >> +                               ret = -EAGAIN;
+> >> >> +                               goto out;
+> >> >> +                       }
+> >> >> +
+>
+> Maybe Just remove Arbitration lost Detect part from  cdns_i2c_process_msg function,  then add to cdns_i2c_master_xfer,  Do you think?
 
+I agree.
+>
+>
+>
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
