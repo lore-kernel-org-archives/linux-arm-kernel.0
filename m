@@ -4,51 +4,53 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BB91C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:59:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A26EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:06:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 38CDE2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:59:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6985A2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:06:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SgHazJLR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 38CDE2084D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SqSJT7jV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6985A2146F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=dqeEd4Ymaa3qa+rSGm8GE0148KIT2vblYfgKCySTwes=; b=SgHazJLR5noEvr
-	wD/04Vqw2u4FJW/w6WtRQtLQBGTrvbnq9z49NdDRYSPjCUmUsq9eVryeQmGsJ+7nm0f0uhy1T6DHI
-	83r5fVeWcjOOfE9rXje8zhcMgWNIgDcYq7ho1zwjr5P5Ef+YdoG9vE2uYojR3mxnSAB0hl016vAAV
-	ozUyp10IxAc7TVI1wjTzCPoJGFk+3YhLhU3WIqkXqogggXD0kLYqWck3Bc/WLQ/r8gFGtSNCQd7MC
-	hQdKCLfWbp07vv3shm+z/ntc9PYoXXZqJQVS7jbxFFXGf/5hylvEM6hrUxZKzkOR4TY4KfmMCuDBs
-	K9vFPO2tn34oPgz396HA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=s6LuBbIXK9IgO0Wl1wvhV5LYEdj8+Vbe2x5W7WySdEQ=; b=SqSJT7jVDLJ+vX
+	SLlIIOSOC0G9LDeJ784IDknZzV8+mU/gIZKxRFkRozZCCAxavykks0soZzqvgjcq6aEuCK7qlPVJr
+	IeP7uRe1TpgcBu42q7nlcsb6dphqzlQgpZDotu4HkgE4IMPrS0ZXGhiuyOZAtJMjBLL7b1jFXDCHk
+	tAruvIjhy/GrIE4oU0+kPz89241gSrdHPbCN5WwxO0JLjhYHB+xxvrVLtkcSeDTgGcYrW2/ef1W8h
+	R3Rs7FDtSswxX9KHl3pakcRmug10nHn6EBXgwp+aoKSJ7R7GGHHBkiTTSOjDH25Earwuqn13pyXDd
+	wFBUuRfuVTT75PtIFcGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvfhj-0008No-0f; Mon, 18 Feb 2019 09:59:15 +0000
+	id 1gvfod-0003PV-Rl; Mon, 18 Feb 2019 10:06:23 +0000
 Received: from bhuna.collabora.co.uk ([46.235.227.227])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvfhf-0008NJ-Uj; Mon, 18 Feb 2019 09:59:13 +0000
+ id 1gvfoV-0003P2-9R; Mon, 18 Feb 2019 10:06:21 +0000
 Received: from [127.0.0.1] (localhost [127.0.0.1])
- (Authenticated sender: ezequiel) with ESMTPSA id 102AF268AF6
+ (Authenticated sender: ezequiel) with ESMTPSA id B8260268AF6
 From: Ezequiel Garcia <ezequiel@collabora.com>
 To: Heiko Stuebner <heiko@sntech.de>
-Subject: [PATCH] arm64: dts: rockchip: enable mali on rock960 boards
-Date: Mon, 18 Feb 2019 06:58:57 -0300
-Message-Id: <20190218095857.26662-1-ezequiel@collabora.com>
+Subject: [PATCH] arm64: dts: rockchip: enable mali on Rock Pi 4
+Date: Mon, 18 Feb 2019 07:05:55 -0300
+Message-Id: <20190218100555.27317-1-ezequiel@collabora.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190218095857.26662-1-ezequiel@collabora.com>
+References: <20190218095857.26662-1-ezequiel@collabora.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_015912_120263_101E8412 
-X-CRM114-Status: UNSURE (   7.89  )
+X-CRM114-CacheID: sfid-20190218_020615_464693_03C62549 
+X-CRM114-Status: UNSURE (   8.40  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -74,14 +76,14 @@ Enable the mali gpu node.
 
 Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi | 5 +++++
+ arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-index 2927db4dda9d..d1248065fe14 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi
-@@ -96,6 +96,11 @@
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts b/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
+index 4a543f2117d4..1e479d06e67e 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
+@@ -157,6 +157,11 @@
  	status = "okay";
  };
  
@@ -91,8 +93,8 @@ index 2927db4dda9d..d1248065fe14 100644
 +};
 +
  &hdmi {
- 	ddc-i2c-bus = <&i2c3>;
  	pinctrl-names = "default";
+ 	pinctrl-0 = <&hdmi_cec>;
 -- 
 2.20.1
 
