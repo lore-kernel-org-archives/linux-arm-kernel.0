@@ -4,78 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E31C5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:55:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E1887C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:55:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1BFD204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:55:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B0E82204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:55:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B7buQwHL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ZIiQuQ+F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1BFD204EC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JSIm+Fz2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B0E82204EC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=pC59CG/AaVlqCrEivxDnet2uH7MsHfJiXX9UA3IXc5s=; b=B7buQwHLknposrv6kN5ZNgv6bq
-	fj2URFlElzVtqZ77LPxIurs4+QpVh14phC+0OI8GoBebmhnlu+YH38RmYTYHHChQX6XjhmyW6cbN8
-	ourmSydzSa0eSoKMmVcNb0gXRMStbq2nwRpxjdQX3nMepA6J/PMFvWZgs6yqmBIs08aZS56EwBnCx
-	JCOJSygdK7u0gQCM9dV6kDxNo93N+hIfOQNPRfvpz9XTEMW0r6WaiGpDlBiygNoBz+zW9yylLs5ZP
-	GOF6kvQ2NLN7enjYyFdJFUEVGBRcF0MeZ54c2nRPx5SPMGFHoZZjkmihforyJBH+dFFY4t3IE0Z3c
-	cemq7VNA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=hCI4HoXATFK1/Y48qsF1hdzg+s7OC2dumiU9TJPopes=; b=JSIm+Fz2Sf1Hst
+	vWPQsjHKCJ8RnenXFPDHCNv7fT99G6AqAF3HG2ngKJOqUYNHPZYI+eunkd9q3rBnOsL1DBn0WyvAW
+	UKmNXl9Z5nePLOkISR553OVExjHDx1dlb6PC5tnXaOfmPrKUj8/eITXBvDm5ATYFTHXyrgDXuvDLm
+	BKvyh8wDNGyzfHAwjXkdJCNn0VAih17itOZm75UAcRSAMF8JL+GHVm3HhTLvuw8h0S/8TJiAQHjB7
+	Oz2BnskqlkxESdJfnlGs9N26qq21QQt3L3nj5xPAjMMzHd6BIqSVVA0V15ppzRIY0jvbIBRKXbRKX
+	CBgBLZvKfMiBQh5/6pfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp0r-0007RC-Sc; Mon, 18 Feb 2019 19:55:37 +0000
-Received: from casper.infradead.org ([85.118.1.10])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozr-00054V-9v
- for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 19:54:35 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=EGVd4wWWCYzC2d2I1ARHCXe9ats6kM/tkZ+D1/b526Q=; b=ZIiQuQ+FKLVmuZfZYTFB4lk+w
- VsTQ7x502mSNuTfnnV/qEfGwv8YI4lTiGVpYLO+NHAezxC09leSG53qofs4QfGa5ZdjKJ1l0XYgNI
- +4o5r9JTt6KCuAk6pcNHcVyHnAdDQZquYwoU8+gu/C2B4twT30C4ERpf8Y/hn9fIXROFKA8e+bnyD
- 8zEpfkNPFGSNh2CdBkvEuYqq2DOxvN5VH3fPqYjztphCZ17WcM2aphsloHs2HVIf5XeTguj+pccpV
- HIeie/OHBdeVYd3nS6CDvFCT7UgZfTv7S4oO2el/VvwJtdFRUNgohiwqRzmiGppIjq65OemuywlnZ
- MtiDmrPVw==;
-Received: from foss.arm.com ([217.140.101.70])
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozn-0005mk-J4
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:33 +0000
+	id 1gvp12-0007g5-LP; Mon, 18 Feb 2019 19:55:48 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvozf-0004mb-NN
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:35 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9A8AE1C00;
- Mon, 18 Feb 2019 11:54:13 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4DA171650;
+ Mon, 18 Feb 2019 11:53:54 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 84E7D3FD9E;
- Mon, 18 Feb 2019 11:54:01 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 358523F77D;
+ Mon, 18 Feb 2019 11:53:32 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 16/26] KVM: arm64: Add missing #include of <linux/string.h>
- in guest.c
-Date: Mon, 18 Feb 2019 19:52:29 +0000
-Message-Id: <1550519559-15915-17-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 03/26] KVM: arm64: Delete orphaned declaration for
+ __fpsimd_enabled()
+Date: Mon, 18 Feb 2019 19:52:16 +0000
+Message-Id: <1550519559-15915-4-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_195431_799026_8340ED13 
-X-CRM114-Status: UNSURE (   9.50  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190218_115424_176135_2840F970 
+X-CRM114-Status: GOOD (  10.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,41 +79,26 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Julien Grall <julien.grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-arch/arm64/kvm/guest.c uses the string functions, but the
-corresponding header is not included.
-
-We seem to get away with this for now, but for completeness this
-patch adds the #include, in preparation for adding yet more
-memset() calls.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kvm/guest.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 65f4338..f83fe22 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -23,6 +23,7 @@
- #include <linux/err.h>
- #include <linux/kvm_host.h>
- #include <linux/module.h>
-+#include <linux/string.h>
- #include <linux/vmalloc.h>
- #include <linux/fs.h>
- #include <kvm/arm_psci.h>
--- 
-2.1.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+X19mcHNpbWRfZW5hYmxlZCgpIG5vIGxvbmdlciBleGlzdHMsIGJ1dCBhIGRhbmdsaW5nIGRlY2xh
+cmF0aW9uIGhhcwpzdXJ2aXZlZCBpbiBrdm1faHlwLmguCgpUaGlzIHBhdGNoIGdldHMgcmlkIG9m
+IGl0LgoKU2lnbmVkLW9mZi1ieTogRGF2ZSBNYXJ0aW4gPERhdmUuTWFydGluQGFybS5jb20+ClJl
+dmlld2VkLWJ5OiBBbGV4IEJlbm7DqWUgPGFsZXguYmVubmVlQGxpbmFyby5vcmc+Ci0tLQogYXJj
+aC9hcm02NC9pbmNsdWRlL2FzbS9rdm1faHlwLmggfCAxIC0KIDEgZmlsZSBjaGFuZ2VkLCAxIGRl
+bGV0aW9uKC0pCgpkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9pbmNsdWRlL2FzbS9rdm1faHlwLmgg
+Yi9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaAppbmRleCBhODBhN2VmLi5iZDdhMDU1
+IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaAorKysgYi9hcmNo
+L2FybTY0L2luY2x1ZGUvYXNtL2t2bV9oeXAuaApAQCAtMTQ4LDcgKzE0OCw2IEBAIHZvaWQgX19k
+ZWJ1Z19zd2l0Y2hfdG9faG9zdChzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUpOwogCiB2b2lkIF9fZnBz
+aW1kX3NhdmVfc3RhdGUoc3RydWN0IHVzZXJfZnBzaW1kX3N0YXRlICpmcF9yZWdzKTsKIHZvaWQg
+X19mcHNpbWRfcmVzdG9yZV9zdGF0ZShzdHJ1Y3QgdXNlcl9mcHNpbWRfc3RhdGUgKmZwX3JlZ3Mp
+OwotYm9vbCBfX2Zwc2ltZF9lbmFibGVkKHZvaWQpOwogCiB2b2lkIGFjdGl2YXRlX3RyYXBzX3Zo
+ZV9sb2FkKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSk7CiB2b2lkIGRlYWN0aXZhdGVfdHJhcHNfdmhl
+X3B1dCh2b2lkKTsKLS0gCjIuMS40CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtl
+cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
+YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
