@@ -2,21 +2,20 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_NEOMUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7F62BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 08:50:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 902D2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 08:50:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 503182089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 08:50:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F74E2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 08:50:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DNLPqYdw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 503182089F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yjig5BkB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F74E2089F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +24,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5GpMXnyBOmeu0Kjb2Tf7AegjhGl9228RnEz+1NV4E0c=; b=DNLPqYdwakxff0GLaVoxJCc66
-	pCftAKP3skCShnLo/0rb2ISAr6W6cGzfDBsNBUqqjl0slDSztF1t8KaP4RJHFWE7czq2D47F4e2Po
-	mqVKS08KInIILelMPqxaQwUq1YgItKnaChBsRU8Cfj3q/L1cNav1YPP7/U288uQxu8vmHub3+kxr8
-	slQH6C/ezIIEAFdJuqIjHaqcR41lIhECgqo427rF40PQ2DP1U2Oc0XVuPXwRYwmIcdCDrLoz5CPbX
-	egbAlzFhSvUBOcHv9BnjTKXW7pjoGVt6VlGVdM7HOP07ZdwDKQbT2AkRi9r8eh7su67jELzKXARol
-	g3QJ6yVZA==;
+	 bh=aHZltCw4A93asndVckoRJa4nVi1DcxtJ2G3Ovxq/+E4=; b=Yjig5BkBd6xyaRosRrHuVCuG7
+	iDexrYavLH0oNCSI+PdCGhqTjIsJP0umF1YAJJ/+w+6ZOVj6CTZWn6Jsl/ZjI6+vA44fkjqib8I0u
+	qLbLmJgjtN2ON0gHhCGuNNA6QSf58ggLSsqMVYxnz+yrDbwLAzzvxpSwAjg3gPl70mYBBXIC9cIaZ
+	1YcfApN2bQgJE9rpDo2vBz+aVUWHRMA9w8lHAbK4KZZQFiaDJl1sBa4O3p2/mKaBdNCOau7nOZ0Ri
+	Q4tOKsgd7hwSxPyzGf1YSOqkSIwqdwGpdpHPyAS0CwggUX0AUYDbvo0uKQE7rN7TXBUnd+1dMPbrq
+	oADXlL0VQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvecp-0007gb-FS; Mon, 18 Feb 2019 08:50:07 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
+	id 1gvedI-0000CQ-K6; Mon, 18 Feb 2019 08:50:36 +0000
+Received: from relay2-d.mail.gandi.net ([217.70.183.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvecm-0007Hd-FF
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 08:50:06 +0000
+ id 1gvedF-0000By-GO
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 08:50:35 +0000
 X-Originating-IP: 90.88.30.68
 Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
  [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id D1EB5C0015;
- Mon, 18 Feb 2019 08:50:01 +0000 (UTC)
-Date: Mon, 18 Feb 2019 09:50:01 +0100
+ by relay2-d.mail.gandi.net (Postfix) with ESMTPSA id D77F24000F;
+ Mon, 18 Feb 2019 08:50:30 +0000 (UTC)
+Date: Mon, 18 Feb 2019 09:50:30 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Yangtao Li <tiny.windzz@gmail.com>
-Subject: Re: [PATCH 3/5] nvmem: sunxi-sid: add binding for H6's SID controller
-Message-ID: <20190218085001.or32zojdpluocg3g@flea>
+Subject: Re: [PATCH 5/5] nvmem: sunxi-sid: convert to SPDX license tags
+Message-ID: <20190218085030.wfpxuvysrweghfo5@flea>
 References: <20190217162316.14111-1-tiny.windzz@gmail.com>
- <20190217162316.14111-4-tiny.windzz@gmail.com>
+ <20190217162316.14111-6-tiny.windzz@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190217162316.14111-4-tiny.windzz@gmail.com>
+In-Reply-To: <20190217162316.14111-6-tiny.windzz@gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_005004_720965_BC1C2DA2 
-X-CRM114-Status: UNSURE (   8.54  )
+X-CRM114-CacheID: sfid-20190218_005033_705380_966C2E9E 
+X-CRM114-Status: UNSURE (   8.29  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -71,24 +70,24 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org, wens@csie.org, robh+dt@kernel.org,
  srinivas.kandagatla@linaro.org, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============0008995814789129654=="
+Content-Type: multipart/mixed; boundary="===============3840948337912343133=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============0008995814789129654==
+--===============3840948337912343133==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="d7e7m6pjzbgim6fq"
+	protocol="application/pgp-signature"; boundary="7zic7777f6jad4o4"
 Content-Disposition: inline
 
 
---d7e7m6pjzbgim6fq
+--7zic7777f6jad4o4
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Sun, Feb 17, 2019 at 11:23:14AM -0500, Yangtao Li wrote:
-> Add a binding for H6's SID controller.
+On Sun, Feb 17, 2019 at 11:23:16AM -0500, Yangtao Li wrote:
+> Updates license to use SPDX-License-Identifier.
 >=20
 > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
 
@@ -101,21 +100,21 @@ Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---d7e7m6pjzbgim6fq
+--7zic7777f6jad4o4
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGpxuQAKCRDj7w1vZxhR
-xYKAAQD2lZlnwHL5FMSNiVLoKkH8ifGzZ48tShn3ROIDjxnPygEAtUO2NnpZzbWh
-TJAMgcrFJJ1bF33CnS5mVnEpIQz7Dg8=
-=BlLD
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGpx1gAKCRDj7w1vZxhR
+xWkmAP9do9WqH/T6q1mimcfyQHRQ4GMH11wocFFs6XcmezumhQD9FckYirnIbKyy
+lPXwfsmh0tEHSEPan0QXF6MwE+IU1wM=
+=RsRR
 -----END PGP SIGNATURE-----
 
---d7e7m6pjzbgim6fq--
+--7zic7777f6jad4o4--
 
 
---===============0008995814789129654==
+--===============3840948337912343133==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -126,5 +125,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============0008995814789129654==--
+--===============3840948337912343133==--
 
