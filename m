@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 51F39C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:55:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D7380C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:55:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E04C218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:55:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A941B218AD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:55:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OcHgNhm7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E04C218D3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gpF9ID4E"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A941B218AD
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,29 +26,29 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=bYwLj+lOvwEo0QU012PHcf9ODZVXnLo5dzphWKMOaQ0=; b=OcHgNhm7kCc+IBggK1CSuIMyhu
-	Wu91AtlIzUiVK8l4QOhsMXnTSDa2S95Mlf0icukuBP+eskGRj7Qy8zvlfDd6jnwvCLM+OHON68STG
-	RXoXF5vGN+mDM3xyuNlMIfmU0NWbsUL+7TiSdHTTkjCUf+mQVKeSLNzsrijKa1rNfw4uDANE3B2oQ
-	b+9CNGd3zvG2HVygsDV72ClzhSK9h0M98qU3TRkPwtbJjpzQ+LcniQIwkmEgS7j5WYTXqSFmYupdL
-	e8pJ5dVzlsAmSlKyxWqpiZGH6RQpfccsscTATRIFUKdwLMEcpm2QWA5KPuE98WBnEbFpbuWY0KzN7
-	4rqH79/w==;
+	bh=163xPTWOUSQujnXo1Dv5FZ/0nZao8YJQWPewiQctgks=; b=gpF9ID4EF67h7cJiE2rDyK0U68
+	FFcGP4fS4sDZH9737ROnx0AzzkrmXllGCISPqzPVyEcaPn4LaSIwq/TtZh/4po2KG3BUZSnjbjcW7
+	T0Wp6N+OQzjSF7TkNbHJVNdLFxF81nnQn6J28V3/e8Re00Ps7ydg4Uweyu90Sz+Mop1xfqOtMfMBf
+	oESBii0FGd1QQbp+w1u2Wz6CcGtIakHUa3y7gg7y4MOkSKj7wavV29+M4W6ISsVGUJBC1x15VwvK2
+	74a4pqWm/qhb8HfkB/ZFAwf+zfcofzoc8tqbeuodYqPgfQXmb6NTpnd6CY/eQLUPoKuFI1LgsWdPW
+	apYhMZzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvfeL-000721-6o; Mon, 18 Feb 2019 09:55:45 +0000
+	id 1gvfeW-0007GC-4L; Mon, 18 Feb 2019 09:55:56 +0000
 Received: from inva021.nxp.com ([92.121.34.21])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvfbg-0002iB-8N
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:53:12 +0000
+ id 1gvfbe-0002hQ-Vu
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:53:17 +0000
 Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 096AF200400;
- Mon, 18 Feb 2019 10:52:59 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id AF6F6200008;
+ Mon, 18 Feb 2019 10:52:57 +0100 (CET)
 Received: from invc005.ap-rdc01.nxp.com (invc005.ap-rdc01.nxp.com
  [165.114.16.14])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id A118B2000EA;
- Mon, 18 Feb 2019 10:52:51 +0100 (CET)
+ by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 185BA20008A;
+ Mon, 18 Feb 2019 10:52:50 +0100 (CET)
 Received: from titan.ap.freescale.net (TITAN.ap.freescale.net [10.192.208.233])
- by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id 669B740307;
- Mon, 18 Feb 2019 17:52:42 +0800 (SGT)
+ by invc005.ap-rdc01.nxp.com (Postfix) with ESMTP id D9455402F8;
+ Mon, 18 Feb 2019 17:52:40 +0800 (SGT)
 From: Xiaowei Bao <xiaowei.bao@nxp.com>
 To: bhelgaas@google.com, Zhiqiang.Hou@nxp.com, robh+dt@kernel.org,
  mark.rutland@arm.com, shawnguo@kernel.org, leoyang.li@nxp.com,
@@ -56,17 +56,16 @@ To: bhelgaas@google.com, Zhiqiang.Hou@nxp.com, robh+dt@kernel.org,
  l.subrahmanya@mobiveil.co.in, arnd@arndb.de, Minghuan.Lian@nxp.com,
  linux-pci@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  devicetree@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [PATCH 6/6] misc: pci_endpoint_test: Add the layerscape PCIe GEN4 EP
- device support
-Date: Mon, 18 Feb 2019 17:46:43 +0800
-Message-Id: <20190218094643.2692-6-xiaowei.bao@nxp.com>
+Subject: [PATCH 5/6] arm64: dts: freescale: lx2160a: add pcie EP mode DT nodes
+Date: Mon, 18 Feb 2019 17:46:42 +0800
+Message-Id: <20190218094643.2692-5-xiaowei.bao@nxp.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20190218094643.2692-1-xiaowei.bao@nxp.com>
 References: <20190218094643.2692-1-xiaowei.bao@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_015300_464011_8856649C 
-X-CRM114-Status: UNSURE (   8.96  )
+X-CRM114-CacheID: sfid-20190218_015259_431957_43CBCA45 
+X-CRM114-Status: UNSURE (   8.33  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,25 +85,116 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add the layerscape PCIE GEN4 EP device support in pci_endpoint_test driver.
+The LX2160A PCIe EP mode node.
 
 Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
 ---
- drivers/misc/pci_endpoint_test.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+depends on: http://patchwork.ozlabs.org/project/linux-pci/list/?series=88754
 
-diff --git a/drivers/misc/pci_endpoint_test.c b/drivers/misc/pci_endpoint_test.c
-index 896e2df..8c3435b 100644
---- a/drivers/misc/pci_endpoint_test.c
-+++ b/drivers/misc/pci_endpoint_test.c
-@@ -789,6 +789,7 @@ static void pci_endpoint_test_remove(struct pci_dev *pdev)
- 	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_DRA74x) },
- 	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_DRA72x) },
- 	{ PCI_DEVICE(PCI_VENDOR_ID_SYNOPSYS, 0xedda) },
-+	{ PCI_DEVICE(PCI_VENDOR_ID_FREESCALE, 0x8d80) },
- 	{ }
+ arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi |   56 ++++++++++++++++++++++++
+ 1 files changed, 56 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+index 3a64f6e..5fee592 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+@@ -923,6 +923,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3400000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03400000 0x0 0x00100000
++			       0x80 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			status = "disabled";
++		};
++
+ 		pcie@3500000 {
+ 			compatible = "fsl,lx2160a-pcie";
+ 			reg = <0x00 0x03500000 0x0 0x00100000   /* controller registers */
+@@ -950,6 +959,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3500000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03500000 0x0 0x00100000
++			       0x88 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			status = "disabled";
++		};
++
+ 		pcie@3600000 {
+ 			compatible = "fsl,lx2160a-pcie";
+ 			reg = <0x00 0x03600000 0x0 0x00100000   /* controller registers */
+@@ -977,6 +995,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3600000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03600000 0x0 0x00100000
++			       0x90 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			max-functions = <2>;
++			status = "disabled";
++		};
++
+ 		pcie@3700000 {
+ 			compatible = "fsl,lx2160a-pcie";
+ 			reg = <0x00 0x03700000 0x0 0x00100000   /* controller registers */
+@@ -1004,6 +1032,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3700000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03700000 0x0 0x00100000
++			       0x98 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			status = "disabled";
++		};
++
+ 		pcie@3800000 {
+ 			compatible = "fsl,lx2160a-pcie";
+ 			reg = <0x00 0x03800000 0x0 0x00100000   /* controller registers */
+@@ -1031,6 +1068,16 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3800000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03800000 0x0 0x00100000
++			       0xa0 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			max-functions = <2>;
++			status = "disabled";
++		};
++
+ 		pcie@3900000 {
+ 			compatible = "fsl,lx2160a-pcie";
+ 			reg = <0x00 0x03900000 0x0 0x00100000   /* controller registers */
+@@ -1058,5 +1105,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		pcie_ep@3900000 {
++			compatible = "fsl,lx2160a-pcie-ep";
++			reg = <0x00 0x03900000 0x0 0x00100000
++			       0xa8 0x00000000 0x8 0x00000000>;
++			reg-names = "regs", "addr_space";
++			num-ob-windows = <256>;
++			status = "disabled";
++		};
++
+ 	};
  };
- MODULE_DEVICE_TABLE(pci, pci_endpoint_test_tbl);
 -- 
 1.7.1
 
