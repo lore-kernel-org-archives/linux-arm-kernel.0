@@ -7,81 +7,86 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83EFCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:20:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ACE3DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:21:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5275C2184E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:20:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A6E92184E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:21:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KVFUCMHc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5275C2184E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HAdbtuz/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="ZEA+UkoU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A6E92184E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1hmA1P2m4I3H2N3ViU+34vtV2qa1OpyYy/QjfFBYem0=; b=KVFUCMHcxqgJ1u
-	3Nyc9d9p7FbjKNITIKTkXpjw3tLjq2ruatMVmR6mEQmfJZX9Z1OZlmjFG0KD/ORJ4bh3LPOiYb4Ro
-	EEZJBBi+kQWtdaCCcH4nSkvfuuNj3Pmp8Oz6YdxGOiN6TiCsljd1Wk2aDHwIoWiZSD86PD/E/NM17
-	MgBnIwIwf+IzYu7qY9VMegZGCtkfnOSy/8QCbWZjXk9Z+sX4LfVr/BC4fkmBDkTIyAox/bEYnvQhc
-	R9MMc8kVNEa2V3Votp0PAaWI7EtfgwLKk3EGYmaVML1pkFCPs16IJwHU3/hOFzLSchA4D5XsJtEZR
-	R4FCs56q/1QCx40IMTfg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=IxKsequMDWsacZkAG5fm1OeQMa3YS0C1NOjPMW/9oxs=; b=HAdbtuz/Jt2NCw9+5pXtP6xUG
+	kxbFUOnSQ0UN1qpuScihLLrAXW2RCPUG4HmBvUmJr2jC/PngBukk0SZIkewNHL2Kp6wdh/nv8xi4i
+	sJvjXEyRcqXCI9OcyhUbP6kHv/cAR2YCYUEDj3eNtc8hj/zMBTMra7bHZPc4kpQvRKJLvxMQTuNXg
+	/YGzUOsUx0or3zjmeM+NlG7Q+QzF5yObyy0QMMTLOrwD4zMUQm0NmuoeOMscQ20wH3aPQ4woQWpHJ
+	BElv5n94Xa6Q/9OfMsvNya/33pyHbY4oX+pmFKnvcW5YofTD0yxyJ9fWtzgLwRMRi91aTSPaE2MXU
+	wzReMXZbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvf5l-0002xg-83; Mon, 18 Feb 2019 09:20:01 +0000
-Received: from mail-ed1-f66.google.com ([209.85.208.66])
+	id 1gvf79-0004cr-1p; Mon, 18 Feb 2019 09:21:27 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvf5i-0002wQ-1d
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:19:59 +0000
-Received: by mail-ed1-f66.google.com with SMTP id b3so13245889ede.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 01:19:54 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=/XrklYpNWnYcNWVDYLyQUagxKF+mFK8VoH185hzGYac=;
- b=ODbdp8TW8kxGGkNp73xmGEgiPLcOeyiACtp/3tZU7acquAgcxv0Ma0eb5Mu+p7cRlH
- zu0m+dxgxRyMQ+sJPmkJO//EKcTIIfnSuGM1k4n1kCqQ7qRuLycfIeHA6J/4SQPaEaPE
- +g1ZZAmod8a0hy271Mlt2QO8B7gmUQoykO7HKe3Yzo/2l980XuQXwPJhe36lNi6PHp+6
- MaZmI3isGUpf0FwjCf/sIXsS5oUrVuxd7CoovmAvkV1eW+HkLka9cCpdF1DJFjf3XM/8
- 4vF7Q4BX1kGblhmnAFglZoKVbyEIFtC54MBH0HbrjxIePNDFr/S4iya7ZX6+2oe+V3Xd
- QxBw==
-X-Gm-Message-State: AHQUAuZjQmswgpUlK14lPQfAVFI7zlXccVfcItMNHYeLzbV5LkPY71DH
- UdYeDFLcSyK24vYfgYbvlwxg2Ksso5w=
-X-Google-Smtp-Source: AHgI3IZewjmRNyUnB7CgELm8ubXIjX+eFWkKAa0oUYP5uktNcPwxLNzafQUhfF4ZTXo1LRHic+cwpQ==
-X-Received: by 2002:a50:c299:: with SMTP id o25mr18568058edf.281.1550481592427; 
- Mon, 18 Feb 2019 01:19:52 -0800 (PST)
-Received: from mail-wm1-f45.google.com (mail-wm1-f45.google.com.
- [209.85.128.45])
- by smtp.gmail.com with ESMTPSA id s3sm2920380ejk.34.2019.02.18.01.19.50
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 18 Feb 2019 01:19:51 -0800 (PST)
-Received: by mail-wm1-f45.google.com with SMTP id x10so16130725wmg.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 01:19:50 -0800 (PST)
-X-Received: by 2002:a7b:c00f:: with SMTP id c15mr14993134wmb.14.1550481590283; 
- Mon, 18 Feb 2019 01:19:50 -0800 (PST)
+ id 1gvf76-0004cX-Cx
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:21:25 +0000
+Received: from hqpgpgate102.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c6a791a0000>; Mon, 18 Feb 2019 01:21:30 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate102.nvidia.com (PGP Universal service);
+ Mon, 18 Feb 2019 01:21:23 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate102.nvidia.com on Mon, 18 Feb 2019 01:21:23 -0800
+Received: from DRHQMAIL101.nvidia.com (10.27.9.10) by HQMAIL106.nvidia.com
+ (172.18.146.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 18 Feb
+ 2019 09:21:23 +0000
+Received: from [10.19.108.132] (10.124.1.5) by DRHQMAIL101.nvidia.com
+ (10.27.9.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 18 Feb
+ 2019 09:21:21 +0000
+Subject: Re: [PATCH V6 5/7] arm64: dts: tegra210: add CPU idle states
+ properties
+To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
+ <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>, "Thomas
+ Gleixner" <tglx@linutronix.de>
+References: <20190201161654.18315-1-josephl@nvidia.com>
+ <20190201161654.18315-6-josephl@nvidia.com>
+ <d98266b3-f0a4-cebe-174a-2ab5c4051fde@linaro.org>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <b6f7b1d2-5d7e-dbb2-9b43-f9bd727442d3@nvidia.com>
+Date: Mon, 18 Feb 2019 17:21:19 +0800
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <20190217162316.14111-1-tiny.windzz@gmail.com>
- <20190217162316.14111-3-tiny.windzz@gmail.com>
- <20190218084931.fdut6d4cgwkwvihx@flea>
-In-Reply-To: <20190218084931.fdut6d4cgwkwvihx@flea>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Mon, 18 Feb 2019 17:19:40 +0800
-X-Gmail-Original-Message-ID: <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
-Message-ID: <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
-Subject: Re: [PATCH 2/5] nvmem: sunxi-sid: add support for H5's SID controller
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+In-Reply-To: <d98266b3-f0a4-cebe-174a-2ab5c4051fde@linaro.org>
+X-Originating-IP: [10.124.1.5]
+X-ClientProxiedBy: HQMAIL105.nvidia.com (172.20.187.12) To
+ DRHQMAIL101.nvidia.com (10.27.9.10)
+Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1550481690; bh=ENS4HhqjAUg8pvS47aAvOALLqBo8dmuR1+IPPOVUF3Q=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=ZEA+UkoUB4rDtsDXqnIuQ7+TmNSp7ZFJ4m7wg/9Fk02rv80RJI/2PmeX1WBEq7U+1
+ YA2bRtiJq9uWBO+oiSQY5iE6AjEWLt+NjWnNVOIFTfVMPNaPw5r79irtfowTBkvrkD
+ +4JfeHEp6oQO6ozDTJCmyrTEBkAka98uC2/bLUwM9oA5fx+wl9hpljrvHLBsgbBf9X
+ SRPRQdyn3qOhlVH1B8MJzS3Zg6Z+kAF8nDBp0VwcAPUG7UVXwRjNq5TzeDC28lNIF9
+ NZEAMiJzTcLWR8ZmvTMWUswwX950r3gvEqw0stgIcZ1j4hij75WvjS61apOoKt9zNH
+ 90XIdgBaYUjMQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_011958_087324_667D157E 
-X-CRM114-Status: GOOD (  20.61  )
+X-CRM114-CacheID: sfid-20190218_012124_450435_DCF2D9EF 
+X-CRM114-Status: GOOD (  15.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,59 +98,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, Yangtao Li <tiny.windzz@gmail.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 4:49 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Sun, Feb 17, 2019 at 11:23:13AM -0500, Yangtao Li wrote:
-> > Add support for H5's SID controller.
-> >
-> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > ---
-> >  drivers/nvmem/sunxi_sid.c | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> >
-> > diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-> > index 570a2e354f30..036029e90921 100644
-> > --- a/drivers/nvmem/sunxi_sid.c
-> > +++ b/drivers/nvmem/sunxi_sid.c
-> > @@ -219,11 +219,17 @@ static const struct sunxi_sid_cfg sun50i_a64_cfg = {
-> >       .size = 0x100,
-> >  };
-> >
-> > +static const struct sunxi_sid_cfg sun50i_h5_cfg = {
-> > +     .value_offset = 0x200,
-> > +     .size = 0x100,
-> > +};
->
-> IIRC, there was an endianness issue on the newer SoCs, with the driver
-> converting the data from big endian to little endian, while it's
-> actually stored little endian in the SID.
+On 2/15/19 11:47 PM, Daniel Lezcano wrote:
+> On 01/02/2019 17:16, Joseph Lo wrote:
+>> Add idle states properties for generic ARM CPU idle driver. This
+>> includes a C7 state which is the power down state of CPU cores.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>> v6:
+>>   * add ack tag from Jon.
+>> v5:
+>>   * no change
+>> v4:
+>>   * no change
+>> v3:
+>>   * no change
+>> v2:
+>>   * add entry-latency-us and exit-latency-us properties
+>>
+>> Note:
+>> This dt patch depends on the DT changes in below series.
+>> http://patchwork.ozlabs.org/project/linux-tegra/list/?series=84380
+>> ---
+>>   arch/arm64/boot/dts/nvidia/tegra210.dtsi | 19 +++++++++++++++++++
+>>   1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> index 2b387364afc3..75534692604c 100644
+>> --- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> +++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+>> @@ -1318,24 +1318,43 @@
+>>   				 <&dfll>;
+>>   			clock-names = "cpu_g", "pll_x", "pll_p", "dfll";
+>>   			clock-latency = <300000>;
+>> +			cpu-idle-states = <&C7>;
+> 
+> Please change the C7 name, that will be confusing with the C-state.
+> 
+> CPU_SLEEP would be nice and consistent with other drivers.
+> 
+>>   		};
+>>   
+>>   		cpu@1 {
+>>   			device_type = "cpu";
+>>   			compatible = "arm,cortex-a57";
+>>   			reg = <1>;
+>> +			cpu-idle-states = <&C7>;
+>>   		};
+>>   
+>>   		cpu@2 {
+>>   			device_type = "cpu";
+>>   			compatible = "arm,cortex-a57";
+>>   			reg = <2>;
+>> +			cpu-idle-states = <&C7>;
+>>   		};
+>>   
+>>   		cpu@3 {
+>>   			device_type = "cpu";
+>>   			compatible = "arm,cortex-a57";
+>>   			reg = <3>;
+>> +			cpu-idle-states = <&C7>;
+>> +		};
+>> +
+>> +		idle-states {
+>> +			entry-method = "psci";
+>> +
+>> +			C7: c7 {
+>> +				compatible = "arm,idle-state";
+>> +				arm,psci-suspend-param = <0x40000007>;
+>> +				entry-latency-us = <250>;
+>> +				exit-latency-us = <100>;
+>> +				min-residency-us = <1000>;
+>> +				wakeup-latency-us = <130>;
+> 
+> Regarding the entry and the exit latency, the wakeup latency sounds a
+> bit small.
+> 
+> ./devicetree/bindings/arm/idle-states.txt
+> 
+>> +				idle-state-name = "c7-cpu-powergated";
+> 
+> "cpu-sleep"
+> 
 
-About that, it seems the internals are either little endian or native (same
-as the bus). Either way the nvmem the driver currently exposes is wrong.
+Will fix them.
 
-My idea is to keep the current one with the current name, but have it not
-associate itself with the DT node. We then register an extra one, called
-"sunxi-sid-native" which uses the native endian. This one will be associated
-with the DT node, so the THS driver can consume nvmem cells.
+Thanks for reviewing,
+Joseph
 
-What do you think?
-
-> Have you checked the SID content?
-
-On the A64 and H5, directly dumping the SID registers (not using the H3
-read method) shows the contents are little or native endian.
-
-ChenYu
+>> +				status = "disabled";
+>> +			};
+>>   		};
+>>   	};
+>>   
+>>
+> 
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
