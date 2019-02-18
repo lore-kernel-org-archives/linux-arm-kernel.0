@@ -2,103 +2,63 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEDB0C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:05:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D37BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:07:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8593E21916
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:05:27 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF02121916
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:07:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="smh/bqF9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=essensium-com.20150623.gappssmtp.com header.i=@essensium-com.20150623.gappssmtp.com header.b="KJPSI94h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8593E21916
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=essensium.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C6hSlg0c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF02121916
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=wVHb7futA5N/X36e44DUQ5jEOAyhYMoeh+3trd5y/NU=; b=smh/bqF9zwIxmpt6p1sQpgWU6a
-	L6YjONk1qJFmA8VK4RZ0MucEIAVHBEEuLu52kKnprPzlduUHYVQdcv1f+wl2XGH55zts6m3bcPkBL
-	5Z/W14dNy2ur7N1Canine2wJtgHjEdB4Q1F//SZb7M0ZCmF5iWC/W2SqseNkGHyw7Z3RbaHpb+Dlb
-	u8NVYcA4JuC8xOY9/XQ9pFNB9sd5rvZrjc7svJXJsuFc6Crvmk5wsMympqjzxWcJFJCgutoM7odcN
-	DB5OiAn25nCPwStu0aWIMgBTzDlR1ly+9+E0CkpNFGFuv8SgkN39Wm04p4kejQp2nZaJd321zkBqD
-	EeeSUnJw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=S/FApACIWLQguhOrL78qG3euxtpyEd710mYYdMEDtCE=; b=C6hSlg0c6+JJJ3IQTjV9deCtv
+	i8EDYSCKhzYy3rtDJo3mcK9SK6kDT7ZTzN/3lF+HHFD5Gya4YnQMjgnFN/T5ipa/O72itopcNpPXC
+	GsvFMDuTCY9YV8N5WhDNEAyzQ+dYcGrbMbIy3la5/1vR9uQGzdRu99a+5Z1yq+XwFI9bMlIPcbPHS
+	DS9V2YtoI+s0ps54HZ46wiBGLRz5OjnBSBPYWepv4SBqgxTvKPvkDqsRCqXtLQys6YwM/PWEEHJ2S
+	NuFOszxDhZmEw9TtSFTiYg4T0/+zYueMIFPg4RorHfrNelonlRrxxA3oRvLGvPJ7Bps+KCnRjEm1Q
+	d2jbsuutA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvjXs-0007I6-Cq; Mon, 18 Feb 2019 14:05:20 +0000
-Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvjWW-0004ad-W3
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:04:00 +0000
-Received: by mail-ed1-x541.google.com with SMTP id m12so13903224edv.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 06:03:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=essensium-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=TMKsmtSeB2s1AaZbZadZjj3xF8b5OyVicGrn8cs6Cxc=;
- b=KJPSI94h/3tr09gSDgWJ5ok7TSJC7JE/SFp+CPCPi5fV/xhzlIP8m+1T5aj3kNAVCS
- xawDKsAC8POcScc1qfEU3Mx7JR/0TIz2paMShO/Y2zlRdoxPpLXQcVNXOi1BkhNbvT5t
- k0Dsnts9zdDl5ya7+AE5PYVl1eet6ZUddv22gxrkx+FfPCHE1QFt1rqHB425oMLtX2dH
- DLj9oeRh/NaIiuETNkVr+lgZUDEJeC/mlCLreb/nV4Sgwr66LdO2XTOmd/gnnQ92GugB
- s6PgCWxnsmxMFnaVMIB24Cm2z6lH0e8xo+pB9gUvDoZQ5IXH9k28jMdD5ZInypUxMlVn
- vJpQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=TMKsmtSeB2s1AaZbZadZjj3xF8b5OyVicGrn8cs6Cxc=;
- b=mPETp4SpGsnyBTescQmnIWZjJbgUDySqFszvD0n75DYMBE7ifpgu8/NvadHFeh6vYu
- shnUcCvCtdwyuB0dZpA8dARus0GdHacgMdo6yAY21XEz/YJKsBk0JX9/dKvVmVnLnU2E
- sVsSLyIP5SKTUNOZADBrfPnY7rW/buuwzEwwyyKHDPneyjyxp77tmSY1F2bhENtitOPm
- MBwrkRTXqXAd50WFzBsYLYohwWm4Ndsmmw+pkYqukxQoP41Lmb9lfJY4G7GSEtMrSLdJ
- yagpUpO1BNw4bqP1Q+jUhRxwAnvdWC9wI8dAzl46Uoa4SkKL8mcbEEmpuiW9U8Bi1X1j
- Jd9Q==
-X-Gm-Message-State: AHQUAuYkrR6WyE1aH8BG8hvBFte/1zrL7/GHRKBtTijzHD7Zjwmepqnj
- YPm+QaVKO1VKI+wgzJH3Rlcggw==
-X-Google-Smtp-Source: AHgI3IZWqJlESiACGZSBuFtcSlgUTXzB5UwYLjy0fJjTMr4Yq/bz8Bc0PoTINj2B3ihTtaQ8an9+iQ==
-X-Received: by 2002:a50:fc12:: with SMTP id i18mr19300418edr.149.1550498635286; 
- Mon, 18 Feb 2019 06:03:55 -0800 (PST)
-Received: from localhost.localdomain (ip-188-118-3-185.reverse.destiny.be.
- [188.118.3.185])
- by smtp.gmail.com with ESMTPSA id w48sm1421606eda.88.2019.02.18.06.03.53
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 18 Feb 2019 06:03:54 -0800 (PST)
-From: Patrick Havelange <patrick.havelange@essensium.com>
-To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
- Lars-Peter Clausen <lars@metafoo.de>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Shawn Guo <shawnguo@kernel.org>, Li Yang <leoyang.li@nxp.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Thierry Reding <thierry.reding@gmail.com>,
- Esben Haabendal <esben@haabendal.dk>,
- William Breathitt Gray <vilhelm.gray@gmail.com>,
- Linus Walleij <linus.walleij@linaro.org>, linux-iio@vger.kernel.org,
- devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-pwm@vger.kernel.org,
- linuxppc-dev@lists.ozlabs.org
-Subject: [PATCH 7/8] dt-bindings: iio/counter: ftm-quaddec: add poll-interval
- parameter
-Date: Mon, 18 Feb 2019 15:03:20 +0100
-Message-Id: <20190218140321.19166-7-patrick.havelange@essensium.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190218140321.19166-1-patrick.havelange@essensium.com>
-References: <20190218140321.19166-1-patrick.havelange@essensium.com>
+	id 1gvjaG-0000eR-3x; Mon, 18 Feb 2019 14:07:48 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvjaC-0000dI-PA
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:07:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 084E7A78;
+ Mon, 18 Feb 2019 06:07:34 -0800 (PST)
+Received: from [10.1.196.50] (e108454-lin.cambridge.arm.com [10.1.196.50])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7A6C33F720;
+ Mon, 18 Feb 2019 06:07:27 -0800 (PST)
+Subject: Re: [RFC PATCH] arm64/fpsimd: Don't disable softirq when touching
+ FPSIMD/SVE state
+To: Julia Cartwright <julia@ni.com>
+References: <20190208165513.8435-1-julien.grall@arm.com>
+ <20190212171350.GB1002@jcartwri.amer.corp.natinst.com>
+From: Julien Grall <julien.grall@arm.com>
+Message-ID: <7671d868-9d33-dfe1-851a-b72271f12d5f@arm.com>
+Date: Mon, 18 Feb 2019 14:07:26 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+MIME-Version: 1.0
+In-Reply-To: <20190212171350.GB1002@jcartwri.amer.corp.natinst.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_060357_415628_ADDA6059 
-X-CRM114-Status: GOOD (  12.84  )
+X-CRM114-CacheID: sfid-20190218_060745_146841_F0DB645F 
+X-CRM114-Status: GOOD (  23.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,44 +70,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Patrick Havelange <patrick.havelange@essensium.com>
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: "linux-rt-users@vger.kernel.org" <linux-rt-users@vger.kernel.org>,
+ "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
+ "bigeasy@linutronix.de" <bigeasy@linutronix.de>,
+ "will.deacon@arm.com" <will.deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "Dave.Martin@arm.com" <Dave.Martin@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-New optional parameter supported by updated driver.
+On 12/02/2019 17:13, Julia Cartwright wrote:
+> Hello Julien-
 
-Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
-Reviewed-by: Esben Haabendal <esben@haabendal.dk>
----
- .../devicetree/bindings/iio/counter/ftm-quaddec.txt       | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Hello Julien,
 
-diff --git a/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt b/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
-index 4d18cd722074..60554e6c4367 100644
---- a/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
-+++ b/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
-@@ -6,8 +6,14 @@ Required properties:
- - compatible:		Must be "fsl,ftm-quaddec".
- - reg:			Must be set to the memory region of the flextimer.
- 
--Optional property:
-+Optional properties:
- - big-endian:		Access the device registers in big-endian mode.
-+- poll-interval		Poll interval time in milliseconds for detecting
-+			the under/overflow of the counter. Default value
-+			is 100.
-+			A value of 0 disables polling. This value can also
-+			be set at runtime, but not to less than this initial
-+			value (except 0 for disabling).
- 
- Example:
- 		counter0: counter@29d0000 {
+> 
+> On Fri, Feb 08, 2019 at 04:55:13PM +0000, Julien Grall wrote:
+>> When the kernel is compiled with CONFIG_KERNEL_MODE_NEON, some part of
+>> the kernel may be able to use FPSIMD/SVE. This is for instance the case
+>> for crypto code.
+>>
+>> Any use of FPSIMD/SVE in the kernel are clearly marked by using the
+>> function kernel_neon_{begin, end}. Furthermore, this can only be used
+>> when may_use_simd() returns true.
+>>
+>> The current implementation of may_use_simd() allows softirq to use
+>> FPSIMD/SVE unless it is currently in used (i.e kernel_neon_busy is true).
+>> When in used, softirqs usually fallback to a software method.
+>>
+>> At the moment, as a softirq may use FPSIMD/SVE, softirqs are disabled
+>> when touching the FPSIMD/SVE context. This has the drawback to disable
+>> all softirqs even if they are not using FPSIMD/SVE.
+>>
+>> As a softirq should not rely on been able to use simd at a given time,
+>> there are limited reason to keep softirq disabled when touching the
+>> FPSIMD/SVE context. Instead, we can only disable preemption and tell
+>> the NEON unit is currently in use.
+>>
+>> This patch introduces two new helpers kernel_neon_{disable, enable} to
+>> mark the area using FPSIMD/SVE context and use them in replacement of
+>> local_bh_{disable, enable}. The functions kernel_neon_{begin, end} are
+>> also re-implemented to use the new helpers.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@arm.com>
+>>
+>> ---
+>>
+>> I have been exploring this solution as an alternative approach to the RT
+>> patch "arm64: fpsimd: use preemp_disable in addition to local_bh_disable()".
+>>
+>> So far, the patch has only been lightly tested.
+>>
+>> For RT-linux, it might be possible to use migrate_{enable, disable}. I
+>> am quite new with RT and have some trouble to understand the semantics
+>> of migrate_{enable, disable}. So far, I am still unsure if it is possible
+>> to run another userspace task on the same CPU while getting preempted
+>> when the migration is disabled.
+> 
+> Yes, a thread in a migrate_disable()-protected critical section can be
+> preempted, and another thread on the same CPU may enter the critical
+> section.
+> 
+> If it's necessary to prevent this from happening, then you need to also
+> make use of a per-CPU mutex.  On RT, this would do the right thing
+> w.r.t. priority inheritance.
+
+Thank you for the explanation, I now understand better the concept of 
+migrate_disable.
+
+Best regards,
+
 -- 
-2.17.1
-
+Julien Grall
 
 _______________________________________________
 linux-arm-kernel mailing list
