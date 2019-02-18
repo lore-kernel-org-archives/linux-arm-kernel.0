@@ -2,22 +2,21 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 24B2DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E9F6C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E48C214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 00B7B214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kAt/V8k+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="H62fRTUF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E48C214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HR60R/Yq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00B7B214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,62 +24,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VyWCeAzLn8j1moD3g66KSwpzVjjOGxcbDOmQ3Zutt50=; b=kAt/V8k+MrmZ9H
-	1+Ybgc7o6Wb1+6IBVBa46lwDb0VBYog8yrRFbGeU8SOMJVVme1GgQg6H9+30golAuptpC7XHBHknW
-	zzY7+BSrb8nSd4hx1S4b8E0+Vx/iriyRM1J2ZrEjKZJgVNnDOA9kXVf7Qd6ynFgfWVMqatWh84sef
-	3jIJ8w/cR0K2JmGLHGxh788K61ursLF3K/PSJJyo7NZLZBoxIDM2jeHORWhRAgeX7iMP+zHYhBFuv
-	cyBmoVXUO6HRFrOiGCa/wDYdOMREuQUYHUKopdwrLpOKv+jG6U0uRQJA78G59NfjYUVmaJUZr+Rbu
-	7fPT6pJum9k7mohsL2fw==;
+	List-Owner; bh=iNVU8pnPz7xICYkziixdg3MmNgND6tYTRsnXVL7hUvU=; b=HR60R/YqQCsafI
+	t8O5zUbZZ7OFYrSlaJIbddAtz1lepAY/zb9YlQguDR7/P07M8AZRbYkCzmRsEN0QizA0nV8AOcJ27
+	hxtiQW/yu51yjABDMbUhp2jwks4Bk3ffEnOIa/ZZvq6NzSQAuvgGu2/gdicjMBj+WNu8ZH3gWrtBY
+	1ZjtVmpppOCmB+aSFYacJubKbRF+7BXtDlSWMRuMLEI3JeThSkxYtgA4G5FACFPTS7bVCUvh8bobM
+	exlb49yu6OME5wBN3RroVfYJF+2Xwhaf4ou3Yxajoge84ldtvALhyX5nox8jhFmONLHdEu5WzQS/C
+	9geruGPOgkvuZwNChIrw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvgCu-0006mN-LQ; Mon, 18 Feb 2019 10:31:28 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+	id 1gvgDJ-00076s-Da; Mon, 18 Feb 2019 10:31:53 +0000
+Received: from mail-qt1-f194.google.com ([209.85.160.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvgCq-0006lS-At
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:31:26 +0000
-Received: by mail-it1-x144.google.com with SMTP id x131so38762074itc.3
+ id 1gvgDG-000750-7f
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:31:51 +0000
+Received: by mail-qt1-f194.google.com with SMTP id b8so18540121qtr.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 02:31:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=E4K+axlQA8c9qW9A7SCZFh5VYNX0Ec6cj0z0/zu20AM=;
- b=H62fRTUFF8Q+CI4GjmS0YIljOsab5lJ3FH688pDa6VhuoaYrdKhSx67anDS0sYtpeD
- MPsLTbuncn5R7qWGeAqQdKeCd2Qp6x44qZVW5CD2p3+duHg2Nh/+I5uByMVPDg8tQtRt
- S/bdKNPQYxbynD+XOyFRR6NGSmOO00xFyh4jo=
+ Mon, 18 Feb 2019 02:31:49 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=E4K+axlQA8c9qW9A7SCZFh5VYNX0Ec6cj0z0/zu20AM=;
- b=JX8jVWlWLW8jxxBhokAXfTnk3pKN0o3GPoiycNmErXGmscwkSUlbY62b7Bf0cuGZDy
- bhFCGKA4ZHtuyIgXaoYXlecwf27iQ0MXC/rdo6JD5DEBoXeN4uJDboSc2nZFx12dtycT
- gzSRPWHMs5N0rDN+vegB86MxDkbt7B/WSY6C2CWzP1giRmyMghC3ejfhM/eO+2U0Nj94
- wNufvRe5ZDlZWZ8z4ee93qYR0arrCDxey6B9ptk+bFG1vjdwAc18jgsrcl43Dl8aV+Vi
- vlj/XBpy6vbzMjE/7hfbU5W2+bLUtJfxLbuPi7Wkj45cVp6yxU8+m2TWrj9Hlt/2vWi9
- q6Aw==
-X-Gm-Message-State: AHQUAuaTJtGlMMD6ezlnrqXNNiMbmz+xHLlHOWpHDpWbd4VWRBczxv1d
- K5MQOOxUfF3/r0ikFXwo/toaYti0wubwgtZSn5lA2Q==
-X-Google-Smtp-Source: AHgI3IbqiCJnNP7bFyoe2H4kgoUTyM1Jllif+oGLIKbHc7o8Rj5nLhu43E4N8xJgazd6H7fEj/OT9CKvm6NiSfY9UV8=
-X-Received: by 2002:a24:6891:: with SMTP id
- v139mr12371868itb.107.1550485881808; 
- Mon, 18 Feb 2019 02:31:21 -0800 (PST)
+ bh=JeAiCwTdj8ylL6sF0x2uByC9gBRqCOAVMEnpZGUkBbU=;
+ b=tAO47uwiNB03uv8VYzlRzcqWihtWYw90QJEibZDhwX8jTgq0KZomAZO2g/DQp8yYI2
+ t3G5mQusg+9lt/gtsmK1Ckz1B/2Y2Bs8F6Qwgn3ssfNCTKGHMVYLq3t5nnG7FKMMyCGh
+ 4s6O0/188wP6wCsozLpJfF1LvyUWMh+3+t4yhMDQSq6UoctJpy5Y0pTABs3DFBoexHIQ
+ lVFW2itbhZKbz3pCicttdG16Nd3jKOcds+0lAJXMADa/u7M4jmpVuQHhtyuGvCtuLZmX
+ VD+FYKUsBjYJsevbqogDsAg+5TiG1WhA36xsH3Kn+Bt5vuYd9I2iK5IOxr1A25K8WCge
+ xyYA==
+X-Gm-Message-State: AHQUAuZha/Bg9gEmA9MYjWSAc4A3mgPwg9+/9mNQCJqYli1ofgUPeMvC
+ yJ62dmJ+lgTuWWoXv+K9EGNVq7KbYSpjqNZRgAc=
+X-Google-Smtp-Source: AHgI3IZjx670/rKQSNrH8eBwkan7S+nY3zbrV1tknWzuZbWoqV5NUEmuqmCi/hYmoX8yMTiCvNurMGPgE2hy0HBWVrw=
+X-Received: by 2002:ac8:4141:: with SMTP id e1mr16997325qtm.96.1550485909026; 
+ Mon, 18 Feb 2019 02:31:49 -0800 (PST)
 MIME-Version: 1.0
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <20190215141244.5jrrqkykna6enbtp@flea>
- <CAMty3ZAA90-fHPADJSE3ht9CiYWA3yBoyEy7wVv9=6C5JiaTVw@mail.gmail.com>
- <c46cd50a-3695-ebc8-0cd4-4ddc27fc353b@openedev.com>
- <8d64d043333e3d43c36d60788d6c5b0997bc4e69.camel@bootlin.com>
-In-Reply-To: <8d64d043333e3d43c36d60788d6c5b0997bc4e69.camel@bootlin.com>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 18 Feb 2019 16:01:09 +0530
-Message-ID: <CAMty3ZDK4Zw4XnSQFmT9C68Kf1LTshnVfMJOEM3ZbXa0AvJT4A@mail.gmail.com>
-Subject: Re: [PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>, 
- Maxime Ripard <maxime.ripard@bootlin.com>
+References: <a9718ae1e97a5911f47874fe23c00ef297d7fed8.1548158832.git.baolin.wang@linaro.org>
+ <CAK8P3a2zkhrZLMi5KZ5=fGJCt85dad3_pZC0o7GqcwJkk4es9w@mail.gmail.com>
+ <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
+ <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
+In-Reply-To: <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 18 Feb 2019 11:31:32 +0100
+Message-ID: <CAK8P3a1Zq6XjymG3sAaHGeNRxU5UXPfJPbi0A9s47cTVK7vC3g@mail.gmail.com>
+Subject: Re: [PATCH 1/3] dt-bindings: dmaengine: Add one new cell to present
+ hardware slave id
+To: Baolin Wang <baolin.wang@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_023124_867906_9B78D5FA 
-X-CRM114-Status: GOOD (  22.55  )
+X-CRM114-CacheID: sfid-20190218_023150_273602_54A34331 
+X-CRM114-Status: GOOD (  22.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,86 +82,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel <dri-devel@lists.freedesktop.org>,
- Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ eric.long@unisoc.com, arm-soc <arm@kernel.org>,
+ Lyra Zhang <zhang.lyra@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Orson Zhai <orsonzhai@gmail.com>, Dan Williams <dan.j.williams@intel.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Paul and Maxime,
-
-On Mon, Feb 18, 2019 at 1:56 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> Hi Jagan,
->
-> On Fri, 2019-02-15 at 22:37 +0530, Jagan Teki wrote:
-> > Hi Maxime,
+On Tue, Feb 12, 2019 at 9:25 AM Baolin Wang <baolin.wang@linaro.org> wrote:
+> On Fri, 1 Feb 2019 at 19:53, Baolin Wang <baolin.wang@linaro.org> wrote:
+> > On Thu, 31 Jan 2019 at 00:52, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > On Tue, Jan 22, 2019 at 2:21 PM Baolin Wang <baolin.wang@linaro.org> wrote:
+> > > >
+> > > >  Client:
+> > > >  DMA clients connected to the Spreadtrum DMA controller must use the format
+> > > > -described in the dma.txt file, using a two-cell specifier for each channel.
+> > > > -The two cells in order are:
+> > > > +described in the dma.txt file, using a three-cell specifier for each channel.
+> > > > +The three cells in order are:
+> > > >  1. A phandle pointing to the DMA controller.
+> > > >  2. The channel id.
+> > > > +3. The hardware slave id which is used for clients to trigger DMA engine
+> > > > +automatically.
+> > >
+> > > I notice that this is an incompatible binding change. Is that necessary?
+> > > If the current code works, I'd suggest allowing both #dma-cells=<2>
+> > > and <3>, and then implementing both in the driver.
 > >
-> > On 15/02/19 8:10 PM, Jagan Teki wrote:
-> > >
-> > > On Fri, 15 Feb, 2019, 7:43 PM Maxime Ripard, <maxime.ripard@bootlin.com
-> > > <mailto:maxime.ripard@bootlin.com>> wrote:
-> > >
-> > >     On Mon, Feb 11, 2019 at 03:41:21PM +0100, Maxime Ripard wrote:
-> > >      > Hi,
-> > >      >
-> > >      > Here is a series implementing the burst mode support for DSI.
-> > >      >
-> > >      > It's been tested on an A33 board with the panel supported on the last
-> > >      > patch, which should remove all quirks due to a different SoC from the
-> > >      > equation.
-> > >
-> > >     I should have sent that mail yesterday, but patches 1-4 and 6-7 were
-> > >     merged. Patch 5 was discarded since it was not consistent with the
-> > >     rest of the driver, and 8 had some comments.
-> > >
-> > >
-> > > Are the applied patches from this series or from my v7 series?
-> > >
-> > >   Would you please point me the branch.
-> > >
+> > Yes, this is necessary.
 > >
-> > Unfortunately my last mail didn't reach arm mailing list.
+> > Yes, current code can work, but the problem is that the DMA clients
+> > must add one property (something like "sprd,slave-id") to specify the
+> > slave id. So considering this, we want to change the dma-cells to 2,
+> > including dma channel and dma slave id, which can avoid introducing
+> > some similar properties for DMA clients.
 > >
-> > Just wanted to know are the applied patches from this series or from my
-> > v7 series? Would you please point me the repo, I couldn't find it on
-> > git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
+> > Now there are no DMA clients in mainline for Spreadtrum platform, and
+> > we want to upstream our first DMA clients: SPI controller. So no other
+> > drivers need to change when we changing dma cells. Thanks.
 >
-> This series is the one that was applied upstream. You can find the
-> commits merged at: https://cgit.freedesktop.org/drm/drm-misc/log/
+> Do you have any other concerns about this patch set? If not, I think
+> Vinod can apply this patch set. Thanks.
 
-Thanks for sharing the link Paul.
+Sorry for the late reply. Yes, this makes sense since there are no
+existing users then. For the DT changes going through the dmaengine
+tree
 
-This is really really discouraging.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Don't know whom to ask directly about this, but I am really upset
-about this move.
+One more question, to make sure we don't need to edit it again:
+Why do you need both a 'channel id' and a 'slave id' here? Is this
+a strict hardware requirement for your DMA engine? In many
+other designs, only a DMA request line number needs to
+be described, and I think this would correspond to what you
+call the 'hardware slave id' in your documentation.
 
-Most of the changes from applied series have similar patches that are
-been part of my series of patches. I've been sending this since last
-September (which was sent way prior than this series).
+Does each request line here correspond to a fixed channel
+id as well, or can a channel be shared between multiple
+slave devices?
 
-How come the same series is recreated and applied with minor changes
-while the original series was still in discussion. At least Maxime
-should have informed me or he should have rejected my work from
-patchwork or atleast NAK in ML?
-
-All these burst changes and random fixes are reviewed in couple of
-versions, now the versioning moved to v8[1] [2]. For each and every
-versioning I'm trying to fix the previous version comments, code
-improvements, commit messages. In fact for each rotation I'm trying to
-validate 4 different panels which eventually consume all my 16 hours
-in day.
-
-Please let me know to how could we better collaborate?
-
-[2] https://patchwork.kernel.org/cover/10813573/
-[1] https://patchwork.kernel.org/cover/10813623/
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
