@@ -2,147 +2,91 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 53C7EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DB8DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 20D2221773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59A3421479
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASpC3VE9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="qUxWwbHf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20D2221773
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gu/QQwUy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="xfmONUNS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59A3421479
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ch2Qwp4THQZaevoklSPxH3yUYEiW5yYyi31Cekr9ROw=; b=ASpC3VE9ECG6I5
-	0V6Q9i0+XXf8z2LTCzb5KTSYY8zkk4vxiQ1A6igwl812ckmh4k7LEf3difVOgFMq3PhogHXmvaKns
-	xlHZmasy/jRXfUhjZ0smgXeOvoEsBwD+70PmpumI7mJ47mz+kX8TTflcIyW8ezlS3u7cR3RdlIaGu
-	LL5pzEm0iM+3l+zycLWlkK2aYpKi8w9kTKiVS0FRazyfx5orZDjnj0RvyFDwMskG7prVD7tM8kazD
-	FNfqAHuX91YegBE5yin6jIJZNDVYkngbBunU6kYSvjDXjTGBHgLPIjXu+FmiJLWG8IqSup6Bt1QLg
-	n68UC60zc+Ptcjl/5S2w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ClfhTd65v5Wmqy/ygZeeOWsseZ7/Bo4bfvdK3/LoBMw=; b=Gu/QQwUyl+fXJP
+	ued6GQe32yNX0pR2tXE6MsM561oLkTzCWEOpYXAcLtcgfSA0OSmAS1cisoawv3WUAcnIr0YUDjVna
+	rzgaXh21tYO9IR1KcztaJY60txvioOjwAww9GWAGhgOQ5iqCFqmCT3hVW6pM3VLOXAJSEOXgYMDB3
+	q8JeNyI57n5Nw75rAkKOw45oDrd8uoEVGYr3t/iSTHc54jEtxqf90jv3ZZLYOm27Ivvh76C3ln/K9
+	R2dnt8+58YScdvlddrDgj9Q2eUzQClN/9W9OYFp5j/mrusHmPXwNuYoMGHVGElhQZnheiOnc+AsOe
+	kXcH61drxGQvDpN1HhPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvi2z-0007RW-Al; Mon, 18 Feb 2019 12:29:21 +0000
-Received: from esa5.microchip.iphmx.com ([216.71.150.166])
+	id 1gvi3H-0007hC-6p; Mon, 18 Feb 2019 12:29:39 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvi2v-0007R6-Tm
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:29:19 +0000
-X-IronPort-AV: E=Sophos;i="5.58,384,1544511600"; d="scan'208";a="24837105"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 18 Feb 2019 05:28:59 -0700
-Received: from NAM02-BL2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Mon, 18 Feb 2019 05:28:58 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=2qzLqmDASAnVczV+mXixLdUlxbyLm3SedR09cZDgmvg=;
- b=qUxWwbHfAr7LOK/PEjxzEuN0GwHkVLcfNxlSD2rlszx7TUyHuMR+mJ7EhmvGHcTa+5uAHlAGBOkKanHPDr7w0tpaoKE8exBj+f8U+s3AdYy6PLXSHwfsWegZUpzJ9iKKrjx941ARNdQENd8+kuY6jWbwFvoGSRNwZ/KgPEYFGPI=
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
- MWHPR11MB1821.namprd11.prod.outlook.com (10.175.53.136) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Mon, 18 Feb 2019 12:28:56 +0000
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1622.018; Mon, 18 Feb 2019
- 12:28:56 +0000
-From: <Nicolas.Ferre@microchip.com>
-To: <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>,
- <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>
-Subject: Re: [RESEND PATCH] dt-bindings: arm: atmel: add new sam9x60 SFR
- binding
-Thread-Topic: [RESEND PATCH] dt-bindings: arm: atmel: add new sam9x60 SFR
- binding
-Thread-Index: AQHUx4WEXfob+TfGvkO0ZSe4kBgSnw==
-Date: Mon, 18 Feb 2019 12:28:56 +0000
-Message-ID: <51c2d2af-3d2f-0fa8-c9e7-5fc6a4f1a1b4@microchip.com>
-References: <20190206180425.27324-1-nicolas.ferre@microchip.com>
-In-Reply-To: <20190206180425.27324-1-nicolas.ferre@microchip.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: LO2P265CA0250.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:600:8a::22) To MWHPR11MB1662.namprd11.prod.outlook.com
- (2603:10b6:301:e::15)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Nicolas.Ferre@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [195.6.168.232]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 2edbae24-6594-4d4f-374e-08d6959ca6d0
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1821; 
-x-ms-traffictypediagnostic: MWHPR11MB1821:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxODIxOzIzOkh6MTNqNi9ua09QZW4rSjZrMnFHZ09McmFI?=
- =?utf-8?B?dUN4SzNhMEpJQUZjcDl5cm9uOU94TEJUMUhIczZmeDlBdnZYNHArQTdvMHE3?=
- =?utf-8?B?bXc4Yk9SRUhIQktZb0E4dGROVzlYMC9UQnJnenJyeE5MQit4ZHVMYWw2dkxT?=
- =?utf-8?B?ZmFYRHN5elplYVhjVTFTakhYaGtnRWpaVXBiUEFjcHlXeDJzOFlTS0NCRGhs?=
- =?utf-8?B?ZW5pRVR3U0dIcTVSOFBBN3lubTFZemJSVGRxelRvZE9nSzIvOFNQTW0xbGR1?=
- =?utf-8?B?cXNCUG1EdUFoVDRTQUR6UVc4eFhBMDJTTkhFZjhiUUcvZ1U4THJNRHVzN2Y2?=
- =?utf-8?B?WTVpZ1JyZUJkdUwyaE5WLzgvaXoxWWtBZHROTnVlK281SHRGSFBjYlBBVVB6?=
- =?utf-8?B?SThma0VyWmUxSVdqcjhMU3I4RVJ3Lzg1cCtiU1VJaHhQK05KYlE2UHZyYm15?=
- =?utf-8?B?aXNrNnJkV1hGbDFqUldIQ1UxSnZ5SXpHTk1MMUl4M1hqQ0p1NkNPdWViWE82?=
- =?utf-8?B?WEI1WjQ5ckhhK1N2dlVqMUYyQm1VMzd3RkdaMDNYb3FSOWo5MStHVFZnemZy?=
- =?utf-8?B?UE1SYzkweXQvdFZvR2JPOXFla2ZhOFVoZTJpaytnaTdUbXNEbStVUVVQaWha?=
- =?utf-8?B?VlNHMnRzaGJ1RHFhbkFRZHZzTFpHRVIvcndIQ0FBRmp4WXl4T1o1UzRib0JJ?=
- =?utf-8?B?QUkvQ0FTdWUyOVhpUUEwOGUvMm8welBmQ3JMWHl0RmYzbmFGdlo1SGRBRzgx?=
- =?utf-8?B?L0h6T2o2Q2p0VzVEclhVVEIyR3oxNENhQXA2NGtPc2wxUWFUWWlZY2pJN2lN?=
- =?utf-8?B?VGZVcUs0dWI5VHhOWDFBWTRkNmhIWTM1OXppdlduT2ZocU1pRkdNbFRDbk90?=
- =?utf-8?B?eE1uZ2s2d3hxZVpPUTJ5Ry9XclhHNkNMOFZzRUYxT1EyNnVJZ1AySXU0TmRK?=
- =?utf-8?B?bmxXa2lIeTV2Mis4cm1JMTQycWxCRVcvU0M0ZUYycUdtd3hpTE9rSDJUUGwz?=
- =?utf-8?B?ak02TjZIYW5NdFpGRlZCRkd5aWpnM0RYYnErWFM4QWUwTlppbXE4TnV4cUls?=
- =?utf-8?B?bEh1STNveUprWDBkRlZYSkJZYTE3NzBIYW9mMGRkSkNjM1NiOVl5RDcyM0Vr?=
- =?utf-8?B?NmloTkpDNDNDMmFJRWVXYjF2WXhoQmRuUGFCZ2Q3cmRUZk4vSmxXRnUyd2ln?=
- =?utf-8?B?TEdIT05jeXpjQVl4elNCL05kTEV5K3BiMkVxWWFsQmcyUk1icHNHaXplaEVH?=
- =?utf-8?B?RjhtMWNiM2JqOERlWk15VHBFOFZkUWdSSUROWkg1WG5BbFoxdHJaUWw4Y2o2?=
- =?utf-8?B?a1dJVlNFRWlCMWE2WDFZbjZHZ2UrcmFUcTY4UlRFNHljU0lWclVodFdGMzQx?=
- =?utf-8?B?a1FyZEFOQ2FXNzl3eENkV2tDaEtaWTNlR0RnNEV0UUpaN1pNMXhUU3I1SVZL?=
- =?utf-8?B?TWlkN1JiS3d4czVnK2NEZ0dMQy9kcEE0VTVwcm1XbndLM1pKcXdOQUVpdWgw?=
- =?utf-8?B?QWU1b3hmK1h1MWw0aTg3cFZPM2hHOGUrbGU3aWJCZ25mZTN1WDV6UkErUjZt?=
- =?utf-8?B?aWkrU0N4TlRrdklVZEpRRjJJd0N3SjI3MURzR0R1OXRCYVM4VWdRMEhXdGJz?=
- =?utf-8?B?MlpsaEFSVjZrQjdJZ1p2NlVUREpQVnlkQjI4ZmhBTkV2eG0xamFiYXJZcmV2?=
- =?utf-8?B?cWpVMzZlQXJ3dG12d25NUUYrSHp5NUFCZWc2YThMVURveitpRjE3NEVMZkhZ?=
- =?utf-8?B?M2d4NDRpQ2I2cU1ycURyTlk1aVo0Y1JMNkloZ2lXWmFDOUtGUmpSajFXSkJ5?=
- =?utf-8?Q?aIwvHaPB1SWCL?=
-x-microsoft-antispam-prvs: <MWHPR11MB1821F9B35A418F4DBDB75F13E0630@MWHPR11MB1821.namprd11.prod.outlook.com>
-x-forefront-prvs: 09525C61DB
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(39860400002)(366004)(346002)(376002)(396003)(199004)(189003)(478600001)(8936002)(8676002)(97736004)(81166006)(53936002)(14454004)(5660300002)(186003)(26005)(81156014)(102836004)(31696002)(229853002)(6512007)(6436002)(6246003)(86362001)(68736007)(4326008)(36756003)(107886003)(6486002)(66066001)(3846002)(6116002)(71190400001)(71200400001)(316002)(105586002)(54906003)(2906002)(305945005)(72206003)(7736002)(99286004)(52116002)(106356001)(110136005)(486006)(11346002)(476003)(446003)(386003)(2616005)(6506007)(53546011)(25786009)(31686004)(14444005)(256004)(76176011);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1821;
- H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: UAQcHt6ohuM1supUOwjZmcfOCSoa9F+Nn8FK1COgXbOCEohaSecWrPMleBb/HL8X1WzuQOReVqrPPHCzvUQrThCKqr7ZZxyoUrK2W6OMGzOnDuPXviRMd9RV+8T25txStJvhjE0PVR4EGaYTkZpD6svYkOnaGP7gocOuix643f1/v0rDUSbzigFA0IzyyyK/nqEuTDnVFdG78/JugUOzhpsLv76W0ro1aVV6/UBL1Ogd1nhflM3mCjQs13wQv3dsBPsMJjNy6Q7nj8K/3xglMkqtxyruCU0UahFKvIluE5qoZ5EMnQoZQJ3zlKUKJI6CRbWQ2BmDYYOxWKSgyGzFIDzpJIIO+cIjfKhDOLoIS4pa08IagkjGNMasC7wF0CL4VONwJR+USRHthbTxeSMzcBqct3WU7UORPFkcf8DJN3A=
-Content-ID: <DE25B2A2E8D5964B884831A01533094A@namprd11.prod.outlook.com>
+ id 1gvi39-0007cd-8r
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:29:33 +0000
+Received: by mail-wm1-x341.google.com with SMTP id j125so16941641wmj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 04:29:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=MRzmTEn9G8kwM20BMcAVcDRHrXJ3gBe2p0nBD+YMJro=;
+ b=xfmONUNSh0hOZbxqpkLcUrMqFonwDGkiq7gydIXoj42z/Gb5HT1YcUJLifIQzWTLRh
+ GJgrv9gs5/p39PWaUPyVLGO4IpPHPxExIHO3RNX2MtHkVzk5Q+VYC00tQbb6LUMCaDK0
+ /C4P5p5mrYvVulsNYXenT3ywd7lByEAC1S5WfrYHgzdXhy3WGHFKpKpko4f8vB80YroU
+ OrepEqlRm0CG4sc549aFHTaZ4Bo1Dc37aRbmgiR8n0pQkxVA8MeMBwgO2geLNA41aUrH
+ o+ueQgCTi254uj0tB/6ygVPeFf8Kxb1jGFni4aVjLETBBp58gVhsBdFI/nlruuJpNP3R
+ N5pw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=MRzmTEn9G8kwM20BMcAVcDRHrXJ3gBe2p0nBD+YMJro=;
+ b=l2xl0a8CPat2epkcJ7DRcpLluz5wX60eiNcPynNkuSKCpwzYQcx7QYaoDQgYe+dQAV
+ 9dUSDZq66/6epGJyyk4EO21W/V8FmmOLOsffqsPhyO91//fGXucuT3UI2CBII+Omyxqk
+ EyqyOPhVEhr8NLEgci4rLymkM9Q7cThU5tyCvcKEppaAT/QpvBTZG04Rsj0dLLmsna1U
+ bPvZhKN5zHAp7LP4cXfi1YIlJ4aat+GBMUzxgP1l3wOAfK/+khfsRJEXwoazvDHYrveo
+ qEWxxKH0jhnO/uCo2kWTI1F/2cbXLB7HligPq5rFbO+/7fI3oL/DzI/webyYsARlfSKa
+ KDkA==
+X-Gm-Message-State: AHQUAua/WGy/tIhHZ4b/2tl/EnBrcbtCnL4Itz936UQkjam5e0C31ZII
+ nDJlcX1duUvz8dLLmQrGOvX50g==
+X-Google-Smtp-Source: AHgI3IaWwB7F0Gq3PtNhGGuTd0bA3jVnrHb0zcpRv2/sVP8qXGbPFPDEaQ4O+kOCPSRcyB3zrni5TA==
+X-Received: by 2002:a7b:cb0a:: with SMTP id u10mr16453075wmj.0.1550492969297; 
+ Mon, 18 Feb 2019 04:29:29 -0800 (PST)
+Received: from [192.168.0.41] (148.125.92.92.rev.sfr.net. [92.92.125.148])
+ by smtp.googlemail.com with ESMTPSA id v4sm5034268wmg.1.2019.02.18.04.29.27
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 18 Feb 2019 04:29:28 -0800 (PST)
+Subject: Re: [PATCH v2 00/15] Add basic support for Socionext Milbeaut M10V SoC
+To: Arnd Bergmann <arnd@arndb.de>, Sugaya Taichi <sugaya.taichi@socionext.com>
+References: <1549628687-29628-1-git-send-email-sugaya.taichi@socionext.com>
+ <CAK8P3a3_j2W+KXSynW_SkVZk_+PJ-DqyxjLkgJL-OichS0fwWw@mail.gmail.com>
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+Message-ID: <10a0375b-0814-6b7d-97d5-ed2c2838c4b4@linaro.org>
+Date: Mon, 18 Feb 2019 13:29:26 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 2edbae24-6594-4d4f-374e-08d6959ca6d0
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 12:28:53.9152 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1821
-X-OriginatorOrg: microchip.com
+In-Reply-To: <CAK8P3a3_j2W+KXSynW_SkVZk_+PJ-DqyxjLkgJL-OichS0fwWw@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_042918_074559_2CFA4AC3 
-X-CRM114-Status: GOOD (  17.08  )
+X-CRM114-CacheID: sfid-20190218_042931_359200_2905C9C6 
+X-CRM114-Status: GOOD (  26.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -154,62 +98,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
- stern@rowland.harvard.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Stephen Boyd <sboyd@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Takao Orito <orito.takao@socionext.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-serial@vger.kernel.org,
+ Jiri Slaby <jslaby@suse.com>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 06/02/2019 at 19:04, Nicolas Ferre wrote:
-> Add this SFR compatible definition for the sam9x60 SoC. Will be needed
-> in OHCI driver: ohci-at91.c.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> ---
-> Hi Rob,
-> It seems that this patch was lost in my series "[PATCH 0/8] ARM: at91/dt:
-> update to existing drivers for the sam9x60 SoC". I split it and resend it only
-> for USB tree.
-
-Rob,
-
-Ping...
-
-
-> Hi Greg,
-> 
-> This DT bindind goes with the patch already queued in your usb-next tree "USB:
-> host: ohci-at91: add sam9x60-sfr definition for ohci".
-> 
-> Once Rob added his tag, can you please queue it in your tree as I reviewed my
-> first idea of adding it to the arm-soc tree?
-> 
-> Best regards,
->    Nicolas
-> 
->   Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> index badce6ef3ab3..dfc91bc02b97 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
-> @@ -148,6 +148,7 @@ required properties:
->   - compatible: Should be "atmel,<chip>-sfr", "syscon" or
->   	"atmel,<chip>-sfrbu", "syscon"
->     <chip> can be "sama5d3", "sama5d4" or "sama5d2".
-> +  It also can be "microchip,sam9x60-sfr", "syscon".
->   - reg: Should contain registers location and length
->   
->   	sfr@f0038000 {
-> 
-
-
--- 
-Nicolas Ferre
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTgvMDIvMjAxOSAxMzoyMCwgQXJuZCBCZXJnbWFubiB3cm90ZToKPiBPbiBGcmksIEZlYiA4
+LCAyMDE5IGF0IDE6MjQgUE0gU3VnYXlhIFRhaWNoaQo+IDxzdWdheWEudGFpY2hpQHNvY2lvbmV4
+dC5jb20+IHdyb3RlOgo+Pgo+PiBIaSwKPj4KPj4gSGVyZSBpcyB0aGUgc2VyaWVzIG9mIHBhdGNo
+ZXMgdGhlIGluaXRpYWwgc3VwcG9ydCBmb3IgU0MyMDAwKE0xMFYpIG9mCj4+IE1pbGJlYXV0IFNv
+Q3MuICJNMTBWIiBpcyB0aGUgaW50ZXJuYWwgbmFtZSBvZiBTQzIwMDAsIHNvIGNvbW1vbmx5IHVz
+ZWQgaW4KPj4gc291cmNlIGNvZGUuCj4+Cj4+IFNDMjAwMCBpcyBhIFNvQyBvZiB0aGUgTWlsYmVh
+dXQgc2VyaWVzLiBlcXVpcHBlZCB3aXRoIGEgRFNQIG9wdGltaXplZCBmb3IKPj4gY29tcHV0ZXIg
+dmlzaW9uLiBJdCBhbHNvIGZlYXR1cmVzIGFkdmFuY2VkIGZ1bmN0aW9uYWxpdGllcyBzdWNoIGFz
+IDM2MC1kZWdyZWUsCj4+IHJlYWwtdGltZSBzcGhlcmljYWwgc3RpdGNoaW5nIHdpdGggbXVsdGkg
+Y2FtZXJhcywgaW1hZ2Ugc3RhYmlsaXphdGlvbiBmb3IKPj4gd2l0aG91dCBtZWNoYW5pY2FsIGdp
+bWJhbHMsIGFuZCByb2xsaW5nIHNodXR0ZXIgY29ycmVjdGlvbi4gTW9yZSBkZXRhaWwgaXMKPj4g
+YmVsb3c6Cj4+IGh0dHBzOi8vd3d3LnNvY2lvbmV4dC5jb20vZW4vcHJvZHVjdHMvYXNzcC9taWxi
+ZWF1dC9TQzIwMDAuaHRtbAo+Pgo+PiBTcGVjaWZpY2F0aW9ucyBmb3IgZGV2ZWxvcGVycyBhcmUg
+YmVsb3c6Cj4+ICAtIFF1YWQtY29yZSAzMmJpdCBDb3J0ZXgtQTcgb24gQVJNdjctQSBhcmNoaXRl
+Y3R1cmUKPj4gIC0gTkVPTiBzdXBwb3J0Cj4+ICAtIERTUAo+PiAgLSBHUFUKPj4gIC0gTUFYIDNH
+QiBERFIzCj4+ICAtIENvcnRleC1NMCBmb3IgcG93ZXIgY29udHJvbAo+PiAgLSBOQU5EIEZsYXNo
+IEludGVyZmFjZQo+PiAgLSBTRCBVSFMtSQo+PiAgLSBTRCBVSFMtSUkKPj4gIC0gU0RJTwo+PiAg
+LSBVU0IyLjAgSE9TVCAvIERldmljZQo+PiAgLSBVU0IzLjAgSE9TVCAvIERldmljZQo+PiAgLSBQ
+Q0kgZXhwcmVzcyBHZW4yCj4+ICAtIEV0aGVybmV0IEVuZ2luZQo+PiAgLSBJMkMKPj4gIC0gVUFS
+VAo+PiAgLSBTUEkKPj4gIC0gUFdNCj4+Cj4+IFN1cHBvcnQgaXMgcXVpdGUgbWluaW1hbCBmb3Ig
+bm93LCBzaW5jZSBpdCBvbmx5IGluY2x1ZGVzIHRpbWVyLCBjbG9jaywKPj4gcGljdHJsIGFuZCBz
+ZXJpYWwgY29udHJvbGxlciBkcml2ZXJzLCBzbyB3ZSBjYW4gb25seSBib290IHRvIHVzZXJzcGFj
+ZQo+PiB0aHJvdWdoIGluaXRyYW1mcy4gU3VwcG9ydCBmb3IgdGhlIG90aGVyIHBlcmlwaGVyYWxz
+ICB3aWxsIGNvbWUgZXZlbnR1YWxseS4KPiAKPiBJJ3ZlIGxvb2tlZCBvdmVyIHRoZSBwbGF0Zm9y
+bSBvbmNlIG1vcmUuIE92ZXJhbGwsIGl0IGxvb2tzIHZlcnkgZ29vZCwgYW5kCj4gSSdkIHN0aWxs
+IGxpa2UgdG8gbWVyZ2UgdGhpcyBmb3IgbGludXgtNS4xLCBidXQgd2UgYXJlIHJ1bm5pbmcgb3V0
+IG9mIHRpbWUKPiB0aGVyZS4gSWYgeW91IHNlbmQgdGhlIHBhdGNoZXMgdG8gc29jQGtlcm5lbC5v
+cmcgcXVpY2tseSwgd2UgY2FuIHRyeSB0bwo+IHN0aWxsIG1lcmdlIHRoZW0gaW4sIGJ1dCBpZiBh
+bnl0aGluZyBnb2VzIHdyb25nLCBpdCB3aWxsIGhhdmUgdG8gd2FpdCB1bnRpbAo+IHdlIHN0YXJ0
+IG1lcmdpbmcgcGF0Y2hlcyBmb3IgNS4yLCBkaXJlY3RseSBhZnRlciA1LjEgaXMgb3V0Lgo+IAo+
+IEkgZGlkIG5vdCBsb29rIGF0IHRoZSBkZXZpY2UgZHJpdmVyIHBhdGNoZXMgKGNsaywgY2xvY2tz
+b3VyY2UsIHBpbmN0cmwsIHNlcmlhbCkKPiBpbiBtdWNoIGRldGFpbC4gSWYgeW91IGhhdmUgYW4g
+QWNrIGZyb20gdGhlIG1haW50YWluZXJzLCBmZWVsIGZyZWUgdG8KPiBpbmNsdWRlIHRoZW0gaW4g
+dGhlIHNlcmllcywgb3RoZXJ3aXNlIGxldCdzIG1lcmdlIHRoZSByZXN0IG5vdyBhbmQgdGhlbgo+
+IHlvdSBjYW4gc2VuZCB0aGUgdXBkYXRlZCBwYXRjaGVzIGZvciBpbmNsdXNpb24gdGhyb3VnaCB0
+aGUgc3Vic3lzdGVtCj4gdHJlZXMgaW4gNS4yLgoKSSdtIG5vdCBpbiBjb3B5IG9mIHRoZSBjbG9j
+a3NvdXJjZSBwYXRjaCBidXQgSSBhY2tlZCBpdCBmb3IgdGhlIGluaXRpYWwKcG9zdC4KCj4gSSBo
+YXZlIHNlbnQgYSBmZXcgY29tbWVudHMuIFRoZSBvbmx5IG9uZSB0aGF0IGlzIHJlYWxseSBpbXBv
+cnRhbnQKPiBoZXJlIGlzIHRoZSBtaXNzaW5nIHBsYXRmb3JtIGNoZWNrIGluIHRoZSBzdXNwZW5k
+IG9wdGlvbnMuIFBsZWFzZQo+IHRyeSB0byBhZGRyZXNzIG1vc3Qgb2YgdGhlIG90aGVyIGNvbW1l
+bnRzbSwgZWl0aGVyIGJ5IGNoYW5naW5nIHRoZQo+IGNvZGUsIG9yIGJ5IGV4cGxhaW5pbmcgd2h5
+IHlvdXIgdmVyc2lvbiBpcyBjb3JyZWN0Lgo+IAo+IAo+IAo+ICAgICAgQXJuZAo+IAoKCi0tIAog
+PGh0dHA6Ly93d3cubGluYXJvLm9yZy8+IExpbmFyby5vcmcg4pSCIE9wZW4gc291cmNlIHNvZnR3
+YXJlIGZvciBBUk0gU29DcwoKRm9sbG93IExpbmFybzogIDxodHRwOi8vd3d3LmZhY2Vib29rLmNv
+bS9wYWdlcy9MaW5hcm8+IEZhY2Vib29rIHwKPGh0dHA6Ly90d2l0dGVyLmNvbS8jIS9saW5hcm9v
+cmc+IFR3aXR0ZXIgfAo8aHR0cDovL3d3dy5saW5hcm8ub3JnL2xpbmFyby1ibG9nLz4gQmxvZwoK
+Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
+bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
+ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
+ZXJuZWwK
