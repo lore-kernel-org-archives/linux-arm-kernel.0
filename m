@@ -2,129 +2,85 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C270DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:21:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2B87C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:24:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9298921738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:21:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A09D321738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:24:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LZjzDyR0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Z8EOAIb2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9298921738
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="syi5yky5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="mAV7IaKg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A09D321738
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=OsoAT58kU0NkgfGo0yOJJMqJdFRnY/cATmUf1Bu6L2g=; b=LZjzDyR0cRAANc
-	RsL8QDK18QN38Pe3JjUNcxSWXbU3mjyN2EfqgMAKJlec9oopSIStSUd47YzbWnUGdwYHtY04YXDsU
-	DmiDiGzPUtX4GSIbM9sy452eMau6zl9MMohk6wCgv257HL92OC2HA8nJN0iHQ7XOfWaafdVUsP60C
-	VTB3AHk9x90hs6a9ZFocX6Db0VMV98QX0h3AAoupqKfko65iZ+3uTpNUJb3/ILCHMS6uGmxZ5kmKX
-	jH1tb8TjWMMie/I5PaKZqfr71AidaFMh2AaJVjrpriYBFFC8XGkWWXiFVP6oqdGaiTNzOSTK7866w
-	1OjJv0LRU2+rgRtplxjA==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=um0E3ZZIUaOKfoVDJX2QpF7KagPBtnkxSatUqA17mnA=; b=syi5yky5QAjfJm
+	g24FhgxwIskgIsHRFR02zFFtu+bV6XsrPh7q3I8e5N8UZx8FizH7uC5d9Bl5UiT/4oKpWaMc5o9N5
+	aVd41zWeh5cpfYvgm5MuppYlKe/SIGUESYaVbzWZ7ztIVL51IKU0IKZh6W4LylwSb7rRMStEh6tOd
+	UDHAEmLlFG89dd76LFfvYZn+4tw98PjAnEcPxp8uD4bU/V0yO3dfyr3gVgVu2jJTRyVqvRWVovqER
+	9EyRaJQY9vX3LZrTFAvz/SiVnzgj9qfM4pdVcXv0htChIiHU9EjEIKk6dDzChlVvcadshdKb/leC6
+	Ad0Vgl5Ti8SeWgXulJBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvqLZ-00065P-Gl; Mon, 18 Feb 2019 21:21:05 +0000
-Received: from mail-eopbgr30049.outbound.protection.outlook.com ([40.107.3.49]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gvqOw-0006a0-48; Mon, 18 Feb 2019 21:24:34 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvqLV-00064a-Lj
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 21:21:03 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=ocVdmxGq+3uMoW82LIAp0u+QNDvIXBxs74LK1gW4RaY=;
- b=Z8EOAIb2M/J2pUTkgbzktr+elR9do7S5DgKWKXUCKogPoAl7Vh1NdbabtY4BPc+P/6n8JibVH6HrkWVuotX9GsQ4nVQGv+6SIQdnD1Mw+95koAZT4OxBhOseHsxS530eOq5jTcRqMInYBgQApG0L7yhqkcb5xf093EYaHGFHHCc=
-Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
- VI1PR0402MB3616.eurprd04.prod.outlook.com (52.134.7.19) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Mon, 18 Feb 2019 21:20:56 +0000
-Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
- ([fe80::2d83:eb90:f977:f649]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
- ([fe80::2d83:eb90:f977:f649%3]) with mapi id 15.20.1622.018; Mon, 18 Feb 2019
- 21:20:56 +0000
-From: Daniel Baluta <daniel.baluta@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>
-Subject: [PATCH] arm64: dts: imx8mq: Add SDMA nodes
-Thread-Topic: [PATCH] arm64: dts: imx8mq: Add SDMA nodes
-Thread-Index: AQHUx8/Vo+C+OLGhTkaUZo5T58EuvA==
-Date: Mon, 18 Feb 2019 21:20:55 +0000
-Message-ID: <20190218212037.902-1-daniel.baluta@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1PR08CA0248.eurprd08.prod.outlook.com
- (2603:10a6:803:dc::21) To VI1PR0402MB3357.eurprd04.prod.outlook.com
- (2603:10a6:803:2::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=daniel.baluta@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.17.1
-x-originating-ip: [95.76.156.53]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: b3566d24-ec47-4201-aea2-08d695e6f827
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR0402MB3616; 
-x-ms-traffictypediagnostic: VI1PR0402MB3616:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR0402MB3616;
- 23:R1XvjvE+mu9aWC9n/66B5Zm0TwNN8G9ouW135?=
- =?iso-8859-1?Q?eBCn1TmoO+28E2GOrsbfZTi/CRFLNHh1zfKovzsa0/fZRC15AtLBKb6VXk?=
- =?iso-8859-1?Q?s3dGutjGAc9sbw1rTLEssSIt6Sh2JmrfDXOsHGgFWllk5fzl1C+6ZAsE+Q?=
- =?iso-8859-1?Q?j9VeBApXhQ5xUepiyQ397tSdF6WeTdR7Ov3b3RPruUuHr46BLgzfII6/3O?=
- =?iso-8859-1?Q?YydY+vOKWyUt4mGMApbugXp6hoHVH53fdAyVpgQSIQ9Johzz12qGpPAfCd?=
- =?iso-8859-1?Q?vtWJ63nHQ8Qa+LcdimJmdbsavmc8JCnMEDn136/8HrmC2h2loQHhSjaN9i?=
- =?iso-8859-1?Q?1TIIL+v3/GcdLIWhuA58AwV4p5mrcVvdrmN5jdJe+S/qrB2EScdFQBKDnE?=
- =?iso-8859-1?Q?n3KCifFaWwV3mscgihO3WzabZIzjbExDU7YZHc+Gw+g0OkSKMwob036fsZ?=
- =?iso-8859-1?Q?4OYVs6nreRwIiSc9SpiLMLtG2C2liiUCUD68xEY37sPsGckHuZNL74a2AF?=
- =?iso-8859-1?Q?v4rKRy4lQ0bsrvowr9g7Gg6o12CZOytZspcJvKkB5N+Rz6dGBJlAYoWBpn?=
- =?iso-8859-1?Q?QtsdW8/dNhi/c5+Os64GRed1ZOJ6X7pAfLehXrj8Ir/HTUYIdgSzRpQGi8?=
- =?iso-8859-1?Q?aZvav3UYXvIXutK3G/aFN5gicBW9G4T/FyOk4hY2f3fd+kNWoNVl6ZfQ5Q?=
- =?iso-8859-1?Q?hb68R3THAIa1U0NGXDc7NPJG0W36nfnmMhSQ9PgbdsRBqZrL+w25w9Pq3w?=
- =?iso-8859-1?Q?i+gNMVxpXoiseMsTFeoprK9ATtjuIC0hhybVjMO5bylJuXR5ntt/1VzDWs?=
- =?iso-8859-1?Q?i/1h5Nrz/qjTBdUXoM9GIsJQlyC8J6CizFGSYA6tz5WJtSGe/c89OWxm3u?=
- =?iso-8859-1?Q?l8FBuWeArvMV0+2USyEGlDA8AfxsHEVy/4uTlI8cssHm/6cLTPyqu5KFL6?=
- =?iso-8859-1?Q?/if87+lTrxRo69xVjuMwp2IQkoYp1RsV7lauTLcwWr3tmPcGaILCEkbbTh?=
- =?iso-8859-1?Q?eY6iC3ntClqwGG/vpfgGLvN4SCg9khsejyR2EnIuVpUhdfCxcE2JXKWyIi?=
- =?iso-8859-1?Q?pJ7LGoHqi75uqvx+FRS6P+SP8su8if3hBEsWKIdw1VNGto3S5NV7df2SV7?=
- =?iso-8859-1?Q?FYzRv6QM6qr6KOwdhVVr83F9hQu6dxbohZTJpDynonajZvHVovjp8C4HZ5?=
- =?iso-8859-1?Q?TVrHSTrEy8Ix/j4fZRpQMuWGmLXx8xvoJktKG0UesoQlO/mjMJshyzW4EX?=
- =?iso-8859-1?Q?e40g5YZ652gL9DI6LLQJ99LsD85BHDGqJEbfHjRHVuUwRJPChvB0Fopx2y?=
- =?iso-8859-1?Q?rmkQSH9RwTjG4TkOcnYKwKwrRLHIdwqvUOCqbZp0W/oZW6Q=3D=3D?=
-x-microsoft-antispam-prvs: <VI1PR0402MB3616077FD7D4F51F869D42E0F9630@VI1PR0402MB3616.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09525C61DB
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(376002)(396003)(366004)(39860400002)(189003)(199004)(71190400001)(478600001)(2906002)(106356001)(6512007)(25786009)(105586002)(6436002)(6506007)(386003)(53936002)(26005)(3846002)(186003)(476003)(2616005)(14454004)(71200400001)(102836004)(6916009)(4326008)(6116002)(54906003)(6486002)(2351001)(486006)(5640700003)(256004)(305945005)(52116002)(14444005)(1730700003)(7736002)(36756003)(68736007)(81166006)(81156014)(2501003)(50226002)(8676002)(44832011)(5660300002)(66066001)(97736004)(316002)(99286004)(86362001)(1076003)(8936002)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3616;
- H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 9YuUugVpfHAAGNgOpj8PDxRP0smQ3xBzsrbXbofT/71oWIbaFi9OxZ+rxuIZYzHoSpt2w46/Mor6L+iyOlCB5AYiaDofYC7uCEyOnUU6x7qG3z7KF/xv1A9vvmWueNFbQ6oF8v2F3oXogNhVIlHT03GPKtUgDSnmzggHlIkRR1s7Lv+UVUg0UovzF4wMMZoo9jPr2CdQBdk4pEvJsIV/IPg3uRhN2WDP/IWA+0wlRSZkKr3bwSNs3aDIXiV11RHJ9TbgYRaPQbpr/V4RofotjLeD6IgUJGsk4BolKw1Ur7bFF8hRsyot9hAdQgVe8H/dEbGxi71dq/1L5NlnDksc5Bt61ajjtNRVuogK/n3TilJe68LiQ26TvNfHUvTaysd5N+k0HEBv7NKqb4z6/L59DOU11VxZ2ovJf2plyF2xFeY=
+ id 1gvqOs-0006YJ-Ay
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 21:24:31 +0000
+Received: by mail-ot1-x344.google.com with SMTP id t7so14305302otk.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 13:24:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=terCZ80LXxA3PBiAEs/Mo83x6p3OLzTXSdBC5o4MSuc=;
+ b=mAV7IaKgmHppncLgCyXV0iacWwMeFxBzJuEEkm1Htp2xc2u8nD/zNXSc3U4amdVtHW
+ 0QDRZpacLpOFWaeox1+99V97K1NrRbxAr66xn7pICzQvhpPVzii3H2TDucFzDDjJQ6dh
+ XjgVnCdCBr2fMg8m0pNE3QijIZi/rwlRZqYJLermzMNY5tHX2WQAITb4IweIQ0HHDpaN
+ 5G5IOegV8R16jxDKe6NoL5mPUKCnE1wS00oy2h/14nmkXEhW0MYL5An/tgklZHaku07s
+ nIYeIvktuzLA2Xnz89a0CuhgOxSuatfjZj0EOrf4+zAZfYsFrxMIcpJ6oydWjCEX7gyY
+ bveQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=terCZ80LXxA3PBiAEs/Mo83x6p3OLzTXSdBC5o4MSuc=;
+ b=jvdYl0nOiBwn75bgysg6Md8xh52fppaxYziw1lRI/4GKlYN0693cwxK+0BpliFTbgb
+ QLQpYQxz+bB949T7LoRjGlI+UpTF7puoIuWLmgfUcyjmnd2zRb65CFWlNCbsXskrBVQ1
+ yvFm0tXhBz2pqEz0DhGgywiOvhJDuWuJAbPZ537YMfcFGJxrHbzJ9fHp0g0179Ksip6u
+ JeSqzlIk5FJAXWpVZc5I3F7Jv9rMGNGI+w1clV07r0SOkxNwsyRyhstT+zyKw5zlyKEn
+ b9sqOYQZY7edfgNF1D3JawifrW4vsVnfqX6+5/OrLhuihJKSNE4r0k1gjsAe1VthMtfA
+ /Qtg==
+X-Gm-Message-State: AHQUAuY9FFGVd+vPieMPXlSBVWxUVvcgRXtVEzDRFYbC1Q0Svv4LU09y
+ 3ApYBF4JsNMqWbIfupsCGp6T594duCrpBOQfVn4=
+X-Google-Smtp-Source: AHgI3IZ9tYltrd7oxavWl94369EvsyvagdqvhhFtZDEex9gjRs04HZLQ3MXARmAm1kNNKVBhj3eDJpaXVD72nKK2WGs=
+X-Received: by 2002:a05:6830:1193:: with SMTP id
+ u19mr14303938otq.221.1550525069011; 
+ Mon, 18 Feb 2019 13:24:29 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: b3566d24-ec47-4201-aea2-08d695e6f827
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 21:20:55.2907 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3616
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com>
+ <20190218211035.GA28145@bogus>
+In-Reply-To: <20190218211035.GA28145@bogus>
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Mon, 18 Feb 2019 13:24:02 -0800
+Message-ID: <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_132101_708309_2681665A 
-X-CRM114-Status: UNSURE (   8.96  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190218_132430_380333_C917363E 
+X-CRM114-Status: GOOD (  17.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -136,76 +92,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Anson Huang <anson.huang@nxp.com>, "festevam@gmail.com" <festevam@gmail.com>,
- "S.j. Wang" <shengjiu.wang@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Daniel Baluta <daniel.baluta@nxp.com>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Marcel Holtmann <marcel@holtmann.org>, linux-bluetooth@vger.kernel.org,
+ Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SDMA1 is part of AIPS-3 region and SDMA2 is part
-of AIPS-1 region.
+On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
+>
+> On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+> > Add binding document for bluetooth part of RTL8723BS/RTL8723CS
+> >
+> > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > ---
+> >  .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+> >  1 file changed, 35 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > new file mode 100644
+> > index 000000000000..8357f242ae4c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > @@ -0,0 +1,35 @@
+> > +RTL8723BS/RTL8723CS Bluetooth
+> > +---------------------
+> > +
+> > +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+> > +BT is connected over serial. It speaks H5 protocol with few extra commands
+> > +to upload firmware and change module speed.
+> > +
+> > +Required properties:
+> > +
+> > + - compatible: should be one of the following:
+> > +   * "realtek,rtl8723bs-bt"
+> > +   * "realtek,rtl8723cs-bt"
+> > +Optional properties:
+> > +
+> > + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+> > + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+> > + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+> > + - firmware-postfix: firmware postfix to be used for firmware config
+>
+> How is this used?
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-[initial submit in i.MX internal tree]
-Signed-off-by: Daniel Baluta <daniel.baluta@nxp.com>
-[adaptation for linux-next]
----
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 24 +++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+rtl8723bs-bt needs 2 firmware binaries -- one is actual firmware,
+another is firmware config which is specific to the board. If
+firmware-postfix is specified, driver appends it to the name of config
+and requests board-specific config while loading firmware. I.e. if
+'pine64' is specified as firmware-postfix driver will load
+rtl8723bs_config-pine64.bin.
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index 9155bd4784eb..9c72e5adef86 100644
---- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -234,6 +234,18 @@
- 				status = "disabled";
- 			};
- 
-+			sdma2: sdma@302c0000 {
-+				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
-+				reg = <0x302c0000 0x10000>;
-+				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_SDMA2_ROOT>,
-+					 <&clk IMX8MQ_CLK_SDMA2_ROOT>;
-+				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
-+				status = "disabled";
-+			};
-+
- 			iomuxc: iomuxc@30330000 {
- 				compatible = "fsl,imx8mq-iomuxc";
- 				reg = <0x30330000 0x10000>;
-@@ -575,6 +587,18 @@
- 				status = "disabled";
- 			};
- 
-+			sdma1: sdma@30bd0000 {
-+				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
-+				reg = <0x30bd0000 0x10000>;
-+				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clk IMX8MQ_CLK_SDMA1_ROOT>,
-+					<&clk IMX8MQ_CLK_SDMA1_ROOT>;
-+				clock-names = "ipg", "ahb";
-+				#dma-cells = <3>;
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
-+				status = "disabled";
-+			};
-+
- 			fec1: ethernet@30be0000 {
- 				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
- 				reg = <0x30be0000 0x10000>;
--- 
-2.17.1
-
+> Rob
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
