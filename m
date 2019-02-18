@@ -2,83 +2,62 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8835CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:10:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 60252C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:17:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 589F92146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:10:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2527E217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:17:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hjNs66j0";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="P/3QVMRF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 589F92146F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eAbaYbcF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2527E217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bRYu5vXXb/BEysOK71Bt/eo1LZe8B2Osi3fW2A0fV1w=; b=hjNs66j0zudFOa
-	mdIRGnptQJAWFmr5jy10ot4PC13fCGV7X0VzTke1NXsZgk0o3TXUErTKxad3uCrwtZCeY4nTeFBIh
-	5eaSbIK9pO3EAZKOwH+81UzFP/DeeKMnlcEFhOGxkhOGn2dOGAzucPQAXCmaeIRMEgshtl2RNH2QT
-	frI7YElFnTdsJbElrlYxhxP26n/eMytqK6yQK33bNa/9vokmWLkQd+OX4o+5C4G9Pmzb5BPkhb1GJ
-	wikOkkz/kXd0a3aaNdJ1NNIVLsCZs6oo2tORlWpj/QMY9yFYX970XFT5rACIf3FUd+tRGvR6c1NwV
-	3ka1ky6FdWd8DW/jY6rA==;
+	List-Owner; bh=7xQoS6E2iDYqqJR4uI4jytJQtv5kkTFeyzhufLgLRwI=; b=eAbaYbcFMHW0+z
+	CgMV7v17GQbS8+F6UQmuAXwhhIh1VdWfSxN0EZuqRuV/XQ9+r8xzgDAKyFAwRPzskGR+ZMzKw4PYc
+	gyvjJ1bqtPYJbZjC+996950PUbQsdZmiITsoRrJE3mK5GqljI57/FPH65NXvgOaLiLjnL6/2PdQ8x
+	e8ATUGody/InU1Bpzwp2/FCpEao1OXXcyt+nH9U1FkTz/rZqS33CBS7+vH5bSuvBZg3pBovUDtnAe
+	Ey4JZKYc0q09L+aw1ObWNMZm8vgaEXLjloqJERdQQUPnWe1u1Cy21PD8OCWTCYI8YQnwxwnD0KlL9
+	X7soy6iuD4leDYotoBlA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvmR6-0001lr-H3; Mon, 18 Feb 2019 17:10:32 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvmR3-0001lW-7Z
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 17:10:30 +0000
-Received: by mail-it1-x142.google.com with SMTP id r11so42864363itc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 09:10:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=DyTk1+oYY8BU8LSV6w0sdrXFLLeS5Pl2fw5zG8Afpp4=;
- b=P/3QVMRFvgsMTama3oot2Yfjy3xx+FYwbTDqAVuPSPgu2OhTcpcsc1PplYSF6DihyU
- Pu3sBnuYQD2i6Z2skjK7qOKZaIICJhXXrOchGQ+gLVk/RXAoKi5Cpil2KXF/pklMkBNc
- PYBSYKC+0eRKurS4eCLIy4iwklRhQJgnGOuWPL+otlId0bhMAYe65WYWQd1A4hrTysiD
- IFgshzs9BdRa2W33w/q2aJgqvSpN8j3IjGu2GnIM4/0FiIt0/6TZg36/MlJmt4xGU/3I
- Mjk09EiPLmbrOI1Nes/HvOtpL0/3zgaEheU7pKLKrWBOzRCvAwjCp3zLTwKLUCGeOXGz
- Q68g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=DyTk1+oYY8BU8LSV6w0sdrXFLLeS5Pl2fw5zG8Afpp4=;
- b=MgqckzvDOGveGEO7ywiJWaKXsmfVtRy39PCGLQO0nuKxazJm/9JX+H9yAuycmkCJkI
- ODlATKWqyFeOB8/Ljyj+NFVzca+5Uhyxdn2zmo+EeAeZorfcU1BcrNBi1yQVl0pwboRf
- ekdcVbkyBqjZOIYi2Au5hr+ZUheAL0CvgO+C72guThXQQ1t4A0Dm91Nd9wGfp67xm/G2
- C8M9Ec/eOOuO42ZSjebPB8cJFsuv+MoIAfEt1b3YNW6zD4CrOkktH8naQB2xDr1O75ju
- yQVR7p0bLh0uI1Q6MG9IaKzLX5VY8Kc6uGCD5MjqpzY5LZRhvV5H+MKsLYgGeYyWHOQB
- YcOA==
-X-Gm-Message-State: AHQUAuakvgy4UllCc69vcL915zVTlN8YU+AXKJQDyDNWz/6g6sPcgpHu
- vpdmC5K6I0kvm2aeAosrNViONC2X/Ku/WDT8WRF6bA==
-X-Google-Smtp-Source: AHgI3Ibejlzq+TLs+b6LzY+89X/qGsocCPaBqJlm+fEPx8OUhdDoSdQHui4zxryHx/SmlpoFrMD8qZ7Wz0EGh8ycsmA=
-X-Received: by 2002:a24:67c6:: with SMTP id
- u189mr12152882itc.106.1550509825832; 
- Mon, 18 Feb 2019 09:10:25 -0800 (PST)
+	id 1gvmXw-0003wA-Ey; Mon, 18 Feb 2019 17:17:36 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvmXo-0003vK-1E
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 17:17:34 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F08291713;
+ Mon, 18 Feb 2019 09:04:16 -0800 (PST)
+Received: from capper-debian.emea.arm.com (C02R32KKFVH8.manchester.arm.com
+ [10.32.102.153])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id AB8863F740;
+ Mon, 18 Feb 2019 09:04:15 -0800 (PST)
+From: Steve Capper <steve.capper@arm.com>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 6/9] arm64: mm: Introduce VA_BITS_MIN
+Date: Mon, 18 Feb 2019 17:02:42 +0000
+Message-Id: <20190218170245.14915-7-steve.capper@arm.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190218170245.14915-1-steve.capper@arm.com>
+References: <20190218170245.14915-1-steve.capper@arm.com>
 MIME-Version: 1.0
-References: <E1gukSa-0003kX-JD@optimist> <20190218113217.GA10794@sirena.org.uk>
- <20190218120921.GA11524@kroah.com> <20190218150853.GA21119@ulmo>
-In-Reply-To: <20190218150853.GA21119@ulmo>
-From: Jassi Brar <jaswinder.singh@linaro.org>
-Date: Mon, 18 Feb 2019 11:10:14 -0600
-Message-ID: <CAJe_ZheryjH8EPy+gmBnnXzYWZZO+gXXCYnR7ysQexa9i4rBcQ@mail.gmail.com>
-Subject: Re: next-20190215 build: 2 failures 19 warnings (next-20190215)
-To: Thierry Reding <treding@nvidia.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_091029_276850_E7BB3F3F 
-X-CRM114-Status: GOOD (  17.09  )
+X-CRM114-CacheID: sfid-20190218_091733_076801_4019931E 
+X-CRM114-Status: GOOD (  19.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,54 +69,162 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linaro-kernel@lists.linaro.org, kernel-build-reports@lists.linaro.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Mark Brown <broonie@kernel.org>,
- Linux-Next Mailing List <linux-next@vger.kernel.org>,
- linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: crecklin@redhat.com, Steve Capper <steve.capper@arm.com>,
+ marc.zyngier@arm.com, catalin.marinas@arm.com, ard.biesheuvel@linaro.org,
+ will.deacon@arm.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 18 Feb 2019 at 09:08, Thierry Reding <treding@nvidia.com> wrote:
->
-> On Mon, Feb 18, 2019 at 01:09:21PM +0100, Greg Kroah-Hartman wrote:
-> > On Mon, Feb 18, 2019 at 11:32:17AM +0000, Mark Brown wrote:
-> > > On Fri, Feb 15, 2019 at 08:51:48PM +0000, Build bot for Mark Brown wrote:
-> > >
-> > > The build failure with mbox_fush() in the tegra-tcu driver that was
-> > > initially reported two weeks ago is still present in -next (this report
-> > > is from Friday but it's also present today):
-> > >
-> > > >   arm64-allmodconfig
-> > > > ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
-> > > >
-> > > >   arm-allmodconfig
-> > > > ERROR: "mbox_flush" [drivers/tty/serial/tegra-tcu.ko] undefined!
-> > >
-> > > Is there any progress on getting a fix merged?
-> >
-> > I can take the fix in my tty tree if I get an ack from the mbox
-> > maintainer...
->
-Not sure if I was on the CC. Honestly I only look into emails that
-pass my very lenient filter. I will add 'mbox' too to it.
+In order to support 52-bit kernel addresses detectable at boot time, the
+kernel needs to know the most conservative VA_BITS possible should it
+need to fall back to this quantity due to lack of hardware support.
 
-> Maybe we can do the below until Jassi picks up the proper fix. There is
-> no hardware currently where we'd want to build the TCU driver as a
-> loadable module, so that would be fine for now.
->
-> It's a bit of churn because I'd want to revert that later on, but it's
-> not too bad and would get linux-next back on track.
->
-Maybe it should be indeed bool or rather directly selected by your
-ARCH because iirc you wanted to send critical debugging messages over
-tcu ;)
+A new compile time constant VA_BITS_MIN is introduced in this patch and
+it is employed in the KASAN end address, KASLR, and EFI stub.
 
-Anyway, I have sent a pull request with this fix in.
+For Arm, if 52-bit VA support is unavailable the fallback is to 48-bits.
 
-Cheers!
+In other words: VA_BITS_MIN = min (48, VA_BITS)
+
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+---
+ arch/arm64/Kconfig                 | 4 ++++
+ arch/arm64/include/asm/efi.h       | 4 ++--
+ arch/arm64/include/asm/memory.h    | 5 ++++-
+ arch/arm64/include/asm/processor.h | 2 +-
+ arch/arm64/kernel/head.S           | 2 +-
+ arch/arm64/kernel/kaslr.c          | 6 +++---
+ arch/arm64/mm/kasan_init.c         | 3 ++-
+ 7 files changed, 17 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index db155ae86fed..0f933d3a1614 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -756,6 +756,10 @@ config ARM64_VA_BITS
+ 	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48 || ARM64_USER_VA_BITS_52
+ 
++config ARM64_VA_BITS_MIN
++	int
++	default ARM64_VA_BITS
++
+ choice
+ 	prompt "Physical address space size"
+ 	default ARM64_PA_BITS_48
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 7ed320895d1f..4a84353bc9f7 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -68,7 +68,7 @@ static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+ 
+ /*
+  * On arm64, we have to ensure that the initrd ends up in the linear region,
+- * which is a 1 GB aligned region of size '1UL << (VA_BITS - 1)' that is
++ * which is a 1 GB aligned region of size '1UL << (VA_BITS_MIN - 1)' that is
+  * guaranteed to cover the kernel Image.
+  *
+  * Since the EFI stub is part of the kernel Image, we can relax the
+@@ -79,7 +79,7 @@ static inline unsigned long efi_get_max_fdt_addr(unsigned long dram_base)
+ static inline unsigned long efi_get_max_initrd_addr(unsigned long dram_base,
+ 						    unsigned long image_addr)
+ {
+-	return (image_addr & ~(SZ_1G - 1UL)) + (1UL << (VA_BITS - 1));
++	return (image_addr & ~(SZ_1G - 1UL)) + (1UL << (VA_BITS_MIN - 1));
+ }
+ 
+ #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index dde0b9b75b22..03db258eb354 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -64,6 +64,9 @@
+ #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
++#define VA_BITS_MIN		(CONFIG_ARM64_VA_BITS_MIN)
++#define _VA_START(va)		(UL(0xffffffffffffffff) - \
++				(UL(1) << ((va) - 1)) + 1)
+ 
+ #define KERNEL_START      _text
+ #define KERNEL_END        _end
+@@ -90,7 +93,7 @@
+ #endif /* CONFIG_KASAN_EXTRA */
+ #else
+ #define KASAN_THREAD_SHIFT	0
+-#define KASAN_SHADOW_END	(VA_START)
++#define KASAN_SHADOW_END	(_VA_START(VA_BITS_MIN))
+ #endif
+ 
+ #define MIN_THREAD_SHIFT	(14 + KASAN_THREAD_SHIFT)
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index f1a7ab18faf3..48e94a671234 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -53,7 +53,7 @@
+  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
+  */
+ 
+-#define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
++#define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS_MIN)
+ #define TASK_SIZE_64		(UL(1) << vabits_user)
+ 
+ #ifdef CONFIG_COMPAT
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 15d79a8e5e5e..b6c15b97ec9d 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -325,7 +325,7 @@ __create_page_tables:
+ 	mov	x5, #52
+ 	cbnz	x6, 1f
+ #endif
+-	mov	x5, #VA_BITS
++	mov	x5, #VA_BITS_MIN
+ 1:
+ 	adr_l	x6, vabits_user
+ 	str	x5, [x6]
+diff --git a/arch/arm64/kernel/kaslr.c b/arch/arm64/kernel/kaslr.c
+index b09b6f75f759..6f0075f983c7 100644
+--- a/arch/arm64/kernel/kaslr.c
++++ b/arch/arm64/kernel/kaslr.c
+@@ -119,15 +119,15 @@ u64 __init kaslr_early_init(u64 dt_phys)
+ 	/*
+ 	 * OK, so we are proceeding with KASLR enabled. Calculate a suitable
+ 	 * kernel image offset from the seed. Let's place the kernel in the
+-	 * middle half of the VMALLOC area (VA_BITS - 2), and stay clear of
++	 * middle half of the VMALLOC area (VA_BITS_MIN - 2), and stay clear of
+ 	 * the lower and upper quarters to avoid colliding with other
+ 	 * allocations.
+ 	 * Even if we could randomize at page granularity for 16k and 64k pages,
+ 	 * let's always round to 2 MB so we don't interfere with the ability to
+ 	 * map using contiguous PTEs
+ 	 */
+-	mask = ((1UL << (VA_BITS - 2)) - 1) & ~(SZ_2M - 1);
+-	offset = BIT(VA_BITS - 3) + (seed & mask);
++	mask = ((1UL << (VA_BITS_MIN - 2)) - 1) & ~(SZ_2M - 1);
++	offset = BIT(VA_BITS_MIN - 3) + (seed & mask);
+ 
+ 	/* use the top 16 bits to randomize the linear region */
+ 	memstart_offset_seed = seed >> 48;
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 66ea44568aa5..3996d46b5d0e 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -148,7 +148,8 @@ static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
+ /* The early shadow maps everything to a single page of zeroes */
+ asmlinkage void __init kasan_early_init(void)
+ {
+-	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
++	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS), PGDIR_SIZE));
++	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS_MIN), PGDIR_SIZE));
+ 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
+ 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
+ 			   true);
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
