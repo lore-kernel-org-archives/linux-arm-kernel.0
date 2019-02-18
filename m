@@ -2,21 +2,22 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 08879C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:18:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83EFCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:20:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE35C218B0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:18:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5275C2184E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:20:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FDhVK9oU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE35C218B0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KVFUCMHc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5275C2184E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,53 +25,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tnUNyjgXvYuqOcwpM4CrmqtmXcyFk1z8f8hqpptd6VI=; b=FDhVK9oUdGvxrk
-	jRZc4PsqED/ptBvmv1rxL07mbgJBDHAhaSAvxnrlXMqp+0vpfcKEsWhoQwPxAxhdK9Vk4uMRB/NB0
-	mIaWbexw5E/zK1kVNAVDV50liQUMg8BKERd6fBn1iT/jVWZVyl+mu4KMKvovZlQtOE6NjyVXcRqfz
-	hjYZdCi6uVt0dawxQvBU4TaFqXpYeFavLlpOxwHHPVYfW77xR3dwN4A7iSYQ5m3CE/dJlj0OARxst
-	uIfcXA0MmEsf15RUXCDa+gNcSMf5PyYiPeBXutwJ5qIr1gZvhJoUWFLJr1J86yp5733FBMNWQCucr
-	dcyfO5dMkCxlEsvkDBKg==;
+	List-Owner; bh=1hmA1P2m4I3H2N3ViU+34vtV2qa1OpyYy/QjfFBYem0=; b=KVFUCMHcxqgJ1u
+	3Nyc9d9p7FbjKNITIKTkXpjw3tLjq2ruatMVmR6mEQmfJZX9Z1OZlmjFG0KD/ORJ4bh3LPOiYb4Ro
+	EEZJBBi+kQWtdaCCcH4nSkvfuuNj3Pmp8Oz6YdxGOiN6TiCsljd1Wk2aDHwIoWiZSD86PD/E/NM17
+	MgBnIwIwf+IzYu7qY9VMegZGCtkfnOSy/8QCbWZjXk9Z+sX4LfVr/BC4fkmBDkTIyAox/bEYnvQhc
+	R9MMc8kVNEa2V3Votp0PAaWI7EtfgwLKk3EGYmaVML1pkFCPs16IJwHU3/hOFzLSchA4D5XsJtEZR
+	R4FCs56q/1QCx40IMTfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvf4N-0002d8-RA; Mon, 18 Feb 2019 09:18:35 +0000
-Received: from mail-qt1-f195.google.com ([209.85.160.195])
+	id 1gvf5l-0002xg-83; Mon, 18 Feb 2019 09:20:01 +0000
+Received: from mail-ed1-f66.google.com ([209.85.208.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvf4K-0002ck-2H
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:18:33 +0000
-Received: by mail-qt1-f195.google.com with SMTP id v10so18402041qtp.8
+ id 1gvf5i-0002wQ-1d
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:19:59 +0000
+Received: by mail-ed1-f66.google.com with SMTP id b3so13245889ede.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 01:18:31 -0800 (PST)
+ Mon, 18 Feb 2019 01:19:54 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=2c6geFCKX+YzsXq6SlYnnZvqPcfkuNDgdgXGbErWd9Q=;
- b=mxv7N5CYIyiYBebPGYhZFIFFhiWOpXuhK/i42XrGhSjeY5h518ufP9Km4Es+Gjs//x
- vRwhQw315NV6YodWlwd3r6VrwS9i2/We6G733FduOIWLMiwxz+DER3LaDRQozG2pN9Y5
- RtS6AwwaAe/wmYS2NdeOwCYWaAJlYUPzkO/UoTy4Kaa07UxVlrRjaFVJxID8gwbjla5f
- xpOqRaHWetvur9e758Bvq+JZ2tqloLQ6zAMp2st3Q1oWcZcLIN4Es3ySR/JD2LUbvpjT
- ePaB/HOKhjpdxZWjUoAGRr1/DVo2xYTRdsw2/EYba3Rgu3epLxiTT0vs53/H5Ubrpf7+
- XPDg==
-X-Gm-Message-State: AHQUAuaN6kKebyNUPiDnn5cG8ipSU7VxREPxZCAnnt3q/kFNHwEHxLXf
- k+V2vP0hQJGHKyKDceJEhNbK+h/yq5RLgKxSvOs=
-X-Google-Smtp-Source: AHgI3IaacCv+bdgkEzYs/kvGAG8Gwl+McqUCDpdFY+CKTC0yBHgWXfZ+wGxf0Xfo7G4DeSZRgLMnxUTG5UcZ+0g6Yng=
-X-Received: by 2002:ac8:33f1:: with SMTP id d46mr17216321qtb.319.1550481510433; 
- Mon, 18 Feb 2019 01:18:30 -0800 (PST)
+ bh=/XrklYpNWnYcNWVDYLyQUagxKF+mFK8VoH185hzGYac=;
+ b=ODbdp8TW8kxGGkNp73xmGEgiPLcOeyiACtp/3tZU7acquAgcxv0Ma0eb5Mu+p7cRlH
+ zu0m+dxgxRyMQ+sJPmkJO//EKcTIIfnSuGM1k4n1kCqQ7qRuLycfIeHA6J/4SQPaEaPE
+ +g1ZZAmod8a0hy271Mlt2QO8B7gmUQoykO7HKe3Yzo/2l980XuQXwPJhe36lNi6PHp+6
+ MaZmI3isGUpf0FwjCf/sIXsS5oUrVuxd7CoovmAvkV1eW+HkLka9cCpdF1DJFjf3XM/8
+ 4vF7Q4BX1kGblhmnAFglZoKVbyEIFtC54MBH0HbrjxIePNDFr/S4iya7ZX6+2oe+V3Xd
+ QxBw==
+X-Gm-Message-State: AHQUAuZjQmswgpUlK14lPQfAVFI7zlXccVfcItMNHYeLzbV5LkPY71DH
+ UdYeDFLcSyK24vYfgYbvlwxg2Ksso5w=
+X-Google-Smtp-Source: AHgI3IZewjmRNyUnB7CgELm8ubXIjX+eFWkKAa0oUYP5uktNcPwxLNzafQUhfF4ZTXo1LRHic+cwpQ==
+X-Received: by 2002:a50:c299:: with SMTP id o25mr18568058edf.281.1550481592427; 
+ Mon, 18 Feb 2019 01:19:52 -0800 (PST)
+Received: from mail-wm1-f45.google.com (mail-wm1-f45.google.com.
+ [209.85.128.45])
+ by smtp.gmail.com with ESMTPSA id s3sm2920380ejk.34.2019.02.18.01.19.50
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 18 Feb 2019 01:19:51 -0800 (PST)
+Received: by mail-wm1-f45.google.com with SMTP id x10so16130725wmg.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 01:19:50 -0800 (PST)
+X-Received: by 2002:a7b:c00f:: with SMTP id c15mr14993134wmb.14.1550481590283; 
+ Mon, 18 Feb 2019 01:19:50 -0800 (PST)
 MIME-Version: 1.0
-References: <20190203214205.13594-1-linus.walleij@linaro.org>
- <20190203214205.13594-5-linus.walleij@linaro.org>
- <ffc97649-bfc2-e411-149f-cd5ed9e8c77e@arm.com>
- <CACRpkdZK7OU9rb-qw9tTjJLNvfQG-VmN_VBXUz9DPqVV11zuww@mail.gmail.com>
- <20190211221156.10036ad8@why.wild-wind.fr.eu.org>
-In-Reply-To: <20190211221156.10036ad8@why.wild-wind.fr.eu.org>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 10:18:14 +0100
-Message-ID: <CAK8P3a0L0AsuqdiZ+RTWpV8EnO5xsVVkbmzJit4yi23nR0jrvw@mail.gmail.com>
-Subject: Re: [PATCH 04/17 v1] irqchip: Add driver for IXP4xx
-To: Marc Zyngier <marc.zyngier@arm.com>
+References: <20190217162316.14111-1-tiny.windzz@gmail.com>
+ <20190217162316.14111-3-tiny.windzz@gmail.com>
+ <20190218084931.fdut6d4cgwkwvihx@flea>
+In-Reply-To: <20190218084931.fdut6d4cgwkwvihx@flea>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 18 Feb 2019 17:19:40 +0800
+X-Gmail-Original-Message-ID: <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
+Message-ID: <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
+Subject: Re: [PATCH 2/5] nvmem: sunxi-sid: add support for H5's SID controller
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_011832_101813_116DAF65 
-X-CRM114-Status: GOOD (  20.87  )
+X-CRM114-CacheID: sfid-20190218_011958_087324_667D157E 
+X-CRM114-Status: GOOD (  20.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,63 +93,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>,
- Linus Walleij <linus.walleij@linaro.org>, Krzysztof Halasa <khalasa@piap.pl>,
- Olof Johansson <olof@lixom.net>, Thomas Gleixner <tglx@linutronix.de>,
- Imre Kaloz <kaloz@openwrt.org>, Tim Harvey <tharvey@gateworks.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Yangtao Li <tiny.windzz@gmail.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 11, 2019 at 11:12 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Mon, Feb 18, 2019 at 4:49 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> On Mon, 11 Feb 2019 21:58:41 +0100
-> Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> > On Mon, Feb 11, 2019 at 4:30 PM Marc Zyngier <marc.zyngier@arm.com> wrote:
->
-> [...]
->
-> > > How about using something that enforces the endianness of the accesses,
-> > > as I suspect the bus is hardcoded to BE?
+> On Sun, Feb 17, 2019 at 11:23:13AM -0500, Yangtao Li wrote:
+> > Add support for H5's SID controller.
 > >
-> > So, IIUC (Krzysztof can confirm) IXP4xx works like this that when the
-> > CPU is brought up in LE mode, all bytes on the address bus are
-> > swizzled so that the access can always use the CPU native
-> > endianness.
+> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > ---
+> >  drivers/nvmem/sunxi_sid.c | 6 ++++++
+> >  1 file changed, 6 insertions(+)
 > >
-> > Isn't it crazy :D
+> > diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+> > index 570a2e354f30..036029e90921 100644
+> > --- a/drivers/nvmem/sunxi_sid.c
+> > +++ b/drivers/nvmem/sunxi_sid.c
+> > @@ -219,11 +219,17 @@ static const struct sunxi_sid_cfg sun50i_a64_cfg = {
+> >       .size = 0x100,
+> >  };
+> >
+> > +static const struct sunxi_sid_cfg sun50i_h5_cfg = {
+> > +     .value_offset = 0x200,
+> > +     .size = 0x100,
+> > +};
 >
-> It's spelled BE32! ;-) I vaguely remember doing some of that on vulcan,
-> but that's a decade ago, and I've paged it out... ;-)
->
-> > This means __raw_writel() will always do the right thing, because
-> > that uses native endianness, and that is why it is used quite a lot
-> > in IXP4xx drivers.
->
-> OK, it now makes some sense. Maybe a comment somewhere will help if
-> someone tries to reverse engineer it again in the next decade!
+> IIRC, there was an endianness issue on the newer SoCs, with the driver
+> converting the data from big endian to little endian, while it's
+> actually stored little endian in the SID.
 
-I think the best way forward would be to change all the
-__raw_readl()/__raw_writel() in ixp4xx specific drivers to a new
-accessor that is defined as a trivial wrapper around __raw_readl()/
-__raw_writel() but that is explicitly defined as
+About that, it seems the internals are either little endian or native (same
+as the bus). Either way the nvmem the driver currently exposes is wrong.
 
-- always accessing a 32-bit word in native endianess
-- only valid on ixp4xx on-chip registers (not PCI)
-- containing the required barriers (if any)
+My idea is to keep the current one with the current name, but have it not
+associate itself with the DT node. We then register an extra one, called
+"sunxi-sid-native" which uses the native endian. This one will be associated
+with the DT node, so the THS driver can consume nvmem cells.
 
-In my mental model of the I/O accessors, readl/writel are used
-for (little-endian) MMIO register accesses, while __raw_readl()/__raw_writel()
-can only be used in portable code on byte streams in memory behind
-a bus, not on registers. The way ixp4xx works fits into neither of those
-two, so we should not use them here. I also think it's a bug to
-use 8-bit or 16-bit accessors for internal registers on ixp4xx, so
-having a pair of special helpers makes it impossible to do so.
+What do you think?
 
-      Arnd
+> Have you checked the SID content?
+
+On the A64 and H5, directly dumping the SID registers (not using the H3
+read method) shows the contents are little or native endian.
+
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
