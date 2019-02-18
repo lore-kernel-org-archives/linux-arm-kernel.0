@@ -2,85 +2,150 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33007C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:33:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0DEDDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:53:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 03FF92184E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:33:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D07C1218C3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 06:53:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M0MzxmUr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="MsuBJSSI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03FF92184E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W9qZ/rnG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="X5hQz9mH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D07C1218C3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LXBQ9uOtC7CXGMAmCAUzEeDPQaesqXRasfoLFW8fr1M=; b=M0MzxmUrEl9P3d
-	YkiLNgWVJOc+KG8LPX6us9D3KRmbFNYFoOawstq1HkSzauG/Q+QxhC72yn1H8bQeFaobmheap66md
-	fVfJjf5jqE1WXl7WRTT+RJjQZoffPfXRLNmZ4pnRC8Qwlxs1i9vYQfO5IF+/mxAHWy2ERRaA3uWmg
-	7JNJsuewe7L2nngM/fwag/v5l7QE0gmjnbrgCFuHCJ9EI4kLsqeuLjbvImGTgNArAMI9VEszYqJEG
-	3HUsGfbr/9+zK6khE1LbqolgbS7J85wk79ucSV4TCWi5BKEud0A+TUKu5CzGieU5iEe9Bp5kUey3d
-	NCSaguADYPEh4iElB2Pw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=m9u9wWhzK7tJzGuA3jK99vplF6XFqr83N8VKDVkRIL8=; b=W9qZ/rnGb6ktl9
+	ifE34aswQh2oRO2P/cGYc9rZpaeON1XnWW9GYFY08fgWefVwcxz5Tv7uQ5mHGmm6vT36IwRHUitJq
+	XFUltHDp6tk+sm+2LIjejq7RBbhiYwe7osXxUrvUZBVe5Lk2dRLwRqbESLTpKn9bALopEhOgyE4PY
+	si8oKMUceLMxPCIK+NTTAw+vv+XlIqjjut4ALPf0zVs/oswL4dWEloSNg2iihul0eRiScGOMJWQfr
+	Piasd47soQ7pYqYAT+Ctr8/BLC83TZQszbAg+mggbEunibvt3kZjKv3N3Op9ZcsqATPumG2KNIyAN
+	CJn1gq1MMEVuM77pWozw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvcUh-00039g-Sw; Mon, 18 Feb 2019 06:33:35 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gvcoG-00020h-Ua; Mon, 18 Feb 2019 06:53:48 +0000
+Received: from mail-eopbgr80077.outbound.protection.outlook.com ([40.107.8.77]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvcUe-000394-W3
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 06:33:34 +0000
-Received: by mail-wr1-x444.google.com with SMTP id f14so17050981wrg.1
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 17 Feb 2019 22:33:30 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=vHCudiFBm/jzc4dvlgpQ6a7QXYNqY+987pMivWSoyZk=;
- b=MsuBJSSIeGgjQ4zYmV+EZjNnmbGHHojlgGczNswkGXwu0B4rIDZPxsA/6sw8qgKGGf
- cl4UfWzzTI6FuCdus+pjdvyCvxRCBy0piyk4m2aLS3397+CFimVmpr5SZY35RMkLnZOR
- +h4xvo2/wVfLE/slwcsV1/l/P8a3C5btMH9vojNYTxKRno7Vdrtbzd76TD9488etd4QG
- clA+74fnpq0udhTPc6J2HuFx6cpthej1G+53oSbXt90fLUAKlfpOgQc+uYXbSZfUiYkP
- YA5GLZT2YKm4+nNjBVJbgd1jokCfFKqSd4MSUjQTughbcKQAtPKZ7DBSfw7ffEEjStu/
- 3yeA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=vHCudiFBm/jzc4dvlgpQ6a7QXYNqY+987pMivWSoyZk=;
- b=JJ2qY0cmHSa/DeT1eDVv6LVUhq1lzVeWhaiCJZ1DQaztR8rS2DwvndJt6mlW1aJUjD
- ANnOM5SDKpT7D/3T4FGkoPkjZzezigwSzfnoSInQwrnv3TV3egr81FbHye2Ui+I7Vmvo
- mlU+DEVwXY7GnJbYTrifk9zAH7/eQP8nijdlIbyyVCZEbKlRNOnVCRcj6NOC4M7cKfcT
- 7HtqY/ARSQz5FBsCaV/aq0fWTtEI53OrTVSyAu/psA4GFkEVHL0DKQnJ91M+oi0Ovv3W
- puPJkPLp8e1LNJt3/AzM5/iCUbFvHkvglALQuFdAcwNTJr0+f9vhLENyHECn1u5kGYJe
- j7KA==
-X-Gm-Message-State: AHQUAuaME4j/2hsTvidfzMqo55SgqBnrviF+UuUxTmcFXAbiCiPa+DkC
- VDd7J7oyMTKk2Fiu+FsAki3CTuZEZaRb/Bs6HKE=
-X-Google-Smtp-Source: AHgI3IZcK0dDAbxkgTlyAFkQYAFnhrQ7YmZYsv9JLwv9GzCKowKM7c0tSc7Z7lD7up9wZg7Gm57L1zDnbjgxin31PrU=
-X-Received: by 2002:adf:cd87:: with SMTP id q7mr16476213wrj.92.1550471609085; 
- Sun, 17 Feb 2019 22:33:29 -0800 (PST)
+ id 1gvcoD-0001zo-0w
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 06:53:46 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=DrM9BCm9y7Y1cuUfJyUAeEJToBuXD9iRMdPf1FUA2rM=;
+ b=X5hQz9mHzddw2lgPlisgFarS1yfUDkoCKREkcwVHJUmB7lxpt5f7bzndLkLb4quowHIF4G8Q/fjy21oZR5HeneiXT+VhFfoA5NHunLZr1zR3mLHpKq9TEMufwzSBjDXWwiyXsj9bUHMe0JYo+Nf4UgyK4sefFZ7JvA40nmg+cOg=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3707.eurprd04.prod.outlook.com (52.134.65.21) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.19; Mon, 18 Feb 2019 06:53:39 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Mon, 18 Feb 2019
+ 06:53:39 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "catalin.marinas@arm.com" <catalin.marinas@arm.com>, "will.deacon@arm.com"
+ <will.deacon@arm.com>, "wim@linux-watchdog.org" <wim@linux-watchdog.org>,
+ "linux@roeck-us.net" <linux@roeck-us.net>, Aisheng Dong
+ <aisheng.dong@nxp.com>, "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ Daniel Baluta <daniel.baluta@nxp.com>, Andy Gross <andy.gross@linaro.org>,
+ "horms+renesas@verge.net.au" <horms+renesas@verge.net.au>, "heiko@sntech.de"
+ <heiko@sntech.de>, "arnd@arndb.de" <arnd@arndb.de>,
+ "bjorn.andersson@linaro.org" <bjorn.andersson@linaro.org>,
+ "jagan@amarulasolutions.com" <jagan@amarulasolutions.com>,
+ "enric.balletbo@collabora.com" <enric.balletbo@collabora.com>,
+ "marc.w.gonzalez@free.fr" <marc.w.gonzalez@free.fr>, "olof@lixom.net"
+ <olof@lixom.net>, "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-watchdog@vger.kernel.org"
+ <linux-watchdog@vger.kernel.org>
+Subject: [PATCH RESEND V2 0/4] Add i.MX8QXP system controller watchdog support
+Thread-Topic: [PATCH RESEND V2 0/4] Add i.MX8QXP system controller watchdog
+ support
+Thread-Index: AQHUx1atSP6lSFBBKUe5Cz27IkPE+g==
+Date: Mon, 18 Feb 2019 06:53:39 +0000
+Message-ID: <1550472539-16590-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0133.apcprd02.prod.outlook.com
+ (2603:1096:202:16::17) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: f380aa6f-73d3-4fec-21c4-08d6956dcfd3
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3707; 
+x-ms-traffictypediagnostic: DB3PR0402MB3707:
+x-ms-exchange-purlcount: 1
+x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3707;
+ 23:RBuINAoncevKsKcqWFPkOm1449Zw1S4eVpBXl?=
+ =?iso-8859-1?Q?CQyO8vDm+GvmWn6xj/PFvn4aOinmjUrGX9kbMcxfEcLcTVWdahr0PJSxG1?=
+ =?iso-8859-1?Q?QZLJibtv+FGtcYYAWHIyqG4wjL713hZzzffwCGVDVg1WE8Frzx0OnExDJ5?=
+ =?iso-8859-1?Q?S7+6qvz3OiKhppYP1S/XP1xGXK1CQgcH/Vm85UXPjxbLxy6l1NzoPKU0Dn?=
+ =?iso-8859-1?Q?rqY78fcvD0sGWjLAImq0D6+BS3esqQ55KyOjz3UxpcgwGGjYmseAVgz70s?=
+ =?iso-8859-1?Q?RtjQu9fHy/miEw/fJhFUfQvudzTOdFKXDSRO2SjFAn1PY+c602hPh7F3in?=
+ =?iso-8859-1?Q?1/JbW8SpIbcWE309I/fww46zZB1UhXnsltSv5iS/cdfqmjEWGreOWwgP10?=
+ =?iso-8859-1?Q?RbHbkG/VQHdzX8oi7mSN5OlNtm6pMkIiArA2/55d0V+8DT27m73fLf0jpo?=
+ =?iso-8859-1?Q?AM0swvI/vJ3zy8FSKpICxU9dsA+rcYeZ0IhDMLlM7s6mWjn8Sjw5a9z96Q?=
+ =?iso-8859-1?Q?/XPaCxX3E5VXCG+Fn7bjVt7E0IJifK+Y6+tv4KYEbEzRiXOKjnuFuSnV0x?=
+ =?iso-8859-1?Q?HzI+nlrdva+GUfJ/fl3OV3XXtvxk2Xcs91Ilc3nil/OmwUOnTRv/Jot+Fo?=
+ =?iso-8859-1?Q?LkPPUGDda7OrDDoE8aUvIjf4MbQNS+soztS8xFTcC9ZbPelBYoSRldTulx?=
+ =?iso-8859-1?Q?5SjMiqU8Pv48+KxWbLhyAS7R0CiiOU2+2YfxAUdLY46odP4HVH71v77t7c?=
+ =?iso-8859-1?Q?voB6m3FTvyb2CCGEL9Xs53Rzh0WNE2AdZzJK5VBYUjxEXjPnaaw1VdgWN+?=
+ =?iso-8859-1?Q?ey5feWD8nmOBtRrQ5XDh3iUHINBZzmtOZBaxlKqNk0GkEqbcRws6ZlprGR?=
+ =?iso-8859-1?Q?lkWhzoX0udHQ/ijgq6KxWgXofdNlhBHjki/Dyy3gY4z7ZOJaHwv0ZQWScl?=
+ =?iso-8859-1?Q?f8LAiOkRQQHgq7NBqj0cGqiDzp6hIKPdwN13dnjEp5b6hbvI23uXcrXbwM?=
+ =?iso-8859-1?Q?7OZHh7mGsGDZE3V/5uFYf7OImlafZqSkGyeTgpPeE4y2UZGPFdRcukFfjh?=
+ =?iso-8859-1?Q?BtMpwSHyVZ7GCYhpmiW0W0WJLWiN6dypBgyJRSKCj8Daj6hEv+e08kf9To?=
+ =?iso-8859-1?Q?T8dEzcEgWLB88L0BS9fkgh7GOpOsl31kGXmoEhaHtS4Ht1xEGh0eOOGKM2?=
+ =?iso-8859-1?Q?JfhGP7R0y9ohg1aFaJ1MQeciGQJSvr3mN5wyVeJo7w3+dDoeD3oM67yPgH?=
+ =?iso-8859-1?Q?KbGldj4eUf5x1hOlwAPYhXDAmSKCLKXpP2S2P3TBW+gWIxyYPji7petZQ1?=
+ =?iso-8859-1?Q?nDBVI178ZVl9y31OZSSwaWL1I+6p3i+mcY+OdSI8F7Tb+gQ=3D=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB37076B11FC1845C473D630DCF5630@DB3PR0402MB3707.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09525C61DB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(39860400002)(366004)(136003)(396003)(54534003)(199004)(189003)(305945005)(71200400001)(71190400001)(217873002)(256004)(5660300002)(14444005)(105586002)(4326008)(7736002)(25786009)(476003)(2616005)(106356001)(53936002)(8676002)(7416002)(316002)(110136005)(66066001)(2501003)(486006)(6116002)(3846002)(86362001)(81166006)(6436002)(8936002)(68736007)(81156014)(2201001)(6512007)(6306002)(50226002)(102836004)(2906002)(6486002)(26005)(478600001)(36756003)(966005)(97736004)(386003)(6506007)(52116002)(186003)(14454004)(99286004)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3707;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: D8DWC7z2VCMd0kU6lxwCNfKX6bmc8jeMgVmXCWrNC3bfYJkfg/n0Ck/Y/S+sHwA9pnYU106HM8wGiicDNQzrOff7/CwJoJ99qZg4trVs5ltz2SKd3PI8KlWKskEGmpyH6NfUVOfq7+TNLTTHpTw/98MXq+q7pBm8XO6T7akjGLhsaEyUhpWIN1S1Ig5RxKS80wFMTgDXuWYh6UU5O8NSpPIoQoUKSY/A0G9eRgO80QgujwYcD+60FpnIXlo2MiJsRg8GWB2I4FaEdJgHXpGwd4wbmVwRfnM2Gsg1eKMu8mUNpd3KBGBF9E0wz1Z/20gdDap6QmVXbpa1vZ6U/ZxxBlUxirg/6LQEao8KDVoHnR2yrE4UmfzwBap5w8zkJtGYfaq+CJ5BUkRAKZR2OIYEbrrGsZwLVgjGWVBJUrFHf6s=
 MIME-Version: 1.0
-References: <20190129195214.30272-1-sxauwsk@163.com>
- <CAKfKVtELqoNNJB0qB88ghGoVrdV2-Ez1DjvmT3dZifntdV0GQg@mail.gmail.com>
- <2019021615501780626817@163.com>
-In-Reply-To: <2019021615501780626817@163.com>
-From: Shubhrajyoti Datta <shubhrajyoti.datta@gmail.com>
-Date: Mon, 18 Feb 2019 12:03:18 +0530
-Message-ID: <CAKfKVtGu3dzSR71-Rsp8SR8nq8-XhY5FrgDvxv9iu_L-TyL5+Q@mail.gmail.com>
-Subject: Re: [PATCH] i2c: cadence: try reset when master receive error
- interrupts
-To: "sxauwsk@163.com" <sxauwsk@163.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: f380aa6f-73d3-4fec-21c4-08d6956dcfd3
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 06:53:26.2026 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3707
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_223333_055424_017E3EA7 
-X-CRM114-Status: GOOD (  20.39  )
+X-CRM114-CacheID: sfid-20190217_225345_068586_C828B1DE 
+X-CRM114-Status: GOOD (  10.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,84 +157,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel <linux-kernel@vger.kernel.org>,
- Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
- "michal.simek" <michal.simek@xilinx.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-i2c <linux-i2c@vger.kernel.org>
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi ,
-On Sat, Feb 16, 2019 at 1:21 PM sxauwsk@163.com <sxauwsk@163.com> wrote:
->
-> >Hi Sxauwsk,
-> >
-> >On Wed, Jan 30, 2019 at 3:13 PM sxauwsk <sxauwsk@163.com> wrote:
-> >>
-> >> When the adapter receive error interrupts, such as NACK, arbitration lost,
-> >> cdns_i2c_master_xfer return to the caller directly instead of resuming
-> >> the adapter which resulted in the adapter being out of control.
-> >>
-> >> So when driver detect err_status then try to repair and fix it.
-> >>
-> >> Signed-off-by: sxauwsk <sxauwsk@163.com>
-> >> ---
-> >>  drivers/i2c/busses/i2c-cadence.c | 12 +++++++-----
-> >>  1 file changed, 7 insertions(+), 5 deletions(-)
-> >>
-> >> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> >> index b13605718291..e10048d7524a 100644
-> >> --- a/drivers/i2c/busses/i2c-cadence.c
-> >> +++ b/drivers/i2c/busses/i2c-cadence.c
-> >> @@ -548,10 +548,6 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
-> >>         cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
-> >>                           CDNS_I2C_IDR_OFFSET);
-> >>
-> >> -       /* If it is bus arbitration error, try again */
-> >> -       if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
-> >> -               return -EAGAIN;
-> >> -
-> >>         return 0;
-> >>  }
-> >>
-> >> @@ -617,13 +613,19 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
-> >>                         id->bus_hold_flag = 0;
-> >>
-> >>                 ret = cdns_i2c_process_msg(id, msgs, adap);
-> >> -               if (ret)
-> >> +               if (!ret)
-> >>                         goto out;
-> >>
-> >In case  the Arbitration error happend  the cdns_i2c_process_msg would return 0
-> >and we will miss the check  below.
-> >
-> >Am I missing something ?
-> >
-> >>                 /* Report the other error interrupts to application */
-> >>                 if (id->err_status) {
-> >>                         cdns_i2c_master_reset(adap);
-> >>
-> >> +                       /* If it is bus arbitration error, try again */
-> >> +                       if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
-> >> +                               ret = -EAGAIN;
-> >> +                               goto out;
-> >> +                       }
-> >> +
-> >>                         if (id->err_status & CDNS_I2C_IXR_NACK) {
-> >>                                 ret = -ENXIO;
-> >>                                 goto out;
-> >> --
-> >> 2.19.2
-> >>
-> >>
->
-> In cdns_i2c_process_msg process, when detect arbitration lost error return -EAGAIN to  cdns_i2c_master_xfer,  not return 0
-> that mean cdns_i2c_process_msg  just go out ignore error check and  problem occur, So we should do something when arbitration error detect.
+i.MX8QXP is an ARMv8 Cortex-A35 SoC with a Cortex-M4 system controller inside,
+the system controller manages overall power, clock, secure RTC and watchdog
+etc., so Linux kernel running on A35 needs to communicate with system
+controller for watchdog operation, this system controller watchdog will
+call SMC to trap to EL3 secure world ARM-Trusted-Firmware and then it will
+request system controller to do the watchdog operation via IPC.
 
-Arbitration lost is fine how about other errors like NACK.
+This V2 patch series addresses all the comments from V1, and change log is inside
+each patch of this V2 series.
+
+Below are the patch dependency:
+
+The dt-binding and imx8qxp.dtsi patch are based on my thermal patch series as below:
+https://patchwork.kernel.org/patch/10800699/
+
+Anson Huang (4):
+  dt-bindings: fsl: scu: add watchdog binding
+  watchdog: imx_sc: Add i.MX system controller watchdog support
+  arm64: defconfig: add support for i.MX system controller watchdog
+  arm64: dts: freescale: imx8qxp: add watchdog support
+
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  10 +
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |   4 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/watchdog/Kconfig                           |  13 ++
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/imx_sc_wdt.c                      | 210 +++++++++++++++++++++
+ 6 files changed, 239 insertions(+)
+ create mode 100644 drivers/watchdog/imx_sc_wdt.c
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
