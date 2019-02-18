@@ -2,62 +2,72 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97108C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:10:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 536E8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:15:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5F6D92077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:10:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 214A021773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:15:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UMYErizT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F6D92077B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="meHoRCQ7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 214A021773
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gVF57woMm7tvcRIJLR75jMORJWH4hEBxg88qvWmitg4=; b=UMYErizT8puSAl
-	A63diIjJwo9+guISXAseHEncLUruuwGZJflxySBWRGdg80HzmqCr3I+PJvHQv7g1lnYExTA3ECRfv
-	4/XV7+YNCuSZ6Wsp4dBkxfBsrlzlHCkn46gZ3FF8D0+XiVegFEKctnFwm5hS9+ZQs6ZE4OiB/3xWl
-	7IJUz9gy5HrvYRQ5WavBokuk2W3Mjj+qevQ/9/u6NlQ8MYwGygTMA/KzKOFzyp/xAx7H5l0DyUrFO
-	oSnEP6NIhqzx9hMMedV8NCwcSbbyHFf2gQo8avS7O2CvBDVArHbEN7QGVZk0+7QXSducrGkiawEyd
-	K+2SJaL0ojTKB5XTyTmg==;
+	List-Owner; bh=3aH1QoBgIyfiAcbqdkxeyLQuA/pGfAPAJwZz0EB46uo=; b=meHoRCQ7oxtMCF
+	7cKjvu2U1LvVVDMnipnUQS3TFhlGHhYdrxsVLD+a6gCYPhzcmclUunGR+eMmB/5/UU7D+2/iopwfK
+	6eqSqPkuRNkPh3DuR/b+v8RtJ2RoqAmjHBQEh+oTAuD8XWmK7GdJYSaS8+mOfT9VnqVbLjQd+0h4p
+	T0Ek0QHdBLxtXcVgw8O8n6t6COxH7pL+qRQKE3u4csQLwMbAw380Xz2SbNq+fuswroHixWTg8C5nd
+	sL2545/Ok1L4NHtST9DyxFTK/pFcXqJ8Yos+pksKayIdlBtWI4cuoemCbSHhz5tDuLC5/+zFVZ31q
+	tegRALNw1uhnhMx6a3+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvhl1-0001Mo-7i; Mon, 18 Feb 2019 12:10:47 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvhkp-00015m-7M
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:10:39 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C580780D;
- Mon, 18 Feb 2019 04:10:28 -0800 (PST)
-Received: from localhost (unknown [10.37.6.16])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3644D3F720;
- Mon, 18 Feb 2019 04:10:28 -0800 (PST)
-Date: Mon, 18 Feb 2019 12:10:26 +0000
-From: Andrew Murray <andrew.murray@arm.com>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH v2 0/5] KVM: arm/arm64: add support for chained counters
-Message-ID: <20190218121026.GI54124@e119886-lin.cambridge.arm.com>
-References: <1549299218-44714-1-git-send-email-andrew.murray@arm.com>
- <20190218085217.4c4ff56f@why.wild-wind.fr.eu.org>
+	id 1gvhpn-00038D-9N; Mon, 18 Feb 2019 12:15:43 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvhpk-00037s-Tv
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:15:42 +0000
+Received: by mail-qt1-f193.google.com with SMTP id n32so18813554qte.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 04:15:39 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=KxG0a3/6eq8D7gGuNRV0Sr562TfMLTabfemllJBULjw=;
+ b=rkDBR5jxbPFzE0uaLIwZTrRhsf1+J4TBvf79PhaqATntDp4BOssfFUeV3UHK9/Rw/e
+ /hwT3UZjmNkfnLMESHoUXgkjXe7Iv9bRcfE/ek39Gt62xMo0KCMZgem8VGSCw+zTipk5
+ +u1j6iEPq0LRLF1Z7CjOcixjQWECec+6A+JsdY665J2qs0hd+Pg2sGwi8ImzxGlZyzZE
+ ZbTfLJiE9QsDUq4tfnBDrTlGzJySdtSk6hq829Tdcut50W4u1pbY9Bd2Opsb4KnhgQSn
+ e93kzKUZJfLt4Wmqapfc85nxbHVusoyfU0DgvOQTwVeohYvnavAwfqAxOvsjYRtpRgw4
+ 3+dw==
+X-Gm-Message-State: AHQUAubf+4L7pbOWI8QleL5R05EeKTU5HC6PCQl2RNECbBJdm6+EenTi
+ r2D4IOzYnQBup/uNpt5t+Sw+a4a/F7DF4cXTDoxAWg==
+X-Google-Smtp-Source: AHgI3Ib5sKA34QROB7/6HzwhSfKuCZIlz1qW1sEMrI2L7nY/UpeCSWSsY3EuQQoBe4kDAFkAMp2QdRFu7udzQjuqgu4=
+X-Received: by 2002:ac8:237b:: with SMTP id b56mr3788997qtb.343.1550492139241; 
+ Mon, 18 Feb 2019 04:15:39 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190218085217.4c4ff56f@why.wild-wind.fr.eu.org>
-User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
+References: <1549628778-30785-1-git-send-email-sugaya.taichi@socionext.com>
+In-Reply-To: <1549628778-30785-1-git-send-email-sugaya.taichi@socionext.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 18 Feb 2019 13:15:22 +0100
+Message-ID: <CAK8P3a026P7tZpJ7gsZbf_MnJJ0eVv60ggGXYndX9kCDLpNy4Q@mail.gmail.com>
+Subject: Re: [PATCH v2 04/15] ARM: milbeaut: Add basic support for Milbeaut
+ m10v SoC
+To: Sugaya Taichi <sugaya.taichi@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_041035_566231_38470E5E 
-X-CRM114-Status: GOOD (  20.90  )
+X-CRM114-CacheID: sfid-20190218_041540_966848_17CA86C0 
+X-CRM114-Status: GOOD (  11.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,57 +79,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Thierry <julien.thierry@arm.com>, suzuki.poulose@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>,
- linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 08:52:17AM +0000, Marc Zyngier wrote:
-> On Mon, 4 Feb 2019 16:53:33 +0000
-> Andrew Murray <andrew.murray@arm.com> wrote:
-> 
-> > ARMv8 provides support for chained PMU counters, where an event type
-> > of 0x001E is set for odd-numbered counters, the event counter will
-> > increment by one for each overflow of the preceding even-numbered
-> > counter. Let's emulate this in KVM by creating a 64 bit perf counter
-> > when a user chains two emulated counters together.
-> > 
-> > Testing has been performed by hard-coding hwc->sample_period in
-> > __hw_perf_event_init (arm_pmu.c) to a small value, this results in
-> > regular overflows (for non sampling events). The following command
-> > was then used to measure chained and non-chained instruction cycles:
-> > 
-> > perf stat -e armv8_pmuv3/long=1,inst_retired/u \
-> >           -e armv8_pmuv3/long=0,inst_retired/u dd if=/dev/zero bs=1M \
-> > 	  count=10 | gzip > /dev/null
-> > 
-> > The reported values were identical (and for non-chained was in the
-> > same ballpark when running on a kernel without this patchset). Debug
-> > was added to verify that the guest received overflow interrupts for
-> > the chain counter.
-> 
-> Hi Andrew,
-> 
-> We're getting quite close to the merge window, and I need to wrap up the
-> pull request pretty soon. If you want this to make it into 5.1, you'll
-> have to respin it pretty quickly (right now, basically...), addressing
-> the comments Suzuki and Julien raised.
-> 
+On Fri, Feb 8, 2019 at 1:26 PM Sugaya Taichi
+<sugaya.taichi@socionext.com> wrote:
 
-Thanks for the prompt, I'll send this out very shortly.
+> +static int m10v_pm_enter(suspend_state_t state)
+> +{
+> +       switch (state) {
+> +       case PM_SUSPEND_STANDBY:
+> +               pr_err("STANDBY\n");
+> +               asm("wfi");
+> +               break;
+> +       case PM_SUSPEND_MEM:
+> +               pr_err("SUSPEND\n");
+> +               cpu_pm_enter();
+> +               cpu_suspend(0, m10v_die);
+> +               cpu_pm_exit();
+> +               break;
+> +       }
+> +       return 0;
+> +}
 
-Thanks,
+It looks like you left the pr_err() messages from bringup, they should probably
+be removed now.
 
-Andrew Murray
+> +static int __init m10v_pm_init(void)
+> +{
+> +       suspend_set_ops(&m10v_pm_ops);
+> +
+> +       return 0;
+> +}
+> +late_initcall(m10v_pm_init);
 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Without deviation from the norm, progress is not possible.
+This requires a check to ensure you are actually on the right platform,
+otherwise you break suspend/resume in a multiplatform kernel running
+on anything other than milbeaut.
+
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
