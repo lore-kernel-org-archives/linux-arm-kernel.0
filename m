@@ -2,148 +2,75 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 90B44C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:33:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BDE2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:35:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 605B3214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:33:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5D2C72173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:35:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D8cbERrS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="WG/oUo6+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 605B3214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nG0lbWqt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5D2C72173C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O8WRi7jxE8PLnE+YP9Wt20G4kllz8gMqfkJfskktbck=; b=D8cbERrSNssx9w
-	o5xfe0JWisJrg3qS0tR//kLR5IzxaBfwNif0Io3+KcT7L35DYloU+qVAMTxi4ex7KhBxK02Uajcux
-	rCfeqYfE95UeN98+3o5fMJz+CF7jo5+hvmEqRc4VY0L8k/Amf6EXv5kVpQ085ixw0UyJVuy5pah3A
-	kcmCS2BiXBKixqpEofLsSIXtEotlM+GnUTMMs4MonKKJrFEqieH8B3CSvJTDfL8bLKPldGVXlFYFk
-	n3LrNWJx3hMB9MRQ03ERIVcGFt4UFGW4TEdUKXH+7NzxCtCzOzN7IMg5HlWxBKKIQ3/MFAONItgko
-	x5amUtEjzUOCGb55qp8w==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rCUaJSHS0zt1uiKldw0C8NyQoMVJWF7iwQTZj5BAk8s=; b=nG0lbWqtmxGG+y
+	UVD49dE564RXoJbwvk4326RiX27yr8ZdEoGju89OK1+kAI+LLvLe2YNk2i5b3oqThwozKVQkeozAS
+	PmOvsQynZVwSoFs21KHyUKX4QP1nH+nnkozH20T5X/QEhuMVpjFpM4dgeKpdj1ur8O3PnmLCRR4+P
+	cgzgW4GHKl80UmSVQvIMJCWJh5tZNF9Ww/vqduLlzcT897vVMD3d6sX177kPp4JTHGWXODct2+kzb
+	eQNfiTHT33YhXY7NEF0s2lwmh+aCcygOrqu1tkjdTNI+wilLK4c5Mm8lrHuEG1pjVHHlG9vp7nssI
+	YIWcZ45X8GdgNocOcNWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvgFC-0007dK-DA; Mon, 18 Feb 2019 10:33:50 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gvgGU-00014B-F0; Mon, 18 Feb 2019 10:35:10 +0000
+Received: from mail-qk1-f196.google.com ([209.85.222.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvgF8-0007WP-Ee
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:33:48 +0000
-Received: by mail-wr1-x442.google.com with SMTP id t18so17794727wrx.2
+ id 1gvgGR-0000ki-AG
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:35:08 +0000
+Received: by mail-qk1-f196.google.com with SMTP id o125so9673374qkf.3
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 02:33:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:openpgp:autocrypt:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=c+B2w+rFefhCHjY863ucBL976x8rzAfm6UmsXhI+arI=;
- b=WG/oUo6+ALBlpgdeTyd6J6oO8tdoCUjUUFKnLtnp0ydl6F8RVto6O7AMS8YFc5Ucrh
- cwZy4eMfQ66YK0ofML69XGZH7sn4VlyNRFeHWWHZ4sIiQiCGZbkjog4IaIWXObr3BmzL
- KvozNKw7ae+INjkQUSTEm9QjADfN7Xnj9GhFZ8JJYd4782i5+EMXa86U4UkGU/wb0Z+u
- Nne7JuRN36oIx55oZxT4L5ZjV5zh7bWpX/y3V18ef73PH6PHLKooUeezCASSqhfv1yM4
- hvfas1jAo9LIHEjo5MNc6FlX69rx/zXWrxA02VVBqzwh6TeDJcvsOIBLpBK1QewL6gvm
- 0nNw==
+ Mon, 18 Feb 2019 02:35:06 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :organization:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=c+B2w+rFefhCHjY863ucBL976x8rzAfm6UmsXhI+arI=;
- b=A7QTDUjw7Vm8bHEe3SCEtw4+xgDt7sySlFcHNgvFkhYUT1x88xzbsYX8pKen09J3fA
- yrAvh9Ixd/QrSrtFRiDqRDFk2FUu34ZSF9qggClxUrWeNPnfzJpzswaQF+MXAxyByQ6Q
- L3SuJIBSS1DzQqvEoGERCtScYL2HMUL29EqriSVrZA5FUne5pg5QAKIALufbAHjqCeYP
- XJ/ms1ZAY9kEPiLiVK8IFD8T1b8sbUavHcwmUZEA22auYZDS0WxJKmRMkAQZfq95M2xM
- bSfsmZr5IEDy/6erl5c61pJWb6M0lBFRkCcziO+ueCMAj55RNI1Csp4cixwoqexS9snR
- LGFw==
-X-Gm-Message-State: AHQUAuboMZ3QQOHU69EPwlNZBYv241YOj78HWPrX9+2+v+8sh1v2cZEz
- cerHlJMAmiGbF5wI5QMSwsPFd9G3gdmU7A==
-X-Google-Smtp-Source: AHgI3IbzOYYq1E0xr6gNsfZOaaFS52Sb4d9Y1WRdMJO3FNgcZMkjNp3wC/Oow2YatzCpmGPHyBJm9Q==
-X-Received: by 2002:a5d:528d:: with SMTP id c13mr16668929wrv.153.1550486024150; 
- Mon, 18 Feb 2019 02:33:44 -0800 (PST)
-Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
- [90.63.244.31])
- by smtp.gmail.com with ESMTPSA id u12sm10066934wmf.44.2019.02.18.02.33.43
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 18 Feb 2019 02:33:43 -0800 (PST)
-Subject: Re: [PATCH 2/8] dt-bindings: phy: Add Amlogic G12A USB3+PCIE Combo
- PHY Bindings
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-References: <20190212151413.24632-1-narmstrong@baylibre.com>
- <20190212151413.24632-3-narmstrong@baylibre.com>
- <CAFBinCA37waCTqGrMqaLmb5n8XuGJof_7iQsWkBdAYr7s2en=g@mail.gmail.com>
-From: Neil Armstrong <narmstrong@baylibre.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
- 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
- ZaTUOEkgIor5losDrePdPgE=
-Organization: Baylibre
-Message-ID: <15bb76c8-16f0-e74d-f3cf-070ce8cf6de2@baylibre.com>
-Date: Mon, 18 Feb 2019 11:33:41 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=31I98wBtG46flOMCHX35G/QXOYiz0ypU0MPiC/Bt+QM=;
+ b=OTtjQA6mrB8A8srf5f1scGcdqmbHdp1VSYPjEb5zDH/uLHGlkMdJ893ES3j4pRTOpu
+ WfKUS9034k++NzuAHKrqZXPG5tHYYEgR5zTw6cxueuqKrf3gsS6xfGPFlDokMTTnKnhR
+ J4291V511GnuEp3SZo0tS2xkN17eaVYQupTqmKcyBDlwKMUkwqbOuJT0vtr/TBPNc9O9
+ 8KfblIHgp2ZcFn8+0aYDVZFxRqrxn878wpUJ14Nss81wbZZsB7PTefmuH/t8zzBPX1ix
+ 87uIcpLyeVYwpySXPuXNH+0CsCYeHBOV/d7BSwWX15wN7S60amCIA482ex/EWea2D23t
+ jKnw==
+X-Gm-Message-State: AHQUAuYisSVula/swPcH2MTOebP4Rg5vMul6k6vA2xVcPgeZWssG08NZ
+ NxO/RxAmYNhD0R6Eyg1f+Qdh3EpgCeka/yzZ/aY=
+X-Google-Smtp-Source: AHgI3IauOpRdgVsOn6T1pujqDnnxhfgsw/2bJs3AIN21nasL0nQnv3TMZV7J4+MgCn/uiVFTZlo8nuhlO765esRY/ng=
+X-Received: by 2002:ae9:d8c2:: with SMTP id
+ u185mr15376077qkf.107.1550486106166; 
+ Mon, 18 Feb 2019 02:35:06 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CAFBinCA37waCTqGrMqaLmb5n8XuGJof_7iQsWkBdAYr7s2en=g@mail.gmail.com>
-Content-Language: en-US
+References: <cover.1550060543.git.baolin.wang@linaro.org>
+ <f34970a034946bacda19202e2ce9973ca732c925.1550060544.git.baolin.wang@linaro.org>
+ <CAK8P3a38=4JZvqPi8f8Mpup2P70c+_xsM48-b35BVRYWGeHp9w@mail.gmail.com>
+ <CAMz4kuJ3-tjXUKk0Hcr3gJLRNmg1REe4NPm3AaXc=Nq21AKzZg@mail.gmail.com>
+In-Reply-To: <CAMz4kuJ3-tjXUKk0Hcr3gJLRNmg1REe4NPm3AaXc=Nq21AKzZg@mail.gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 18 Feb 2019 11:34:49 +0100
+Message-ID: <CAK8P3a3mpr1CpdwPEjGyigTFgqP4gVxQbpW+qypv1kaYskLBUg@mail.gmail.com>
+Subject: Re: [PATCH v2 5/5] arm64: dts: sprd: Remove wildcard compatible string
+To: Baolin Wang <baolin.wang@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_023346_550581_61274395 
-X-CRM114-Status: GOOD (  21.58  )
+X-CRM114-CacheID: sfid-20190218_023507_367346_07FA89AD 
+X-CRM114-Status: GOOD (  13.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -155,66 +82,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, balbi@kernel.org, gregkh@linuxfoundation.org,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
- hminas@synopsys.com, linux-amlogic@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ arm-soc <arm@kernel.org>, Lyra Zhang <zhang.lyra@gmail.com>,
+ Mark Brown <broonie@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Orson Zhai <orsonzhai@gmail.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 17/02/2019 23:03, Martin Blumenstingl wrote:
-> On Tue, Feb 12, 2019 at 4:15 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->> Add the Amlogic G12A Family USB3 + PCIE Combo PHY Bindings.
->>
->> This PHY can provide exclusively USB3 or PCIE support on shared I/Os.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> one nit-pick below, but apart from that:
-> Reviewed-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> 
->> ---
->>  .../bindings/phy/meson-g12a-usb3-pcie-phy.txt | 25 +++++++++++++++++++
->>  1 file changed, 25 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt b/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
->> new file mode 100644
->> index 000000000000..714d751091f5
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
->> @@ -0,0 +1,25 @@
->> +* Amlogic G12A USB3 + PCIE Combo PHY binding
->> +
->> +Required properties:
->> +- compatible:  Should be "amlogic,meson-g12a-usb3-pcie-phy"
->> +- #phys-cells: must be 1. The cell number is used to select the phy mode
->> +  as defined in <dt-bindings/phy/phy.h> between PHY_TYPE_USB3 and PHY_TYPE_PCIE
->> +- reg:         The base address and length of the registers
->> +- clocks:      a phandle to the 100MHz reference clock of this PHY
->> +- clock-names: must be "ref_clk"
->> +- resets:      phandle to the reset lines for:
->> +               - the PHY control
->> +               - the USB3+PCIE PHY
->> +               - the PHY registers
-> no reset-names (like in the G12A USB2 PHY bindings) here?
-> even if you don't use them in the driver I suggest you add them for
-> consistency (and maybe to make it easier to compare the bindings with
-> the datasheet. I don't have access to the datasheet so I'm not sure if
-> having the reset-names is relevant for this case)
+On Thu, Feb 14, 2019 at 2:56 AM Baolin Wang <baolin.wang@linaro.org> wrote:
+>
+> On Wed, 13 Feb 2019 at 22:32, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> > On Wed, Feb 13, 2019 at 1:34 PM Baolin Wang <baolin.wang@linaro.org> wrote:
+> > >
+> > > Remove wildcard compatible string.
+> > >
+> > > Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+> >
+> >
+> > Looks good to me. It does break using the new dtb file on older kernels,
+> > but I suppose this is not a case we care much about yet on your
+> > platform, given that both the dts file sand the drivers in the
+> > kernel are still  work in progress.
+>
+> Right. Thanks for your reviewing.
 
-You're right, it's better to have names here !
+I have applied patches 1 through 5 now. Thanks,
 
-Neil
-
-> 
-> 
-> Regards
-> Martin
-> 
-
+     Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
