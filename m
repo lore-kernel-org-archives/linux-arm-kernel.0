@@ -2,56 +2,56 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A176C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 02:01:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E13CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 02:01:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16D96218A6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 02:01:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 591F8218D8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 02:01:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PnTVFHBn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lnzY0m9z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16D96218A6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ddoQC8Pe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="wkp+lLm8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 591F8218D8
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=LiDKt5SQReZtlHWIreqo0a4vPlxazUWRzjTgSRySUts=; b=PnTVFHBnL7DPyI
-	Lt55XJFWwASHwbiwTX7W1mYVh+0OyuK+/3enuzMgKECNJDVkZNhN9wME3PUlH8D5LkgKKyOrnL1sZ
-	mrQd9Z15qJr5TDt5Lcoz/QTZEOr9eJL+k0HObzm/cZqbQOUvz23qigDKP/HRw64fAK+y0t/R1t3UJ
-	ucV5c+x2Y00+9xCrlSffP26C8A99eGdr7qFvRjBclXkaVEguoj1FMmV6t+9OQE7lA3kOgtfk3o1lN
-	2tFq3qWb1sT32AJfdi05hy8drrDNWYvsK6i8lAe+DsH2zNpSbvWVEuxrnFQZdMBQ3qTPkTwOtI24Z
-	DD8Kk/sVRsS5/JmNVyag==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UTNU5HCEB/Z3UGbxlA630BhlmQMOniuLAzs2lZ3M6t4=; b=ddoQC8Peergq2X
+	K45WZw5rh6FteRiaYJK6v3M6kjWuDD/DJP5UafR14U+0ROXdOWuBA/BuC39xrgqPB07vuO75Ch0P4
+	y8WcdkucaHN3pVYXZ8WEW//DwvWLuoqlfMmssepTyv4VUWsMrS+sRfntbgT/4GEUgwwl/+InjbTKk
+	+sXV22rVGFpKPvcjBA6cbuTS5xgBU2mXVCAWF+D8oOpHWiBowbO6Ap0hvSTBpeBlIO9o3jZOg8Q9I
+	3Ts73fCtP2RSV3E56WfLDe6URR/ONNj1UNz4fGRR8yKi9LpYtTSzTz9jZo1tmY+dToGUwImaisAv7
+	MRsB5EuminwxapXLxCaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvYFG-000270-AJ; Mon, 18 Feb 2019 02:01:22 +0000
-Received: from mail-eopbgr80078.outbound.protection.outlook.com ([40.107.8.78]
+	id 1gvYFQ-0002JF-EZ; Mon, 18 Feb 2019 02:01:32 +0000
+Received: from mail-eopbgr80041.outbound.protection.outlook.com ([40.107.8.41]
  helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvYFC-00026S-Ti
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 02:01:20 +0000
+ id 1gvYFJ-000277-FX
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 02:01:28 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=jkAJuVGwN5nHPN9VEIm8Jc+uNdErm4jgApurkTh/ZsU=;
- b=lnzY0m9zrLyINP86QUAQqDjCGOT4yulhphT7HbKvzQjnjuwWZdE+L8KE+6O003Um6jTWzLXe2n8y/fPVC7Z7v9TpWoQ0VPX6y60dY/6WXtzRaXTiZORK3Ym5GPa2QCEGYK+b9OXUydOsBeJC67hBuSnd076fdGlW9acAqUuml1E=
+ bh=SQ7KBQRzG1pkCz+hQKnSbVHy2xbhBdBCBt48ommeQUU=;
+ b=wkp+lLm8Vw1ph6cSNtgcYwoGL0gq3jfbU55dLHXVZXfB+IXckxMuOYWQHUtdBAyRvp0mOV96fVKMgI4CvULW+g15BuHzC74F4qHZB2NetGHcNyVJfNfQYDQOapivS6s+F5LtvKqmIJ7scdr6gckjbrgh0JxfnzxyZqGdqCdiJY4=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
  DB3PR0402MB3900.eurprd04.prod.outlook.com (52.134.71.14) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.17; Mon, 18 Feb 2019 02:01:11 +0000
+ 15.20.1601.17; Mon, 18 Feb 2019 02:01:20 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Mon, 18 Feb 2019
- 02:01:11 +0000
+ 02:01:20 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -73,11 +73,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>, "linux-watchdog@vger.kernel.org"
  <linux-watchdog@vger.kernel.org>
-Subject: [PATCH V2 0/4] Add i.MX8QXP system controller watchdog support
-Thread-Topic: [PATCH V2 0/4] Add i.MX8QXP system controller watchdog support
-Thread-Index: AQHUxy3SjzHfKLwYjUOtmItPpKm1yA==
-Date: Mon, 18 Feb 2019 02:01:11 +0000
-Message-ID: <1550454997-4398-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V2 1/4] dt-bindings: fsl: scu: add watchdog binding
+Thread-Topic: [PATCH V2 1/4] dt-bindings: fsl: scu: add watchdog binding
+Thread-Index: AQHUxy3XB0HTxyCzNkOieuLhEA6Imw==
+Date: Mon, 18 Feb 2019 02:01:19 +0000
+Message-ID: <1550454997-4398-2-git-send-email-Anson.Huang@nxp.com>
+References: <1550454997-4398-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1550454997-4398-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -91,7 +93,7 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: d9f9851e-b602-4421-5486-08d69544f424
+x-ms-office365-filtering-correlation-id: fe3d3c72-d972-4eb7-c650-08d69544f975
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
@@ -100,51 +102,51 @@ x-ms-traffictypediagnostic: DB3PR0402MB3900:
 x-ms-exchange-purlcount: 1
 x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3900;
- 23:YDQHBy7oREmN76FBisT10bn6rgF8MrDSz+WuR?=
- =?iso-8859-1?Q?t3CCw6NoxarNUbvD+8pxCAnb4P1XQqfYPxxSFRd3H2WXO+0AX6iWPz9kZ/?=
- =?iso-8859-1?Q?6TxmPQg99LMBqPB711+kqKkEF63GaNeuSGZNle/rzHIQjOs8r7agVrB0Ml?=
- =?iso-8859-1?Q?rUiZIbl8Bkie8UA7xbr4kOB/dYyeYzO+stIT5R7n2jGreN9rwBtGd0660a?=
- =?iso-8859-1?Q?yifnrOzIOJFcZj0FjM/b2tzz3kjqVUEj8h0DG9yttkRFIaWGtJtMIqRx9Y?=
- =?iso-8859-1?Q?7KduxyqXrQLdEDvO++XZFIfYa096Nay7Z2UIh4KlMObujxgZ16G48zN5hL?=
- =?iso-8859-1?Q?0v5nwQbACX5kMz4n/DcfAlIJmZf1dVtGJCNjp2bbzv1vFxxbesK9ZuZNoM?=
- =?iso-8859-1?Q?K0zpIqQQNJO5OpQT2Yh5Kj/HthlmO4kOyNCHIs53A0oYRh/NPYB+9gW/h4?=
- =?iso-8859-1?Q?H/7WKvZP5EjJ0X09VH0fqw5xQuiAo8nsFA0gOq74R4gzIcxILktYCY6tEm?=
- =?iso-8859-1?Q?rYDQoiUhSMMvmfBNuQ9FVQGHKhngs0wll5RUhGT5pjZSpimQIKQnbhWdRk?=
- =?iso-8859-1?Q?VpLicKt/8djjfxvRNbhER0zrb4zstJRdrNsq/uJWiJTPTGW9RvAdV6gckZ?=
- =?iso-8859-1?Q?cfpYV9lxMaXYdxu0Ow2msKrnhnWt/VFSg+eSzbWOC2BlUSkMml7s2A1335?=
- =?iso-8859-1?Q?O+rrOova+QoMqu0/2x3tQFK4369FFYV4z97s9Hxg9uQiG7k4QuFruWq8hf?=
- =?iso-8859-1?Q?ieuiVz1o34IkRiWaUOoQ2Kop5KzK6Ge7Lwll6P77hWmi13g2B9k2MUEK4J?=
- =?iso-8859-1?Q?BJqQNs4Wtdxb21iyQ9eChupaHzVmXVK/+qyk3j8SQyRzR5ZlhB0Q9Pw3B/?=
- =?iso-8859-1?Q?PMK7Ou2tQgEi7ZEuetctb1sZQ9Mjqaz0DRffVpk9Nr25hq/riQyzyE3o4Z?=
- =?iso-8859-1?Q?YvjFueftl4E2yo1aJUcDQ8XELQYc/Ifl39VITfZVnNx2WdIunX5AlUjhIc?=
- =?iso-8859-1?Q?SqypF1///haBbDpxux1Yqf1cgPLrscfAxW7eZRphCWOyCZYeZboqsQj3u2?=
- =?iso-8859-1?Q?/tnifQLz4bdzkJVxG5bxvAjwZr7KgkB5b4GRbFYI5rrbKBWxu7HEjxwExu?=
- =?iso-8859-1?Q?YlomLfSR5vZeSB1Y5dsB4ruV4sr7tctP2VOITp8VF3fDrsihyLkrdZMPTa?=
- =?iso-8859-1?Q?kyrzBR67XJJiC8P6mI2QkTZYPMyjtE+Q42oXIMGq+JdBJ8h3RKnXCfrogO?=
- =?iso-8859-1?Q?ZV0vWVD7bt+WHN55BlSukryN3KOahXPOc/XqrFdo31MhUsQ7+N0Ytz7Z6K?=
- =?iso-8859-1?Q?wXOU=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3900E2CD23820A810C7AF639F5630@DB3PR0402MB3900.eurprd04.prod.outlook.com>
+ 23:+yqbDc2AfVyL5JURXjkfR8RQlgbUHTrluKGM+?=
+ =?iso-8859-1?Q?uMAg3cFe9QghHZaPKTUHYVXDGtzzciulFawlgBOtTQAfS5Ji3bbFUPZyja?=
+ =?iso-8859-1?Q?KsE9RDjmbJG49xqVYk/NM62NpDS3L21Z4r9DBrdsFYmGK/LxxVsOXv2xji?=
+ =?iso-8859-1?Q?G9NlgRWk5864WZdMpDbOhgwWgXM8Y5isJ9L3s6CA/pwsYMc4zU6miL0A+r?=
+ =?iso-8859-1?Q?+yFnOKTv3IKbki4jCLfmSHQR55w+ti8SGinDsUFjtzSymr8X5Eao+X2BkP?=
+ =?iso-8859-1?Q?pIvfJMLrf9ZXayoruC7uag2QgzTPXpBx8ryxd/vyF3RdJV1Ugc+rdUJ78Y?=
+ =?iso-8859-1?Q?+i0v8IIWlyDJlfgKjnWsRaKrKmnN3NqDLWNSe6LK+tJKaHOdPuw7lYnlE9?=
+ =?iso-8859-1?Q?T6eHxolR143X9pBwO/aBSw25QWyt5Bv5GMf/MyiMGOtp1158hA1oKnADnv?=
+ =?iso-8859-1?Q?2b269xp5Pm85icTTRaRlb5+px8j6E52T/hTFjWj/bEEMInMyVC5t+T7aDK?=
+ =?iso-8859-1?Q?it0/mJ4k+GyizdREn7CxoT2GQTaf1S20ekKb7HyomlUzG7y1lcgBQ7R7vR?=
+ =?iso-8859-1?Q?NTNouh92Rs0OPPtDWtzASjuyMdYJZ4qV/nqqX9ldW3wNuXXEcJfYGAk2jy?=
+ =?iso-8859-1?Q?yBj8h+59PtUZGtcC9pQ35Fzjww611oW9lxg/5NcVJBsTxQsa+wFzQ0WE/s?=
+ =?iso-8859-1?Q?TkLGnmhQTMzr5lESGbPyf6s/271W1bgHhCa+9j5lurmPReOHA4lYIPG256?=
+ =?iso-8859-1?Q?s/efOlw7PgK0xGnIdNEoWRn4zfBqjmKq9r0H8pp3n2LuEqRmoWEz9TQrWV?=
+ =?iso-8859-1?Q?Az67wJVnLP3vhAAfxtnoIzos3b4ji36Cgn1TybLDeIbNj84aDvOXA4J0Mh?=
+ =?iso-8859-1?Q?UntKgyzv9hVd/2xB/gNRLMuAKlxyN1js4IWjzVyx/2qKLMcXnZ9pYCIhBm?=
+ =?iso-8859-1?Q?qU7MUNFrJAkd9pNGEZso/poioDjGIeBObn94EMguOFi3Q94z1yeLWU8d2x?=
+ =?iso-8859-1?Q?F6OGkdeuAXPsb3JLHjWd6r3fbtPRA+OCF0rqLXLM8uajZicTPORTkATzUS?=
+ =?iso-8859-1?Q?pnLlRrCBi3fXvGG67TLS/jh6vyp705+XtgwzyN9Ij5h21H/81rANghlykQ?=
+ =?iso-8859-1?Q?keBNb+YS1O4dalPvEMEK709pYrwRE8lVotODKsphenVtMo+l9qVWlHGUEr?=
+ =?iso-8859-1?Q?Qto9Y0dzSAEPk/UF5mhazP4z8EWwoNOAcGSxoLRdPG/aaDuxIl8WEnip9y?=
+ =?iso-8859-1?Q?8MhERfFf0RoWKZ07lvOgmwUbkkHnnnaGF/XI65CKQXP2vDw4EeKNNOYcp7?=
+ =?iso-8859-1?Q?tupSEf5AXDhu7eIkt7w6UAWrWo9SyOUBm8U2wtCIjVoVnkg=3D=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3900F95CDF78AA7D0F81ED95F5630@DB3PR0402MB3900.eurprd04.prod.outlook.com>
 x-forefront-prvs: 09525C61DB
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(39860400002)(376002)(396003)(366004)(189003)(199004)(6306002)(7416002)(66066001)(81166006)(81156014)(8676002)(6512007)(25786009)(3846002)(2501003)(8936002)(476003)(6116002)(2616005)(50226002)(68736007)(14454004)(478600001)(2906002)(2201001)(105586002)(6486002)(106356001)(110136005)(71190400001)(186003)(52116002)(966005)(5660300002)(6436002)(14444005)(36756003)(486006)(256004)(386003)(26005)(71200400001)(102836004)(99286004)(7736002)(53936002)(4326008)(305945005)(97736004)(86362001)(316002)(6506007)(921003)(1121003);
+ SFS:(10009020)(346002)(136003)(39860400002)(376002)(396003)(366004)(189003)(199004)(6306002)(7416002)(66066001)(81166006)(81156014)(8676002)(446003)(6512007)(11346002)(25786009)(3846002)(2501003)(8936002)(476003)(6116002)(2616005)(50226002)(68736007)(14454004)(478600001)(2906002)(2201001)(105586002)(6486002)(106356001)(110136005)(71190400001)(186003)(52116002)(966005)(76176011)(5660300002)(6436002)(36756003)(486006)(256004)(386003)(26005)(71200400001)(102836004)(99286004)(7736002)(53936002)(4326008)(305945005)(97736004)(86362001)(316002)(6506007)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3900;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: e51Xsp+pf8SYVyi6aX1Ujb1S+bUFzL9dc+5dIY0z+GEwW/ke7F8Zm1Xm6dFWyeu+sPCkqf1reuYd7riMh0RsjPQmym8tgRKzy2PjC/b2XgaAOMzXZpishBxavR+o+AYABM9qZutSm22hGXgLShPwb7+1Vz4q71q6BHwVxsqxyN91sl0yJ3KzKJRx5uqNE0j4YV8T8rrX24SFjF4czi0sKE4cpspKWMh+hiUOCrB7/msLrT1oprkOhSoqOJe5Z25ouZEGbhdomItZjKJCJA8Xwg11NdpDvSjDTtRJ0Sa4tIoKqs+O60sfjZ8j42p3kzi/CCYbJkqalfLWMid4BeTqoKTQvRlMelr2KLrwlli2WQbToHrJFEoWYBXlZFWotoamxE5dPGWpXXPvizqr4UeZDGPFxRET8vhv+Cr6iEYw81Q=
+x-microsoft-antispam-message-info: FVjjdmL48xuH+DPQnUO9tW6l/Ufr5AbJ9kM72LAEAu4RE+bMInkhNnF6GrhSx089DPHCtewL+0yDq3SAXKDfBaud2RbeEak/SZj8sLVPTAL+KvJxni9Z+KEptJylpb+mWt8yLMwqzZvU09zNFuscietBCukLMqHSVA06hqi0/0EmYy6z6g9yKk6/SR1VNjm8ne7fdecoiU9LqMQrCHqXkfVzC9r/HL0X1MQZGpSbWfji+82f6auKH5gGFzGQWhbahFmAtVeDTWJeGU6I67lxOD3jvt2LBZZLAshd+r/xKJz2VZjNVTDjEuRnSBGjd2vWDTSqAGSLsrSXw1RBirO3I8vCD6D+og0a1nbMpsQ86/uTJgRt2NG+4Maud7Wz5XURqQVqspnYva/YBhRFrCqRakU69ky1TB4KFt2HCRMMqHM=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d9f9851e-b602-4421-5486-08d69544f424
-X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 02:01:02.5873 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: fe3d3c72-d972-4eb7-c650-08d69544f975
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 02:01:11.5086 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3900
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_180119_032863_07CED8ED 
-X-CRM114-Status: GOOD (  10.31  )
+X-CRM114-CacheID: sfid-20190217_180125_742639_83930507 
+X-CRM114-Status: GOOD (  10.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -162,33 +164,43 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-i.MX8QXP is an ARMv8 Cortex-A35 SoC with a Cortex-M4 system controller inside,
-the system controller manages overall power, clock, secure RTC and watchdog
-etc., so Linux kernel running on A35 needs to communicate with system
-controller for watchdog operation, this system controller watchdog will
-call SMC to trap to EL3 secure world ARM-Trusted-Firmware and then it will
-request system controller to do the watchdog operation via IPC.
+Add i.MX8QXP system controller watchdog binding.
 
-Below are the patch dependency:
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+Note: this patch is based on my thermal patch series: https://patchwork.kernel.org/patch/10800699/
+---
+ Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-The dt-binding and imx8qxp.dtsi patch are based on my thermal patch series as below:
-https://patchwork.kernel.org/patch/10800699/
-
-Anson Huang (4):
-  dt-bindings: fsl: scu: add watchdog binding
-  watchdog: imx_sc: Add i.MX system controller watchdog support
-  arm64: defconfig: add support for i.MX system controller watchdog
-  arm64: dts: freescale: imx8qxp: add watchdog support
-
- .../devicetree/bindings/arm/freescale/fsl,scu.txt  |  10 +
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |   4 +
- arch/arm64/configs/defconfig                       |   1 +
- drivers/watchdog/Kconfig                           |  13 ++
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/imx_sc_wdt.c                      | 210 +++++++++++++++++++++
- 6 files changed, 239 insertions(+)
- create mode 100644 drivers/watchdog/imx_sc_wdt.c
-
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+index 4b79751..f388ec6 100644
+--- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+@@ -136,6 +136,12 @@ Required properties:
+ 			   resource id for thermal driver to get temperature via
+ 			   SCU IPC.
+ 
++Watchdog bindings based on SCU Message Protocol
++------------------------------------------------------------
++
++Required properties:
++- compatible: should be "fsl,imx8qxp-sc-wdt";
++
+ Example (imx8qxp):
+ -------------
+ lsio_mu1: mailbox@5d1c0000 {
+@@ -188,6 +194,10 @@ firmware {
+ 			tsens-num = <1>;
+ 			#thermal-sensor-cells = <1>;
+ 		};
++
++		watchdog: watchdog {
++			compatible = "fsl,imx8qxp-sc-wdt";
++		};
+ 	};
+ };
+ 
 -- 
 2.7.4
 
