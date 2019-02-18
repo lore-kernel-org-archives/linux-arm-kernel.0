@@ -2,90 +2,79 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A1B45C10F02
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:01:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 220ADC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:03:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B9FF2175B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:01:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB0032175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 09:03:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r37+4rub";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="Z6rABJMd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B9FF2175B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifQTK0ss";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="gSfTmvcd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB0032175B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xyle4p3dsFov/95MOM7ahNO6C3snWkhner8P5oasM9Y=; b=r37+4rubKmS3Q5iDL9Ty5Dc1P
-	1/1Jl5PBOGhpOhCXTF3r8eIcweK5BoKytxFNtQnO/3WNil/rGE9SZ5klw6GQ9E7GpJvwvYRNiOM+R
-	6RuEIeoMD5JALTgU6GtjECYUDf/eDE3Mf4CIUEpZmqME4mgMTdpZ+2bbIa1/2zkEKD9MFcy1UhWDX
-	XYaOV8l4/sgDQ83szENB8MqN/Vh0uM/vSka/f4Ygytm3g5tvKXxDv7SUdGcdwzUsPGmNFbDu0YxVM
-	JVhVlgDs0dMlZqUZQJxfYqesgeAP719zBje6VYIsjrx5PQ1zfdVplr3HPnm4CEB1SpYIq+Chnrc1l
-	KG/WqA3Zg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3FNRlAJPLUNTjc30rNB9xGos3u8HvjWO1J5CBfTV+cY=; b=ifQTK0ss46xslq
+	5YT4LCywezkyhF+aZ+4zBUol6qdrFitjspxf8uEoU7KQKmoYoaOBK78EyGEdOlnaLz7O+qqgu0vyA
+	Iq39S6/COwLIp1K5ZEb/xiGdAek4KV6bHpr/KlzdwLmi8zSkph52KGLWPSdoelMFUnqt8+cb5tXpD
+	KIQq1Pb0qMOCCZn7NiofkVSbrL3KE4/b5+bnU0hxg05oP57eWBwIRfxoqh5WsuObw4xAkeLQx+vh/
+	psXbPUAvkKBRY7m9762e2cP0bvAS5yTHTwB5EGuIbmkeTQPySNYwsVOzmCWgZO7E2AcWsoDTilFRz
+	HPUQg94eHs2C6YdLl+4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvenz-000598-SO; Mon, 18 Feb 2019 09:01:39 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
+	id 1gvepp-0005Xe-FN; Mon, 18 Feb 2019 09:03:33 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvenq-00057Y-TN
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 09:01:37 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c6a746e0000>; Mon, 18 Feb 2019 01:01:34 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Mon, 18 Feb 2019 01:01:29 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Mon, 18 Feb 2019 01:01:29 -0800
-Received: from DRHQMAIL101.nvidia.com (10.27.9.10) by HQMAIL108.nvidia.com
- (172.18.146.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 18 Feb
- 2019 09:01:26 +0000
-Received: from [10.19.108.132] (10.124.1.5) by DRHQMAIL101.nvidia.com
- (10.27.9.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Mon, 18 Feb
- 2019 09:01:23 +0000
-Subject: Re: [PATCH V6 2/7] clocksource: tegra: add Tegra210 timer support
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
- <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>, "Thomas
- Gleixner" <tglx@linutronix.de>
-References: <20190201161654.18315-1-josephl@nvidia.com>
- <20190201161654.18315-3-josephl@nvidia.com>
- <3849a41f-ab36-d7e0-b2ce-1aa5c4e34aec@linaro.org>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <87731d61-10f6-0842-a90f-0c78ffba9ef7@nvidia.com>
-Date: Mon, 18 Feb 2019 17:01:12 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gvepn-0005XX-Oy
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 09:03:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=yZ6N+kGZ5Pw5/vxuhiA+q4QZ4NOtPDkAadQRH2EBWdM=; b=gSfTmvcdIPHlcMqJuqBZHtYx+
+ bnKCX+VO0eDO5k6Nmvg2sv2Ck2H0C3IYv4CTY3KO7b21cZcMMF+oXynMJDN19femm3J6H+C5HIrt+
+ BvyBj3k1hzSDbzFLM6tBw/Ag8Ap6Oxrn/qEKr/shIyqD5cjm7RAVbbIJHvycn/LlbHgAvoBVskasF
+ p0me5yGQ47wmwoP47KNlRuL8B98d6IpMTbv6t8pJQ2RHNPfGSVu5OeUnq2vcwvpzEgu+5QDd1UEJY
+ Cvbtk+SoS8YUnWJGmuIqdpcNsJQPTOYghThgLV5zgjm6o3nEzEBYSxciZiv5x7UKULQQl0ffX4W/I
+ pJrt4Gfmg==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvepi-0004ne-27; Mon, 18 Feb 2019 09:03:26 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id AE2652851C40E; Mon, 18 Feb 2019 10:03:22 +0100 (CET)
+Date: Mon, 18 Feb 2019 10:03:22 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Andy Lutomirski <luto@amacapital.net>
+Subject: [PATCH v2] sched/x86: Save [ER]FLAGS on context switch
+Message-ID: <20190218090322.GT32534@hirez.programming.kicks-ass.net>
+References: <20190213131720.GU32494@hirez.programming.kicks-ass.net>
+ <20190213140025.GB6346@brain-police>
+ <20190213142524.GW32494@hirez.programming.kicks-ass.net>
+ <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
+ <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
-In-Reply-To: <3849a41f-ab36-d7e0-b2ce-1aa5c4e34aec@linaro.org>
-X-Originating-IP: [10.124.1.5]
-X-ClientProxiedBy: HQMAIL108.nvidia.com (172.18.146.13) To
- DRHQMAIL101.nvidia.com (10.27.9.10)
-Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1550480494; bh=gdeGp+7F1da5XhRVBHV92J2zxc10m7bbBVaUwykl8w4=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=Z6rABJMdGz9GG4rWOKyAAcBxbO63lDq8HgN3RBw2m1L2mFQ2uHpiBqbQ3hpkJF6YG
- jmUamw2EW3FampqUxfwdb1nvcy2EtkE6QP1ZWkGKDQVm8jlV6SrH4AIaPfMvLb0VsV
- kJtZOLFDWj+UrNGSiez2hQZ9NDIt99l6kRKh+q9mkJzY0HZoDN7gnS/Zh63nDRgAhx
- acVgPhJlWXJQeKHKkj7IYzE48oJET0GYJmJhZbUcShicxPpE2C3NwOO33jhWEysY5M
- MnCNmYQzMr9e4jtHQVuZF2Bs3Uwg2g678YiLvCApDzYvUZ7yjNMEoPQAT1itLVfX8t
- Ylw3WxOErhVog==
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_010130_962495_A236C6C8 
-X-CRM114-Status: GOOD (  32.24  )
+Content-Disposition: inline
+In-Reply-To: <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,316 +86,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: dvlasenk@redhat.com, brgerst@gmail.com,
+ Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ jpoimboe@redhat.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, valentin.schneider@arm.com, mingo@redhat.com,
+ james.morse@arm.com, luto@kernel.org, hpa@zytor.com, bp@alien8.de,
+ tglx@linutronix.de, torvalds@linux-foundation.org,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/15/19 11:14 PM, Daniel Lezcano wrote:
-> On 01/02/2019 17:16, Joseph Lo wrote:
->> Add support for the Tegra210 timer that runs at oscillator clock
->> (TMR10-TMR13). We need these timers to work as clock event device and to
->> replace the ARMv8 architected timer due to it can't survive across the
->> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
->> source when CPU suspends in power down state.
->>
->> Also convert the original driver to use timer-of API.
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: linux-kernel@vger.kernel.org
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> Acked-by: Thierry Reding <treding@nvidia.com>
->> Acked-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->> v6:
->>   * refine the timer defines
->>   * add ack tag from Jon.
->> v5:
->>   * add ack tag from Thierry
->> v4:
->>   * merge timer-tegra210.c in previous version into timer-tegra20.c
->> v3:
->>   * use timer-of API
->> v2:
->>   * add error clean-up code
->> ---
->>   drivers/clocksource/Kconfig         |   2 +-
->>   drivers/clocksource/timer-tegra20.c | 371 ++++++++++++++++++++--------
->>   include/linux/cpuhotplug.h          |   1 +
->>   3 files changed, 270 insertions(+), 104 deletions(-)
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index a9e26f6a81a1..6af78534a285 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -131,7 +131,7 @@ config SUN5I_HSTIMER
->>   config TEGRA_TIMER
->>   	bool "Tegra timer driver" if COMPILE_TEST
->>   	select CLKSRC_MMIO
->> -	depends on ARM
-> 
-> This will break because the delay functions are defined in
-> arch/arm/include/asm/delay.h and the 01.org will try to compile the
-> driver on x86.
-> 
-> You may want to add 'depends on ARM && ARM64'
-> 
 
-OK, I think it's 'depends on ARM || ARM64'.
-Will fix.
 
->> +	select TIMER_OF
->>   	help
->>   	  Enables support for the Tegra driver.
->>   
-[snip]
->> -
->>   static struct timespec64 persistent_ts;
->>   static u64 persistent_ms, last_persistent_ms;
-> 
-> Did you check the above changes are still relevant after commit
-> 39232ed5a1793f67 and after doing a change similar to
-> commit 1569557549697207e523 ?
-> 
+Subject: sched/x86: Save [ER]FLAGS on context switch
+From: Peter Zijlstra <peterz@infradead.org>
+Date: Thu Feb 14 10:30:52 CET 2019
 
-Yes, just check both commits. I think it's okay to use the same. But 
-need another patch to do that, this patch only adds new support for 
-Tegra210. Doesn't touch the original code.
+Effectively reverts commit:
 
-> 
->>   static struct delay_timer tegra_delay_timer;
-[snip]
->> +#ifdef CONFIG_ARM64
->> +static DEFINE_PER_CPU(struct timer_of, tegra_to) = {
->> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE,
->> +
->> +	.clkevt = {
->> +		.name = "tegra_timer",
->> +		.rating = 460,
->> +		.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> 
-> 			CLOCK_EVT_FEAT_DYNIRQ ?
-Yes, good catch.
-> 
->> +		.set_next_event = tegra_timer_set_next_event,
->> +		.set_state_shutdown = tegra_timer_shutdown,
->> +		.set_state_periodic = tegra_timer_set_periodic,
->> +		.set_state_oneshot = tegra_timer_shutdown,
->> +		.tick_resume = tegra_timer_shutdown,
->> +	},
->> +};
-[snip]
->> -static unsigned long tegra_delay_timer_read_counter_long(void)
->> +static int tegra_timer_suspend(void)
->>   {
->> -	return readl(timer_reg_base + TIMERUS_CNTR_1US);
->> +#ifdef CONFIG_ARM64
-> 
-> Please do not add those #ifdef but function stubs.
-> 
->> +	int cpu;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
->> +		void __iomem *reg_base = timer_of_base(to);
->> +
->> +		writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
->> +	}
->> +#else
->> +	void __iomem *reg_base = timer_of_base(&tegra_to);
->> +
->> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
->> +#endif
->> +
->> +	return 0;
->>   }
->>   
->> -static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
->> +static void tegra_timer_resume(void)
->>   {
->> -	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
->> -	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
->> -	evt->event_handler(evt);
->> -	return IRQ_HANDLED;
->> +	writel(usec_config, timer_reg_base + TIMERUS_USEC_CFG);
->>   }
->>   
->> -static struct irqaction tegra_timer_irq = {
->> -	.name		= "timer0",
->> -	.flags		= IRQF_TIMER | IRQF_TRIGGER_HIGH,
->> -	.handler	= tegra_timer_interrupt,
->> -	.dev_id		= &tegra_clockevent,
->> +static struct syscore_ops tegra_timer_syscore_ops = {
->> +	.suspend = tegra_timer_suspend,
->> +	.resume = tegra_timer_resume,
->>   };
-> 
-> It will be nicer to use the suspend/resume callbacks defined in the
-> clockevent structure, so you can use generic as there are multiple
-> clockevents defined for the tegra210, thus multiple timer-of
-> encapsulating them. When the suspend/resume callbacks are called, they
-> have the clock_event pointer and you can use it to retrieve the timer-of
-> and then the base address. At the end, the callbacks will end up the
-> same for tegra20 and tegra210.
-> 
+  2c7577a75837 ("sched/x86_64: Don't save flags on context switch")
 
-Very good suggestion, will follow up.
+Specifically because SMAP uses FLAGS.AC which invalidates the claim
+that the kernel has clean flags.
 
->> -static int __init tegra20_init_timer(struct device_node *np)
->> +static int tegra_timer_init(struct device_node *np, struct timer_of *to)
-[snip]
->> +	for_each_possible_cpu(cpu) {
->> +		struct timer_of *cpu_to;
->> +
->> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
->> +		cpu_to->of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(cpu);
->> +		cpu_to->of_clk.rate = timer_of_rate(to);
->> +		cpu_to->clkevt.cpumask = cpumask_of(cpu);
->> +
->> +		cpu_to->clkevt.irq =
->> +			irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
->> +		if (!cpu_to->clkevt.irq) {
->> +			pr_err("%s: can't map IRQ for CPU%d\n",
->> +			       __func__, cpu);
->> +			ret = -EINVAL;
->> +			goto out;
->> +		}
->> +
->> +		irq_set_status_flags(cpu_to->clkevt.irq, IRQ_NOAUTOEN);
->> +		ret = request_irq(cpu_to->clkevt.irq, tegra_timer_isr,
->> +				  IRQF_TIMER | IRQF_NOBALANCING,
->> +				  cpu_to->clkevt.name, &cpu_to->clkevt);
->> +		if (ret) {
->> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
->> +				__func__, cpu_to->clkevt.irq, cpu);
->> +			ret = -EINVAL;
->> +			goto out_irq;
->> +		}
->> +	}
-> 
-> You should configure the timer in the tegra_timer_setup() function
-> instead of using this cpu loop.
-> 
+In particular; while preemption from interrupt return is fine (the
+IRET frame on the exception stack contains FLAGS) it breaks any code
+that does synchonous scheduling, including preempt_enable().
 
-I think I still need to leave 'irq_of_parse_and_map' and 'request_irq' 
-here. Is that ok?
+This has become a significant issue ever since commit:
 
->> +
->> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
->> +			  "AP_TEGRA_TIMER_STARTING", tegra_timer_setup,
->> +			  tegra_timer_stop);
->> +
->> +	return ret;
->> +
->> +out_irq:
->> +	for_each_possible_cpu(cpu) {
->> +		struct timer_of *cpu_to;
->> +
->> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
->> +		if (cpu_to->clkevt.irq) {
->> +			free_irq(cpu_to->clkevt.irq, &cpu_to->clkevt);
->> +			irq_dispose_mapping(cpu_to->clkevt.irq);
->> +		}
->>   	}
->> +out:
->> +	timer_of_cleanup(to);
->> +	return ret;
->> +}
->> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra210_timer_init);
->> +#else /* CONFIG_ARM */
-> 
-> Don't use the macro to select one or another. Just define the functions
-> and let the init postcalls to free the memory.
-> 
+  5b24a7a2aa20 ("Add 'unsafe' user access functions for batched accesses")
 
-Okay, I think I can move 'TIMER_OF_DECLARE' out of the ifdef. They will 
-be something like below. And change tegraxxx_init_timer to tegra_init_timer.
+provided for means of having 'normal' C code between STAC / CLAC,
+exposing the FLAGS.AC state. So far this hasn't led to trouble,
+however fix it before it comes apart.
 
-TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra_timer_init);
-TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra_timer_init);
+Fixes: 5b24a7a2aa20 ("Add 'unsafe' user access functions for batched accesses")
+Acked-by: Andy Lutomirski <luto@amacapital.net>
+Reported-by: Julien Thierry <julien.thierry@arm.com>
+Signed-off-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+---
+ arch/x86/entry/entry_32.S        |    2 ++
+ arch/x86/entry/entry_64.S        |    2 ++
+ arch/x86/include/asm/switch_to.h |    1 +
+ arch/x86/kernel/process_32.c     |    7 +++++++
+ arch/x86/kernel/process_64.c     |    8 ++++++++
+ 5 files changed, 20 insertions(+)
 
-Is that ok?
-
-Thanks for reviewing,
-Joseph
-
->> +static int __init tegra20_init_timer(struct device_node *np)
->> +{
->> +	int ret = 0;
->> +
->> +	ret = tegra_timer_init(np, &tegra_to);
->> +	if (ret < 0)
->> +		goto out;
->>   
->> -	sched_clock_register(tegra_read_sched_clock, 32, 1000000);
->> +	tegra_to.of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(0);
->> +	tegra_to.of_clk.rate = 1000000; /* microsecond timer */
->>   
->> +	sched_clock_register(tegra_read_sched_clock, 32,
->> +			     timer_of_rate(&tegra_to));
->>   	ret = clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
->> -				    "timer_us", 1000000, 300, 32,
->> -				    clocksource_mmio_readl_up);
->> +				    "timer_us", timer_of_rate(&tegra_to),
->> +				    300, 32, clocksource_mmio_readl_up);
->>   	if (ret) {
->>   		pr_err("Failed to register clocksource\n");
->> -		return ret;
->> +		goto out;
->>   	}
->>   
->>   	tegra_delay_timer.read_current_timer =
->>   			tegra_delay_timer_read_counter_long;
->> -	tegra_delay_timer.freq = 1000000;
->> +	tegra_delay_timer.freq = timer_of_rate(&tegra_to);
->>   	register_current_timer_delay(&tegra_delay_timer);
->>   
->> -	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
->> -	if (ret) {
->> -		pr_err("Failed to register timer IRQ: %d\n", ret);
->> -		return ret;
->> -	}
->> +	clockevents_config_and_register(&tegra_to.clkevt,
->> +					timer_of_rate(&tegra_to),
->> +					0x1,
->> +					0x1fffffff);
->>   
->> -	tegra_clockevent.cpumask = cpu_possible_mask;
->> -	tegra_clockevent.irq = tegra_timer_irq.irq;
->> -	clockevents_config_and_register(&tegra_clockevent, 1000000,
->> -					0x1, 0x1fffffff);
->> +	return ret;
->> +out:
->> +	timer_of_cleanup(&tegra_to);
->>   
->> -	return 0;
->> +	return ret;
->>   }
->>   TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
->>   
->> @@ -261,3 +425,4 @@ static int __init tegra20_init_rtc(struct device_node *np)
->>   	return register_persistent_clock(tegra_read_persistent_clock64);
->>   }
->>   TIMER_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
->> +#endif
->> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
->> index fd586d0301e7..e78281d07b70 100644
->> --- a/include/linux/cpuhotplug.h
->> +++ b/include/linux/cpuhotplug.h
->> @@ -121,6 +121,7 @@ enum cpuhp_state {
->>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>   	CPUHP_AP_ARM_TWD_STARTING,
->>   	CPUHP_AP_QCOM_TIMER_STARTING,
->> +	CPUHP_AP_TEGRA_TIMER_STARTING,
->>   	CPUHP_AP_ARMADA_TIMER_STARTING,
->>   	CPUHP_AP_MARCO_TIMER_STARTING,
->>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
->>
-> 
-> 
+--- a/arch/x86/entry/entry_32.S
++++ b/arch/x86/entry/entry_32.S
+@@ -650,6 +650,7 @@ ENTRY(__switch_to_asm)
+ 	pushl	%ebx
+ 	pushl	%edi
+ 	pushl	%esi
++	pushfl
+ 
+ 	/* switch stack */
+ 	movl	%esp, TASK_threadsp(%eax)
+@@ -672,6 +673,7 @@ ENTRY(__switch_to_asm)
+ #endif
+ 
+ 	/* restore callee-saved registers */
++	popfl
+ 	popl	%esi
+ 	popl	%edi
+ 	popl	%ebx
+--- a/arch/x86/entry/entry_64.S
++++ b/arch/x86/entry/entry_64.S
+@@ -291,6 +291,7 @@ ENTRY(__switch_to_asm)
+ 	pushq	%r13
+ 	pushq	%r14
+ 	pushq	%r15
++	pushfq
+ 
+ 	/* switch stack */
+ 	movq	%rsp, TASK_threadsp(%rdi)
+@@ -313,6 +314,7 @@ ENTRY(__switch_to_asm)
+ #endif
+ 
+ 	/* restore callee-saved registers */
++	popfq
+ 	popq	%r15
+ 	popq	%r14
+ 	popq	%r13
+--- a/arch/x86/include/asm/switch_to.h
++++ b/arch/x86/include/asm/switch_to.h
+@@ -40,6 +40,7 @@ asmlinkage void ret_from_fork(void);
+  * order of the fields must match the code in __switch_to_asm().
+  */
+ struct inactive_task_frame {
++	unsigned long flags;
+ #ifdef CONFIG_X86_64
+ 	unsigned long r15;
+ 	unsigned long r14;
+--- a/arch/x86/kernel/process_32.c
++++ b/arch/x86/kernel/process_32.c
+@@ -127,6 +127,13 @@ int copy_thread_tls(unsigned long clone_
+ 	struct task_struct *tsk;
+ 	int err;
+ 
++	/*
++	 * For a new task use the RESET flags value since there is no before.
++	 * All the status flags are zero; DF and all the system flags must also
++	 * be 0, specifically IF must be 0 because we context switch to the new
++	 * task with interrupts disabled.
++	 */
++	frame->flags = X86_EFLAGS_FIXED;
+ 	frame->bp = 0;
+ 	frame->ret_addr = (unsigned long) ret_from_fork;
+ 	p->thread.sp = (unsigned long) fork_frame;
+--- a/arch/x86/kernel/process_64.c
++++ b/arch/x86/kernel/process_64.c
+@@ -392,6 +392,14 @@ int copy_thread_tls(unsigned long clone_
+ 	childregs = task_pt_regs(p);
+ 	fork_frame = container_of(childregs, struct fork_frame, regs);
+ 	frame = &fork_frame->frame;
++
++	/*
++	 * For a new task use the RESET flags value since there is no before.
++	 * All the status flags are zero; DF and all the system flags must also
++	 * be 0, specifically IF must be 0 because we context switch to the new
++	 * task with interrupts disabled.
++	 */
++	frame->flags = X86_EFLAGS_FIXED;
+ 	frame->bp = 0;
+ 	frame->ret_addr = (unsigned long) ret_from_fork;
+ 	p->thread.sp = (unsigned long) fork_frame;
 
 _______________________________________________
 linux-arm-kernel mailing list
