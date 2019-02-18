@@ -2,20 +2,21 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7A75EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:19:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 245C8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:20:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4467B21736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:19:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8E9B2175B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:20:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifkdxkbS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4467B21736
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yz2600ak"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8E9B2175B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,48 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gKE5VU70TT1PzN2xKzQgi8w6XHravZSO6OsZbHUVDFc=; b=ifkdxkbSIes6js
-	xpsO8oqL8Y0GfouK+SiRkMUcSkChYj6DIfyVZCgXoRf2QRX7tk4JB16kMTR2o7uqym+DTJpj9EP4t
-	RT5ludHeZAH6lYjn75XFl2ss2euyBSMUMvwXyUq7UE1BNm1tuMkIMgzlGUO9fYwSSDqUKE2LkOHOK
-	egsvnzJaIj5tuidmHZZylXKmlsZIvoUoWb3YR59N3PJN0k/zODCZZOJSZZZ7ytaXg7AbASueDjatp
-	qTMLTEWnDIfZpXyGW/DJVM8DrurTKukcekExT39zuD9rssLrC9XF3HZjbZJd62OgaBmWQPSNfRxbE
-	MvETZ6FmaaR9PmR8lXVg==;
+	List-Owner; bh=LUzNssdVEaI4NUzJuFOdt/JijrCjoL170DqLgiG1CJY=; b=Yz2600akXdvpSx
+	HJ+P1qyI2kq+t5Y/uRrbQ5nqGR8YBfDI0kmrd0yG6FwIY1gaVidtzD+wNrkGa6bonSrNrooNehhuT
+	htlh/c/YboCw1Sqcvd1ckZJ1GMYpZdtcVO7nelWyWJt1HqeJvs5OLkOT1RfLwNnHfXTaRUsf9obAR
+	zRprTSuWS8HPl0YRBVhaZoLFCmztxSNSU7lZSOHNSNp390OJx2F8b1e0TeY9N6JBsOzYiTxK9kniU
+	eETMVok7uDqPWMlY4olqxnjqVRaQnSpaYHjwS3W41ffBHpVTCBV6YIlwu5nOYvpERJMipM+fl4VM2
+	EnmOm+ZgJCy0YhkJCkCQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvg1S-0001E6-LX; Mon, 18 Feb 2019 10:19:38 +0000
-Received: from mail-qk1-f193.google.com ([209.85.222.193])
+	id 1gvg2G-0002oM-LC; Mon, 18 Feb 2019 10:20:28 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvg1P-0001Dl-LY; Mon, 18 Feb 2019 10:19:37 +0000
-Received: by mail-qk1-f193.google.com with SMTP id o125so9653630qkf.3;
- Mon, 18 Feb 2019 02:19:35 -0800 (PST)
+ id 1gvg2D-0002ny-Kp; Mon, 18 Feb 2019 10:20:26 +0000
+Received: by mail-qt1-f193.google.com with SMTP id 2so18559800qtb.5;
+ Mon, 18 Feb 2019 02:20:25 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=FuFwn397ir3mXbdPHzH2RizXYz96v+f5u+om4e9Skgw=;
- b=T3RMg0pRcdlVy1CLwb8K2YT1icJ6cH618UcOJEhc3PoO0NFrDrzIz2tayV9NeQmxNB
- XSNs/0e+QrdE7Sn/BorRitw/Ml5m39JuI20arXpda2JktQmfsntdMjXXbbtcVN7gCqW3
- WLl2vBoNugr1Bi/YTUtgZt9HX08YJGAwzEGQVQVJYziBQ8QTegmqJHxqYusBeH15RuKk
- 6fnrNOL/ZFPsSpre9UdyhMcJglJO4TJzqyBbfsiuyDMmyFuHfI96W+y+LWNLWRiTz1N6
- awtNzebFMdnv72yEGFoIkEaBWk5TeERTho8qHByoRpxVamMSGEB4BKKuZcYQzF8cTRrT
- M1MQ==
-X-Gm-Message-State: AHQUAua8xXhgHggmrrazCnK3gRGyz6p+ayLGVl/BXdCoGSTFcQcOe+wW
- qBmaXM9NUkmgsyhzWKLxrH5/6I3OFzIcLYu+zgw=
-X-Google-Smtp-Source: AHgI3Ia+paP1aSaRzLYUk8W/X4Pm9fJhfcJFMpnx5VwTtGgQ6mSk4wVRn1vI4LmXLTAwyRviFP2AGeuGcLA9iFrMWpo=
-X-Received: by 2002:ae9:d8c2:: with SMTP id
- u185mr15336111qkf.107.1550485174755; 
- Mon, 18 Feb 2019 02:19:34 -0800 (PST)
+ bh=fMASI8Kl0kMzNKT5pTFxdsz8hPoKLQaP8gNI7fXdG8k=;
+ b=bIwSfIkgO/StKe6QUEaGAyAL+psRh5XdDIjRvOJRWh/8WMWJaWD3UeJS0xxOEyXDYJ
+ uctzvhZxDZFriEfssfdQnXXuJfC0RclWr5cU4EX0eZwkqZ7yvgQNXV521dbjwcQu2n6R
+ qqCeNkAiboZPJFDJIerCB9J1MMQhGyj5U46nONrhPKquUVksdl5LJwgVetz3B/6dd0LI
+ 1nrZm3DftD5BwqDgaZJL0ghLCePBNxe+CpFOmS8rjkkH5Yw8tPdaBeMrKP+Cu6wDjZJC
+ 04fwj+LO9sTNVHJLgOWpJI7bipKp3hDDxYHzVsPpJcBa4qr1F1FEE+8vSnpV6DrOmk/e
+ +HWg==
+X-Gm-Message-State: AHQUAuaUfa3gLqnXFRMj0tA+qW9WGirsbgq6EeJlsqNl20t2LU0ADRL5
+ 6402DIZ7Rn5AnLW1cjv04YB8BTSY0bMTgBk1qfs=
+X-Google-Smtp-Source: AHgI3IbPsGNns3VcoTc5TvXODZ3zts5+lOXQ+FKNNIE7ylyafToQlzS/pEv/1cWxoA/aWA2GfSrx/pBP+g2/vp/fKTE=
+X-Received: by 2002:ac8:4141:: with SMTP id e1mr16966761qtm.96.1550485224476; 
+ Mon, 18 Feb 2019 02:20:24 -0800 (PST)
 MIME-Version: 1.0
-References: <1972197.JU0Au1QvNm@phil>
-In-Reply-To: <1972197.JU0Au1QvNm@phil>
+References: <1972197.JU0Au1QvNm@phil> <29818451.VkXVVsXLZK@phil>
+In-Reply-To: <29818451.VkXVVsXLZK@phil>
 From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 11:19:18 +0100
-Message-ID: <CAK8P3a3oBKmGk_3YyUgBELkGNMSUYQgTGtp89n5oBBd9ugJLiw@mail.gmail.com>
-Subject: Re: [GIT PULL 1/2] Rockchip dts32 updates for 5.1 - round 2
+Date: Mon, 18 Feb 2019 11:20:07 +0100
+Message-ID: <CAK8P3a3mnfrBwCQQRReHRmOt_osr9KXC9svPT6AvEp8L81UhSg@mail.gmail.com>
+Subject: Re: [GIT PULL 2/2] Rockchip dts64 updates for 5.1 - round 2
 To: Heiko Stuebner <heiko@sntech.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_021935_701740_AF9BF7B9 
-X-CRM114-Status: UNSURE (   6.53  )
+X-CRM114-CacheID: sfid-20190218_022025_681395_C8C1A59A 
+X-CRM114-Status: UNSURE (   9.81  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -85,17 +85,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 1:18 AM Heiko Stuebner <heiko@sntech.de> wrote:
+On Mon, Feb 18, 2019 at 1:19 AM Heiko Stuebner <heiko@sntech.de> wrote:
 >
-> Hi Arnd, Kevin Olof,
+> The following changes since commit 79164c99db284d07aa4e84e57b469d225609799c:
 >
-> please find below and in the reply a second round of Rockchip devicetree
-> updates targetted at 5.1. Again nothing major just some more collected
-> improvements. So if there is still time, please pull.
+>   arm64: dts: rockchip: clean up the abuse of disable-wp (2019-01-28 10:51:22 +0100)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v5.1-rockchip-dts64-2
+>
+> for you to fetch changes up to 02260a619efe574d0f6c2a4420b8b76c6802294e:
+>
+>   arm64: dts: rockchip: Enable tsadc device on rock960 (2019-02-17 23:59:05 +0100)
+>
+> ----------------------------------------------------------------
+> rockpro64 regulator improvements, rock960 improvements (tsadc, wifi, hdmi
+> audio), nanopi4 bluetooth support and rk3328-roc-cc gmac improvement.
 
 Pulled into arm/dt, thanks!
 
-     Arnd
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
