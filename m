@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DCF0C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:49:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CF837C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:49:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2DCC22176F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:49:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F0702176F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:49:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="duJaKpbZ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="boy2rsnJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DCC22176F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KeLLvc7u";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=verge.net.au header.i=@verge.net.au header.b="Dn/D/Y0A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F0702176F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=verge.net.au
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,41 +27,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=7PyAqmpRCdlW5JMT3y/ky/JQ4rzVt76lFMbisXMzaJ0=; b=duJaKpbZJ3h+D752FUfuN1yAmN
-	eHO6oSoCsBmVZDfsv6LcPi+wMOLJNVFXkijqRcLkYw2LEKUCaOXX12akZW1HDYrYd8enBvqOVjEQY
-	UxFOtxkLZK7q+wsiDLNqKBZk8VbheYVrTXp3VLO34oAGKZxkuh9rqitRY4wFhMKQCagWzcHbSE7eW
-	NY76tiUpy4po83MgorCOYiXeHxZZTJ94XjzPSLOZ/9clVJRFobJT3FmqrYDsHRC1vim9d9a9VRp/y
-	Nx7f4JJl3ci4VxenK72WbtnxgQiy28hrqIVWdTQcE6Sms2jm96GQLf1OpbOLdMmq3Pud5dPVlJtE7
-	FgbPjKUg==;
+	bh=yZM4fqEllYaTv5ZzExSOzlv/azEZSXX3aIALRhqQ0Tg=; b=KeLLvc7u/MyzqrcUyKsZp6zZHA
+	IIlUKxQxc0DCRkwma5Qh03rPSPXCU9fSIsI1dPQ+S2HA1jiisnJwE6F2yrD5ONKa8P4WGanyj29jS
+	x5Fj0OoGJA/+2UfDyaww4t95FuKDJ87H5m20RejXwRa6mmlz3bfPByM21YJD6iGWr/vU2FHkApTts
+	Jh8U16zNp/xmP477fN1Bq86/rdVf/SS26YOmx8SQg1cmEnTXTxoiY8qVry8c8nL7WaZ3qWfazkCSv
+	cuak1NK0D8HgTTOODGt3rsOhazGPGEujlH4eHroiDQb3PdpZWBI7UulPAh9hqP+uXlY37lyK+NCOA
+	mQ26vJAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvgTy-0008CC-NG; Mon, 18 Feb 2019 10:49:06 +0000
+	id 1gvgU9-0008Qs-EQ; Mon, 18 Feb 2019 10:49:17 +0000
 Received: from kirsty.vergenet.net ([202.4.237.240])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvgTU-0007Tx-RI
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:48:39 +0000
+ id 1gvgTX-0007Tx-EX
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:48:41 +0000
 Received: from penelope.horms.nl (unknown [62.119.166.9])
- by kirsty.vergenet.net (Postfix) with ESMTPA id C80E925BEDA;
+ by kirsty.vergenet.net (Postfix) with ESMTPA id 8158125BEAC;
  Mon, 18 Feb 2019 21:48:23 +1100 (AEDT)
 DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple; d=verge.net.au; s=mail;
- t=1550486904; bh=F3cCUCLMmHYfgbDN9NlFeyvUSJy2jx37FQe1yMcCG6A=;
+ t=1550486906; bh=ywfXuCMYMMxno5H1hvjTQde5VmOUreRVvV6jPD6zTf0=;
  h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=boy2rsnJRuRrYGsI3WrMuTETiNXwKvmpsGoXanvAaEI6O+gKYZoecYqJtfJe7Ebz3
- ea9BrdVVxhdaTI5D7q9ahP9cvczMWnT+kzncnI/lTWoVsiB4LrHYZsu0KlE8AqjQBy
- dxs/eeHBAv4iz9xmRARIguSEJYqLlCk7MWq4vYY0=
+ b=Dn/D/Y0ARJtLdqNwSNCjwQKMIn1hop/7vsIEiQmCfcBnb7ydGrDfmhjf+e2yLJt3/
+ OXwA7HmSYjq22iXwaLUbuAIyCRfVcdITQwz/jUMqTbFvd/XNcS+ZKc3/ocgq/suLtE
+ StWBRa7vBuRIV3HNn8nVM2amyadX7C5Q2Dpc3jis=
 Received: by penelope.horms.nl (Postfix, from userid 7100)
- id BF9D6E218D1; Mon, 18 Feb 2019 11:48:07 +0100 (CET)
+ id C3956E218D3; Mon, 18 Feb 2019 11:48:07 +0100 (CET)
 From: Simon Horman <horms+renesas@verge.net.au>
 To: linux-renesas-soc@vger.kernel.org
-Subject: [PATCH 2/4] dt-bindings: arm: renesas: Add si-linux cat87[45] boards
-Date: Mon, 18 Feb 2019 11:48:04 +0100
-Message-Id: <1a69a73c9b006ae72e06a5e637932bfe2fb7bc05.1549624030.git.horms+renesas@verge.net.au>
+Subject: [PATCH 3/4] dt-bindings: arm: renesas: Document RZ/A2M EVB
+Date: Mon, 18 Feb 2019 11:48:05 +0100
+Message-Id: <58097b0e05c0dc70345c02cd83117f134574024e.1549624030.git.horms+renesas@verge.net.au>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <cover.1549624030.git.horms+renesas@verge.net.au>
 References: <cover.1549624030.git.horms+renesas@verge.net.au>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_024837_525897_A4FDA742 
-X-CRM114-Status: UNSURE (   9.61  )
+X-CRM114-CacheID: sfid-20190218_024839_674990_0D48DAD0 
+X-CRM114-Status: UNSURE (   8.54  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -74,8 +74,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
- Simon Horman <horms+renesas@verge.net.au>, Magnus Damm <magnus.damm@gmail.com>,
+Cc: Simon Horman <horms+renesas@verge.net.au>,
+ Chris Brandt <chris.brandt@renesas.com>, Magnus Damm <magnus.damm@gmail.com>,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
@@ -83,38 +83,31 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-This patch adds board cat874 (powered by the RZ/G2E) and board
-cat875 (that sits on top of cat874). Both boards are made by
-Silicon Linux.
+Add the RZ/A2M Evaluation board.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Chris Paterson <Chris.Paterson2@renesas.com>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- Documentation/devicetree/bindings/arm/renesas.yaml | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ Documentation/devicetree/bindings/arm/renesas.yaml | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/Documentation/devicetree/bindings/arm/renesas.yaml b/Documentation/devicetree/bindings/arm/renesas.yaml
-index 5e9d4864a600..9e1e07b5192e 100644
+index 9e1e07b5192e..cb9b4417e8a1 100644
 --- a/Documentation/devicetree/bindings/arm/renesas.yaml
 +++ b/Documentation/devicetree/bindings/arm/renesas.yaml
-@@ -108,6 +108,14 @@ properties:
+@@ -30,6 +30,8 @@ properties:
  
-       - description: RZ/G2E (R8A774C0)
+       - description: RZ/A2 (R7S9210)
          items:
 +          - enum:
-+              - si-linux,cat874 # Silicon Linux RZ/G2E 96board platform (CAT874)
-+          - const: renesas,r8a774c0
-+
-+      - items:
-+          - enum:
-+              - si-linux,cat875 # Silicon Linux sub board for CAT874 (CAT875)
-+          - const: si-linux,cat874
-           - const: renesas,r8a774c0
++              - renesas,rza2mevb # RZ/A2M Eval Board (RTK7921053S00000BE)
+           - const: renesas,r7s9210
  
-       - description: R-Car M1A (R8A77781)
+       - description: SH-Mobile AG5 (R8A73A00/SH73A0)
 -- 
 2.11.0
 
