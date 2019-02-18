@@ -7,56 +7,74 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 972C9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C56AAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 694F0204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9576B217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ki+dps1+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 694F0204EC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JEzgYRQA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LG75W+vS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9576B217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mlZDxKfRCI6C+/9OVDsztdDr36DUIcAJcYZghhRn0qU=; b=ki+dps1+1jwEhJ
-	OXSVmpzRdUxERpBp7OCcDGygD0QKa2nY7usaV24GSrwsoO+S5vROH3+Khdj7cZExE1A2DCCvCwoVz
-	SnLngDxpS2DcAceDziJ2z9EZQsLkBFvs75XL56yBA4UZEIDh9fVksTjNYd9+8QytCuupxsrDBea+d
-	QBwpDoaV01cD0I4q8Qjtt9cLRS/HsrGx/H3HburNkfLtqxiixNoUlJzKj1xqVj8TsTiOKVJHt7P9i
-	LSmyGfMHc5s7IG9kOBCAJXveNMW6K9imh7FcT1qPWCdzFR2PmNN1MHPn5E9V52TqAeoqRFdHixuWR
-	jjSZZJwDJHjVYVgI43jw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=xteNDgrkPLYYoF4Hf/vnKOVxq95EKJjLF+CJ+j9AyEg=; b=JEzgYRQA+mpVfz35x4QkzJfvut
+	e247CQEU9u81SJpUnF57GWxjNoAnzBmo7qnwbcJ1z3KRRpeyN6ytQ5i0kd3SkqoSvQra46TaP6T14
+	wLa/LEjC2GYMwe1TkbYpoood7xNm8IJaVzmi9GMPONLk/hMrPOwl5Ofqkfy4s6Bixttx2yZ0O87ur
+	ywgz+4K3MoPrA2laRUcipRkCP3b5AilGDVfuROF+ei0p3htU1Bu5+/2PXOU+eN0y84HdF/g++2b+P
+	R3AC6cuJXOiBXDrMHgYp0D5SWlpOI0k7g6gOITOcQw5O/QKRWANXkBuvqu9LlmnXrPRPWEHr1LAgK
+	4HmzBN/g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp1t-0008Fz-Hf; Mon, 18 Feb 2019 19:56:41 +0000
+	id 1gvp21-0008P5-Dk; Mon, 18 Feb 2019 19:56:49 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvp00-0005Ck-Mx
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 19:54:44 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=qFmejAfScTZyZcZc5IW1S5jUQVxgh7WLALlBombMnb4=; b=LG75W+vSD22MMtAEtplPpykN/
+ zXBx/FcPWQwvfDKb5BsL9WTx/RpWkXZTyJw/C4DwWf7FAt3R+lGakSmu9yJOvJvxG59miKpgAR1NI
+ 6taXNaNQM4QLkmbIpLoItkaFclP3WYMwB/3pF8soA5kMacfxAwuZJRIGuUl0NcVHYMjL3k3xiiaRI
+ FTe0x2I6AsxpuCQBcH0dZNfP8/JBuTYZCNg+DX65YE6KXht+LGhoZ2RHmaewbyVMk83uKGgduzdf1
+ lmIKhxeVhBAjNsof64KY02yAMKCzZoiumbT/EsmH1OkuXu0RVB2EMot9M+3i0Ev8YJXTLMzaGn/zY
+ OmLySNjfw==;
 Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozm-0004c0-4z
+ by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvozv-0003pZ-Fk
  for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:42 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5D4761BF7;
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 921A71C2B;
  Mon, 18 Feb 2019 11:54:14 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 33C953FD55;
- Mon, 18 Feb 2019 11:53:48 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id A3EB63FBA7;
+ Mon, 18 Feb 2019 11:54:12 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 10/26] KVM: arm64: Propagate vcpu into read_id_reg()
-Date: Mon, 18 Feb 2019 19:52:23 +0000
-Message-Id: <1550519559-15915-11-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 21/26] KVM: arm/arm64: Add hook to finalize the vcpu
+ configuration
+Date: Mon, 18 Feb 2019 19:52:34 +0000
+Message-Id: <1550519559-15915-22-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_115430_451044_D54CEC56 
-X-CRM114-Status: GOOD (  12.93  )
+X-CRM114-CacheID: sfid-20190218_145441_827989_DDACF79D 
+X-CRM114-Status: GOOD (  15.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,76 +95,92 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Julien Grall <julien.grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QXJjaGl0ZWN0dXJlIGZlYXR1cmVzIHRoYXQgYXJlIGNvbmRpdGlvbmFsbHkgdmlzaWJsZSB0byB0
-aGUgZ3Vlc3QKd2lsbCByZXF1aXJlIHJ1bi10aW1lIGNoZWNrcyBpbiB0aGUgSUQgcmVnaXN0ZXIg
-YWNjZXNzb3IgZnVuY3Rpb25zLgpJbiBwYXJ0aWN1bGFyLCByZWFkX2lkX3JlZygpIHdpbGwgbmVl
-ZCB0byBwZXJmb3JtIGNoZWNrcyBpbiBvcmRlcgp0byBnZW5lcmF0ZSB0aGUgY29ycmVjdCBlbXVs
-YXRlZCB2YWx1ZSBmb3IgY2VydGFpbiBJRCByZWdpc3RlcgpmaWVsZHMgc3VjaCBhcyBJRF9BQTY0
-UEZSMF9FTDEuU1ZFIGZvciBleGFtcGxlLgoKVGhpcyBwYXRjaCBwcm9wYWdhdGVzIHZjcHUgaW50
-byByZWFkX2lkX3JlZygpIHNvIHRoYXQgZnV0dXJlCnBhdGNoZXMgY2FuIGFkZCBydW4tdGltZSBj
-aGVja3Mgb24gdGhlIGd1ZXN0IGNvbmZpZ3VyYXRpb24gaGVyZS4KCkZvciBub3csIHRoZXJlIGlz
-IG5vIGZ1bmN0aW9uYWwgY2hhbmdlLgoKU2lnbmVkLW9mZi1ieTogRGF2ZSBNYXJ0aW4gPERhdmUu
-TWFydGluQGFybS5jb20+ClJldmlld2VkLWJ5OiBBbGV4IEJlbm7DqWUgPGFsZXguYmVubmVlQGxp
-bmFyby5vcmc+Ci0tLQogYXJjaC9hcm02NC9rdm0vc3lzX3JlZ3MuYyB8IDIzICsrKysrKysrKysr
-KystLS0tLS0tLS0tCiAxIGZpbGUgY2hhbmdlZCwgMTMgaW5zZXJ0aW9ucygrKSwgMTAgZGVsZXRp
-b25zKC0pCgpkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9rdm0vc3lzX3JlZ3MuYyBiL2FyY2gvYXJt
-NjQva3ZtL3N5c19yZWdzLmMKaW5kZXggZTNlMzcyMi4uNzFjNTgyNSAxMDA2NDQKLS0tIGEvYXJj
-aC9hcm02NC9rdm0vc3lzX3JlZ3MuYworKysgYi9hcmNoL2FybTY0L2t2bS9zeXNfcmVncy5jCkBA
-IC0xMDI5LDcgKzEwMjksOCBAQCBzdGF0aWMgYm9vbCBhY2Nlc3NfY250cF9jdmFsKHN0cnVjdCBr
-dm1fdmNwdSAqdmNwdSwKIH0KIAogLyogUmVhZCBhIHNhbml0aXNlZCBjcHVmZWF0dXJlIElEIHJl
-Z2lzdGVyIGJ5IHN5c19yZWdfZGVzYyAqLwotc3RhdGljIHU2NCByZWFkX2lkX3JlZyhzdHJ1Y3Qg
-c3lzX3JlZ19kZXNjIGNvbnN0ICpyLCBib29sIHJheikKK3N0YXRpYyB1NjQgcmVhZF9pZF9yZWco
-Y29uc3Qgc3RydWN0IGt2bV92Y3B1ICp2Y3B1LAorCQlzdHJ1Y3Qgc3lzX3JlZ19kZXNjIGNvbnN0
-ICpyLCBib29sIHJheikKIHsKIAl1MzIgaWQgPSBzeXNfcmVnKCh1MzIpci0+T3AwLCAodTMyKXIt
-Pk9wMSwKIAkJCSAodTMyKXItPkNSbiwgKHUzMilyLT5DUm0sICh1MzIpci0+T3AyKTsKQEAgLTEw
-NjgsNyArMTA2OSw3IEBAIHN0YXRpYyBib29sIF9fYWNjZXNzX2lkX3JlZyhzdHJ1Y3Qga3ZtX3Zj
-cHUgKnZjcHUsCiAJaWYgKHAtPmlzX3dyaXRlKQogCQlyZXR1cm4gd3JpdGVfdG9fcmVhZF9vbmx5
-KHZjcHUsIHAsIHIpOwogCi0JcC0+cmVndmFsID0gcmVhZF9pZF9yZWcociwgcmF6KTsKKwlwLT5y
-ZWd2YWwgPSByZWFkX2lkX3JlZyh2Y3B1LCByLCByYXopOwogCXJldHVybiB0cnVlOwogfQogCkBA
-IC0xMDk3LDE2ICsxMDk4LDE4IEBAIHN0YXRpYyB1NjQgc3lzX3JlZ190b19pbmRleChjb25zdCBz
-dHJ1Y3Qgc3lzX3JlZ19kZXNjICpyZWcpOwogICogYXJlIHN0b3JlZCwgYW5kIGZvciBzZXRfaWRf
-cmVnKCkgd2UgZG9uJ3QgYWxsb3cgdGhlIGVmZmVjdGl2ZSB2YWx1ZQogICogdG8gYmUgY2hhbmdl
-ZC4KICAqLwotc3RhdGljIGludCBfX2dldF9pZF9yZWcoY29uc3Qgc3RydWN0IHN5c19yZWdfZGVz
-YyAqcmQsIHZvaWQgX191c2VyICp1YWRkciwKK3N0YXRpYyBpbnQgX19nZXRfaWRfcmVnKGNvbnN0
-IHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwKKwkJCWNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJk
-LCB2b2lkIF9fdXNlciAqdWFkZHIsCiAJCQlib29sIHJheikKIHsKIAljb25zdCB1NjQgaWQgPSBz
-eXNfcmVnX3RvX2luZGV4KHJkKTsKLQljb25zdCB1NjQgdmFsID0gcmVhZF9pZF9yZWcocmQsIHJh
-eik7CisJY29uc3QgdTY0IHZhbCA9IHJlYWRfaWRfcmVnKHZjcHUsIHJkLCByYXopOwogCiAJcmV0
-dXJuIHJlZ190b191c2VyKHVhZGRyLCAmdmFsLCBpZCk7CiB9CiAKLXN0YXRpYyBpbnQgX19zZXRf
-aWRfcmVnKGNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJkLCB2b2lkIF9fdXNlciAqdWFkZHIs
-CitzdGF0aWMgaW50IF9fc2V0X2lkX3JlZyhjb25zdCBzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsCisJ
-CQljb25zdCBzdHJ1Y3Qgc3lzX3JlZ19kZXNjICpyZCwgdm9pZCBfX3VzZXIgKnVhZGRyLAogCQkJ
-Ym9vbCByYXopCiB7CiAJY29uc3QgdTY0IGlkID0gc3lzX3JlZ190b19pbmRleChyZCk7CkBAIC0x
-MTE4LDcgKzExMjEsNyBAQCBzdGF0aWMgaW50IF9fc2V0X2lkX3JlZyhjb25zdCBzdHJ1Y3Qgc3lz
-X3JlZ19kZXNjICpyZCwgdm9pZCBfX3VzZXIgKnVhZGRyLAogCQlyZXR1cm4gZXJyOwogCiAJLyog
-VGhpcyBpcyB3aGF0IHdlIG1lYW4gYnkgaW52YXJpYW50OiB5b3UgY2FuJ3QgY2hhbmdlIGl0LiAq
-LwotCWlmICh2YWwgIT0gcmVhZF9pZF9yZWcocmQsIHJheikpCisJaWYgKHZhbCAhPSByZWFkX2lk
-X3JlZyh2Y3B1LCByZCwgcmF6KSkKIAkJcmV0dXJuIC1FSU5WQUw7CiAKIAlyZXR1cm4gMDsKQEAg
-LTExMjcsMjUgKzExMzAsMjUgQEAgc3RhdGljIGludCBfX3NldF9pZF9yZWcoY29uc3Qgc3RydWN0
-IHN5c19yZWdfZGVzYyAqcmQsIHZvaWQgX191c2VyICp1YWRkciwKIHN0YXRpYyBpbnQgZ2V0X2lk
-X3JlZyhzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsIGNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJk
-LAogCQkgICAgICBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZywgdm9pZCBfX3VzZXIgKnVh
-ZGRyKQogewotCXJldHVybiBfX2dldF9pZF9yZWcocmQsIHVhZGRyLCBmYWxzZSk7CisJcmV0dXJu
-IF9fZ2V0X2lkX3JlZyh2Y3B1LCByZCwgdWFkZHIsIGZhbHNlKTsKIH0KIAogc3RhdGljIGludCBz
-ZXRfaWRfcmVnKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwgY29uc3Qgc3RydWN0IHN5c19yZWdfZGVz
-YyAqcmQsCiAJCSAgICAgIGNvbnN0IHN0cnVjdCBrdm1fb25lX3JlZyAqcmVnLCB2b2lkIF9fdXNl
-ciAqdWFkZHIpCiB7Ci0JcmV0dXJuIF9fc2V0X2lkX3JlZyhyZCwgdWFkZHIsIGZhbHNlKTsKKwly
-ZXR1cm4gX19zZXRfaWRfcmVnKHZjcHUsIHJkLCB1YWRkciwgZmFsc2UpOwogfQogCiBzdGF0aWMg
-aW50IGdldF9yYXpfaWRfcmVnKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwgY29uc3Qgc3RydWN0IHN5
-c19yZWdfZGVzYyAqcmQsCiAJCQkgIGNvbnN0IHN0cnVjdCBrdm1fb25lX3JlZyAqcmVnLCB2b2lk
-IF9fdXNlciAqdWFkZHIpCiB7Ci0JcmV0dXJuIF9fZ2V0X2lkX3JlZyhyZCwgdWFkZHIsIHRydWUp
-OworCXJldHVybiBfX2dldF9pZF9yZWcodmNwdSwgcmQsIHVhZGRyLCB0cnVlKTsKIH0KIAogc3Rh
-dGljIGludCBzZXRfcmF6X2lkX3JlZyhzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsIGNvbnN0IHN0cnVj
-dCBzeXNfcmVnX2Rlc2MgKnJkLAogCQkJICBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZywg
-dm9pZCBfX3VzZXIgKnVhZGRyKQogewotCXJldHVybiBfX3NldF9pZF9yZWcocmQsIHVhZGRyLCB0
-cnVlKTsKKwlyZXR1cm4gX19zZXRfaWRfcmVnKHZjcHUsIHJkLCB1YWRkciwgdHJ1ZSk7CiB9CiAK
-IC8qIHN5c19yZWdfZGVzYyBpbml0aWFsaXNlciBmb3Iga25vd24gY3B1ZmVhdHVyZSBJRCByZWdp
-c3RlcnMgKi8KLS0gCjIuMS40CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
-bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
-bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Some aspects of vcpu configuration can't be completed inside
+KVM_VCPU_INIT, but still change API behaviour visible to userspace.
+
+Where such configuration choices affect the register list visible
+to userspace, we will need to track whether we have made a
+commitment to userspace regarding the list of vcpu registers.
+
+This patch adds a new hook kvm_arm_vcpu_finalize() to capture this
+commitment, along with a corresponding check
+kvm_arm_vcpu_finalized().  We commit to the register list when
+userspace reads it via KVM_GET_REG_LIST, or when the vcpu is fired
+up via KVM_RUN.
+
+kvm_arm_vcpu_finalize() is currently a no-op, but future patches
+will amend this to handle SVE on arm64.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm/include/asm/kvm_host.h   | 4 ++++
+ arch/arm64/include/asm/kvm_host.h | 4 ++++
+ virt/kvm/arm/arm.c                | 8 ++++++++
+ 3 files changed, 16 insertions(+)
+
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index ca56537..ab7c76b 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -360,4 +360,8 @@ static inline int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type)
+ 	return 0;
+ }
+ 
++/* Commit to the set of vcpu registers currently configured: */
++static inline int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu) { return 0; }
++#define kvm_arm_vcpu_finalized(vcpu) true
++
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index d233855..015c2578 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -553,4 +553,8 @@ void kvm_arch_free_vm(struct kvm *kvm);
+ 
+ int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type);
+ 
++/* Commit to the set of vcpu registers currently configured: */
++static inline int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu) { return 0; }
++#define kvm_arm_vcpu_finalized(vcpu) true
++
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 9e350fd3..12f9dc2 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -560,6 +560,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	if (likely(vcpu->arch.has_run_once))
+ 		return 0;
+ 
++	ret = kvm_arm_vcpu_finalize(vcpu);
++	if (ret)
++		return ret;
++
+ 	vcpu->arch.has_run_once = true;
+ 
+ 	if (likely(irqchip_in_kernel(kvm))) {
+@@ -1121,6 +1125,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 		if (unlikely(!kvm_vcpu_initialized(vcpu)))
+ 			break;
+ 
++		r = kvm_arm_vcpu_finalize(vcpu);
++		if (r)
++			break;
++
+ 		r = -EFAULT;
+ 		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
+ 			break;
+-- 
+2.1.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
