@@ -4,129 +4,145 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CD02C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:25:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53C7EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06D74217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:25:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20D2221773
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:29:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TmNEYKBe";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="j8xF6/yy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06D74217F5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ASpC3VE9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="qUxWwbHf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20D2221773
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rS+feEP63yxdUqtJX6CpBrMmzPlpsALmL08QoEHy9Us=; b=TmNEYKBeR20dW0
-	ulvWFCMFciOoxizM1N1nhhAaV1EeZ8k7YUDdUocwgmDL8i+ISj1/EZh8+cxOJTR5B0liC2Gt286Hq
-	guYuTLtC5/I5ITKuFTJMxHlcH074qpqsYVPT6OarfVeffR1iRAR6svmCHidhTBELRPqp09a5lCHMH
-	1heKlgf4LaWt7O5Hrj2vJYt2+gzU28j4gwRxlNLUf3mDKjIGs/3oz5Ywpu2/w9NYmgl54T6xcV/U9
-	E9sngpr71UqG5aHQGXX12TTTu0tsjteozT45y9WKEIsU99Sv7wPqqIoLOg2MLXZ6Y9rxMCaVejk47
-	YZoC8bCnt0MBEytWXBCg==;
+	List-Owner; bh=Ch2Qwp4THQZaevoklSPxH3yUYEiW5yYyi31Cekr9ROw=; b=ASpC3VE9ECG6I5
+	0V6Q9i0+XXf8z2LTCzb5KTSYY8zkk4vxiQ1A6igwl812ckmh4k7LEf3difVOgFMq3PhogHXmvaKns
+	xlHZmasy/jRXfUhjZ0smgXeOvoEsBwD+70PmpumI7mJ47mz+kX8TTflcIyW8ezlS3u7cR3RdlIaGu
+	LL5pzEm0iM+3l+zycLWlkK2aYpKi8w9kTKiVS0FRazyfx5orZDjnj0RvyFDwMskG7prVD7tM8kazD
+	FNfqAHuX91YegBE5yin6jIJZNDVYkngbBunU6kYSvjDXjTGBHgLPIjXu+FmiJLWG8IqSup6Bt1QLg
+	n68UC60zc+Ptcjl/5S2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvhyj-0005jY-SM; Mon, 18 Feb 2019 12:24:57 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gvi2z-0007RW-Al; Mon, 18 Feb 2019 12:29:21 +0000
+Received: from esa5.microchip.iphmx.com ([216.71.150.166])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvhyg-0005jC-B6
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:24:56 +0000
-Received: from eucas1p1.samsung.com (unknown [182.198.249.206])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190218122451euoutp012d3e74833b27393a84e8844fa222849e~EdONbXWvj0334903349euoutp01Y
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 12:24:51 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190218122451euoutp012d3e74833b27393a84e8844fa222849e~EdONbXWvj0334903349euoutp01Y
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1550492691;
- bh=Ghv0BSlXyuvbO/afYNzY7v0IY0nLsWqNOjGlx717jo8=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=j8xF6/yycKN2tiuna3087rx1EKUS0cUtuO+lj9H43BrJbQ7gn4I+Skar0HhAccpOo
- KshkdfdOvnyCpiGJuyVZesh2pvI0xFCcXvsY+4q/f2Ys1neC/QWWRIwl8isTkt1+Op
- TPAKxSTSk/xn7SHjXEHcjwlEno9cl8tG3DMCKrKc=
-Received: from eusmges3new.samsung.com (unknown [203.254.199.245]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20190218122451eucas1p2a6656eb6e68570233169dda6ee095249~EdOM_IjN80245802458eucas1p2m;
- Mon, 18 Feb 2019 12:24:51 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges3new.samsung.com (EUCPMTA) with SMTP id C7.81.04806.214AA6C5; Mon, 18
- Feb 2019 12:24:50 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20190218122449eucas1p114c6297d7b3c4a1074600b288c2df097~EdOL6JzF_2828728287eucas1p1s;
- Mon, 18 Feb 2019 12:24:49 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20190218122449eusmtrp162ca27435e025804bcef8c114562c511~EdOLry34i1056610566eusmtrp1_;
- Mon, 18 Feb 2019 12:24:49 +0000 (GMT)
-X-AuditID: cbfec7f5-367ff700000012c6-50-5c6aa412066c
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 01.CE.04128.114AA6C5; Mon, 18
- Feb 2019 12:24:49 +0000 (GMT)
-Received: from [106.116.147.30] (unknown [106.116.147.30]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190218122449eusmtip2e6e1ac65b444065a762211db1dc41a47~EdOLNAwrB0583305833eusmtip2U;
- Mon, 18 Feb 2019 12:24:49 +0000 (GMT)
-Subject: Re: [PATCH 4/5] ARM: dts: exynos: Add support ARM architected timers
-To: Chanwoo Choi <cw00.choi@samsung.com>, linux-samsung-soc@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-From: Marek Szyprowski <m.szyprowski@samsung.com>
-Message-ID: <4c0a5561-b1f0-6938-3e89-eae5014aafa1@samsung.com>
-Date: Mon, 18 Feb 2019 13:24:48 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
-MIME-Version: 1.0
-In-Reply-To: <c73ca3d2-ccd1-e2d0-f81c-5b62a4313a5d@samsung.com>
+ id 1gvi2v-0007R6-Tm
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:29:19 +0000
+X-IronPort-AV: E=Sophos;i="5.58,384,1544511600"; d="scan'208";a="24837105"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa5.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 18 Feb 2019 05:28:59 -0700
+Received: from NAM02-BL2-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.106) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Mon, 18 Feb 2019 05:28:58 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=2qzLqmDASAnVczV+mXixLdUlxbyLm3SedR09cZDgmvg=;
+ b=qUxWwbHfAr7LOK/PEjxzEuN0GwHkVLcfNxlSD2rlszx7TUyHuMR+mJ7EhmvGHcTa+5uAHlAGBOkKanHPDr7w0tpaoKE8exBj+f8U+s3AdYy6PLXSHwfsWegZUpzJ9iKKrjx941ARNdQENd8+kuY6jWbwFvoGSRNwZ/KgPEYFGPI=
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
+ MWHPR11MB1821.namprd11.prod.outlook.com (10.175.53.136) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.19; Mon, 18 Feb 2019 12:28:56 +0000
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1622.018; Mon, 18 Feb 2019
+ 12:28:56 +0000
+From: <Nicolas.Ferre@microchip.com>
+To: <alexandre.belloni@bootlin.com>, <Ludovic.Desroches@microchip.com>,
+ <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>
+Subject: Re: [RESEND PATCH] dt-bindings: arm: atmel: add new sam9x60 SFR
+ binding
+Thread-Topic: [RESEND PATCH] dt-bindings: arm: atmel: add new sam9x60 SFR
+ binding
+Thread-Index: AQHUx4WEXfob+TfGvkO0ZSe4kBgSnw==
+Date: Mon, 18 Feb 2019 12:28:56 +0000
+Message-ID: <51c2d2af-3d2f-0fa8-c9e7-5fc6a4f1a1b4@microchip.com>
+References: <20190206180425.27324-1-nicolas.ferre@microchip.com>
+In-Reply-To: <20190206180425.27324-1-nicolas.ferre@microchip.com>
+Accept-Language: en-US
 Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA01SbUiTYRTt8f10tPE6LR+0ZawyDfxCfwwMK4pcgVgRFbWomS863absVUv7
- kSKZDl1Zq+YUNRkYc0ydmy4pqSmOWDgVUhP7gGSmNB2plBDSthfLf+fce+4998AlEb4ZiyJl
- yhJapZTKhTgH7R/dcCfwDQWS5DcdyaJeXTcmml5bwEStqwKR291DiCzfpjCRzj0UIuqzPEGO
- EWKLsQ4Xz029wsXLY2OEuM9wV6yxGoF41bL3LH6FcySXlsvKaFVSxg1O/q+Fday4+sDtez4b
- VglsAjUIJSGVBu1WM6oGHJJPvQDwtW8WZ8kagE9/VyEsWQXQ6m3AtkZaP/wk2Eanf2SxLoQl
- KwB2abQgoAqnsuGo1RrEERQDp12dICBCKBuACxo9EWjgVApUe9V4AHOpDKhTa4MWKHUQmnpq
- gvVdlARqx0YIVhMG3zXNowEcSh2Fc4aJoB6hYmC1rRlhcSScnW8LXgSpQQL+8Hj8hPSTk/B9
- y342QjhccloJFu+Brsf1KKuvBvC+Tk+wpB5AW4sdZ1XpcNgZcCP9DvGwezCJ3XkcNm+eYyEP
- znjD2BN48FH/M4Qtc2FtDZ/dEQv1TvM/17fjk8hDINRvC6bfFka/LYz+v207QI0gki5lFHk0
- k6qkbyUyUgVTqsxLvFmksAD/F7k2net2MPQnxwEoEgh3cn1lMgkfk5Yx5QoHgCQijOCev1Yg
- 4XNzpeUVtKrouqpUTjMOEE2iwkjunR1fr/KpPGkJXUjTxbRqqxtChkZVAl3+Wc2IZKDAk9Vr
- LLzY6RsfPPP8c66jsegSzxOOZq+MpkV/NxwaSZdnN2obYk+1VsaVPOAZL8g6TLsbmpY+Fgo6
- vH3tmZ/6TbF2TDw+KTC3z2R0nfbqazcGhucqLp8QtcVjTGbVRA7XtfzSNL2vHv+SMJulxpwx
- qVI7HrcoRJl8acphRMVI/wLqWh88QQMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrIIsWRmVeSWpSXmKPExsVy+t/xe7qCS7JiDBZfV7fYOGM9q8X1L89Z
- LeZ9lrU4f34Du8Wmx9dYLWac38dksXnTVGYHdo9NqzrZPO5c28Pm8e7cOXaPzUvqPfq2rGL0
- +LxJLoAtSs+mKL+0JFUhI7+4xFYp2tDCSM/Q0kLPyMRSz9DYPNbKyFRJ384mJTUnsyy1SN8u
- QS/j+/OvrAXNKhWtH7ayNjBule1i5OSQEDCRmHf1E3sXIxeHkMBSRolTV56zQyRkJE5Oa2CF
- sIUl/lzrYoMoessoce/PbyaQhLCAr8TVjVsZQWwRgWKJk2d+soAUMQtsZ5S4uqWXCaLjF6PE
- nlebwKrYBAwlut6CjOLk4BWwk5jRNQVsBYuAqsSaDW1AcQ4OUYEYiavnGCFKBCVOznzCAmJz
- CthL3FlyEaycWUBd4s+8S8wQtrxE89bZULa4xK0n85kmMArNQtI+C0nLLCQts5C0LGBkWcUo
- klpanJueW2ykV5yYW1yal66XnJ+7iREYfduO/dyyg7HrXfAhRgEORiUe3g9lmTFCrIllxZW5
- hxglOJiVRHiDYrNihHhTEiurUovy44tKc1KLDzGaAv02kVlKNDkfmBjySuINTQ3NLSwNzY3N
- jc0slMR5zxtURgkJpCeWpGanphakFsH0MXFwSjUwyoqnfz97hvHmibMB24/f+zAlXd7uQI6G
- F+fBlUVpy/qUeLd3/eJ6PXnzuXNnenbK2FssuP7sgK2kV9PVmZbhFzUjXDkTG75e09ZYt5/Z
- PuzsJg+JjLvime2Hjx7+Y7H9iemptVqlK7q0J5zldpv5yUuS/drh0EsmqlqnbJ5bfjsYdue0
- 9SvNt0osxRmJhlrMRcWJABJXPVrUAgAA
-X-CMS-MailID: 20190218122449eucas1p114c6297d7b3c4a1074600b288c2df097
-X-Msg-Generator: CA
-X-RootMTR: 20190215125240eucas1p277671ab6d0eb4d1102d3cddd6c61c255
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190215125240eucas1p277671ab6d0eb4d1102d3cddd6c61c255
-References: <20190215125229.30180-1-m.szyprowski@samsung.com>
- <CGME20190215125240eucas1p277671ab6d0eb4d1102d3cddd6c61c255@eucas1p2.samsung.com>
- <20190215125229.30180-5-m.szyprowski@samsung.com>
- <c73ca3d2-ccd1-e2d0-f81c-5b62a4313a5d@samsung.com>
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: LO2P265CA0250.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:8a::22) To MWHPR11MB1662.namprd11.prod.outlook.com
+ (2603:10b6:301:e::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Nicolas.Ferre@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [195.6.168.232]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 2edbae24-6594-4d4f-374e-08d6959ca6d0
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1821; 
+x-ms-traffictypediagnostic: MWHPR11MB1821:
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxODIxOzIzOkh6MTNqNi9ua09QZW4rSjZrMnFHZ09McmFI?=
+ =?utf-8?B?dUN4SzNhMEpJQUZjcDl5cm9uOU94TEJUMUhIczZmeDlBdnZYNHArQTdvMHE3?=
+ =?utf-8?B?bXc4Yk9SRUhIQktZb0E4dGROVzlYMC9UQnJnenJyeE5MQit4ZHVMYWw2dkxT?=
+ =?utf-8?B?ZmFYRHN5elplYVhjVTFTakhYaGtnRWpaVXBiUEFjcHlXeDJzOFlTS0NCRGhs?=
+ =?utf-8?B?ZW5pRVR3U0dIcTVSOFBBN3lubTFZemJSVGRxelRvZE9nSzIvOFNQTW0xbGR1?=
+ =?utf-8?B?cXNCUG1EdUFoVDRTQUR6UVc4eFhBMDJTTkhFZjhiUUcvZ1U4THJNRHVzN2Y2?=
+ =?utf-8?B?WTVpZ1JyZUJkdUwyaE5WLzgvaXoxWWtBZHROTnVlK281SHRGSFBjYlBBVVB6?=
+ =?utf-8?B?SThma0VyWmUxSVdqcjhMU3I4RVJ3Lzg1cCtiU1VJaHhQK05KYlE2UHZyYm15?=
+ =?utf-8?B?aXNrNnJkV1hGbDFqUldIQ1UxSnZ5SXpHTk1MMUl4M1hqQ0p1NkNPdWViWE82?=
+ =?utf-8?B?WEI1WjQ5ckhhK1N2dlVqMUYyQm1VMzd3RkdaMDNYb3FSOWo5MStHVFZnemZy?=
+ =?utf-8?B?UE1SYzkweXQvdFZvR2JPOXFla2ZhOFVoZTJpaytnaTdUbXNEbStVUVVQaWha?=
+ =?utf-8?B?VlNHMnRzaGJ1RHFhbkFRZHZzTFpHRVIvcndIQ0FBRmp4WXl4T1o1UzRib0JJ?=
+ =?utf-8?B?QUkvQ0FTdWUyOVhpUUEwOGUvMm8welBmQ3JMWHl0RmYzbmFGdlo1SGRBRzgx?=
+ =?utf-8?B?L0h6T2o2Q2p0VzVEclhVVEIyR3oxNENhQXA2NGtPc2wxUWFUWWlZY2pJN2lN?=
+ =?utf-8?B?VGZVcUs0dWI5VHhOWDFBWTRkNmhIWTM1OXppdlduT2ZocU1pRkdNbFRDbk90?=
+ =?utf-8?B?eE1uZ2s2d3hxZVpPUTJ5Ry9XclhHNkNMOFZzRUYxT1EyNnVJZ1AySXU0TmRK?=
+ =?utf-8?B?bmxXa2lIeTV2Mis4cm1JMTQycWxCRVcvU0M0ZUYycUdtd3hpTE9rSDJUUGwz?=
+ =?utf-8?B?ak02TjZIYW5NdFpGRlZCRkd5aWpnM0RYYnErWFM4QWUwTlppbXE4TnV4cUls?=
+ =?utf-8?B?bEh1STNveUprWDBkRlZYSkJZYTE3NzBIYW9mMGRkSkNjM1NiOVl5RDcyM0Vr?=
+ =?utf-8?B?NmloTkpDNDNDMmFJRWVXYjF2WXhoQmRuUGFCZ2Q3cmRUZk4vSmxXRnUyd2ln?=
+ =?utf-8?B?TEdIT05jeXpjQVl4elNCL05kTEV5K3BiMkVxWWFsQmcyUk1icHNHaXplaEVH?=
+ =?utf-8?B?RjhtMWNiM2JqOERlWk15VHBFOFZkUWdSSUROWkg1WG5BbFoxdHJaUWw4Y2o2?=
+ =?utf-8?B?a1dJVlNFRWlCMWE2WDFZbjZHZ2UrcmFUcTY4UlRFNHljU0lWclVodFdGMzQx?=
+ =?utf-8?B?a1FyZEFOQ2FXNzl3eENkV2tDaEtaWTNlR0RnNEV0UUpaN1pNMXhUU3I1SVZL?=
+ =?utf-8?B?TWlkN1JiS3d4czVnK2NEZ0dMQy9kcEE0VTVwcm1XbndLM1pKcXdOQUVpdWgw?=
+ =?utf-8?B?QWU1b3hmK1h1MWw0aTg3cFZPM2hHOGUrbGU3aWJCZ25mZTN1WDV6UkErUjZt?=
+ =?utf-8?B?aWkrU0N4TlRrdklVZEpRRjJJd0N3SjI3MURzR0R1OXRCYVM4VWdRMEhXdGJz?=
+ =?utf-8?B?MlpsaEFSVjZrQjdJZ1p2NlVUREpQVnlkQjI4ZmhBTkV2eG0xamFiYXJZcmV2?=
+ =?utf-8?B?cWpVMzZlQXJ3dG12d25NUUYrSHp5NUFCZWc2YThMVURveitpRjE3NEVMZkhZ?=
+ =?utf-8?B?M2d4NDRpQ2I2cU1ycURyTlk1aVo0Y1JMNkloZ2lXWmFDOUtGUmpSajFXSkJ5?=
+ =?utf-8?Q?aIwvHaPB1SWCL?=
+x-microsoft-antispam-prvs: <MWHPR11MB1821F9B35A418F4DBDB75F13E0630@MWHPR11MB1821.namprd11.prod.outlook.com>
+x-forefront-prvs: 09525C61DB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(39860400002)(366004)(346002)(376002)(396003)(199004)(189003)(478600001)(8936002)(8676002)(97736004)(81166006)(53936002)(14454004)(5660300002)(186003)(26005)(81156014)(102836004)(31696002)(229853002)(6512007)(6436002)(6246003)(86362001)(68736007)(4326008)(36756003)(107886003)(6486002)(66066001)(3846002)(6116002)(71190400001)(71200400001)(316002)(105586002)(54906003)(2906002)(305945005)(72206003)(7736002)(99286004)(52116002)(106356001)(110136005)(486006)(11346002)(476003)(446003)(386003)(2616005)(6506007)(53546011)(25786009)(31686004)(14444005)(256004)(76176011);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1821;
+ H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: UAQcHt6ohuM1supUOwjZmcfOCSoa9F+Nn8FK1COgXbOCEohaSecWrPMleBb/HL8X1WzuQOReVqrPPHCzvUQrThCKqr7ZZxyoUrK2W6OMGzOnDuPXviRMd9RV+8T25txStJvhjE0PVR4EGaYTkZpD6svYkOnaGP7gocOuix643f1/v0rDUSbzigFA0IzyyyK/nqEuTDnVFdG78/JugUOzhpsLv76W0ro1aVV6/UBL1Ogd1nhflM3mCjQs13wQv3dsBPsMJjNy6Q7nj8K/3xglMkqtxyruCU0UahFKvIluE5qoZ5EMnQoZQJ3zlKUKJI6CRbWQ2BmDYYOxWKSgyGzFIDzpJIIO+cIjfKhDOLoIS4pa08IagkjGNMasC7wF0CL4VONwJR+USRHthbTxeSMzcBqct3WU7UORPFkcf8DJN3A=
+Content-ID: <DE25B2A2E8D5964B884831A01533094A@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2edbae24-6594-4d4f-374e-08d6959ca6d0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 12:28:53.9152 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1821
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_042454_678456_A2D4EB4B 
-X-CRM114-Status: GOOD (  20.28  )
+X-CRM114-CacheID: sfid-20190218_042918_074559_2CFA4AC3 
+X-CRM114-Status: GOOD (  17.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -138,95 +154,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Gleixner <tglx@linutronix.de>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: devicetree@vger.kernel.org, Tudor.Ambarus@microchip.com,
+ linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org,
+ stern@rowland.harvard.edu, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQ2hhbndvbywKCk9uIDIwMTktMDItMTggMTI6NTgsIENoYW53b28gQ2hvaSB3cm90ZToKPiBP
-biAxOS4gMi4gMTUuIOyYpO2bhCA5OjUyLCBNYXJlayBTenlwcm93c2tpIHdyb3RlOgo+PiBBbGwg
-Q29ydGV4QTcvQTE1IGJhc2VkIEV4eW5vcyBTb0NzIGhhdmUgQVJNIGFyY2hpdGVjdGVkIHRpbWVy
-cywgc28gZW5hYmxlCj4+IHN1cHBvcnQgZm9yIHRoZW0gZGlyZWN0bHkgaW4gdGhlIGJhc2UgZHRz
-aSBmb3IgRXh5bm9zMzI1MCwgRXh5bm9zNTI1MAo+PiBhbmQgRXh5bm9zNTR4eCBTb0NzLiBOb25l
-IG9mIHRoZSBrbm93biBmaXJtd2FyZSBwcm9wZXJseSBjb25maWd1cmVzIGFyY2gKPj4gdGltZXIg
-cmVnaXN0ZXJzLCBzbyBtYXJrIHRoZW0gYXMgbm90LWZ3LWNvbmZpZ3VyZWQgYW5kIHNldCBmcmVx
-dWVuY3kKPj4gdG8gMjRNSHosIHdoaWNoIGlzIHRoZSBvbmx5IGNvbmZpZ3VyYXRpb24gc3VwcG9y
-dGVkIGJ5IHRoZSByZW1haW5pbmcKPj4gZHJpdmVycyAoY2xvY2tzKSBzbyBmYXIuCj4+Cj4+IFNp
-Z25lZC1vZmYtYnk6IE1hcmVrIFN6eXByb3dza2kgPG0uc3p5cHJvd3NraUBzYW1zdW5nLmNvbT4K
-Pj4gLS0tCj4+ICBhcmNoL2FybS9ib290L2R0cy9leHlub3MzMjUwLmR0c2kgfCAxMCArKysrKysr
-KysrCj4+ICBhcmNoL2FybS9ib290L2R0cy9leHlub3M1MjUwLmR0c2kgfCAgMSArCj4+ICBhcmNo
-L2FybS9ib290L2R0cy9leHlub3M1NHh4LmR0c2kgfCAxMCArKysrKysrKysrCj4+ICAzIGZpbGVz
-IGNoYW5nZWQsIDIxIGluc2VydGlvbnMoKykKPj4KPj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jv
-b3QvZHRzL2V4eW5vczMyNTAuZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRzL2V4eW5vczMyNTAuZHRz
-aQo+PiBpbmRleCA2MDhkMTc0NTQxNzkuLjM5NjZlNzk2MDk2NCAxMDA2NDQKPj4gLS0tIGEvYXJj
-aC9hcm0vYm9vdC9kdHMvZXh5bm9zMzI1MC5kdHNpCj4+ICsrKyBiL2FyY2gvYXJtL2Jvb3QvZHRz
-L2V4eW5vczMyNTAuZHRzaQo+PiBAQCAtMTM0LDYgKzEzNCwxNiBAQAo+PiAgCQkJfTsKPj4gIAkJ
-fTsKPj4gIAo+PiArCQl0aW1lciB7Cj4+ICsJCQljb21wYXRpYmxlID0gImFybSxhcm12Ny10aW1l
-ciI7Cj4+ICsJCQlpbnRlcnJ1cHRzID0gPEdJQ19QUEkgMTMgKEdJQ19DUFVfTUFTS19TSU1QTEUo
-NCkgfCBJUlFfVFlQRV9MRVZFTF9MT1cpPiwKPj4gKwkJCQkgICAgIDxHSUNfUFBJIDE0IChHSUNf
-Q1BVX01BU0tfU0lNUExFKDQpIHwgSVJRX1RZUEVfTEVWRUxfTE9XKT4sCj4+ICsJCQkJICAgICA8
-R0lDX1BQSSAxMSAoR0lDX0NQVV9NQVNLX1NJTVBMRSg0KSB8IElSUV9UWVBFX0xFVkVMX0xPVyk+
-LAo+PiArCQkJCSAgICAgPEdJQ19QUEkgMTAgKEdJQ19DUFVfTUFTS19TSU1QTEUoNCkgfCBJUlFf
-VFlQRV9MRVZFTF9MT1cpPjsKPj4gKwkJCWNsb2NrLWZyZXF1ZW5jeSA9IDwyNDAwMDAwMD47Cj4+
-ICsJCQlhcm0sY3B1LXJlZ2lzdGVycy1ub3QtZnctY29uZmlndXJlZDsKPj4gKwkJfTsKPj4gKwo+
-PiAgCQlzeXNyYW1AMjAyMDAwMCB7Cj4+ICAJCQljb21wYXRpYmxlID0gIm1taW8tc3JhbSI7Cj4+
-ICAJCQlyZWcgPSA8MHgwMjAyMDAwMCAweDQwMDAwPjsKPj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJt
-L2Jvb3QvZHRzL2V4eW5vczUyNTAuZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRzL2V4eW5vczUyNTAu
-ZHRzaQo+PiBpbmRleCA4MDk4NmI5N2RmZTUuLjk1YWY0MDUwZjY5ZCAxMDA2NDQKPj4gLS0tIGEv
-YXJjaC9hcm0vYm9vdC9kdHMvZXh5bm9zNTI1MC5kdHNpCj4+ICsrKyBiL2FyY2gvYXJtL2Jvb3Qv
-ZHRzL2V4eW5vczUyNTAuZHRzaQo+PiBAQCAtMjM5LDYgKzIzOSw3IEBACj4+ICAJCQkgKiBzbyB3
-ZSBuZWVkIHRoZSB2YWx1ZSBmcm9tIERULgo+PiAgCQkJICovCj4+ICAJCQljbG9jay1mcmVxdWVu
-Y3kgPSA8MjQwMDAwMDA+Owo+PiArCQkJYXJtLGNwdS1yZWdpc3RlcnMtbm90LWZ3LWNvbmZpZ3Vy
-ZWQ7Cj4+ICAJCX07Cj4+ICAKPj4gIAkJbWN0QDEwMWMwMDAwIHsKPj4gZGlmZiAtLWdpdCBhL2Fy
-Y2gvYXJtL2Jvb3QvZHRzL2V4eW5vczU0eHguZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRzL2V4eW5v
-czU0eHguZHRzaQo+PiBpbmRleCBkZTI2ZTVlZTBkMmQuLjQ1ZTA2NzE3ZWU1MSAxMDA2NDQKPj4g
-LS0tIGEvYXJjaC9hcm0vYm9vdC9kdHMvZXh5bm9zNTR4eC5kdHNpCj4+ICsrKyBiL2FyY2gvYXJt
-L2Jvb3QvZHRzL2V4eW5vczU0eHguZHRzaQo+PiBAQCAtNDYsNiArNDYsMTYgQEAKPj4gIAkJCXN0
-YXR1cyA9ICJkaXNhYmxlZCI7Cj4+ICAJCX07Cj4+ICAKPj4gKwkJdGltZXIgewo+PiArCQkJY29t
-cGF0aWJsZSA9ICJhcm0sYXJtdjctdGltZXIiOwo+PiArCQkJaW50ZXJydXB0cyA9IDxHSUNfUFBJ
-IDEzIChHSUNfQ1BVX01BU0tfU0lNUExFKDQpIHwgSVJRX1RZUEVfTEVWRUxfTE9XKT4sCj4+ICsJ
-CQkJICAgICA8R0lDX1BQSSAxNCAoR0lDX0NQVV9NQVNLX1NJTVBMRSg0KSB8IElSUV9UWVBFX0xF
-VkVMX0xPVyk+LAo+PiArCQkJCSAgICAgPEdJQ19QUEkgMTEgKEdJQ19DUFVfTUFTS19TSU1QTEUo
-NCkgfCBJUlFfVFlQRV9MRVZFTF9MT1cpPiwKPj4gKwkJCQkgICAgIDxHSUNfUFBJIDEwIChHSUNf
-Q1BVX01BU0tfU0lNUExFKDQpIHwgSVJRX1RZUEVfTEVWRUxfTE9XKT47Cj4+ICsJCQlhcm0sY3B1
-LXJlZ2lzdGVycy1ub3QtZnctY29uZmlndXJlZDsKPj4gKwkJCWNsb2NrLWZyZXF1ZW5jeSA9IDwy
-NDAwMDAwMD47Cj4+ICsJCX07Cj4+ICsKPj4gIAkJc3lzcmFtQDIwMjAwMDAgewo+PiAgCQkJY29t
-cGF0aWJsZSA9ICJtbWlvLXNyYW0iOwo+PiAgCQkJcmVnID0gPDB4MDIwMjAwMDAgMHg1NDAwMD47
-Cj4+Cj4gVGhlIGV4eW5vczU0eHguZHRzaSBhZmZlY3RzIHRoZSBleHlub3M1NDEwIFNvQy4KPiBX
-aGVuIEkgY2hlY2tlZCB0aGUgUFBJIHBvcnQgbnVtYmVyIG9uIEV4eW5vczU0MTAvRXh5bm9zNTQy
-MiBUUk0sCj4gdGhleSBoYXZlIHRoZSBkaWZmZXJlbnQgUFBJIHBvcnQgbnVtYmVyIGFzIGZvbGxv
-d2luZzoKPgo+IAkJCQl8RXh5bm9zNTQxMAl8RXh5bm9zNTQyMgl8Cj4gLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLQo+IEFSQ0hfVElNRVJfUEhZU19TRUNVUkVfUFBJCXwxIG5DTlRQU0lS
-UQl8MTMgbkNOVFBTSVJRCXxTZWN1cmUgcGh5c2ljYWwgdGltZXIKPiBBUkNIX1RJTUVSX1BIWVNf
-Tk9OU0VDVVJFX1BQSQl8MiBuQ05UUE5TSVJRCXwxNCBuQ05UUE5TSVJRCXxOb24tc2VjdXJlIHBo
-eXNpY2FsIHRpbWVyCj4gQVJDSF9USU1FUl9WSVJUX1BQSQkJfDQgbkNOVFZJUlEJfDExIG5DTlRW
-SVJRCXxWaXJ0dWFsIHRpbWVyCj4gQVJDSF9USU1FUl9IWVBfUFBJCQl8NSBuQ05USFBJUlEJfDEw
-IG5DTlRIUElSUQl8SHlwZXJ2aXNvciB0aW1lcgo+IC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0KClNhZGx5LCBFeHlub3M1NDEwIFRSTSBzZWVtcyB0byBiZSB3cm9uZy4gQWxsIG90aGVy
-IEV4eW5vczUgVFJNcyAoNTI1MCwKNTI2MCwgNTQyMCwgNTQyMikgZGVmaW5lcyAxMywxNCwxMSwx
-MCBQUEkgZm9yIGFyY2ggdGltZXIuIEkndmUgY2hlY2tlZApvbiB0aGUgcmVhbCBoYXJkd2FyZSAo
-RXh5bm9zNTQxMC1iYXNlZCBPZHJvaWQgWFUgYm9hcmQpIGFuZCB0aGUgdmFsdWVzCnRha2VuIGZy
-b20gRXh5bm9zNTQyMiBUUk0gd29ya3MgZmluZSwgd2hpbGUgdGhlIG9uZXMgZnJvbSA1NDEwIFRS
-TSBkb24ndC4KCj4gRXh5bm9zNTQxMCBhbmQgRXh5bm9zNTQyMiBoYXZlIHRoZSBkaWZmZXJlbnQg
-dXNhZ2Ugb2YgYml0ZmllbGQKPiBvZiAgbkNOVFBTSVJRL25DTlRQTlNJUlEvbkNOVFZJUlEvbkNO
-VEhQSVJRIGFzIGZvbGxvd2luZzoKPgo+IAkJCQl8RXh5bm9zNTQxMAl8RXh5bm9zNTQyMgo+IC0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LQo+IG5DTlRQU0lSUVszOjBdCQkJfCBLRkMJCXwgRUFHTEUKPiBuQ05UUE5TSVJRWzM6MF0JCQl8
-IEtGQwkJfCBFQUdMRQo+IG5DTlRWSVJRWzM6MF0JCQl8IEtGQwkJfCBFQUdMRQo+IG5DTlRIUElS
-UVszOjBdCQkJfCBLRkMJCXwgRUFHTEUKPiAtLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
-LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KPiBuQ05UUFNJUlFbNzo0XQkJCXwgRUFHTEUJ
-CXwgS0ZDCj4gbkNOVFBOU0lSUVs3OjRdCQkJfCBFQUdMRQkJfCBLRkMKPiBuQ05UVklSUVs3OjRd
-CQkJfCBFQUdMRQkJfCBLRkMKPiBuQ05USFBJUlFbNzo0XQkJCXwgRUFHTEUJCXwgS0ZDCgpUaGlz
-IGlzIG5vdCBhbiBpc3N1ZSwgdGhpcyBpcyBhIHJlc3VsdCBvZiBkaWZmZXJlbnQgb3JkZXIgb2Yg
-Yml0L0xJVFRMRQpjb3Jlcy4gU2FtZSBmb3IgRXh5bm9zNTQyMC4KCkJlc3QgcmVnYXJkcwotLSAK
-TWFyZWsgU3p5cHJvd3NraSwgUGhEClNhbXN1bmcgUiZEIEluc3RpdHV0ZSBQb2xhbmQKCgpfX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2Vy
-bmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0
-cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVs
-Cg==
+On 06/02/2019 at 19:04, Nicolas Ferre wrote:
+> Add this SFR compatible definition for the sam9x60 SoC. Will be needed
+> in OHCI driver: ohci-at91.c.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> ---
+> Hi Rob,
+> It seems that this patch was lost in my series "[PATCH 0/8] ARM: at91/dt:
+> update to existing drivers for the sam9x60 SoC". I split it and resend it only
+> for USB tree.
+
+Rob,
+
+Ping...
+
+
+> Hi Greg,
+> 
+> This DT bindind goes with the patch already queued in your usb-next tree "USB:
+> host: ohci-at91: add sam9x60-sfr definition for ohci".
+> 
+> Once Rob added his tag, can you please queue it in your tree as I reviewed my
+> first idea of adding it to the arm-soc tree?
+> 
+> Best regards,
+>    Nicolas
+> 
+>   Documentation/devicetree/bindings/arm/atmel-sysregs.txt | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> index badce6ef3ab3..dfc91bc02b97 100644
+> --- a/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> +++ b/Documentation/devicetree/bindings/arm/atmel-sysregs.txt
+> @@ -148,6 +148,7 @@ required properties:
+>   - compatible: Should be "atmel,<chip>-sfr", "syscon" or
+>   	"atmel,<chip>-sfrbu", "syscon"
+>     <chip> can be "sama5d3", "sama5d4" or "sama5d2".
+> +  It also can be "microchip,sam9x60-sfr", "syscon".
+>   - reg: Should contain registers location and length
+>   
+>   	sfr@f0038000 {
+> 
+
+
+-- 
+Nicolas Ferre
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
