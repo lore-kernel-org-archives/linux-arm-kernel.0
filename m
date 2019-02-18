@@ -2,75 +2,148 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E9F6C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 90B44C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:33:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 00B7B214DA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:31:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 605B3214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:33:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HR60R/Yq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 00B7B214DA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D8cbERrS";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="WG/oUo6+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 605B3214DA
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iNVU8pnPz7xICYkziixdg3MmNgND6tYTRsnXVL7hUvU=; b=HR60R/YqQCsafI
-	t8O5zUbZZ7OFYrSlaJIbddAtz1lepAY/zb9YlQguDR7/P07M8AZRbYkCzmRsEN0QizA0nV8AOcJ27
-	hxtiQW/yu51yjABDMbUhp2jwks4Bk3ffEnOIa/ZZvq6NzSQAuvgGu2/gdicjMBj+WNu8ZH3gWrtBY
-	1ZjtVmpppOCmB+aSFYacJubKbRF+7BXtDlSWMRuMLEI3JeThSkxYtgA4G5FACFPTS7bVCUvh8bobM
-	exlb49yu6OME5wBN3RroVfYJF+2Xwhaf4ou3Yxajoge84ldtvALhyX5nox8jhFmONLHdEu5WzQS/C
-	9geruGPOgkvuZwNChIrw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=O8WRi7jxE8PLnE+YP9Wt20G4kllz8gMqfkJfskktbck=; b=D8cbERrSNssx9w
+	o5xfe0JWisJrg3qS0tR//kLR5IzxaBfwNif0Io3+KcT7L35DYloU+qVAMTxi4ex7KhBxK02Uajcux
+	rCfeqYfE95UeN98+3o5fMJz+CF7jo5+hvmEqRc4VY0L8k/Amf6EXv5kVpQ085ixw0UyJVuy5pah3A
+	kcmCS2BiXBKixqpEofLsSIXtEotlM+GnUTMMs4MonKKJrFEqieH8B3CSvJTDfL8bLKPldGVXlFYFk
+	n3LrNWJx3hMB9MRQ03ERIVcGFt4UFGW4TEdUKXH+7NzxCtCzOzN7IMg5HlWxBKKIQ3/MFAONItgko
+	x5amUtEjzUOCGb55qp8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvgDJ-00076s-Da; Mon, 18 Feb 2019 10:31:53 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1gvgFC-0007dK-DA; Mon, 18 Feb 2019 10:33:50 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvgDG-000750-7f
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:31:51 +0000
-Received: by mail-qt1-f194.google.com with SMTP id b8so18540121qtr.9
+ id 1gvgF8-0007WP-Ee
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:33:48 +0000
+Received: by mail-wr1-x442.google.com with SMTP id t18so17794727wrx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 02:31:49 -0800 (PST)
+ Mon, 18 Feb 2019 02:33:45 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:openpgp:autocrypt:organization
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=c+B2w+rFefhCHjY863ucBL976x8rzAfm6UmsXhI+arI=;
+ b=WG/oUo6+ALBlpgdeTyd6J6oO8tdoCUjUUFKnLtnp0ydl6F8RVto6O7AMS8YFc5Ucrh
+ cwZy4eMfQ66YK0ofML69XGZH7sn4VlyNRFeHWWHZ4sIiQiCGZbkjog4IaIWXObr3BmzL
+ KvozNKw7ae+INjkQUSTEm9QjADfN7Xnj9GhFZ8JJYd4782i5+EMXa86U4UkGU/wb0Z+u
+ Nne7JuRN36oIx55oZxT4L5ZjV5zh7bWpX/y3V18ef73PH6PHLKooUeezCASSqhfv1yM4
+ hvfas1jAo9LIHEjo5MNc6FlX69rx/zXWrxA02VVBqzwh6TeDJcvsOIBLpBK1QewL6gvm
+ 0nNw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=JeAiCwTdj8ylL6sF0x2uByC9gBRqCOAVMEnpZGUkBbU=;
- b=tAO47uwiNB03uv8VYzlRzcqWihtWYw90QJEibZDhwX8jTgq0KZomAZO2g/DQp8yYI2
- t3G5mQusg+9lt/gtsmK1Ckz1B/2Y2Bs8F6Qwgn3ssfNCTKGHMVYLq3t5nnG7FKMMyCGh
- 4s6O0/188wP6wCsozLpJfF1LvyUWMh+3+t4yhMDQSq6UoctJpy5Y0pTABs3DFBoexHIQ
- lVFW2itbhZKbz3pCicttdG16Nd3jKOcds+0lAJXMADa/u7M4jmpVuQHhtyuGvCtuLZmX
- VD+FYKUsBjYJsevbqogDsAg+5TiG1WhA36xsH3Kn+Bt5vuYd9I2iK5IOxr1A25K8WCge
- xyYA==
-X-Gm-Message-State: AHQUAuZha/Bg9gEmA9MYjWSAc4A3mgPwg9+/9mNQCJqYli1ofgUPeMvC
- yJ62dmJ+lgTuWWoXv+K9EGNVq7KbYSpjqNZRgAc=
-X-Google-Smtp-Source: AHgI3IZjx670/rKQSNrH8eBwkan7S+nY3zbrV1tknWzuZbWoqV5NUEmuqmCi/hYmoX8yMTiCvNurMGPgE2hy0HBWVrw=
-X-Received: by 2002:ac8:4141:: with SMTP id e1mr16997325qtm.96.1550485909026; 
- Mon, 18 Feb 2019 02:31:49 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :organization:message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=c+B2w+rFefhCHjY863ucBL976x8rzAfm6UmsXhI+arI=;
+ b=A7QTDUjw7Vm8bHEe3SCEtw4+xgDt7sySlFcHNgvFkhYUT1x88xzbsYX8pKen09J3fA
+ yrAvh9Ixd/QrSrtFRiDqRDFk2FUu34ZSF9qggClxUrWeNPnfzJpzswaQF+MXAxyByQ6Q
+ L3SuJIBSS1DzQqvEoGERCtScYL2HMUL29EqriSVrZA5FUne5pg5QAKIALufbAHjqCeYP
+ XJ/ms1ZAY9kEPiLiVK8IFD8T1b8sbUavHcwmUZEA22auYZDS0WxJKmRMkAQZfq95M2xM
+ bSfsmZr5IEDy/6erl5c61pJWb6M0lBFRkCcziO+ueCMAj55RNI1Csp4cixwoqexS9snR
+ LGFw==
+X-Gm-Message-State: AHQUAuboMZ3QQOHU69EPwlNZBYv241YOj78HWPrX9+2+v+8sh1v2cZEz
+ cerHlJMAmiGbF5wI5QMSwsPFd9G3gdmU7A==
+X-Google-Smtp-Source: AHgI3IbzOYYq1E0xr6gNsfZOaaFS52Sb4d9Y1WRdMJO3FNgcZMkjNp3wC/Oow2YatzCpmGPHyBJm9Q==
+X-Received: by 2002:a5d:528d:: with SMTP id c13mr16668929wrv.153.1550486024150; 
+ Mon, 18 Feb 2019 02:33:44 -0800 (PST)
+Received: from [10.1.2.12] (lmontsouris-657-1-212-31.w90-63.abo.wanadoo.fr.
+ [90.63.244.31])
+ by smtp.gmail.com with ESMTPSA id u12sm10066934wmf.44.2019.02.18.02.33.43
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 18 Feb 2019 02:33:43 -0800 (PST)
+Subject: Re: [PATCH 2/8] dt-bindings: phy: Add Amlogic G12A USB3+PCIE Combo
+ PHY Bindings
+To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+References: <20190212151413.24632-1-narmstrong@baylibre.com>
+ <20190212151413.24632-3-narmstrong@baylibre.com>
+ <CAFBinCA37waCTqGrMqaLmb5n8XuGJof_7iQsWkBdAYr7s2en=g@mail.gmail.com>
+From: Neil Armstrong <narmstrong@baylibre.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=narmstrong@baylibre.com; prefer-encrypt=mutual; keydata=
+ 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
+ ZaTUOEkgIor5losDrePdPgE=
+Organization: Baylibre
+Message-ID: <15bb76c8-16f0-e74d-f3cf-070ce8cf6de2@baylibre.com>
+Date: Mon, 18 Feb 2019 11:33:41 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <a9718ae1e97a5911f47874fe23c00ef297d7fed8.1548158832.git.baolin.wang@linaro.org>
- <CAK8P3a2zkhrZLMi5KZ5=fGJCt85dad3_pZC0o7GqcwJkk4es9w@mail.gmail.com>
- <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
- <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
-In-Reply-To: <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 11:31:32 +0100
-Message-ID: <CAK8P3a1Zq6XjymG3sAaHGeNRxU5UXPfJPbi0A9s47cTVK7vC3g@mail.gmail.com>
-Subject: Re: [PATCH 1/3] dt-bindings: dmaengine: Add one new cell to present
- hardware slave id
-To: Baolin Wang <baolin.wang@linaro.org>
+In-Reply-To: <CAFBinCA37waCTqGrMqaLmb5n8XuGJof_7iQsWkBdAYr7s2en=g@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_023150_273602_54A34331 
-X-CRM114-Status: GOOD (  22.58  )
+X-CRM114-CacheID: sfid-20190218_023346_550581_61274395 
+X-CRM114-Status: GOOD (  21.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,72 +155,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- eric.long@unisoc.com, arm-soc <arm@kernel.org>,
- Lyra Zhang <zhang.lyra@gmail.com>, Mark Brown <broonie@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
- Orson Zhai <orsonzhai@gmail.com>, Dan Williams <dan.j.williams@intel.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, balbi@kernel.org, gregkh@linuxfoundation.org,
+ linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
+ hminas@synopsys.com, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 12, 2019 at 9:25 AM Baolin Wang <baolin.wang@linaro.org> wrote:
-> On Fri, 1 Feb 2019 at 19:53, Baolin Wang <baolin.wang@linaro.org> wrote:
-> > On Thu, 31 Jan 2019 at 00:52, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Tue, Jan 22, 2019 at 2:21 PM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > >
-> > > >  Client:
-> > > >  DMA clients connected to the Spreadtrum DMA controller must use the format
-> > > > -described in the dma.txt file, using a two-cell specifier for each channel.
-> > > > -The two cells in order are:
-> > > > +described in the dma.txt file, using a three-cell specifier for each channel.
-> > > > +The three cells in order are:
-> > > >  1. A phandle pointing to the DMA controller.
-> > > >  2. The channel id.
-> > > > +3. The hardware slave id which is used for clients to trigger DMA engine
-> > > > +automatically.
-> > >
-> > > I notice that this is an incompatible binding change. Is that necessary?
-> > > If the current code works, I'd suggest allowing both #dma-cells=<2>
-> > > and <3>, and then implementing both in the driver.
-> >
-> > Yes, this is necessary.
-> >
-> > Yes, current code can work, but the problem is that the DMA clients
-> > must add one property (something like "sprd,slave-id") to specify the
-> > slave id. So considering this, we want to change the dma-cells to 2,
-> > including dma channel and dma slave id, which can avoid introducing
-> > some similar properties for DMA clients.
-> >
-> > Now there are no DMA clients in mainline for Spreadtrum platform, and
-> > we want to upstream our first DMA clients: SPI controller. So no other
-> > drivers need to change when we changing dma cells. Thanks.
->
-> Do you have any other concerns about this patch set? If not, I think
-> Vinod can apply this patch set. Thanks.
+On 17/02/2019 23:03, Martin Blumenstingl wrote:
+> On Tue, Feb 12, 2019 at 4:15 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>
+>> Add the Amlogic G12A Family USB3 + PCIE Combo PHY Bindings.
+>>
+>> This PHY can provide exclusively USB3 or PCIE support on shared I/Os.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> one nit-pick below, but apart from that:
+> Reviewed-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> 
+>> ---
+>>  .../bindings/phy/meson-g12a-usb3-pcie-phy.txt | 25 +++++++++++++++++++
+>>  1 file changed, 25 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt b/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
+>> new file mode 100644
+>> index 000000000000..714d751091f5
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/meson-g12a-usb3-pcie-phy.txt
+>> @@ -0,0 +1,25 @@
+>> +* Amlogic G12A USB3 + PCIE Combo PHY binding
+>> +
+>> +Required properties:
+>> +- compatible:  Should be "amlogic,meson-g12a-usb3-pcie-phy"
+>> +- #phys-cells: must be 1. The cell number is used to select the phy mode
+>> +  as defined in <dt-bindings/phy/phy.h> between PHY_TYPE_USB3 and PHY_TYPE_PCIE
+>> +- reg:         The base address and length of the registers
+>> +- clocks:      a phandle to the 100MHz reference clock of this PHY
+>> +- clock-names: must be "ref_clk"
+>> +- resets:      phandle to the reset lines for:
+>> +               - the PHY control
+>> +               - the USB3+PCIE PHY
+>> +               - the PHY registers
+> no reset-names (like in the G12A USB2 PHY bindings) here?
+> even if you don't use them in the driver I suggest you add them for
+> consistency (and maybe to make it easier to compare the bindings with
+> the datasheet. I don't have access to the datasheet so I'm not sure if
+> having the reset-names is relevant for this case)
 
-Sorry for the late reply. Yes, this makes sense since there are no
-existing users then. For the DT changes going through the dmaengine
-tree
+You're right, it's better to have names here !
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Neil
 
-One more question, to make sure we don't need to edit it again:
-Why do you need both a 'channel id' and a 'slave id' here? Is this
-a strict hardware requirement for your DMA engine? In many
-other designs, only a DMA request line number needs to
-be described, and I think this would correspond to what you
-call the 'hardware slave id' in your documentation.
+> 
+> 
+> Regards
+> Martin
+> 
 
-Does each request line here correspond to a fixed channel
-id as well, or can a channel be shared between multiple
-slave devices?
-
-      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
