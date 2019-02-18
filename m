@@ -2,133 +2,111 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B3B3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:35:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8ED61C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:36:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF9AB2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:35:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 594132089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 00:36:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gLeRvgjL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="SAIHzO8u"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF9AB2089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xw55ge1c";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="UidRx6Hs";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZiFYjd/D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 594132089F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cyi4cmHVuE0ggTn7YTDWlsACkJNBoq/khaqlNdqyv4c=; b=gLeRvgjL7NIoBv
-	rFnLYT9VIJfItCztl0E27ED32ur2MfTiVZvnhLsfwTBRKenZmWY+B/wboJtLaEsqK5F/1e7kX9CA+
-	3ZFeUDLFkJuV4h1rNxA/vIEIxEy81eFzmUFq8mjMVYewOU1/dlpP4we+VERmt90J6/db6V4IXn+Z5
-	9Gv4xRtL/poyWpNPaKsdVoQEdhONKSYxF5HhcMvMFVzYhr4/7iOGbPv206s3c4PB/OJ0zZo+SJDSw
-	pQYaMkObHJoIhO/MW2gNwDIKWX2x04BI/IpZps+dStqg3POmsg6Mzkyqy2mc/KjdmkZ0vk1VdJih9
-	1QfpuLQWLFDGhUgUB6bQ==;
+	List-Owner; bh=8la6RfnjHOQlWLHh80YGHbRnZY7pVgDCUFvldra3TT4=; b=Xw55ge1ciNHPOB
+	nUKsuIPobzVb7pzBDfNC1Dx2dLoYHxm3yH70CcD15HfqbFJXe2gHfEIpoEdZ4lrA9gGvCBlsuB78U
+	KRVSlogp3dHMcm4/LVQOTV9H1XbZsjKOw1KJpgJphLp7McG2/mhPe50SUvILu/zmBvQDCovKJQK83
+	IQVEi4/5HV1oLgluEguWlytS3bsIZQ48+CmtOg4rXWXlXpy50nbej+AKBYkSnMml/LGZPtou7zEpX
+	Y+rinMGd05tGJw22PkwfQn3LgWr2YpiqNjZRYf8HAvElOhgCI/XTXe3TV6dkovyasMyEiFIp05RXl
+	P+Egd11uB0Y+udway6rQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvWuA-0000dj-SI; Mon, 18 Feb 2019 00:35:30 +0000
-Received: from mailout3.samsung.com ([203.254.224.33])
+	id 1gvWuW-0000x1-Ac; Mon, 18 Feb 2019 00:35:52 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvWu6-0000am-QR
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 00:35:28 +0000
-Received: from epcas1p2.samsung.com (unknown [182.195.41.46])
- by mailout3.samsung.com (KnoxPortal) with ESMTP id
- 20190218003523epoutp03734b6f13634b4bbfcd417dfa980fcfb3~ETiwd9h_22381523815epoutp03P
+ id 1gvWuV-0000m6-AH
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 00:35:51 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=9FtVEGiGy9Eakv2EeSbS97SgOgiiipvDTd5Smr8Hxk8=; b=UidRx6HsKLwMEDxdvJv0pxQF7P
+ ebDp3vdxfjePIMjrh5+l1A1twdzBf+myhNZW/gYcblalNasSqZohH9zyb7q7XXWW+HzbPpg/J+zDW
+ i4AkQqT4dgv5O7VuCYy+4woJzCiTYun9f+i6VAnuFuHoSPufk2O0NH7E8xpwwd7BKoAYcoCIlSqk/
+ xGM4Oo9pK3mJIsbWYW3SqqpnJGhTf4O2EX5FyKsgmafKNw2Og0+q4vQUvCZeGTJOOXs8Yx3TwW3nY
+ lQ7n36geEkUCuDVgfbNBNi4AN5If11priPGZBAX6zlXECFjy0FjhxGQrXSI6TLDg4ydEhFbIYJaxV
+ mtAMuWbA==;
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvWfH-0002PW-1d
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 00:20:09 +0000
+Received: by mail-pl1-x644.google.com with SMTP id p8so7831706plo.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 00:35:23 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout3.samsung.com
- 20190218003523epoutp03734b6f13634b4bbfcd417dfa980fcfb3~ETiwd9h_22381523815epoutp03P
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1550450123;
- bh=s586eAn0yDUxx/F2Ly8n7yy6QpAP+0VaSGFu21YdEwE=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=SAIHzO8uwsb7AcIFXNzPQQXFwRYTbZm5hbR6ORvOmCm4JIgxT1/MfVFjstog01oUf
- k0a5+dm9sgt6IOqXUEhec8U4feaed0+atOoBfccMZWhiaxZgGiELURvTfGW4QOKEVX
- jXQSWGw4IOokKyJq4KjO9y8Vb3aWV5WmqFK4R4Xg=
-Received: from epsmges1p3.samsung.com (unknown [182.195.40.153]) by
- epcas1p2.samsung.com (KnoxPortal) with ESMTP id
- 20190218003520epcas1p2e617fdb5b624e8c988940cda69f70a2e~ETiuUpA-F0451604516epcas1p2N;
- Mon, 18 Feb 2019 00:35:20 +0000 (GMT)
-Received: from epcas1p3.samsung.com ( [182.195.41.47]) by
- epsmges1p3.samsung.com (Symantec Messaging Gateway) with SMTP id
- 78.F4.04069.8CDF96C5; Mon, 18 Feb 2019 09:35:20 +0900 (KST)
-Received: from epsmtrp2.samsung.com (unknown [182.195.40.14]) by
- epcas1p3.samsung.com (KnoxPortal) with ESMTPA id
- 20190218003520epcas1p3bc3c0c45a681aea39e900b83d487eed4~ETityAyRW2409824098epcas1p3v;
- Mon, 18 Feb 2019 00:35:20 +0000 (GMT)
-Received: from epsmgms1p1new.samsung.com (unknown [182.195.42.41]) by
- epsmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190218003520epsmtrp22535e642467f0f1bbcb066e82beb20c5~ETitwmqkI1279112791epsmtrp2Y;
- Mon, 18 Feb 2019 00:35:20 +0000 (GMT)
-X-AuditID: b6c32a37-971ff70000000fe5-8d-5c69fdc892bd
-Received: from epsmtip2.samsung.com ( [182.195.34.31]) by
- epsmgms1p1new.samsung.com (Symantec Messaging Gateway) with SMTP id
- 7E.37.03971.8CDF96C5; Mon, 18 Feb 2019 09:35:20 +0900 (KST)
-Received: from [10.113.221.102] (unknown [10.113.221.102]) by
- epsmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190218003519epsmtip271812fe34ee93b8b7d2b353fb867c057~ETitgIedg2160621606epsmtip2M;
- Mon, 18 Feb 2019 00:35:19 +0000 (GMT)
-Subject: Re: [PATCH 2/3] PM / devfreq: rockchip-dfi: remove unneeded semicolon
-To: Yangtao Li <tiny.windzz@gmail.com>, myungjoo.ham@samsung.com,
- kyungmin.park@samsung.com, heiko@sntech.de, thierry.reding@gmail.com,
- jonathanh@nvidia.com
-From: Chanwoo Choi <cw00.choi@samsung.com>
-Organization: Samsung Electronics
-Message-ID: <47edbfaa-2c2d-04d3-cf24-8368f723c6fa@samsung.com>
-Date: Mon, 18 Feb 2019 09:35:19 +0900
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Sun, 17 Feb 2019 16:20:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=9FtVEGiGy9Eakv2EeSbS97SgOgiiipvDTd5Smr8Hxk8=;
+ b=ZiFYjd/DceJ32azEOGg3cEeCfivgoHOn5pSsHhx6DOzudxTGZgsSdpN91KqrwkcBoj
+ JE8F+vmR/wGEYqfBK5hlpgRzxkouMwDbbQM5dwg6yIW0TbTsAy0zyTBGqRcWPHI5bzvP
+ J+fSm2HPUAEfqtMHbagvT4XTvcCzN7p0jKLCXqm+N9kbvcgmHlv7EbDvl342ov6wbdQX
+ bRul/abgCPNwWLohKJJEZKkEzVhJthIKSszAxtG2cyxiztZvcZm1Moc+n8kXY4KL5k1j
+ lalO2xETJno5ZoqgKjRTHoqiPDjYBHfrl+XH55pGccOaElQduEsGfAcmuJSVA1KZzb9J
+ eFUA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=9FtVEGiGy9Eakv2EeSbS97SgOgiiipvDTd5Smr8Hxk8=;
+ b=Dm6HDIGjb/zhGDtTGBHv01E0ZOgmBIEsIu5odz7uhQsWrrUqXiYKFoZ8pIdaNMKEvS
+ LS8yEejENi952Zsz5ZwWeTtyDKW6OahNmtX649wL4K9nRp9AYiOUyvWHa/XAzcdtyh+o
+ 3DSASV4uhuyjRKJlxc9OHVfOSU+Ig4hWbXp7ekznWs/30/mIT+jXKavRPR1vtm6VFXBk
+ fYzIvgyXUTMl/yg4OBtk72xIqOAlNs8V3pKRdMq+fKYFVGAdrl/ou9fSafiIpskPEJDV
+ Il1pJGltsRvOdwmPzrWBuCPPx24vY1Y+La+2LkGsBlynIW1ARZRwgD3SH0OucFoXKBoj
+ YPQw==
+X-Gm-Message-State: AHQUAua4goaEw0PnGMfxyyqcl9yvLM7I2eBmahruWDoTad294r3WKOxv
+ mu1A9r3s7G8mUuzal2v1FpZ9axUi
+X-Google-Smtp-Source: AHgI3IYQ/SwO5F6rcNdfHclFv8bc9xGYpjbYXVBHjrn4VC4UNvGShKHQnUALs/pzHyCq3Fc5mml44Q==
+X-Received: by 2002:a17:902:9306:: with SMTP id
+ bc6mr2982099plb.59.1550449204193; 
+ Sun, 17 Feb 2019 16:20:04 -0800 (PST)
+Received: from localhost.localdomain (ppp91-79-175-49.pppoe.mtu-net.ru.
+ [91.79.175.49])
+ by smtp.gmail.com with ESMTPSA id s73sm31518071pfi.124.2019.02.17.16.19.58
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sun, 17 Feb 2019 16:20:03 -0800 (PST)
+From: Dmitry Osipenko <digetx@gmail.com>
+To: Russell King <linux@armlinux.org.uk>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>, Robert Yang <decatf@gmail.com>,
+ =?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?= <mirq-linux@rere.qmqm.pl>
+Subject: [PATCH v4 7/8] ARM: tegra: Support L2 cache maintenance done via
+ firmware
+Date: Mon, 18 Feb 2019 03:17:25 +0300
+Message-Id: <20190218001726.16785-8-digetx@gmail.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190218001726.16785-1-digetx@gmail.com>
+References: <20190218001726.16785-1-digetx@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <20190216151826.11584-3-tiny.windzz@gmail.com>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFtrLJsWRmVeSWpSXmKPExsWy7bCmvu6Jv5kxBpsb9S3+P3rNatEyaxGL
- xdmmN+wWmx5fY7W4vGsOm8Xn3iOMFp8e/Ge26Pwyi83iduMKNoufu+axWMz9PYHNgdtj56y7
- 7B6bl9R79Da/Y/Po27KK0WP7tXnMHp83yQWwRWXbZKQmpqQWKaTmJeenZOal2yp5B8c7x5ua
- GRjqGlpamCsp5CXmptoqufgE6Lpl5gCdp6RQlphTChQKSCwuVtK3synKLy1JVcjILy6xVUot
- SMkpsCzQK07MLS7NS9dLzs+1MjQwMDIFKkzIzti39xBzwRr2iuu/MxsYG9m6GDk5JARMJJY3
- v2btYuTiEBLYwSjRcqGPBcL5xCgxe/s2NgjnG6PEh6UzmGFa7h9vYYZI7GWU2PTnPVT/e0aJ
- K8vPMIJUCQsESNxa38YIkhARWMAosa5zKjuIwyywlFFi7t5PLCBVbAJaEvtf3AA7hV9AUeLq
- j8dAHRwcvAJ2EhfWg61jEVCVuHJyEyuILSoQIXG49x3YAl4BQYmTM5+AjeEUsJbYuOAAmM0s
- IC5x68l8JghbXqJ562ywUyUEJrNLHDg5jx3iBxeJDw9eskDYwhKvjm+BiktJfH63Fxo01RIr
- Tx5hg2juYJTYsv8CK0TCWGL/0slMIIcyC2hKrN+lD7GMT+Ld1x5WkLCEAK9ER5sQRLWyxOUH
- d5kgbEmJxe2dbBAlHhKXLjBNYFScheSbWUg+mIXkg1kIuxYwsqxiFEstKM5NTy02LDBGju1N
- jOCkq2W+g3HDOZ9DjAIcjEo8vB/KMmOEWBPLiitzDzFKcDArifAu+gYU4k1JrKxKLcqPLyrN
- SS0+xGgKDOyJzFKiyfnAjJBXEm9oamRsbGxhYmhmamioJM673sE5RkggPbEkNTs1tSC1CKaP
- iYNTqoGx2a9EYO5tgbL0uPcH8u/lTpc9bHLj7uHCC9XvD7zb+TR2i3fpWZZt++sOul/2CLp9
- ySigoeXVtrniIouEnrb+j/6ffnPztDkbpnqcDSiP+rJR7Xzwztq8zCdTN4hGOD+V4tC1nqg6
- ZVJRy8a4R6ZnP29+fnXjMen9PzwKmZ2bIv/zrI1aVlxbqsRSnJFoqMVcVJwIAMT1jvXQAwAA
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFlrOIsWRmVeSWpSXmKPExsWy7bCSvO6Jv5kxBp/bOSz+P3rNatEyaxGL
- xdmmN+wWmx5fY7W4vGsOm8Xn3iOMFp8e/Ge26Pwyi83iduMKNoufu+axWMz9PYHNgdtj56y7
- 7B6bl9R79Da/Y/Po27KK0WP7tXnMHp83yQWwRXHZpKTmZJalFunbJXBl7Nt7iLlgDXvF9d+Z
- DYyNbF2MnBwSAiYS94+3MHcxcnEICexmlOh9e44RIiEpMe3iUaAEB5AtLHH4cDFEzVtGiaZj
- L5lAaoQF/CTapm0AaxYRWMAo8ffjC1aQBLPAUkaJ/W9YITr2M0pM6tjADpJgE9CS2P/iBthq
- fgFFias/HjOCbOAVsJO4sJ4ZJMwioCpx5eQmsDmiAhESH5/uA1vGKyAocXLmExYQm1PAWmLj
- ggMsELvUJf7Mu8QMYYtL3HoynwnClpdo3jqbeQKj8Cwk7bOQtMxC0jILScsCRpZVjJKpBcW5
- 6bnFhgWGeanlesWJucWleel6yfm5mxjB0aeluYPx8pL4Q4wCHIxKPLwfyjJjhFgTy4orcw8x
- SnAwK4nwLvoGFOJNSaysSi3Kjy8qzUktPsQozcGiJM77NO9YpJBAemJJanZqakFqEUyWiYNT
- qoGRf4nfAatOeZ2td49k6z0ya7/i+CDD6uWinldMq9iiiyf+dNnr+t6phH9PqLpK46eLeox2
- L95P5Pi94Mekb59F1bPVlF4sfPRB0/H4sZ6t/wu1f8x0UThkpRU/4wP/FIXCyUc+TbL6PUXL
- 6fKdZa6frLp2P5+gVr4h37NdZ/k2A3ONld1rcnKTlFiKMxINtZiLihMBgpbBb7oCAAA=
-X-CMS-MailID: 20190218003520epcas1p3bc3c0c45a681aea39e900b83d487eed4
-X-Msg-Generator: CA
-CMS-TYPE: 101P
-DLP-Filter: Pass
-X-CFilter-Loop: Reflected
-X-CMS-RootMailID: 20190216152000epcas1p216810769e13852c4b92896348657b6d6
-References: <20190216151826.11584-1-tiny.windzz@gmail.com>
- <CGME20190216152000epcas1p216810769e13852c4b92896348657b6d6@epcas1p2.samsung.com>
- <20190216151826.11584-3-tiny.windzz@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190217_163527_025935_AA60E82F 
-X-CRM114-Status: GOOD (  22.54  )
+X-CRM114-CacheID: sfid-20190218_002007_431694_53E9F729 
+X-CRM114-Status: GOOD (  17.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,31 +118,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-rockchip@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-pm@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-tegra@vger.kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGksCgpPbiAxOS4gMi4gMTcuIOyYpOyghCAxMjoxOCwgWWFuZ3RhbyBMaSB3cm90ZToKPiBUaGUg
-c2VtaWNvbG9uIGlzIHVubmVlZGVkLCBzbyByZW1vdmUgaXQuCj4gCj4gU2lnbmVkLW9mZi1ieTog
-WWFuZ3RhbyBMaSA8dGlueS53aW5kenpAZ21haWwuY29tPgo+IC0tLQo+ICBkcml2ZXJzL2RldmZy
-ZXEvZXZlbnQvcm9ja2NoaXAtZGZpLmMgfCAyICstCj4gIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2Vy
-dGlvbigrKSwgMSBkZWxldGlvbigtKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2RldmZyZXEv
-ZXZlbnQvcm9ja2NoaXAtZGZpLmMgYi9kcml2ZXJzL2RldmZyZXEvZXZlbnQvcm9ja2NoaXAtZGZp
-LmMKPiBpbmRleCAyMmIxMTMzNjNmZmMuLmZjYmY3NmViZjU1ZCAxMDA2NDQKPiAtLS0gYS9kcml2
-ZXJzL2RldmZyZXEvZXZlbnQvcm9ja2NoaXAtZGZpLmMKPiArKysgYi9kcml2ZXJzL2RldmZyZXEv
-ZXZlbnQvcm9ja2NoaXAtZGZpLmMKPiBAQCAtMjExLDcgKzIxMSw3IEBAIHN0YXRpYyBpbnQgcm9j
-a2NoaXBfZGZpX3Byb2JlKHN0cnVjdCBwbGF0Zm9ybV9kZXZpY2UgKnBkZXYpCj4gIAlpZiAoSVNf
-RVJSKGRhdGEtPmNsaykpIHsKPiAgCQlkZXZfZXJyKGRldiwgIkNhbm5vdCBnZXQgdGhlIGNsayBk
-bWNfY2xrXG4iKTsKPiAgCQlyZXR1cm4gUFRSX0VSUihkYXRhLT5jbGspOwo+IC0JfTsKPiArCX0K
-PiAgCj4gIAkvKiB0cnkgdG8gZmluZCB0aGUgb3B0aW9uYWwgcmVmZXJlbmNlIHRvIHRoZSBwbXUg
-c3lzY29uICovCj4gIAlub2RlID0gb2ZfcGFyc2VfcGhhbmRsZShucCwgInJvY2tjaGlwLHBtdSIs
-IDApOwo+IAoKUmV2aWV3ZWQtYnk6IENoYW53b28gQ2hvaSA8Y3cwMC5jaG9pQHNhbXN1bmcuY29t
-PgoKLS0gCkJlc3QgUmVnYXJkcywKQ2hhbndvbyBDaG9pClNhbXN1bmcgRWxlY3Ryb25pY3MKCl9f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1r
-ZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpo
-dHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJu
-ZWwK
+Trusted Foundations firmware require MMU to be enabled for L2 cache
+maintenance on Tegra30, hence perform the maintenance early/late on
+suspend-resume respectively.
+
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+---
+ arch/arm/mach-tegra/pm.c    | 36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep.S | 11 +++++++----
+ 2 files changed, 43 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 1ad5719779b0..66c8cd63dd86 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -38,6 +38,7 @@
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
++#include <asm/trusted_foundations.h>
+ 
+ #include "iomap.h"
+ #include "pm.h"
+@@ -195,8 +196,27 @@ void tegra_idle_lp2_last(void)
+ 	cpu_cluster_pm_enter();
+ 	suspend_cpu_complex();
+ 
++	/*
++	 * L2 cache disabling using kernel API only allowed when all
++	 * secondary CPU's are offline. Cache have to be disabled early
++	 * if cache maintenance is done via Trusted Foundations firmware.
++	 * Note that CPUIDLE won't ever enter powergate on Tegra30 if any
++	 * of secondary CPU's is online and this is the LP2 codepath only
++	 * for Tegra20/30.
++	 */
++	if (trusted_foundations_registered())
++		outer_disable();
++
+ 	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, &tegra_sleep_cpu);
+ 
++	/*
++	 * Resume L2 cache if it wasn't re-enabled early during resume,
++	 * which is the case for Tegra30 that has to re-enable the cache
++	 * via firmware call. In other cases cache is already enabled and
++	 * hence re-enabling is a no-op.
++	 */
++	outer_resume();
++
+ 	restore_cpu_complex();
+ 	cpu_cluster_pm_exit();
+ }
+@@ -340,8 +360,24 @@ static int tegra_suspend_enter(suspend_state_t state)
+ 		break;
+ 	}
+ 
++	/*
++	 * Cache have to be disabled early if cache maintenance is done
++	 * via Trusted Foundations firmware. Otherwise this is a no-op,
++	 * like on Tegra114+.
++	 */
++	if (trusted_foundations_registered())
++		outer_disable();
++
+ 	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, tegra_sleep_func);
+ 
++	/*
++	 * Resume L2 cache if it wasn't re-enabled early during resume,
++	 * which is the case for Tegra30 that has to re-enable the cache
++	 * via firmware call. In other cases cache is already enabled and
++	 * hence re-enabling is a no-op.
++	 */
++	outer_resume();
++
+ 	switch (mode) {
+ 	case TEGRA_SUSPEND_LP1:
+ 		tegra_suspend_exit_lp1();
+diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+index 5e3496753df1..0a8086d5a47a 100644
+--- a/arch/arm/mach-tegra/sleep.S
++++ b/arch/arm/mach-tegra/sleep.S
+@@ -132,10 +132,13 @@ ENTRY(tegra_shut_off_mmu)
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Disable L2 cache */
+ 	check_cpu_part_num 0xc09, r9, r10
+-	movweq	r2, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
+-	movteq	r2, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
+-	moveq	r3, #0
+-	streq	r3, [r2, #L2X0_CTRL]
++	retne	r0
++
++	mov32	r2, TEGRA_ARM_PERIF_BASE + 0x3000
++	ldr	r3, [r2, #L2X0_CTRL]
++	mov	r9, #0
++	tst	r3, #1
++	strne	r9, [r2, #L2X0_CTRL]
+ #endif
+ 	ret	r0
+ ENDPROC(tegra_shut_off_mmu)
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
