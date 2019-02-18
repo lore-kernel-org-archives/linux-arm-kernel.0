@@ -2,71 +2,54 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 81D98C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:52:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87A51C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:59:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4F5332177E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:52:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5AED6217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:59:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HpVPBWis";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="xf5SY8Bu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F5332177E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MGUV+9YU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5AED6217D9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=owXx07kHFmEZTTcGjUT6xGuRFFB3BBYTpLkzeo253HA=; b=HpV
-	PBWisq9TgzVw4BBKXAsdJWQDV4ApNO6Gpwr8JDvFDD+tJ5bgSLawMk7rUAJXBkO+R+PaktOtB6xn/
-	inZMrqrSvKA2OxsH4Hcz5Z+UxSv7XUxJ4+3EOF42za7FL6VfzpR71uLjDg7/iYO8OEi7MLX3PbDuC
-	7+iFc7oB8S6LDcFLPIZ1S7JqI/0tqCAKwHdm0q9HGzXGKCkqHzJJeqnoVDHdEX8wtaHOG5MuLM7dD
-	ZO0LUA8QY8WwhE2OteZLKdyUqwS1qyUejGAI4gy+hYp0Of8Az9hB7ly8uYB/wpnnHdsdWYUJx934q
-	nSvIIBYDZ2CgkGT9SrKnf6M/bJ09zxQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=iqsm1DryFmSbdHEg8y8BLWMs0YZLdTr8ljtqXUP3Mvg=; b=MGUV+9YULqk2vV
+	Dq68Ig8oWY3mRcQxplKCP+ne2MyBuvGgnn1v7MWnQyCly/ljwofP/f7/2kfai32qMwL86jCFkKslW
+	Pzrd7K+jzrqd8hOMn0RBi1mmvCqCLe+WwvNslb7GwJAjTettcGxnIAe2GJVIooZ+T4JBrc5nZ6tWP
+	sEW4avAY1rZ65YuXUwcHV9b83NPhX6nxXfQXbkP+DNQ4weX37zqOXuXMkjiySYrLqR1rCDrV798Ie
+	e0GuSUnIKN5t8tyylgKut8Q2rUuNBq5OnBgDLpokzhCMGGJajVAKiFLE2vC7gEltKsocwaY3qKzv8
+	ZBzA93pOoeGId7evZV9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvo1s-0006lt-JJ; Mon, 18 Feb 2019 18:52:36 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+	id 1gvo8j-0000Vy-MH; Mon, 18 Feb 2019 18:59:41 +0000
+Received: from bhuna.collabora.co.uk ([46.235.227.227])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvo1o-0006l2-HD
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 18:52:34 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=39BnjRBP3mAF1mj98V17S7lBxoprAgwGQFFxs8scGXw=; b=xf5SY8Bu22cO
- j3Y/61hUhcYes/SWLwWKtyz3XmfARfNF/OUIYAziaWhlsOZKEvfDyMTWBh6EQHK9GUNMrBZWqgzfD
- YWZuk4xKWa5bla25HTSh1O8YGBz5G+z0XBqU795stltU6IgfLYm6VR+e34Md4P3D9UrYudiqKhbAB
- Wcdbk=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gvo1h-0001iU-Sq; Mon, 18 Feb 2019 18:52:25 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 691B01128008; Mon, 18 Feb 2019 18:52:25 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: YueHaibing <yuehaibing@huawei.com>
-Subject: Applied "ASoC: stm32: sai: remove set but not used variables 'mask,
- cr1'" to the asoc tree
-In-Reply-To: <20190218145026.142805-1-yuehaibing@huawei.com>
-X-Patchwork-Hint: ignore
-Message-Id: <20190218185225.691B01128008@debutante.sirena.org.uk>
-Date: Mon, 18 Feb 2019 18:52:25 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+ id 1gvo8g-0000Ut-7V; Mon, 18 Feb 2019 18:59:39 +0000
+Received: from [127.0.0.1] (localhost [127.0.0.1])
+ (Authenticated sender: ezequiel) with ESMTPSA id 5971C27FCAA
+From: Ezequiel Garcia <ezequiel@collabora.com>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: [PATCH] arm64: dts: rockchip: add DDC bus on Rock Pi 4
+Date: Mon, 18 Feb 2019 15:59:26 -0300
+Message-Id: <20190218185926.16040-1-ezequiel@collabora.com>
+X-Mailer: git-send-email 2.20.1
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_105232_718097_5FB7313B 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20190218_105938_407404_4D45763B 
+X-CRM114-Status: UNSURE (   8.62  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,94 +61,34 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, Olivier Moysan <olivier.moysan@st.com>,
- kernel-janitors@vger.kernel.org, Arnaud Pouliquen <arnaud.pouliquen@st.com>,
- Takashi Iwai <tiwai@suse.com>, Liam Girdwood <lgirdwood@gmail.com>,
- Mark Brown <broonie@kernel.org>, linux-arm-kernel@lists.infradead.org,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>, Jaroslav Kysela <perex@perex.cz>,
- linux-stm32@st-md-mailman.stormreply.com, linux-kernel@vger.kernel.org
-MIME-Version: 1.0
+Cc: linux-rockchip@lists.infradead.org, kernel@collabora.com,
+ Ezequiel Garcia <ezequiel@collabora.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+A DDC I2C bus specifier is required for DDC EDID probing to work
+properly.
 
-   ASoC: stm32: sai: remove set but not used variables 'mask, cr1'
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
-From 70605450fd42060783b0072a61a30f42a74f2917 Mon Sep 17 00:00:00 2001
-From: YueHaibing <yuehaibing@huawei.com>
-Date: Mon, 18 Feb 2019 14:50:26 +0000
-Subject: [PATCH] ASoC: stm32: sai: remove set but not used variables 'mask,
- cr1'
-
-Fixes gcc '-Wunused-but-set-variable' warning:
-
-sound/soc/stm/stm32_sai_sub.c: In function 'stm32_sai_configure_clock':
-sound/soc/stm/stm32_sai_sub.c:902:11: warning:
- variable 'mask' set but not used [-Wunused-but-set-variable]
-sound/soc/stm/stm32_sai_sub.c:902:6: warning:
- variable 'cr1' set but not used [-Wunused-but-set-variable]
-
-It's not used any more after 8307b2afd386 ("ASoC: stm32: sai: set sai as
-mclk clock provider")
-
-Signed-off-by: YueHaibing <yuehaibing@huawei.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Fixes: 1b5715c602fda ("arm64: dts: rockchip: add ROCK Pi 4 DTS support")
+Signed-off-by: Ezequiel Garcia <ezequiel@collabora.com>
 ---
- sound/soc/stm/stm32_sai_sub.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
-index d4825700b63f..f9297228c41c 100644
---- a/sound/soc/stm/stm32_sai_sub.c
-+++ b/sound/soc/stm/stm32_sai_sub.c
-@@ -898,7 +898,7 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
- 				     struct snd_pcm_hw_params *params)
- {
- 	struct stm32_sai_sub_data *sai = snd_soc_dai_get_drvdata(cpu_dai);
--	int cr1, mask, div = 0;
-+	int div = 0;
- 	int sai_clk_rate, mclk_ratio, den;
- 	unsigned int rate = params_rate(params);
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts b/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
+index 1e479d06e67e..e030627159c6 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-rock-pi-4.dts
+@@ -163,6 +163,7 @@
+ };
  
-@@ -943,10 +943,8 @@ static int stm32_sai_configure_clock(struct snd_soc_dai *cpu_dai,
- 		} else {
- 			if (sai->mclk_rate) {
- 				mclk_ratio = sai->mclk_rate / rate;
--				if (mclk_ratio == 512) {
--					mask = SAI_XCR1_OSR;
--					cr1 = SAI_XCR1_OSR;
--				} else if (mclk_ratio != 256) {
-+				if ((mclk_ratio != 512) &&
-+				    (mclk_ratio != 256)) {
- 					dev_err(cpu_dai->dev,
- 						"Wrong mclk ratio %d\n",
- 						mclk_ratio);
+ &hdmi {
++	ddc-i2c-bus = <&i2c3>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&hdmi_cec>;
+ 	status = "okay";
 -- 
 2.20.1
 
