@@ -3,85 +3,72 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0BCA6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:53:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20035C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:59:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CBF432176F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:53:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DDEC3217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 10:59:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PzNnJKkq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="aQ0FVTAg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBF432176F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SpXyjAxC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDEC3217D7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5RRM0cDru7oIjGntqSJbePae66l8eyaM97zLdtfXoz8=; b=PzNnJKkqXvl/CG
-	zEsomkvyn2CzLfm7H3PCRXJjDcKheAKfOiYpGXR4p0YR9d4a0pYmRzJGbxn03hiwANYSm4VfV8WAe
-	dLSza3dOzDJAuPgmqkf4tbVozRu5Ep3aUTvEPjUaFyOk2UVU9KBCl4lCMbn1IrLqYhDt/fz2rktqK
-	Z+ZAGOKojxLcmd5p2xO6nrmoYi61Ajea0RTPwFgOfDYaIcBVD3X3NgxKq2gUrt4Znp37YQruUkmvw
-	gxHjURuF+Bs447k/PkGf9QpOZoXfMvZaVCLgc03Xq04fB3tx8E2p2je0QbmVFx70FFjY1oStGS082
-	k/ZvrGWeAm1ZBAV/IXYA==;
+	List-Owner; bh=k5tO6YsOlz38IGoduZnjVI5phPPo2R/rRwIRmy/9nug=; b=SpXyjAxC6imZoA
+	3cTFM1bfP7dB+5BLZhd/rIZJnvDw2vFf6MXCtvUM340YzFnC8L+PFGqDJDy2Uf+bICrclvgb/qmON
+	xhdsWhq06HBi0CcUL0hVdOK9vziuEC/cfTkzSJMGimnLJgll0zZXOe0kiqXhuUpsqghC9OufEpxhK
+	lb75G/UQczVNuhsHCpdz5m2FArZDwb0RPw45Zwv2phNI99hg+oQSW8w/LkSUFkKEuzBhOxpxQW39q
+	pW6dIU8LTFodQ0PviG9ohaZuBw8tXst0dAvlS6yO/H7L4nPEj8lffaFjSCe2VCX7X4kDQMVC3eIwx
+	kR3eIXYotLuFj8vL3yNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvgXj-0001sI-Oh; Mon, 18 Feb 2019 10:52:59 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvgXg-0001rv-KT
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:52:58 +0000
-Received: by mail-lj1-x243.google.com with SMTP id z25so6108622ljk.8
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 02:52:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=CC6KdorLKJMkicgELgpTwOMSFBb61BLug+n8sMHlNNE=;
- b=aQ0FVTAgAh1AmDGYYGeP5HNVOgDbZIQteYFysIV8WjWXEkf1yp+T7u04DWjDBhBOeo
- 14Ldk8cyUD6YCbdrD+Np+wqszjJuxDSsLR2piGuurRL2X2MDsqJCY8Yg5bhDRMvnf/ek
- IQ3PAP/UcBLPGe0d+Ldgq0M2H1kWdAuTnAzRU/GBEdBRV6JAR91lol1oisE5AFj5Oq8h
- 1M/9FHtT4DgRDJYVHERn7BGIWyY+CHDJ0kW6xa4eiHuKrgr0lTJHbwiGR84G1VzeTtim
- 6Fc1Bx/zf8ohHxVTFHY6bdBgXmhm3bsmb0pEcwQOLAt3ck0x0SOrPqphy9XJv7mhFwvO
- lj4A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=CC6KdorLKJMkicgELgpTwOMSFBb61BLug+n8sMHlNNE=;
- b=TCok9Rn83YF4k+moXFZOb+INluOPUfOrRFSEUyR389UX6ZO9xKqT4kDdlrqk7X5zbi
- 5n4jSWajBsu+4oNdMGYoUhrA7Trchfn+x7Y8HECKrpEw+mujVFNH3FDJNjiOgG+14OiX
- nd/mT3cJG05xKZAuW1b+zGRdV5YO3g2TxV0JkekNrlhH+MPAT43DwPWTfA3gH0xGUbA0
- DructiyCo5Cup1/aBaneYuVoKjG7e00z6G7vF7PF3r42nRaKPgbIKQpK6LjM0H9kiXaK
- glcVy0BygJnm4PIRauKVHJZ3G6ZCj2OGNECMKsmHYTm/AAitH2rsR1W+egZzteBXrQKU
- BJUw==
-X-Gm-Message-State: AHQUAuahpC7IYzfdk540piZLQ5IriXNFTjgfWu+N9HwsmLE7PG24N0eQ
- 7j0LjNVl8Ug4nFAVgcTu/YM2/RaT05o3ewKEmS5L8g==
-X-Google-Smtp-Source: AHgI3Ian99yzYlQaqTBpe48UhUpXkh7SKZMzNP8m7UWC+tojep5CMiISRwWf0mHl2AoC0RY96Ps/vRq/UiAyHfwNaY4=
-X-Received: by 2002:a2e:6a18:: with SMTP id f24mr14330316ljc.97.1550487174177; 
- Mon, 18 Feb 2019 02:52:54 -0800 (PST)
+	id 1gvgdz-0003s4-It; Mon, 18 Feb 2019 10:59:27 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvgdw-0003rL-Ib
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 10:59:26 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EBC5380D;
+ Mon, 18 Feb 2019 02:59:21 -0800 (PST)
+Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9AA933F720;
+ Mon, 18 Feb 2019 02:59:20 -0800 (PST)
+Date: Mon, 18 Feb 2019 10:59:16 +0000
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Dave Martin <Dave.Martin@arm.com>
+Subject: Re: [PATCH 1/2] KVM: arm/arm64: Add save/restore support for
+ firmware workaround state
+Message-ID: <20190218105916.4f1b0612@why.wild-wind.fr.eu.org>
+In-Reply-To: <20190218102852.GP3567@e103592.cambridge.arm.com>
+References: <20190107120537.184252-1-andre.przywara@arm.com>
+ <20190107120537.184252-2-andre.przywara@arm.com>
+ <20190122151714.GG3578@e103592.cambridge.arm.com>
+ <20190125144657.3db91c91@donnerap.cambridge.arm.com>
+ <20190129213223.GB3567@e103592.cambridge.arm.com>
+ <20190130113900.10089070@donnerap.cambridge.arm.com>
+ <20190215095857.2fd7e0fb@donnerap.cambridge.arm.com>
+ <864l95s2fw.wl-marc.zyngier@arm.com>
+ <20190215172558.GO3567@e103592.cambridge.arm.com>
+ <20190218090731.3d313d81@why.wild-wind.fr.eu.org>
+ <20190218102852.GP3567@e103592.cambridge.arm.com>
+Organization: ARM Ltd
+X-Mailer: Claws Mail 3.14.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-References: <a9718ae1e97a5911f47874fe23c00ef297d7fed8.1548158832.git.baolin.wang@linaro.org>
- <CAK8P3a2zkhrZLMi5KZ5=fGJCt85dad3_pZC0o7GqcwJkk4es9w@mail.gmail.com>
- <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
- <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
- <CAK8P3a1Zq6XjymG3sAaHGeNRxU5UXPfJPbi0A9s47cTVK7vC3g@mail.gmail.com>
-In-Reply-To: <CAK8P3a1Zq6XjymG3sAaHGeNRxU5UXPfJPbi0A9s47cTVK7vC3g@mail.gmail.com>
-From: Baolin Wang <baolin.wang@linaro.org>
-Date: Mon, 18 Feb 2019 18:52:40 +0800
-Message-ID: <CAMz4kuL=B53xLk4SFbrwWeUhp4P9zbUfOmXgftQCEjVSwOnD5A@mail.gmail.com>
-Subject: Re: [PATCH 1/3] dt-bindings: dmaengine: Add one new cell to present
- hardware slave id
-To: Arnd Bergmann <arnd@arndb.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_025256_676773_D766CA9F 
-X-CRM114-Status: GOOD (  25.36  )
+X-CRM114-CacheID: sfid-20190218_025924_625856_1005BB38 
+X-CRM114-Status: GOOD (  31.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,99 +80,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- eric.long@unisoc.com, arm-soc <arm@kernel.org>,
- Lyra Zhang <zhang.lyra@gmail.com>, Mark Brown <broonie@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
- Orson Zhai <orsonzhai@gmail.com>, Dan Williams <dan.j.williams@intel.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Andre Przywara <andre.przywara@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org, kvm@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Arnd,
+On Mon, 18 Feb 2019 10:28:54 +0000
+Dave Martin <Dave.Martin@arm.com> wrote:
 
-On Mon, 18 Feb 2019 at 18:31, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Tue, Feb 12, 2019 at 9:25 AM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > On Fri, 1 Feb 2019 at 19:53, Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > On Thu, 31 Jan 2019 at 00:52, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > On Tue, Jan 22, 2019 at 2:21 PM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > > >
-> > > > >  Client:
-> > > > >  DMA clients connected to the Spreadtrum DMA controller must use the format
-> > > > > -described in the dma.txt file, using a two-cell specifier for each channel.
-> > > > > -The two cells in order are:
-> > > > > +described in the dma.txt file, using a three-cell specifier for each channel.
-> > > > > +The three cells in order are:
-> > > > >  1. A phandle pointing to the DMA controller.
-> > > > >  2. The channel id.
-> > > > > +3. The hardware slave id which is used for clients to trigger DMA engine
-> > > > > +automatically.
-> > > >
-> > > > I notice that this is an incompatible binding change. Is that necessary?
-> > > > If the current code works, I'd suggest allowing both #dma-cells=<2>
-> > > > and <3>, and then implementing both in the driver.
-> > >
-> > > Yes, this is necessary.
-> > >
-> > > Yes, current code can work, but the problem is that the DMA clients
-> > > must add one property (something like "sprd,slave-id") to specify the
-> > > slave id. So considering this, we want to change the dma-cells to 2,
-> > > including dma channel and dma slave id, which can avoid introducing
-> > > some similar properties for DMA clients.
-> > >
-> > > Now there are no DMA clients in mainline for Spreadtrum platform, and
-> > > we want to upstream our first DMA clients: SPI controller. So no other
-> > > drivers need to change when we changing dma cells. Thanks.
-> >
-> > Do you have any other concerns about this patch set? If not, I think
-> > Vinod can apply this patch set. Thanks.
->
-> Sorry for the late reply. Yes, this makes sense since there are no
-> existing users then. For the DT changes going through the dmaengine
-> tree
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> On Mon, Feb 18, 2019 at 09:07:31AM +0000, Marc Zyngier wrote:
+> > On Fri, 15 Feb 2019 17:26:02 +0000
+> > Dave Martin <Dave.Martin@arm.com> wrote:
+> >   
+> > > On Fri, Feb 15, 2019 at 11:42:27AM +0000, Marc Zyngier wrote:  
+> > > > On Fri, 15 Feb 2019 09:58:57 +0000,
+> > > > Andre Przywara <andre.przywara@arm.com> wrote:    
+> > > > > 
+> > > > > On Wed, 30 Jan 2019 11:39:00 +0000
+> > > > > Andre Przywara <andre.przywara@arm.com> wrote:
+> > > > > 
+> > > > > Peter, Marc, Christoffer,
+> > > > > 
+> > > > > can we have an opinion on whether it's useful to introduce some
+> > > > > common scheme for firmware workaround system registers (parts of
+> > > > > KVM_REG_ARM_FW_REG(x)), which would allow checking them for
+> > > > > compatibility between two kernels without specifically knowing about
+> > > > > them?
+> > > > > Dave suggested to introduce some kind of signed encoding in the 4
+> > > > > LSBs for all those registers (including future ones), where 0 means
+> > > > > UNKNOWN and greater values are better. So without knowing about the
+> > > > > particular register, one could judge whether it's safe to migrate.
+> > > > > I am just not sure how useful this is, given that QEMU seems to ask
+> > > > > the receiving kernel about any sysreg, and doesn't particularly care
+> > > > > about the meaning of those registers. And I am not sure we really
+> > > > > want to introduce some kind of forward looking scheme in the kernel
+> > > > > here, short of a working crystal ball. I think the kernel policy was
+> > > > > always to be as strict as possible about those things.    
+> > > > 
+> > > > I honestly don't understand how userspace can decide whether a given
+> > > > configuration is migratable or not solely based on the value of such a
+> > > > register. In my experience, the target system has a role to play, and
+> > > > is the only place where we can find out about whether migration is
+> > > > actually possible.    
+> > > 
+> > > Both origin and target system need to be taken into account.  I don't
+> > > think that's anything new.  
+> > 
+> > Well, that was what I understood from Andre's question.
+> >   
+> > >   
+> > > > As you said, userspace doesn't interpret the data, nor should it. It
+> > > > is only on the receiving end that compatibility is assessed and
+> > > > whether some level of compatibility can be safely ensured.
+> > > > 
+> > > > So to sum it up, I don't believe in this approach as a general way of
+> > > > describing the handling or errata.    
+> > > 
+> > > For context, my idea attempted to put KVM, not userspace, in charge of
+> > > the decision: userspace applies fixed comparison rules determined ahead
+> > > of time, but KVM supplies the values compared (and hence determines the
+> > > result).
+> > > 
+> > > My worry was that otherwise we may end up with a wild-west tangle of
+> > > arbitrary properties that userspace needs specific knowledge about.  
+> > 
+> > And this is where our understanding differs. I do not think userspace
+> > has to care at all. All it has to do is to provide the saved register
+> > values to the target system, and let KVM accept or refuse these
+> > settings. I can't see what providing a set of predefined values back to
+> > userspace gains us.  
+> 
+> Can we just pull all the UAPI header definitions then?  If this is
+> really kernel private, we don't even need userspace to know what the
+> IDs mean, let alone what's in the registers.
 
-Thanks for your reviewing.
+I'm in two minds about this. Indeed, userspace shouldn't know about
+this. And yet this is userspace visible. If we make it kernel private,
+we still have the risk of accidentally breaking compatibility because
+"this is kernel private and we can do what we want".
 
->
-> One more question, to make sure we don't need to edit it again:
-> Why do you need both a 'channel id' and a 'slave id' here? Is this
-> a strict hardware requirement for your DMA engine? In many
-> other designs, only a DMA request line number needs to
-> be described, and I think this would correspond to what you
-> call the 'hardware slave id' in your documentation.
+Sticking it into UAPI makes it abundantly clear that you cannot mess
+with this at all without the risk of breaking save/restore.
 
-I try to explain why we need the slave id.
+Thanks,
 
-For our DMA engine driver, we have software request mode and hardware
-request mode. For software request mode, the DMA engine driver need
-trigger DMA to start transfer manually. But for hardware request mode,
-we just set one unique slave id corresponding to the slave hardware to
-the DMA engine, then the slave hardware can trigger DMA automatically.
-And the slave id is not always same with the channel id according to
-the SoC design, so we add one cell to specify the slave id.
-
->
-> Does each request line here correspond to a fixed channel
-> id as well, or can a channel be shared between multiple
-
-Yes, each request line corresponds to a fixed channel id.
-
-> slave devices?
->
->       Arnd
-
-
-
+	M.
 -- 
-Baolin Wang
-Best Regards
+Without deviation from the norm, progress is not possible.
 
 _______________________________________________
 linux-arm-kernel mailing list
