@@ -4,78 +4,59 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80AC6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 972C9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2414D204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 694F0204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kYRy8m1M";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ZI70kgsP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2414D204EC
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ki+dps1+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 694F0204EC
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=S7ZBehEN+SV/HGKqPVfkDAhvpt+wyWYNG0syKww0aj0=; b=kYRy8m1MlfE3qzB9ranD1c3m+h
-	bbUEZNwAnBba3SmQ/nr86m8aff7RXgix+Ui/TNSgdh3g1z4LsrtJUHBKgNRkqNzf9pvKUB+6gnTAs
-	3lcXXmz/kjQSzA3s1E8T+ZHy9fM3koJ/jwcZphpsLw85XO9E2ocTUUUhaXb9IVQrQvzbe89X67sE4
-	ubYTMaD34VCVBVHHRTL0kPgQAPjq2vL0IaCsu9UXhsd0lsJsnhU9TG6qN1vVn1fVl1xk7//fAzh+z
-	r5Bb1S3PG51vjdwsPxQ6XXSoPO+liMTeOwnCeiUd1ZNUO1dGfQeZUCqi2NNDkoJGk+3ndRIY5spKJ
-	ZYkPAiDw==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=mlZDxKfRCI6C+/9OVDsztdDr36DUIcAJcYZghhRn0qU=; b=ki+dps1+1jwEhJ
+	OXSVmpzRdUxERpBp7OCcDGygD0QKa2nY7usaV24GSrwsoO+S5vROH3+Khdj7cZExE1A2DCCvCwoVz
+	SnLngDxpS2DcAceDziJ2z9EZQsLkBFvs75XL56yBA4UZEIDh9fVksTjNYd9+8QytCuupxsrDBea+d
+	QBwpDoaV01cD0I4q8Qjtt9cLRS/HsrGx/H3HburNkfLtqxiixNoUlJzKj1xqVj8TsTiOKVJHt7P9i
+	LSmyGfMHc5s7IG9kOBCAJXveNMW6K9imh7FcT1qPWCdzFR2PmNN1MHPn5E9V52TqAeoqRFdHixuWR
+	jjSZZJwDJHjVYVgI43jw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp1D-0007uU-51; Mon, 18 Feb 2019 19:55:59 +0000
-Received: from casper.infradead.org ([85.118.1.10])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozs-00054V-BV
- for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 19:54:36 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=OJxC6XaQoRGvkn8WSk7FL81Z60oeTGcAEMPJHRMTcPk=; b=ZI70kgsPfxdfLA5n6P0+P4obr
- 2coq3tVdK2P/xzl6qeexj5unXDJemUWSb9HoykoxR+ijnlBwMnHXHLz++nZR3ndMuozoz2h8DgEL5
- Vio6o48/gFDtLEW/v7IhDUoiNm5q+DmaCW+ihlCRYeH4JNn9JUMcGPEBLBVornadXIGc5B1QhVwQT
- rW/3uBIAifIvXILNHPyoaetz2kf1a334U19OyYEmfKoR+SpTHYoxRTruoFKLrEVDR5xXNOOrtGbNr
- vdcXcg2CHykj+Yoo7D7yABWauVfkQcUb1bNu/yLhkz40nx3LK0Crl+m0lvA1GVs/xOzVU/aeXPvfz
- fuRdmC/wg==;
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozn-0005ml-J2
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:33 +0000
+	id 1gvp1t-0008Fz-Hf; Mon, 18 Feb 2019 19:56:41 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvozm-0004c0-4z
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:42 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F42351CC4;
- Mon, 18 Feb 2019 11:54:18 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5D4761BF7;
+ Mon, 18 Feb 2019 11:54:14 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 107633FBA7;
- Mon, 18 Feb 2019 11:54:16 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 33C953FD55;
+ Mon, 18 Feb 2019 11:53:48 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 23/26] KVM: arm64/sve: Allow userspace to enable SVE for
- vcpus
-Date: Mon, 18 Feb 2019 19:52:36 +0000
-Message-Id: <1550519559-15915-24-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 10/26] KVM: arm64: Propagate vcpu into read_id_reg()
+Date: Mon, 18 Feb 2019 19:52:23 +0000
+Message-Id: <1550519559-15915-11-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_195432_058240_573E9488 
-X-CRM114-Status: GOOD (  20.44  )
+X-CRM114-CacheID: sfid-20190218_115430_451044_D54CEC56 
+X-CRM114-Status: GOOD (  12.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,187 +77,76 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Julien Grall <julien.grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Now that all the pieces are in place, this patch offers a new flag
-KVM_ARM_VCPU_SVE that userspace can pass to KVM_ARM_VCPU_INIT to
-turn on SVE for the guest, on a per-vcpu basis.
-
-As part of this, support for initialisation and reset of the SVE
-vector length set and registers is added in the appropriate places.
-Allocation SVE registers is deferred until kvm_arm_vcpu_finalize(),
-by which time the size of the registers is known.
-
-Setting the vector lengths supported by the vcpu is considered
-configuration of the emulated hardware rather than runtime
-configuration, so no support is offered for changing the vector
-lengths of an existing vcpu across reset.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
----
-
-Changes since v4:
-
- * Pull out vcpu_sve_state_size(), for use earlier in the series.
-
- * Remove unnecessary vcpu->arch.sve_vqs[], and clamp maximum guest
-   vector length to 256 bytes for forwards compatibility.
-
-   (See "KVM: arm64/sve: Add pseudo-register for the guest's vector
-   lengths".)
-
- * Minor tidyups to make some checks less verbose.
----
- arch/arm64/include/asm/kvm_host.h |  2 +-
- arch/arm64/include/uapi/asm/kvm.h |  1 +
- arch/arm64/kvm/reset.c            | 70 ++++++++++++++++++++++++++++++++++++++-
- 3 files changed, 71 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e53119a..3277a39 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -45,7 +45,7 @@
- 
- #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
- 
--#define KVM_VCPU_MAX_FEATURES 4
-+#define KVM_VCPU_MAX_FEATURES 5
- 
- #define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 7ff1bd4..6963b7e 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -102,6 +102,7 @@ struct kvm_regs {
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
- #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
- #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-+#define KVM_ARM_VCPU_SVE		4 /* enable SVE for this CPU */
- 
- struct kvm_vcpu_init {
- 	__u32 target;
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 1379fb2..e67cd2e 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -23,11 +23,13 @@
- #include <linux/kvm_host.h>
- #include <linux/kvm.h>
- #include <linux/hw_breakpoint.h>
-+#include <linux/slab.h>
- 
- #include <kvm/arm_arch_timer.h>
- 
- #include <asm/cpufeature.h>
- #include <asm/cputype.h>
-+#include <asm/fpsimd.h>
- #include <asm/ptrace.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_asm.h>
-@@ -98,11 +100,69 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 	return r;
- }
- 
-+static int kvm_reset_sve(struct kvm_vcpu *vcpu)
-+{
-+	if (!system_supports_sve())
-+		return -EINVAL;
-+
-+	/* If resetting an already-configured vcpu, just zero the SVE regs: */
-+	if (vcpu->arch.sve_state) {
-+		size_t size = vcpu_sve_state_size(vcpu);
-+
-+		if (!size || WARN_ON(!vcpu_has_sve(vcpu)))
-+			return -EINVAL;
-+
-+		memset(vcpu->arch.sve_state, 0, size);
-+		return 0;
-+	}
-+
-+	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-+		return -EINVAL;
-+
-+	/* If the full set of host vector lengths cannot be used, give up: */
-+	if (sve_max_virtualisable_vl < sve_max_vl)
-+		return -EINVAL;
-+
-+	/* Default to the set of vector lengths supported by the host */
-+	vcpu->arch.sve_max_vl = sve_max_vl;
-+
-+	/*
-+	 * The get_sve_reg()/set_sve_reg() ioctl interface will need
-+	 * to be extended with multiple register slice support in
-+	 * order to support vector lengths greater than
-+	 * SVE_VL_ARCH_MAX:
-+	 */
-+	if (WARN_ONCE(vcpu->arch.sve_max_vl > SVE_VL_ARCH_MAX,
-+		      "KVM: SVE vector length for guests limited to %d bytes\n",
-+		      SVE_VL_ARCH_MAX))
-+		vcpu->arch.sve_max_vl = SVE_VL_ARCH_MAX;
-+
-+	/*
-+	 * Userspace can still customize the vector lengths by writing
-+	 * KVM_REG_ARM64_SVE_VLS.  Allocation is deferred until
-+	 * kvm_arm_vcpu_finalize(), which freezes the configuration.
-+	 */
-+	vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-+
-+	return 0;
-+}
-+
- int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
- {
- 	if (likely(kvm_arm_vcpu_finalized(vcpu)))
- 		return 0;
- 
-+	if (vcpu_has_sve(vcpu)) {
-+		size_t size = vcpu_sve_state_size(vcpu);
-+
-+		if (!size)
-+			return -EINVAL;
-+
-+		vcpu->arch.sve_state = kzalloc(size, GFP_KERNEL);
-+		if (!vcpu->arch.sve_state)
-+			return -ENOMEM;
-+	}
-+
- 	vcpu->arch.flags |= KVM_ARM64_VCPU_FINALIZED;
- 	return 0;
- }
-@@ -113,12 +173,20 @@ int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
-  *
-  * This function finds the right table above and sets the registers on
-  * the virtual CPU struct to their architecturally defined reset
-- * values.
-+ * values, except for registers whose reset is deferred until
-+ * kvm_arm_vcpu_finalize().
-  */
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
-+	int ret;
- 	const struct kvm_regs *cpu_reset;
- 
-+	if (test_bit(KVM_ARM_VCPU_SVE, vcpu->arch.features)) {
-+		ret = kvm_reset_sve(vcpu);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	switch (vcpu->arch.target) {
- 	default:
- 		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
--- 
-2.1.4
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+QXJjaGl0ZWN0dXJlIGZlYXR1cmVzIHRoYXQgYXJlIGNvbmRpdGlvbmFsbHkgdmlzaWJsZSB0byB0
+aGUgZ3Vlc3QKd2lsbCByZXF1aXJlIHJ1bi10aW1lIGNoZWNrcyBpbiB0aGUgSUQgcmVnaXN0ZXIg
+YWNjZXNzb3IgZnVuY3Rpb25zLgpJbiBwYXJ0aWN1bGFyLCByZWFkX2lkX3JlZygpIHdpbGwgbmVl
+ZCB0byBwZXJmb3JtIGNoZWNrcyBpbiBvcmRlcgp0byBnZW5lcmF0ZSB0aGUgY29ycmVjdCBlbXVs
+YXRlZCB2YWx1ZSBmb3IgY2VydGFpbiBJRCByZWdpc3RlcgpmaWVsZHMgc3VjaCBhcyBJRF9BQTY0
+UEZSMF9FTDEuU1ZFIGZvciBleGFtcGxlLgoKVGhpcyBwYXRjaCBwcm9wYWdhdGVzIHZjcHUgaW50
+byByZWFkX2lkX3JlZygpIHNvIHRoYXQgZnV0dXJlCnBhdGNoZXMgY2FuIGFkZCBydW4tdGltZSBj
+aGVja3Mgb24gdGhlIGd1ZXN0IGNvbmZpZ3VyYXRpb24gaGVyZS4KCkZvciBub3csIHRoZXJlIGlz
+IG5vIGZ1bmN0aW9uYWwgY2hhbmdlLgoKU2lnbmVkLW9mZi1ieTogRGF2ZSBNYXJ0aW4gPERhdmUu
+TWFydGluQGFybS5jb20+ClJldmlld2VkLWJ5OiBBbGV4IEJlbm7DqWUgPGFsZXguYmVubmVlQGxp
+bmFyby5vcmc+Ci0tLQogYXJjaC9hcm02NC9rdm0vc3lzX3JlZ3MuYyB8IDIzICsrKysrKysrKysr
+KystLS0tLS0tLS0tCiAxIGZpbGUgY2hhbmdlZCwgMTMgaW5zZXJ0aW9ucygrKSwgMTAgZGVsZXRp
+b25zKC0pCgpkaWZmIC0tZ2l0IGEvYXJjaC9hcm02NC9rdm0vc3lzX3JlZ3MuYyBiL2FyY2gvYXJt
+NjQva3ZtL3N5c19yZWdzLmMKaW5kZXggZTNlMzcyMi4uNzFjNTgyNSAxMDA2NDQKLS0tIGEvYXJj
+aC9hcm02NC9rdm0vc3lzX3JlZ3MuYworKysgYi9hcmNoL2FybTY0L2t2bS9zeXNfcmVncy5jCkBA
+IC0xMDI5LDcgKzEwMjksOCBAQCBzdGF0aWMgYm9vbCBhY2Nlc3NfY250cF9jdmFsKHN0cnVjdCBr
+dm1fdmNwdSAqdmNwdSwKIH0KIAogLyogUmVhZCBhIHNhbml0aXNlZCBjcHVmZWF0dXJlIElEIHJl
+Z2lzdGVyIGJ5IHN5c19yZWdfZGVzYyAqLwotc3RhdGljIHU2NCByZWFkX2lkX3JlZyhzdHJ1Y3Qg
+c3lzX3JlZ19kZXNjIGNvbnN0ICpyLCBib29sIHJheikKK3N0YXRpYyB1NjQgcmVhZF9pZF9yZWco
+Y29uc3Qgc3RydWN0IGt2bV92Y3B1ICp2Y3B1LAorCQlzdHJ1Y3Qgc3lzX3JlZ19kZXNjIGNvbnN0
+ICpyLCBib29sIHJheikKIHsKIAl1MzIgaWQgPSBzeXNfcmVnKCh1MzIpci0+T3AwLCAodTMyKXIt
+Pk9wMSwKIAkJCSAodTMyKXItPkNSbiwgKHUzMilyLT5DUm0sICh1MzIpci0+T3AyKTsKQEAgLTEw
+NjgsNyArMTA2OSw3IEBAIHN0YXRpYyBib29sIF9fYWNjZXNzX2lkX3JlZyhzdHJ1Y3Qga3ZtX3Zj
+cHUgKnZjcHUsCiAJaWYgKHAtPmlzX3dyaXRlKQogCQlyZXR1cm4gd3JpdGVfdG9fcmVhZF9vbmx5
+KHZjcHUsIHAsIHIpOwogCi0JcC0+cmVndmFsID0gcmVhZF9pZF9yZWcociwgcmF6KTsKKwlwLT5y
+ZWd2YWwgPSByZWFkX2lkX3JlZyh2Y3B1LCByLCByYXopOwogCXJldHVybiB0cnVlOwogfQogCkBA
+IC0xMDk3LDE2ICsxMDk4LDE4IEBAIHN0YXRpYyB1NjQgc3lzX3JlZ190b19pbmRleChjb25zdCBz
+dHJ1Y3Qgc3lzX3JlZ19kZXNjICpyZWcpOwogICogYXJlIHN0b3JlZCwgYW5kIGZvciBzZXRfaWRf
+cmVnKCkgd2UgZG9uJ3QgYWxsb3cgdGhlIGVmZmVjdGl2ZSB2YWx1ZQogICogdG8gYmUgY2hhbmdl
+ZC4KICAqLwotc3RhdGljIGludCBfX2dldF9pZF9yZWcoY29uc3Qgc3RydWN0IHN5c19yZWdfZGVz
+YyAqcmQsIHZvaWQgX191c2VyICp1YWRkciwKK3N0YXRpYyBpbnQgX19nZXRfaWRfcmVnKGNvbnN0
+IHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwKKwkJCWNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJk
+LCB2b2lkIF9fdXNlciAqdWFkZHIsCiAJCQlib29sIHJheikKIHsKIAljb25zdCB1NjQgaWQgPSBz
+eXNfcmVnX3RvX2luZGV4KHJkKTsKLQljb25zdCB1NjQgdmFsID0gcmVhZF9pZF9yZWcocmQsIHJh
+eik7CisJY29uc3QgdTY0IHZhbCA9IHJlYWRfaWRfcmVnKHZjcHUsIHJkLCByYXopOwogCiAJcmV0
+dXJuIHJlZ190b191c2VyKHVhZGRyLCAmdmFsLCBpZCk7CiB9CiAKLXN0YXRpYyBpbnQgX19zZXRf
+aWRfcmVnKGNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJkLCB2b2lkIF9fdXNlciAqdWFkZHIs
+CitzdGF0aWMgaW50IF9fc2V0X2lkX3JlZyhjb25zdCBzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsCisJ
+CQljb25zdCBzdHJ1Y3Qgc3lzX3JlZ19kZXNjICpyZCwgdm9pZCBfX3VzZXIgKnVhZGRyLAogCQkJ
+Ym9vbCByYXopCiB7CiAJY29uc3QgdTY0IGlkID0gc3lzX3JlZ190b19pbmRleChyZCk7CkBAIC0x
+MTE4LDcgKzExMjEsNyBAQCBzdGF0aWMgaW50IF9fc2V0X2lkX3JlZyhjb25zdCBzdHJ1Y3Qgc3lz
+X3JlZ19kZXNjICpyZCwgdm9pZCBfX3VzZXIgKnVhZGRyLAogCQlyZXR1cm4gZXJyOwogCiAJLyog
+VGhpcyBpcyB3aGF0IHdlIG1lYW4gYnkgaW52YXJpYW50OiB5b3UgY2FuJ3QgY2hhbmdlIGl0LiAq
+LwotCWlmICh2YWwgIT0gcmVhZF9pZF9yZWcocmQsIHJheikpCisJaWYgKHZhbCAhPSByZWFkX2lk
+X3JlZyh2Y3B1LCByZCwgcmF6KSkKIAkJcmV0dXJuIC1FSU5WQUw7CiAKIAlyZXR1cm4gMDsKQEAg
+LTExMjcsMjUgKzExMzAsMjUgQEAgc3RhdGljIGludCBfX3NldF9pZF9yZWcoY29uc3Qgc3RydWN0
+IHN5c19yZWdfZGVzYyAqcmQsIHZvaWQgX191c2VyICp1YWRkciwKIHN0YXRpYyBpbnQgZ2V0X2lk
+X3JlZyhzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsIGNvbnN0IHN0cnVjdCBzeXNfcmVnX2Rlc2MgKnJk
+LAogCQkgICAgICBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZywgdm9pZCBfX3VzZXIgKnVh
+ZGRyKQogewotCXJldHVybiBfX2dldF9pZF9yZWcocmQsIHVhZGRyLCBmYWxzZSk7CisJcmV0dXJu
+IF9fZ2V0X2lkX3JlZyh2Y3B1LCByZCwgdWFkZHIsIGZhbHNlKTsKIH0KIAogc3RhdGljIGludCBz
+ZXRfaWRfcmVnKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwgY29uc3Qgc3RydWN0IHN5c19yZWdfZGVz
+YyAqcmQsCiAJCSAgICAgIGNvbnN0IHN0cnVjdCBrdm1fb25lX3JlZyAqcmVnLCB2b2lkIF9fdXNl
+ciAqdWFkZHIpCiB7Ci0JcmV0dXJuIF9fc2V0X2lkX3JlZyhyZCwgdWFkZHIsIGZhbHNlKTsKKwly
+ZXR1cm4gX19zZXRfaWRfcmVnKHZjcHUsIHJkLCB1YWRkciwgZmFsc2UpOwogfQogCiBzdGF0aWMg
+aW50IGdldF9yYXpfaWRfcmVnKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSwgY29uc3Qgc3RydWN0IHN5
+c19yZWdfZGVzYyAqcmQsCiAJCQkgIGNvbnN0IHN0cnVjdCBrdm1fb25lX3JlZyAqcmVnLCB2b2lk
+IF9fdXNlciAqdWFkZHIpCiB7Ci0JcmV0dXJuIF9fZ2V0X2lkX3JlZyhyZCwgdWFkZHIsIHRydWUp
+OworCXJldHVybiBfX2dldF9pZF9yZWcodmNwdSwgcmQsIHVhZGRyLCB0cnVlKTsKIH0KIAogc3Rh
+dGljIGludCBzZXRfcmF6X2lkX3JlZyhzdHJ1Y3Qga3ZtX3ZjcHUgKnZjcHUsIGNvbnN0IHN0cnVj
+dCBzeXNfcmVnX2Rlc2MgKnJkLAogCQkJICBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZywg
+dm9pZCBfX3VzZXIgKnVhZGRyKQogewotCXJldHVybiBfX3NldF9pZF9yZWcocmQsIHVhZGRyLCB0
+cnVlKTsKKwlyZXR1cm4gX19zZXRfaWRfcmVnKHZjcHUsIHJkLCB1YWRkciwgdHJ1ZSk7CiB9CiAK
+IC8qIHN5c19yZWdfZGVzYyBpbml0aWFsaXNlciBmb3Iga25vd24gY3B1ZmVhdHVyZSBJRCByZWdp
+c3RlcnMgKi8KLS0gCjIuMS40CgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
+bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
+bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
