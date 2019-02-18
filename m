@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 899CBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:04:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C8C9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:04:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5A0C82190C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:04:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4EE4C21901
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 14:04:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aQF7bbtV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=essensium-com.20150623.gappssmtp.com header.i=@essensium-com.20150623.gappssmtp.com header.b="r986BO1B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A0C82190C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U+RVjeZi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=essensium-com.20150623.gappssmtp.com header.i=@essensium-com.20150623.gappssmtp.com header.b="kdHcXhxC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EE4C21901
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=essensium.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,53 +27,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=H+IYvo/4FOonZiDhwpWzJpjUQ/kQsd3lDfMTDPGMPDk=; b=aQF7bbtV8rBj3dBCt/AIQXEvW4
-	1Dhq3ii2LKJMUNoUxPbe5DV8QcNx++kZc6OZ3z/fTCfR5O5okW9aISGbxZa8+Cwktz/fYJabGmuBh
-	AjY9InWMU4tzcOh5xwG26ozAWs4R4iVHbPehOQdGttWYLlYU5YKsQQxXLPcB46ZWnF+G7i/LH2Bg/
-	Xru06y7d/3vvvmWvhL5MWStLmHCKjYLkd5ghlD4uK5vLqTW6B71uwe6Vu26/jdzkl8ccUj/cvoZ72
-	fvYc0n0O9aPeL1qw5c2odtOmr+gMlOVWo78BNty6WxpiKrb88mggNC1LJOSZCeUmtg5IGwcmphfMH
-	dUXDDyNA==;
+	bh=PHfKbcjpuJPWWxFVrJvVay+paFDWbt++m/hLD12No3A=; b=U+RVjeZix6IGMCir1GjaiIObi9
+	v3M18OmmQsfh/LqfrCjWYGKQgMV7zkBW8CYD8B9gA2t00pOecHLm+Gr/pnhIUKiXipyn29MmU1Ahs
+	ThC3Jz+CmsXOQWFSBiPfyvKc49FagSyIPVggudUFPflKIcgiNuAJ7vKaMaL578oDYYxjuLTxnPiCO
+	uJSsObYFyCgBrrnI0denx7ANTN0nUxQWy/Q2q5yXMXN3l4dh0s3ObQGmw3dcWc8rQcS9tNvjWjhD+
+	hauJSJW/B1vHGZKniGth0fETj5Lcs7rORREelcVuIeunkFbGUVCEvmlrl/HwpkdNpeZi6axM7dZcP
+	r7cszv1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvjWc-0004hA-Er; Mon, 18 Feb 2019 14:04:02 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gvjX2-00058f-CC; Mon, 18 Feb 2019 14:04:28 +0000
+Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvjWQ-0004WZ-Tn
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:03:52 +0000
-Received: by mail-ed1-x544.google.com with SMTP id f2so13868327edy.13
+ id 1gvjWT-0004XK-4x
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 14:03:56 +0000
+Received: by mail-ed1-x542.google.com with SMTP id x7so13897160eds.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 06:03:50 -0800 (PST)
+ Mon, 18 Feb 2019 06:03:52 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=essensium-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=yRbFDaxWpy1WZcEaSiXFGy4r6+XphTOi/wCgftAJFLc=;
- b=r986BO1Bzxok2V8E1eD37WYjzK2SBEteAVMs6PJ+GyfPBhlMmSQusvvsx60zQIua0j
- HEtFc2Cbjy57gwxNqqBkJTEfiend4iuH9mrGHHfaPOHdhozsGK7yXfjWIX5pNCwVJfzf
- Hi7DRrqfs8UCedwzmElcbeS4l2np34oQ+BmVxFRzAKISQbXvMikWdJV9/RWIbEHMnp8t
- B7CuoCwlSNrRceunX/D+BNQP/vorwExi5Q3k3KPWa29v4DiDhCkN4xsC777AFI8ZwwZc
- VzHmLw2/DQxlDztf1WTkxkdvMn9z8ND9aIuIVSjPg6LbZqJVTe885POnip9mNLyZWwYu
- I2Dw==
+ bh=I6Qr3PnJqhUErKNHRtGnpwGVLGbDm4vYaQedao4hHXI=;
+ b=kdHcXhxCjuyfL/RsbUdI7m1L2Yqy6Ch6aOf/JLBNnD5HRcGRSlgFnLV7GDHT0+O/ZH
+ WwhadtXZC4vVGNOZDuBn55xN7S4uRWX++KyhraFKHbfOfDIpV2BF2i1X1ZZmPSUG4VoF
+ AkRhIRakB9igwGHCOjQRaHFAWn158WcLofcO9Bvujyxj6a9Q5/FR2tK/sXcaVtMFDepB
+ mzDtU5X9T6XAokc0oVHVyJYLk6aWrjK7mlq7vIRYN+67ZQfflVjoZTlS3hBnJ8v3vCvY
+ cUmqgkNmUgZCJM9+9LD/mdkYFxEuSclcXauFOzLsjW1gmke/0ca5/PZRLVfeL0qwR77Y
+ 7kDw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=yRbFDaxWpy1WZcEaSiXFGy4r6+XphTOi/wCgftAJFLc=;
- b=Jc9CSxXqWGpVBNxANUBG0LRR+HG7WFCxAL/fkDfgPT3m8dl9L5mrFjCaUYAAGHl66E
- lz13El8J7sk3D4E1A715+fzgyeSIxoA0OWKjmnR9gROCuhGCkjkpaDSlNgkxB65pceEO
- azaqAky0K5yem+mIzDm4ONWdzzWfP/dVX1zRi/xi/FoZheY4jCmIYDCu6pOZk/JInkKt
- SaWP8ncOe1CWqhT9jIxezNpqg6D6cgLxNODzdHih1RMUqGUjLNDHfHOcgCCa/IeLYe4A
- l0aa3iPFDwf5bzAHCQ2aqpUxgS1Lm++LuRcZ3mj7JW7BLFzxuBEO1gIZ2AYru6q11MGc
- jLqw==
-X-Gm-Message-State: AHQUAub2Kgnrja8x32NercPxHfZlBUYfnU4tPGbiVedV3w+FjFt4dg3a
- wXB2wNvZPPUXWg/1Vt5PfjD6/w==
-X-Google-Smtp-Source: AHgI3IYj7ckxoDKJl3E4bX/rvyXEihO7cEuEYlmgZecPBrtn60bN0Tp19Cvro+2kMS5QDOx/dl2T5Q==
-X-Received: by 2002:a50:b527:: with SMTP id y36mr19649567edd.83.1550498629140; 
- Mon, 18 Feb 2019 06:03:49 -0800 (PST)
+ bh=I6Qr3PnJqhUErKNHRtGnpwGVLGbDm4vYaQedao4hHXI=;
+ b=lLrze6WCzk6AM4c2tsQIn5i8IScBd/ALFMB9NmddtwFkjumD5bwYH3moouN5MM4hVn
+ uc7f1S5MbeGct4QuT3LMhPiFgpwAGQdNBmvcLMnAVR7E/BKHZPIkcSUprbRzc56AX/x0
+ oezq8ubHBIKakci5JlrXNk4Q9MkLwii7rra/i+eibfBc+v7arjko6jfuzInUcN9+aiUt
+ of+v1S2j+1dLx2A8w7VbCf78JkY+Y9mZQQ5Iw9V5w7ffD2d5gK8QuF9cjKxz1L+4/k5i
+ bkXI66UZLPTNKSlEB0DeoiRrRMKDkzId6xe7X2+AifGse1Tr7+pR1/Q7/aZIqMQWHxFQ
+ TOKA==
+X-Gm-Message-State: AHQUAuar7Tdb+7e8c2G+zVMVh2xPvEkkAj+1+8eEWrIur3LLumzZyKZB
+ jJeF/niP+uBpctvRooADf+8fyA==
+X-Google-Smtp-Source: AHgI3IZi9n1v6BYfISfADbqQLufHezmPHIqiJiJUI3/6IPWV+cI2byGpqq/pa18Sn/cvn8B5knGS2w==
+X-Received: by 2002:a17:906:ee2:: with SMTP id
+ x2mr16832980eji.202.1550498631380; 
+ Mon, 18 Feb 2019 06:03:51 -0800 (PST)
 Received: from localhost.localdomain (ip-188-118-3-185.reverse.destiny.be.
  [188.118.3.185])
- by smtp.gmail.com with ESMTPSA id w48sm1421606eda.88.2019.02.18.06.03.47
+ by smtp.gmail.com with ESMTPSA id w48sm1421606eda.88.2019.02.18.06.03.50
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 18 Feb 2019 06:03:48 -0800 (PST)
+ Mon, 18 Feb 2019 06:03:50 -0800 (PST)
 From: Patrick Havelange <patrick.havelange@essensium.com>
 To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
  Lars-Peter Clausen <lars@metafoo.de>,
@@ -89,16 +90,15 @@ To: Jonathan Cameron <jic23@kernel.org>, Hartmut Knaack <knaack.h@gmx.de>,
  devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-pwm@vger.kernel.org,
  linuxppc-dev@lists.ozlabs.org
-Subject: [PATCH 2/8] drivers/pwm: pwm-fsl-ftm: use common header for FlexTimer
- #defines
-Date: Mon, 18 Feb 2019 15:03:15 +0100
-Message-Id: <20190218140321.19166-2-patrick.havelange@essensium.com>
+Subject: [PATCH 4/8] dt-bindings: iio/counter: ftm-quaddec
+Date: Mon, 18 Feb 2019 15:03:17 +0100
+Message-Id: <20190218140321.19166-4-patrick.havelange@essensium.com>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190218140321.19166-1-patrick.havelange@essensium.com>
 References: <20190218140321.19166-1-patrick.havelange@essensium.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_060350_954763_4392658F 
-X-CRM114-Status: GOOD (  12.80  )
+X-CRM114-CacheID: sfid-20190218_060353_184172_3450651E 
+X-CRM114-Status: GOOD (  13.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,72 +117,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This also fixes the wrong value for the previously defined
-FTM_MODE_INIT macro (it was not used).
+FlexTimer quadrature decoder driver.
 
 Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
 Reviewed-by: Esben Haabendal <esben@haabendal.dk>
 ---
- drivers/pwm/pwm-fsl-ftm.c | 44 +--------------------------------------
- 1 file changed, 1 insertion(+), 43 deletions(-)
+ .../bindings/iio/counter/ftm-quaddec.txt       | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
 
-diff --git a/drivers/pwm/pwm-fsl-ftm.c b/drivers/pwm/pwm-fsl-ftm.c
-index 883378d055c6..f21ea1b97116 100644
---- a/drivers/pwm/pwm-fsl-ftm.c
-+++ b/drivers/pwm/pwm-fsl-ftm.c
-@@ -22,51 +22,9 @@
- #include <linux/pwm.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
-+#include <linux/fsl/ftm.h>
- 
--#define FTM_SC		0x00
--#define FTM_SC_CLK_MASK_SHIFT	3
--#define FTM_SC_CLK_MASK	(3 << FTM_SC_CLK_MASK_SHIFT)
- #define FTM_SC_CLK(c)	(((c) + 1) << FTM_SC_CLK_MASK_SHIFT)
--#define FTM_SC_PS_MASK	0x7
--
--#define FTM_CNT		0x04
--#define FTM_MOD		0x08
--
--#define FTM_CSC_BASE	0x0C
--#define FTM_CSC_MSB	BIT(5)
--#define FTM_CSC_MSA	BIT(4)
--#define FTM_CSC_ELSB	BIT(3)
--#define FTM_CSC_ELSA	BIT(2)
--#define FTM_CSC(_channel)	(FTM_CSC_BASE + ((_channel) * 8))
--
--#define FTM_CV_BASE	0x10
--#define FTM_CV(_channel)	(FTM_CV_BASE + ((_channel) * 8))
--
--#define FTM_CNTIN	0x4C
--#define FTM_STATUS	0x50
--
--#define FTM_MODE	0x54
--#define FTM_MODE_FTMEN	BIT(0)
--#define FTM_MODE_INIT	BIT(2)
--#define FTM_MODE_PWMSYNC	BIT(3)
--
--#define FTM_SYNC	0x58
--#define FTM_OUTINIT	0x5C
--#define FTM_OUTMASK	0x60
--#define FTM_COMBINE	0x64
--#define FTM_DEADTIME	0x68
--#define FTM_EXTTRIG	0x6C
--#define FTM_POL		0x70
--#define FTM_FMS		0x74
--#define FTM_FILTER	0x78
--#define FTM_FLTCTRL	0x7C
--#define FTM_QDCTRL	0x80
--#define FTM_CONF	0x84
--#define FTM_FLTPOL	0x88
--#define FTM_SYNCONF	0x8C
--#define FTM_INVCTRL	0x90
--#define FTM_SWOCTRL	0x94
--#define FTM_PWMLOAD	0x98
- 
- enum fsl_pwm_clk {
- 	FSL_PWM_CLK_SYS,
+diff --git a/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt b/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
+new file mode 100644
+index 000000000000..4d18cd722074
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/counter/ftm-quaddec.txt
+@@ -0,0 +1,18 @@
++FlexTimer Quadrature decoder counter
++
++This driver exposes a simple counter for the quadrature decoder mode.
++
++Required properties:
++- compatible:		Must be "fsl,ftm-quaddec".
++- reg:			Must be set to the memory region of the flextimer.
++
++Optional property:
++- big-endian:		Access the device registers in big-endian mode.
++
++Example:
++		counter0: counter@29d0000 {
++			compatible = "fsl,ftm-quaddec";
++			reg = <0x0 0x29d0000 0x0 0x10000>;
++			big-endian;
++			status = "disabled";
++		};
 -- 
 2.17.1
 
