@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
 	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A28D6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 23:13:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16AF9C00319
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 23:13:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 70BC3218AD
+	by mail.kernel.org (Postfix) with ESMTPS id D35F521901
 	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 23:13:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rmoETkxG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="bsfGy1P+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70BC3218AD
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QhszEAQz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="Kim7VCp0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D35F521901
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sthsSvMUaaQjyiG0CMwXttSgvn7Rs18HWIvM/c2VlGU=; b=rmoETkxGcuPzWq
-	1u8RaGr+1xl95OVH4okYmvlnjCAxRX9QuitV0oVqsFU+eCholUB8XMQlBPZdW7UhC+W4TAcv3ixji
-	fDRmWfAUiVjkQjykGEqm7TDNQsR+oXgua73rdwg1C6PDYUV4uGi0a+ED/PSG/aNlz+h8Bv6lfPAW/
-	s0leh0Cl+jDGZOX0B4TTS4D/VO+SiNXOWCdnII6Zi7QluI49Zrt6oW9ZfbQXxoiNfg1+wCtby9qbF
-	pFWqmI6BA0soy0Pw58an5j4r6RiqUUUtxp1fYIwyark11O3BxDi1GTqw+xhnSM+yZ+/r2gyrMYX9U
-	Zy+AZopE3nmXNU4mj88g==;
+	List-Owner; bh=471zge+HjNJVqWRM7gFbjn3rxWkZXasALX3p7Tq3In8=; b=QhszEAQzqDyEe5
+	j7v3d7lSEHsWVGQnGwdnRyQwoZDxmSP+YFzo9IDllazY6Cr9KsuzG/8OyBBGld+UnbBEGj6BUHx2f
+	JNyr5ofNnmBOC+aJH2i9HbobbagI4TBuWQGly4e0bbwfwOxND3Cd1O5jXqOXmntEaMkrih9Nru7ug
+	hdfzFX/z9wKEuS6KF4ld7iFyOROkrFutBm0yodgmV2H2dI/qJaiLmBa0QN5nGyos9KZwTp8PZNdPV
+	kGbx5vjCg9BAcKZBY7Q65OM7/FjH5T6qeD60YEpRfsmTYbEJNZGd7ZVe3tFMKvLhTY9pCy1IAOzq9
+	i8WkFbrSFR+kHQ9ZQeyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvs6S-0000VC-Vq; Mon, 18 Feb 2019 23:13:37 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gvs6L-0000LO-TS; Mon, 18 Feb 2019 23:13:29 +0000
+Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvs6J-0000KV-AG
+ id 1gvs6I-0000KU-Tp
  for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 23:13:28 +0000
-Received: by mail-it1-x143.google.com with SMTP id l66so1919547itg.3
+Received: by mail-it1-x142.google.com with SMTP id i2so1890180ite.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 15:13:26 -0800 (PST)
+ Mon, 18 Feb 2019 15:13:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=V1IdqbYubtCixESl5TR0muUvkg/E2O8mQvzM202vMJY=;
- b=bsfGy1P+JAaNzK2xsZmC2Tj104zGh/lur1QTBqvenBJ2/qYq2g/zlrWxNZQtQfM35p
- SvHcbH51aav58mTv6SC3r+eXafQV/q2wT7dySMfLdYtqGwd3IU4BO5OncxK0Sc1m+fIj
- nQfKurxrxsrekUV5Engn2LJyRILWrYvwJyz5n0SWzgddARHKb325HaCw91Il4vDU1Zx/
- mk9/PYlyIFAHhkP2hr5znpaOUFZOUpl6KFCa/NcBzVtwHJoN4RB7/T7YpN2vbUZpYTCL
- LQgIbfhf2ht7PVFcOoXfG78S2gMcj0aiK0WoV3lEAuUhwncWxtNbknbhAN1dIFxSI790
- gxtw==
+ bh=U/EYw2rlCI4mDqlXBqXNVekL8hDo+V+cu5waHUfY2FU=;
+ b=Kim7VCp0StMXRnvvAWqYcMEpvO63kYz5zHERRNvlruuQQyJ/O/6e+78airAc6V3njt
+ QPh65tXH7igo5M8n9Y+AY35NXYR4O99incnRtGZjj5tDT4G/3SpUfm/d5+VrXm3QMc14
+ 75MeWggtjgmG93XKz8SbkdnbNJxnW40gBOu2nYy4fTAaAZalUyFgJHBLbbsFBZcpmf7r
+ gIqdQ766/KCsrLwCM+YpAq/CN78i4u/aY+3DZvUca0RcFYIOEnylrKumqeycBQkWaONH
+ MUXpvu3EkRdDRMckSlclBjo8KbsFUEzseKNLXMHT/gA5Kd3J8udX+m6D9rsbbBHZIn4Z
+ 4luA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=V1IdqbYubtCixESl5TR0muUvkg/E2O8mQvzM202vMJY=;
- b=HlfyH1qI3pgLl4fE6jhEf2y23PkxO/yEJsEfv5i8ZnHGJG0s59HK3lKM5HDmlD9zUW
- tryyWkWIqu/l6rjS5Nysdv86ytyqw3kvJQi67Pe7vhg17wyg2J2EX00/ZtWMEamwdK4m
- QsaRmjuotT417b4qUiw0fUoC6QQnIfTYzlwlCwuMY3jGEo/ok4/icpY1qIW0AzGlS3DR
- rjQPrPUpg1Rif7Vm7jb0dSQ2GzEZUdJhHzYeVbVm4zCYQfjy5FE7PLgS0lbg9CWfO+U+
- 6LI4z8tmdfaNAEgNKTLEs1ldgxCtCdZvs23yeGXqZTjMPhVV/0MY5wtC421utkyYvEhH
- +iHA==
-X-Gm-Message-State: AHQUAua4mjl0TGaGdHgSd5PiUgNj/YEeIgltidAgDCXf3Q7ikJKI9kkC
- eZzf8jqYIbbO3C6o5cgjVFnuKw==
-X-Google-Smtp-Source: AHgI3IZT6Mu4hL5CdKV5I1EiL7aKLnA6dLePkX8jtfw/N38Liese0eXKCRasVCtk+AF0ZUvijxlkeQ==
-X-Received: by 2002:a24:7d88:: with SMTP id b130mr796701itc.163.1550531606189; 
- Mon, 18 Feb 2019 15:13:26 -0800 (PST)
+ bh=U/EYw2rlCI4mDqlXBqXNVekL8hDo+V+cu5waHUfY2FU=;
+ b=l4q9+ouGm/G7/xGTeL1JpIOIIi+TCAQt/CjHCDIsCdURX5SN3kvrH6Stukr+FJRXP7
+ sFtyBfbYorSi4CmM7NPEDgIvUqbwE85DqQf+KMN6AVvlDpH6yYCgxt3M1MNxqBr64Pv0
+ Qc29bk3rlYImifJJwew7QDnaIuT4Yt15/MEacwxoDc1JToAnUMIkd6nXcybpMHnoj9BR
+ g99YZNOH4QN+Bwrks2oDOVJxshkju26hzkjW12iQD/LCm3/FszDk52eWdXiTHRckM2Bh
+ KtLdt8RO9eEi2lrFvyjvVXJyC8hvjGXbMdH+Slok4qADFum1p89jN6fKODEg8END747C
+ 6OlA==
+X-Gm-Message-State: AHQUAuaiw+PkFtxlkWSEZ6pBzhiPQiMcHVeGP9uz4o33MvYGnyX9prgH
+ irHvBSGOKJljeRKPQOezmrMhUQ==
+X-Google-Smtp-Source: AHgI3IZhDNTkjmRqX5ciPMAt1QHx6yCLXNgtuFuVzvtd4/Fv0kqYiBMJG132E3NRHTpB/NiNuEH4qw==
+X-Received: by 2002:a24:918c:: with SMTP id i134mr744158ite.92.1550531604541; 
+ Mon, 18 Feb 2019 15:13:24 -0800 (PST)
 Received: from yuzhao.bld.corp.google.com
  ([2620:15c:183:0:a0c3:519e:9276:fc96])
- by smtp.gmail.com with ESMTPSA id x23sm6541463ion.38.2019.02.18.15.13.24
+ by smtp.gmail.com with ESMTPSA id x23sm6541463ion.38.2019.02.18.15.13.23
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 18 Feb 2019 15:13:25 -0800 (PST)
+ Mon, 18 Feb 2019 15:13:23 -0800 (PST)
 From: Yu Zhao <yuzhao@google.com>
 To: Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>
-Subject: [PATCH v2 2/3] arm64: mm: don't call page table ctors for init_mm
-Date: Mon, 18 Feb 2019 16:13:18 -0700
-Message-Id: <20190218231319.178224-2-yuzhao@google.com>
+Subject: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
+Date: Mon, 18 Feb 2019 16:13:17 -0700
+Message-Id: <20190218231319.178224-1-yuzhao@google.com>
 X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
-In-Reply-To: <20190218231319.178224-1-yuzhao@google.com>
+In-Reply-To: <20190214211642.2200-1-yuzhao@google.com>
 References: <20190214211642.2200-1-yuzhao@google.com>
- <20190218231319.178224-1-yuzhao@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_151327_351891_A1F48F60 
-X-CRM114-Status: GOOD (  15.26  )
+X-CRM114-CacheID: sfid-20190218_151326_988645_D1C55B50 
+X-CRM114-Status: GOOD (  15.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,59 +112,124 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-init_mm doesn't require page table lock to be initialized at
-any level. Add a separate page table allocator for it, and the
-new one skips page table ctors.
-
-The ctors allocate memory when ALLOC_SPLIT_PTLOCKS is set. Not
-calling them avoids memory leak in case we call pte_free_kernel()
-on init_mm.
+For pte page, use pgtable_page_ctor(); for pmd page, use
+pgtable_pmd_page_ctor() if not folded; and for the rest (pud,
+p4d and pgd), don't use any.
 
 Signed-off-by: Yu Zhao <yuzhao@google.com>
 ---
- arch/arm64/mm/mmu.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ arch/arm64/mm/mmu.c | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index fa7351877af3..e8bf8a6300e8 100644
+index b6f5aa52ac67..fa7351877af3 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -370,6 +370,16 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+@@ -98,7 +98,7 @@ pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ }
+ EXPORT_SYMBOL(phys_mem_access_prot);
+ 
+-static phys_addr_t __init early_pgtable_alloc(void)
++static phys_addr_t __init early_pgtable_alloc(int shift)
+ {
+ 	phys_addr_t phys;
+ 	void *ptr;
+@@ -173,7 +173,7 @@ static void init_pte(pmd_t *pmdp, unsigned long addr, unsigned long end,
+ static void alloc_init_cont_pte(pmd_t *pmdp, unsigned long addr,
+ 				unsigned long end, phys_addr_t phys,
+ 				pgprot_t prot,
+-				phys_addr_t (*pgtable_alloc)(void),
++				phys_addr_t (*pgtable_alloc)(int),
+ 				int flags)
+ {
+ 	unsigned long next;
+@@ -183,7 +183,7 @@ static void alloc_init_cont_pte(pmd_t *pmdp, unsigned long addr,
+ 	if (pmd_none(pmd)) {
+ 		phys_addr_t pte_phys;
+ 		BUG_ON(!pgtable_alloc);
+-		pte_phys = pgtable_alloc();
++		pte_phys = pgtable_alloc(PAGE_SHIFT);
+ 		__pmd_populate(pmdp, pte_phys, PMD_TYPE_TABLE);
+ 		pmd = READ_ONCE(*pmdp);
+ 	}
+@@ -207,7 +207,7 @@ static void alloc_init_cont_pte(pmd_t *pmdp, unsigned long addr,
+ 
+ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
+ 		     phys_addr_t phys, pgprot_t prot,
+-		     phys_addr_t (*pgtable_alloc)(void), int flags)
++		     phys_addr_t (*pgtable_alloc)(int), int flags)
+ {
+ 	unsigned long next;
+ 	pmd_t *pmdp;
+@@ -245,7 +245,7 @@ static void init_pmd(pud_t *pudp, unsigned long addr, unsigned long end,
+ static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
+ 				unsigned long end, phys_addr_t phys,
+ 				pgprot_t prot,
+-				phys_addr_t (*pgtable_alloc)(void), int flags)
++				phys_addr_t (*pgtable_alloc)(int), int flags)
+ {
+ 	unsigned long next;
+ 	pud_t pud = READ_ONCE(*pudp);
+@@ -257,7 +257,7 @@ static void alloc_init_cont_pmd(pud_t *pudp, unsigned long addr,
+ 	if (pud_none(pud)) {
+ 		phys_addr_t pmd_phys;
+ 		BUG_ON(!pgtable_alloc);
+-		pmd_phys = pgtable_alloc();
++		pmd_phys = pgtable_alloc(PMD_SHIFT);
+ 		__pud_populate(pudp, pmd_phys, PUD_TYPE_TABLE);
+ 		pud = READ_ONCE(*pudp);
+ 	}
+@@ -293,7 +293,7 @@ static inline bool use_1G_block(unsigned long addr, unsigned long next,
+ 
+ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
+ 			   phys_addr_t phys, pgprot_t prot,
+-			   phys_addr_t (*pgtable_alloc)(void),
++			   phys_addr_t (*pgtable_alloc)(int),
+ 			   int flags)
+ {
+ 	unsigned long next;
+@@ -303,7 +303,7 @@ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
+ 	if (pgd_none(pgd)) {
+ 		phys_addr_t pud_phys;
+ 		BUG_ON(!pgtable_alloc);
+-		pud_phys = pgtable_alloc();
++		pud_phys = pgtable_alloc(PUD_SHIFT);
+ 		__pgd_populate(pgdp, pud_phys, PUD_TYPE_TABLE);
+ 		pgd = READ_ONCE(*pgdp);
+ 	}
+@@ -344,7 +344,7 @@ static void alloc_init_pud(pgd_t *pgdp, unsigned long addr, unsigned long end,
+ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+ 				 unsigned long virt, phys_addr_t size,
+ 				 pgprot_t prot,
+-				 phys_addr_t (*pgtable_alloc)(void),
++				 phys_addr_t (*pgtable_alloc)(int),
+ 				 int flags)
+ {
+ 	unsigned long addr, length, end, next;
+@@ -370,11 +370,20 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
  	} while (pgdp++, addr = next, addr != end);
  }
  
-+static phys_addr_t pgd_kernel_pgtable_alloc(int shift)
-+{
-+	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
-+	BUG_ON(!ptr);
-+
-+	/* Ensure the zeroed page is visible to the page table walker */
-+	dsb(ishst);
-+	return __pa(ptr);
-+}
-+
- static phys_addr_t pgd_pgtable_alloc(int shift)
+-static phys_addr_t pgd_pgtable_alloc(void)
++static phys_addr_t pgd_pgtable_alloc(int shift)
  {
  	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
-@@ -591,7 +601,7 @@ static int __init map_entry_trampoline(void)
- 	/* Map only the text into the trampoline page table */
- 	memset(tramp_pg_dir, 0, PGD_SIZE);
- 	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
--			     prot, pgd_pgtable_alloc, 0);
-+			     prot, pgd_kernel_pgtable_alloc, 0);
+-	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
+-		BUG();
++	BUG_ON(!ptr);
++
++	/*
++	 * Initialize page table locks in case later we need to
++	 * call core mm functions like apply_to_page_range() on
++	 * this pre-allocated page table.
++	 */
++	if (shift == PAGE_SHIFT)
++		BUG_ON(!pgtable_page_ctor(virt_to_page(ptr)));
++	else if (shift == PMD_SHIFT && PMD_SHIFT != PUD_SHIFT)
++		BUG_ON(!pgtable_pmd_page_ctor(virt_to_page(ptr)));
  
- 	/* Map both the text and data into the kernel page table */
- 	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
-@@ -1067,7 +1077,8 @@ int arch_add_memory(int nid, u64 start, u64 size, struct vmem_altmap *altmap,
- 		flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
- 
- 	__create_pgd_mapping(swapper_pg_dir, start, __phys_to_virt(start),
--			     size, PAGE_KERNEL, pgd_pgtable_alloc, flags);
-+			     size, PAGE_KERNEL, pgd_kernel_pgtable_alloc,
-+			     flags);
- 
- 	return __add_pages(nid, start >> PAGE_SHIFT, size >> PAGE_SHIFT,
- 			   altmap, want_memblock);
+ 	/* Ensure the zeroed page is visible to the page table walker */
+ 	dsb(ishst);
 -- 
 2.21.0.rc0.258.g878e2cd30e-goog
 
