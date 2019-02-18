@@ -2,79 +2,62 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19419C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:53:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F1791C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:54:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D8BF9217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:53:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C0871204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:54:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UTBuhvjO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8BF9217D9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iACNEn+G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0871204EC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=s1823bK7KDtIZyogUpjZwV68Aj1rpGTBebRY7QjX+aM=; b=UTBuhvjORuSzz9
-	InUcMGGxx++dfsn1EZU4+fvQcR4psB2QCR3t/SopEK5AhoGxSL3lXKXSKIwWnjbK1tU7AcHywQh4Y
-	bvfEvetcOPNEg41TMhUemdVXhPkJb4KOuKbWLYTSFQ1QBvZ0dInOV4ILFEW4cpJd/Eqb6Z/ga6s0U
-	o+SJis31ImTQdXcdglMkoGvDCL/WZZdWbnrmmrVLf6dzwiHb9svYBmAsryDZ3654fRlj2y8zLyQbA
-	kCL2LbstuOLU9XCE0pNT1eTyw1ul7h7UGSTfAmD1m9mYXa8GV5fuf7aWzSvGg4HUoSETWE7ow7DcR
-	gRf8jeBYzl2HshYQq53Q==;
+	List-Owner; bh=qdyN6lOshXUwtbTjGNoWThvBGj0R41hcoAZnAamOfQM=; b=iACNEn+GIHSt9N
+	bjJ1HCiQg5CPT0rg59V48XOy4K++GEkmQ6WXj8wMTbnvAin8rcx+kDeJF2nS1g01lQUr5HIVnJrdr
+	wKL6+DWUGVRK5TNGvOfQ7T3X0ZjbgsLSjNtz9/2tggALvnk5h72KlcPVvf7p4b27hR/mBOX/N7lav
+	1V6DLe6KkFNf9s/M4cl/BdpxhTUaVwSRqAdWGhcF8kuXVflRMV+4yNHHdZSBqMO0xMC9IKC7oyAka
+	IF0lE1E2cmPVtnJoOVUiIZBrxRqHls2wIy3Fjo0OA6CC+OmzBRA743kRXf8GV916IMejBwoqxHVbi
+	xZI3iGizP2DxJSmFsJ7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvoyw-0004FJ-Uw; Mon, 18 Feb 2019 19:53:38 +0000
-Received: from mail-ot1-f66.google.com ([209.85.210.66])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvoyr-0004ER-8Y
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:53:37 +0000
-Received: by mail-ot1-f66.google.com with SMTP id n8so30280983otl.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 11:53:32 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=jlCn6jkU9IcrascAKbvn8O2rZxuEgNgJdsYgsK3IElI=;
- b=qaOp5RNo3B+gKdxX+HuPSJ3+42WHCncOAt6TNzCrpO7JbCspQa61MkoyqTNZ2KcctZ
- YAQ5FFpuwvLjMaIA9anVnR5PT92E+9ZshBqvbrVrDSXe7nfKi05ezJHgpL0AIHx+tbfx
- xJmaJ2erFnmKdTjukAPxlmjMcKhan5QkKbGikpNynF0mN0Vgt3x0E6AdibACeQoNbKAS
- KNQ8atSb7cHDQfRlSAVmQIE26sIZRZHS21X8fOd2abaf0z0K23V1v0ZxpJ6CM/6F3ePr
- 23tToXBi5Ikb+LLwctYpswtgfMvrxuHIJzvuNZdBAlliOVVvW1/0Fy0S0RLwnfjTowdv
- BhpA==
-X-Gm-Message-State: AHQUAuaZfATFIMxEIIo53aBuQXmD5BzKc7A27JDL8RNo3F1e+qIluLtI
- DJ/wkm4q53xX53Pq4rQZtQ==
-X-Google-Smtp-Source: AHgI3IbXfww3DGmS1wTGJkahwv30ASz3Kha7vmnPGZyuh+3CKl0nRO4gkvq47EYtC015ktvSNWYUeg==
-X-Received: by 2002:a9d:7554:: with SMTP id b20mr14723858otl.32.1550519612296; 
- Mon, 18 Feb 2019 11:53:32 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id t77sm4388276oie.26.2019.02.18.11.53.31
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 18 Feb 2019 11:53:31 -0800 (PST)
-Date: Mon, 18 Feb 2019 13:53:31 -0600
-From: Rob Herring <robh@kernel.org>
-To: Sugaya Taichi <sugaya.taichi@socionext.com>
-Subject: Re: [PATCH v2 05/15] dt-bindings: timer: Add Milbeaut M10V timer
- description
-Message-ID: <20190218195331.GA16665@bogus>
-References: <1549628790-30960-1-git-send-email-sugaya.taichi@socionext.com>
+	id 1gvozS-0004YK-C6; Mon, 18 Feb 2019 19:54:10 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvozO-0004Vu-KJ
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AAF921684;
+ Mon, 18 Feb 2019 11:53:56 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 88D0E3FB75;
+ Mon, 18 Feb 2019 11:53:34 -0800 (PST)
+From: Dave Martin <Dave.Martin@arm.com>
+To: kvmarm@lists.cs.columbia.edu
+Subject: [PATCH v5 04/26] KVM: arm64: Refactor kvm_arm_num_regs() for easier
+ maintenance
+Date: Mon, 18 Feb 2019 19:52:17 +0000
+Message-Id: <1550519559-15915-5-git-send-email-Dave.Martin@arm.com>
+X-Mailer: git-send-email 2.1.4
+In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1549628790-30960-1-git-send-email-sugaya.taichi@socionext.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_115335_124609_57ACB905 
-X-CRM114-Status: GOOD (  11.71  )
+X-CRM114-CacheID: sfid-20190218_115407_038037_D015504C 
+X-CRM114-Status: GOOD (  13.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,33 +69,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Sugaya Taichi <sugaya.taichi@socionext.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>, Thomas Gleixner <tglx@linutronix.de>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+Cc: Peter Maydell <peter.maydell@linaro.org>,
+ Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ Julien Grall <julien.grall@arm.com>,
+ =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri,  8 Feb 2019 21:26:30 +0900, Sugaya Taichi wrote:
-> Add DT bindings document for Milbeaut M10V timer.
-> 
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> ---
->  .../bindings/timer/socionext,milbeaut-timer.txt         | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/socionext,milbeaut-timer.txt
-> 
-
-Reviewed-by: Rob Herring <robh@kernel.org>
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+a3ZtX2FybV9udW1fcmVncygpIGFkZHMgdG9nZXRoZXIgdmFyaW91cyBwYXJ0aWFsIHJlZ2lzdGVy
+IGNvdW50cyBpbgphIGZyZWVmb3JtIHN1bSBleHByZXNzaW9uLCB3aGljaCBtYWtlcyBpdCBoYXJk
+ZXIgdGhhbiBuZWNlc3NhcnkgdG8KcmVhZCBkaWZmcyB0aGF0IGFkZCwgbW9kaWZ5IG9yIHJlbW92
+ZSBhIHNpbmdsZSB0ZXJtIGluIHRoZSBzdW0KKHdoaWNoIGlzIGV4cGVjdGVkIHRvIHRoZSBjb21t
+b24gY2FzZSB1bmRlciBtYWludGVuYW5jZSkuCgpUaGlzIHBhdGNoIHJlZmFjdG9ycyB0aGUgY29k
+ZSB0byBhZGQgdGhlIHRlcm0gb25lIHBlciBsaW5lLCBmb3IKbWF4aW11bSByZWFkYWJpbGl0eS4K
+ClNpZ25lZC1vZmYtYnk6IERhdmUgTWFydGluIDxEYXZlLk1hcnRpbkBhcm0uY29tPgpSZXZpZXdl
+ZC1ieTogQWxleCBCZW5uw6llIDxhbGV4LmJlbm5lZUBsaW5hcm8ub3JnPgotLS0KIGFyY2gvYXJt
+NjQva3ZtL2d1ZXN0LmMgfCAxMCArKysrKysrKy0tCiAxIGZpbGUgY2hhbmdlZCwgOCBpbnNlcnRp
+b25zKCspLCAyIGRlbGV0aW9ucygtKQoKZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQva3ZtL2d1ZXN0
+LmMgYi9hcmNoL2FybTY0L2t2bS9ndWVzdC5jCmluZGV4IDQ2ZWI4NjcuLjY1ZjQzMzggMTAwNjQ0
+Ci0tLSBhL2FyY2gvYXJtNjQva3ZtL2d1ZXN0LmMKKysrIGIvYXJjaC9hcm02NC9rdm0vZ3Vlc3Qu
+YwpAQCAtMzEyLDggKzMxMiwxNCBAQCBzdGF0aWMgaW50IGdldF90aW1lcl9yZWcoc3RydWN0IGt2
+bV92Y3B1ICp2Y3B1LCBjb25zdCBzdHJ1Y3Qga3ZtX29uZV9yZWcgKnJlZykKICAqLwogdW5zaWdu
+ZWQgbG9uZyBrdm1fYXJtX251bV9yZWdzKHN0cnVjdCBrdm1fdmNwdSAqdmNwdSkKIHsKLQlyZXR1
+cm4gbnVtX2NvcmVfcmVncygpICsga3ZtX2FybV9udW1fc3lzX3JlZ19kZXNjcyh2Y3B1KQotCQkr
+IGt2bV9hcm1fZ2V0X2Z3X251bV9yZWdzKHZjcHUpCSsgTlVNX1RJTUVSX1JFR1M7CisJdW5zaWdu
+ZWQgbG9uZyByZXMgPSAwOworCisJcmVzICs9IG51bV9jb3JlX3JlZ3MoKTsKKwlyZXMgKz0ga3Zt
+X2FybV9udW1fc3lzX3JlZ19kZXNjcyh2Y3B1KTsKKwlyZXMgKz0ga3ZtX2FybV9nZXRfZndfbnVt
+X3JlZ3ModmNwdSk7CisJcmVzICs9IE5VTV9USU1FUl9SRUdTOworCisJcmV0dXJuIHJlczsKIH0K
+IAogLyoqCi0tIAoyLjEuNAoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxA
+bGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
+c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
