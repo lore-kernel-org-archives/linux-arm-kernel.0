@@ -1,73 +1,73 @@
 Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: *
-X-Spam-Status: No, score=1.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Level: 
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNWANTED_LANGUAGE_BODY autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 846BAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:46:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2287BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:53:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4976421848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:46:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E5B60206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 12:53:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YlvfEycz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4976421848
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z46si9Ge";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="UUmN5Ppr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5B60206A3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PuQGH4uS02iVPDqZpXucN2IDUu+rD5cVKSo+ZscZGC8=; b=YlvfEycza2mMmj
-	otjjAijQZowrOgIhRAcLNdQrHTxYbYaKJswzrYFmATs8TfUOhMHvo37LcBE5nqq14scyqw1iG1tx6
-	lUCtyt1W0Y0vy93BMeaXv6MOjMkQQVyEabCf44fD1VzSsrm4hGZEh+Nf0g8Pfgf3lEPsrC/FIoGNm
-	rqD4x0r5gqaAhjSR8jdPMtvPpBMwJTD/8gySqEf3U4B3wwO/kBLLXPe35uYEkyeywnGyGEAhXjwux
-	+jax7JOSuwH/FY4YmpXpM4HWax1umfUP1iivo1bXazkcvSmFN8JeEklAOb/3VpzGVkTsC/VHCpuQp
-	VX1B5lKE8IM9kDAbMq8g==;
+	List-Owner; bh=MzHvInfm8FTtnPMCSGUEAlLNZQVT4944q1vyzeebX5k=; b=Z46si9GerdUSp4
+	ih1bZNon6PfMfvhXXnqV86XeJpNcWfci2bc2XNN/JlmJaj8HnCzc7j3dwwqBTqydp/P1rtotX23Lf
+	jMoNHNNvZ6nSrkVNyN1niXLBCTK0OfB544zwkrLLQUDlRV88n6849u2sn9EJR4I8umK1FR5T69RnQ
+	EBXNUgEG1PkF7mf38WAIoxU/7eJ0v+AOcnGCb2ss6XxU1gzaaCds2h3A2aQR/NJCDREWmozzPbhrt
+	INjjJY+3MfYMJp1ZtI3mcKOBHd7XzBMG3qZ8asY+oV2OADYvqbMXJhARjGqQ8y/8HE5uZTM+5mnBi
+	wYGiQVBMOB29WGukVmkQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gviJd-0006w8-AK; Mon, 18 Feb 2019 12:46:33 +0000
-Received: from mail-qt1-f172.google.com ([209.85.160.172])
+	id 1gviQU-0000Qp-0s; Mon, 18 Feb 2019 12:53:38 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gviJZ-0006ve-PV
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 12:46:31 +0000
-Received: by mail-qt1-f172.google.com with SMTP id n32so18910444qte.11
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 04:46:29 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ZrEx2cRQxdXeodqjUo4XIcaCBR+a+Rm+BO9bl4vQgE0=;
- b=V+jlOoq79I+cD6xruu/dbDL/j+ov4bCMyAuhPdi7cKm5hbK3yHL8ClqZ5Blqx8hI6s
- pb0ZCG61Sj1hcTmKos4rKfkw05e7LexW1z84ut4x/ScVgz/Wic/10RTM/RrvQnPew7m8
- qRffn+afWEdUNq4KVzvSijVTzg/+2UDyG8JjhbsIzC4doQlawYF+qdXoGHK45Tqvfa8a
- i2WrfdP6ZQHVveBPJnStjNNAugitn9TKHnEhhIC5FQJavoAOUp+t2TkaRRfuZyZH2BVX
- cc0GlCJ84P4dYsZ5kVV832SmRZVEtk0dP83tAbl+m0N4CT9gRMeD6abRcP6pj1IdB0Um
- W69Q==
-X-Gm-Message-State: AHQUAubzFShYoMSSCcXMDUzEyIVWds5zSYUAtKSi7CZt1h+aOH4/V/7O
- 23IONOBA3JOU0CBp/HFhyOi97EKqEakJOycJQJD+Ew==
-X-Google-Smtp-Source: AHgI3IbcUInUC9bZ2/6MuX6JJ/ZxG4chFw+umwjVbPJvSTQCiJCExkippLPqaUdbHRq6riEsVeCXIO/97R19AkMcaUQ=
-X-Received: by 2002:ac8:2c34:: with SMTP id d49mr18293738qta.152.1550493988723; 
- Mon, 18 Feb 2019 04:46:28 -0800 (PST)
+ id 1gviQS-0000Qf-5D
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 12:53:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=o9duW35qkVBByBckeYSVEKqqj00p/T7Hi5MwdEAEhQc=; b=UUmN5PprHGZoQhOVHvZZxxJb6
+ hHw50LSLCBROSQL9dckvU4QK0G/XtpZkGlOE+IrG+Y3MjB8IcVVJNHqDu2HdKKRDJA+2dmdwNvo15
+ QwQpbpiQ16sHm+WUw5EUSP0G9AE4KToH8ivrK8ZBdcvtxBcc+HLCzZHeDamtsfBX8gS0Em6FACMYx
+ 68vR6PCWS0O5qe7x/LTU2hEqxCztkwJImv7YffHR/lCLtRvtVOd2imCaEFcFFI+1zU3HPd7ZVlQsK
+ POL7d7amdHmnvg8t+qHVMR96ym+N+D/NMxmBIr0C85eSdoo2UoOIgwOv7pgu8BDdKkFfUU4Ns+nfL
+ vsFqBi97Q==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gviQL-0006Mc-Hs; Mon, 18 Feb 2019 12:53:29 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 0F9C9286A33C8; Mon, 18 Feb 2019 13:53:27 +0100 (CET)
+Date: Mon, 18 Feb 2019 13:53:27 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Mark Rutland <Mark.Rutland@arm.com>
+Subject: Re: [PATCH 03/13] mm: Add generic p?d_large() macros
+Message-ID: <20190218125327.GT32494@hirez.programming.kicks-ass.net>
+References: <20190215170235.23360-1-steven.price@arm.com>
+ <20190215170235.23360-4-steven.price@arm.com>
+ <20190218111421.GC8036@lakrids.cambridge.arm.com>
 MIME-Version: 1.0
-References: <cover.1549624030.git.horms+renesas@verge.net.au>
-In-Reply-To: <cover.1549624030.git.horms+renesas@verge.net.au>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 18 Feb 2019 13:46:12 +0100
-Message-ID: <CAK8P3a3Ja1H5mH7zLTq6ruPrt6D5nBCVML1=ejpvL3i4+MKJ3g@mail.gmail.com>
-Subject: Re: [GIT PULL] Renesas ARM Based SoC DT Bindings Updates for v5.1
-To: Simon Horman <horms+renesas@verge.net.au>
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_044629_822276_7FA1E34F 
-X-CRM114-Status: UNSURE (   8.57  )
-X-CRM114-Notice: Please train this message.
+Content-Disposition: inline
+In-Reply-To: <20190218111421.GC8036@lakrids.cambridge.arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,28 +79,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kevin Hilman <khilman@kernel.org>, Magnus Damm <magnus.damm@gmail.com>,
- Linux-Renesas <linux-renesas-soc@vger.kernel.org>, arm-soc <arm@kernel.org>,
- Olof Johansson <olof@lixom.net>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Dave Hansen <dave.hansen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Catalin Marinas <Catalin.Marinas@arm.com>, "x86@kernel.org" <x86@kernel.org>,
+ Will Deacon <Will.Deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Steven Price <Steven.Price@arm.com>, "linux-mm@kvack.org" <linux-mm@kvack.org>,
+ =?iso-8859-1?B?Suly9G1l?= Glisse <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <James.Morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 11:48 AM Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> ----------------------------------------------------------------
-> Renesas ARM Based SoC DT Bindings Updates for v5.1
->
-> * Convert Renesas board/soc bindings to json-schema
-> * Correct SoC missmpatch for R-Car H2 (r8a7790) based Stout board
-> * Document RZ/A2M (r7s9210) based EVB
-> * Document RZ/G2E (r8a774c0) based cat87[45] boards
+On Mon, Feb 18, 2019 at 11:14:23AM +0000, Mark Rutland wrote:
+> > +#ifndef pgd_large
+> > +#define pgd_large(x)0
+> > +#endif
+> > +#ifndef pud_large
+> > +#define pud_large(x)0
+> > +#endif
+> > +#ifndef pmd_large
+> > +#define pmd_large(x)0
+> > +#endif
+> 
+> It might be worth a comment defining the semantics of these, e.g. how
+> they differ from p?d_huge() and p?d_trans_huge().
 
-Pulled into arm/dt, thanks!
+Yes; I took it to mean any large page mapping, so it would explicitly
+include huge and thp.
 
-     Arnd
+
 
 _______________________________________________
 linux-arm-kernel mailing list
