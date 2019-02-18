@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2D78C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB097C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1A6D217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 78F722070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 21:08:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A1Dsy9PT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1A6D217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IJuLfRPz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 78F722070D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,49 +25,50 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=O1AG7g9Gb/BLjGFcp3WW0CdmNUjYiuOuKkZBcD5YHHY=; b=A1Dsy9PTpOyzT7
-	z0lpTFRqEO/tzRfKi5eUlps36hwczK5JCHjEZATpvseV750TVo+ATooz8XJz5hWupXjY/Mn7Lu6E1
-	6gVgmYpZGJcAZEVRojPiib3/eBzpAy921W+Ucpw6kI2a7p6zCztAEM+HhSt60cyEzzyiRXrJXT+DZ
-	NTw5o/Qtx00qjk7lPTBcJQB611q3idrXzjbbKz/LHuXRc+iCbx9fJnlldwi1OKI7cipHbwOWObfve
-	IZIARiuyFrtB68WNl44Q0WFYNOXpkmBNXlUgBuQ1yQLFszUIHDXOnPwZLSzNIvzV1j8gQR9BFIbsq
-	fDAA3IbD2XaXbVEaOnNQ==;
+	List-Owner; bh=jUgxlOzPb8bbrKtN0yCXe5lEHvVBQUyiiRv8bnYWDJE=; b=IJuLfRPzaSe1sJ
+	oGADj+Isp/r6jSP1n5cNNZoDUg+TMOLTKbOVfKDeo20/PPEcGUdLV4Py42mo+X7gdYGgVhubp/klm
+	LhYwNSDCvEYxw6dSRGhvNxpwe8wPVARf1XzzPCToMUiffptQxhE1QphdiNtu70mT8/T4TPb3dTDWU
+	8sNEo3xtAYQWClIsAN4r0O7NVWaQkkUaI0IjrcWGkRhNyU7lrF7L6CgVCBKsbFw2gq2CxxPis8XNK
+	QRvvARNh09sg1z/L00NX/R9LAeDUsfFbmTFJ+r2oQSgXa1b4ex8GRxxJIKXtYlKrn+qNsz1FTlVTK
+	b9IgWus/PbC2QThzLjJQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvq9J-00067O-RZ; Mon, 18 Feb 2019 21:08:25 +0000
+	id 1gvq9k-0006WX-W5; Mon, 18 Feb 2019 21:08:53 +0000
 Received: from mout.kundenserver.de ([212.227.17.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvq8n-0005PP-IF; Mon, 18 Feb 2019 21:07:55 +0000
+ id 1gvq8o-0005QA-Kf; Mon, 18 Feb 2019 21:07:56 +0000
 Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
  (mreue106 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1MekKJ-1hVzpn14AH-00akyl; Mon, 18 Feb 2019 22:07:30 +0100
+ 1MlO9r-1hL1UD3zaP-00liHH; Mon, 18 Feb 2019 22:07:29 +0100
 From: Arnd Bergmann <arnd@arndb.de>
 To: y2038@lists.linaro.org
-Subject: [PATCH 8/8] riscv: Use latest system call ABI
-Date: Mon, 18 Feb 2019 22:07:12 +0100
-Message-Id: <20190218210712.3503891-9-arnd@arndb.de>
+Subject: [PATCH 6/8] checksyscalls: fix up mq_timedreceive and stat exceptions
+Date: Mon, 18 Feb 2019 22:07:10 +0100
+Message-Id: <20190218210712.3503891-7-arnd@arndb.de>
 X-Mailer: git-send-email 2.20.0
 In-Reply-To: <20190218210712.3503891-1-arnd@arndb.de>
 References: <20190218210712.3503891-1-arnd@arndb.de>
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:ScKittBUPbtTQVR0D2l9QJ/Xwbz5RAo/fF1oCAct/9ud6octFcV
- h3yKXHywP14xKDxJaVLEsUWPE3OmqCjnG82aCB4NUdkfbVY7hwv4QqVPvKB1vAHJ19xcaO5
- 3xAwwTl6rnM1agEMyLmSR6J//chNkfRHVVpRX4ULBuwjtaigY5FA4YB1h9617BWsOOYJd8J
- fZOQ9NbBzqv5qvep4QBaw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:o9dJBFc/2PE=:6OUQhfzYWqi4WunWGXaGYB
- f8vS8yA6t8rxXrEjV2+dgiT8v9CkTOE5ltkLO1zfySqpw9H5yP4F0tmidAyGQKJ18jc2Qyp94
- 12pypKf9UmKVK0cryzzr6qL/Yd7V+vqidT+8nqsm9QdjbFqAc9oM7DNzuVibjvheQ575PHNon
- Mkcdar5U2VYCW9MNIVaGPXl7REnT6LfBbW7cKOSXDJ5Ueq6q+FqEBKs8oNtXSfKAtkQ6rlLAN
- rJhAaxiN2ekwUPA2db0cmGB6ORpu86ikvL7CCJ6phhyUf18Sj6Z+TlT/Jpe2HRzdBFxRSaYvQ
- DVhHv05ZNrwohLC1oTH7uSavLNKG003rJPSpe1+0gP2g1lBzc3paQSXYX+4pHayuHNOPwyeTt
- G0OOTppm5+VkOO8Duiax8ns/IvgW45ytBJ3BgpkjOjafbeOfmsyjSMoOzLv7IYCk+25Op6WFS
- YBBLvab8oC/VSpr/Kn6RGM+0ag37Y9rpso+qx6z4QOS9k+wtjuSC+9bVcCWGUWN0P253djT0F
- U8R9lm90BTHgXMmBSrCRhNsU8LQ/HJFHjt3A15sYM23jsPlBKWZl8GQeh4KXdeCjaJbGM4kgI
- gjI6yl7I8ImAunRYolHOLl+VULxe9YqMH94pqQHuIuu+TEguAJfxe5f4F4DYeHuKz1sxnZhts
- JD8zXIPwT20T6Or/Fu7ywh3ogDuoLSaL0IxeXGWpKnHv2g1KT62daFuvl0mG/exugc4Oc4PUZ
- HDKrpRF9L+odFkMf/xPku6J4TybLaPqhB2kBrQ==
+X-Provags-ID: V03:K1:UgT5qLzBRe8uGhCU9AyHn5Jt9cfHoQ+D0/iLF4gMTpdoEuzsO5q
+ poQ3zyyety+N59s3VxhuXLURLB1ufFgiJP7cPrbxRJTMbWMQ7K0uKTGBFu/NpnSZWaFSdog
+ T5gcp2hhQXO/x3YKwmnCZyKSdPjGDBSytrIMMHzUDbw9nXiaOEcLEtNWS47SPtFe0pvedzm
+ Ahdkq9w/U6TCxmxQhHcnQ==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:FXDoJv4Bfvw=:6GGmsD/rmCT7ei5OeBL7DH
+ t9coJHnvAkWeYWrmUafR5IWBjDhHbw2hVsAkjpwqjvj3M0jVTAtvr7aqtTJp3u2S6u2FYnMqW
+ oespDKsgf17cgnskdeI7Sy/It7HDngnnl74fqB+LbOq6/d7fW09m7xuwmbqLX9HGP30okqkVC
+ l7Rv7RBccaKtbAvSmZmfBLGqy4RvBP2v1u7W8bw0wCcDCNj/9OGlxnPdKoduPuCDMljPNKkFg
+ JTtgWH8cJKfZZ2jO2wbH+O8AtgAx2NPL0R3zDybKPp0Dsvbr4choUvo5Ukzb/LYmpBH/5SqTj
+ 0eUWMq3UHbkVx8A/WLYPvrRLXGGufyIG3fJukEQka4tWA9POcGL7GbFZdx6cX1YBavQM6+ByU
+ zU4K+JW1rJnKBnsQVgKCCms9O+DsmmG7AUmR4yF7tA00HB40Cy1HsgjbxYpo0aWBks6MLe+8E
+ S7M6NSY9pyhl8HXrsGEtNZYBhlLUN0Cgw0vl8vgW3V9gq7fPe+GUbtgAxR7VsfN4YHZACoZ/p
+ IzfbkPLQA2l7yP0ln+KZkpHc+jEUnWcCy6Leah+mx8/eM2RAQSXAVtrOZGtmgJWqm69jQKts1
+ eeB3ScSFFC+r9IGdyNPr8m6apR0guzuUaE1Vw6q+1wIVfXRrJu6sT7SocYw82+e3UcDNhEurI
+ 7gyiHW/RS/RFQmAfCFQy82U8gb9TOHsW93BtxnO0Uva0vatR8Yfwov25b1QvqBmgsxezJ9Bpq
+ o0d2GWfT3VWHoeSTt3tl9IAc2q/hmZNKR3+1xg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_130754_002599_F4489AC8 
-X-CRM114-Status: GOOD (  10.28  )
+X-CRM114-CacheID: sfid-20190218_130754_976883_E180C3D2 
+X-CRM114-Status: UNSURE (   8.78  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,63 +93,44 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We don't yet have an upstream glibc port for riscv, so there is no user
-space for the existing ABI, and we can remove the definitions for 32-bit
-time_t, off_t and struct resource and system calls based on them,
-including the vdso.
+mq_timedreceive was spelled incorrectly, and we need exceptions
+for new architectures that leave out newstat or stat64, implementing
+only statx() now.
 
+Fixes: 48166e6ea47d ("y2038: add 64-bit time_t syscalls to all 32-bit architectures")
+Fixes: bf4b6a7d371e ("y2038: Remove stat64 family from default syscall set")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/riscv/Kconfig                   | 1 -
- arch/riscv/include/uapi/asm/unistd.h | 5 +----
- arch/riscv/kernel/vdso/Makefile      | 2 ++
- 3 files changed, 3 insertions(+), 5 deletions(-)
+ scripts/checksyscalls.sh | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/arch/riscv/Kconfig b/arch/riscv/Kconfig
-index 09fa3a87bf30..feeeaa60697c 100644
---- a/arch/riscv/Kconfig
-+++ b/arch/riscv/Kconfig
-@@ -11,7 +11,6 @@ config 32BIT
- 
- config RISCV
- 	def_bool y
--	select ARCH_32BIT_OFF_T if !64BIT
- 	# even on 32-bit, physical (and DMA) addresses are > 32-bits
- 	select PHYS_ADDR_T_64BIT
- 	select OF
-diff --git a/arch/riscv/include/uapi/asm/unistd.h b/arch/riscv/include/uapi/asm/unistd.h
-index 486a288b454c..0e2eeeb1fd27 100644
---- a/arch/riscv/include/uapi/asm/unistd.h
-+++ b/arch/riscv/include/uapi/asm/unistd.h
-@@ -17,11 +17,8 @@
- 
- #ifdef __LP64__
- #define __ARCH_WANT_NEW_STAT
--#endif /* __LP64__ */
- #define __ARCH_WANT_SET_GET_RLIMIT
--#ifndef __LP64__
--#define __ARCH_WANT_TIME32_SYSCALLS
+diff --git a/scripts/checksyscalls.sh b/scripts/checksyscalls.sh
+index ffd635efbdca..a18b47695f55 100755
+--- a/scripts/checksyscalls.sh
++++ b/scripts/checksyscalls.sh
+@@ -30,13 +30,10 @@ cat << EOF
+ #define __IGNORE_readlink	/* readlinkat */
+ #define __IGNORE_symlink	/* symlinkat */
+ #define __IGNORE_utimes		/* futimesat */
+-#if BITS_PER_LONG == 64
+ #define __IGNORE_stat		/* fstatat */
+ #define __IGNORE_lstat		/* fstatat */
+-#else
+ #define __IGNORE_stat64		/* fstatat64 */
+ #define __IGNORE_lstat64	/* fstatat64 */
 -#endif
-+#endif /* __LP64__ */
  
- #include <asm-generic/unistd.h>
- 
-diff --git a/arch/riscv/kernel/vdso/Makefile b/arch/riscv/kernel/vdso/Makefile
-index eed1c137f618..fec62b24df89 100644
---- a/arch/riscv/kernel/vdso/Makefile
-+++ b/arch/riscv/kernel/vdso/Makefile
-@@ -2,9 +2,11 @@
- 
- # Symbols present in the vdso
- vdso-syms  = rt_sigreturn
-+ifdef CONFIG_64BIT
- vdso-syms += gettimeofday
- vdso-syms += clock_gettime
- vdso-syms += clock_getres
-+endif
- vdso-syms += getcpu
- vdso-syms += flush_icache
- 
+ #ifndef __ARCH_WANT_SET_GET_RLIMIT
+ #define __IGNORE_getrlimit	/* getrlimit */
+@@ -138,7 +135,7 @@ cat << EOF
+ #define __IGNORE_io_pgetevents
+ #define __IGNORE_recvmmsg
+ #define __IGNORE_mq_timedsend
+-#define __IGNORE_mq_timedreceiv
++#define __IGNORE_mq_timedreceive
+ #define __IGNORE_semtimedop
+ #define __IGNORE_rt_sigtimedwait
+ #define __IGNORE_futex
 -- 
 2.20.0
 
