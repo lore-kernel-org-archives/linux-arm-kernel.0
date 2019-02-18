@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE97CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFF87C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AF711217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABFE6217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bxqj333s"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF711217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t4PGnkwG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABFE6217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,38 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=IwFySHXg+++fbG+M/agEuk5XzIF0veBL4qt9Aq2QaJI=; b=Bxqj333smaeEhNIM1W0rHCw9bX
-	HOnFAeT2nYA3rJqjKzy3A91yp28C1cB6kqtQdhmf4OLcvUAeTXf20BsZ2whJSCo1F70gZO8BYRSqW
-	vQZ6Xs1rqyt2xlVsVz9+g8d6pQK2wj6gGkfep0/+yHoUSazUCCB39ysro2KcJ0Ti0wINO8XxEFt+P
-	jX0JIRIKg6F/Cez07r3dMM9PoQ1eW0ZJna1M14YBslzfGaJq2k78sRssi4mbKTad81jzgaXvxPoIk
-	szW2Kaw4jxtIIp3sWS3TzDyGij8Im0ErFc0NdAThWARtgLfKY9Zubx95yK/S29TtgZiqyY3CkCVf1
-	4pn5nFkA==;
+	bh=2v4afn66RyEG65pB/yEJf6JriM4W00oY2xYq7N7Mp8Q=; b=t4PGnkwGnHOHtbS3QpW84X98AX
+	r1MVynchVYhPQ78qZhI4eYwB5NDJkmev4MRMGNrRbPxcUuR2FIajsQlyNCx8mGQz1xT4SzeVXhAuW
+	JsYcFsotMINUBrgVu+Yr14qLmVPSkfMA2HT3ZKeQYo3QVEGWRlpeeOKcTN34OnnQiLyZYLsE1gWXI
+	fqPr1sBjeYXg3bpTsTepHM2UOgSiou/WN6unI0pOxfFvWLC2Fxqd4BnBN5Bd1zGG77utustcvNOaI
+	yYZxv2WTYoEg8ZCIwA6ptPvfqQj+X59NCgxxUOwsiba/u0eqYrU0tJdymOP5umcjA+0tjyjYH7e1E
+	gnDpZJwA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp2C-0000DZ-Du; Mon, 18 Feb 2019 19:57:00 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gvp2N-0000SJ-R4; Mon, 18 Feb 2019 19:57:11 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozm-00051o-MM
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:45 +0000
+ id 1gvozs-00055H-9h
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:47 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5E5491C14;
- Mon, 18 Feb 2019 11:54:14 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 372C11DC8;
+ Mon, 18 Feb 2019 11:54:30 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 641B93F575;
- Mon, 18 Feb 2019 11:53:50 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 440253F740;
+ Mon, 18 Feb 2019 11:54:08 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 11/26] KVM: arm64: Extend reset_unknown() to handle mixed
- RES0/UNKNOWN registers
-Date: Mon, 18 Feb 2019 19:52:24 +0000
-Message-Id: <1550519559-15915-12-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 19/26] KVM: arm64: Enumerate SVE register indices for
+ KVM_GET_REG_LIST
+Date: Mon, 18 Feb 2019 19:52:32 +0000
+Message-Id: <1550519559-15915-20-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_115430_989558_24281632 
-X-CRM114-Status: GOOD (  13.31  )
+X-CRM114-CacheID: sfid-20190218_115436_363360_40B1A695 
+X-CRM114-Status: GOOD (  16.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,63 +85,114 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The reset_unknown() system register helper initialises a guest
-register to a distinctive junk value on vcpu reset, to help expose
-and debug deficient register initialisation within the guest.
+This patch includes the SVE register IDs in the list returned by
+KVM_GET_REG_LIST, as appropriate.
 
-Some registers such as the SVE control register ZCR_EL1 contain a
-mixture of UNKNOWN fields and RES0 bits.  For these,
-reset_unknown() does not work at present, since it sets all bits to
-junk values instead of just the wanted bits.
+On a non-SVE-enabled vcpu, no new IDs are added.
 
-There is no need to craft another special helper just for that,
-since reset_unknown() almost does the appropriate thing anyway.
-This patch takes advantage of the unused val field in struct
-sys_reg_desc to specify a mask of bits that should be initialised
-to zero instead of junk.
-
-All existing users of reset_unknown() do not (and should not)
-define a value for val, so they will implicitly set it to zero,
-resulting in all bits being made UNKNOWN by this function: thus,
-this patch makes no functional change for currently defined
-registers.
-
-Future patches will make use of non-zero val.
+On an SVE-enabled vcpu, IDs for the FPSIMD V-registers are removed
+from the list, since userspace is required to access the Z-
+registers instead to access their context.  For the variably-sized
+SVE registers, the appropriate set of slice IDs are enumerated,
+depending on the maximum vector length for the vcpu.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
----
- arch/arm64/kvm/sys_regs.h | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index 3b1bc7f..174ffc0 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -56,7 +56,12 @@ struct sys_reg_desc {
- 	/* Index into sys_reg[], or 0 if we don't need to save it. */
- 	int reg;
+---
+
+Changes since v4:
+
+ * Drop KVM_SVE_SLICES(), which is no longer used due to the dropping of
+   register multi-slice support from the series.
+
+ * Drop register multi-slice support.
+---
+ arch/arm64/kvm/guest.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 8cfa889..4a2ad60 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -366,6 +366,14 @@ static int copy_core_reg_indices(const struct kvm_vcpu *vcpu,
+ 			continue;
+ 		}
  
--	/* Value (usually reset value) */
-+	/*
-+	 * Value (usually reset value)
-+	 * For reset_unknown, each bit set to 1 in val is treated as
-+	 * RES0 in the register: the corresponding register bit is
-+	 * reset to 0 instead of "unknown".
-+	 */
- 	u64 val;
- 
- 	/* Custom get/set_user functions, fallback to generic if NULL */
-@@ -92,7 +97,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
- {
- 	BUG_ON(!r->reg);
- 	BUG_ON(r->reg >= NR_SYS_REGS);
--	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
++		/*
++		 * The KVM_REG_ARM64_SVE regs must be used instead of
++		 * KVM_REG_ARM_CORE for accessing the FPSIMD V-registers on
++		 * SVE-enabled vcpus:
++		 */
++		if (vcpu_has_sve(vcpu) && core_reg_offset_is_vreg(i))
++			continue;
 +
-+	/* If non-zero, r->val specifies which register bits are RES0: */
-+	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
+ 		if (uind) {
+ 			if (put_user(reg, *uind))
+ 				return -EFAULT;
+@@ -436,6 +444,44 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
  }
  
- static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
++static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
++{
++	/* Only the first slice ever exists, for now */
++	const unsigned int slices = 1;
++
++	if (!vcpu_has_sve(vcpu))
++		return 0;
++
++	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
++}
++
++static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
++{
++	/* Only the first slice ever exists, for now */
++	const unsigned int slices = 1;
++	unsigned int i, n;
++
++	if (!vcpu_has_sve(vcpu))
++		return 0;
++
++	for (i = 0; i < slices; i++) {
++		for (n = 0; n < SVE_NUM_ZREGS; n++) {
++			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
++				return -EFAULT;
++		}
++
++		for (n = 0; n < SVE_NUM_PREGS; n++) {
++			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
++				return -EFAULT;
++		}
++
++		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
++			return -EFAULT;
++	}
++
++	return 0;
++}
++
+ /**
+  * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+  *
+@@ -446,6 +492,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+ 	unsigned long res = 0;
+ 
+ 	res += num_core_regs(vcpu);
++	res += num_sve_regs(vcpu);
+ 	res += kvm_arm_num_sys_reg_descs(vcpu);
+ 	res += kvm_arm_get_fw_num_regs(vcpu);
+ 	res += NUM_TIMER_REGS;
+@@ -466,6 +513,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	ret = copy_sve_reg_indices(vcpu, &uindices);
++	if (ret)
++		return ret;
++
+ 	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
+ 	if (ret)
+ 		return ret;
 -- 
 2.1.4
 
