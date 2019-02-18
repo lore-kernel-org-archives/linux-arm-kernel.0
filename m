@@ -7,58 +7,57 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 78D95C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:58:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A269EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:58:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40EEE21773
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:58:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F22E3217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:58:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s4iUmLzQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40EEE21773
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LACDpsFn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F22E3217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eq37JQEDPqym0U5ibgQpmPrpD720QP1nbnvJcBmaZNw=; b=s4iUmLzQxzPGGK
-	rBR11fMkpE7q7dpiu70LOt7w7n0RtZS47kjU94Szqd0CjNSKJT0W2cb8Ixt2JyhY/l+tyLJnGt9qT
-	6VKyPAroNAeKHAvTaso/4/g+bA38lJ1EiQXT84+LvfKcEdo8D4a6luZ1Mo5LpQGmOjRkOuegzyyeU
-	IqegZZs8i8oDHzvRwFJm1ler5QTp2UkXAB2iC+TRfIKknnK/1NuMg2bTxcXXlunqaxJ/DOYJuzFmE
-	BLy4l/PchSqGw4r4OoZ7Ee9i8nyAh3wq1d3XXZwVNJX5XGGwthvPh37baugWiG1dp7FBXJXJxY6Le
-	pLG89ZLallvENDxUE0tg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=7hwO/EwmhvpOy8bmowQjPndnTIypqRV25fqOXxyFbhw=; b=LACDpsFnvL0lwYKC0sUqRITXOW
+	zzKCz9TnACd9hNAe4OtLJODgzcIt6eT7FxsrEdDIHJDVdv+pdLD81aBEKpG5oCDl8ccyUOzDy7alK
+	mz/AtuSBULI4n+3x4wzPjroeg5W+gYd0Vq6Hw9poEfyVlJFcbr6mdkOMcd9HPq8qLKpvaGJH1fOMF
+	cAoOZlWRAlu7H+GNRq9O3ciRJYo8R68O4dQRyWEq+nkunLHgTFMijzgtoPtqAlnj0TAnCc99h5qhH
+	N93QR31ECcypN3nuPK3c5qmTB5V6qlqSOeXKGP/Byr8crAPU5F1SLi5XT7LFbWkOuqO84o5n04qN3
+	o7VeAEdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp35-0001Oz-8O; Mon, 18 Feb 2019 19:57:55 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gvp3F-0001dE-Vq; Mon, 18 Feb 2019 19:58:06 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozg-0004m2-Mt
+ id 1gvozg-0004bY-Vj
  for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0A7AC1688;
- Mon, 18 Feb 2019 11:53:59 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A57091A25;
+ Mon, 18 Feb 2019 11:54:05 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id E53123FBA7;
- Mon, 18 Feb 2019 11:53:36 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 74BC73FBD5;
+ Mon, 18 Feb 2019 11:53:41 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 05/26] KVM: arm64: Add missing #include of <linux/bitmap.h>
- to kvm_host.h
-Date: Mon, 18 Feb 2019 19:52:18 +0000
-Message-Id: <1550519559-15915-6-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 07/26] arm64/sve: Clarify role of the VQ map maintenance
+ functions
+Date: Mon, 18 Feb 2019 19:52:20 +0000
+Message-Id: <1550519559-15915-8-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
-MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_115425_396110_30AF236F 
-X-CRM114-Status: GOOD (  12.23  )
+X-CRM114-CacheID: sfid-20190218_115425_444816_4A29074D 
+X-CRM114-Status: GOOD (  12.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,27 +78,67 @@ Cc: Peter Maydell <peter.maydell@linaro.org>,
  Julien Grall <julien.grall@arm.com>,
  =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-a3ZtX2hvc3QuaCB1c2VzIERFQ0xBUkVfQklUTUFQKCkgdG8gZGVjbGFyZSB0aGUgZmVhdHVyZXMg
-bWVtYmVyIG9mCnN0cnVjdCB2Y3B1X2FyY2gsIGJ1dCB0aGUgY29ycmVzcG9uZGluZyAjaW5jbHVk
-ZSBmb3IgdGhpcyBpcwptaXNzaW5nLgoKVGhpcyBwYXRjaCBhZGRzIGEgc3VpdGFibGUgI2luY2x1
-ZGUgZm9yIDxsaW51eC9iaXRtYXAuaD4uICBBbHRob3VnaAp0aGUgaGVhZGVyIGJ1aWxkcyB3aXRo
-b3V0IGl0IHRvZGF5LCB0aGlzIHNob3VsZCBoZWxwIHRvIGF2b2lkCmZ1dHVyZSBzdXJwcmlzZXMu
-CgpTaWduZWQtb2ZmLWJ5OiBEYXZlIE1hcnRpbiA8RGF2ZS5NYXJ0aW5AYXJtLmNvbT4KUmV2aWV3
-ZWQtYnk6IEFsZXggQmVubsOpZSA8YWxleC5iZW5uZWVAbGluYXJvLm9yZz4KLS0tCiBhcmNoL2Fy
-bTY0L2luY2x1ZGUvYXNtL2t2bV9ob3N0LmggfCAxICsKIDEgZmlsZSBjaGFuZ2VkLCAxIGluc2Vy
-dGlvbigrKQoKZGlmZiAtLWdpdCBhL2FyY2gvYXJtNjQvaW5jbHVkZS9hc20va3ZtX2hvc3QuaCBi
-L2FyY2gvYXJtNjQvaW5jbHVkZS9hc20va3ZtX2hvc3QuaAppbmRleCA3NzMyZDBiLi44NDA1NmE0
-IDEwMDY0NAotLS0gYS9hcmNoL2FybTY0L2luY2x1ZGUvYXNtL2t2bV9ob3N0LmgKKysrIGIvYXJj
-aC9hcm02NC9pbmNsdWRlL2FzbS9rdm1faG9zdC5oCkBAIC0yMiw2ICsyMiw3IEBACiAjaWZuZGVm
-IF9fQVJNNjRfS1ZNX0hPU1RfSF9fCiAjZGVmaW5lIF9fQVJNNjRfS1ZNX0hPU1RfSF9fCiAKKyNp
-bmNsdWRlIDxsaW51eC9iaXRtYXAuaD4KICNpbmNsdWRlIDxsaW51eC90eXBlcy5oPgogI2luY2x1
-ZGUgPGxpbnV4L2t2bV90eXBlcy5oPgogI2luY2x1ZGUgPGFzbS9jcHVmZWF0dXJlLmg+Ci0tIAoy
-LjEuNAoKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxp
-bnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFk
-ZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4
-LWFybS1rZXJuZWwK
+The roles of sve_init_vq_map(), sve_update_vq_map() and
+sve_verify_vq_map() are highly non-obvious to anyone who has not dug
+through cpufeatures.c in detail.
+
+Since the way these functions interact with each other is more
+important here than a full understanding of the cpufeatures code, this
+patch adds comments to make the functions' roles clearer.
+
+No functional change.
+
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/kernel/fpsimd.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 64729e2..92c2331 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -647,6 +647,10 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+ 	}
+ }
+ 
++/*
++ * Initialise the set of known supported VQs for the boot CPU.
++ * This is called during kernel boot, before secondary CPUs are brought up.
++ */
+ void __init sve_init_vq_map(void)
+ {
+ 	sve_probe_vqs(sve_vq_map);
+@@ -656,6 +660,7 @@ void __init sve_init_vq_map(void)
+ /*
+  * If we haven't committed to the set of supported VQs yet, filter out
+  * those not supported by the current CPU.
++ * This function is called during the bring-up of early secondary CPUs only.
+  */
+ void sve_update_vq_map(void)
+ {
+@@ -666,7 +671,10 @@ void sve_update_vq_map(void)
+ 	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, tmp_map, SVE_VQ_MAX);
+ }
+ 
+-/* Check whether the current CPU supports all VQs in the committed set */
++/*
++ * Check whether the current CPU supports all VQs in the committed set.
++ * This function is called during the bring-up of late secondary CPUs only.
++ */
+ int sve_verify_vq_map(void)
+ {
+ 	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
+-- 
+2.1.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
