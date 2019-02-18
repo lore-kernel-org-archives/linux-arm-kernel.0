@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B53D9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:07:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC7FDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:08:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84B5120645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:07:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BD6A521872
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 13:08:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cUOs/GW5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84B5120645
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SN4hsMtq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD6A521872
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=holtmann.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,36 +24,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
 	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=R6qpFT7T45V5RMKxu/zeeN5nPmMMXOe3dOv2oE/QNng=; b=cUOs/GW555qCv9
-	W6dav5fmfMmJSFWEWSa+09vt3w3bOxT5Mi2zQHtpTMGF1bVKOkjg5ptKYwiHk3rrmoXwgJjPFfixP
-	gFLfxgpE2eeh6+JfaQyp/XAgHE+SHmo8H/FJZE0v2z5i/KW77XbQxF7kFAc6vZGyO6KjXyJ5ZmOzN
-	XUgSVXeeIbG4H+2ZJeiEy/uwNv511n7EgYTJ8dcjw9T9P1nkEC7axoLveMIZYWkIyG9gvief0zblX
-	zKuwnR2hqpBN+VyxqM9/xsDl68qvzJm7vFotH1d87VB4m0VlcDpy9rYAeJyWeMriv5DH7BmIOUZJK
-	uDJHx7Dfi4980waygw4g==;
+	List-Owner; bh=Ve6bxAzLxsrBglR5m4W/yB1Ko+8PVc2OYvyeDggXY+M=; b=SN4hsMtqnC+RaW
+	IQQ8oMth176CvHrwWb+A6mbxVJqENzsIt+h7mmAlXcssw0gzb1MdkPwjxrkgtaj5jyEbK/RRkYLD4
+	xjTCla8jZram/+DKrnu4K7sXOuMmu3jLEIwZ9cxECp4SqFmA6aAqShBo6svpC2MQBbO1aXTX5FkhW
+	/hHJam2EHTwaJTNU7K4r7YfgABfIP+qLP4xNreLQuOWGWAB9tEnW6S+Mj/F4FuNVLUV4G8FWDj6K0
+	RwbcnGkMPCfuiooVqnabLkYMrRNI6YPKNFsqH+h+Tlu0DedVx72x0yO19TIS1c2Cr/7zMC54S3Wq2
+	q02hpU7SH7mktRU0QUMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvidb-00071j-Dh; Mon, 18 Feb 2019 13:07:11 +0000
+	id 1gviee-0007NK-QM; Mon, 18 Feb 2019 13:08:16 +0000
 Received: from coyote.holtmann.net ([212.227.132.17] helo=mail.holtmann.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvidY-00070j-At; Mon, 18 Feb 2019 13:07:09 +0000
+ id 1gvieZ-0007ML-P5; Mon, 18 Feb 2019 13:08:14 +0000
 Received: from marcel-macpro.fritz.box (p4FF9F361.dip0.t-ipconnect.de
  [79.249.243.97])
- by mail.holtmann.org (Postfix) with ESMTPSA id 87926CF2C7;
- Mon, 18 Feb 2019 14:14:58 +0100 (CET)
+ by mail.holtmann.org (Postfix) with ESMTPSA id 22981CF2C7;
+ Mon, 18 Feb 2019 14:16:04 +0100 (CET)
 Mime-Version: 1.0 (Mac OS X Mail 12.2 \(3445.102.3\))
-Subject: Re: [PATCH 3/6] Bluetooth: mediatek: fix up an error path to restore
- bdev->tx_state
+Subject: Re: [PATCH 4/6] Bluetooth: mediatek: pass a pointer to
+ mtk_hci_wmt_sync
 From: Marcel Holtmann <marcel@holtmann.org>
-In-Reply-To: <b1a496748170af6a89d8ba19db9412787ef53668.1550184473.git.sean.wang@mediatek.com>
-Date: Mon, 18 Feb 2019 14:07:05 +0100
-Message-Id: <DA63C054-59A4-4881-A475-7345A644D4FF@holtmann.org>
+In-Reply-To: <614e7741328e835071099ddcd4f9c2afd9528534.1550184473.git.sean.wang@mediatek.com>
+Date: Mon, 18 Feb 2019 14:08:10 +0100
+Message-Id: <7A2615D4-1497-4BE2-8E89-66447370E31E@holtmann.org>
 References: <cover.1550184473.git.sean.wang@mediatek.com>
- <b1a496748170af6a89d8ba19db9412787ef53668.1550184473.git.sean.wang@mediatek.com>
-To: sean.wang@mediatek.com
+ <614e7741328e835071099ddcd4f9c2afd9528534.1550184473.git.sean.wang@mediatek.com>
+To: Sean Wang <sean.wang@mediatek.com>
 X-Mailer: Apple Mail (2.3445.102.3)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_050708_522408_CB9073D9 
-X-CRM114-Status: UNSURE (   7.86  )
+X-CRM114-CacheID: sfid-20190218_050812_000132_C68D711E 
+X-CRM114-Status: UNSURE (   6.34  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -77,14 +77,13 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 Hi Sean,
 
-> Restore bdev->tx_state with clearing bit BTMTKUART_TX_WAIT_VND_EVT
-> when there is an error on waiting for the corresponding event.
+> Pass a structure pointer to mtk_hci_wmt_sync rather than several arguments
+> to avoid take up additional stack area and be better to read the code.
 > 
-> Fixes: 7237c4c9ec92 ("Bluetooth: mediatek: Add protocol support for MediaTek serial devices")
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
-> drivers/bluetooth/btmtkuart.c | 2 ++
-> 1 file changed, 2 insertions(+)
+> drivers/bluetooth/btmtkuart.c | 63 ++++++++++++++++++++++++++---------
+> 1 file changed, 48 insertions(+), 15 deletions(-)
 
 patch has been applied to bluetooth-next tree.
 
