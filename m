@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C56AAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DE97CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9576B217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:56:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF711217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 19:57:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JEzgYRQA";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LG75W+vS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9576B217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bxqj333s"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF711217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,54 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=xteNDgrkPLYYoF4Hf/vnKOVxq95EKJjLF+CJ+j9AyEg=; b=JEzgYRQA+mpVfz35x4QkzJfvut
-	e247CQEU9u81SJpUnF57GWxjNoAnzBmo7qnwbcJ1z3KRRpeyN6ytQ5i0kd3SkqoSvQra46TaP6T14
-	wLa/LEjC2GYMwe1TkbYpoood7xNm8IJaVzmi9GMPONLk/hMrPOwl5Ofqkfy4s6Bixttx2yZ0O87ur
-	ywgz+4K3MoPrA2laRUcipRkCP3b5AilGDVfuROF+ei0p3htU1Bu5+/2PXOU+eN0y84HdF/g++2b+P
-	R3AC6cuJXOiBXDrMHgYp0D5SWlpOI0k7g6gOITOcQw5O/QKRWANXkBuvqu9LlmnXrPRPWEHr1LAgK
-	4HmzBN/g==;
+	bh=IwFySHXg+++fbG+M/agEuk5XzIF0veBL4qt9Aq2QaJI=; b=Bxqj333smaeEhNIM1W0rHCw9bX
+	HOnFAeT2nYA3rJqjKzy3A91yp28C1cB6kqtQdhmf4OLcvUAeTXf20BsZ2whJSCo1F70gZO8BYRSqW
+	vQZ6Xs1rqyt2xlVsVz9+g8d6pQK2wj6gGkfep0/+yHoUSazUCCB39ysro2KcJ0Ti0wINO8XxEFt+P
+	jX0JIRIKg6F/Cez07r3dMM9PoQ1eW0ZJna1M14YBslzfGaJq2k78sRssi4mbKTad81jzgaXvxPoIk
+	szW2Kaw4jxtIIp3sWS3TzDyGij8Im0ErFc0NdAThWARtgLfKY9Zubx95yK/S29TtgZiqyY3CkCVf1
+	4pn5nFkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp21-0008P5-Dk; Mon, 18 Feb 2019 19:56:49 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvp00-0005Ck-Mx
- for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 19:54:44 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=qFmejAfScTZyZcZc5IW1S5jUQVxgh7WLALlBombMnb4=; b=LG75W+vSD22MMtAEtplPpykN/
- zXBx/FcPWQwvfDKb5BsL9WTx/RpWkXZTyJw/C4DwWf7FAt3R+lGakSmu9yJOvJvxG59miKpgAR1NI
- 6taXNaNQM4QLkmbIpLoItkaFclP3WYMwB/3pF8soA5kMacfxAwuZJRIGuUl0NcVHYMjL3k3xiiaRI
- FTe0x2I6AsxpuCQBcH0dZNfP8/JBuTYZCNg+DX65YE6KXht+LGhoZ2RHmaewbyVMk83uKGgduzdf1
- lmIKhxeVhBAjNsof64KY02yAMKCzZoiumbT/EsmH1OkuXu0RVB2EMot9M+3i0Ev8YJXTLMzaGn/zY
- OmLySNjfw==;
+	id 1gvp2C-0000DZ-Du; Mon, 18 Feb 2019 19:57:00 +0000
 Received: from foss.arm.com ([217.140.101.70])
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvozv-0003pZ-Fk
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:42 +0000
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvozm-00051o-MM
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:54:45 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 921A71C2B;
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5E5491C14;
  Mon, 18 Feb 2019 11:54:14 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id A3EB63FBA7;
- Mon, 18 Feb 2019 11:54:12 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 641B93F575;
+ Mon, 18 Feb 2019 11:53:50 -0800 (PST)
 From: Dave Martin <Dave.Martin@arm.com>
 To: kvmarm@lists.cs.columbia.edu
-Subject: [PATCH v5 21/26] KVM: arm/arm64: Add hook to finalize the vcpu
- configuration
-Date: Mon, 18 Feb 2019 19:52:34 +0000
-Message-Id: <1550519559-15915-22-git-send-email-Dave.Martin@arm.com>
+Subject: [PATCH v5 11/26] KVM: arm64: Extend reset_unknown() to handle mixed
+ RES0/UNKNOWN registers
+Date: Mon, 18 Feb 2019 19:52:24 +0000
+Message-Id: <1550519559-15915-12-git-send-email-Dave.Martin@arm.com>
 X-Mailer: git-send-email 2.1.4
 In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_145441_827989_DDACF79D 
-X-CRM114-Status: GOOD (  15.85  )
+X-CRM114-CacheID: sfid-20190218_115430_989558_24281632 
+X-CRM114-Status: GOOD (  13.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,81 +84,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Some aspects of vcpu configuration can't be completed inside
-KVM_VCPU_INIT, but still change API behaviour visible to userspace.
+The reset_unknown() system register helper initialises a guest
+register to a distinctive junk value on vcpu reset, to help expose
+and debug deficient register initialisation within the guest.
 
-Where such configuration choices affect the register list visible
-to userspace, we will need to track whether we have made a
-commitment to userspace regarding the list of vcpu registers.
+Some registers such as the SVE control register ZCR_EL1 contain a
+mixture of UNKNOWN fields and RES0 bits.  For these,
+reset_unknown() does not work at present, since it sets all bits to
+junk values instead of just the wanted bits.
 
-This patch adds a new hook kvm_arm_vcpu_finalize() to capture this
-commitment, along with a corresponding check
-kvm_arm_vcpu_finalized().  We commit to the register list when
-userspace reads it via KVM_GET_REG_LIST, or when the vcpu is fired
-up via KVM_RUN.
+There is no need to craft another special helper just for that,
+since reset_unknown() almost does the appropriate thing anyway.
+This patch takes advantage of the unused val field in struct
+sys_reg_desc to specify a mask of bits that should be initialised
+to zero instead of junk.
 
-kvm_arm_vcpu_finalize() is currently a no-op, but future patches
-will amend this to handle SVE on arm64.
+All existing users of reset_unknown() do not (and should not)
+define a value for val, so they will implicitly set it to zero,
+resulting in all bits being made UNKNOWN by this function: thus,
+this patch makes no functional change for currently defined
+registers.
+
+Future patches will make use of non-zero val.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 4 ++++
- arch/arm64/include/asm/kvm_host.h | 4 ++++
- virt/kvm/arm/arm.c                | 8 ++++++++
- 3 files changed, 16 insertions(+)
+ arch/arm64/kvm/sys_regs.h | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index ca56537..ab7c76b 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -360,4 +360,8 @@ static inline int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type)
- 	return 0;
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index 3b1bc7f..174ffc0 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -56,7 +56,12 @@ struct sys_reg_desc {
+ 	/* Index into sys_reg[], or 0 if we don't need to save it. */
+ 	int reg;
+ 
+-	/* Value (usually reset value) */
++	/*
++	 * Value (usually reset value)
++	 * For reset_unknown, each bit set to 1 in val is treated as
++	 * RES0 in the register: the corresponding register bit is
++	 * reset to 0 instead of "unknown".
++	 */
+ 	u64 val;
+ 
+ 	/* Custom get/set_user functions, fallback to generic if NULL */
+@@ -92,7 +97,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
+ {
+ 	BUG_ON(!r->reg);
+ 	BUG_ON(r->reg >= NR_SYS_REGS);
+-	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
++
++	/* If non-zero, r->val specifies which register bits are RES0: */
++	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
  }
  
-+/* Commit to the set of vcpu registers currently configured: */
-+static inline int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu) { return 0; }
-+#define kvm_arm_vcpu_finalized(vcpu) true
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d233855..015c2578 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -553,4 +553,8 @@ void kvm_arch_free_vm(struct kvm *kvm);
- 
- int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type);
- 
-+/* Commit to the set of vcpu registers currently configured: */
-+static inline int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu) { return 0; }
-+#define kvm_arm_vcpu_finalized(vcpu) true
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 9e350fd3..12f9dc2 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -560,6 +560,10 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	if (likely(vcpu->arch.has_run_once))
- 		return 0;
- 
-+	ret = kvm_arm_vcpu_finalize(vcpu);
-+	if (ret)
-+		return ret;
-+
- 	vcpu->arch.has_run_once = true;
- 
- 	if (likely(irqchip_in_kernel(kvm))) {
-@@ -1121,6 +1125,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		if (unlikely(!kvm_vcpu_initialized(vcpu)))
- 			break;
- 
-+		r = kvm_arm_vcpu_finalize(vcpu);
-+		if (r)
-+			break;
-+
- 		r = -EFAULT;
- 		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
- 			break;
+ static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
 -- 
 2.1.4
 
