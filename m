@@ -2,63 +2,111 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7097FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:23:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5893FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:24:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3EE6D217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:23:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1BC1E2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 11:24:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="InaHARiI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3EE6D217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eiRCS06s";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="Q5k32Tlp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BC1E2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mMyeMQii3VStIXYD8J7xIVzRYSnzCvsX87xOnwKNqN0=; b=InaHARiIzNie6X
-	39QvpxtNEHtJ19XFNtZlfPRTK3kBn8QuSh8NlsGJHK81ZT9PHbQ2crJA7hIFEenhKnvqgtUMPB4K9
-	2qZH55Uhy59am0fDdx+D3RYiU1NjzFVD99g2PgfubrqnLE9fsn4QApXhyhnMSd2Efq8EM9DcSSaLv
-	UyEgi5kfIOwTqLaDClbLm7NG6SFsL8baAtjTUQ/+jIO+xo9yWHSkMgGHGuYHsqshFigRmFS2RYR+Z
-	d9UYqTcg2wAUVgDO1OdjGOsxqI9SqEkeehLk9tFA3DG4Cq6nOA14cbSoywAi5h81JANkAjr3Z7oGC
-	GlMFDRtod6yzNUKUr2XA==;
+	List-Owner; bh=Pngf1nVP92J24wge8S8MdhpnnSkMe9+EA31r7+iGW3s=; b=eiRCS06s6WN0R+
+	YZWCWJKo0nTTIolCnopcKTnZyp/aNzdawIURoRZkJvNfrzgQwSNYu6ohmgY/EbhAgWJfGumUX354m
+	iiiVYdgY+xiO4o5AylEuJOFo7lCV0PDFgGFCdkPxu0+YR5a3pUr1PbioySGYdN2ERq5tbQAauHsTL
+	Dn04P2wbg+g71vlB0ay/iZmc6d1X3IYcK8rAFx0qAEflJFjI26WifjVBaIdMCjc87OMYDtXgntrHt
+	n+xWm9gYydOPqtBD2t0xRx4JpGCHilb5Y+B79T+tViTooJc6MF9c6RHhBAbxnkFnpr6+bijIp1gWz
+	vWH45KBKCZApI97Y88Mw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvh1X-00065s-Kd; Mon, 18 Feb 2019 11:23:47 +0000
-Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+	id 1gvh1n-0006PB-NE; Mon, 18 Feb 2019 11:24:03 +0000
+Received: from mail-eopbgr150045.outbound.protection.outlook.com
+ ([40.107.15.45] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvh1T-000648-Rc
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 11:23:45 +0000
-Received: from DGGEMS409-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id D0669AAE83E6631E8CEB;
- Mon, 18 Feb 2019 19:23:31 +0800 (CST)
-Received: from vm100-107-113-134.huawei.com (100.107.113.134) by
- DGGEMS409-HUB.china.huawei.com (10.3.19.209) with Microsoft SMTP Server id
- 14.3.408.0; Mon, 18 Feb 2019 19:23:26 +0800
-From: Yu Chen <chenyu56@huawei.com>
-To: <linux-usb@vger.kernel.org>, <devicetree@vger.kernel.org>,
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH v2 10/10] dts: hi3660: Add support for usb on Hikey960
-Date: Mon, 18 Feb 2019 19:23:10 +0800
-Message-ID: <20190218112310.17860-11-chenyu56@huawei.com>
-X-Mailer: git-send-email 2.15.0-rc2
-In-Reply-To: <20190218112310.17860-1-chenyu56@huawei.com>
-References: <20190218112310.17860-1-chenyu56@huawei.com>
+ id 1gvh1h-0006Gp-K1
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 11:24:02 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=Ua2Y2pqLglvhPkZ5x4rnHUcO+Ns/IxJSCHYCvBPPNoc=;
+ b=Q5k32TlppmzCtC/ulLxPV4cJ/up4QTPgc4l+w4pRq97/6vkVBnHdHiVdbZVk9+I7jlarqrSXXxBZNuBBAZ1uzHvw3+tiIc+wr+vYE3vY7LMg9gwrWPZGSI0fSQVq2tLnWNt25zQuWsb9553d3Tf+WXwctnCJiby3+R+hSJHorHw=
+Received: from VI1PR08MB3742.eurprd08.prod.outlook.com (20.178.15.26) by
+ VI1PR08MB3040.eurprd08.prod.outlook.com (52.133.14.145) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.16; Mon, 18 Feb 2019 11:23:53 +0000
+Received: from VI1PR08MB3742.eurprd08.prod.outlook.com
+ ([fe80::2508:8790:80cb:2f91]) by VI1PR08MB3742.eurprd08.prod.outlook.com
+ ([fe80::2508:8790:80cb:2f91%6]) with mapi id 15.20.1622.018; Mon, 18 Feb 2019
+ 11:23:53 +0000
+From: Mark Rutland <Mark.Rutland@arm.com>
+To: Steven Price <Steven.Price@arm.com>
+Subject: Re: [PATCH 06/13] mm: pagewalk: Add 'depth' parameter to pte_hole
+Thread-Topic: [PATCH 06/13] mm: pagewalk: Add 'depth' parameter to pte_hole
+Thread-Index: AQHUxVB7+BoYcscuHEWALktrgxL4UKXlbjYA
+Date: Mon, 18 Feb 2019 11:23:53 +0000
+Message-ID: <20190218112350.GE8036@lakrids.cambridge.arm.com>
+References: <20190215170235.23360-1-steven.price@arm.com>
+ <20190215170235.23360-7-steven.price@arm.com>
+In-Reply-To: <20190215170235.23360-7-steven.price@arm.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+x-originating-ip: [217.140.106.52]
+x-clientproxiedby: LO2P265CA0329.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:a4::29) To VI1PR08MB3742.eurprd08.prod.outlook.com
+ (2603:10a6:803:bc::26)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Mark.Rutland@arm.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 370a9579-1a6c-451b-2e5e-08d695939028
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR08MB3040; 
+x-ms-traffictypediagnostic: VI1PR08MB3040:
+x-microsoft-exchange-diagnostics: 1; VI1PR08MB3040;
+ 20:j3A26RUPxyVy73IxvMJUrlJIUlgZiBohxGZW3WtKAldNIbRtRL02dglFutJEmghL1zRlUvvvHRC4JYyz2IkEipAse0/9hzIv/rPlCJJngEUBt8rdIS7ywKmZEHGbqDNDXvaBjuv71X+RaxJS9yDydhIAHZNNOKrmIObs9BHnGDs=
+x-microsoft-antispam-prvs: <VI1PR08MB3040736376D9DA0A8F28240D84630@VI1PR08MB3040.eurprd08.prod.outlook.com>
+x-forefront-prvs: 09525C61DB
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(376002)(39860400002)(346002)(396003)(136003)(40434004)(189003)(199004)(8936002)(186003)(99286004)(6636002)(25786009)(229853002)(81166006)(81156014)(7736002)(8676002)(5660300002)(26005)(68736007)(316002)(86362001)(446003)(1076003)(14454004)(72206003)(2906002)(6506007)(386003)(476003)(305945005)(11346002)(478600001)(102836004)(6116002)(3846002)(44832011)(6512007)(6246003)(53936002)(58126008)(71200400001)(54906003)(14444005)(4326008)(256004)(6436002)(33656002)(5024004)(71190400001)(105586002)(76176011)(52116002)(7416002)(486006)(97736004)(66066001)(6862004)(6486002)(106356001)(18370500001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR08MB3040;
+ H:VI1PR08MB3742.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: AlU0ZG8sPR36ZyJW9lSnMGHUc7UfbyIfYyDgaUgLTowsd+vfNIW3shucra3cU+jblcq6ml48MigkLwjRFLEtcZyjOYQt7RCLhta3e9gb56Kwo8BnFvCuu4O1DV9ZWlGzVb+5TlwnuxE90mrvJU2PHM0qYL1UZNlvDCZILiUi9AmmTTNBFO7cRbPFt7OH5Xep39UvrF2/V1Ow6lPj3fseicxaHA15UO6MO1nzwF3cvc57UVg+KjnbHv5kCGAEZxI1zT0E/A8MxllNaYyLvO0WUi2rqLtflUHmRpq5cH6Q7NLFAYs4zswDtOyqg/YsYugBRwSb14Pfj4dMf1GSTjsO2iwz6rD00+DdUGfnzbmWz7m/xlFOu8vGyqL6lXEToTmK0lIXVh2N5kDH9os65+l1ZcK14D+7p7Vp/0+Dly7ZV4Y=
+Content-ID: <B21B81C21E7E834CB0208E2833B2C1CC@eurprd08.prod.outlook.com>
 MIME-Version: 1.0
-X-Originating-IP: [100.107.113.134]
-X-CFilter-Loop: Reflected
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 370a9579-1a6c-451b-2e5e-08d695939028
+X-MS-Exchange-CrossTenant-originalarrivaltime: 18 Feb 2019 11:23:52.4773 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR08MB3040
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_032344_064261_8FF29AC2 
-X-CRM114-Status: GOOD (  13.15  )
+X-CRM114-CacheID: sfid-20190218_032358_044487_CBB29F35 
+X-CRM114-Status: GOOD (  29.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,211 +118,217 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, yudongbin@hisilicon.com,
- Binghui Wang <wangbinghui@hisilicon.com>, xuyiping@hisilicon.com,
- xuyoujun4@huawei.com, suzhuangluan@hisilicon.com, songxiaowei@hisilicon.com,
- Yu Chen <chenyu56@huawei.com>, kongfei@hisilicon.com,
- Wei Xu <xuwei5@hisilicon.com>, fangshengzhou@hisilicon.com,
- lipengcheng8@huawei.com, Rob Herring <robh+dt@kernel.org>,
- john.stultz@linaro.org, wanghu17@hisilicon.com, zangleigang@hisilicon.com,
- chenyao11@huawei.com, liuyu712@hisilicon.com,
- linux-arm-kernel@lists.infradead.org, butao@hisilicon.com
+Cc: "x86@kernel.org" <x86@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <Catalin.Marinas@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <Will.Deacon@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-mm@kvack.org" <linux-mm@kvack.org>,
+ =?iso-8859-1?Q?J=E9r=F4me_Glisse?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <James.Morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds support for usb on Hikey960.
+On Fri, Feb 15, 2019 at 05:02:27PM +0000, Steven Price wrote:
+> The pte_hole() callback is called at multiple levels of the page tables.
+> Code dumping the kernel page tables needs to know what at what depth
+> the missing entry is. Add this is an extra parameter to pte_hole().
+> When the depth isn't know (e.g. processing a vma) then -1 is passed.
+>
+> Note that depth starts at 0 for a PGD so that PUD/PMD/PTE retain their
+> natural numbers as levels 2/3/4.
+>
+> Signed-off-by: Steven Price <steven.price@arm.com>
+> ---
+>  fs/proc/task_mmu.c |  4 ++--
+>  include/linux/mm.h |  5 +++--
+>  mm/hmm.c           |  2 +-
+>  mm/migrate.c       |  1 +
+>  mm/mincore.c       |  1 +
+>  mm/pagewalk.c      | 16 ++++++++++------
+>  6 files changed, 18 insertions(+), 11 deletions(-)
+>
+> diff --git a/fs/proc/task_mmu.c b/fs/proc/task_mmu.c
+> index f0ec9edab2f3..91131cd4e9e0 100644
+> --- a/fs/proc/task_mmu.c
+> +++ b/fs/proc/task_mmu.c
+> @@ -474,7 +474,7 @@ static void smaps_account(struct mem_size_stats *mss, struct page *page,
+>
+>  #ifdef CONFIG_SHMEM
+>  static int smaps_pte_hole(unsigned long addr, unsigned long end,
+> -struct mm_walk *walk)
+> +  __always_unused int depth, struct mm_walk *walk)
+>  {
+>  struct mem_size_stats *mss = walk->private;
+>
+> @@ -1203,7 +1203,7 @@ static int add_to_pagemap(unsigned long addr, pagemap_entry_t *pme,
+>  }
+>
+>  static int pagemap_pte_hole(unsigned long start, unsigned long end,
+> -struct mm_walk *walk)
+> +    __always_unused int depth, struct mm_walk *walk)
+>  {
+>  struct pagemapread *pm = walk->private;
+>  unsigned long addr = start;
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index 1a4b1615d012..0418a018d7b3 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -1420,7 +1420,8 @@ void unmap_vmas(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
+>   *       pmd_trans_huge() pmds.  They may simply choose to
+>   *       split_huge_page() instead of handling it explicitly.
+>   * @pte_entry: if set, called for each non-empty PTE (4th-level) entry
+> - * @pte_hole: if set, called for each hole at all levels
+> + * @pte_hole: if set, called for each hole at all levels,
+> + *            depth is -1 if not known
+>   * @hugetlb_entry: if set, called for each hugetlb entry
+>   * @test_walk: caller specific callback function to determine whether
+>   *             we walk over the current vma or not. Returning 0
+> @@ -1445,7 +1446,7 @@ struct mm_walk {
+>  int (*pte_entry)(pte_t *pte, unsigned long addr,
+>   unsigned long next, struct mm_walk *walk);
+>  int (*pte_hole)(unsigned long addr, unsigned long next,
+> -struct mm_walk *walk);
+> +int depth, struct mm_walk *walk);
+>  int (*hugetlb_entry)(pte_t *pte, unsigned long hmask,
+>       unsigned long addr, unsigned long next,
+>       struct mm_walk *walk);
+> diff --git a/mm/hmm.c b/mm/hmm.c
+> index a04e4b810610..e3e6b8fda437 100644
+> --- a/mm/hmm.c
+> +++ b/mm/hmm.c
+> @@ -440,7 +440,7 @@ static void hmm_range_need_fault(const struct hmm_vma_walk *hmm_vma_walk,
+>  }
+>
+>  static int hmm_vma_walk_hole(unsigned long addr, unsigned long end,
+> -     struct mm_walk *walk)
+> +     __always_unused int depth, struct mm_walk *walk)
+>  {
+>  struct hmm_vma_walk *hmm_vma_walk = walk->private;
+>  struct hmm_range *range = hmm_vma_walk->range;
+> diff --git a/mm/migrate.c b/mm/migrate.c
+> index d4fd680be3b0..8b62a9fecb5c 100644
+> --- a/mm/migrate.c
+> +++ b/mm/migrate.c
+> @@ -2121,6 +2121,7 @@ struct migrate_vma {
+>
+>  static int migrate_vma_collect_hole(unsigned long start,
+>      unsigned long end,
+> +    __always_unused int depth,
+>      struct mm_walk *walk)
+>  {
+>  struct migrate_vma *migrate = walk->private;
+> diff --git a/mm/mincore.c b/mm/mincore.c
+> index 218099b5ed31..c4edbc688241 100644
+> --- a/mm/mincore.c
+> +++ b/mm/mincore.c
+> @@ -104,6 +104,7 @@ static int __mincore_unmapped_range(unsigned long addr, unsigned long end,
+>  }
+>
+>  static int mincore_unmapped_range(unsigned long addr, unsigned long end,
+> +   __always_unused int depth,
+>     struct mm_walk *walk)
+>  {
+>  walk->private += __mincore_unmapped_range(addr, end,
+> diff --git a/mm/pagewalk.c b/mm/pagewalk.c
+> index dac0c848b458..b8038f852f06 100644
+> --- a/mm/pagewalk.c
+> +++ b/mm/pagewalk.c
+> @@ -38,7 +38,7 @@ static int walk_pmd_range(pud_t *pud, unsigned long addr, unsigned long end,
+>  next = pmd_addr_end(addr, end);
+>  if (pmd_none(*pmd)) {
+>  if (walk->pte_hole)
+> -err = walk->pte_hole(addr, next, walk);
+> +err = walk->pte_hole(addr, next, 3, walk);
+>  if (err)
+>  break;
+>  continue;
+> @@ -88,7 +88,7 @@ static int walk_pud_range(p4d_t *p4d, unsigned long addr, unsigned long end,
+>  next = pud_addr_end(addr, end);
+>  if (pud_none(*pud)) {
+>  if (walk->pte_hole)
+> -err = walk->pte_hole(addr, next, walk);
+> +err = walk->pte_hole(addr, next, 2, walk);
+>  if (err)
+>  break;
+>  continue;
+> @@ -123,13 +123,17 @@ static int walk_p4d_range(pgd_t *pgd, unsigned long addr, unsigned long end,
+>  p4d_t *p4d;
+>  unsigned long next;
+>  int err = 0;
+> +/* If the p4ds are actually just pgds then we should report a depth
+> + * of 0 not 1 (as a missing entry is really a missing pgd
+> + */
 
-Cc: Wei Xu <xuwei5@hisilicon.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Binghui Wang <wangbinghui@hisilicon.com>
-Signed-off-by: Yu Chen <chenyu56@huawei.com>
----
-v2:
-* Remove device_type property.
-* Add property "usb-role-switch".
----
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 54 +++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 73 +++++++++++++++++++++++
- 2 files changed, 127 insertions(+)
+Nit: comment style violation. This should look like:
+should be:
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 46435466f1ab..2cada9d44046 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -13,6 +13,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/usb/pd.h>
- 
- / {
- 	model = "HiKey960";
-@@ -196,6 +197,27 @@
- 			method = "smc";
- 		};
- 	};
-+
-+	hisi_hikey_usb: hisi_hikey_usb {
-+		compatible = "hisilicon,hikey960_usb";
-+		typec-vbus-gpios = <&gpio25 2 0>;
-+		typec-vbus-enable-val = <1>;
-+		otg-switch-gpios = <&gpio25 6 0>;
-+		hub-vdd33-en-gpios = <&gpio5 6 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usbhub5734_pmx_func>;
-+
-+		port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			hikey_usb_ep: endpoint@0 {
-+				reg = <0>;
-+				remote-endpoint = <&dwc3_role_switch_notify>;
-+			};
-+		};
-+	};
-+
- };
- 
- /*
-@@ -526,6 +548,38 @@
- &i2c1 {
- 	status = "okay";
- 
-+	rt1711h: rt1711h@4e {
-+		compatible = "richtek,rt1711h";
-+		reg = <0x4e>;
-+		status = "ok";
-+		interrupt-parent = <&gpio27>;
-+		interrupts = <3 IRQ_TYPE_LEVEL_LOW>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb_cfg_func>;
-+
-+		usb_con: connector {
-+			compatible = "usb-c-connector";
-+			label = "USB-C";
-+			data-role = "dual";
-+			power-role = "dual";
-+			try-power-role = "sink";
-+			source-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_USB_COMM)>;
-+			sink-pdos = <PDO_FIXED(5000, 500, PDO_FIXED_USB_COMM)
-+				PDO_VAR(5000, 5000, 1000)>;
-+			op-sink-microwatt = <10000000>;
-+		};
-+
-+		port {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			rt1711h_ep: endpoint@0 {
-+				reg = <0>;
-+				remote-endpoint = <&dwc3_role_switch>;
-+			};
-+		};
-+	};
-+
- 	adv7533: adv7533@39 {
- 		status = "ok";
- 		compatible = "adi,adv7533";
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index 20ae40df61d5..a2808c53c538 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -355,6 +355,12 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		pmctrl: pmctrl@fff31000 {
-+			compatible = "hisilicon,hi3660-pmctrl", "syscon";
-+			reg = <0x0 0xfff31000 0x0 0x1000>;
-+			#clock-cells = <1>;
-+		};
-+
- 		pmuctrl: crg_ctrl@fff34000 {
- 			compatible = "hisilicon,hi3660-pmuctrl", "syscon";
- 			reg = <0x0 0xfff34000 0x0 0x1000>;
-@@ -1134,5 +1140,72 @@
- 				};
- 			};
- 		};
-+
-+		usb3_otg_bc: usb3_otg_bc@ff200000 {
-+			compatible = "syscon";
-+			reg = <0x0 0xff200000 0x0 0x1000>;
-+		};
-+
-+		usb_phy: usb-phy {
-+			compatible = "hisilicon,hi3660-usb-phy";
-+			#phy-cells = <0>;
-+			hisilicon,pericrg-syscon = <&crg_ctrl>;
-+			hisilicon,pctrl-syscon = <&pctrl>;
-+			hisilicon,usb3-otg-bc-syscon = <&usb3_otg_bc>;
-+			hisilicon,eye-diagram-param = <0x22466e4>;
-+		};
-+
-+		usb3: hisi_dwc3 {
-+			compatible = "hisilicon,hi3660-dwc3";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			clocks = <&crg_ctrl HI3660_CLK_ABB_USB>,
-+				 <&crg_ctrl HI3660_ACLK_GATE_USB3OTG>;
-+			clock-names = "clk_usb3phy_ref", "aclk_usb3otg";
-+
-+			assigned-clocks = <&crg_ctrl HI3660_ACLK_GATE_USB3OTG>;
-+			assigned-clock-rates = <229000000>;
-+			resets = <&crg_rst 0x90 8>,
-+				 <&crg_rst 0x90 7>,
-+				 <&crg_rst 0x90 6>,
-+				 <&crg_rst 0x90 5>;
-+
-+			dwc3: dwc3@ff100000 {
-+				compatible = "snps,dwc3";
-+				reg = <0x0 0xff100000 0x0 0x100000>;
-+				interrupts = <0 159 4>, <0 161 4>;
-+				phys = <&usb_phy>;
-+				phy-names = "usb3-phy";
-+				dr_mode = "otg";
-+				maximum-speed = "super-speed";
-+				phy_type = "utmi";
-+				snps,dis-del-phy-power-chg-quirk;
-+				snps,lfps_filter_quirk;
-+				snps,dis_u2_susphy_quirk;
-+				snps,dis_u3_susphy_quirk;
-+				snps,tx_de_emphasis_quirk;
-+				snps,tx_de_emphasis = <1>;
-+				snps,dis_enblslpm_quirk;
-+				snps,gctl-reset-quirk;
-+				usb-role-switch;
-+
-+				port {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					dwc3_role_switch: endpoint@0 {
-+						reg = <0>;
-+						remote-endpoint = <&rt1711h_ep>;
-+					};
-+
-+					dwc3_role_switch_notify: endpoint@1 {
-+						reg = <1>;
-+						remote-endpoint = <&hikey_usb_ep>;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
--- 
-2.15.0-rc2
+/*
+ * If the p4ds are actually just pgds then we should report a depth
+ * of 0 not 1 (as a missing entry is really a missing pgd
+ */
 
+> +int depth = (PTRS_PER_P4D == 1)?0:1;
+
+Nit: the ternary should have spacing.
+
+We don't seem to do this at any other level that could be folded, so why
+does p4d need special care?
+
+For example, what happens on arm64 when using 64K pages and 3 level
+paging, where puds are folded into pgds?
+
+Thanks,
+Mark.
+
+>
+>  p4d = p4d_offset(pgd, addr);
+>  do {
+>  next = p4d_addr_end(addr, end);
+>  if (p4d_none_or_clear_bad(p4d)) {
+>  if (walk->pte_hole)
+> -err = walk->pte_hole(addr, next, walk);
+> +err = walk->pte_hole(addr, next, depth, walk);
+>  if (err)
+>  break;
+>  continue;
+> @@ -160,7 +164,7 @@ static int walk_pgd_range(unsigned long addr, unsigned long end,
+>  next = pgd_addr_end(addr, end);
+>  if (pgd_none_or_clear_bad(pgd)) {
+>  if (walk->pte_hole)
+> -err = walk->pte_hole(addr, next, walk);
+> +err = walk->pte_hole(addr, next, 0, walk);
+>  if (err)
+>  break;
+>  continue;
+> @@ -206,7 +210,7 @@ static int walk_hugetlb_range(unsigned long addr, unsigned long end,
+>  if (pte)
+>  err = walk->hugetlb_entry(pte, hmask, addr, next, walk);
+>  else if (walk->pte_hole)
+> -err = walk->pte_hole(addr, next, walk);
+> +err = walk->pte_hole(addr, next, -1, walk);
+>
+>  if (err)
+>  break;
+> @@ -249,7 +253,7 @@ static int walk_page_test(unsigned long start, unsigned long end,
+>  if (vma->vm_flags & VM_PFNMAP) {
+>  int err = 1;
+>  if (walk->pte_hole)
+> -err = walk->pte_hole(start, end, walk);
+> +err = walk->pte_hole(start, end, -1, walk);
+>  return err ? err : 1;
+>  }
+>  return 0;
+> --
+> 2.20.1
+>
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
 
 _______________________________________________
 linux-arm-kernel mailing list
