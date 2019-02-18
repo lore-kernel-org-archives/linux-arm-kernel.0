@@ -2,84 +2,83 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EA0ECC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 16:04:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D797BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 16:11:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ACE8D20836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 16:04:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A72F921736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 16:11:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DQK/Ultu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="fpiz3aAW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACE8D20836
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fE5SXY52";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nRxDg7KE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A72F921736
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UfhI3DioM47lhgGU1E64dX+xAFkxE2NTj90sgnmGVKI=; b=DQK/UltuUYvrAH
-	t1QfYTy+8ZTy5CIMoODJ92MasMtFj/Ju6LC98o1r6yvfrm7wnMCEjudwHA02VwPJBFT1XUbYWow1n
-	t3uzROToFs4lzQ4Ojl3QOt0qaSJ7OusRRHnu1QRwcJhAW0qzDNCv2SU3jmxBIEUMh0qbdQigNgR55
-	QmXZiZQf5w3xAoC7Vh/iSNh040uEmknFfRJkmZoqkTZY5iRZZEIlrTh9BBduvO3bKUib+yYHyqzUA
-	zsdBSA2F6Je4x2Fh/Fm+VJOpLj+7OlN8uzgatK9XoPH5SyPsi4iBUHunZZpdHuonHgkzgDLV+Y2XP
-	cIGq/+l82K21loG2FdxA==;
+	List-Owner; bh=DoI5WsSO2zGjE+0iq7UI4b5aAUzg3Su2WdP8wwWDtRc=; b=fE5SXY52j8VcXe
+	iFwj/+3BU55lUQJMDpCBqeKCBbjTA/19ENaZuHm4X/xnR2L4cWrsr49rjT6oZ1j0JM/efg8SVis57
+	e3tXsqyx7tq3LGJXoUXMYnxPGWEZIvJJiYHwNSzCeT2MkLzEXbEafO6Fi8dGz/e8XOXkhpUYpKtEr
+	IpYyRisIRiYjpNReT6s29qnr0SSiv4kzV2tz/tQYX+ptkE7IVTWLVgVQpSja4XgWv6xVlZ2KpTNIT
+	FaG07XW2/iBRd8W8UZx+SW0t7eWvWOOn6Uy50huC3TFlopvRYdkOF6ma99jTgi5zot5DJ8zQdt4Jn
+	wZpKN+DZfduKnbyeMWXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvlP0-0002rw-J0; Mon, 18 Feb 2019 16:04:18 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1gvlVj-0006cf-2q; Mon, 18 Feb 2019 16:11:15 +0000
+Received: from casper.infradead.org ([85.118.1.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvlOw-0002rc-Ik
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 16:04:16 +0000
-Received: by mail-ot1-x343.google.com with SMTP id i5so29039898oto.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 08:04:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=m+lidQw3+CwGVLVVkUFOmOJusJPLo4FhCDb4zUr+4K4=;
- b=fpiz3aAW8nHDHMJAu6WHVdxOgqunzkE7bf9gkunuHa/BM8tRNKxQRowZ99w5PB4NKV
- cgMi/jSVuK8sdW5HeZdt86IbMsatEX7xf7nag1YsBdiPZggJZk8FiAecR0D2IzVqkWA7
- nSD9Cxy3RDKFd6TPaMM3P033/H5uq5AIXcyGqvLZnzo2rdgg6q7d/MXfZRMUZvmWMnvv
- jyoWcOIgUPyB1XwonfgLFVlQgaUKqZEFGoGtal1nZpksshKqfEKuGgrnT6OB6wHzyCXM
- 9gD4TGbDpMbSrUphCG/J5zoAbRYx1SZgVYFQLcw20mP7zklJ7DxRBQw1GkjswOXBsCrI
- eCpA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=m+lidQw3+CwGVLVVkUFOmOJusJPLo4FhCDb4zUr+4K4=;
- b=KR12i6dlQ0TGS+jV+iq/OUYQc6HRPNkd16S8v1NJdwhfTJkyoA8aOUGpj3SE1WW3Vw
- xciqxH3HzG3ZHlHIvLS/PnGiKVW7plS2HHceLNC00Vr2FeBJpnxRcBk9gVSYQEDf1QU9
- 1AG2cBHKXSY0/+731Rw55pn0c3ZcGd9tBCt9CuVHsRoolOhAa2f0Cx4euYnLJfDsh7J3
- NYC6LbsBZI+bhMdyXWMrHen9Z2k7on5eX5W5mGnwhkgeQGOqEznMYL++xgunesGQfXZ1
- JvahubDKZgOqD+yjEGg+fE6W2Bk6OPmPYjfJWaD+o6Sy17U2SvKAPIQdD8ou8kcgFOhb
- OW7w==
-X-Gm-Message-State: AHQUAuagdxSWcPZozcXZxQiZCDGDYD4Q1OQCXJ2B1zxa2LFTa4rkciF4
- 23IS4ORWqV+4JJ07Y8X2SYWcWJn1TCQ/4nfld57I7A==
-X-Google-Smtp-Source: AHgI3Ibe3FvpE2nMhR/pmTjFU7Ghac0QgtFhBCfHVPTEU9Oe8rO/Tq2OD8kLthLdSyCea0wWkivfU/rQy10PK3qO0f8=
-X-Received: by 2002:aca:d509:: with SMTP id m9mr13940235oig.64.1550505853166; 
- Mon, 18 Feb 2019 08:04:13 -0800 (PST)
+ id 1gvlVg-0006c4-KJ
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 16:11:12 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=d94sm8P47kVTS2uqvx03V++qxMmR65VI+QpPVY2xWb0=; b=nRxDg7KE8obBRWmFVU2Pwd5kz
+ CIh6yXI/1Y1WjGtaqhamGuE/zxWiTOvKoXEddkU+RyYDmGR0i6ans9tQz9W9SHZj49E+89xiMvpK9
+ 5bdqdEU3bnIuEn8C0l4Hf/r5lGdszC1d56MADb9TVS3IcjzfjDXPqtVVlBpRyfmu2M7tg6FgtqRih
+ hO/bUFzz9WWGUv3qeH4oqR40eLaNDCfGESNWRuK8iwoA1tQsxmV1UA67fPNYuMAPYkGMHoBjlxGuA
+ w804S+Wgf+m3UpWtbt2qgIhFDfx2wAT6PbBUBtJ9E+s1Du7sfWYZQ1Z4KMeE1+ZsgaPjxm8PgvR4F
+ BUCzGHGlQ==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvlVa-0006We-Gc
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 16:11:10 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2726380D;
+ Mon, 18 Feb 2019 08:05:58 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 16CD33F675;
+ Mon, 18 Feb 2019 08:05:56 -0800 (PST)
+Date: Mon, 18 Feb 2019 16:05:54 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Andrew Murray <andrew.murray@arm.com>
+Subject: Re: [PATCH 3/6] arm64: HWCAP: encapsulate elf_hwcap
+Message-ID: <20190218160554.GR3567@e103592.cambridge.arm.com>
+References: <1549459868-45992-1-git-send-email-andrew.murray@arm.com>
+ <1549459868-45992-4-git-send-email-andrew.murray@arm.com>
+ <20190207114757.GG3567@e103592.cambridge.arm.com>
+ <20190218154601.GB35031@e119886-lin.cambridge.arm.com>
 MIME-Version: 1.0
-References: <20190128142313.17036-1-benjamin.gaignard@st.com>
- <20190128142313.17036-2-benjamin.gaignard@st.com>
-In-Reply-To: <20190128142313.17036-2-benjamin.gaignard@st.com>
-From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Date: Mon, 18 Feb 2019 17:04:02 +0100
-Message-ID: <CA+M3ks4S3y9=VvAu1Vah9crd-g_Ri3T4szS-FkwiNP6rfXqO1g@mail.gmail.com>
-Subject: Re: [RFC v2 1/7] devicetree: bindings: Document domains controller
- bindings
-To: Benjamin Gaignard <benjamin.gaignard@st.com>
+Content-Disposition: inline
+In-Reply-To: <20190218154601.GB35031@e119886-lin.cambridge.arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_080414_625429_A94B5CC7 
-X-CRM114-Status: GOOD (  19.17  )
+X-CRM114-CacheID: sfid-20190218_161108_676093_60F1B8CC 
+X-CRM114-Status: GOOD (  32.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,77 +90,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Loic PALLARDY <loic.pallardy@st.com>,
- Arnd Bergmann <arnd@arndb.de>, s.hauer@pengutronix.de,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Mark Brown <broonie@kernel.org>, linux-imx@nxp.com, kernel@pengutronix.de,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Szabolcs Nagy <Szabolcs.Nagy@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TGUgbHVuLiAyOCBqYW52LiAyMDE5IMOgIDE1OjIzLCBCZW5qYW1pbiBHYWlnbmFyZAo8YmVuamFt
-aW4uZ2FpZ25hcmRAc3QuY29tPiBhIMOpY3JpdCA6Cj4KPiBEb2N1bWVudCBjb21tb25zIGRvbWFp
-bnMgY29udHJvbGxlciBiaW5kaW5ncyBmb3IgY29udHJvbGxlcgo+IGFuZCBjbGllbnQgZGV2aWNl
-cy4KCkdlbnRsZSBwaW5nIHRvIGdldCBjb21tZW50cyBvbiB0aG9zZSBiaW5kaW5ncywKClRoYW5r
-cywKQmVuamFtaW4KPgo+IFNpZ25lZC1vZmYtYnk6IEJlbmphbWluIEdhaWduYXJkIDxiZW5qYW1p
-bi5nYWlnbmFyZEBzdC5jb20+Cj4gLS0tCj4gdmVyc2lvbiAyOgo+IC0gY29tcGxldGUgcmV3b3Jr
-IG9mIGJpbmRpbmdzIGRlc2NyaXB0aW9uIHRvIHRyeSB0byBnaXZlIGEgYmV0dGVyIGRlZmluaXRp
-b24KPiAgIG9mIHdoYXQgYnVzIGRvbWFpbnMgY291bGQgYmUuCj4gIC4uLi9iaW5kaW5ncy9idXMv
-ZG9tYWlucy9kb21haW5zY3RybC50eHQgICAgICAgICAgIHwgNTUgKysrKysrKysrKysrKysrKysr
-KysrKwo+ICAxIGZpbGUgY2hhbmdlZCwgNTUgaW5zZXJ0aW9ucygrKQo+ICBjcmVhdGUgbW9kZSAx
-MDA2NDQgRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2J1cy9kb21haW5zL2RvbWFp
-bnNjdHJsLnR4dAo+Cj4gZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5k
-aW5ncy9idXMvZG9tYWlucy9kb21haW5zY3RybC50eHQgYi9Eb2N1bWVudGF0aW9uL2RldmljZXRy
-ZWUvYmluZGluZ3MvYnVzL2RvbWFpbnMvZG9tYWluc2N0cmwudHh0Cj4gbmV3IGZpbGUgbW9kZSAx
-MDA2NDQKPiBpbmRleCAwMDAwMDAwMDAwMDAuLmEzZmNlZDkxODQyZAo+IC0tLSAvZGV2L251bGwK
-PiArKysgYi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYnVzL2RvbWFpbnMvZG9t
-YWluc2N0cmwudHh0Cj4gQEAgLTAsMCArMSw1NSBAQAo+ICtDb21tb24gRG9tYWlucyBDb250cm9s
-bGVyIGJpbmRpbmdzIHByb3BlcnRpZXMKPiArCj4gK0J1cyBkb21haW5zIGNvbnRyb2xsZXJzIGFs
-bG93IHRvIGRpdmlkZWQgc3lzdGVtIG9uIGNoaXAgaW50byBtdWx0aXBsZSBkb21haW5zCj4gK3Ro
-YXQgY2FuIGJlIHVzZWQgdG8gc2VsZWN0IGJ5IHdobyBoYXJkd2FyZSBibG9ja3MgY291bGQgYmUg
-YWNjZXNzZWQuCj4gK0EgZG9tYWluIGNvdWxkIGJlIGEgY2x1c3RlciBvZiBDUFVzIChvciBjb3By
-b2Nlc3NvcnMpLCBhIHJhbmdlIG9mIGFkZHJlc3NlcyBvcgo+ICthIGdyb3VwIG9mIGhhcmR3YXJl
-IGJsb2Nrcy4KPiArCj4gK1RoaXMgZGV2aWNlIHRyZWUgYmluZGluZ3MgY2FuIGJlIHVzZWQgdG8g
-YmluZCBidXMgZG9tYWluIGNvbnN1bWVyIGRldmljZXMgd2l0aAo+ICt0aGVpciBidXMgZG9tYWlu
-cyBwcm92aWRlZCBieSBidXMgZG9tYWlucyBjb250cm9sbGVycy4gQSBidXMgZG9tYWluIHByb3Zp
-ZGVyCj4gK2NhbiBiZSByZXByZXNlbnRlZCBieSBhbnkgbm9kZSBpbiB0aGUgZGV2aWNlIHRyZWUg
-YW5kIGNhbiBwcm92aWRlIG9uZSBvciBtb3JlCj4gK2J1cyBkb21haW5zLiBBIGNvbnN1bWVyIG5v
-ZGUgY2FuIHJlZmVyIHRvIHRoZSBwcm92aWRlciBieSBhIHBoYW5kbGUgYW5kIGEgc2V0Cj4gK29m
-IHBoYW5kbGUgYXJndW1lbnRzIG9mIGxlbmd0aCBzcGVjaWZpZWQgYnkgdGhlICNkb21haW5jdHJs
-LWNlbGxzIHByb3BlcnR5IGluCj4gK3RoZSBidXMgZG9tYWluIHByb3ZpZGVyIG5vZGUuCj4gKwo+
-ICs9PUJ1cyBkb21haW4gcHJvdmlkZXI9PQo+ICsKPiArUmVxdWlyZWQgcHJvcGVydGllczoKPiAr
-LSAjZG9tYWluY3RybC1jZWxscyAgICA6IE51bWJlciBvZiBjZWxscyBpbiBhIGJ1cyBkb21haW4g
-c3BlY2lmaWVyOwo+ICsgICAgICAgICAgICAgICAgICAgICAgICAgQ2FuIGJlIGFueSB2YWx1ZSBh
-cyBzcGVjaWZpZWQgYnkgZGV2aWNlIHRyZWUgYmluZGluZwo+ICsgICAgICAgICAgICAgICAgICAg
-ICAgICAgZG9jdW1lbnRhdGlvbiBvZiBhIHBhcnRpY3VsYXIgcHJvdmlkZXIuCj4gKwo+ICs9PUJ1
-cyBkb21haW4gY29uc3VtZXI9PQo+ICsKPiArUmVxdWlyZWQgcHJvcGVydGllczoKPiArLSBkb21h
-aW5zY3RybC1YICAgICAgICAgICAgICAgIDogQSBsaXN0IG9mIGJ1cyBkb21haW4gc3BlY2lmaWVy
-cywgYXMgZGVmaW5lZCBieQo+ICsgICAgICAgICAgICAgICAgICAgICAgICAgYmluZGluZ3Mgb2Yg
-dGhlIGJ1cyBkb21haW4gY29udHJvbGxlciB0aGF0IGlzIHRoZQo+ICsgICAgICAgICAgICAgICAg
-ICAgICAgICAgYnVzIGRvbWFpbiBwcm92aWRlci4KPiArCj4gK09wdGlvbmFsIHByb3BlcnRpZXM6
-Cj4gKy0gZG9tYWluc2N0cmwtbmFtZXMgICAgOiBBIGxpc3Qgb2YgYnVzIGRvbWFpbiBuYW1lIHN0
-cmluZyBzb3J0ZWQgaW4gdGhlIHNhbWUKPiArICAgICAgICAgICAgICAgICAgICAgICAgIG9yZGVy
-IGFzIHRoZSBkb21haW5zY3RybC1YIHByb3ByZXJ0aWVzLiBDb25zdW1lcgo+ICsgICAgICAgICAg
-ICAgICAgICAgICAgICAgZHJpdmVycyB3aWxsIHVzZSBkb21haW5zY3RybC1uYW1lcyB0byBtYXRj
-aCBidXMKPiArICAgICAgICAgICAgICAgICAgICAgICAgIGRvbWFpbnMgd2l0aCBidXMgZG9tYWlu
-cyBzcGVjaWZpZXJzLgo+ICsgICAgICAgICAgICAgICAgICAgICAgICAgTm90ZSB0aGF0ICJkZWZh
-dWx0IiBhbmQgInVuYmluZCIgYXJlIHJlc2VydmVkIG5hbWVzCj4gKyAgICAgICAgICAgICAgICAg
-ICAgICAgICB1c2VkIGJ5IHRoZSBmcmFtZXdvcmsuCj4gKwo+ICtFeGFtcGxlIG9mIHVzYWdlIHdp
-dGg6Cj4gKy0gYSBkb21haW5zIGNvbnRyb2xsZXIgd2l0aCBhIDIgcGFyYW1ldGVycyBjZWxsCj4g
-Ky0gYSBkb21haW5zIGNvbnRyb2xsZXIgd2l0aCBhIDMgcGFyYW1ldGVycyBjZWxsCj4gKy0gYSBj
-bGllbnQgZGV2aWNlIG5vZGUgdXNpbmcgdGhlIGJvdGggY29udHJvbGxlcnMgYW5kIDIgY29uZmln
-dXJhdGlvbnMKPiArICBuYW1lZCAiZGVmYXVsdCIgYW5kICJ1bmJpbmQiCj4gKwo+ICtjdHJsMDog
-Y3RybEAwIHsKPiArICAgICAgICNkb21haW5jdHJsLWNlbGxzID0gPDI+Owo+ICt9Owo+ICsKPiAr
-Y3RybDE6IGN0cmxAMSB7Cj4gKyAgICAgICAjZG9tYWluY3RybC1jZWxscyA9IDwzPjsKPiArfTsK
-PiArCj4gK2Zvb0AwIHsKPiArICAgICAgIGRvbWFpbnMtbmFtZXMgPSAiZGVmYXVsdCIsICJ1bmJp
-bmQiOwo+ICsgICAgICAgZG9tYWluY3RybC0wID0gPCZjdHJsMCAxIDI+LCA8JmN0cmwxIDMgNCA1
-PjsKPiArICAgICAgIGRvbWFpbmN0cmwtMSA9IDwmY3RybDAgNiA3PiwgPCZjdHJsMSA4IDkgMD47
-Cj4gK307Cj4gLS0KPiAyLjE1LjAKPgoKCi0tIApCZW5qYW1pbiBHYWlnbmFyZAoKR3JhcGhpYyBT
-dHVkeSBHcm91cAoKTGluYXJvLm9yZyDilIIgT3BlbiBzb3VyY2Ugc29mdHdhcmUgZm9yIEFSTSBT
-b0NzCgpGb2xsb3cgTGluYXJvOiBGYWNlYm9vayB8IFR3aXR0ZXIgfCBCbG9nCgpfX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1h
-aWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xp
-c3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Mon, Feb 18, 2019 at 03:46:02PM +0000, Andrew Murray wrote:
+> On Thu, Feb 07, 2019 at 11:47:59AM +0000, Dave Martin wrote:
+> > On Wed, Feb 06, 2019 at 01:31:05PM +0000, Andrew Murray wrote:
+> > > The introduction of elf_hwcap2 introduced accessors which ensure that
+> > > features are set/tested in the appropriate elf_hwcapX variable.
+> > > 
+> > > Let's now mandate access to elf_hwcapX via these accessors by making
+> > > elf_hwcapX static within cpufeature.c.
+> > > 
+> > > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > > ---
+> > >  arch/arm64/include/asm/cpufeature.h | 19 ++++---------------
+> > >  arch/arm64/include/asm/hwcap.h      |  6 +++---
+> > >  arch/arm64/kernel/cpufeature.c      | 33 ++++++++++++++++++++++++++++-----
+> > >  3 files changed, 35 insertions(+), 23 deletions(-)
+> > 
+> > [...]
+> > 
+> > > diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+> > > index 05ee9b9..ced87ad 100644
+> > > --- a/arch/arm64/include/asm/hwcap.h
+> > > +++ b/arch/arm64/include/asm/hwcap.h
+> > 
+> > [...]
+> > 
+> > > @@ -97,6 +98,5 @@ enum {
+> > >  #endif
+> > >  };
+> > >  
+> > > -extern unsigned long elf_hwcap, elf_hwcap2;
+> > >  #endif
+> > >  #endif
+> > > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > > index d10a455..5b9620d 100644
+> > > --- a/arch/arm64/kernel/cpufeature.c
+> > > +++ b/arch/arm64/kernel/cpufeature.c
+> > > @@ -35,11 +35,8 @@
+> > >  #include <asm/traps.h>
+> > >  #include <asm/virt.h>
+> > >  
+> > > -unsigned long elf_hwcap __read_mostly;
+> > > -EXPORT_SYMBOL_GPL(elf_hwcap);
+> > > -
+> > 
+> > Will this affect out-of-tree modules?
+> > 
+> > I also note an out-of-arch/ use in
+> > drivers/clocksource/arm_arch_timer.c, which this series doesn't appear
+> > to address (or I missed it).
+> 
+> It was in "arm64: HWCAP: add support for ELF_HWCAP2" - though due to it
+> being used by arm32 code I had to use #ifdef CONFIG_ARM64 as
+> cpu_set_feature doesn't exist there.
+
+Ah, I guess I missed that.
+
+> > 
+> > We are allowed to break EXPORT_SYMBOL_GPL()s in general so long as it's
+> > not done without any meaningful reason, so maybe this is not a huge
+> > concern so long as we catch all the in-tree users.
+> 
+> The benefit of removing the EXPORT_SYMBOL_GPL is that we can encapsulate
+> the elf_hwcap variables with getters/setters that ensure they are modified
+> correctly. This is only relevant now as we split bits between elf_hwcap and
+> elf_hwcap2.
+> 
+> My suggestion is to remove the EXPORT_SYMBOL_GPL and then also stick with
+> using just one elf_hwcap variable. As you previously suggested we can then
+> update the ELF_HWCAP{,2} marcos to produce the relevant bit fields. This
+> also has the added benefit of simplifying cpu_{have,set}_feature functions
+> as the number of hwcaps grow.
+
+I guess this depends on what is decided re the other patches.
+
+While it would be nice to avoid exposing elf_hwcap and elf_hwcap2
+directly, I'm starting to feel it may be easier to expose them as-is.
+
+Cheers
+---Dave
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
