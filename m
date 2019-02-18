@@ -2,86 +2,85 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CB20EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:39:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA785C10F01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:08:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AD772085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 17:39:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7BB64217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 18:08:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YgKpJYKz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DhpHm0wY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AD772085A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HTLYu2DW";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="dDmdOEhY";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="dDmdOEhY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7BB64217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aFwMl6a1uowrV1sOxbq3SONXfxjAzTLA7zObez+kIgw=; b=YgKpJYKzMUQohf
-	giwsbyM9ziRiDguDA7gZRhXEJj08L4sy7qwzOG1vIJ72Qf+soaawHqGi4SEOGUn1rPV/PPhUeugTB
-	BV/HnZ2/+jSLJl31oaRZm4XwF+CBBc3HUmVcRbwRzstoghFGGxrp3MAzPKvAaoCvb8OSAGQpEdu18
-	6zVh8liw0A8LyfdlrL0lLR/VC2HT+rfEgrZjcPTQ0b/ORPwGQrkrcS2HyFLoam0Fn55+149irU0jm
-	teVbRtQbRHbbmJbZefulCSjT+DtNdL0Kulr1EV8nf7eVV+p957sVpy6oOHrG/si4lhEWtTb8qC1pa
-	GbLMrDMjiRyvl4lVzSiQ==;
+	List-Owner; bh=uy3TeZCt5mKkpsLg+LrtiRYEUIwlX/onHG6VEjQAc2g=; b=HTLYu2DWsJBLJ2
+	g+FchvTJFrc3bOHbbM0xOhav1gv2Ysx7cdFgT6OJvwR6xPSLMu+xNDSvOx+JnKC0nX8vwjQpKes2x
+	JJkvcpQ1IK6xG/9jm/sGwMfErSoJZXVwMuDo1jFtQ39IlrE0NRrZMg668ViNcnE2NOi8Lw1KyL9wK
+	id1algaCkMiJ3MyqWGMQbpTEirW22iIw3GeVlKMs8353hp7/hbOUgyiFSDtvqOVoPpxzkTsmXir7f
+	P6wy3W1Bd+2nGxL6HR8Wnn5QLTEKHjvoKbqUGVeB8Pt6D//Ady3KQ9TDr40j3+aXEKvm5QMja1ISy
+	B7Q8nQZCaTMp/QyYOu6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvmsr-00049d-VD; Mon, 18 Feb 2019 17:39:13 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gvnLC-00055r-1p; Mon, 18 Feb 2019 18:08:30 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvmso-00049C-Q2
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 17:39:12 +0000
-Received: by mail-ot1-x344.google.com with SMTP id v62so20779386otb.3
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 09:39:08 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=lPq6JgeJlfOMlBKr8ZIokMvU7bEx60jWLuEjCLYHXhk=;
- b=DhpHm0wYLnHUorR/3WrCDfKq2c3Ghx/69RD2/XyERQl3YCHA2Ss12fOA2oq73hstcj
- qTJFOf8zLQm03aBjvDMl0ERPeRcmW7d6xsD0SA05UtOgoWmQOQOLHPPh1Cn/zZHsdME/
- aonl1+jW6W0AMxl45ZGVS6yOJ9ZTtEYLoWMzETQzYQf4RaMU2zLoT0D+YymQJAVLreZM
- LrTCXUhO+gLh5ev2SRVIuSX2Krtzs9cnJl3VR4pJGB5Zpa/BIjdzHxANzgFe3zWrhVFc
- DP/dhJ9fZRzxaycUmaQ+q7VQUmuulyGvBIsGN+5nR13YZg7RT+pEN7bm28BBZt4KlBTv
- Bw4w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=lPq6JgeJlfOMlBKr8ZIokMvU7bEx60jWLuEjCLYHXhk=;
- b=m/37KCCwPGxKfWjxCUGySdolQrSnEyBW4QqcSyjEqL6pO2zGTNaMdMS7qBw8P6r8DH
- La4Jz5YSWQLtZV9SV+3O/JZDuDdfgWDheHqlN85lWTgYGEcv3VXVk/3qDZQjt8CLPq+I
- R0JsirN7qK5CrV8hiCso2ek/ERE/TGxPd5mcDrkPERbk2DqZVDkflI5sVX8odG/5MeBV
- yYz+kP2d4+RDZkxSxs3F06bchdpzpG6Jb4PKu+KdiUA+SbwOGaAra9zbvaOft8WRlqWZ
- 98K150lyq1jYz0swgsoIXuVhglTJkVax3LV+uo+6A1lBgvqEPUno7Lx5JFV2OLlmnO8R
- mqrA==
-X-Gm-Message-State: AHQUAub4HPlXI5odBoRJjp/FpNQVs/g0iZIUdkeFlraXw+2pSKf+RLa3
- yobJlN8xFvkyClQyzENlAzjljxPOZ3L6Md9vZFUzDw==
-X-Google-Smtp-Source: AHgI3IbzisbKYiBbpKJ6BH4gJB0buX25wt/UQdgOW8/7v7QFH0QlZ4s3wl7+RtyWHTyOqbwgbfHQi5LLQtn9v3pyZ24=
-X-Received: by 2002:a05:6830:1547:: with SMTP id
- l7mr12050435otp.196.1550511548045; 
- Mon, 18 Feb 2019 09:39:08 -0800 (PST)
+ id 1gvnL8-00055G-BN; Mon, 18 Feb 2019 18:08:27 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 833CB602FE; Mon, 18 Feb 2019 18:08:25 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1550513305;
+ bh=xCjBUogtWIOqJZsdmRtXiOBmgDLvp893h57ZpPCX8xw=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=dDmdOEhYTB4RXWskygVmUXPMZ/rPdDYnOA2nlpyw3yQmLZ/zOgW3+9KLRub13wxR4
+ Wkc8atuV3wEHk7OO37OzpZEgujivVZ/qedzl2jkAGR1waUU/dm2pIsqagd5u9WRYwI
+ b5/8cGWxRbLAHA92ZO7C/N78Km9Z676Hyyv42Ewk=
+Received: from potku.adurom.net (88-114-240-156.elisa-laajakaista.fi
+ [88.114.240.156])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: kvalo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 83FD560388;
+ Mon, 18 Feb 2019 18:08:21 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1550513305;
+ bh=xCjBUogtWIOqJZsdmRtXiOBmgDLvp893h57ZpPCX8xw=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=dDmdOEhYTB4RXWskygVmUXPMZ/rPdDYnOA2nlpyw3yQmLZ/zOgW3+9KLRub13wxR4
+ Wkc8atuV3wEHk7OO37OzpZEgujivVZ/qedzl2jkAGR1waUU/dm2pIsqagd5u9WRYwI
+ b5/8cGWxRbLAHA92ZO7C/N78Km9Z676Hyyv42Ewk=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 83FD560388
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=kvalo@codeaurora.org
+From: Kalle Valo <kvalo@codeaurora.org>
+To: Masahiro Yamada <yamada.masahiro@socionext.com>
+Subject: Re: [PATCH 1/2] wireless: mt76: call hweight8() instead of
+ __sw_hweight8()
+References: <1550469571-25933-1-git-send-email-yamada.masahiro@socionext.com>
+ <1550469571-25933-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 18 Feb 2019 20:08:18 +0200
+In-Reply-To: <1550469571-25933-2-git-send-email-yamada.masahiro@socionext.com>
+ (Masahiro Yamada's message of "Mon, 18 Feb 2019 14:59:30 +0900")
+Message-ID: <877edxt1f1.fsf@kamboji.qca.qualcomm.com>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/24.5 (gnu/linux)
 MIME-Version: 1.0
-References: <1550253761-26841-1-git-send-email-Frank.Li@nxp.com>
- <1550253761-26841-3-git-send-email-Frank.Li@nxp.com>
-In-Reply-To: <1550253761-26841-3-git-send-email-Frank.Li@nxp.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Mon, 18 Feb 2019 14:38:56 -0300
-Message-ID: <CAOMZO5ArupZLgfw5abDdrBFK4B2s0vC7+g0H=oZiYMwn5nHSOA@mail.gmail.com>
-Subject: Re: [PATCH V4 3/4] arm64: dts: imx8qxp: added ddr performance monitor
- nodes
-To: Frank Li <frank.li@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_093910_863485_B7C3D9DA 
-X-CRM114-Status: UNSURE (   7.15  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190218_100826_410103_A9CF9908 
+X-CRM114-Status: GOOD (  13.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,28 +92,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- Aisheng Dong <aisheng.dong@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "lznuaa@gmail.com" <lznuaa@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: netdev@vger.kernel.org, x86@kernel.org, linux-wireless@vger.kernel.org,
+ linux-kernel@vger.kernel.org, "David S. Miller" <davem@davemloft.net>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>,
+ linux-mediatek@lists.infradead.org, Thomas Gleixner <tglx@linutronix.de>,
+ Christoph Hellwig <hch@lst.de>, linux-arm-kernel@lists.infradead.org,
+ Felix Fietkau <nbd@nbd.name>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 4:03 PM Frank Li <frank.li@nxp.com> wrote:
->
-> Add ddr performance monitor
->
-> Signed-off-by: Frank Li <Frank.Li@nxp.com>
+Masahiro Yamada <yamada.masahiro@socionext.com> writes:
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+> __sw_hweight8() is just internal implementation.
+>
+> Drivers should use the common API, hweight8().
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+Acked-by: Kalle Valo <kvalo@codeaurora.org>
+
+> This patch should go to x86 tree along with 2/2.
+>
+> Otherwise, all{yes,mod}config of x86 would be broken.
+>
+> This patch is trivial enough.
+> I want ACK from the net/wireless maintainer
+> so that this can go in via x86 tree.
+
+Sounds good to me, feel free to push via the x86 tree.
+
+-- 
+Kalle Valo
 
 _______________________________________________
 linux-arm-kernel mailing list
