@@ -2,96 +2,59 @@ Return-Path: <SRS0=ULCN=QZ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 967ADC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 20:00:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CDEE3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 20:02:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5BA7A217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 20:00:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5C0CF217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 18 Feb 2019 20:02:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ltuDNKuO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="vcgO/325"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BA7A217F5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o9Fd9nvA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C0CF217F5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iteJPmUXk7EPzjdwbM1SqUBzDYvkJaMCKVzA2D6xOV4=; b=ltuDNKuOi4EV67
-	CLyL/vG5ZQiKvNmJcXd7BS1Nh3El3pZw14JEuB4IfLNLs33X1sDWK9xEHSzgvqXamt1pBS9xr1tiO
-	tBLmnv6iovdtn4jtEO3Yu/HbAmyPYfv+hqO4rVVINMPe/A8O1nOadKkUiO/P/3hPQ57z4ZpJZVDPU
-	iMvAVsL6ZNJ7/KfNTodBwUPyeSw799hSoXAhAZ9bOR6iUlTt3cv7QXrklDBBkiliDgquN1zOs7q1H
-	jG2uFEwZ9Fi5CyfbVBkniK7E/4LCTgKtVBXj6rwSi6x48p4BDsJDN6IJRFRa8wNCtE5GdJ9kfcPKr
-	ysNmfHtZOSgT0LLMp75w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Bm3NGlgldgANRc9NooFXyNJLViGkIcyhmurjOZ4tD5c=; b=o9Fd9nvALy7jxP
+	cLKrg1dn5JpttZc8TWsLa4uoq05YRH1QapoJCvDzf2rdZPvuI6j7px/I/WOCti4K2jWT2HN7NF3vv
+	pFz4LLllH6PLQ9eeythEoqOPH0ijyX2ztOSw6fyxIm+OPRePkTn7MjU25KJjZQPWdZOyFKU6RNLRd
+	QchHpf09F/O02zvLkdPryw5ySPwRxMbh90HmR3tJbjKg2TvwxGbWOrOFbGQzooPzzayoS48HZBjg7
+	jKlZAdjBCwUHIgZe3EhL1uKIDo7ITqJUGuQ1azQJtIoqJ8KlJbgWVWGk0QWFpnOp55ZvuEJIkMDnZ
+	L0bVqF7ZAteFokH6YgAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvp5X-0004u1-2c; Mon, 18 Feb 2019 20:00:27 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvp2Y-0000i8-Ko
- for linux-arm-kernel@bombadil.infradead.org; Mon, 18 Feb 2019 19:57:22 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=VuL8M/buYU86p5J9UP9rJFLjnhT7S5iFxpf0dcOOp04=; b=vcgO/325AV60LDwBNDKRVhEyH
- cY6TXc1BUdiGOLWqfJIyD+hBkJIzDAUpAF92QI65YtNa8tkwm9695/jE/biVJAUz8vUAcYYOSG6VR
- mQ+0Raow0/ZlrI32vkeX6L4eXQ22IGqbRlZT8p0FMs13vDH+R/BcFSVGJTYruCR+vbCQu4r4BioOR
- pPDga3cIA/aRqx0OEHSRpC2IN8ag55TEqreNO/Y5y6E5gg3oSAwi8Siy3Ym7K7H1xT3fK9ueaM+bl
- zkZpgUcZ6rBKAEmFuzYdJsgdFFysbnXdxFw11Z3Iu71clSUIZjr6F1NmN/v5M/nd2r3YcGaboOnrn
- 6qdGduT0Q==;
-Received: from mail-ot1-f65.google.com ([209.85.210.65])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvp2V-0003xH-Cq
- for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 19:57:20 +0000
-Received: by mail-ot1-f65.google.com with SMTP id s5so30300046oth.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 11:57:17 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=VuL8M/buYU86p5J9UP9rJFLjnhT7S5iFxpf0dcOOp04=;
- b=dbWX7qiO03tF6owCxiLSt7CH6+zpBPYGJQtmvDLEDQFAQpKvGrCa9oEl93KgxlRbAe
- dY5H7xY9TPy3/Y4WHgQfeHPPG8Q1rZhlOaU92a1w7Z08miAN3SBzt3mtHxToM9998RLt
- saGR/b8BHc6jdCXl122+W5tlyZToTvU1HsVN0S/iV3YtJKOK844TqgBMPx0cC6y1Oiil
- 3R1Q7c5jvAHEyiMFHl6KghX9J9wD8gvvko63iE5GujUkbcxhdgApdmi2UC+o7z7AU7MO
- rops8Za7K/Pg2+X53fS/Rw4HOHIZIAe2Id8vK6wOJFAjMcHwODtxGqrYsUaXSoNS3Ldu
- GY2g==
-X-Gm-Message-State: AHQUAubsz/0388TwnzIxvVUwmxyYxS6v8DA5+T1qMKMAbS1FXjybtaMl
- XfG7+Q4T09d+I5wV2LqfWPcj5qE=
-X-Google-Smtp-Source: AHgI3Iac3+nO3BWxXRLG68RaLv+2bzPmd2cppsflZs6ky7GttF4E0zcVaOBbIKnVfXfigURaAPNgng==
-X-Received: by 2002:aca:ed06:: with SMTP id l6mr321892oih.7.1550519834438;
- Mon, 18 Feb 2019 11:57:14 -0800 (PST)
-Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id p129sm6421789oif.17.2019.02.18.11.57.13
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 18 Feb 2019 11:57:13 -0800 (PST)
-Date: Mon, 18 Feb 2019 13:57:13 -0600
-From: Rob Herring <robh@kernel.org>
-To: Sugaya Taichi <sugaya.taichi@socionext.com>
-Subject: Re: [PATCH v2 09/15] dt-bindings: serial: Add Milbeaut serial driver
- description
-Message-ID: <20190218195713.GA18625@bogus>
-References: <1549628849-31726-1-git-send-email-sugaya.taichi@socionext.com>
+	id 1gvp7V-0006EB-Bn; Mon, 18 Feb 2019 20:02:29 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvp7R-0006Di-0X
+ for linux-arm-kernel@lists.infradead.org; Mon, 18 Feb 2019 20:02:27 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 996B6A78;
+ Mon, 18 Feb 2019 11:53:07 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 99CAB3F575;
+ Mon, 18 Feb 2019 11:52:45 -0800 (PST)
+From: Dave Martin <Dave.Martin@arm.com>
+To: kvmarm@lists.cs.columbia.edu
+Subject: [PATCH v5 00/26] KVM: arm64: SVE guest support
+Date: Mon, 18 Feb 2019 19:52:13 +0000
+Message-Id: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+X-Mailer: git-send-email 2.1.4
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1549628849-31726-1-git-send-email-sugaya.taichi@socionext.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_145719_456863_20B2488D 
-X-CRM114-Status: GOOD (  19.13  )
+X-CRM114-CacheID: sfid-20190218_120225_062259_638D6E36 
+X-CRM114-Status: GOOD (  17.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,67 +66,151 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
- Jassi Brar <jaswinder.singh@linaro.org>, linux-serial@vger.kernel.org,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+Cc: Peter Maydell <peter.maydell@linaro.org>,
+ Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ Julien Grall <julien.grall@arm.com>,
+ =?UTF-8?q?Alex=20Benn=C3=A9e?= <alex.bennee@linaro.org>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 08, 2019 at 09:27:29PM +0900, Sugaya Taichi wrote:
-> Add DT bindings document for Milbeaut serial driver.
-> 
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> ---
->  .../devicetree/bindings/serial/milbeaut-uart.txt    | 21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/milbeaut-uart.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/milbeaut-uart.txt b/Documentation/devicetree/bindings/serial/milbeaut-uart.txt
-> new file mode 100644
-> index 0000000..8f61c38
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/milbeaut-uart.txt
-> @@ -0,0 +1,21 @@
-> +Socionext Milbeaut UART controller
-> +
-> +Required properties:
-> +- compatible: should be "socionext,milbeaut-usio-uart".
-> +- reg: offset and length of the register set for the device.
-> +- interrupts: two interrupts specifier.
-> +- clocks: phandle to the input clock.
-> +- interrupt-names: should be "rx", "tx".
+This series implements support for allowing KVM guests to use the Arm
+Scalable Vector Extension (SVE), superseding the previous v4 series [1].
 
-Put this next to 'interrupts'
+The patches are also available on a branch for reviewer convenience. [2]
 
-> +
-> +Optional properties:
-> +- uart-flow-enable: flow control enable.
+The patches are based on v5.0-rc6.
 
-We already have a standard property for this: auto-flow-control
+They depend on another small series currently under review [3] that does
+a bit of relevant refactoring (as well as fixing an anomaly not directly
+related to this series).  A base branch [4] is provided so that
+reviewers don't need to hunt down both series independently.
 
-> +
-> +Example:
-> +	usio1: usio_uart@1e700010 {
+This series contains no major update except for the removal of multiple
+register slice support in the user register access ioctls.  The ABI is
+kept as-is so that this functionality can be added back in later on
+if/when needed.  ioctl access to nonexistent slices now yields ENOENT,
+which is more consistent with the notion of an absent register.
 
-serial@...
+For a description of minor updates, see the individual patches.
 
-> +		compatible = "socionext,milbeaut-usio-uart";
-> +		reg = <0x1e700010 0x10>;
-> +		interrupts = <0 141 0x4>, <0 149 0x4>;
-> +		interrupt-names = "rx", "tx";
-> +		clocks = <&clk 2>;
-> +		uart-flow-enable;
-> +	};
-> -- 
-> 1.9.1
-> 
+
+Functionality testing and stress-testing has been done, using a
+hacked-up kvmtool [5]:
+
+ * Arm Fast Model: full testing of arm64 defconfig, including running
+   non-SVE and SVE guests with mixtures of vector lengths.  limited
+   testing of other configurations.
+
+ * ThunderX2: basic testing of arm64 defconfig, including booting guests
+   (no SVE support on this hardware).
+
+ * Full build-bisect testing and sparse testing of every commit done
+   for arm64 (defconfig, CONFIG_ARM64_SVE=n, CONFIG_KVM=n) and arm
+   (multi_v7_defconfig, CONFIG_KVM=y).  One new sparse warning,
+   probably spurious (see note in patch 22).
+
+
+AArch32 host testing is pending.  I will ping this series with a reply
+to the cover letter when that testing has been completed.
+
+   
+Known issues:
+
+ * **Possible bug**
+
+   SVE state corruption has been in the host when running on the Arm
+   Fast Model.
+
+   After some investigation with the model engineers, it appears that
+   there may be a model bug in this area.  I have also obtained detailed
+   trace of failure cases, which is also suggestive of a model bug.  No
+   clear evidence has been obtained to show that there is a bug in
+   Linux, so far.
+
+   All available evidence suggests that this bug will not affect non-SVE
+   hardware: the symptom is unexpected zeroing of bits 128 and above of
+   the vector registers (which don't exist prior to SVE).
+
+ * kvmtool support is not mature
+
+
+[1] [RFC PATCH v4 00/24] KVM: arm64: SVE guest support
+https://lists.cs.columbia.edu/pipermail/kvmarm/2019-January/034134.html
+
+[2] This series in git:
+http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve-kvm/v5/head
+git://linux-arm.org/linux-dm.git sve-kvm/v5/head
+
+[3] [PATCH v2 0/2] Fix KVM_GET_REG_LIST invalid register ID regression
+https://lists.cs.columbia.edu/pipermail/kvmarm/2018-December/033810.html
+
+[4] Base of this series in git:
+http://linux-arm.org/git?p=linux-dm.git;a=shortlog;h=refs/heads/sve-kvm/v5/base
+git://linux-arm.org/linux-dm.git sve-kvm/v5/base
+
+[5] [RFC PATCH 00/12] arm64: SVE guest support test hacks
+https://lists.cs.columbia.edu/pipermail/kvmarm/2019-January/034162.html
+
+
+Dave Martin (26):
+  KVM: Documentation: Document arm64 core registers in detail
+  arm64: fpsimd: Always set TIF_FOREIGN_FPSTATE on task state flush
+  KVM: arm64: Delete orphaned declaration for __fpsimd_enabled()
+  KVM: arm64: Refactor kvm_arm_num_regs() for easier maintenance
+  KVM: arm64: Add missing #include of <linux/bitmap.h> to kvm_host.h
+  arm64/sve: Check SVE virtualisability
+  arm64/sve: Clarify role of the VQ map maintenance functions
+  arm64/sve: Enable SVE state tracking for non-task contexts
+  KVM: arm64: Add a vcpu flag to control SVE visibility for the guest
+  KVM: arm64: Propagate vcpu into read_id_reg()
+  KVM: arm64: Extend reset_unknown() to handle mixed RES0/UNKNOWN
+    registers
+  KVM: arm64: Support runtime sysreg visibility filtering
+  KVM: arm64/sve: System register context switch and access support
+  KVM: arm64/sve: Context switch the SVE registers
+  KVM: Allow 2048-bit register access via ioctl interface
+  KVM: arm64: Add missing #include of <linux/string.h> in guest.c
+  KVM: arm64: Reject ioctl access to FPSIMD V-regs on SVE vcpus
+  KVM: arm64/sve: Add SVE support to register access ioctl interface
+  KVM: arm64: Enumerate SVE register indices for KVM_GET_REG_LIST
+  arm64/sve: In-kernel vector length availability query interface
+  KVM: arm/arm64: Add hook to finalize the vcpu configuration
+  KVM: arm64/sve: Add pseudo-register for the guest's vector lengths
+  KVM: arm64/sve: Allow userspace to enable SVE for vcpus
+  KVM: arm64: Add a capabillity to advertise SVE support
+  KVM: Document errors for KVM_GET_ONE_REG and KVM_SET_ONE_REG
+  KVM: arm64/sve: Document KVM API extensions for SVE
+
+ Documentation/virtual/kvm/api.txt |  93 ++++++++++
+ arch/arm/include/asm/kvm_host.h   |   4 +
+ arch/arm64/include/asm/fpsimd.h   |  33 +++-
+ arch/arm64/include/asm/kvm_host.h |  35 +++-
+ arch/arm64/include/asm/kvm_hyp.h  |   1 -
+ arch/arm64/include/asm/sysreg.h   |   3 +
+ arch/arm64/include/uapi/asm/kvm.h |  22 +++
+ arch/arm64/kernel/cpufeature.c    |   2 +-
+ arch/arm64/kernel/fpsimd.c        | 172 +++++++++++++------
+ arch/arm64/kernel/signal.c        |   5 -
+ arch/arm64/kvm/fpsimd.c           |  17 +-
+ arch/arm64/kvm/guest.c            | 348 +++++++++++++++++++++++++++++++++++---
+ arch/arm64/kvm/hyp/switch.c       |  69 ++++++--
+ arch/arm64/kvm/reset.c            |  87 +++++++++-
+ arch/arm64/kvm/sys_regs.c         | 144 ++++++++++++++--
+ arch/arm64/kvm/sys_regs.h         |  24 ++-
+ include/uapi/linux/kvm.h          |   2 +
+ virt/kvm/arm/arm.c                |   8 +
+ 18 files changed, 944 insertions(+), 125 deletions(-)
+
+-- 
+2.1.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
