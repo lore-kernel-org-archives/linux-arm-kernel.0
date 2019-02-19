@@ -2,62 +2,140 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C0A8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:09:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55E9BC10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:10:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C03D2064C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:09:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 27F982075A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:10:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SOVIsElR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C03D2064C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d5kFfghD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="iBN+lcOQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27F982075A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RD1GYNNzsJD7tXANhy+TzT5/YFShO7sZyDTrgC3nojs=; b=SOVIsElR/tZWyD
-	LF+gD5rF+d/qDo6zj5g0SDbNyyFlcfnlAJi/9xFeOOAqEY3s7SHdgs0OLvWtpTcT2/w/v8dup1iuO
-	bwP0Wd7K/ALn4dQu2LbVvuemm0V63AajReA5H9QyEUVBGQ657H9kqPfcqaoT+F9SRPpK8iiG945Nc
-	VN1m0t5rsFDDs7pNJjVmxdvJZuRVfZg/qcaaZ5JqEJgd7s5AZ4brGmT5i3qSfrOSa5kioEAZaAqHT
-	0n97/MZjJOcZnGG0XtjoSMebcxhhIIAVYCdHvfnpL0J8sG/U/r0aNcb3XlJ4UmTB+I65JMUp0YxNm
-	bdpqZIkNpI9NWJFFcS0g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=3a0jW2dc/6l9aWW8u4fABZ7D5jeq2+iMlQJAB9emKb0=; b=d5kFfghD9aqnid
+	d5pcinP1ptnQ0M2Kr3aVInT0zKqzLgSQ1RdclEI6ww10P/XknhV48+rH97QQ2aCqI3cGBWd1gJC7Z
+	dORDLAtJLkFzlvMe1InIG0egCIRNmJ+y3WzQ1sAyhhpys/MsuMAAz6io5ajb9plDX5aDBlPDD8jz7
+	LojBEWGEiiQ8RSQWEvyv9nRPV+jzPBahpMiMWx3Pxf8VrT1jMzrOV7GsOrgH7EC5RW5SEZ3wdZ1uX
+	bQx5l7st9JgyPhFetYQvcG9EmcaCQ2IPpS8HSpkzX20zdmILdjDPEZZlDGwKtmacsNaBuFyzWJ8Rc
+	hE77jAlTlGcsEjlX2xYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvvmI-0001PX-3Q; Tue, 19 Feb 2019 03:09:02 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvvmD-0001OX-LV
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 03:08:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4CB1480D;
- Mon, 18 Feb 2019 19:08:54 -0800 (PST)
-Received: from [10.162.40.139] (p8cg001049571a15.blr.arm.com [10.162.40.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 0EB4C3F575; Mon, 18 Feb 2019 19:08:50 -0800 (PST)
-Subject: Re: [PATCH] arm64: mm: enable per pmd page table lock
-To: Yu Zhao <yuzhao@google.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-References: <20190214211642.2200-1-yuzhao@google.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <f67b5468-2144-c51f-6cf0-ea7ece93b502@arm.com>
-Date: Tue, 19 Feb 2019 08:38:54 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
-MIME-Version: 1.0
-In-Reply-To: <20190214211642.2200-1-yuzhao@google.com>
+	id 1gvvo3-0002um-S1; Tue, 19 Feb 2019 03:10:51 +0000
+Received: from mail-eopbgr130049.outbound.protection.outlook.com
+ ([40.107.13.49] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvvo0-0002u7-SA
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 03:10:50 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=wMdVyfv4lkkTWzf8aFeLRADG3QC6V6+YGdrLiHZWN/s=;
+ b=iBN+lcOQxF/3lfnIXMzqFL3q4528sXLZBkymYwrhzrTAPiJEOvtDXiftArBOvwGcNoq9sBzJbUgCQrL7/Yz5Gm5gSFokidPd7L4cD6jiWJ/FmyYhnJbciyrWWsBcIUF4C6vaGJIQmTdXX0pTqKXmZ5p/uQewkS/Ps76Z7L70/Eg=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1601.21; Tue, 19 Feb 2019 03:10:42 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Tue, 19 Feb 2019
+ 03:10:42 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "a.zummo@towertech.it" <a.zummo@towertech.it>,
+ "alexandre.belloni@bootlin.com" <alexandre.belloni@bootlin.com>, Aisheng Dong
+ <aisheng.dong@nxp.com>, "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ Daniel Baluta <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-rtc@vger.kernel.org"
+ <linux-rtc@vger.kernel.org>
+Subject: [PATCH V3 1/4] dt-bindings: fsl: scu: add general interrupt support
+Thread-Topic: [PATCH V3 1/4] dt-bindings: fsl: scu: add general interrupt
+ support
+Thread-Index: AQHUyACy8HmIYiPaSECjXHiTh1QyKA==
+Date: Tue, 19 Feb 2019 03:10:42 +0000
+Message-ID: <1550545569-7197-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0186.apcprd02.prod.outlook.com
+ (2603:1096:201:21::22) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: b8ff25f2-d5bb-4a48-893e-08d69617d4e2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3916; 
+x-ms-traffictypediagnostic: DB3PR0402MB3916:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3916;
+ 23:mb9o3mZL8y30999K2d4iIYDAbSM+X9PdaPZrn?=
+ =?iso-8859-1?Q?phL7MIj8Qa5oElC6EadUlokTv8ofmyZlqP0eR/MGtxqlj1L4GoReNGfegz?=
+ =?iso-8859-1?Q?eQI7G9DJjRiZau8MYy/mFujDLQr1fmauXx+i6YouLKCqOEM0HOHBIWJdJE?=
+ =?iso-8859-1?Q?SO95kfPp+wkHbhVzRTcYNS788dU24xbA1Om5sbE253ntxuf/8qF7bjkp2F?=
+ =?iso-8859-1?Q?AR2AAFMJmdjgW0bSvwurwB4h6pBunBKw/mgVqsXJ+00k/XRtuGKkzHYQRw?=
+ =?iso-8859-1?Q?1OG5l2oct8UG9HoAnvIflW/9bKPOlCr/leCBdLDHsf5+5h587wMHSq+nAl?=
+ =?iso-8859-1?Q?ygC5lRatkkMt94sb5we7CDcJcbi6P/wXX69hcxkvu7mQrpLORldW/J6k7p?=
+ =?iso-8859-1?Q?44YTpOnrRIzDyGP1j2XRT9dqoJejx26BR6wpPwtHvaT0e6o8uEAL4fLqzJ?=
+ =?iso-8859-1?Q?BiQeVtJtWv/ovQntGk+Vyt6/hkvCG/0iCowZerVFXxoNIFV18JaXpHMd3g?=
+ =?iso-8859-1?Q?A707iSP7nfnpWgInBhAMzA3WCySp7QIoIOWn0UASwbuWs/H07hnQAHA534?=
+ =?iso-8859-1?Q?rRgcQ/SQaChU3E/UTrwu4eUyidQ2lL4c9DgfYnxWBZD6pAnx8ENvFUPKpu?=
+ =?iso-8859-1?Q?nCoAaSFlA+NJ2ROfFbD5t0Fck+0/aWPSDN/1IjZ+vAj6kGgwC/JvzR1h1K?=
+ =?iso-8859-1?Q?PZFPmOfP1Q8f/ztSW8CVOeVgvjgy6tQrpEYwH+5bZbqI2i3eAAp4UD7CIH?=
+ =?iso-8859-1?Q?9tvNNHviQe/QfUS9wAjTp8z2EU9c4+3jfYA+omKrJVho7tCtSyEK3yfz4W?=
+ =?iso-8859-1?Q?BApivGT+KIyWOtu8ciYrbfpwY4VV4IkropCFyEdc1zkKIOreo/GJXsvrMm?=
+ =?iso-8859-1?Q?p4s+He9pLeJW1jwAh8TJLh1Uc07G024DWvs5r3rAFnZx3RfK1mfOdS4vRB?=
+ =?iso-8859-1?Q?yTk9sDB7876HFCKnheGoJSedcWmsLh8x59ivozgaiZom7DUYj7TXphENwp?=
+ =?iso-8859-1?Q?nhp4MpigiLbpg8d5JS/xblGMYnkbb3rAohIpKUu1h9nMDxtKWDFh6IU4IR?=
+ =?iso-8859-1?Q?FvI9C+hNS24GNTkOmhQsfiE95iwDjhkSYqlkmHtt67BFj+4UpJTKPwDieZ?=
+ =?iso-8859-1?Q?zpSCG1/lcNFW72mYDbPyEcKDrN62GTRxDb4WsTuAQghJvXppGzqF7GIgdB?=
+ =?iso-8859-1?Q?1O8ulV21JGwUmGksTYUMMfycCS1EOO1J72yks2lttcb19VcegbLt8pWCfv?=
+ =?iso-8859-1?Q?CyiMcXVldXjyWoRpOxpHU/GdFoV3e8E7TeDssJBgg=3D=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB391692163D7DEFBFAE5BB5AFF57C0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09538D3531
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(136003)(39850400004)(376002)(346002)(366004)(189003)(199004)(26005)(6512007)(25786009)(68736007)(256004)(6346003)(478600001)(486006)(3846002)(6116002)(6436002)(7416002)(2616005)(186003)(14454004)(476003)(6486002)(4326008)(52116002)(316002)(8936002)(81166006)(50226002)(99286004)(7736002)(81156014)(53936002)(305945005)(110136005)(8676002)(2906002)(86362001)(102836004)(105586002)(2501003)(2201001)(386003)(6506007)(71190400001)(71200400001)(97736004)(106356001)(36756003)(66066001)(5660300002)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3916;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 6rTrLIc7XwgM07W/nYfCJBV+ZNEb9y3FL0suW4Y47xmqNku40nN/9aSCefxMnw0L+INQHian3ibK7lAbSPjRCfWuW69oq51lu3KysFeu7nrjh5k26nfuRm1dUGBoDiSfX8cAZioVfnCFA2SBAn18UTkGPS1bS9EzVFXxPhUZ9+jUSgNYL2yKSyuLfctoTPuPAQqwpewtiBCdu+hN6l+pSYP/VCZlprxKM+FNr3pyyEp3/8w1qpiXmC5Y2BfnqYk5nj6wJKB60ZPW8YYLIDLILLQJ9IM4MrEjIaon3OG0Xs5dLKqecAoe61b8g801mY9IapQnr0zqhSZaDoR4YdXW4m7oambURDYyG0niUWhpycFAmE22558KmNR04ePRn19/ZWzg/Sd8YeT9sqyjbJWAlLHDXTjDYl0wSnn36LySuoE=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b8ff25f2-d5bb-4a48-893e-08d69617d4e2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 03:10:36.8447 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3916
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_190857_708328_5710C011 
-X-CRM114-Status: GOOD (  13.46  )
+X-CRM114-CacheID: sfid-20190218_191048_977237_67937E67 
+X-CRM114-Status: UNSURE (   9.74  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,35 +147,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Peter Zijlstra <peterz@infradead.org>,
- linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
- linux-mm@kvack.org, "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
- Joel Fernandes <joel@joelfernandes.org>,
- "Kirill A . Shutemov" <kirill@shutemov.name>,
- Andrew Morton <akpm@linux-foundation.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Add scu general interrupt function support.
 
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+No change since V2.
+---
+ .../devicetree/bindings/arm/freescale/fsl,scu.txt      | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
 
-On 02/15/2019 02:46 AM, Yu Zhao wrote:
-> Switch from per mm_struct to per pmd page table lock by enabling
-> ARCH_ENABLE_SPLIT_PMD_PTLOCK. This provides better granularity for
-> large system.
-> 
-> I'm not sure if there is contention on mm->page_table_lock. Given
-> the option comes at no cost (apart from initializing more spin
-> locks), why not enable it now.
-> 
-
-This has similar changes to what I had posted part of the general page table
-page accounting clean up series on arm64 last month.
-
-https://www.spinics.net/lists/arm-kernel/msg701954.html
+diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+index f388ec6..e5def3e 100644
+--- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
++++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+@@ -22,9 +22,11 @@ Required properties:
+ -------------------
+ - compatible:	should be "fsl,imx-scu".
+ - mbox-names:	should include "tx0", "tx1", "tx2", "tx3",
+-			       "rx0", "rx1", "rx2", "rx3".
+-- mboxes:	List of phandle of 4 MU channels for tx and 4 MU channels
+-		for rx. All 8 MU channels must be in the same MU instance.
++			       "rx0", "rx1", "rx2", "rx3",
++			       "gi3".
++- mboxes:	List of phandle of 4 MU channels for tx, 4 MU channels for
++		rx, and 1 MU channel for general interrupt. All 9 MU channels
++		must be in the same MU instance.
+ 		Cross instances are not allowed. The MU instance can only
+ 		be one of LSIO MU0~M4 for imx8qxp and imx8qm. Users need
+ 		to make sure use the one which is not conflict with other
+@@ -34,6 +36,7 @@ Required properties:
+ 		Channel 1 must be "tx1" or "rx1".
+ 		Channel 2 must be "tx2" or "rx2".
+ 		Channel 3 must be "tx3" or "rx3".
++		General interrupt channel must be "gi3".
+ 		e.g.
+ 		mboxes = <&lsio_mu1 0 0
+ 			  &lsio_mu1 0 1
+@@ -42,7 +45,8 @@ Required properties:
+ 			  &lsio_mu1 1 0
+ 			  &lsio_mu1 1 1
+ 			  &lsio_mu1 1 2
+-			  &lsio_mu1 1 3>;
++			  &lsio_mu1 1 3
++			  &lsio_mu1 3 3>;
+ 		See Documentation/devicetree/bindings/mailbox/fsl,mu.txt
+ 		for detailed mailbox binding.
  
+@@ -153,7 +157,8 @@ firmware {
+ 	scu {
+ 		compatible = "fsl,imx-scu";
+ 		mbox-names = "tx0", "tx1", "tx2", "tx3",
+-			     "rx0", "rx1", "rx2", "rx3";
++			     "rx0", "rx1", "rx2", "rx3",
++			     "gi3";
+ 		mboxes = <&lsio_mu1 0 0
+ 			  &lsio_mu1 0 1
+ 			  &lsio_mu1 0 2
+@@ -161,7 +166,8 @@ firmware {
+ 			  &lsio_mu1 1 0
+ 			  &lsio_mu1 1 1
+ 			  &lsio_mu1 1 2
+-			  &lsio_mu1 1 3>;
++			  &lsio_mu1 1 3
++			  &lsio_mu1 3 3>;
+ 
+ 		clk: clk {
+ 			compatible = "fsl,imx8qxp-clk", "fsl,scu-clk";
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
