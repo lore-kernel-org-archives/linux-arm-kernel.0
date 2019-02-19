@@ -4,91 +4,73 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A6F4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:52:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EF8B3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:53:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CEF832147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:52:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C15DA2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:53:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="igIqlIrI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="kjbeoIwl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEF832147C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PfD1fVZX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C15DA2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/znM7mBXxN7Vsep0nJ8GfRK0I60LVuEL/PnyOKPhYXg=; b=igIqlIrI4pIBlJ
-	Nmdugr3XhcLa02Wa1kHo+nmQlwwe6wLJmvEvxOqZAJpqX58t93AtDkVjGbRQ2mSmlGd88lr3bIBVr
-	3hAxJ4iBD+GYxNDRFho82Pr3aAH/oBAJQQvPc62d+kntsL9Aw0/nkKGftJK+E2i2H3ONX7uwbq/47
-	SkiNl2KukD+gCd5brUiPdf47MNZLO9icTJ/HbOD0jzbIMrZpnmz7yGPRuq8gYacfdEQAAomYde5Dm
-	68L1KAa+Q5SoJDK1SS+jmZIh/ehY55CiceBGBCjmFa2W5PXxmfy7tuX21MqUrb1+16QtW/LzE8D34
-	fYTEcF5q+BtC9yJl0hUw==;
+	List-Owner; bh=FRT8XN1ZRnS5HYfGtT8yk3u/kVgAf2LBKvpIFxWKgbs=; b=PfD1fVZXknHECP
+	LfKZWS/mFeq6ZQfJ2MOY/+ca/2A4lc8+0U3x3vKtS3sPTKmVC0XpdgBfd5iwSpITaYAmWr7pNqJU4
+	tCq5Somr0a31VN3Sv3S1T/++o8dQD5GHw9fZN0PAFrsc8hdZvBMffMXRkwAm0WBf5fbdSK4RcIyn2
+	1tKeuhlFbZ7XJ3E6o9rqOI/mTf3LZUzErJ5xNtONxU3WFyijWJIZ7JxHoy5SmlQosuloDLLolrbOs
+	BZsoRqIu319og4Fo28O28Mx+l76PXjoyM8dq56eH4t6/rw+3zxnHcFpNUt43kygzfNrJJQYJ8qJm6
+	ErePsNLzz34YLhA+SQWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw18D-0003ZX-Gm; Tue, 19 Feb 2019 08:52:01 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw185-0003PI-1f
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:51:55 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1J8pVUF086856;
- Tue, 19 Feb 2019 02:51:31 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550566291;
- bh=s4HYJPqyPJn3r1uSudtaaH3WEZvuI8niOjTupXXcvSM=;
- h=From:Subject:To:CC:References:Date:In-Reply-To;
- b=kjbeoIwlJ2ouADzwUbz07nm5+csBCIJ73GcH7O1D5/mFwWYnkZ2Rx6Zf/Lp1vw2dX
- LOqvi0IG5Ul/8XPcymnEg/m9gnYS2HKAMO9La/30CG6OBKMXGvkt3o3QtDDyduP+yd
- 68kAXw0O5YuibZV+zxgk0fQWYmJ2ibTyQuaxRcCE=
-Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1J8pVLs037891
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 19 Feb 2019 02:51:31 -0600
-Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE100.ent.ti.com
- (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
- Feb 2019 02:51:31 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE111.ent.ti.com
- (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 19 Feb 2019 02:51:31 -0600
-Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1J8pQD9017838;
- Tue, 19 Feb 2019 02:51:27 -0600
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-To: Tony Lindgren <tony@atomide.com>
-References: <20190212162247.GK5720@atomide.com>
- <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
- <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
- <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
- <20190215161629.GK5720@atomide.com>
- <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
- <20190218143245.GC15711@atomide.com>
-Message-ID: <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
-Date: Tue, 19 Feb 2019 14:21:10 +0530
+	id 1gw19k-0003uC-1m; Tue, 19 Feb 2019 08:53:36 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw19g-0003tE-07
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:53:34 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7E26AEBD;
+ Tue, 19 Feb 2019 00:53:28 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7A3693F675;
+ Tue, 19 Feb 2019 00:53:25 -0800 (PST)
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+To: Linus Torvalds <torvalds@linux-foundation.org>,
+ "H. Peter Anvin" <hpa@zytor.com>
+References: <20190213140025.GB6346@brain-police>
+ <20190213142524.GW32494@hirez.programming.kicks-ass.net>
+ <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
+ <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+ <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
+ <20190216103044.GR32494@hirez.programming.kicks-ass.net>
+ <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
+ <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <8a3f9094-63a7-7fe2-bb4d-6deb5c022596@arm.com>
+Date: Tue, 19 Feb 2019 08:53:22 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20190218143245.GC15711@atomide.com>
+In-Reply-To: <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
 Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_005153_225166_83A6C417 
-X-CRM114-Status: GOOD (  19.80  )
+X-CRM114-CacheID: sfid-20190219_005332_397154_FBC50630 
+X-CRM114-Status: GOOD (  19.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,80 +82,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: Denys Vlasenko <dvlasenk@redhat.com>, Josh Poimboeuf <jpoimboe@redhat.com>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
+ Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
+ James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
+ Brian Gerst <brgerst@gmail.com>, Borislav Petkov <bp@alien8.de>,
+ Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
+ "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
 
-On 18/02/19 8:02 PM, Tony Lindgren wrote:
-> * Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
->> On 2/15/2019 9:46 PM, Tony Lindgren wrote:
->>> The dts node for the interrupt controller should describe a
->>> proper Linux device, that is with reg entries and so on.
+
+On 19/02/2019 00:24, Linus Torvalds wrote:
+> On Mon, Feb 18, 2019 at 2:31 PM H. Peter Anvin <hpa@zytor.com> wrote:
 >>
->> You are asking to just keep the compatible property :)
+>> The question is what "fix it" means. I'm really concerned about AC escapes,
+>> and everyone else should be, too.
 > 
-> Right, and then I realized this node is missing the standard
-> reg entry too. And you're saying the registers are not even
-> accissible from Linux.
+> I do think that it might be the right thing to do to add some kind of
+> WARN_ON_ONCE() for AC being set in various can-reschedule situations.
 > 
-> So based on that IMO you should not even have a device tree
-> node for it at all. You should just have the interrupt
+> We'd just have to abstract it sanely. I'm sure arm64 has the exact
+> same issue with PAN - maybe it saves properly, but the same "we
+> wouldn't want to go through the scheduler with PAN clear".
+> 
 
-Practically lets look at what all I am adding in the DT node. Below is one such
-example:
+As of right now, we have the same issue on arm64 as on x86. We don't
+currently save the PAN bit on task switch, but I have a patch to do that.
 
-main_intr: interrupt-controller0 {
-	compatible = "ti,sci-intr";
-	interrupt-controller;
-	interrupt-parent = <&gic500>;
-	#interrupt-cells = <4>;
-	ti,sci = <&dmsc>;
-	ti,sci-dst-id = <56>;
-	ti,sci-rm-range-girq = <0x1>;
-};
+Unless we decide to go down the route of warning against uses of
+schedule() inside.
 
-The following 4 properties are required at least for probing, to represent the
-hierarchy and for  interrupt definition:
-	compatible = "ti,sci-intr";
-	interrupt-controller;
-	interrupt-parent = <&gic500>;
-	#interrupt-cells = <4>;
+As for the abstraction, I had this patch[1] that added another primitive
+for the user_access API (although this might not be suited for x86 if
+you also want to check DF). However, an issue that appears is where to
+perform the check to cover enough ground.
 
-The remaining 3 properties represents the TISCI interface. Let's go step by step:
-* ti,sci = <&dmsc> :This is the phandle to the firmware protocol driver using
-which the messages are sent
-* ti,sci-dst-id = <56> : This is the TISCI device ID for the parent controller
-for which your irqs needs to be connected. As I said this cannot be queried from
-sysfw and this is the input to the messages that are send to sysfw.
-*  ti,sci-rm-range-girq = <0x1>: This define the ids using which the parent-irq
-ranges that are allocated to this interrupt router instance can be queried from
-sysfw.
-If the above 2 properties are to be added as driver phandle then for every
-instance of interrupt router in the SoC, a new compatible needs to be created. I
-don't think this is a desirable solution.
+Checking inside the schedule() code you only cover cases where things
+have already gone wrong, and not the use of functions that are unsafe to
+call inside a user_access region.
 
-With this can you tell me how can we not have a device-tree and still support
-irq allocation?
+[1]
+http://lists.infradead.org/pipermail/linux-arm-kernel/2019-January/625385.html
 
-Also, this is not the first time a driver based on a firmware is being added.
-K2g clock, power and reset drivers are based on this where device ids are being
-passed from consumers. Similarly arm scpi based drivers are also available.
+Cheers,
 
-Thanks and regards,
-Lokesh
-
-
-
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
