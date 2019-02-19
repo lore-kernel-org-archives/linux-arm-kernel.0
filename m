@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A2FFC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:05:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 09F3CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:05:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B7CE21738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:05:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9DEDA21738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:05:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ak20/IBh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DLn8k50K"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B7CE21738
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ROZLIbmJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="G+dvwvSu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DEDA21738
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mrwqwAUfWEbLHhYey3QhP1aRd4GBEYxWa1P0OVuGC4o=; b=Ak20/IBh+9av0G
-	OiucUQHRdjYMARaFo8HHX8ASItiGrjNVzhvH//2nYqgA5mK/p3UdGH7CvjYG8b9OpUOTlCS9a3rqR
-	0jqaLXTtCM61bzV3Suc9DlnW2YtybzBVPv8oU6kVPqkJbmoNNCRE5AoM+7ikGLO3npYcfSsTxaUXC
-	qobQvZlDOtwGMqcv4Xf66HFSNT+0m1WMB9Fv/LDKzXmg8VvF84+98pluHlcG30H4UL5q2AK7aM5mk
-	8deeco8m0b/OAh16e2eUfpZPTxqXJ/0DnqTpAesszwAJiBoGOtQbroqB49xKmsGasqUACMxBeRhrO
-	uhJ1pWspgDYL/LO4F5Dw==;
+	List-Owner; bh=tmpZ82rC5OHHwEba0zcf14mTcO7kKCmtRXKZvlLv6kg=; b=ROZLIbmJJZMBed
+	vvR+ChkXk9qnYjBdr61WMHAOdAx02XHee8Sg5CjwqS4yvvTxqD+jLpXnzEvBV4HneyFkA7K2/aMhj
+	GofMhPETHanSiXwATRuBmyW+ruIfancQ8kwNFGGQzs1aC9idEgviZhu1+2eautRqtVQ3R5dMmmmR0
+	fOXmxb2MIyCMzUfwrBK+XbIgHiMWRRe6ewiKK3hFeLD2m1uJ73hvFNXGL+bhAq9Jd8BtPznAY4sG6
+	4WZuVaBp/YGVDV1upzhM0W3Ni0DHs38cVHpVKyHNeYyaqltWSXbi4z62wGE64uLCgqhJDZkonzyyt
+	BMcRiKLB5u5X2+P/u/uA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwBdQ-0003M7-1w; Tue, 19 Feb 2019 20:04:56 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gwBdi-00048s-H9; Tue, 19 Feb 2019 20:05:14 +0000
+Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwBcq-0002dP-7i
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 20:04:23 +0000
-Received: by mail-pf1-x441.google.com with SMTP id q17so10714826pfh.10
+ id 1gwBcr-0002eM-QY
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 20:04:24 +0000
+Received: by mail-pg1-x541.google.com with SMTP id q206so10636042pgq.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 12:04:20 -0800 (PST)
+ Tue, 19 Feb 2019 12:04:21 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=BZi2w8f57gOm3gFQ8UGMMY60waRhbgxhlftcvIngYdk=;
- b=DLn8k50K04WUEg8VKTvya93AQofVWYeFWRQz7bWvjzLLN0Wd8V8DxubI+t+I1QVspL
- UioKOnR03EfgqqlIWdFmCv2+l2xLBpwABpTcHSNUrlGVJBfVzEbV1dV44IStOjfG+36G
- GVLYkbRlBsJjXSA/IsokZBdbqtUqbvf6KGLLcpMiM3o8USZ3CrZdeFPyjOaAXL/vlsZR
- 1WIipNvw2ieVcyKUottu7TeHg84Ucvlp0UZSXRtMo3+3NuUghzdaWdJtqE6W7nzFpmjy
- uF+esZmk12ri7Ewl6tfaQu/omAIabWWEl+prmDRokPYZPmmt67EkV/nyvKk0ViVgCJWt
- j31Q==
+ bh=gTZS3t8Lyn570x3oRncarDhKKj8oVR/yQ7+W/riZcU8=;
+ b=G+dvwvSuDU6HE9jgfFG21HfXS4BEgBfzNKskDzwX91rsuKELDHESW0fs5hqOY2/3/F
+ iRQL1z7xpeKG+1zlTLP6FkpfTgZ9JRUKJCwsfFrL4RogLj+xJTd94WvBdbD/AT+WZfGf
+ nudFMCdQyvSe7qYa8FSGXVaZEMfbPZkjqpcU/x3ZQnwNP82XH01iqriLzmws6F83d0tq
+ MX+14L4oqAAZAPnalbRTOC+7B81+PSBHpcjJ14SC7YYNUiF6nR80CH4xVNXQsFvFqAyH
+ DUa/kmQBal3LSauQW24gx9bNuMLyaEsnaEDaP6+vLreBt2AYELyp4eo15wrcjZg0fAih
+ bVKA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=BZi2w8f57gOm3gFQ8UGMMY60waRhbgxhlftcvIngYdk=;
- b=kNsHqL9ffGe8JOxwDL9YckiFvCep1D6JZv/IxEqK/3GN7tGWhfKn9d+XK1bqIFi5xa
- idWH0COIJUM6zUZQ499kZphVQrm9HGnn/NPozosj/Qn6MBA1QuZW94AVvySzs8HxB3jI
- vBKgUywFM40Y8bc2zmi0w59locYZd6wwd0zleEFS6FOEP8XYCVggr/ljV1ZmllgzwYsZ
- W58h4vsVr+CTE3yOtkE67rNMC8c2vetUeBLN4UymcJ5L/BTmCQAEMSjl9NE3YOzwyHR5
- BMRht6DqN6T+5wKV6kHD18f2vIhPRV2CxJ2qIYFNGUfC/dHfcgcMU22wvnOETNZ3A5UE
- 8grw==
-X-Gm-Message-State: AHQUAubJqs/6NqPcPRshLvgI8vc7DhuwgIT0AtRrRaKDqMacz5oIocDJ
- heAerb4/sZRIw4sI7KQ6Wtk=
-X-Google-Smtp-Source: AHgI3IZInibU5Q4FBmodj59vvkLZQJoScZEM++EElmkNviJN23OVcpFqfexe7ksD15S1jtW4MRHw7g==
-X-Received: by 2002:a63:4e05:: with SMTP id c5mr25940085pgb.393.1550606659627; 
- Tue, 19 Feb 2019 12:04:19 -0800 (PST)
+ bh=gTZS3t8Lyn570x3oRncarDhKKj8oVR/yQ7+W/riZcU8=;
+ b=PYvHSygpmsK5qbbHBSZZonfeE21l+rAbZM2uOhAnkZ//UJI+bOXibiqL1qE/lzyTTl
+ BV0HM3xI021fKneGVn3QqFkreF35GRu8Xmd3B1MQkTQf5k+fDR5+KoY3dkf9mRXCb1ll
+ K6L6panAPTQkFpKUKIEdKMSl3yQniWEWM/LUCLqB9PLy7a7x+l+hIiUHA4c9iKJGIrBE
+ 7h8Wq32GmZ5bPdwxwrM/ptnJHT8Jc/8i8DmzW2w1Jl9GVIAVnfrqI7vWHohOYoWd2n/h
+ eYR90sFlt1hUgNGO09kvKnYQn+3RQHM3VOu8QaZX4/gaDb4RodUI0uhG5jvOro6kHcpu
+ FBvA==
+X-Gm-Message-State: AHQUAua/udVfAHSiZaa9+CoSlmVJTho0tHXP5ZuaP3lN1uVy8dtHaWnS
+ Qik5w5btAHPGa/eJDd/Pd2Y=
+X-Google-Smtp-Source: AHgI3IbtUCPjKiYn8vRprZhcgLfAG7cHtYkA9MN4O7HEk3qZ8QWNEfA+R628X+qWcnqFcCpLAEyPYA==
+X-Received: by 2002:a63:6881:: with SMTP id d123mr25343732pgc.10.1550606661180; 
+ Tue, 19 Feb 2019 12:04:21 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id e63sm31519622pfc.47.2019.02.19.12.04.18
+ by smtp.gmail.com with ESMTPSA id e63sm31519622pfc.47.2019.02.19.12.04.19
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 19 Feb 2019 12:04:18 -0800 (PST)
+ Tue, 19 Feb 2019 12:04:20 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH 4/5] PCI: dwc: Make use of GENMASK/FIELD_PREP
-Date: Tue, 19 Feb 2019 12:02:41 -0800
-Message-Id: <20190219200242.17243-5-andrew.smirnov@gmail.com>
+Subject: [PATCH 5/5] PCI: dwc: Remove superfluous shifting in definitions
+Date: Tue, 19 Feb 2019 12:02:42 -0800
+Message-Id: <20190219200242.17243-6-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190219200242.17243-1-andrew.smirnov@gmail.com>
 References: <20190219200242.17243-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_120420_316197_BC2EF037 
-X-CRM114-Status: GOOD (  11.98  )
+X-CRM114-CacheID: sfid-20190219_120421_957255_1EA6C1AE 
+X-CRM114-Status: GOOD (  10.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,10 +109,8 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert various multi-bit fields to be defined using
-GENMASK/FIELD_PREP. This way bit field boundaries are defined in a
-single place only, as well as defined in a way that makes it easier to
-verify them against reference manual. No functional change intended.
+Surrounding definitions no longer use explicit shift, so "<< 0" here
+serve no purpose. Remove them. No functional change intended.
 
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
@@ -129,70 +127,35 @@ Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 Cc: linux-pci@vger.kernel.org
 ---
- drivers/pci/controller/dwc/pcie-designware.h | 29 +++++++++++---------
- 1 file changed, 16 insertions(+), 13 deletions(-)
+ drivers/pci/controller/dwc/pcie-designware.h | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 070382869685..8ebfb06584d9 100644
+index 8ebfb06584d9..f6fb65a40f10 100644
 --- a/drivers/pci/controller/dwc/pcie-designware.h
 +++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -11,6 +11,7 @@
- #ifndef _PCIE_DESIGNWARE_H
- #define _PCIE_DESIGNWARE_H
- 
-+#include <linux/bitfield.h>
- #include <linux/dma-mapping.h>
- #include <linux/irq.h>
- #include <linux/msi.h>
-@@ -30,11 +31,12 @@
- 
- /* Synopsys-specific PCIe configuration registers */
- #define PCIE_PORT_LINK_CONTROL		0x710
--#define PORT_LINK_MODE_MASK		(0x3f << 16)
--#define PORT_LINK_MODE_1_LANES		(0x1 << 16)
--#define PORT_LINK_MODE_2_LANES		(0x3 << 16)
--#define PORT_LINK_MODE_4_LANES		(0x7 << 16)
--#define PORT_LINK_MODE_8_LANES		(0xf << 16)
-+#define PORT_LINK_MODE_MASK		GENMASK(21, 16)
-+#define PORT_LINK_MODE(n)		FIELD_PREP(PORT_LINK_MODE_MASK, n)
-+#define PORT_LINK_MODE_1_LANES		PORT_LINK_MODE(0x1)
-+#define PORT_LINK_MODE_2_LANES		PORT_LINK_MODE(0x3)
-+#define PORT_LINK_MODE_4_LANES		PORT_LINK_MODE(0x7)
-+#define PORT_LINK_MODE_8_LANES		PORT_LINK_MODE(0xf)
- 
- #define PCIE_PORT_DEBUG0		0x728
- #define PORT_LOGIC_LTSSM_STATE_MASK	0x1f
-@@ -42,11 +44,12 @@
- 
- #define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
- #define PORT_LOGIC_SPEED_CHANGE		BIT(17)
--#define PORT_LOGIC_LINK_WIDTH_MASK	(0x1f << 8)
--#define PORT_LOGIC_LINK_WIDTH_1_LANES	(0x1 << 8)
--#define PORT_LOGIC_LINK_WIDTH_2_LANES	(0x2 << 8)
--#define PORT_LOGIC_LINK_WIDTH_4_LANES	(0x4 << 8)
--#define PORT_LOGIC_LINK_WIDTH_8_LANES	(0x8 << 8)
-+#define PORT_LOGIC_LINK_WIDTH_MASK	GENMASK(12, 8)
-+#define PORT_LOGIC_LINK_WIDTH(n)	FIELD_PREP(PORT_LOGIC_LINK_WIDTH_MASK, n)
-+#define PORT_LOGIC_LINK_WIDTH_1_LANES	PORT_LOGIC_LINK_WIDTH(0x1)
-+#define PORT_LOGIC_LINK_WIDTH_2_LANES	PORT_LOGIC_LINK_WIDTH(0x2)
-+#define PORT_LOGIC_LINK_WIDTH_4_LANES	PORT_LOGIC_LINK_WIDTH(0x4)
-+#define PORT_LOGIC_LINK_WIDTH_8_LANES	PORT_LOGIC_LINK_WIDTH(0x8)
- 
- #define PCIE_MSI_ADDR_LO		0x820
- #define PCIE_MSI_ADDR_HI		0x824
-@@ -72,9 +75,9 @@
- #define PCIE_ATU_UPPER_BASE		0x910
- #define PCIE_ATU_LIMIT			0x914
- #define PCIE_ATU_LOWER_TARGET		0x918
--#define PCIE_ATU_BUS(x)			(((x) & 0xff) << 24)
--#define PCIE_ATU_DEV(x)			(((x) & 0x1f) << 19)
--#define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
-+#define PCIE_ATU_BUS(x)			FIELD_PREP(GENMASK(31, 24), x)
-+#define PCIE_ATU_DEV(x)			FIELD_PREP(GENMASK(23, 19), x)
-+#define PCIE_ATU_FUNC(x)		FIELD_PREP(GENMASK(18, 16), x)
- #define PCIE_ATU_UPPER_TARGET		0x91C
- 
- #define PCIE_MISC_CONTROL_1_OFF		0x8BC
+@@ -60,14 +60,14 @@
+ #define PCIE_ATU_VIEWPORT		0x900
+ #define PCIE_ATU_REGION_INBOUND		BIT(31)
+ #define PCIE_ATU_REGION_OUTBOUND	0
+-#define PCIE_ATU_REGION_INDEX2		(0x2 << 0)
+-#define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
+-#define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
++#define PCIE_ATU_REGION_INDEX2		0x2
++#define PCIE_ATU_REGION_INDEX1		0x1
++#define PCIE_ATU_REGION_INDEX0		0x0
+ #define PCIE_ATU_CR1			0x904
+-#define PCIE_ATU_TYPE_MEM		(0x0 << 0)
+-#define PCIE_ATU_TYPE_IO		(0x2 << 0)
+-#define PCIE_ATU_TYPE_CFG0		(0x4 << 0)
+-#define PCIE_ATU_TYPE_CFG1		(0x5 << 0)
++#define PCIE_ATU_TYPE_MEM		0x0
++#define PCIE_ATU_TYPE_IO		0x2
++#define PCIE_ATU_TYPE_CFG0		0x4
++#define PCIE_ATU_TYPE_CFG1		0x5
+ #define PCIE_ATU_CR2			0x908
+ #define PCIE_ATU_ENABLE			BIT(31)
+ #define PCIE_ATU_BAR_MODE_ENABLE	BIT(30)
 -- 
 2.20.1
 
