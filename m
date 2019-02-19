@@ -2,62 +2,72 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.3 required=3.0 tests=DATE_IN_PAST_12_24,
+	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 91E7DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:13:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C56A6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:13:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 60B672146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:13:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99AF82087B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:13:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P1JDKHmj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60B672146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dx/oki3s";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="FbeTJQj4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99AF82087B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=PRuTRLGtIFGspOphCOumL0gdejjf1Ev5RLOqe0GWRVM=; b=P1JDKHmjZfYnqG
-	87a5NorM/FMIwRbSodBkPevM6oAMZB/WkufaJK4/Fz1YtZnaD+T671XrA3kq88yLhTbZmmNJC62xo
-	0oEppxkvnSpb+OsFGcwd0D0GY69Ogcd85Ss+RaQwLK+4NZriL8j+j1O4R8L5ol/5kJo94iXSxrwJy
-	sympvE1x+SDTuwW4USqUdRna9rBLgzDDmRDy98FPGIPQNBQ5mO4OOP+kzFIUuDUOk3Dfach2reZch
-	5VWnACz6+6IL3gwBSIYcJWUgq7eARV5L+7C8ybHcX9tBXQ5cGLDvGHtCnvT4Xs2rT77nUAjdMv6FC
-	GnW3nGCLeTL8jzYNnpgg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
+	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	References:List-Owner; bh=HdPEJJk1KzRcW6wIBlPboS0UzpMVCtAHr7TPTZ9DbX4=; b=dx/
+	oki3sOlJBdhy/c8uQtz2ZA53kPyz0KvLH0uczToVmRnE+tOpqCuHFPgM7Id+tpQ0OzvHmCq3/1ZqA
+	bZZxzn4aGaBHQU1twNZ3jg9SVWYI7Ux3zhU4yP7ZG/I/tvk0Ce49wbRwAaMDKXOT98WgoHM8Zh7MF
+	pKkoB3DEyS7rt7b6HPhD0PEp09M1SkvSg+qUSralJk4X0T9vJmM4AFNgR/uYSnSetZAH+jumkb5jV
+	JWsNencW0LqDR8quN9UNNe43a5ozGxnRfZblbU5EWA+7khZYiPh2kJnKPE7f+UHk8WLmz77ypnBs+
+	K+pFuM2BTheEO9JdhmYn0yfzXBndhLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPoA-0006h3-J3; Wed, 20 Feb 2019 11:12:58 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPo7-0006fO-5n
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:12:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 79A9CA78;
- Wed, 20 Feb 2019 03:12:53 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CDC1A3F575;
- Wed, 20 Feb 2019 03:12:51 -0800 (PST)
-Subject: Re: [PATCH v5 06/26] arm64/sve: Check SVE virtualisability
-To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-7-git-send-email-Dave.Martin@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <64764e35-c243-e642-a868-5b9e221813c7@arm.com>
-Date: Wed, 20 Feb 2019 11:12:49 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <1550519559-15915-7-git-send-email-Dave.Martin@arm.com>
-Content-Language: en-US
+	id 1gwPox-00071k-VM; Wed, 20 Feb 2019 11:13:47 +0000
+Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwPot-0006yS-U1
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:13:45 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
+ List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
+ List-Archive; bh=5a9zKw2eSUcz77NUFjUpGYNDUVyazIqQEz09C8lddxA=; b=FbeTJQj4Repv
+ Uv3zQEif4WY6sjCmcAKF86ToBbO+mVaTlBekKITAVeVT0hoPssrAV1XXhlzldiq3rXUcDzgdNpjNc
+ GrjttCnlHnWp11sMbSyeB1bXKDE1OEKfh/v66YGL0tfzyyQVr5B5jyY/YEmFc5BSlrPF5rXGB0olf
+ Ilp10=;
+Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
+ ([82.37.168.47] helo=debutante.sirena.org.uk)
+ by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
+ (envelope-from <broonie@sirena.org.uk>)
+ id 1gwPom-00011g-Mo; Wed, 20 Feb 2019 11:13:36 +0000
+Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
+ id 29FAB11284BB; Tue, 19 Feb 2019 15:50:16 +0000 (GMT)
+From: Mark Brown <broonie@kernel.org>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Applied "ASoC: sunxi: sun50i-codec-analog: Rename hpvcc regulator
+ supply to cpvdd" to the asoc tree
+In-Reply-To: <20190213070457.26049-2-wens@csie.org>
+X-Patchwork-Hint: ignore
+Message-Id: <20190219155016.29FAB11284BB@debutante.sirena.org.uk>
+Date: Tue, 19 Feb 2019 15:50:16 +0000 (GMT)
+X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_031255_229740_881EAA9D 
-X-CRM114-Status: GOOD (  27.56  )
+X-CRM114-CacheID: sfid-20190220_031344_108763_B7191BDE 
+X-CRM114-Status: GOOD (  14.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,203 +79,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, alsa-devel@alsa-project.org,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Liam Girdwood <lgirdwood@gmail.com>,
+ linux-kernel@vger.kernel.org, linux-sunxi@googlegroups.com,
+ Mark Brown <broonie@kernel.org>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Dave,
+The patch
 
-On 18/02/2019 19:52, Dave Martin wrote:
-> Due to the way the effective SVE vector length is controlled and
-> trapped at different exception levels, certain mismatches in the
-> sets of vector lengths supported by different physical CPUs in the
-> system may prevent straightforward virtualisation of SVE at parity
-> with the host.
-> 
-> This patch analyses the extent to which SVE can be virtualised
-> safely without interfering with migration of vcpus between physical
-> CPUs, and rejects late secondary CPUs that would erode the
-> situation further.
-> 
-> It is left up to KVM to decide what to do with this information.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/fpsimd.h |  1 +
->  arch/arm64/kernel/cpufeature.c  |  2 +-
->  arch/arm64/kernel/fpsimd.c      | 86 ++++++++++++++++++++++++++++++++++-------
->  3 files changed, 73 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index dd1ad39..964adc9 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -87,6 +87,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
->  extern u64 read_zcr_features(void);
->  
->  extern int __ro_after_init sve_max_vl;
-> +extern int __ro_after_init sve_max_virtualisable_vl;
->  
->  #ifdef CONFIG_ARM64_SVE
->  
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index f6d84e2..5eaacb4 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -1825,7 +1825,7 @@ static void verify_sve_features(void)
->  	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
->  
->  	if (len < safe_len || sve_verify_vq_map()) {
-> -		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
-> +		pr_crit("CPU%d: SVE: vector length support mismatch\n",
->  			smp_processor_id());
->  		cpu_die_early();
->  	}
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 62c37f0..64729e2 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -18,6 +18,7 @@
->   */
->  
->  #include <linux/bitmap.h>
-> +#include <linux/bitops.h>
->  #include <linux/bottom_half.h>
->  #include <linux/bug.h>
->  #include <linux/cache.h>
-> @@ -48,6 +49,7 @@
->  #include <asm/sigcontext.h>
->  #include <asm/sysreg.h>
->  #include <asm/traps.h>
-> +#include <asm/virt.h>
->  
->  #define FPEXC_IOF	(1 << 0)
->  #define FPEXC_DZF	(1 << 1)
-> @@ -130,14 +132,18 @@ static int sve_default_vl = -1;
->  
->  /* Maximum supported vector length across all CPUs (initially poisoned) */
->  int __ro_after_init sve_max_vl = SVE_VL_MIN;
-> +int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
->  /* Set of available vector lengths, as vq_to_bit(vq): */
->  static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +/* Set of vector lengths present on at least one cpu: */
-> +static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
->  static void __percpu *efi_sve_state;
->  
->  #else /* ! CONFIG_ARM64_SVE */
->  
->  /* Dummy declaration for code that will be optimised out: */
->  extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
->  extern void __percpu *efi_sve_state;
->  
->  #endif /* ! CONFIG_ARM64_SVE */
-> @@ -623,12 +629,6 @@ int sve_get_current_vl(void)
->  	return sve_prctl_status(0);
->  }
->  
-> -/*
-> - * Bitmap for temporary storage of the per-CPU set of supported vector lengths
-> - * during secondary boot.
-> - */
-> -static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
-> -
->  static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
->  {
->  	unsigned int vq, vl;
-> @@ -650,6 +650,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
->  void __init sve_init_vq_map(void)
->  {
->  	sve_probe_vqs(sve_vq_map);
-> +	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
->  }
->  
->  /*
-> @@ -658,25 +659,58 @@ void __init sve_init_vq_map(void)
->   */
->  void sve_update_vq_map(void)
->  {
-> -	sve_probe_vqs(sve_secondary_vq_map);
-> -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
-> +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-> +
-> +	sve_probe_vqs(tmp_map);
-> +	bitmap_and(sve_vq_map, sve_vq_map, tmp_map, SVE_VQ_MAX);
-> +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, tmp_map, SVE_VQ_MAX);
->  }
->  
->  /* Check whether the current CPU supports all VQs in the committed set */
->  int sve_verify_vq_map(void)
->  {
-> -	int ret = 0;
-> +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-> +	unsigned long b;
->  
-> -	sve_probe_vqs(sve_secondary_vq_map);
-> -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
-> -		      SVE_VQ_MAX);
-> -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
-> +	sve_probe_vqs(tmp_map);
-> +
-> +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-> +	if (bitmap_intersects(tmp_map, sve_vq_map, SVE_VQ_MAX)) {
->  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
->  			smp_processor_id());
-> -		ret = -EINVAL;
-> +		return -EINVAL;
->  	}
->  
-> -	return ret;
-> +	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
-> +		return 0;
-> +
-> +	/*
-> +	 * For KVM, it is necessary to ensure that this CPU doesn't
-> +	 * support any vector length that guests may have probed as
-> +	 * unsupported.
-> +	 */
-> +
-> +	/* Recover the set of supported VQs: */
-> +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-> +	/* Find VQs supported that are not globally supported: */
-> +	bitmap_andnot(tmp_map, tmp_map, sve_vq_map, SVE_VQ_MAX);
-> +
-> +	/* Find the lowest such VQ, if any: */
-> +	b = find_last_bit(tmp_map, SVE_VQ_MAX);
-> +	if (b >= SVE_VQ_MAX)
-> +		return 0; /* no mismatches */
-> +
-> +	/*
-> +	 * Mismatches above sve_max_virtualisable_vl are fine, since
-> +	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
-> +	 */
-> +	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
-> +		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
+   ASoC: sunxi: sun50i-codec-analog: Rename hpvcc regulator supply to cpvdd
 
-Nit: might be good to specify that the vector length is unsupported for
-virtualisation.
+has been applied to the asoc tree at
 
-Also, since KVM is the one deciding what to do with the information,
-should we have a warning here? But I can understand that knowing which
-CPUs are introducing unsupported vector length, maybe using pr_devel()
-instead of pr_warn()
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-In any case, the logic looks good to me:
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-Cheers,
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
+Thanks,
+Mark
+
+From 5fd812e6f5ae0376134234ceb70e8de541ccb10d Mon Sep 17 00:00:00 2001
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Wed, 13 Feb 2019 15:04:56 +0800
+Subject: [PATCH] ASoC: sunxi: sun50i-codec-analog: Rename hpvcc regulator
+ supply to cpvdd
+
+The A64 datasheet lists the supply rail for the headphone amp's charge
+pump as "CPVDD". cpvdd-supply is the name of the property for this power
+rail specified in the device tree bindings. "HPVCC" was the name used in
+the A33 datasheet for the same function.
+
+Rename the supply so it matches the datasheet, bindings, and the subject
+from the original commit.
+
+Fixes: ca0412a05756 ("ASoC: sunxi: sun50i-codec-analog: Add support for cpvdd regulator supply")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/sun50i-codec-analog.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun50i-codec-analog.c b/sound/soc/sunxi/sun50i-codec-analog.c
+index df1fed0aa001..d105c90c3706 100644
+--- a/sound/soc/sunxi/sun50i-codec-analog.c
++++ b/sound/soc/sunxi/sun50i-codec-analog.c
+@@ -274,7 +274,7 @@ static const struct snd_soc_dapm_widget sun50i_a64_codec_widgets[] = {
+ 	 * stream widgets at the card level.
+ 	 */
+ 
+-	SND_SOC_DAPM_REGULATOR_SUPPLY("hpvcc", 0, 0),
++	SND_SOC_DAPM_REGULATOR_SUPPLY("cpvdd", 0, 0),
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun50i_codec_hp_src),
+ 	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN50I_ADDA_HP_CTRL,
+@@ -362,7 +362,7 @@ static const struct snd_soc_dapm_route sun50i_a64_codec_routes[] = {
+ 	{ "Headphone Source Playback Route", "Mixer", "Left Mixer" },
+ 	{ "Headphone Source Playback Route", "Mixer", "Right Mixer" },
+ 	{ "Headphone Amp", NULL, "Headphone Source Playback Route" },
+-	{ "Headphone Amp", NULL, "hpvcc" },
++	{ "Headphone Amp", NULL, "cpvdd" },
+ 	{ "HP", NULL, "Headphone Amp" },
+ 
+ 	/* Microphone Routes */
 -- 
-Julien Thierry
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
