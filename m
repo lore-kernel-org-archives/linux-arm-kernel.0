@@ -4,88 +4,69 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18259C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:35:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16777C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:38:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA7E32086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:35:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC4CB204EC
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:38:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egiCnElY";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="SjwtoSl4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA7E32086A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dpI2BN4e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC4CB204EC
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xKUF/ovTBgWM9OsD/r53TxcA8ns7msQjN9qHKodtV3c=; b=egiCnElYspKDN5
-	+OUnTEp+8AR1Cwk7RwCKPOvWbrrDt/R+xPdcO78HFPq8UaE5vlh2wFjFzhp+8O/OVZ+/DvVJSgCjU
-	OUVVp24VXvtP88CbFqM1Sc+zp7LRhZU96XQwxkrAOT8Zc2+O4Fi2Md/Lv6NMOswJUKT9hMQAQdhS9
-	YLWTMVLI8UwsRpKOBi3moTnulgGzO2LFIXeQhpoNnKO8UL5UhOjkorBJGhUs8210fBBk9NyORA5yn
-	7rtN+OJD+NdfRt97AbL3k7PxxKHJ2zwjtspYK09Ke4knPTzLLAPTT1NPeM/VTiGfNQTQdSBU3DXGT
-	tKrZtYBVluYptxkkO9Xg==;
+	List-Owner; bh=NdKusmIew7daceSLqQvzadDwrve8Taq6D+JMT9zFlfg=; b=dpI2BN4eJ72yTy
+	XMLclZn2ciLWsboj8v4QbS3KvHB3Z+pxqXAyptZCuTHIC1e82p89U5IsgaX+MLlNhufjzPU+MFzg5
+	PZ6sOTDF39Ax2WrG+4uoL16Zbky5a7G20PO+fES0p0WyAxofcB6N5y8FORTSScsw9TRSIwLgfgpWR
+	n1uQiEaRX66TcQwcmvo6G3/ute+DfJnVGr9ZrbC+o9ptGqLUWBCJcKrO2GmTC3ez/Sf/SG0U88oxT
+	7GP3KWh4P9sGMpbexoBReIfpZbaUoB3mW08HF5CvvCVVhYxLmZf6ZqUp/mnqLL/3InqvTZjvBgfMJ
+	RFJpXuGkqKQXo2FbLwiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw3gT-0004hc-Kn; Tue, 19 Feb 2019 11:35:33 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gw3jj-0005Jp-Ih; Tue, 19 Feb 2019 11:38:55 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw3gP-0004gy-Hb
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 11:35:31 +0000
-Received: by mail-it1-x141.google.com with SMTP id x131so5224395itc.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 03:35:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=q62Kg48ghBbijwcL6qdW6IrFyeQHl6ptcqcFoGHPA58=;
- b=SjwtoSl4aYbAcaO7SS5Ui6BzSU6U6HCC46Ds0w9EBHnuDtOKN7wD1HfR+V+bFLix9B
- T3jY1/7NUOXPDZ8sZ1/5nz/g7qk+W0FVKl238/+ZKkSH3k2y0fYqi7WZ1C2B28uzF0tJ
- /zDdDJcdAW42k1A0j+/sk1v/TSeg9yClehkfX7dQym24TyEIy3kdnUHJtmLZs+zRSSVJ
- /AzlLveNbWYL50aH7651Z4VCHQSckhXv8Jvb/9pndjjLeBfr9X1izqYAxEF70biWAZwv
- VBk1J6yVIfWYA8GpcHfKDXcEpJ5SQzwD9Md9fg+vE0vAeFchIOf2JkFF3jErsX7ZsBVB
- QlFg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=q62Kg48ghBbijwcL6qdW6IrFyeQHl6ptcqcFoGHPA58=;
- b=JeNysfyHNh+txW5oI+q2hQlB1BQ8wOOIKjM3wiAUjC/FyDPRRo/dy3ym1WLxXTrPiX
- tcy9ojmXdg34F4TbGRNgrfFwywoikeSQQQTKQvT5UapZq1hoc0bKo5FZX+HLYqKAi5/1
- OYg8M+LLE6r5cde/kJ7E/lgZxfQVrV6lpq6RYwjDYldAcNGBzX12fuakIOsl5hcpRYeD
- P6zU62+DR72W1ZWiO6hHYTO4Yc7LP2zx07RySKm/A8O16fHwriHtlREclzcfoRZm6av/
- JK39H8n2OhYYOq6j5xvek58KZ0xolKL3E52IKp7L3frJXNGx6u18zGEFuinpG1/i2oOz
- 7+hQ==
-X-Gm-Message-State: AHQUAuZkv2+sGHPSDAIbIoxTDnUp7gnw0TQe1t9M4f4tYkTSoBcXayNI
- NRWq69sS0lzsmzJctIV6NJ4pVq6xaQlTEqNSzrdLIg==
-X-Google-Smtp-Source: AHgI3IbhGlAhVvJOxnIGcP9rZGjCooAyEe3AVeJc/1xXXTlEGXKBp5Ayp9Jq4QzlsBYVDHrelb2M8WDN4lFq/Ykqra8=
-X-Received: by 2002:a02:5782:: with SMTP id b2mr15174690jad.2.1550576128089;
- Tue, 19 Feb 2019 03:35:28 -0800 (PST)
+ id 1gw3jf-0005JB-W0
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 11:38:53 +0000
+Received: from p5492e0d8.dip0.t-ipconnect.de ([84.146.224.216] helo=nanos)
+ by Galois.linutronix.de with esmtpsa (TLS1.2:DHE_RSA_AES_256_CBC_SHA256:256)
+ (Exim 4.80) (envelope-from <tglx@linutronix.de>)
+ id 1gw3jX-0001fG-8N; Tue, 19 Feb 2019 12:38:43 +0100
+Date: Tue, 19 Feb 2019 12:38:42 +0100 (CET)
+From: Thomas Gleixner <tglx@linutronix.de>
+To: Peter Zijlstra <peterz@infradead.org>
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+In-Reply-To: <20190219094438.GV32534@hirez.programming.kicks-ass.net>
+Message-ID: <alpine.DEB.2.21.1902191238250.1644@nanos.tec.linutronix.de>
+References: <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+ <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
+ <20190216103044.GR32494@hirez.programming.kicks-ass.net>
+ <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
+ <20190219090409.GW32494@hirez.programming.kicks-ass.net>
+ <20190219094438.GV32534@hirez.programming.kicks-ass.net>
+User-Agent: Alpine 2.21 (DEB 202 2017-01-01)
 MIME-Version: 1.0
-References: <20190215013959.21320-1-natechancellor@gmail.com>
- <20190215185026.GE15084@fuggles.cambridge.arm.com>
- <CAKv+Gu-=2C4fBPAKNrkeiOsMG0Fg3jHHGuG2rVZvjtT=0-aDkA@mail.gmail.com>
- <CAKwvOd=+_pwHStdhfB3bAYEuyMEjJ+T+gyTd9KA7GyNE2wMk7g@mail.gmail.com>
- <CAKv+Gu-41fhEfJF+pvfCQRqXs4vYPHs77rkJo9=X8Y23QVd6Tw@mail.gmail.com>
- <CAKwvOdke_HbSrmGO5ThNy4o87G4BhA845QcgZFUTB7m6cBHTDg@mail.gmail.com>
- <CAKv+Gu-Aj68gXoi9CXLyw96iRychWjqX=XtMCQxcZqOv0jhsLw@mail.gmail.com>
- <CAKv+Gu_nwKr65zLG0p0dSW4sQtN4dwEkevCMPe5s9U++SaDezg@mail.gmail.com>
- <20190219111927.GA17012@kroah.com>
-In-Reply-To: <20190219111927.GA17012@kroah.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 19 Feb 2019 12:35:16 +0100
-Message-ID: <CAKv+Gu9v3htHyfCZvDU2Qd8vQozbBQVeHyyNsrdrwO2r7ReBwA@mail.gmail.com>
-Subject: Re: [PATCH] arm64/neon: Disable -Wincompatible-pointer-types when
- building with Clang
-To: Greg KH <gregkh@linuxfoundation.org>
+X-Linutronix-Spam-Score: -1.0
+X-Linutronix-Spam-Level: -
+X-Linutronix-Spam-Status: No , -1.0 points, 5.0 required, ALL_TRUSTED=-1,
+ SHORTCIRCUIT=-0.0001
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_033529_595816_3451364F 
-X-CRM114-Status: GOOD (  23.16  )
+X-CRM114-CacheID: sfid-20190219_033852_174479_07BBDB45 
+X-CRM114-Status: GOOD (  13.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,80 +78,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sandeep Patil <sspatil@google.com>,
- Nick Desaulniers <ndesaulniers@google.com>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Mark Brown <broonie@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Nathan Chancellor <natechancellor@gmail.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: jpoimboe@redhat.com, dvlasenk@redhat.com, brgerst@gmail.com,
+ Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ valentin.schneider@arm.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Andy Lutomirski <luto@amacapital.net>,
+ mingo@redhat.com, james.morse@arm.com, luto@kernel.org,
+ "H. Peter Anvin" <hpa@zytor.com>, bp@alien8.de, torvalds@linux-foundation.org,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 19 Feb 2019 at 12:19, Greg KH <gregkh@linuxfoundation.org> wrote:
->
-> On Tue, Feb 19, 2019 at 11:35:12AM +0100, Ard Biesheuvel wrote:
-> > On Fri, 15 Feb 2019 at 20:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > >
-> > > On Fri, 15 Feb 2019 at 20:43, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> > > >
-> > > > On Fri, Feb 15, 2019 at 11:28 AM Ard Biesheuvel
-> > > > <ard.biesheuvel@linaro.org> wrote:
-> > > > >
-> > > > > On Fri, 15 Feb 2019 at 20:25, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> > > > > >
-> > > > > > On Fri, Feb 15, 2019 at 11:20 AM Ard Biesheuvel
-> > > > > > <ard.biesheuvel@linaro.org> wrote:
-> > > > > > > Provided that we stop sending Clang enablement patches to -stable:
-> > > > > >
-> > > > > > What does that mean?  We're trying to provide clang support back to
-> > > > > > 4.4 LTS branches. (so 4.4, 4.9, 4.14, 4.19).
-> > > > >
-> > > > > I understand that is what you are attempting, but that does not mean
-> > > > > it /belongs/ in -stable.
-> > > > >
-> > > > > There are rules for stable, and people that track stable kernels (such
-> > > > > as the distros) should be able to rely on us to only backport bug
-> > > > > fixes, not linker script changes and other updates that fix issues
-> > > > > that did not exist when those kernels were released.
-> > > > >
-> > > > > It is unclear to me how these clang changes benefit those users.
-> > > >
-> > > > If you're referring to
-> > > > https://www.spinics.net/lists/stable/msg278381.html, that's fair (I
-> > > > think those were helpful for LLD support on arm64).
-> > > >
-> > > > Why didn't you speak up then?  Why is this coming up now?
-> > >
-> > > That is just one example, and I failed to realise it at the time.
-> > >
-> > > I think the Clang/LLVM work you are doing is very important, but I
-> > > simply don't think any of it belongs in -stable kernels.
-> >
-> > OK, to clarify my position:
-> >
-> > I have no problem whatsoever with taking this patch into v5.x, so
-> >
-> > Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >
-> > but going forward, I will push back on -stable backports for
-> > Clang/LLVM specific changes, since they are obviously in violation of
-> > the stable kernel rules.
->
-> Getting older kernels to build/run properly on newer compilers is just a
-> part of life for the stable trees.  If you note, we have done a lot of
-> gcc7, then gcc8, and clang patches backported over the years in order to
-> make it possible for people (like me and my testing infrastructure at
-> the least) to keep building these old kernels on newer systems.
->
-> So while it's not part of the "documented" rules, I do take this type of
-> change, as it does help out a huge population of users and testers.
->
+On Tue, 19 Feb 2019, Peter Zijlstra wrote:
 
-That doesn't make a lot of sense to me, but that is the common
-practice, then I won't object any longer.
+> On Tue, Feb 19, 2019 at 10:04:09AM +0100, Peter Zijlstra wrote:
+> > > Does that make more sense?
+> > 
+> > It appears to me you're going about it backwards.
+> 
+> So how about you do a GCC plugin that verifies limits on code-gen
+> between user_access_begin/user_access_end() ?
+> 
+>  - No CALL/RET
+>    - implies user_access_end() happens
+>    - implies no fentry hooks
+>  - No __preempt_count frobbing
+>  - No tracepoints
+>  - ...
+> 
+> That way you put the burden on the special code, not on the rest of the
+> kernel.
+
+And then you have kprobes ....
 
 _______________________________________________
 linux-arm-kernel mailing list
