@@ -2,64 +2,70 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BD0C9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 04:49:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F373FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:11:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 84811217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 04:49:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C5622217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:11:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nRQTfQos"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 84811217D7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DCXbDayf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5622217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KcNY4piydtKLlLUQ0rIl8F99acih7FM68Wfanpl7baQ=; b=nRQTfQosOdQNOE
-	813EcD/M/85/WPaAmeWRIq4qfbVTBXKRh3GG4B1j14jGe+yQuHFqGfoLb4yesv18qEhFkUm3wNvSX
-	GpCJSX2Jd6Qdq5T5PLlR6naj9xCHuMTgkJN1Z8OwQx7GfUzmucu7nDjp3xzoK7lm/ORlxZGV1XxXK
-	p0c6UoJEvMsmGWaYiNnr7LSnmYVYOoP5HP/vrsiI0DFCjpG911zyVwQvxJTRhTYPA9pH9gy6Bj9f4
-	p9mhFs0ejP/5149zQRdjGhPOItsTx/cLI2AbSwFqwHjGn3gUOykKk18xTL7vs9Tx/m8ZBLbllTrj+
-	3mpNykIzVJXyZO1q7OOw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=yryMwWrHPXUTTg9ptSGs80saNFf2JNm7Rwq67m+sGAA=; b=DCXbDayf8ic/kZ+li0ITj6ve+
+	1twl3XXwRCHvSe+RdWgVmzF0sjY6Y6ks9SyS95xNBbyx0ymQwJ8q8OUpPos2e5Sae7S5Azr+Z+3D+
+	3ZFgjGsDDlfRB0HZZerpp31s4NHklxsDKkbf7Fte1v1H8fgDgT2ff0YR0IRyMgETuTiNx7OtDGgBH
+	LT8pYrEdN53BNRCLQkldQ5Vea1T1MezJivYWQvMGfFfBuFJVMdWd8VRO5atGBMUNoY7zg6H3JrhjZ
+	Xh7oPJZZlp6cjbNgsf5/wxdAN9IjfDKl0rImb+XG5DmL3KiLFHH7MDqXecwWqZDn1GrrGX1X0WRuK
+	FHQYC0zmA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvxLK-00010T-1c; Tue, 19 Feb 2019 04:49:18 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gvxgp-0008GI-Rc; Tue, 19 Feb 2019 05:11:31 +0000
+Received: from mx.socionext.com ([202.248.49.38])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvxLG-000108-KE
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 04:49:16 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5986F80D;
- Mon, 18 Feb 2019 20:49:13 -0800 (PST)
-Received: from [10.162.40.139] (p8cg001049571a15.blr.arm.com [10.162.40.139])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- EEFCB3F675; Mon, 18 Feb 2019 20:49:10 -0800 (PST)
-Subject: Re: [PATCH 6/6] arm64/mm: Enable page table page accounting for user
- space
-To: Will Deacon <will.deacon@arm.com>
-References: <1548307220-19756-1-git-send-email-anshuman.khandual@arm.com>
- <1548307220-19756-7-git-send-email-anshuman.khandual@arm.com>
- <20190214171116.GF2475@fuggles.cambridge.arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <31acd62e-46cc-1c09-7e99-05257ee525e2@arm.com>
-Date: Tue, 19 Feb 2019 10:19:13 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+ id 1gvxgm-0008FI-BT
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 05:11:29 +0000
+Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
+ by mx.socionext.com with ESMTP; 19 Feb 2019 14:11:22 +0900
+Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
+ by kinkan-ex.css.socionext.com (Postfix) with ESMTP id EF03C180C10;
+ Tue, 19 Feb 2019 14:11:22 +0900 (JST)
+Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
+ Tue, 19 Feb 2019 14:11:22 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by kinkan.css.socionext.com (Postfix) with ESMTP id 695371A04E1;
+ Tue, 19 Feb 2019 14:11:22 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 50878120459;
+ Tue, 19 Feb 2019 14:11:22 +0900 (JST)
+Subject: Re: [PATCH v2 13/15] ARM: dts: milbeaut: Add device tree set for the
+ Milbeaut M10V board
+To: Arnd Bergmann <arnd@arndb.de>
+References: <1549628920-32623-1-git-send-email-sugaya.taichi@socionext.com>
+ <CAK8P3a15mLEgVAh1+jQ+GqOcQa0zhrePWofo8iGkTs5_bd=TmQ@mail.gmail.com>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <ba5bb646-7fa6-e98f-4ac2-47c55c8f82ba@socionext.com>
+Date: Tue, 19 Feb 2019 14:11:21 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-In-Reply-To: <20190214171116.GF2475@fuggles.cambridge.arm.com>
+In-Reply-To: <CAK8P3a15mLEgVAh1+jQ+GqOcQa0zhrePWofo8iGkTs5_bd=TmQ@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_204914_666274_5012C0DA 
-X-CRM114-Status: GOOD (  15.72  )
+X-CRM114-CacheID: sfid-20190218_211128_512471_DB7093BB 
+X-CRM114-Status: GOOD (  21.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,53 +77,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, Steve.Capper@arm.com, marc.zyngier@arm.com,
- Catalin.Marinas@arm.com, suzuki.poulose@arm.com, james.morse@arm.com,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi,
+Thank you for you comments.
 
-
-On 02/14/2019 10:41 PM, Will Deacon wrote:
-> On Thu, Jan 24, 2019 at 10:50:20AM +0530, Anshuman Khandual wrote:
->> Page table pages created for user space processes must be accounted against
->> their memory control groups if initialized. This just introduces a helper
->> function pgtable_gfp_flags() which returns PGALLOC_GFP for all kernel page
->> table page allocations but adds __GFP_ACCOUNT for user page table pages.
->>
->> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
->> ---
->>  arch/arm64/include/asm/pgalloc.h | 12 +++++++++++-
->>  1 file changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
->> index 076764f..775cde9 100644
->> --- a/arch/arm64/include/asm/pgalloc.h
->> +++ b/arch/arm64/include/asm/pgalloc.h
->> @@ -100,12 +100,22 @@ pte_alloc_one_kernel(struct mm_struct *mm)
->>  	return (pte_t *)pte_alloc_one_virt(mm);
->>  }
->>  
->> +static inline gfp_t pgtable_gfp_flags(struct mm_struct *mm)
->> +{
->> +	if (unlikely(mm == &init_mm))
->> +		return PGALLOC_GFP;
->> +	else
->> +		return PGALLOC_GFP | __GFP_ACCOUNT;
->> +}
+On 2019/02/18 21:09, Arnd Bergmann wrote:
+> On Fri, Feb 8, 2019 at 1:28 PM Sugaya Taichi
+> <sugaya.taichi@socionext.com> wrote:
+>> +
+>> +       aliases {
+>> +               serial1 = &uart1;
+>> +       };
 > 
-> Hmm, what about things like the efi mm?
+> Maybe start with serial0 here? It seems unusual to start
+> counting at 1.
+> 
 
+The M10V evaluation board(EVB) uses a console with uart ch1, so this 
+alias number is derived from the used channel one.
+Therefore it is no problem to change the alias number to 0.
 
-EFI mappings are created with
+>> +       chosen {
+>> +               bootargs = "init=/sbin/finit rootwait earlycon";
+> 
+> The /sbin/finit argument seems user space specific, so you probably don't
+> want this in the dts file but rather pass it from the boot loader.
+> Possible drop the bootargs entirely.
+> 
 
-efi_virtmap_init() -> efi_create_mapping() -> create_pgd_mapping()
+Okay, remove the arg from the dts and add to bootargs instead.
 
-which calls into pgd_pgtable_alloc(). Sure will add check for efi_mm along
-with init_mm not to use __GFP_ACCOUNT.
+Thanks,
+Sugaya Taichi
+
+>       Arnd
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
