@@ -2,137 +2,62 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D72E4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FE25C10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:04:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6B7421902
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 01A3C2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:04:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ns8VwA90";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="gZNcKY6R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6B7421902
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z/cT2Eq/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01A3C2146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=oQnNz2qai3rCiO0UKwtwN6GNsqf52I4UxlXzgxtlYwE=; b=Ns8VwA90rEoCe2
-	jU89gign5NNxBOFkGKhvpsla1A0ucYjZAjYCUWsSQAjaQz5ZNg39InWY4W82RweSPSX4HcMF6SGQG
-	17UIXsO92X52xTMt4LTovZtrb04nB6uyfzRnQ/zaNH4f4igXSGpcpxVY+jfF+npliqcy+rp7Fwl6O
-	QbuJ0Sh91Sp7FN4fGDF+0a/FG7aZOr59cZ3iUlSUDrr/F95WgyOTix7w5Y92vn+Oadl/dcjtWcp3e
-	GspqwFiMJepj1ecV9XMLPwKPpHlvSOO83j7Go2lP4y05YKcx9l5nlp8aP54aaWnxrQ7wzUfEplQ94
-	NsnorF05ctNGgJeoH3EA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6MM+F2o//hX10+kOOhCUX7ExZrkQnDIN1AKOqzx57fs=; b=Z/cT2Eq/4LOSWs
+	bukWDaSl8seU0n+zBZeugliMxD1ayuYBXC+NEtbRbtRY4tsomkHxvg2anoBXWlLNbqzyaJ478neO0
+	fhp00TWNCLcWUjLEq/FFmjCy7vuJRb2efOhOvTkInGOhUr7JCdY/fBq6GJ9av/X00OquIDxu1P6sP
+	m1qpPlwcDYKdXDeCzMp6e4FBBUkaMGlpQonM3zKqboGQSZ5qQwEJaMXW1k0rxLvFFW56OrxI0SAn6
+	bqGuICc4XhosGeaMEuZ20bFknQXH3IHy68Kp08GhXCU//B892IqCWVTn+EteWS0+HAtzkz2eGcaiY
+	fuTTHL8j6AlDOQDmyNfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1HU-0000aa-HP; Tue, 19 Feb 2019 09:01:36 +0000
-Received: from mail-eopbgr00051.outbound.protection.outlook.com ([40.107.0.51]
- helo=EUR02-AM5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1HF-0000QB-3A
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:01:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=8Dp2FTwaLI0Smk1dCKR30JbI+2Lf5+AGn27pC+eXOJs=;
- b=gZNcKY6Rn280dkzWoRz8hFfg5/5g5XkugSG3/t1joSHcxk6vOJPu9L/hU0esXapn6ZHd6WoYyqTQwV7oPLGDIpoxu0XQAsf5GjFPsiUtEJwy0o6jgLwxJussM33Vo1oshIFT3Zlu0DEacw72nDuMSVFeSvbOXOF+u5rCbqdQmdo=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3642.eurprd04.prod.outlook.com (52.134.65.24) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Tue, 19 Feb 2019 09:01:16 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Tue, 19 Feb 2019
- 09:01:16 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>, Aisheng Dong
- <aisheng.dong@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH] dt-bindings: imx: update scu resource id headfile
-Thread-Topic: [PATCH] dt-bindings: imx: update scu resource id headfile
-Thread-Index: AQHUyDGr6JcuNwk39kK74/kE/Vm17w==
-Date: Tue, 19 Feb 2019 09:01:15 +0000
-Message-ID: <1550566601-11497-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0151.apcprd02.prod.outlook.com
- (2603:1096:201:1f::11) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: cc78e73a-7225-4921-7e77-08d69648cdf2
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3642; 
-x-ms-traffictypediagnostic: DB3PR0402MB3642:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3642;
- 23:ywsPChIwFi5ljUQ19aqv/mOgLvZ+KNg4a6dhn?=
- =?iso-8859-1?Q?NTcLqoIOWlTHfXEJei+SfsfIqciPiZvY20+7xcCofS36mSNoJhumAiziXe?=
- =?iso-8859-1?Q?VF1RlxD5kA03CE9RCue/bdi4Mt1zv9gKy9JkP+SX4U8KvoHfsMEJmmJivc?=
- =?iso-8859-1?Q?bCNDoW8+rBKOL3onRVXaEl3EzgmfjdDUmg2YY2QFbLf8ECnUwS9xv1ubAe?=
- =?iso-8859-1?Q?wwvgF5MZ+75LYinwtk2Qufape/SKG/BQWRH5C6H967pN7pzfVqAoxUHZOU?=
- =?iso-8859-1?Q?iP3ggfO0mmITucK11wr4w3LYU4eixkQOyQOOI2RdcEknyUK52GFg5oOXWY?=
- =?iso-8859-1?Q?KNuX3f+FeF2QxpU37bA+usI7jl5j9YhIvqqJSWdIka2us9ckiAR0VOtbHM?=
- =?iso-8859-1?Q?tWkoEOLtmlpCyaStLqPsXk1oxtjGOosFOljj5WISOvhXWXt91gCZUzwHl1?=
- =?iso-8859-1?Q?UbhsEn93QiUq7ECwLnB7r8DPZJuqELLbbjH3grv19oHkgx8eoZSQb5THrx?=
- =?iso-8859-1?Q?GIPUYGOthSPhX4uM56WSRSS72bff8vwjcohT253vBrzk0fLIKW6w6Wxqes?=
- =?iso-8859-1?Q?x/lkYJxWaqgN98TkBTJJ/zbo6dLRL6uubgzY4j3ydxJ63tRYq2nrtOliTO?=
- =?iso-8859-1?Q?VkISnYrTyu2gNhYzPQXNZjFJs4iRGEpl/QLU6bffoU5Npx26iaCRV3Y8ff?=
- =?iso-8859-1?Q?bWc8wuHUWBu1eOIEbSza2gOQ3VHONGaOnAPuY63FCaBEWrt6QhP1MMtatT?=
- =?iso-8859-1?Q?q40Zohu8/k2RBOPyuO/Qra3N1FSk0W6suAxEZQ6DzezcgaRFAzJh75T24k?=
- =?iso-8859-1?Q?CH+HSNWOSsxMalDxymnSzD9xXgbQfB0Tx/ROtDcG7Oil4TRMp9PtULdG5Q?=
- =?iso-8859-1?Q?4/xpcw/HuGBpZ6QVdGaKasmW9IJfRpqHShJVcRLZAIYUM10wkh/LmDtUPk?=
- =?iso-8859-1?Q?g4FE6X+oe88nd9y2lN/ugHIEdKgYuz43qR3sxFLL/9sWEAL7nk3jhcTi4T?=
- =?iso-8859-1?Q?aaYp2MaE3BjS/jgPAwHkvgKQ4U0EadmFaDATP3K9vh5tQwocQzrc+ZbFce?=
- =?iso-8859-1?Q?Ocu6Fm9nU2jIUPZcrCi4KgDrjepTi/IVfQ3kwRLt4EIf5SGMl6vCD1nz7v?=
- =?iso-8859-1?Q?QeulvGdc5iTyPD+/smLimFT3mlL4VyRjqA2hWQeUyU8u3xLOiqmtTmnE/3?=
- =?iso-8859-1?Q?fyPvuwr27n8a3jWlhVeuZzOw/1PmxBBvVQVeSiAvwYJkPH+NyhK8qEfJ+V?=
- =?iso-8859-1?Q?avwrZrnTdk2hQo/E7Rxg2XO98qEi2IXTq9PbObAXj+N93AWyrX2YdfpMNR?=
- =?iso-8859-1?Q?aCnc=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3642E723BCF30ED446BCC2D9F57C0@DB3PR0402MB3642.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09538D3531
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(396003)(376002)(39860400002)(346002)(189003)(199004)(52116002)(25786009)(316002)(110136005)(99286004)(2501003)(4326008)(36756003)(106356001)(97736004)(6116002)(3846002)(478600001)(66066001)(105586002)(53936002)(2616005)(486006)(8676002)(6436002)(68736007)(14454004)(8936002)(476003)(305945005)(2906002)(26005)(186003)(7736002)(6512007)(256004)(14444005)(102836004)(7416002)(81156014)(6506007)(5660300002)(386003)(86362001)(2201001)(15650500001)(6486002)(81166006)(50226002)(71190400001)(71200400001)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3642;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 6r7GudruMI69rKNUAc+dv2GDjbJHvMxRs99/7i6cCNVmx1A1Jtp7F6LC7PZrrALT7n5vRJlG+o5EN9coesfbHJTcX8Wx83x/2Sz/6FWx0Wm/5aI1NOIYkDLxs1DQvZCC/O3dEMKCRChcoxCvn+mtHhAv2w9IbKL1CLq9Kp3BJylRXV9U9id/3kFYUisiHCuV82peyEwzrlU/M1onxMxMt9sK6K+RMk/h3MrR+JPg4fdByOs507iCM7GeohNpI7mrbOc84wknqEZ4G3ewTe5MMaSpub4A1187nT7A00xGUyw+6v8ujTAz685ep1GpmJGYw2d4GtLhPvI4O5GRFPz7Zlo5fGmCilbb61uiIjsOjmJWCjgw/9w1lGNVnQMizVLDjeFwBkfpItEZOXh7HfjCpS/FoSW4rDYvbbK6Su71i1w=
+	id 1gw1K3-0000yO-Gx; Tue, 19 Feb 2019 09:04:15 +0000
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw1K1-0000y5-2B; Tue, 19 Feb 2019 09:04:13 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 7A1B7286B87C3; Tue, 19 Feb 2019 10:04:09 +0100 (CET)
+Date: Tue, 19 Feb 2019 10:04:09 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: "H. Peter Anvin" <hpa@zytor.com>
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+Message-ID: <20190219090409.GW32494@hirez.programming.kicks-ass.net>
+References: <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
+ <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ <20190213222146.GC32494@hirez.programming.kicks-ass.net>
+ <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
+ <20190214101429.GD32494@hirez.programming.kicks-ass.net>
+ <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
+ <20190216103044.GR32494@hirez.programming.kicks-ass.net>
+ <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: cc78e73a-7225-4921-7e77-08d69648cdf2
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 09:01:10.0296 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3642
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_010121_544560_EC41F44A 
-X-CRM114-Status: UNSURE (   8.90  )
-X-CRM114-Notice: Please train this message.
+Content-Disposition: inline
+In-Reply-To: <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -144,115 +69,109 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: dvlasenk@redhat.com, jpoimboe@redhat.com,
+ Julien Thierry <julien.thierry@arm.com>, catalin.marinas@arm.com,
+ valentin.schneider@arm.com, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Andy Lutomirski <luto@amacapital.net>,
+ mingo@redhat.com, james.morse@arm.com, luto@kernel.org, brgerst@gmail.com,
+ bp@alien8.de, tglx@linutronix.de, torvalds@linux-foundation.org,
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Update i.MX SCU resource ID table according to latest
-system controller firmware.
+On Mon, Feb 18, 2019 at 02:30:21PM -0800, H. Peter Anvin wrote:
+> On 2/16/19 2:30 AM, Peter Zijlstra wrote:
+> > On Fri, Feb 15, 2019 at 08:06:56PM -0800, hpa@zytor.com wrote:
+> >> This implies we invoke schedule -- a restricted operation (consider
+> >> may_sleep) during execution of STAC-enabled code, but *not* as an
+> >> exception or interrupt, since those preserve the flags.
+> > 
+> > Meet preempt_enable().
+> 
+> I believe this falls under "doctor, it hurts when I do that." And it hurts for
+> very good reasons. See below.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- include/dt-bindings/firmware/imx/rsrc.h | 39 +++++++++++++++++++--------------
- 1 file changed, 22 insertions(+), 17 deletions(-)
+I disagree; the basic rule is that if you're preemptible you must also
+be able to schedule and vice-versa. These AC regions violate this.
 
-diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
-index 4481f2d..ad747a8 100644
---- a/include/dt-bindings/firmware/imx/rsrc.h
-+++ b/include/dt-bindings/firmware/imx/rsrc.h
-@@ -36,15 +36,15 @@
- #define IMX_SC_R_DC_0_BLIT1		20
- #define IMX_SC_R_DC_0_BLIT2		21
- #define IMX_SC_R_DC_0_BLIT_OUT		22
--#define IMX_SC_R_DC_0_CAPTURE0		23
--#define IMX_SC_R_DC_0_CAPTURE1		24
-+#define IMX_SC_R_PERF			23
-+#define IMX_SC_R_UNUSED5		24
- #define IMX_SC_R_DC_0_WARP		25
--#define IMX_SC_R_DC_0_INTEGRAL0		26
--#define IMX_SC_R_DC_0_INTEGRAL1		27
-+#define IMX_SC_R_UNUSED7		26
-+#define IMX_SC_R_UNUSED8		27
- #define IMX_SC_R_DC_0_VIDEO0		28
- #define IMX_SC_R_DC_0_VIDEO1		29
- #define IMX_SC_R_DC_0_FRAC0		30
--#define IMX_SC_R_DC_0_FRAC1		31
-+#define IMX_SC_R_UNUSED6		31
- #define IMX_SC_R_DC_0			32
- #define IMX_SC_R_GPU_2_PID0		33
- #define IMX_SC_R_DC_0_PLL_0		34
-@@ -53,17 +53,17 @@
- #define IMX_SC_R_DC_1_BLIT1		37
- #define IMX_SC_R_DC_1_BLIT2		38
- #define IMX_SC_R_DC_1_BLIT_OUT		39
--#define IMX_SC_R_DC_1_CAPTURE0		40
--#define IMX_SC_R_DC_1_CAPTURE1		41
-+#define IMX_SC_R_UNUSED9		40
-+#define IMX_SC_R_UNUSED10		41
- #define IMX_SC_R_DC_1_WARP		42
--#define IMX_SC_R_DC_1_INTEGRAL0		43
--#define IMX_SC_R_DC_1_INTEGRAL1		44
-+#define IMX_SC_R_UNUSED11		43
-+#define IMX_SC_R_UNUSED12		44
- #define IMX_SC_R_DC_1_VIDEO0		45
- #define IMX_SC_R_DC_1_VIDEO1		46
- #define IMX_SC_R_DC_1_FRAC0		47
--#define IMX_SC_R_DC_1_FRAC1		48
-+#define IMX_SC_R_UNUSED13		48
- #define IMX_SC_R_DC_1			49
--#define IMX_SC_R_GPU_3_PID0		50
-+#define IMX_SC_R_UNUSED14		50
- #define IMX_SC_R_DC_1_PLL_0		51
- #define IMX_SC_R_DC_1_PLL_1		52
- #define IMX_SC_R_SPI_0			53
-@@ -303,8 +303,8 @@
- #define IMX_SC_R_M4_0_UART		287
- #define IMX_SC_R_M4_0_I2C		288
- #define IMX_SC_R_M4_0_INTMUX		289
--#define IMX_SC_R_M4_0_SIM		290
--#define IMX_SC_R_M4_0_WDOG		291
-+#define IMX_SC_R_UNUSED15		290
-+#define IMX_SC_R_UNUSED16		291
- #define IMX_SC_R_M4_0_MU_0B		292
- #define IMX_SC_R_M4_0_MU_0A0		293
- #define IMX_SC_R_M4_0_MU_0A1		294
-@@ -323,8 +323,8 @@
- #define IMX_SC_R_M4_1_UART		307
- #define IMX_SC_R_M4_1_I2C		308
- #define IMX_SC_R_M4_1_INTMUX		309
--#define IMX_SC_R_M4_1_SIM		310
--#define IMX_SC_R_M4_1_WDOG		311
-+#define IMX_SC_R_UNUSED17		310
-+#define IMX_SC_R_UNUSED18		311
- #define IMX_SC_R_M4_1_MU_0B		312
- #define IMX_SC_R_M4_1_MU_0A0		313
- #define IMX_SC_R_M4_1_MU_0A1		314
-@@ -337,7 +337,7 @@
- #define IMX_SC_R_IRQSTR_SCU2		321
- #define IMX_SC_R_IRQSTR_DSP		322
- #define IMX_SC_R_ELCDIF_PLL		323
--#define IMX_SC_R_UNUSED6		324
-+#define IMX_SC_R_OCRAM			324
- #define IMX_SC_R_AUDIO_PLL_0		325
- #define IMX_SC_R_PI_0			326
- #define IMX_SC_R_PI_0_PWM_0		327
-@@ -554,6 +554,11 @@
- #define IMX_SC_R_VPU_MU_3		538
- #define IMX_SC_R_VPU_ENC_1		539
- #define IMX_SC_R_VPU			540
--#define IMX_SC_R_LAST			541
-+#define IMX_SC_R_DMA_5_CH0		541
-+#define IMX_SC_R_DMA_5_CH1		542
-+#define IMX_SC_R_DMA_5_CH2		543
-+#define IMX_SC_R_DMA_5_CH3		544
-+#define IMX_SC_R_ATTESTATION		545
-+#define IMX_SC_R_LAST			546
- 
- #endif /* __DT_BINDINGS_RSCRC_IMX_H */
--- 
-2.7.4
+And, like illustrated, it is _very_ easy to get all sorts inside that AC
+crap.
+
+> >> I have serious concerns about this. This is more or less saying that
+> >> we have left an unlimited gap and have had AC escape.
+> > 
+> > Yes; by allowing normal C in between STAC and CLAC this is so.
+> > 
+> >> Does *anyone* see a need to allow this? I got a question at LPC from
+> >> someone about this, and what they were trying to do once all the
+> >> layers had been unwound was so far down the wrong track for a root
+> >> problem that actually has a very simple solution.
+> > 
+> > Have you read the rest of the thread?
+> > 
+> > All it takes for this to explode is a call to a C function that has
+> > tracing on it in between the user_access_begin() and user_access_end()
+> > things. That is a _very_ easy thing to do.
+> > 
+> > Heck, GCC is allowed to generate that broken code compiling
+> > lib/strnlen_user.c; it doesn't _have_ to inline do_strnlen_user (esp.
+> > with CONFIG_OPTIMIZE_INLINING), and making that a function call would
+> > get us fentry hooks and ftrace and *BOOM*.
+> > 
+> > (Now, of course, its a static function with a single caller, and GCC
+> > isn't _THAT_ stupid, but it could, if it wanted to)
+> > 
+> > Since the bar is _that_ low for mistakes, I figure we'd better fix it.
+> > 
+> 
+> The question is what "fix it" means. 
+
+It means that when we do schedule, the next task doesn't have AC set,
+and when we schedule back, we'll restore our AC when we had it. Unlike
+the current situation, where the next task will run with AC set.
+
+IOW, it confines AC to the task context where it was set.
+
+> I'm really concerned about AC escapes,
+> and everyone else should be, too.
+
+Then _that_ should be asserted.
+
+> For an issue specific to tracing, it would be more appropriate to do the
+> appropriate things in the tracing entry/exit than in schedule. Otherwise, we
+> don't want to silently paper over mistakes which could mean that we run a
+> large portion of the kernel without protection we thought we had.
+> 
+> In that sense, calling schedule() with AC set is in fact a great place to have
+> a WARN() or even BUG(), because such an event really could imply that the
+> kernel has been security compromised.
+
+It is not specific to tracing, tracing is just one of the most trivial
+and non-obvious ways to make it go splat.
+
+There's lot of fairly innocent stuff that does preempt_disable() /
+preempt_enable(). And just a warning in schedule() isn't sufficient,
+you'd have to actually trigger a reschedule before you know your code is
+bad.
+
+And like I said; the invariant is: if you're preemptible you can
+schedule and v.v.
+
+Now, clearly you don't want to mark these whole regions as !preemptible,
+because then you can also not take faults, but somehow you're not
+worried about the whole fault handler, but you are worried about the
+scheduler ?!? How does that work? The fault handler can touch a _ton_
+more code. Heck, the fault handler can schedule.
+
+So either pre-fault, and run the whole AC crap with preemption disabled
+and retry, or accept that we have to schedule.
+
+> Does that make more sense?
+
+It appears to me you're going about it backwards.
+
 
 
 _______________________________________________
