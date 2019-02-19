@@ -2,71 +2,80 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64ED7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 14:52:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D9B10C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 14:54:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2EFF92146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 14:52:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A72712177E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 14:54:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eLMA01d3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EFF92146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d3TaS3Xr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="zQu3YlL1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A72712177E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=fVQ3Fh50B7Xc1eCrlFlXArSFoaxpH/5OtGecGeSl6q4=; b=eLMA01d30QQ4+b
-	h1fPC23FRJRzB2igHzm18CUpm7Oa+5LbTbaIJlaGsiGsxgZCTmmOeDn8Qm72EpbLd/oQ0NkwSqqkc
-	uEXZTuB1fptL9zcKUTuymR6+bgaFxN3O72yUnR5wtpyfnpCh8VQy0VWE84yUlgVA6MXDNdiWdnXNz
-	Tg2ZbeFsIUBHPsETdYFNDPaDkS3c91hZU2NE73WSSgFG7G0B7fdfMBuI0NCKwOD9MyB+NfDDIo7EH
-	f7hz8PTmEhELG3s+uYW4zNWG+ZeGXR3J6ZkkPTUMF+QVmC22q2o+0Ba4PQRZ3TgBNLDm/qoGDgLWJ
-	3d1ajl7C+8YozpxEQYPQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=nsxUsY0yyNWt28dQMAXfyLWiyHvKKYAe+s/MyDXMFis=; b=d3TaS3XrLCogJP
+	OxkAD7TOzTQpg8uZn30bAHNrUPqIN2t2kEwUEiJmiSPcb/PM2Ff2R69PiwC1jY9c+b6TGCUcoMAPT
+	8Pp99f4wGM2Ai9pb6eHskMhgpYGf5rUHey+Wumg1lK10LHKbanjnPvyO16a8LwbX1BTEIfQ+mIACZ
+	dfgbq7vXr+lVq9XeclfpAzanL+1nFqseof8RSqpRe1BMwKT4hBO9TE7dyrgfHgGSlZVKjk/c9BtwW
+	rH9ystEMgXGGssYOZEQ+bfVygJe9HvXG3P4h3Xyqg5/Mes3ihNpg0QLvudpTKAYC3cDmUWn5vHIvf
+	Gw7BaIWe1/iB9oof/qow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw6l3-0007Nl-5s; Tue, 19 Feb 2019 14:52:29 +0000
-Received: from mout.kundenserver.de ([217.72.192.74])
+	id 1gw6nQ-0001Tr-L9; Tue, 19 Feb 2019 14:54:56 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw6ky-0007Cx-GI
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 14:52:26 +0000
-Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
- (mreue109 [212.227.15.145]) with ESMTPA (Nemesis) id
- 1M1YlB-1gujBA2Yln-00357Z; Tue, 19 Feb 2019 15:52:19 +0100
-From: Arnd Bergmann <arnd@arndb.de>
-To: arm@kernel.org
-Subject: [PATCH] ARM: pxa: remove CONFIG_SND_PXA2XX_AC97 in pxa_defconfig
-Date: Tue, 19 Feb 2019 15:51:57 +0100
-Message-Id: <20190219145214.3811804-1-arnd@arndb.de>
-X-Mailer: git-send-email 2.20.0
+ id 1gw6nM-0001TT-BZ
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 14:54:54 +0000
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com
+ [209.85.160.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9E09921908
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 14:54:50 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550588090;
+ bh=sMKevPs9QRwjYJalNCDpDqxOd816wl1rVZc+onpeTbw=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=zQu3YlL1Gmyl28RjDHk7sbW4WAAGqHQa0ZjrDc+xj4tHe7zW2ZUWQ8d99tH4vG38y
+ Rp0P3Gv/OfsFTGUK7aOfEAy4xRR/8+kBqM/0mRWhP51gsjcccKsFXucbIBRos9iE2Q
+ Va8eLYI0DFZBLhdb06bu9FRAh9kWURwMwsQxDR5g=
+Received: by mail-qt1-f169.google.com with SMTP id b8so23350218qtr.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 06:54:50 -0800 (PST)
+X-Gm-Message-State: AHQUAuZenXvmtZsf7MNqD+aR056T3inHgmuM5vv7lYUMbsHXkfnmaAdW
+ 7SGWd4MMO4uhUCowK+Xtw3hy1dUYszxQJGaWPA==
+X-Google-Smtp-Source: AHgI3IYC1Mn4upLNA2uND8FWdVvO/S/bdQL1woBdATwigCyJ10TmlDSfFEJP6xt5X1XP6BG5Bj5G9yMj4zIrvXq9dvc=
+X-Received: by 2002:ac8:25d1:: with SMTP id f17mr21982144qtf.38.1550588089725; 
+ Tue, 19 Feb 2019 06:54:49 -0800 (PST)
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:x4bvBMHiHPbWMhKrQcdgWXDZO6WyzNAmLpDDxKm89QKrHAOI5eD
- IlnHRvII32Ujc91l5+oVC+f87fVpvY6PfU/FrdnPkFNaj2VBtJefuQq/Jhm4/Qq1plfJI0P
- ro+/3K6qwvauN2rnoYeeloPGB7ojJa7KZtFJVKOKepwTPDyaA2UFPuKeOYZauFC5z5w2iB0
- umju6PwWOxyPY7G8SEqxw==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:04mafl0Eoak=:Pte53+ULKDbyM2QN1JQz9R
- sXq/KKtbnycw22I6SEFgltIpvhCFinDD8KPflOMPg6jQHoEs9XYbaZo96ruA3lpwH8cvG2LB+
- ErB4Ic8/K1zGeNPXwdJ9Pman04YW0/U7Ym6Ap0DXrlLT+Ijbp/LM4LBo2HbZr44NRBK5WVFM7
- cWSPPDoVZuNCAbDV6ZblpzwIK6x2TfQ+NNpPfvIedLpNGq4loBVTozY4KSzchmniSZiiiwhiy
- 8q53Kp8QQg9e+LYQwVTtzyikKq+ekSWZc3fo2eRXCAN+GMPVfO2r3sJYsxfSbKKBLjQ00dEoO
- fsR52mA7YFl3s2+NJvSptE52K+/PjyIpgV6FkP5WpW70cMEOn8l/Ib1z9zYokbl5OydPYlgYG
- aOwcuZ4Dd+P/S4aQsX0KMZU6oWKMyx6eFDvvgJFlo4LnHS0ZxYXmw9H+I+AoSmePqj7ryoD4S
- ffC87srX8dOb6BAEX5PkLntB51yIx6NHWKOyeGxgNDZhGUQtMEjGwKoEkn4uQBlai5cABLuCQ
- eMfRukPiOS8B/p1fDAi5KxhEa/+ggcSOUB1sQ/fkvdk3/OCjgx/hzWSXhzVwrX2M7p8mKFh0q
- VUx7VcwG0b2Xjz7j13648iuO4v5nYPJyTEqyOiZqjBwIzXMpXLDujbnW8lWTYCCRUtDidnza4
- az2QonX8mzNVQRXHaepeB0FgQu3WgvWE8W+JU5omiO4KMohEh+maZCo2kCSx0yzzxqGMR7mXG
- Xk04ORUgA8IdzFWGpgLluDBfpdzyNzntn41tAg==
+References: <20190215050957.20755-1-anarsoul@gmail.com>
+ <20190215050957.20755-11-anarsoul@gmail.com>
+ <20190218183301.GA5480@bogus>
+ <CA+E=qVcdDQJvssZgu23gM_gKvz2G5GAWcmjFBokE_V=WGJ4h6A@mail.gmail.com>
+In-Reply-To: <CA+E=qVcdDQJvssZgu23gM_gKvz2G5GAWcmjFBokE_V=WGJ4h6A@mail.gmail.com>
+From: Rob Herring <robh@kernel.org>
+Date: Tue, 19 Feb 2019 08:54:36 -0600
+X-Gmail-Original-Message-ID: <CAL_Jsq+pyAd_kMMz+yKjqY=asAi1X1XguM58VjfVhPwD-xi-2w@mail.gmail.com>
+Message-ID: <CAL_Jsq+pyAd_kMMz+yKjqY=asAi1X1XguM58VjfVhPwD-xi-2w@mail.gmail.com>
+Subject: Re: [PATCH v3 10/11] drm/panel: simple: Add NewEast Optoelectronics
+ CO., LTD WJFH116008A panel support
+To: Vasily Khoruzhick <anarsoul@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_065224_846175_FD2BFB56 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20190219_065452_435291_80AC49F8 
+X-CRM114-Status: GOOD (  24.03  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,42 +87,75 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, linux-kernel@vger.kernel.org,
- Haojian Zhuang <haojian.zhuang@gmail.com>, Daniel Mack <daniel@zonque.org>,
- Robert Jarzmik <robert.jarzmik@free.fr>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Archit Taneja <architt@codeaurora.org>, Andrzej Hajda <a.hajda@samsung.com>,
+ David Airlie <airlied@linux.ie>, linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The CONFIG_SND_PXA2XX_AC97 driver is for the old AC97 bus implementation,
-and conflicts with all the new-style AC97 drivers after the conversion,
-so the drivers we want all get turned off.
+On Mon, Feb 18, 2019 at 1:07 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>
+> On Mon, Feb 18, 2019 at 10:33 AM Rob Herring <robh@kernel.org> wrote:
+> >
+> > On Thu, Feb 14, 2019 at 09:09:56PM -0800, Vasily Khoruzhick wrote:
+> > > This commit adds support for the NewEast Optoelectronics CO., LTD
+> > > WJFH116008A 11.6" 1920x1080 TFT LCD panel.
+> > >
+> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > ---
+> > >  .../display/panel/neweast,wjfh116008a.txt     |  7 ++++
+> > >  drivers/gpu/drm/panel/panel-simple.c          | 39 +++++++++++++++++++
+> > >  2 files changed, 46 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/display/panel/neweast,wjfh116008a.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/display/panel/neweast,wjfh116008a.txt b/Documentation/devicetree/bindings/display/panel/neweast,wjfh116008a.txt
+> > > new file mode 100644
+> > > index 000000000000..d76579f9f55e
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/display/panel/neweast,wjfh116008a.txt
+> > > @@ -0,0 +1,7 @@
+> > > +NewEast Optoelectronics CO., LTD WJFH116008A 11.6" 1920x1080 TFT LCD panel
+> > > +
+> > > +Required properties:
+> > > +- compatible: should be "neweast,wjfh116008a"
+> > > +
+> > > +This binding is compatible with the simple-panel binding, which is specified
+> > > +in simple-panel.txt in this directory.
+> >
+> > We already established that this goes thru a standard eDP connector. We
+> > should describe that and everything associated with it.
+>
+> I believe using eDP connector binding wouldn't help much in my case
+> and it won't improve accuracy of hardware description while adding
+> unnecessary code duplication (edp-connector will be pretty much
+> simple-panel).
+>
+> Since currently there're no standalone connector drivers, implementing
+> one requires significant refactoring of the code that I'm not
+> familiar.
 
-Not disabling the symbol however does the right thing, and we get
-the drivers that are selectively enabled here.
+I'm not talking about drivers. I'm talking about bindings. Those are
+not necessarily 1-1. There's no reason the simple panel driver can't
+have an 'edp-connector' entry.
 
-Fixes: 25540f68c871 ("ASoC: pxa: change ac97 dependencies")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/configs/pxa_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+Also, since you have EDID, you should be using that for timing data
+IMO, and the binding needs to have enough information to support that.
+It may if DP-aux comes from the bridge chip or it may not if you need
+to describe that connection. Again, this is independent from what
+Linux chooses to do. If Linux chooses to have its own timing
+information that's its choice. Another OS may choose to use EDID.
 
-diff --git a/arch/arm/configs/pxa_defconfig b/arch/arm/configs/pxa_defconfig
-index 6bb506edb1f5..7f0f1fda2584 100644
---- a/arch/arm/configs/pxa_defconfig
-+++ b/arch/arm/configs/pxa_defconfig
-@@ -482,7 +482,6 @@ CONFIG_SND_PCM_OSS=m
- CONFIG_SND_DYNAMIC_MINORS=y
- CONFIG_SND_VERBOSE_PRINTK=y
- CONFIG_SND_DEBUG=y
--CONFIG_SND_PXA2XX_AC97=m
- CONFIG_SND_USB_AUDIO=m
- CONFIG_SND_SOC=m
- CONFIG_SND_ATMEL_SOC=m
--- 
-2.20.0
-
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
