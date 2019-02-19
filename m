@@ -2,78 +2,70 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89E7AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:27:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AFBFC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:34:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 574E5217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:27:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 28ADD2146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:34:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iKRHKNcK";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="i2Lr6wPR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 574E5217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RBgkD8Eh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=163.com header.i=@163.com header.b="MRTuwdl5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28ADD2146E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=163.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=eVtysnL1fYJvz1p5nJs1vjn07hRDBGJ79Ob6Cbl7ViE=; b=iKRHKNcKW1NSHj
-	Zg8zlgrtSqpYbF352dqlu04/t6z/Onrm/MCoKhqRDdDIO1eVx3PzR7dgthM6A7VGE087ZQVxU4mpS
-	S0W9CxrwJu3hL2eqwAhoQngUtOYM7ewf98kxVHGKCBsPS1W4QX8cmNvxaWUi/UnIqWfUQq7eGO/3B
-	/QmdECqaxIsGeqi1p844TjG9QhGSHgKyQ8Udh9R4GEpP/fWCJMEn+6Q6+2uV/82VhClY1/0aOkJVA
-	cUUgMkDzvKD7Ib3y4KbVqN00wmV0y3+ZlY9q9pTOMdcVY6u9abgvGpiQ8MvVXZjFMupzDEhhiYeV3
-	3ie6kmg3muCvFHixrs/g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=nwkbRdPwIA4UTpWrtHv7B5VM6OCIVdJ32zRlwD/I5+g=; b=RBgkD8EhJqeG+n
+	X/wwn2ItvDmWxgJAwMIVnUYFx8RgTXa5neaV6TNUadANhQgijQekO5ikNSrK0p8BBZ7QA+DDVn1+8
+	jKAnn++Avmt029xl7JkJoA4XDHMKb6M6SSmKN6uqBFMUWDiDRdxEjVivt8YMNCwnqC20sbj8xASIQ
+	X3O3mAhBMrVB0JEZzca3dcBtXZLAxH6JasLmX7CwPNCNnJLZa5KDsAHwJIWDBVkZAUtMg8rliZHZh
+	hWzQu++eUIIkVpZwMnB92l1MHavBtSQCW9eXzR0mVeksjvXbKPjro26eU5BXA2exFCQwo3+4cjzby
+	DDBDupKqunoAeZtE54Rw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvuBO-0002k5-Ue; Tue, 19 Feb 2019 01:26:50 +0000
-Received: from conssluserg-05.nifty.com ([210.131.2.90])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvuBL-0002jl-IW
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 01:26:49 +0000
-Received: from mail-ua1-f52.google.com (mail-ua1-f52.google.com
- [209.85.222.52]) (authenticated)
- by conssluserg-05.nifty.com with ESMTP id x1J1QYD9004986
- for <linux-arm-kernel@lists.infradead.org>; Tue, 19 Feb 2019 10:26:35 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-05.nifty.com x1J1QYD9004986
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1550539595;
- bh=Syvc8CYUnyJsga+YWR2VemKzeLLMgqDIsdamLYpWt6Y=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=i2Lr6wPRQ8hi+A49Jo7CgGnfNEUofXKy/F430HjcnO/PKC+waSYXzrL/VLzFgZfc5
- AVBAlH2sZUiKBq/ToftG/4boCMCPrz9wrnxF5/kCYP2FyG1lyrcoBV/WhoGQKnBpTa
- Jcq7qIbgmh0Lb0tZPib1f4HZ7Ay1CndCGyHgh2nFOSBUGhZl42wEoxyk7gMkT9yXL1
- RD7w6OQuCOpRBUJwMaw8DVD+MJmCz0Yjioc1eL0nZCua3CqJKGvfTTVtP+4d+ZI/Wf
- 6jiWZUfYhWpDBeTMfZhjoGzpOXeAfNMJfxpahNPaDNpLK0VtRdYRCz7CzwI5lMJOSq
- IZFsf4K0bKY7Q==
-X-Nifty-SrcIP: [209.85.222.52]
-Received: by mail-ua1-f52.google.com with SMTP id j8so6420249uae.13
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 18 Feb 2019 17:26:34 -0800 (PST)
-X-Gm-Message-State: AHQUAuaHHOX+6EbOg2QRoVSHHiHz8Q57Cvn9LeUP68s7yv417KakPyqz
- SwrVIBOQIRCFooMVaJ+CUtiJpbktQJe6c3oIFJ0=
-X-Google-Smtp-Source: AHgI3IZas5ygeL45f0Nha89sjRomBSU9T2uUd8P0L/EZiHQFjvc53s26SFm8p//v0TaUto4qUriOFaV6W60kzhImkk0=
-X-Received: by 2002:ab0:c07:: with SMTP id a7mr2581963uak.55.1550539593750;
- Mon, 18 Feb 2019 17:26:33 -0800 (PST)
+	id 1gvuIW-000513-8T; Tue, 19 Feb 2019 01:34:12 +0000
+Received: from m12-12.163.com ([220.181.12.12])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvuIS-00050U-4H
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 01:34:09 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=163.com;
+ s=s110527; h=From:Subject:Date:Message-Id:MIME-Version; bh=vJOxl
+ iD3ylQNF+bK3c+e1E/IPoF2RmPsUHSYa4f68G4=; b=MRTuwdl5hca/5724t3b7h
+ Dr4LnqeBtUejGLE3FLMPjrnSDFE6WlxYKdmkKEBXyDrzZ9jcRIA4oPda3nQqtHIk
+ QxTdlSzkMwEIxZtXJ7j0abGg+7jzZXdI7OshAkJaP6+Lzssht9u8AcVH1ngs3FoR
+ ggyP35j3nDDxE0Prw/iT4w=
+Received: from localhost.localdomain (unknown [117.36.119.220])
+ by smtp8 (Coremail) with SMTP id DMCowAC3NM4CXWtcMmt4GQ--.10745S3;
+ Tue, 19 Feb 2019 09:33:55 +0800 (CST)
+From: Shikai Wang <sxauwsk@163.com>
+To: Michal Simek <michal.simek@xilinx.com>
+Subject: [PATCH v2] i2c: cadence: try reset when master receive arbitration
+ lost
+Date: Tue, 19 Feb 2019 09:24:47 +0800
+Message-Id: <20190219012447.5900-1-sxauwsk@163.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <1549628764-30587-1-git-send-email-sugaya.taichi@socionext.com>
-In-Reply-To: <1549628764-30587-1-git-send-email-sugaya.taichi@socionext.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Tue, 19 Feb 2019 10:25:57 +0900
-X-Gmail-Original-Message-ID: <CAK7LNARTX4_phfcXRXUKGp_V0k_q_RKjL6A3Kz=Hxyqj6VXW+Q@mail.gmail.com>
-Message-ID: <CAK7LNARTX4_phfcXRXUKGp_V0k_q_RKjL6A3Kz=Hxyqj6VXW+Q@mail.gmail.com>
-Subject: Re: [PATCH v2 03/15] dt-bindings: Add documentation for Milbeaut SoCs
-To: Sugaya Taichi <sugaya.taichi@socionext.com>
+X-CM-TRANSID: DMCowAC3NM4CXWtcMmt4GQ--.10745S3
+X-Coremail-Antispam: 1Uf129KBjvJXoW7tr1xGw4UZr1DAw17CryUKFg_yoW8Gw1Upa
+ 1DG39IkrW0qr4IqFs7Ar17ZF98uwsYga4UKF4Fk34q9F15CrWDtFy3tF95XF4xCry5Xw1a
+ qrZ0y39rG3W2vFJanT9S1TB71UUUUUUqnTZGkaVYY2UrUUUUjbIjqfuFe4nvWSU5nxnvy2
+ 9KBjDUYxBIdaVFxhVjvjDU0xZFpf9x07UgTmDUUUUU=
+X-Originating-IP: [117.36.119.220]
+X-CM-SenderInfo: 5v0d34lvn6il2tof0z/1tbiQBRgJlSIZQ4tnwABsW
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_172647_825833_58AD5F9C 
-X-CRM114-Status: GOOD (  15.29  )
+X-CRM114-CacheID: sfid-20190218_173408_519742_AA5ADBE4 
+X-CRM114-Status: GOOD (  11.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,64 +77,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Wolfram Sang <wsa@the-dreams.de>,
+ Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
+ linux-kernel@vger.kernel.org, linux-i2c@vger.kernel.org,
+ Shikai Wang <sxauwsk@163.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 8, 2019 at 9:26 PM Sugaya Taichi
-<sugaya.taichi@socionext.com> wrote:
->
-> This adds a DT binding documentation for the M10V and its evaluation
-> board.
->
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> ---
->  Documentation/devicetree/bindings/arm/milbeaut.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/milbeaut.txt
->
-> diff --git a/Documentation/devicetree/bindings/arm/milbeaut.txt b/Documentation/devicetree/bindings/arm/milbeaut.txt
+When the adapter receive arbitration lost error interrupts,
+cdns_i2c_master_xfer return to the caller directly instead of resetting
+the adapter which resulted in the adapter being out of control.
 
+So when driver detect err_status such as arbitration lost,
+then try to repair and fix it.
 
+Reviewed-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+Signed-off-by: Shikai Wang <sxauwsk@163.com>
+---
+ drivers/i2c/busses/i2c-cadence.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-I added uniphier SoC/board binding into
-
-Documentation/devicetree/bindings/arm/socionext/uniphier.txt
-
-
-You can milbeaut.txt to the socionext directory as well.
-
-
-
-
-> new file mode 100644
-> index 0000000..9fd053a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/milbeaut.txt
-> @@ -0,0 +1,6 @@
-> +Milbeaut platforms device tree bindings
-> +---------------------------------------
-> +
-> +- Milbeaut M10V Evaluation Board
-> +    Required root node properties:
-> +      - compatible = "socionext,milbeaut-m10v-evb", "socionext,sc2000a";
-> --
-> 1.9.1
->
-
-
+diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+index b13605718291..595b0d56ff1a 100644
+--- a/drivers/i2c/busses/i2c-cadence.c
++++ b/drivers/i2c/busses/i2c-cadence.c
+@@ -548,10 +548,6 @@ static int cdns_i2c_process_msg(struct cdns_i2c *id, struct i2c_msg *msg,
+ 	cdns_i2c_writereg(CDNS_I2C_IXR_ALL_INTR_MASK,
+ 			  CDNS_I2C_IDR_OFFSET);
+ 
+-	/* If it is bus arbitration error, try again */
+-	if (id->err_status & CDNS_I2C_IXR_ARB_LOST)
+-		return -EAGAIN;
+-
+ 	return 0;
+ }
+ 
+@@ -624,6 +620,12 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
+ 		if (id->err_status) {
+ 			cdns_i2c_master_reset(adap);
+ 
++			/* If it is bus arbitration error, try again */
++			if (id->err_status & CDNS_I2C_IXR_ARB_LOST) {
++				ret = -EAGAIN;
++				goto out;
++			}
++
+ 			if (id->err_status & CDNS_I2C_IXR_NACK) {
+ 				ret = -ENXIO;
+ 				goto out;
 -- 
-Best Regards
-Masahiro Yamada
+2.19.2
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
