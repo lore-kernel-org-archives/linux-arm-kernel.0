@@ -2,84 +2,93 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BF7BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 06:37:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 14AC1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 06:51:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 000A9217D7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 06:37:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D734921902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 06:51:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NYEPa3zB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="x+MhAm/8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 000A9217D7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L47INCwa";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=piap.pl header.i=@piap.pl header.b="fdZErFL1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D734921902
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=piap.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zO932f9rl42oU/0820SgcQ1kf5RDZqcVjRyJyoJj67Y=; b=NYEPa3zB1BoyqW
-	4glgy9AW8blIK/tgeHzt2eC6VnTVSnRKYkKRUkNi/DXfog0bXqA1AjKIghs3ktEijsPlJAiinyikr
-	xHWvvHe9OkVmCfPCpyMat7gduSf7/LVy0X04i+77gHjxCxtmg9kn0kScmgdhM3MzI86td1moqK8Xv
-	A/tBpIGwlxr3vKNCC5g/LMtTieKNiYtMWTyPCgpDmeatmsPB8aJTk85GrUJnt0qY4bcxx7/G6yHzE
-	BRfZHFnyvVK0s62mix5nZc3pIyhx1BNcb5hVP9tTTPYufdxsIWiLALGyvgV6WipPf5tUDYSGbiwNg
-	8r7n+5Ix2hxvjxw9zBcA==;
+	List-Owner; bh=oQ94WX5UV36IksQEI3dltbXa+qaNSCuqt8W4b1lEqY0=; b=L47INCwadr/WE8
+	ryUKNQwhdsvDxozBTpPAu+UhEMhLLp3oY4nE7I4CAgVJslfdWqoyGqyazuIJHAE47lQKKwix4x8L9
+	rxi8K4Te7I7yz+Ru0bRXA/w2IKmyIwbEIvwriyPEwhPN29Xf7qYKXTyixqrkwWX/o0XJJ+Z9dOuSk
+	DwAZ5HdHENzcGx8R4mtPd/yuwcBe9F/Tpa26xToI05QP80Eba5553XvWRjVpqbT8/2BO7Py6esnps
+	Mt6VJXOlNQ2ZynWNl8UP26Jbjd3d1ikLMGoQfZ17j7wGtN6+2/2iXLMEbt83LhK2z80BB+gnymzdS
+	4qvAXowBr3MuqMNYaV6w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvz2C-0003en-An; Tue, 19 Feb 2019 06:37:40 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gvzFN-0008LV-5P; Tue, 19 Feb 2019 06:51:17 +0000
+Received: from ni.piap.pl ([195.187.100.4])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvz0U-0001Us-Ga; Tue, 19 Feb 2019 06:36:02 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1J6ZkZW106310;
- Tue, 19 Feb 2019 00:35:46 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550558146;
- bh=ar9/zidlSzMeE+mIPajTlV0BwC8y9cYI3NC9lb7nhHs=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=x+MhAm/8UkEJ2H7sGQVITRCnI1ZDUWrX9SduTFxFxLZjVUZ/R9ibZPCado6QyA1SA
- 3EZaiEB7DtFn4DUCGAF8NzHv4uSxnSr3OlIG8meRhBcvMpj7txVJCzqvFXfZy92du+
- oq7cZwnhPyvR27Wd9HwKYppwoRgNvT1Bp7DHMrpY=
-Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1J6ZkGL123565
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 19 Feb 2019 00:35:46 -0600
-Received: from DLEE115.ent.ti.com (157.170.170.26) by DLEE109.ent.ti.com
- (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
- Feb 2019 00:35:45 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE115.ent.ti.com
- (157.170.170.26) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 19 Feb 2019 00:35:45 -0600
-Received: from a0132425.india.ti.com (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1J6ZCt3025516;
- Tue, 19 Feb 2019 00:35:40 -0600
-From: Vignesh R <vigneshr@ti.com>
-To: Vignesh R <vigneshr@ti.com>, David Woodhouse <dwmw2@infradead.org>, Brian
- Norris <computersforpeace@gmail.com>, Boris Brezillon
- <bbrezillon@kernel.org>, Marek Vasut <marek.vasut@gmail.com>, Richard
- Weinberger <richard@nod.at>, Rob Herring <robh+dt@kernel.org>
-Subject: [RFC PATCH 5/5] mtd: hyperbus: Add driver for TI's Hyperbus memory
- controller
-Date: Tue, 19 Feb 2019 12:06:07 +0530
-Message-ID: <20190219063607.29949-6-vigneshr@ti.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190219063607.29949-1-vigneshr@ti.com>
-References: <20190219063607.29949-1-vigneshr@ti.com>
+ id 1gvzFJ-0008Kj-2f
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 06:51:15 +0000
+Received: from t19.piap.pl (OSB1819.piap.pl [10.0.9.19])
+ (using TLSv1.2 with cipher AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by ni.piap.pl (Postfix) with ESMTPSA id EC85C440446;
+ Tue, 19 Feb 2019 07:51:06 +0100 (CET)
+DKIM-Filter: OpenDKIM Filter v2.11.0 ni.piap.pl EC85C440446
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=piap.pl; s=mail;
+ t=1550559067; bh=vrCBjwobIdl3ZcLtS4XMgk4qNLUXLgi4vqQQiqpjo44=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=fdZErFL1kEGT6vF8DyPYKat9FwRbHpf8oUOGEEaqd/36BE+b+b72zZTQSAFfsJqE6
+ WdDqhjVmWTGzaxIDJThcnCZvAnMSeP5yDXWoAiCuYfJtceRr7E5h8zVZ/hmyZyxv3I
+ vMp8kN1XBatmRqr2HjGEjEZ5IM4OoD82TLExaKtk=
+From: khalasa@piap.pl (Krzysztof =?utf-8?Q?Ha=C5=82asa?=)
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [PATCH 04/17 v1] irqchip: Add driver for IXP4xx
+References: <20190203214205.13594-1-linus.walleij@linaro.org>
+ <20190203214205.13594-5-linus.walleij@linaro.org>
+ <ffc97649-bfc2-e411-149f-cd5ed9e8c77e@arm.com>
+ <CACRpkdZK7OU9rb-qw9tTjJLNvfQG-VmN_VBXUz9DPqVV11zuww@mail.gmail.com>
+ <20190211221156.10036ad8@why.wild-wind.fr.eu.org>
+ <m3k1hxvan4.fsf@t19.piap.pl>
+ <CACRpkdYuvZEPzmeKo552g4DR3wxQZtw24jX3ONbmdoD_6bUSPw@mail.gmail.com>
+ <CAK8P3a1Y2kLeDYKGMGpuLk8rxUxFwuPvjMRoLj-c2a8Bnwi56w@mail.gmail.com>
+ <m3bm39uwvm.fsf@t19.piap.pl>
+ <CAK8P3a0iubKdPrTO9ZxM+=0c3H8djpBw11KY-SO0Ai1Zgx3zHg@mail.gmail.com>
+Date: Tue, 19 Feb 2019 07:51:05 +0100
+In-Reply-To: <CAK8P3a0iubKdPrTO9ZxM+=0c3H8djpBw11KY-SO0Ai1Zgx3zHg@mail.gmail.com>
+ (Arnd Bergmann's message of "Mon, 18 Feb 2019 13:44:19 +0100")
+Message-ID: <m37edwuv8m.fsf@t19.piap.pl>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+X-KLMS-Rule-ID: 1
+X-KLMS-Message-Action: clean
+X-KLMS-AntiSpam-Lua-Profiles: 135866 [Feb 19 2019]
+X-KLMS-AntiSpam-Version: 5.8.6.0
+X-KLMS-AntiSpam-Envelope-From: khalasa@piap.pl
+X-KLMS-AntiSpam-Rate: 0
+X-KLMS-AntiSpam-Status: not_detected
+X-KLMS-AntiSpam-Method: none
+X-KLMS-AntiSpam-Info: LuaCore: 234 234
+ 6084fb9491110ca2901942eb14874f7e6341a62a, {Tracking_DKIM, one},
+ {Tracking_marketers, sender}, {Tracking_ sender_matches_from},
+ {Tracking_subj_double_letters}, {Tracking_text_let_digits},
+ Auth:dkim=pass header.d=piap.pl
+X-KLMS-AntiSpam-Interceptor-Info: scan successful
+X-KLMS-AntiPhishing: Clean, 2019/02/18 15:22:35
+X-KLMS-AntiVirus: Kaspersky Security 8.0 for Linux Mail Server,
+ version 8.0.1.721, bases: 2019/02/19 00:01:00 #9558000
+X-KLMS-AntiVirus-Status: Clean, skipped
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_223555_456236_E61BEE37 
-X-CRM114-Status: GOOD (  20.84  )
+X-CRM114-CacheID: sfid-20190218_225113_623420_2C0560B1 
+X-CRM114-Status: GOOD (  12.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,142 +100,52 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- tudor.ambarus@microchip.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- nsekhar@ti.com, linux-kernel@vger.kernel.org, linux-mtd@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Jason Cooper <jason@lakedaemon.net>, Marc Zyngier <marc.zyngier@arm.com>,
+ Linus Walleij <linus.walleij@linaro.org>, Olof Johansson <olof@lixom.net>,
+ Thomas Gleixner <tglx@linutronix.de>, Imre Kaloz <kaloz@openwrt.org>,
+ Tim Harvey <tharvey@gateworks.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add driver for Hyperbus memory controller on TI's AM654 SoC. Programming
-IP is pretty simple and provides direct memory mapped access to
-connected Flash devices.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Add basic support for the IP without DMA. Second ChipSelect is not
-supported for now.
+> - I have a vague memory that only specific revisions actually require
+>   the PCI indirect mode. Is it the same chip revision A0 of IXP425
+>   that requires both pci-indirect and address-coherent mode, or are
+>   there other combinations?
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- drivers/mtd/hyperbus/hbmc_am654.c | 105 ++++++++++++++++++++++++++++++
- 1 file changed, 105 insertions(+)
- create mode 100644 drivers/mtd/hyperbus/hbmc_am654.c
+IIRC, all chips support indirect PCI. Perhaps there are some changes
+about LE mode on the PCI, but that's it.
 
-diff --git a/drivers/mtd/hyperbus/hbmc_am654.c b/drivers/mtd/hyperbus/hbmc_am654.c
-new file mode 100644
-index 000000000000..1f0d2dc52f9f
---- /dev/null
-+++ b/drivers/mtd/hyperbus/hbmc_am654.c
-@@ -0,0 +1,105 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
-+// Author: Vignesh R <vigneshr@ti.com>
-+
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/mtd/hyperbus.h>
-+#include <linux/mtd/mtd.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/types.h>
-+
-+struct am654_hbmc_priv {
-+	struct hb_device hbdev;
-+	void __iomem	*regbase;
-+};
-+
-+static int am654_hbmc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct am654_hbmc_priv *priv;
-+	struct resource *res;
-+	int err;
-+
-+	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (IS_ERR(res)) {
-+		dev_err(&pdev->dev, "failed to get memory resource\n");
-+		return -ENOENT;
-+	}
-+
-+	priv->regbase = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(priv->regbase)) {
-+		dev_err(dev, "Cannot remap controller address.\n");
-+		return PTR_ERR(priv->regbase);
-+	}
-+
-+	pm_runtime_enable(&pdev->dev);
-+	err = pm_runtime_get_sync(&pdev->dev);
-+	if (err < 0) {
-+		pm_runtime_put_noidle(&pdev->dev);
-+		return err;
-+	}
-+
-+	priv->hbdev.needs_calib = true;
-+	priv->hbdev.dev = &pdev->dev;
-+	priv->hbdev.np = of_get_next_child(dev->of_node, NULL);
-+	err = hb_register_device(&priv->hbdev);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to register controller\n");
-+		goto err_destroy;
-+	}
-+
-+	return 0;
-+
-+err_destroy:
-+	hb_unregister_device(&priv->hbdev);
-+	pm_runtime_put_sync(&pdev->dev);
-+	return err;
-+}
-+
-+static int am654_hbmc_remove(struct platform_device *pdev)
-+{
-+	struct am654_hbmc_priv *priv = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	ret = hb_unregister_device(&priv->hbdev);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+
-+	return ret;
-+}
-+
-+static const struct of_device_id am654_hbmc_dt_ids[] = {
-+	{
-+		.compatible = "ti,am654-hbmc",
-+	},
-+	{ /* end of table */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, am654_hbmc_dt_ids);
-+
-+static struct platform_driver am654_hbmc_platform_driver = {
-+	.probe = am654_hbmc_probe,
-+	.remove = am654_hbmc_remove,
-+	.driver = {
-+		.name = "hbmc-am654",
-+		.of_match_table = am654_hbmc_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(am654_hbmc_platform_driver);
-+
-+MODULE_DESCRIPTION("HBMC driver for AM654 SoC");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:hbmc-am654");
-+MODULE_AUTHOR("Vignesh R <vigneshr@ti.com>");
+Most boards don't need indirect PCI. It's only needed when there is more
+than 64 MB of PCI address space to be used - IIRC IXP4xx have 4 direct
+PCI memory access windows, and each is 16 MB in size.
+I remember I needed indirect PCI for use with a (SiS?) VGA card, it had
+(I guess) 128 MB of RAM. I think indirect PCI means the memory can't be
+really mapped, it can only be accessed using readl() and friends (which
+are then converted into register accesses resulting in the actual MMIO).
+Even with indirect PCI, 64 MB can be accessed directly (though I think
+we don't support it).
+
+This is different from the bus mastering access to the main RAM - I
+think only the first 64 MB can be used for PCI BM DMA. This limitation,
+IIRC, doesn't apply to internal devices (Ethernet etc).
+
+> - How much would it hurt actual users to drop support for both
+>   features? I.e. do we know of anyone using the affected chips
+>   (and still doing updates), or are the remaining ixp4xx systems
+>   generally using the later chip revision?
+
+Most chips are B0+, though there are (were) certain A0 platforms.
+I don't have any idea about their current use.
 -- 
-2.20.1
+Krzysztof Halasa
 
+Industrial Research Institute for Automation and Measurements PIAP
+Al. Jerozolimskie 202, 02-486 Warsaw, Poland
 
 _______________________________________________
 linux-arm-kernel mailing list
