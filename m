@@ -2,64 +2,90 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ABE9CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:27:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18259C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:35:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 53E6F21736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:27:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA7E32086A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 11:35:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qoO8kOAP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 53E6F21736
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="egiCnElY";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="SjwtoSl4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA7E32086A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KSJ7kPn2EGU0t+JdDgknw2qVWrvo5oWzO0im1wn50+Y=; b=qoO8kOAPbaM0iK
-	dK2FFLeT1GS/PkUWPK3PG90DOk1jBAiQlMY/is/3Oj2FLOu+Y0WPckdgtyFfiLK4A+aRno7FRTRmt
-	gzitahLDCW1SsDOatO0czG5OoUJYoShCbBUSDb7F1otlWXOSrxWjOwkekKpdgrNvI4S4+wKwiXxKV
-	DKYWAXCo17QnTy46ztQ5YiGD/tnymZiAX0AMAwlxQYNIc+HFtBjyX4HoOhJMd1JDGSPXSHfRvRrXy
-	zGsg4XTczGsk2WvMNIvJ/X5Y80v/vH2QIleIVQ2vBgitbvvX9/MH1qVhDFGlz3xmPdDIrkFU+lV+5
-	sg34KpVgo583ZdRNATdA==;
+	List-Owner; bh=xKUF/ovTBgWM9OsD/r53TxcA8ns7msQjN9qHKodtV3c=; b=egiCnElYspKDN5
+	+OUnTEp+8AR1Cwk7RwCKPOvWbrrDt/R+xPdcO78HFPq8UaE5vlh2wFjFzhp+8O/OVZ+/DvVJSgCjU
+	OUVVp24VXvtP88CbFqM1Sc+zp7LRhZU96XQwxkrAOT8Zc2+O4Fi2Md/Lv6NMOswJUKT9hMQAQdhS9
+	YLWTMVLI8UwsRpKOBi3moTnulgGzO2LFIXeQhpoNnKO8UL5UhOjkorBJGhUs8210fBBk9NyORA5yn
+	7rtN+OJD+NdfRt97AbL3k7PxxKHJ2zwjtspYK09Ke4knPTzLLAPTT1NPeM/VTiGfNQTQdSBU3DXGT
+	tKrZtYBVluYptxkkO9Xg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw3Yq-0001jW-LX; Tue, 19 Feb 2019 11:27:40 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw3Ym-0001j5-M7
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 11:27:38 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 91998A78;
- Tue, 19 Feb 2019 03:27:30 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 333B33F720;
- Tue, 19 Feb 2019 03:27:27 -0800 (PST)
-Date: Tue, 19 Feb 2019 11:27:21 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Xiaowei Bao <xiaowei.bao@nxp.com>
-Subject: Re: [PATCHv6 3/4] pci: layerscape: Add the EP mode support.
-Message-ID: <20190219112721.GA15442@e107981-ln.cambridge.arm.com>
-References: <20190122063328.25228-1-xiaowei.bao@nxp.com>
- <20190122063328.25228-3-xiaowei.bao@nxp.com>
+	id 1gw3gT-0004hc-Kn; Tue, 19 Feb 2019 11:35:33 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw3gP-0004gy-Hb
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 11:35:31 +0000
+Received: by mail-it1-x141.google.com with SMTP id x131so5224395itc.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 03:35:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=q62Kg48ghBbijwcL6qdW6IrFyeQHl6ptcqcFoGHPA58=;
+ b=SjwtoSl4aYbAcaO7SS5Ui6BzSU6U6HCC46Ds0w9EBHnuDtOKN7wD1HfR+V+bFLix9B
+ T3jY1/7NUOXPDZ8sZ1/5nz/g7qk+W0FVKl238/+ZKkSH3k2y0fYqi7WZ1C2B28uzF0tJ
+ /zDdDJcdAW42k1A0j+/sk1v/TSeg9yClehkfX7dQym24TyEIy3kdnUHJtmLZs+zRSSVJ
+ /AzlLveNbWYL50aH7651Z4VCHQSckhXv8Jvb/9pndjjLeBfr9X1izqYAxEF70biWAZwv
+ VBk1J6yVIfWYA8GpcHfKDXcEpJ5SQzwD9Md9fg+vE0vAeFchIOf2JkFF3jErsX7ZsBVB
+ QlFg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=q62Kg48ghBbijwcL6qdW6IrFyeQHl6ptcqcFoGHPA58=;
+ b=JeNysfyHNh+txW5oI+q2hQlB1BQ8wOOIKjM3wiAUjC/FyDPRRo/dy3ym1WLxXTrPiX
+ tcy9ojmXdg34F4TbGRNgrfFwywoikeSQQQTKQvT5UapZq1hoc0bKo5FZX+HLYqKAi5/1
+ OYg8M+LLE6r5cde/kJ7E/lgZxfQVrV6lpq6RYwjDYldAcNGBzX12fuakIOsl5hcpRYeD
+ P6zU62+DR72W1ZWiO6hHYTO4Yc7LP2zx07RySKm/A8O16fHwriHtlREclzcfoRZm6av/
+ JK39H8n2OhYYOq6j5xvek58KZ0xolKL3E52IKp7L3frJXNGx6u18zGEFuinpG1/i2oOz
+ 7+hQ==
+X-Gm-Message-State: AHQUAuZkv2+sGHPSDAIbIoxTDnUp7gnw0TQe1t9M4f4tYkTSoBcXayNI
+ NRWq69sS0lzsmzJctIV6NJ4pVq6xaQlTEqNSzrdLIg==
+X-Google-Smtp-Source: AHgI3IbhGlAhVvJOxnIGcP9rZGjCooAyEe3AVeJc/1xXXTlEGXKBp5Ayp9Jq4QzlsBYVDHrelb2M8WDN4lFq/Ykqra8=
+X-Received: by 2002:a02:5782:: with SMTP id b2mr15174690jad.2.1550576128089;
+ Tue, 19 Feb 2019 03:35:28 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190122063328.25228-3-xiaowei.bao@nxp.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+References: <20190215013959.21320-1-natechancellor@gmail.com>
+ <20190215185026.GE15084@fuggles.cambridge.arm.com>
+ <CAKv+Gu-=2C4fBPAKNrkeiOsMG0Fg3jHHGuG2rVZvjtT=0-aDkA@mail.gmail.com>
+ <CAKwvOd=+_pwHStdhfB3bAYEuyMEjJ+T+gyTd9KA7GyNE2wMk7g@mail.gmail.com>
+ <CAKv+Gu-41fhEfJF+pvfCQRqXs4vYPHs77rkJo9=X8Y23QVd6Tw@mail.gmail.com>
+ <CAKwvOdke_HbSrmGO5ThNy4o87G4BhA845QcgZFUTB7m6cBHTDg@mail.gmail.com>
+ <CAKv+Gu-Aj68gXoi9CXLyw96iRychWjqX=XtMCQxcZqOv0jhsLw@mail.gmail.com>
+ <CAKv+Gu_nwKr65zLG0p0dSW4sQtN4dwEkevCMPe5s9U++SaDezg@mail.gmail.com>
+ <20190219111927.GA17012@kroah.com>
+In-Reply-To: <20190219111927.GA17012@kroah.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 19 Feb 2019 12:35:16 +0100
+Message-ID: <CAKv+Gu9v3htHyfCZvDU2Qd8vQozbBQVeHyyNsrdrwO2r7ReBwA@mail.gmail.com>
+Subject: Re: [PATCH] arm64/neon: Disable -Wincompatible-pointer-types when
+ building with Clang
+To: Greg KH <gregkh@linuxfoundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_032736_738393_1BE2D134 
-X-CRM114-Status: GOOD (  22.83  )
+X-CRM114-CacheID: sfid-20190219_033529_595816_3451364F 
+X-CRM114-Status: GOOD (  23.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,230 +97,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, roy.zang@nxp.com, arnd@arndb.de,
- devicetree@vger.kernel.org, gregkh@linuxfoundation.org,
- kstewart@linuxfoundation.org, linuxppc-dev@lists.ozlabs.org,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
- minghuan.Lian@nxp.com, robh+dt@kernel.org, cyrille.pitchen@free-electrons.com,
- linux-arm-kernel@lists.infradead.org, pombredanne@nexb.com,
- bhelgaas@google.com, leoyang.li@nxp.com, shawnguo@kernel.org,
- shawn.lin@rock-chips.com, mingkai.hu@nxp.com
+Cc: Sandeep Patil <sspatil@google.com>,
+ Nick Desaulniers <ndesaulniers@google.com>, Will Deacon <will.deacon@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Mark Brown <broonie@kernel.org>, Kevin Hilman <khilman@baylibre.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Jan 22, 2019 at 02:33:27PM +0800, Xiaowei Bao wrote:
-> Add the PCIe EP mode support for layerscape platform.
-> 
-> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
-> Reviewed-by: Minghuan Lian <minghuan.lian@nxp.com>
-> Reviewed-by: Zhiqiang Hou <zhiqiang.hou@nxp.com>
-> Reviewed-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
-> depends on: https://patchwork.kernel.org/project/linux-pci/list/?series=66177
-> 
-> v2:
->  - remove the EP mode check function.
-> v3:
->  - modif the return value when enter default case.
-> v4:
->  - no change.
-> v5:
->  - no change.
-> v6:
->  - modify the code base on the submit patch of the EP framework.
+On Tue, 19 Feb 2019 at 12:19, Greg KH <gregkh@linuxfoundation.org> wrote:
+>
+> On Tue, Feb 19, 2019 at 11:35:12AM +0100, Ard Biesheuvel wrote:
+> > On Fri, 15 Feb 2019 at 20:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > >
+> > > On Fri, 15 Feb 2019 at 20:43, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> > > >
+> > > > On Fri, Feb 15, 2019 at 11:28 AM Ard Biesheuvel
+> > > > <ard.biesheuvel@linaro.org> wrote:
+> > > > >
+> > > > > On Fri, 15 Feb 2019 at 20:25, Nick Desaulniers <ndesaulniers@google.com> wrote:
+> > > > > >
+> > > > > > On Fri, Feb 15, 2019 at 11:20 AM Ard Biesheuvel
+> > > > > > <ard.biesheuvel@linaro.org> wrote:
+> > > > > > > Provided that we stop sending Clang enablement patches to -stable:
+> > > > > >
+> > > > > > What does that mean?  We're trying to provide clang support back to
+> > > > > > 4.4 LTS branches. (so 4.4, 4.9, 4.14, 4.19).
+> > > > >
+> > > > > I understand that is what you are attempting, but that does not mean
+> > > > > it /belongs/ in -stable.
+> > > > >
+> > > > > There are rules for stable, and people that track stable kernels (such
+> > > > > as the distros) should be able to rely on us to only backport bug
+> > > > > fixes, not linker script changes and other updates that fix issues
+> > > > > that did not exist when those kernels were released.
+> > > > >
+> > > > > It is unclear to me how these clang changes benefit those users.
+> > > >
+> > > > If you're referring to
+> > > > https://www.spinics.net/lists/stable/msg278381.html, that's fair (I
+> > > > think those were helpful for LLD support on arm64).
+> > > >
+> > > > Why didn't you speak up then?  Why is this coming up now?
+> > >
+> > > That is just one example, and I failed to realise it at the time.
+> > >
+> > > I think the Clang/LLVM work you are doing is very important, but I
+> > > simply don't think any of it belongs in -stable kernels.
+> >
+> > OK, to clarify my position:
+> >
+> > I have no problem whatsoever with taking this patch into v5.x, so
+> >
+> > Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >
+> > but going forward, I will push back on -stable backports for
+> > Clang/LLVM specific changes, since they are obviously in violation of
+> > the stable kernel rules.
+>
+> Getting older kernels to build/run properly on newer compilers is just a
+> part of life for the stable trees.  If you note, we have done a lot of
+> gcc7, then gcc8, and clang patches backported over the years in order to
+> make it possible for people (like me and my testing infrastructure at
+> the least) to keep building these old kernels on newer systems.
+>
+> So while it's not part of the "documented" rules, I do take this type of
+> change, as it does help out a huge population of users and testers.
+>
 
-Can I apply this series to my pci/endpoint branch (where I queued
-Kishon's EP features rework patches) ? Can you check please ?
-
-Thanks,
-Lorenzo
-
->  drivers/pci/controller/dwc/Makefile            |    2 +-
->  drivers/pci/controller/dwc/pci-layerscape-ep.c |  157 ++++++++++++++++++++++++
->  2 files changed, 158 insertions(+), 1 deletions(-)
->  create mode 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
-> 
-> diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
-> index 7bcdcdf..b5f3b83 100644
-> --- a/drivers/pci/controller/dwc/Makefile
-> +++ b/drivers/pci/controller/dwc/Makefile
-> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
->  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
->  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone.o
-> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
-> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
->  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
->  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
->  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
-> diff --git a/drivers/pci/controller/dwc/pci-layerscape-ep.c b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-> new file mode 100644
-> index 0000000..ddc2dbb
-> --- /dev/null
-> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
-> @@ -0,0 +1,157 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * PCIe controller EP driver for Freescale Layerscape SoCs
-> + *
-> + * Copyright (C) 2018 NXP Semiconductor.
-> + *
-> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of_pci.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <linux/pci.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/resource.h>
-> +
-> +#include "pcie-designware.h"
-> +
-> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
-> +
-> +struct ls_pcie_ep {
-> +	struct dw_pcie		*pci;
-> +};
-> +
-> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
-> +
-> +static int ls_pcie_establish_link(struct dw_pcie *pci)
-> +{
-> +	return 0;
-> +}
-> +
-> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
-> +	.start_link = ls_pcie_establish_link,
-> +};
-> +
-> +static const struct of_device_id ls_pcie_ep_of_match[] = {
-> +	{ .compatible = "fsl,ls-pcie-ep",},
-> +	{ },
-> +};
-> +
-> +static const struct pci_epc_features ls_pcie_epc_features = {
-> +	.linkup_notifier = false,
-> +	.msi_capable = true,
-> +	.msix_capable = false,
-> +};
-> +
-> +static const struct pci_epc_features*
-> +ls_pcie_ep_get_features(struct dw_pcie_ep *ep)
-> +{
-> +	return &ls_pcie_epc_features;
-> +}
-> +
-> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep)
-> +{
-> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-> +	struct pci_epc *epc = ep->epc;
-> +	enum pci_barno bar;
-> +
-> +	for (bar = BAR_0; bar <= BAR_5; bar++)
-> +		dw_pcie_ep_reset_bar(pci, bar);
-> +}
-> +
-> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
-> +				  enum pci_epc_irq_type type, u16 interrupt_num)
-> +{
-> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
-> +
-> +	switch (type) {
-> +	case PCI_EPC_IRQ_LEGACY:
-> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
-> +	case PCI_EPC_IRQ_MSI:
-> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
-> +	case PCI_EPC_IRQ_MSIX:
-> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
-> +	default:
-> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static struct dw_pcie_ep_ops pcie_ep_ops = {
-> +	.ep_init = ls_pcie_ep_init,
-> +	.raise_irq = ls_pcie_ep_raise_irq,
-> +	.get_features = ls_pcie_ep_get_features,
-> +};
-> +
-> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
-> +					struct platform_device *pdev)
-> +{
-> +	struct dw_pcie *pci = pcie->pci;
-> +	struct device *dev = pci->dev;
-> +	struct dw_pcie_ep *ep;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	ep = &pci->ep;
-> +	ep->ops = &pcie_ep_ops;
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
-> +	if (!res)
-> +		return -EINVAL;
-> +
-> +	ep->phys_base = res->start;
-> +	ep->addr_size = resource_size(res);
-> +
-> +	ret = dw_pcie_ep_init(ep);
-> +	if (ret) {
-> +		dev_err(dev, "failed to initialize endpoint\n");
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int __init ls_pcie_ep_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct dw_pcie *pci;
-> +	struct ls_pcie_ep *pcie;
-> +	struct resource *dbi_base;
-> +	int ret;
-> +
-> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-> +	if (!pcie)
-> +		return -ENOMEM;
-> +
-> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-> +	if (!pci)
-> +		return -ENOMEM;
-> +
-> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
-> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
-> +	if (IS_ERR(pci->dbi_base))
-> +		return PTR_ERR(pci->dbi_base);
-> +
-> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
-> +	pci->dev = dev;
-> +	pci->ops = &ls_pcie_ep_ops;
-> +	pcie->pci = pci;
-> +
-> +	platform_set_drvdata(pdev, pcie);
-> +
-> +	ret = ls_add_pcie_ep(pcie, pdev);
-> +
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver ls_pcie_ep_driver = {
-> +	.driver = {
-> +		.name = "layerscape-pcie-ep",
-> +		.of_match_table = ls_pcie_ep_of_match,
-> +		.suppress_bind_attrs = true,
-> +	},
-> +};
-> +builtin_platform_driver_probe(ls_pcie_ep_driver, ls_pcie_ep_probe);
-> -- 
-> 1.7.1
-> 
+That doesn't make a lot of sense to me, but that is the common
+practice, then I won't object any longer.
 
 _______________________________________________
 linux-arm-kernel mailing list
