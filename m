@@ -2,21 +2,22 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74AEFC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:15:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4965C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:16:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4975D21848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:15:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68D1721848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:16:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tGDUsnep"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4975D21848
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FeKoSNbI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68D1721848
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,40 +25,49 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jZsTpB4SSG6ctrWOjwA5TO7nHla9xNHv0BsRTO8uaWs=; b=tGDUsnepgCjuJ9
-	R6J7F2TnEPjnKNDKR9ob9LL1z5maFSkjWp2f4APlflJo+AsyXnIezzx/UCFBME8sfeqeXdBbf+tJD
-	aJLoLAxkbOQQH9Qn+k7gAvfavybOc6HIXiDUU8cWarhkBmO0hYqe7O5/mhLzq7GTjmswqvHj/3wP9
-	YvfOF5iTIhCA1zjXPTLdU1uIVmvrsftx9acudr40qsy6ZzO7pSfcR4C6Ncy4VVoL/NFmAB1fTJZ6F
-	TrbYmpjn99U7NfnHgQWrDi6Cw248lP1ljUdgzxeg0pVqoD5u+0lR/ZsITxsfdafShdSFqB5YuP2Wa
-	Zgb5sDR4edNc8s65LotA==;
+	List-Owner; bh=17LmNcKBsZVDbxyXj7HfiuQJjdASSwFmJxyVCgyUUGA=; b=FeKoSNbIQTspi4
+	AvGuhOkFx+s4c7DECNUEELeBMhVP9f8D64TZp2JQsoEp5ezUmZtFHBL5QM7hiplbSaqUTjQIbb7/L
+	F+6oFiaXiiIFzFPD4+MrOI6MLcHxP6ldVXueWIhwM0v0S0jdZqSoe3o7yCejypVFuENlDBsi9+gJU
+	TFRgT3dheUlsFH7kOexGyBxvTg73Wf8PP1oz+fyHBBslJL2G3kPgqYBsnMJ4vSxuXzqawxlZmgp4N
+	E3i7fjng/+gpZZiuqjlfJWLWdDcpO5+BtRT6vuXQqP5thjKnR5g7CIeznPBxZ7aadilX+Pcx4jvKI
+	EYL+8P1mYiK5Zv0iB1vQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1Uz-0007ee-1s; Tue, 19 Feb 2019 09:15:33 +0000
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=hirez.programming.kicks-ass.net)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1Ut-0007a9-OW; Tue, 19 Feb 2019 09:15:27 +0000
-Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
- id 04640286C98DE; Tue, 19 Feb 2019 10:15:26 +0100 (CET)
-Date: Tue, 19 Feb 2019 10:15:25 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Linus Torvalds <torvalds@linux-foundation.org>
-Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
-Message-ID: <20190219091525.GX32494@hirez.programming.kicks-ass.net>
-References: <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
- <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
- <20190213222146.GC32494@hirez.programming.kicks-ass.net>
- <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
- <20190214101429.GD32494@hirez.programming.kicks-ass.net>
- <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
+	id 1gw1VT-00082k-Oo; Tue, 19 Feb 2019 09:16:03 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw1Uu-0007ac-DD
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:15:34 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gw1Un-00072b-Av; Tue, 19 Feb 2019 10:15:21 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gw1Um-0005tF-Gi; Tue, 19 Feb 2019 10:15:20 +0100
+Date: Tue, 19 Feb 2019 10:15:20 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Claudiu.Beznea@microchip.com
+Subject: Re: [PATCH 2/4] pwm: atmel: add support for controllers with 32 bit
+ counters
+Message-ID: <20190219091520.4s3hafqxkszmhme2@pengutronix.de>
+References: <1548073783-22640-1-git-send-email-claudiu.beznea@microchip.com>
+ <1548073783-22640-3-git-send-email-claudiu.beznea@microchip.com>
+ <20190219074246.kcdbd5nhf43yw5ax@pengutronix.de>
+ <e08cbcb2-4e37-4a2e-ea79-021a2c7a25d6@microchip.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <e08cbcb2-4e37-4a2e-ea79-021a2c7a25d6@microchip.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190219_011528_795070_ABEE1E7E 
+X-CRM114-Status: GOOD (  21.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,37 +79,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Poimboeuf <jpoimboe@redhat.com>, Denys Vlasenko <dvlasenk@redhat.com>,
- Brian Gerst <brgerst@gmail.com>, Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
- Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- "H. Peter Anvin" <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, linux-pwm@vger.kernel.org,
+ alexandre.belloni@bootlin.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 04:24:30PM -0800, Linus Torvalds wrote:
-> On Mon, Feb 18, 2019 at 2:31 PM H. Peter Anvin <hpa@zytor.com> wrote:
-> >
-> > The question is what "fix it" means. I'm really concerned about AC escapes,
-> > and everyone else should be, too.
-> 
-> I do think that it might be the right thing to do to add some kind of
-> WARN_ON_ONCE() for AC being set in various can-reschedule situations.
+On Tue, Feb 19, 2019 at 08:57:04AM +0000, Claudiu.Beznea@microchip.com wrot=
+e:
+> =
 
-So I disagree.
+> =
 
-Either we set AC with preempt disabled, and then we don't need an extra
-warning, because we already have a warning about scheduling with
-preemption disabled, or we accept that the fault handler can run.
+> On 19.02.2019 09:42, Uwe Kleine-K=F6nig wrote:
+> > Hello Claudiu,
+> > =
 
+> > On Mon, Jan 21, 2019 at 12:30:53PM +0000, Claudiu.Beznea@microchip.com =
+wrote:
+> >> From: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >>
+> >> New SAM9X60's PWM controller use 32 bits counters thus it could genera=
+te
+> >> signals with higher period and duty cycles. Update the current driver
+> >> to work with old controller (that uses 16 bits counters) and with the
+> >> new SAM9X60's controller.
+> >>
+> >> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> >> ---
+> >>  drivers/pwm/pwm-atmel.c | 38 +++++++++++++++++++++++++++-----------
+> >>  1 file changed, 27 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> >> index 7e86a5266eb6..44f4a1c9f60b 100644
+> >> --- a/drivers/pwm/pwm-atmel.c
+> >> +++ b/drivers/pwm/pwm-atmel.c
+> >> @@ -48,15 +48,15 @@
+> >>  #define PWMV2_CPRD		0x0C
+> >>  #define PWMV2_CPRDUPD		0x10
+> >>  =
 
+> >> -/*
+> >> - * Max value for duty and period
+> >> - *
+> >> - * Although the duty and period register is 32 bit,
+> >> - * however only the LSB 16 bits are significant.
+> >> - */
+> >> -#define PWM_MAX_DTY		0xFFFF
+> >> -#define PWM_MAX_PRD		0xFFFF
+> >> -#define PRD_MAX_PRES		10
+> >> +/* Max values for period and prescaler */
+> >> +
+> >> +/* Only the LSB 16 bits are significant. */
+> >> +#define PWM_MAXV1_PRD		0xFFFF
+> >> +
+> >> +/* All 32 bits are significant. */
+> >> +#define PWM_MAXV2_PRD		0xFFFFFFFF
+> > =
+
+> > This symbol is unused, so I wonder if the patch really does what the
+> > commit log promises.
+> =
+
+> It is only of SAM9X60's PWM. Please check patch 3/4. Maybe I should have
+> been introduced it in there. If you consider it is better to be introduced
+> in patch 3/4 please let me know.
+
+Yeah, I think cpp symbols should be introduced with their first user.
+And then the commit log should read something like:
+
+	New SAM9X60's PWM controller use 32 bits counters thus it could
+	generate signals with higher period and duty cycles compared to
+	the already supported implementations that only have 16 bit
+	counters. Update the driver to handle counter width depending on
+	compatible data. Semantically this is a no-op but it's used in
+	the next patch to add support for SAM9X60.
+
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
