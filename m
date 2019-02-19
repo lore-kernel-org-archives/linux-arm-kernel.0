@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E31C6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:30:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2D81C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:33:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B68472147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:30:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 98CA92147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:33:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ApXuDAVi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B68472147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QTLEwKap"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 98CA92147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lip6.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,37 +24,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
 	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qBoSIXU5Q8YvTHapmWJwnSiCBXZ71bW9+20Q0OzF7t8=; b=ApXuDAVi+5p8VZ
-	KXeGXFFRqGoCKP0Zyr/HI91Rfx6NzWyUlOdwSy6ZDbk94GGgmpIGIo6XoYe0sbLmkmwayZauBPoYR
-	gHF7GRtI3KCQ6z5pCl/v7Sx+THIpEU2mxPW1czrKwAOGX2YZumqQl+x2W6cp0CBmdiulFDOzUprql
-	26NyyIMM1IWeaSIO6iyoMd1CrjAV0/JGe7NbokWu2iYTkaRygzpEImCaKdiN4ltqjGRYegqb71BU+
-	BL0CwfiKHuxjkAFDw0nQ9ctfOE9Ie5pw/NG8ZnCMMpd2CrfVKgrZFvUKZdRVF3MrKhZ2a8Y4ZEAXs
-	SqxqZvswd3So0wfKI34w==;
+	List-Owner; bh=v8OQQ29CuLPDt6GhbpK0AnDKjLhQl1t//J6cpxabZE8=; b=QTLEwKapDLQt3P
+	BzzGba0J71ZDF4BeTqtkY6ZmmCSCBIGxTKmHVuyrZr84SMMhuMK/0NS7H0tkVfLYFRvC2kw8+VBA5
+	Y9PuQJb+enOtdRDhqAhCtgB2I9lxvF17X2WDIofmjDHJd2dstZDTSEScgpEnPoWiDJfJbwhrgx4Rm
+	YnpFzNP4RxpbU0gpTVznFtfgsFCAI0xG48xmlBLyiuV311rqTaEC8sHw5LlHhdgWIBth11G9Dng3q
+	QUGPnyE9ExKq0yYD1uepxnJt8zUz6nn15MF0FfKMg1cbHP6ZQP+oAhFAznjmbYu14z9rj3ASQuNpN
+	mv3H5Y5LF5MdrdP8uDNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw9Dv-00061J-3y; Tue, 19 Feb 2019 17:30:27 +0000
-Received: from mail3-relais-sop.national.inria.fr ([192.134.164.104])
+	id 1gw9Gt-0006N6-Ql; Tue, 19 Feb 2019 17:33:31 +0000
+Received: from mail2-relais-roc.national.inria.fr ([192.134.164.83])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw9Dq-00060S-Jw
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 17:30:24 +0000
-X-IronPort-AV: E=Sophos;i="5.58,388,1544482800"; d="scan'208";a="296689475"
+ id 1gw9Gp-0006MK-Vb
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 17:33:29 +0000
+X-IronPort-AV: E=Sophos;i="5.58,388,1544482800"; d="scan'208";a="370069650"
 Received: from vaio-julia.rsr.lip6.fr ([132.227.76.33])
- by mail3-relais-sop.national.inria.fr with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 19 Feb 2019 18:30:06 +0100
-Date: Tue, 19 Feb 2019 18:30:03 +0100 (CET)
+ by mail2-relais-roc.national.inria.fr with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 19 Feb 2019 18:33:24 +0100
+Date: Tue, 19 Feb 2019 18:33:22 +0100 (CET)
 From: Julia Lawall <julia.lawall@lip6.fr>
 X-X-Sender: jll@hadrien
 To: Tony Lindgren <tony@atomide.com>
 Subject: Re: [PATCH] arm/mach-omap2/display: fix possible object reference leak
 In-Reply-To: <20190219170516.GL15711@atomide.com>
-Message-ID: <alpine.DEB.2.20.1902191824410.27989@hadrien>
+Message-ID: <alpine.DEB.2.20.1902191830490.27989@hadrien>
 References: <1550071969-86286-1-git-send-email-peng.hao2@zte.com.cn>
  <20190219170516.GL15711@atomide.com>
 User-Agent: Alpine 2.20 (DEB 67 2015-01-07)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_093022_951682_7084A924 
-X-CRM114-Status: GOOD (  22.08  )
+X-CRM114-CacheID: sfid-20190219_093328_291680_D9762F22 
+X-CRM114-Status: GOOD (  19.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,32 +110,19 @@ On Tue, 19 Feb 2019, Tony Lindgren wrote:
 >
 > 	r = of_platform_populate(node, NULL, NULL, &pdev->dev);
 > 	of_node_put(dev_node);
-
-Are these solving the same problems?  The of_node_put looks clearly
-necessary, whether there is a success or failure.  I'm not familiar with
-put_device.  I see that it does a kobject_put, but I don't know what
-happens because of that.  But it looks like an inconsistency that Peng's
-patch only considers the failure case, while your suggestion happens
-always.
-
-I guess Peng's patch is motivated by a Coccinelle script that Wen Yang
-(also from ZTE) has been working on.  Perhaps there is a need to adjust
-what is suggested by that script.
-
-[Wen Yang added to CC]
-
-julia
-
 > 	if (r) {
 > 		...
 > 	}
 >
 > If so, Julia might have a Coccinelle recpipe for it?
->
-> Regards,
->
-> Tony
->
+
+Unfortunately this is not really an ideal case for Coccinelle, because
+node is the result of calling a local function and Coccinelle doesn't by
+default do any interprocedural analysis.  It is possible to write a rule
+that explicitly looks for one function that returns a device node and then
+the pattern of its usage in the caller, though.
+
+julia
 
 _______________________________________________
 linux-arm-kernel mailing list
