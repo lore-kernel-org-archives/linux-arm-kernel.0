@@ -2,71 +2,86 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33A1BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:13:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17C34C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:26:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0107E2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:13:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D7F042147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:26:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZjC4ACfB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0107E2147A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UYHtShgW";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DzKgjW3A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7F042147C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=J+rfTWeks/TAM6Q0OSy+PTIcpGPOW7OH506mFwU/WXE=; b=ZjC4ACfBz8tioM
-	5UT8s4JWhNAtBw5qFFeKt86e7N/NqoRA86niVXqSI299p3Ev/n+rS5zLexJO/j1JKhPX6hfaO9IKr
-	Z6QNUJSYciWAIzLEVyDRHb+dYSy8bsd3diqt3pSJlaQmPnd4JXlc0CnpgCfOStbIUwCxto9wdZ/m2
-	BXuwkurG+/BapxMByuVMzkv150ItwDpT6f9r/TdVLdI66UeO/OOXlL671I3du2a2Ldc4X11/VmhQz
-	+K6XpLcMWUADLGQ2EJhDcYNKEprrUbhwAppy/ad9zZi24HolVivdnJ4qJSezJzv7fR4CgpYGSUjz9
-	AJeII8jekekP0Igu4wSw==;
+	List-Owner; bh=zgbi2E4QvCw+Sociuha4hfrEkbLYfFTRBG6U+N56koA=; b=UYHtShgW5xDUvQ
+	skJ/SEsYa/YMty+5wmn9ClHMhNmVPOE239IjE9Ge7NcN+fUf3hBkAelmPdA3ZvFWDmhHjemRD2DJK
+	a6oineX5y/uEMz8JyJus+8b834mlfFZG3bn1V48pdBZii5aqk3fEOhkpcLwlF2Sfdo2JLr8LQpSNM
+	/wgoG7c6Qc2DWfxlXesFMkRNHGpA4w62R/DRgXFb+jUdK/BTgBoV0sRXhNwIdEuqlyVRFMWD3FE4x
+	YGvorikQuzrjkdeDUa/jvhUbQKRkKE8uZiyq/7wGFREjRfIQuNTv1ujEcWFRiR4KAHGHHDEcMnQcV
+	VhtiBxQXShtCxJjgiG8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwCi4-0003Gi-FY; Tue, 19 Feb 2019 21:13:48 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gwCu9-0007vr-Az; Tue, 19 Feb 2019 21:26:17 +0000
+Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwCi1-0003GF-Al; Tue, 19 Feb 2019 21:13:47 +0000
-X-UUID: c474132f5c9b4773b67b22ee348fdb1b-20190219
-X-UUID: c474132f5c9b4773b67b22ee348fdb1b-20190219
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
- (envelope-from <sean.wang@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 289004711; Tue, 19 Feb 2019 13:13:38 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 13:13:37 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 20 Feb 2019 05:13:22 +0800
-Received: from [172.21.77.33] (172.21.77.33) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 20 Feb 2019 05:13:22 +0800
-Message-ID: <1550610802.8245.1.camel@mtkswgap22>
-Subject: Re: [PATCH 0/6]Bluetooth: mediatek: add support for MediaTek
- MT7663U and MT7668U UART devices
-From: Sean Wang <sean.wang@mediatek.com>
-To: Marcel Holtmann <marcel@holtmann.org>
-Date: Wed, 20 Feb 2019 05:13:22 +0800
-In-Reply-To: <B7EBA86E-B6C2-4301-BA01-004EA83A50A9@holtmann.org>
-References: <cover.1550184473.git.sean.wang@mediatek.com>
- <B7EBA86E-B6C2-4301-BA01-004EA83A50A9@holtmann.org>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gwCu6-0007vP-Ik
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 21:26:16 +0000
+Received: by mail-ot1-x344.google.com with SMTP id 98so36933685oty.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 13:26:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=tShKv+rCj4cb7oTii69qoiNaguPqqY5jERkY1mOdgTM=;
+ b=DzKgjW3Ab2k8LY+wa0b4QdOUykt3EMt1/XZqpstcRerFKA9xBuMKrrdd+72r8XI9yy
+ XaajW+aOFG7XEphSg4WkRmeiQDEwlRp+8RxL1vK0qiSHfOoFgdmKyqJWyMHWNMpAsSIn
+ 81Vp09gttURJG9sFlp8vaFeNp3McRcEgkjVD+BB4b5+nUbu1NKJHmLzaM6Y20eTy2H6x
+ UWHbFbE2tfgCofhy4RE3V/65lx94pbnEnfUaWGMCNtOlqBTyLcurLJ3wTUriODulnw4M
+ 7UV1AtNgTeTLJ8NWMLT5uGj2dx2CHa44rWmMmc5gPnxLbYWIYMogrjB53QcwEsvuZMje
+ 6VmA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=tShKv+rCj4cb7oTii69qoiNaguPqqY5jERkY1mOdgTM=;
+ b=t/K96tCcXa8N2t1h+o6ecSVk+SD2xXpMfAqcOYSsq1m4AaYgeTdJIqorMLAmkzeIjR
+ PQLCnRHWlJYX+FAIGECQYPFruizCUemj6VQuoHOjBO4DHiBfeaD28t7hrKiLUnqpzLJw
+ Dvj7/JcGD7HwZeqpmWbqvL0wo8qyY8Y856B8GLPJFc7AVVO5SPkz4HgRUXDGvpJb0+vw
+ P89pRw+vhsL4LU5d0QXgCOR4Du6sdc4wbqyepj8gT8FRoJGz+u6Xs4+9JtNBPpqV8Hbe
+ tlgLBopluSL0BIrk5ZXxZa4iq54/WE5OHJBrrUNEGgra4JJIvQSIS0THKvryqvntYKwJ
+ D8OQ==
+X-Gm-Message-State: AHQUAuZ6nBkO3R2dFOvvyoOHGjzvmTAovDOlv/oZlsI7bUQy5gkefkJz
+ /rhkKMmqngCoR4NUizT8m2KHnv2jYNwUe5GeI1Q=
+X-Google-Smtp-Source: AHgI3IYscnf3cOH1ASQ/+LIT3zFXVhlWpKS6nUKk00gm3SV0dcsdihIG+KU/oX1k/KU6jcNTU0Z9MvuT4GcWox8Olo8=
+X-Received: by 2002:aca:c142:: with SMTP id r63mr3962109oif.98.1550611573153; 
+ Tue, 19 Feb 2019 13:26:13 -0800 (PST)
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 98A3CAF5D64E85FAF0BAE40E263515CF4456794E36B4038D6C812BCE94E377172000:8
-X-MTK: N
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com>
+ <20190218211035.GA28145@bogus>
+ <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+ <CAL_Jsq+kqFrY3DoHG_TJCCSxVHRkin4OwM+F9qm6W0w5YfjPQQ@mail.gmail.com>
+In-Reply-To: <CAL_Jsq+kqFrY3DoHG_TJCCSxVHRkin4OwM+F9qm6W0w5YfjPQQ@mail.gmail.com>
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Tue, 19 Feb 2019 13:25:46 -0800
+Message-ID: <CA+E=qVf44XBEGHY6NoQZrvkodCs2UX7xFkHZ5vs6A5TCAXr1oA@mail.gmail.com>
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
+To: Rob Herring <robh@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_131345_378787_62730528 
-X-CRM114-Status: GOOD (  16.76  )
+X-CRM114-CacheID: sfid-20190219_132614_651014_F3DE0882 
+X-CRM114-Status: GOOD (  21.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,68 +93,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- Johan Hedberg <johan.hedberg@gmail.com>, linux-kernel@vger.kernel.org,
- linux-bluetooth@vger.kernel.org, robh+dt@kernel.org,
- linux-mediatek@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev <netdev@vger.kernel.org>,
+ Marcel Holtmann <marcel@holtmann.org>,
+ "open list:BLUETOOTH DRIVERS" <linux-bluetooth@vger.kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marcel,
+On Tue, Feb 19, 2019 at 6:14 AM Rob Herring <robh@kernel.org> wrote:
+>
+> On Mon, Feb 18, 2019 at 3:24 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> >
+> > On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
+> > >
+> > > On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+> > > > Add binding document for bluetooth part of RTL8723BS/RTL8723CS
+> > > >
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > ---
+> > > >  .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+> > > >  1 file changed, 35 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > > > new file mode 100644
+> > > > index 000000000000..8357f242ae4c
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+> > > > @@ -0,0 +1,35 @@
+> > > > +RTL8723BS/RTL8723CS Bluetooth
+> > > > +---------------------
+> > > > +
+> > > > +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+> > > > +BT is connected over serial. It speaks H5 protocol with few extra commands
+> > > > +to upload firmware and change module speed.
+> > > > +
+> > > > +Required properties:
+> > > > +
+> > > > + - compatible: should be one of the following:
+> > > > +   * "realtek,rtl8723bs-bt"
+> > > > +   * "realtek,rtl8723cs-bt"
+> > > > +Optional properties:
+> > > > +
+> > > > + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+> > > > + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+> > > > + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+> > > > + - firmware-postfix: firmware postfix to be used for firmware config
+> > >
+> > > How is this used?
+> >
+> > rtl8723bs-bt needs 2 firmware binaries -- one is actual firmware,
+> > another is firmware config which is specific to the board. If
+> > firmware-postfix is specified, driver appends it to the name of config
+> > and requests board-specific config while loading firmware. I.e. if
+> > 'pine64' is specified as firmware-postfix driver will load
+> > rtl8723bs_config-pine64.bin.
+>
+> We already have 'firmware-name' defined and I'd prefer not to have
+> another way to do things. The difference is just you have to give the
+> full filename.
 
-I will follow it up. Thank for your help!
+OK
 
-	Sean
+> Also, on other chips with board specific config blobs, there's been
+> some discussion of converting those to DT properties. That depends on
+> you knowing what's in the blob and having a reasonable number of
+> parameter to make properties.
 
+We'd have to RE binary format of this config first.
 
-On Mon, 2019-02-18 at 14:10 +0100, Marcel Holtmann wrote:
-> Hi Sean,
-> 
-> > This adds the support of enabling MT7668U and MT7663U UART based Bluetooth
-> > function running on the top of btmtkuart driver.
-> > 
-> > We are through several patches to reach the goal and also wish applied
-> > the same flow in MediaTek btusb [1] for the transport independence.
-> > Once [1] and the series is being merged and then in next step I will
-> > consider to add a btmtk.c to hold these independent operations among
-> > various transport reused by MediaTek UART, USB and SDIO-based Bluetooth.
-> > 
-> > Firstly,
-> > in patch 1/6 to update the dt-binding document for the kind of devices.
-> > in patch 2/6, 3/6 to fix the common error issues in the current code.
-> > in Patch 4/6, 5/6 to add the general flow which MT7622 and even MT7663U and
-> > MT7668U USB devices also utilize.
-> > 
-> > Finally, in patch 6/6 to add the specific setups for MediaTek UART-based
-> > Bluetooth and enable MT7663U and MT7668U device.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-mediatek/2019-January/017074.html 
-> > 
-> > Sean Wang (6):
-> >  dt-bindings: net: bluetooth: add support for MediaTek MT7663U and
-> >    MT7668U UART devices
-> >  Bluetooth: mediatek: trivial typo fix
-> >  Bluetooth: mediatek: fix up an error path to restore bdev->tx_state
-> >  Bluetooth: mediatek: pass a pointer to mtk_hci_wmt_sync
-> >  Bluetooth: mediatek: update the common setup between MT7622 and other
-> >    devices
-> >  Bluetooth: mediatek: add support for MediaTek MT7663U and MT7668U UART
-> >    devices
-> > 
-> > .../bindings/net/mediatek-bluetooth.txt       |  64 +++
-> > drivers/bluetooth/btmtkuart.c                 | 538 ++++++++++++++++--
-> > 2 files changed, 569 insertions(+), 33 deletions(-)
-> 
-> please re-send 1/6 and 6/6 when the DT changes are ACKed by Rob.
-> 
-> Regards
-> 
-> Marcel
-> 
-
-
+> Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
