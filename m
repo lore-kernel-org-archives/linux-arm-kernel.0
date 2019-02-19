@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 65BF0C10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:04:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20BDBC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:04:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3122F2183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:04:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA28D21738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:04:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gcMqoK1/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="j7EeaW7x"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3122F2183F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WBLIpxxv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Kis3oj3j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA28D21738
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=S5aVYnwoy4WeXXC/kAJ4JvqWsJ8tJX4I3ZTs1/i5Tx4=; b=gcMqoK1/icQAes
-	38RPkxu71gj1EWQBSKNFRt6Qo3OAIOxM0tjtFHwu1ifcBcc6+fjN8LSmu4FNhkbOkzyaLDQAvTcf1
-	xkylD5fOtb52WLPaI3TyJQKVwAqRlN3yT6ZzMJdxaCKZLt4sgyohzoqt0uUo+w8fZyuj4jEXFKHtL
-	S1Sv8JJIJn24bKBURYKIOgGtdUEtjwgGLkzBVzaIQuXzMQYyYAKGAsmcetNDzIPa+POL8FLT87QYB
-	tU24vkao5zpPOzeNKTWkiQtb2hvUXxexdN7aLaXy0rqqRGBr5yHqmCJgMsbunOwi5el3GIl2vaHuc
-	DBKH5Lt92vfm6ubq3/dA==;
+	List-Owner; bh=EYOvOyCpKApWKd0XQW0IpeStcpDXWjbXsPlYu5gc+8A=; b=WBLIpxxvNi6eNE
+	u3xU/V2XLkMANqcorHrqDYzLePltGtw13VtRUxv5AcYhmt1imb6OcLE6cyL2kDMbXLTuglOe1bjmE
+	22iM/+Tln98+mpCy3+KOzwRSc1vDjuRbv7v2tRf0IbkQJyQmZx+XcJvMk7j0yNVz+Zae2QuC8S861
+	gy3L26C2Iwbf9I5X4qlSqCQkOfU76o9RhXhdQ1ICsyV06yPRanc/5wvEJ0dXA3OS34+HBBrW0XqH7
+	Dvl34PB9XyTKiQI4g4prfODRNwMZl0eVEQOgkKmiHZDCsFv5cS7iAHXncB6fxkWyw0mkf1DJwMXhn
+	5bmqBOkin09GPlTtpGHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwBd4-0002tU-MP; Tue, 19 Feb 2019 20:04:34 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gwBdE-00034t-6K; Tue, 19 Feb 2019 20:04:44 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwBco-0002d0-Vo
+ id 1gwBcn-0002cx-Lm
  for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 20:04:21 +0000
-Received: by mail-pf1-x441.google.com with SMTP id n125so3443296pfn.5
+Received: by mail-pl1-x643.google.com with SMTP id y10so10960327plp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 12:04:18 -0800 (PST)
+ Tue, 19 Feb 2019 12:04:17 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=jp5F1KPWJWW598c9kjTLRM3hJfIiNreNpkLqMBLWLxc=;
- b=j7EeaW7xx5pdrl8h3qI/gaSy9x13j2SUiv58eh+Lzn7mlEzP+JjRgZEe3Y2gQiBKtZ
- EqQWvD/mCqfo9Bw8gENUWyEurkocFtx1oOfhg0hqJ+Ha0ppP4F7VkR0fkLa6Md5iZ9gy
- xvdW/FRtssuFz8hkCE2ey2Td2u4KwOcIH+9ERLIXm6XZMWI8MumsDQUXnhHGTzMsESPO
- I3aW6tY6PtsQWXb5RMz/KOskKtoCDatfTfy2SKJDinMCgeLnZi3S7CCqsDahyBmN68A3
- f5LfnDRQpJH+dC7PEv1pk8qzW5pWtFQeZj9HtYkFjBBHN+OSueBS7Er1/69aX8+LIsYY
- YWjw==
+ bh=7zn1Jso68+ps/Kh/7DAZgNR71SoxjfHsFyh8div2Ihs=;
+ b=Kis3oj3jXF0ANwB2G41FeWJeyQ3FdHxBIWM0FTBwP+kFYfsg5shhl/pt+bCNZtts82
+ JXVXQjuk/+GmIT7vIK7jy+DHL2JZ61oN6Oz8gL+iCPMvTkTTiSFi1F8wiNFMriPtSTA0
+ FB4XorGN65UHlmL4APKsDHFzHH22QcpGC5/GSQpWgBk5jJLPv/iSQmJnobB9Mi0izBLQ
+ e+oaJN/yHK2bztEA4p+/bc+FCKisdGIZbFvzhMCjY50Z0qIUquXAifTamgUG0n5HfbAv
+ 3YOl95z1V12U49m2byrz2VuBsP2QarpW6ZngGjosIJzwGXnuzLf2ZAGnh88fsc5Cj+Un
+ 9v8g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=jp5F1KPWJWW598c9kjTLRM3hJfIiNreNpkLqMBLWLxc=;
- b=jKxBykk8APHpWoH2xqYfzI7yU53jQfuPUM4TB4bNuXiPwuAqoltpodTUA0Tqp/9ctr
- 9d+zCchfWKbZhqp5nsaHdIP0BRyZGiEnvbnF2H60jS/8HnxN5W7GhYSduRL5U4S2/pw5
- xlRlNIuv44wjwv0ZO8upFZBciHK/qrOswl9BUTjGeadWp+qT0uoePorCidxEgAl+RhLF
- maDOBOfkXAfi2febPkCYCFDWvQMs/VWzapjCAIJReSTo8gM6WsO7dsKfCAkEDFnhh15I
- AGbWkEmgOMsoS4D1P66FmFUGRysEKFqP/x78RCAwvESYsChF1JXq/xcw4Sr6ite6b8XV
- XljA==
-X-Gm-Message-State: AHQUAuZUiMYQ3wmkN0GZYtqLBomfYQf8pOZuI7cOo6RJR2fvK0epgD4N
- uNLd4YVhWy+sKm9WM2Msf2g=
-X-Google-Smtp-Source: AHgI3IYggCXb4ggn0uNchQ1s7xq2ZhI++jGaZDTAUqENU/DRFsKCpY7ZpdJ52mJt9s8XPDcEWcITKw==
-X-Received: by 2002:a62:6e07:: with SMTP id j7mr31841489pfc.135.1550606658265; 
- Tue, 19 Feb 2019 12:04:18 -0800 (PST)
+ bh=7zn1Jso68+ps/Kh/7DAZgNR71SoxjfHsFyh8div2Ihs=;
+ b=EpJrIlXnrID9Dy92hfabJCTHr5baBcQOm9TwxwoANa5pw62EQM3gtkyg3jWQnb2zUS
+ e3ZoZtJppPPBEnsbFWw9ImPavJrGLcLKflceVY2f1oRCFMMQtHl9yH8G2ODmislFVEcb
+ rJdgeBbkgyblSJzvX2fOKwYPrnVJzkKEyxWoJUwrBwMHU0TZVKhHkqCf9Lmwdn4z2GPO
+ 2KDSMU1AU8dolWd49WTR5xhYIsq7PZuLzIokpcf9hw+WBBnkGY+hblTQbGtaefDZxWQC
+ S+oeNKKo71csKzQvEPFKqoK+3qsMHCct7B2OnmDd1m2IuZuRiO4OmRNbAd95FWg2oNdY
+ zQBg==
+X-Gm-Message-State: AHQUAuZHELrTu2ibTD/nEAXhdHcNZOvJ3Y5KnFALS5/CrBSr1AY3Ofna
+ m0/CF2ZnqaX+M2dth/tTx7w=
+X-Google-Smtp-Source: AHgI3IbRI7q9KYAp9AZ8+6shmYkfxaKhV7eDpmJIN3SeblXin+Rif0oznINJYKHkn6jfsdsfVIvo8g==
+X-Received: by 2002:a17:902:e409:: with SMTP id
+ ci9mr9313567plb.221.1550606656725; 
+ Tue, 19 Feb 2019 12:04:16 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id e63sm31519622pfc.47.2019.02.19.12.04.16
+ by smtp.gmail.com with ESMTPSA id e63sm31519622pfc.47.2019.02.19.12.04.14
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 19 Feb 2019 12:04:17 -0800 (PST)
+ Tue, 19 Feb 2019 12:04:15 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: [PATCH 3/5] PCI: dwc: Make use of BIT() in constant definitions
-Date: Tue, 19 Feb 2019 12:02:40 -0800
-Message-Id: <20190219200242.17243-4-andrew.smirnov@gmail.com>
+Subject: [PATCH 2/5] PCI: dwc: Share code for dw_pcie_rd/wr_other_conf()
+Date: Tue, 19 Feb 2019 12:02:39 -0800
+Message-Id: <20190219200242.17243-3-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190219200242.17243-1-andrew.smirnov@gmail.com>
 References: <20190219200242.17243-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_120420_029993_82D346F5 
-X-CRM114-Status: GOOD (  11.09  )
+X-CRM114-CacheID: sfid-20190219_120419_971419_BF49CC93 
+X-CRM114-Status: GOOD (  14.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,8 +110,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Avoid using explicit left shifts and convert various definitions to
-use BIT() instead. No functional change intended.
+Default implementation of pcie_rd_other_conf() and
+dw_pcie_wd_other_conf() share more than 80% of their code. Move shared
+code into a dedicated subroutine and convert pcie_rd_other_conf() and
+dw_pcie_wd_other_conf() to use it. No functional change intended.
 
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 Acked-by: Gustavo Pimentel <gustavo.pimentel@synopsys.com>
@@ -127,76 +130,107 @@ Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 Cc: linux-pci@vger.kernel.org
 ---
- drivers/pci/controller/dwc/pcie-designware.c |  2 +-
- drivers/pci/controller/dwc/pcie-designware.h | 14 +++++++-------
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ .../pci/controller/dwc/pcie-designware-host.c | 61 +++++++------------
+ 1 file changed, 23 insertions(+), 38 deletions(-)
 
-diff --git a/drivers/pci/controller/dwc/pcie-designware.c b/drivers/pci/controller/dwc/pcie-designware.c
-index 67236379c61a..31f6331ca46f 100644
---- a/drivers/pci/controller/dwc/pcie-designware.c
-+++ b/drivers/pci/controller/dwc/pcie-designware.c
-@@ -306,7 +306,7 @@ void dw_pcie_disable_atu(struct dw_pcie *pci, int index,
- 	}
- 
- 	dw_pcie_writel_dbi(pci, PCIE_ATU_VIEWPORT, region | index);
--	dw_pcie_writel_dbi(pci, PCIE_ATU_CR2, ~PCIE_ATU_ENABLE);
-+	dw_pcie_writel_dbi(pci, PCIE_ATU_CR2, (u32)~PCIE_ATU_ENABLE);
+diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
+index 45ff5e4f8af6..0c18ab63811f 100644
+--- a/drivers/pci/controller/dwc/pcie-designware-host.c
++++ b/drivers/pci/controller/dwc/pcie-designware-host.c
+@@ -512,8 +512,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	return ret;
  }
  
- int dw_pcie_wait_for_link(struct dw_pcie *pci)
-diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
-index 279000255ad1..070382869685 100644
---- a/drivers/pci/controller/dwc/pcie-designware.h
-+++ b/drivers/pci/controller/dwc/pcie-designware.h
-@@ -41,7 +41,7 @@
- #define PORT_LOGIC_LTSSM_STATE_L0	0x11
+-static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+-				 u32 devfn, int where, int size, u32 *val)
++static int dw_pcie_access_other_conf(struct pcie_port *pp, struct pci_bus *bus,
++				     u32 devfn, int where, int size, u32 *val,
++				     bool write)
+ {
+ 	int ret, type;
+ 	u32 busdev, cfg_size;
+@@ -521,9 +522,6 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 	void __iomem *va_cfg_base;
+ 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
  
- #define PCIE_LINK_WIDTH_SPEED_CONTROL	0x80C
--#define PORT_LOGIC_SPEED_CHANGE		(0x1 << 17)
-+#define PORT_LOGIC_SPEED_CHANGE		BIT(17)
- #define PORT_LOGIC_LINK_WIDTH_MASK	(0x1f << 8)
- #define PORT_LOGIC_LINK_WIDTH_1_LANES	(0x1 << 8)
- #define PORT_LOGIC_LINK_WIDTH_2_LANES	(0x2 << 8)
-@@ -55,8 +55,8 @@
- #define PCIE_MSI_INTR0_STATUS		0x830
+-	if (pp->ops->rd_other_conf)
+-		return pp->ops->rd_other_conf(pp, bus, devfn, where, size, val);
+-
+ 	busdev = PCIE_ATU_BUS(bus->number) | PCIE_ATU_DEV(PCI_SLOT(devfn)) |
+ 		 PCIE_ATU_FUNC(PCI_FUNC(devfn));
  
- #define PCIE_ATU_VIEWPORT		0x900
--#define PCIE_ATU_REGION_INBOUND		(0x1 << 31)
--#define PCIE_ATU_REGION_OUTBOUND	(0x0 << 31)
-+#define PCIE_ATU_REGION_INBOUND		BIT(31)
-+#define PCIE_ATU_REGION_OUTBOUND	0
- #define PCIE_ATU_REGION_INDEX2		(0x2 << 0)
- #define PCIE_ATU_REGION_INDEX1		(0x1 << 0)
- #define PCIE_ATU_REGION_INDEX0		(0x0 << 0)
-@@ -66,8 +66,8 @@
- #define PCIE_ATU_TYPE_CFG0		(0x4 << 0)
- #define PCIE_ATU_TYPE_CFG1		(0x5 << 0)
- #define PCIE_ATU_CR2			0x908
--#define PCIE_ATU_ENABLE			(0x1 << 31)
--#define PCIE_ATU_BAR_MODE_ENABLE	(0x1 << 30)
-+#define PCIE_ATU_ENABLE			BIT(31)
-+#define PCIE_ATU_BAR_MODE_ENABLE	BIT(30)
- #define PCIE_ATU_LOWER_BASE		0x90C
- #define PCIE_ATU_UPPER_BASE		0x910
- #define PCIE_ATU_LIMIT			0x914
-@@ -78,7 +78,7 @@
- #define PCIE_ATU_UPPER_TARGET		0x91C
+@@ -542,7 +540,11 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+ 				  type, cpu_addr,
+ 				  busdev, cfg_size);
+-	ret = dw_pcie_read(va_cfg_base + where, size, val);
++	if (write)
++		ret = dw_pcie_write(va_cfg_base + where, size, *val);
++	else
++		ret = dw_pcie_read(va_cfg_base + where, size, val);
++
+ 	if (pci->num_viewport <= 2)
+ 		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+ 					  PCIE_ATU_TYPE_IO, pp->io_base,
+@@ -551,43 +553,26 @@ static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 	return ret;
+ }
  
- #define PCIE_MISC_CONTROL_1_OFF		0x8BC
--#define PCIE_DBI_RO_WR_EN		(0x1 << 0)
-+#define PCIE_DBI_RO_WR_EN		BIT(0)
++static int dw_pcie_rd_other_conf(struct pcie_port *pp, struct pci_bus *bus,
++				 u32 devfn, int where, int size, u32 *val)
++{
++	if (pp->ops->rd_other_conf)
++		return pp->ops->rd_other_conf(pp, bus, devfn, where,
++					      size, val);
++
++	return dw_pcie_access_other_conf(pp, bus, devfn, where, size, val,
++					 false);
++}
++
+ static int dw_pcie_wr_other_conf(struct pcie_port *pp, struct pci_bus *bus,
+ 				 u32 devfn, int where, int size, u32 val)
+ {
+-	int ret, type;
+-	u32 busdev, cfg_size;
+-	u64 cpu_addr;
+-	void __iomem *va_cfg_base;
+-	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+-
+ 	if (pp->ops->wr_other_conf)
+-		return pp->ops->wr_other_conf(pp, bus, devfn, where, size, val);
+-
+-	busdev = PCIE_ATU_BUS(bus->number) | PCIE_ATU_DEV(PCI_SLOT(devfn)) |
+-		 PCIE_ATU_FUNC(PCI_FUNC(devfn));
++		return pp->ops->wr_other_conf(pp, bus, devfn, where,
++					      size, val);
  
- /*
-  * iATU Unroll-specific register definitions
-@@ -105,7 +105,7 @@
- 		((region) << 9)
+-	if (bus->parent->number == pp->root_bus_nr) {
+-		type = PCIE_ATU_TYPE_CFG0;
+-		cpu_addr = pp->cfg0_base;
+-		cfg_size = pp->cfg0_size;
+-		va_cfg_base = pp->va_cfg0_base;
+-	} else {
+-		type = PCIE_ATU_TYPE_CFG1;
+-		cpu_addr = pp->cfg1_base;
+-		cfg_size = pp->cfg1_size;
+-		va_cfg_base = pp->va_cfg1_base;
+-	}
+-
+-	dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+-				  type, cpu_addr,
+-				  busdev, cfg_size);
+-	ret = dw_pcie_write(va_cfg_base + where, size, val);
+-	if (pci->num_viewport <= 2)
+-		dw_pcie_prog_outbound_atu(pci, PCIE_ATU_REGION_INDEX1,
+-					  PCIE_ATU_TYPE_IO, pp->io_base,
+-					  pp->io_bus_addr, pp->io_size);
+-
+-	return ret;
++	return dw_pcie_access_other_conf(pp, bus, devfn, where, size, &val,
++					 true);
+ }
  
- #define PCIE_GET_ATU_INB_UNR_REG_OFFSET(region) \
--		(((region) << 9) | (0x1 << 8))
-+		(((region) << 9) | BIT(8))
- 
- #define MAX_MSI_IRQS			256
- #define MAX_MSI_IRQS_PER_CTRL		32
+ static int dw_pcie_valid_device(struct pcie_port *pp, struct pci_bus *bus,
 -- 
 2.20.1
 
