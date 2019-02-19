@@ -2,120 +2,63 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 95B55C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:09:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CB37FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:10:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FD1F2146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:09:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 87CEC2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:10:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qv7bhlX8";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=davidjohnsummers.uk header.i=@davidjohnsummers.uk header.b="2elFioHm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FD1F2146F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BKtA2UES"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 87CEC2146F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=iIsdk8/mOiZh0E2SD0Fx6YjjnA8mi0qn96m8A25c1xU=; b=qv7bhlX8moOW3j8zMRE77QdMF
-	dvCjO8i3rlUGISmonhzRM+guhSGh7TCILUlHXlleW0eZgTnpzValp7pcrpUXk5Y+Qs/Nwc3rlyZg3
-	lmxCzbtL1y5mIti5zlUSZrDHBtermhYvQBmjLfsSQl5+7ByhoY7qqZDrt95zO7+L7g2F3o4iLutUS
-	3i4r7/6ZEZfwuF1dOiMsR52c4UNGxvMCAK4gojIP0SVjQBa5oBJhF7lwMUjdhSEV4h2NIN8f36hnn
-	qMipcC66L9k8ce4tu9za2WabqqeRdFfLMwoRxmdiUFLHC4X3hqyHldJewa8oSCDEb1HSkgjwEiKfM
-	eKiPmpXsQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=NbLxeFXQXdcceVcW9sK8snYtcIxUdmURaGabxnNQcFM=; b=BKt
+	A2UESFu/a7BWvTqHx6Qr6gddNyVgROHLk5+eJXnEyxQ9+sGS96tA9XVZC56HaVa7AYFyBjepOvuqn
+	1NeX6+imqcxPWr/Z5qqDWf0/FGBleeluG2QzGfHw3ElKSz+AklhOxGdnEG6bvTlzLeF1JDieZ77Q3
+	CGRLPRtQki4GJL14/2evelaju2JJSchY2VxEzoax1ylWA6j3wvPMbCON/xVtMbFrKPJXF1vQQsv41
+	11tqGqfEXiJkzcP6g6Br7Xsv0HSBK1+MbaJWIqmYd0F/a2IEbwdzQMXMftWPLdzJGIDwpSS1COV4h
+	sLDeGHRzS5MxPVEFmCXphEQJWC0XT3w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwCdu-0001JS-Rm; Tue, 19 Feb 2019 21:09:30 +0000
-Received: from mail-gw.thundercloud.uk ([149.255.60.88])
+	id 1gwCeN-0001Yd-F4; Tue, 19 Feb 2019 21:09:59 +0000
+Received: from inva020.nxp.com ([92.121.34.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwCdr-0001J3-Dy
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 21:09:29 +0000
-Received: from mailbsf01.thundercloud.uk (mail-gw.thundercloud.uk
- [149.255.60.72])
- by mail-gw.thundercloud.uk (Postfix) with ESMTPS id C549162A77C2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 21:09:25 +0000 (GMT)
-X-ASG-Debug-ID: 1550610563-05541312653109a0001-tbGyMd
-Received: from cloud706.unlimitedwebhosting.co.uk (no-dns-yet.unlimited.uk.net
- [149.255.62.7]) by mailbsf01.thundercloud.uk with ESMTP id PiPKd6rm7cMTKc7b
- (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO) for
- <linux-arm-kernel@lists.infradead.org>; Tue, 19 Feb 2019 21:09:23 +0000 (GMT)
-X-Barracuda-Envelope-From: beagleboard@davidjohnsummers.uk
-X-Barracuda-Effective-Source-IP: no-dns-yet.unlimited.uk.net[149.255.62.7]
-X-Barracuda-Apparent-Source-IP: 149.255.62.7
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=davidjohnsummers.uk; s=default; h=Content-Transfer-Encoding:Content-Type:
- In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=q0ySjtH8j43IV9rMNu6araMj86TY/R79rsof0VLvboQ=; b=2elFioHmdMd+QNe0H8MA4XBc8h
- PUVK8uihwM+t5Uf0Y4P28yaUc/2z6zBz53xSTerUMxLAeNVGeu9s1BvilNppsGyQyHbKD1uWJd2mA
- +H04xrDG4CR7X3dqdKBI+xmKfHgN2HzQo16446+ljXYDI6EE50J9F2gEYputbfbFx+r2FDxR5GeTf
- 0uSEaGOvOFx43WPLMW6U/Rz97DCA4ebjxIWKpgW/xZk39icL3UiFxXmCdNhZ5/e9PbYmmgqcZY2Yu
- Z7/AZYxZhJqnBR2vLF4j0s+nsOh+5NcVx/e3OormKY/hKc4y+DIm5jAcBNhryCU8Pe6FN4MHTeXtF
- vHCPOqlg==;
-Received: from [87.114.170.31] (port=59590 helo=[192.168.2.187])
- by cloud706.unlimitedwebhosting.co.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
- (envelope-from <beagleboard@davidjohnsummers.uk>)
- id 1gwCdm-000L5r-Pf; Tue, 19 Feb 2019 21:09:22 +0000
-Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
-To: Rob Herring <robh@kernel.org>, Vasily Khoruzhick <anarsoul@gmail.com>
-X-ASG-Orig-Subj: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add
- rtl8723bs-bluetooth
-References: <20190118170232.16142-1-anarsoul@gmail.com>
- <20190118170232.16142-4-anarsoul@gmail.com> <20190218211035.GA28145@bogus>
- <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
- <1245842044.588056.1550527701604@email.ionos.de>
- <CA+E=qVdMNmVkytCzXqYgJtV196-G=c_bWx+aLvs=Y0iuRpjdRg@mail.gmail.com>
- <CAL_JsqLROpJMoEPLXaAL_JG1SNufstMDmB4xy_V_p4=duHKPSA@mail.gmail.com>
-From: David Summers <beagleboard@davidjohnsummers.uk>
-Message-ID: <6a26ff97-0b9c-cfdd-9428-74580694220a@davidjohnsummers.uk>
-Date: Tue, 19 Feb 2019 21:09:21 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
-MIME-Version: 1.0
-In-Reply-To: <CAL_JsqLROpJMoEPLXaAL_JG1SNufstMDmB4xy_V_p4=duHKPSA@mail.gmail.com>
-Content-Language: en-PH
-X-AntiAbuse: This header was added to track abuse,
- please include it with any abuse report
-X-AntiAbuse: Primary Hostname - cloud706.unlimitedwebhosting.co.uk
-X-AntiAbuse: Original Domain - lists.infradead.org
-X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
-X-AntiAbuse: Sender Address Domain - davidjohnsummers.uk
-X-Get-Message-Sender-Via: cloud706.unlimitedwebhosting.co.uk: authenticated_id:
- davidjoh/from_h
-X-Authenticated-Sender: cloud706.unlimitedwebhosting.co.uk: beagleboard@davidjohnsummers.uk
-X-Source: 
-X-Source-Args: 
-X-Source-Dir: 
-X-Barracuda-Connect: no-dns-yet.unlimited.uk.net[149.255.62.7]
-X-Barracuda-Start-Time: 1550610563
-X-Barracuda-Encrypted: ECDHE-RSA-AES256-GCM-SHA384
-X-Barracuda-URL: https://149.255.60.72:443/cgi-mod/mark.cgi
-X-Virus-Scanned: by bsmtpd at thundercloud.uk
-X-Barracuda-Scan-Msg-Size: 3136
-X-Barracuda-BRTS-Status: 1
-X-Barracuda-Spam-Score: 0.00
-X-Barracuda-Spam-Status: No, SCORE=0.00 using global scores of TAG_LEVEL=1000.0
- QUARANTINE_LEVEL=1000.0 KILL_LEVEL=2.0 tests=BSF_SC0_MISMATCH_TO
-X-Barracuda-Spam-Report: Code version 3.2, rules version 3.2.3.67592
- Rule breakdown below
- pts rule name              description
- ---- ---------------------- --------------------------------------------------
- 0.00 BSF_SC0_MISMATCH_TO    Envelope rcpt doesn't match header
+ id 1gwCeK-0001YF-Ol
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 21:09:58 +0000
+Received: from inva020.nxp.com (localhost [127.0.0.1])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 0C46C1A0064;
+ Tue, 19 Feb 2019 22:09:55 +0100 (CET)
+Received: from smtp.na-rdc02.nxp.com (inv1260.us-phx01.nxp.com [134.27.49.11])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id C28ED1A011E;
+ Tue, 19 Feb 2019 22:09:54 +0100 (CET)
+Received: from someleo.am.freescale.net (someleo.am.freescale.net
+ [10.81.33.49])
+ by inv1260.us-phx01.nxp.com (Postfix) with ESMTP id EB90340CAF;
+ Tue, 19 Feb 2019 14:09:53 -0700 (MST)
+From: Li Yang <leoyang.li@nxp.com>
+To: arm@kernel.org
+Subject: [GIT PULL] updates to soc/fsl drivers for v5.1 take3
+Date: Tue, 19 Feb 2019 15:09:53 -0600
+Message-Id: <20190219210953.1840-1-leoyang.li@nxp.com>
+X-Mailer: git-send-email 2.17.1
+X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_130927_615707_FCC78406 
-X-CRM114-Status: GOOD (  15.80  )
+X-CRM114-CacheID: sfid-20190219_130956_940832_4DC7D60D 
+X-CRM114-Status: UNSURE (   8.85  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,86 +70,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>, Mark Rutland <mark.rutland@arm.com>,
- Johan Hedberg <johan.hedberg@gmail.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, netdev <netdev@vger.kernel.org>,
- Marcel Holtmann <marcel@holtmann.org>,
- "open list:BLUETOOTH DRIVERS" <linux-bluetooth@vger.kernel.org>,
- Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
- arm-linux <linux-arm-kernel@lists.infradead.org>
+Cc: shawnguo@kernel.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 19/02/2019 14:17, Rob Herring wrote:
-> On Mon, Feb 18, 2019 at 4:28 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> On Mon, Feb 18, 2019 at 2:08 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
->>> Hi Vasily,
->> Hi Stefan,
->>
->>>> Vasily Khoruzhick <anarsoul@gmail.com> hat am 18. Februar 2019 um 22:24 geschrieben:
->>>>
->>>>
->>>> On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
->>>>> On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
->>>>>> Add binding document for bluetooth part of RTL8723BS/RTL8723CS
->>>>>>
->>>>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->>>>>> ---
->>>>>>   .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
->>>>>>   1 file changed, 35 insertions(+)
->>>>>>   create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
->>>>>> new file mode 100644
->>>>>> index 000000000000..8357f242ae4c
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
->>>>>> @@ -0,0 +1,35 @@
->>>>>> +RTL8723BS/RTL8723CS Bluetooth
->>>>>> +---------------------
->>>>>> +
->>>>>> +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
->>>>>> +BT is connected over serial. It speaks H5 protocol with few extra commands
->>>>>> +to upload firmware and change module speed.
->>>>>> +
->>>>>> +Required properties:
->>>>>> +
->>>>>> + - compatible: should be one of the following:
->>>>>> +   * "realtek,rtl8723bs-bt"
->>>>>> +   * "realtek,rtl8723cs-bt"
->>>>>> +Optional properties:
->>>>>> +
->>>>>> + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
->>>>>> + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
->>>>>> + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
->>>>>> + - firmware-postfix: firmware postfix to be used for firmware config
->>> sorry, i didn't noticed your great series before. David and i working at the same stuff but for the Asus Tinker Board.
->>>
->>> I created a similiar yet untested patch version for hci_h5 [1]. Maybe it's useful.
->> Looks good to me, but you may need to add firmware-postfix.
->>
->>> Just a comment about the binding. It's really necessary to add the reset-gpio? Can't we use the enable-gpio with inverse polarity for this?
->> Yes, we can use enable-gpio instead of reset-gpio on pine64 and pinebook.
-> Then why do we have both? Reset and enable are distinct. The inverse
-> of enable-gpios is typically powerdown-gpios, not reset-gpios.
->
-> Rob
+Hi arm-soc maintainers,
 
-Both data sheets that I know:
+Please help to look into the following changes on top of previous
+pull request and merge them if they look good.
 
-http://cit.odessa.ua/media/pdf/Intel-Compute-Stick/FN-Link_F23BDSM25-W1.pdf
-http://files.pine64.org/doc/datasheet/pine64/RTL8723BS.pdf
 
-BT_RST_N BT Reset IN / BT_DIS# General Purpose I/O Pin
+The following changes since commit 3c0d64e867ed78a782a8a00d3b519396d9c5a2db:
 
-So from the datasheet there is only one pin. And from its name it sounds 
-like reset.
+  soc: fsl: guts: reuse machine name from device tree (2019-01-11 16:08:43 -0600)
 
-This said though the datasheets of these Realtek devices are a bit thin ....
+are available in the Git repository at:
 
+  git://git.kernel.org/pub/scm/linux/kernel/git/leo/linux.git tags/soc-fsl-next-v5.1-3
+
+for you to fetch changes up to bd3bd3b36df725645036748e58a8c35c8d2cbf91:
+
+  soc: fsl: dpio: fix memory leak of a struct qbman on error exit path (2019-02-19 14:59:39 -0600)
+
+----------------------------------------------------------------
+NXP/FSL SoC driver updates for v5.1 take3
+
+DPIO driver
+- fixed a use after free problem
+- fixed a memory leak on error path
+
+----------------------------------------------------------------
+Colin Ian King (1):
+      soc: fsl: dpio: fix memory leak of a struct qbman on error exit path
+
+Dan Carpenter (1):
+      soc: fsl: dpio: Use after free in dpaa2_dpio_remove()
+
+ drivers/soc/fsl/dpio/dpio-driver.c  | 2 +-
+ drivers/soc/fsl/dpio/qbman-portal.c | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
