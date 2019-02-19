@@ -2,69 +2,69 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CF43DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 07:39:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F256CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 07:39:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9AF2D20645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 07:39:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C07F120645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 07:39:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ILLJq+Gk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9AF2D20645
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lpXeaeWz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C07F120645
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nPBfH5TnIiV+I/tEOieMQzG9cBFKP7USPRIWan3jZRQ=; b=ILLJq+GkXV8cmO
-	K0H6zsdmL/FTFbxR0LQpqjXGtP9/j+GM4PAIxYIro+MRSIJ1VDM4LRHVIz6c6+C39nxWA+QJwrbIA
-	Fa+5kI0MGrKY0qej30BCfqkj2XL4fZXfbprKla2d2zFK5RteTqoImMtlyFsGbakXVoKShXtvMKU4n
-	qY8gjEjbADkexgpalqaKZlIOcuDCnNldkmzXwh1nEKy36lUT+7xIOtMIVYA3kgaRxRZmCu4oYAWQs
-	aNfUmbQ4P1bcuA/A1MGwAfVOoQMciKFgo4Vd9sSsNF4GC/AsB7ITIQbC1v7pKS2oRrn7MJx3bC5IU
-	ZfVeOK50xUUqqyss17eg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=s1j6+TYaseaBvGjv9Hl07Wrzd8FxxVP1SWQDg/OMJW8=; b=lpXeaeWz4s4cJOxR1X2C4wlOY
+	aVz227zZjVZ5uhXPBZ7dzJZZZP09cXEgxugf9Ckn3CbTt4hLeSq1O6TnRDJ9i3e9i/yhxd9vSQLxU
+	K+jgpW1Ry+vPcsFrp3qhTnLnEXd+v+fL4Eu83UytWLyg4nEYG6oSEjsGYoVPxDJXl1P9njnoYZkaH
+	M+99cz7UN3QjOU3derMSHTbCts72OIl75D2bgKaaaUY7MqhNcmA0fkSl1F81EAcYO6AeFTPDjQwIQ
+	SBO+IApI9BKzgBo2TjSfl/xjGHWy8MOi0a4UqDEvAaY99/fWrKPR5jROMStIFBV9vjZFRXguu1Ujb
+	3nfTrosJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvzzg-0001EV-Q4; Tue, 19 Feb 2019 07:39:08 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvzyO-00087P-Dx; Tue, 19 Feb 2019 07:37:59 +0000
-X-UUID: d0048c77858d4f88a559597d103d419c-20190218
-X-UUID: d0048c77858d4f88a559597d103d419c-20190218
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <min.guo@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 726352409; Mon, 18 Feb 2019 23:37:15 -0800
-Received: from MTKMBS31DR.mediatek.inc (172.27.6.102) by
- MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 18 Feb 2019 23:37:13 -0800
-Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- MTKMBS31DR.mediatek.inc (172.27.6.102) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 15:37:10 +0800
-Received: from localhost.localdomain (10.17.3.153) by mtkcas08.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 19 Feb 2019 15:37:09 +0800
-From: <min.guo@mediatek.com>
-To: Bin Liu <b-liu@ti.com>, Rob Herring <robh+dt@kernel.org>
-Subject: [PATCH v5 6/6] usb: musb: Add support for MediaTek musb controller
-Date: Tue, 19 Feb 2019 15:36:35 +0800
-Message-ID: <1550561795-31132-7-git-send-email-min.guo@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1550561795-31132-1-git-send-email-min.guo@mediatek.com>
-References: <1550561795-31132-1-git-send-email-min.guo@mediatek.com>
+	id 1gvzzr-0001P0-Pm; Tue, 19 Feb 2019 07:39:19 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvzyr-0000Lx-W7
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 07:38:30 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 19 Feb 2019 16:38:17 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 1D9726117D;
+ Tue, 19 Feb 2019 16:38:17 +0900 (JST)
+Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
+ Tue, 19 Feb 2019 16:38:17 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by iyokan.css.socionext.com (Postfix) with ESMTP id 7F4E740340;
+ Tue, 19 Feb 2019 16:38:16 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 5880F121B6C;
+ Tue, 19 Feb 2019 16:38:16 +0900 (JST)
+Subject: Re: [PATCH v2 00/15] Add basic support for Socionext Milbeaut M10V SoC
+To: Arnd Bergmann <arnd@arndb.de>
+References: <1549628687-29628-1-git-send-email-sugaya.taichi@socionext.com>
+ <CAK8P3a3_j2W+KXSynW_SkVZk_+PJ-DqyxjLkgJL-OichS0fwWw@mail.gmail.com>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <26959ef6-bca0-fe51-fc24-9969913e9af4@socionext.com>
+Date: Tue, 19 Feb 2019 16:38:15 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <CAK8P3a3_j2W+KXSynW_SkVZk_+PJ-DqyxjLkgJL-OichS0fwWw@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_233748_914786_5809BABF 
-X-CRM114-Status: GOOD (  21.02  )
+X-CRM114-CacheID: sfid-20190218_233818_583191_F7B8AF26 
+X-CRM114-Status: GOOD (  29.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,731 +76,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Yonglong Wu <yonglong.wu@mediatek.com>, hdegoede@redhat.com, tony@atomide.com,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-usb@vger.kernel.org,
- linux-kernel@vger.kernel.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Alan Stern <stern@rowland.harvard.edu>, Min Guo <min.guo@mediatek.com>,
- chunfeng.yun@mediatek.com, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>, Stephen Boyd <sboyd@kernel.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Russell King <linux@armlinux.org.uk>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, linux-serial@vger.kernel.org,
+ Jiri Slaby <jslaby@suse.com>, Jassi Brar <jaswinder.singh@linaro.org>,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Shinji Kanematsu <kanematsu.shinji@socionext.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Min Guo <min.guo@mediatek.com>
+Hi,
 
-This adds support for MediaTek musb controller in
-host, peripheral and otg mode.
-There are some quirk of MediaTek musb controller, such as:
- -W1C interrupt status registers
- -Private data toggle registers
- -No dedicated DMA interrupt line
+Thank you for your comments.
 
-Signed-off-by: Min Guo <min.guo@mediatek.com>
-Signed-off-by: Yonglong Wu <yonglong.wu@mediatek.com>
----
-changes in v5:
-1. Replace musb_readb() with musb_clearb() to clear common/tx/rx pending interrupts
-2. Make musb_clearb/w() return the value of musb_readb/w()
-3. Add driver to get child nodes of usb connector and extcon device
+On 2019/02/18 21:20, Arnd Bergmann wrote:
+> On Fri, Feb 8, 2019 at 1:24 PM Sugaya Taichi
+> <sugaya.taichi@socionext.com> wrote:
+>>
+>> Hi,
+>>
+>> Here is the series of patches the initial support for SC2000(M10V) of
+>> Milbeaut SoCs. "M10V" is the internal name of SC2000, so commonly used in
+>> source code.
+>>
+>> SC2000 is a SoC of the Milbeaut series. equipped with a DSP optimized for
+>> computer vision. It also features advanced functionalities such as 360-degree,
+>> real-time spherical stitching with multi cameras, image stabilization for
+>> without mechanical gimbals, and rolling shutter correction. More detail is
+>> below:
+>> https://www.socionext.com/en/products/assp/milbeaut/SC2000.html
+>>
+>> Specifications for developers are below:
+>>   - Quad-core 32bit Cortex-A7 on ARMv7-A architecture
+>>   - NEON support
+>>   - DSP
+>>   - GPU
+>>   - MAX 3GB DDR3
+>>   - Cortex-M0 for power control
+>>   - NAND Flash Interface
+>>   - SD UHS-I
+>>   - SD UHS-II
+>>   - SDIO
+>>   - USB2.0 HOST / Device
+>>   - USB3.0 HOST / Device
+>>   - PCI express Gen2
+>>   - Ethernet Engine
+>>   - I2C
+>>   - UART
+>>   - SPI
+>>   - PWM
+>>
+>> Support is quite minimal for now, since it only includes timer, clock,
+>> pictrl and serial controller drivers, so we can only boot to userspace
+>> through initramfs. Support for the other peripherals  will come eventually.
+> 
+> I've looked over the platform once more. Overall, it looks very good, and
+> I'd still like to merge this for linux-5.1, but we are running out of time
+> there. If you send the patches to soc@kernel.org quickly, we can try to
+> still merge them in, but if anything goes wrong, it will have to wait until
+> we start merging patches for 5.2, directly after 5.1 is out.
+> 
 
-changes in v4:
-1. no changes
+I see.
+I do my best to make it.
 
-changes in v3:
-suggested by Bin:
-1. Remove 'u8/u16 data' parameter in clearb/w() hooks
-2. Replace musb_readb/w() with musb_clearb/w() to clear interrupts status
+> I did not look at the device driver patches (clk, clocksource, pinctrl, serial)
+> in much detail. If you have an Ack from the maintainers, feel free to
+> include them in the series, otherwise let's merge the rest now and then
+> you can send the updated patches for inclusion through the subsystem
+> trees in 5.2.
+> 
 
-changes in v2:
-suggested by Bin:
-1. Add summarize of MediaTek musb controller differences in the commit log
-2. Add "|| COMPILE_TEST" in Kconfig
-3. Move MediaTek's private toggle registers from musb_regs.h to mediatek.c
-4. Replace musb_readl() with musb_readw() to read 16bit toggle register
----
- drivers/usb/musb/Kconfig    |   8 +-
- drivers/usb/musb/Makefile   |   1 +
- drivers/usb/musb/mediatek.c | 629 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 637 insertions(+), 1 deletion(-)
- create mode 100644 drivers/usb/musb/mediatek.c
+OK, I'll add the patches with "Acked" or "Reviewed" tag.
 
-diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-index ad08895..b72b7c1 100644
---- a/drivers/usb/musb/Kconfig
-+++ b/drivers/usb/musb/Kconfig
-@@ -115,6 +115,12 @@ config USB_MUSB_JZ4740
- 	depends on USB_MUSB_GADGET
- 	depends on USB_OTG_BLACKLIST_HUB
- 
-+config USB_MUSB_MEDIATEK
-+	tristate "MediaTek platforms"
-+	depends on ARCH_MEDIATEK || COMPILE_TEST
-+	depends on NOP_USB_XCEIV
-+	depends on GENERIC_PHY
-+
- config USB_MUSB_AM335X_CHILD
- 	tristate
- 
-@@ -141,7 +147,7 @@ config USB_UX500_DMA
- 
- config USB_INVENTRA_DMA
- 	bool 'Inventra'
--	depends on USB_MUSB_OMAP2PLUS
-+	depends on USB_MUSB_OMAP2PLUS || USB_MUSB_MEDIATEK
- 	help
- 	  Enable DMA transfers using Mentor's engine.
- 
-diff --git a/drivers/usb/musb/Makefile b/drivers/usb/musb/Makefile
-index 3a88c79..63d82d0 100644
---- a/drivers/usb/musb/Makefile
-+++ b/drivers/usb/musb/Makefile
-@@ -24,6 +24,7 @@ obj-$(CONFIG_USB_MUSB_DA8XX)			+= da8xx.o
- obj-$(CONFIG_USB_MUSB_UX500)			+= ux500.o
- obj-$(CONFIG_USB_MUSB_JZ4740)			+= jz4740.o
- obj-$(CONFIG_USB_MUSB_SUNXI)			+= sunxi.o
-+obj-$(CONFIG_USB_MUSB_MEDIATEK)      		+= mediatek.o
- 
- 
- obj-$(CONFIG_USB_MUSB_AM335X_CHILD)		+= musb_am335x.o
-diff --git a/drivers/usb/musb/mediatek.c b/drivers/usb/musb/mediatek.c
-new file mode 100644
-index 0000000..946b453
---- /dev/null
-+++ b/drivers/usb/musb/mediatek.c
-@@ -0,0 +1,629 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 MediaTek Inc.
-+ *
-+ * Author:
-+ *  Min Guo <min.guo@mediatek.com>
-+ *  Yonglong Wu <yonglong.wu@mediatek.com>
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/usb/usb_phy_generic.h>
-+#include "musb_core.h"
-+#include "musb_dma.h"
-+
-+#define USB_L1INTS	0x00a0
-+#define USB_L1INTM	0x00a4
-+#define MTK_MUSB_TXFUNCADDR	0x0480
-+
-+/* MediaTek controller toggle enable and status reg */
-+#define MUSB_RXTOG		0x80
-+#define MUSB_RXTOGEN		0x82
-+#define MUSB_TXTOG		0x84
-+#define MUSB_TXTOGEN		0x86
-+
-+#define TX_INT_STATUS		BIT(0)
-+#define RX_INT_STATUS		BIT(1)
-+#define USBCOM_INT_STATUS		BIT(2)
-+#define DMA_INT_STATUS		BIT(3)
-+
-+#define DMA_INTR_STATUS_MSK		GENMASK(7, 0)
-+#define DMA_INTR_UNMASK_SET_MSK	GENMASK(31, 24)
-+
-+enum mtk_vbus_id_state {
-+	MTK_ID_FLOAT = 1,
-+	MTK_ID_GROUND,
-+	MTK_VBUS_OFF,
-+	MTK_VBUS_VALID,
-+};
-+
-+struct mtk_glue {
-+	struct device *dev;
-+	struct musb *musb;
-+	struct platform_device *musb_pdev;
-+	struct platform_device *usb_phy;
-+	struct phy *phy;
-+	struct usb_phy *xceiv;
-+	enum phy_mode phy_mode;
-+	struct clk *main;
-+	struct clk *mcu;
-+	struct clk *univpll;
-+	struct regulator *vbus;
-+	struct extcon_dev *edev;
-+	struct notifier_block vbus_nb;
-+	struct notifier_block id_nb;
-+};
-+
-+static int mtk_musb_clks_get(struct mtk_glue *glue)
-+{
-+	struct device *dev = glue->dev;
-+
-+	glue->main = devm_clk_get(dev, "main");
-+	if (IS_ERR(glue->main)) {
-+		dev_err(dev, "fail to get main clock\n");
-+		return PTR_ERR(glue->main);
-+	}
-+
-+	glue->mcu = devm_clk_get(dev, "mcu");
-+	if (IS_ERR(glue->mcu)) {
-+		dev_err(dev, "fail to get mcu clock\n");
-+		return PTR_ERR(glue->mcu);
-+	}
-+
-+	glue->univpll = devm_clk_get(dev, "univpll");
-+	if (IS_ERR(glue->univpll)) {
-+		dev_err(dev, "fail to get univpll clock\n");
-+		return PTR_ERR(glue->univpll);
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_musb_clks_enable(struct mtk_glue *glue)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(glue->main);
-+	if (ret) {
-+		dev_err(glue->dev, "failed to enable main clock\n");
-+		goto err_main_clk;
-+	}
-+
-+	ret = clk_prepare_enable(glue->mcu);
-+	if (ret) {
-+		dev_err(glue->dev, "failed to enable mcu clock\n");
-+		goto err_mcu_clk;
-+	}
-+
-+	ret = clk_prepare_enable(glue->univpll);
-+	if (ret) {
-+		dev_err(glue->dev, "failed to enable univpll clock\n");
-+		goto err_univpll_clk;
-+	}
-+
-+	return 0;
-+
-+err_univpll_clk:
-+	clk_disable_unprepare(glue->mcu);
-+err_mcu_clk:
-+	clk_disable_unprepare(glue->main);
-+err_main_clk:
-+	return ret;
-+}
-+
-+static void mtk_musb_clks_disable(struct mtk_glue *glue)
-+{
-+	clk_disable_unprepare(glue->univpll);
-+	clk_disable_unprepare(glue->mcu);
-+	clk_disable_unprepare(glue->main);
-+}
-+
-+static void mtk_musb_set_vbus(struct musb *musb, int is_on)
-+{
-+	struct device *dev = musb->controller;
-+	struct mtk_glue *glue = dev_get_drvdata(dev->parent);
-+	int ret;
-+
-+	/* vbus is optional */
-+	if (!glue->vbus)
-+		return;
-+
-+	dev_dbg(musb->controller, "%s, is_on=%d\r\n", __func__, is_on);
-+	if (is_on) {
-+		ret = regulator_enable(glue->vbus);
-+		if (ret) {
-+			dev_err(glue->dev, "fail to enable vbus regulator\n");
-+			return;
-+		}
-+	} else {
-+		regulator_disable(glue->vbus);
-+	}
-+}
-+
-+/*
-+ * switch to host: -> MTK_VBUS_OFF --> MTK_ID_GROUND
-+ * switch to device: -> MTK_ID_FLOAT --> MTK_VBUS_VALID
-+ */
-+static void mtk_musb_set_mailbox(struct mtk_glue *glue,
-+				 enum mtk_vbus_id_state status)
-+{
-+	struct musb *musb = glue->musb;
-+	u8 devctl = 0;
-+
-+	dev_dbg(glue->dev, "mailbox state(%d)\n", status);
-+	switch (status) {
-+	case MTK_ID_GROUND:
-+		phy_power_on(glue->phy);
-+		devctl = readb(musb->mregs + MUSB_DEVCTL);
-+		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
-+		mtk_musb_set_vbus(musb, 1);
-+		glue->phy_mode = PHY_MODE_USB_HOST;
-+		phy_set_mode(glue->phy, glue->phy_mode);
-+		devctl |= MUSB_DEVCTL_SESSION;
-+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-+		MUSB_HST_MODE(musb);
-+		break;
-+	/*
-+	 * MTK_ID_FLOAT process is the same as MTK_VBUS_VALID
-+	 * except that turn off VBUS
-+	 */
-+	case MTK_ID_FLOAT:
-+		mtk_musb_set_vbus(musb, 0);
-+		/* fall through */
-+	case MTK_VBUS_OFF:
-+		musb->xceiv->otg->state = OTG_STATE_B_IDLE;
-+		devctl &= ~MUSB_DEVCTL_SESSION;
-+		musb_writeb(musb->mregs, MUSB_DEVCTL, devctl);
-+		phy_power_off(glue->phy);
-+		break;
-+	case MTK_VBUS_VALID:
-+		phy_power_on(glue->phy);
-+		glue->phy_mode = PHY_MODE_USB_DEVICE;
-+		phy_set_mode(glue->phy, glue->phy_mode);
-+		MUSB_DEV_MODE(musb);
-+		break;
-+	default:
-+		dev_err(glue->dev, "invalid state\n");
-+	}
-+}
-+
-+static int mtk_musb_id_notifier(struct notifier_block *nb,
-+				unsigned long event, void *ptr)
-+{
-+	struct mtk_glue *glue = container_of(nb, struct mtk_glue, id_nb);
-+
-+	if (event)
-+		mtk_musb_set_mailbox(glue, MTK_ID_GROUND);
-+	else
-+		mtk_musb_set_mailbox(glue, MTK_ID_FLOAT);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static int mtk_musb_vbus_notifier(struct notifier_block *nb,
-+				  unsigned long event, void *ptr)
-+{
-+	struct mtk_glue *glue = container_of(nb, struct mtk_glue, vbus_nb);
-+
-+	if (event)
-+		mtk_musb_set_mailbox(glue, MTK_VBUS_VALID);
-+	else
-+		mtk_musb_set_mailbox(glue, MTK_VBUS_OFF);
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static void mtk_otg_switch_init(struct mtk_glue *glue)
-+{
-+	int ret;
-+
-+	/* extcon is optional */
-+	if (!glue->edev)
-+		return;
-+
-+	glue->vbus_nb.notifier_call = mtk_musb_vbus_notifier;
-+	ret = devm_extcon_register_notifier(glue->dev, glue->edev, EXTCON_USB,
-+					    &glue->vbus_nb);
-+	if (ret < 0)
-+		dev_err(glue->dev, "failed to register notifier for USB\n");
-+
-+	glue->id_nb.notifier_call = mtk_musb_id_notifier;
-+	ret = devm_extcon_register_notifier(glue->dev, glue->edev,
-+					    EXTCON_USB_HOST, &glue->id_nb);
-+	if (ret < 0)
-+		dev_err(glue->dev, "failed to register notifier for USB-HOST\n");
-+
-+	dev_dbg(glue->dev, "EXTCON_USB: %d, EXTCON_USB_HOST: %d\n",
-+		extcon_get_state(glue->edev, EXTCON_USB),
-+		extcon_get_state(glue->edev, EXTCON_USB_HOST));
-+
-+	/* default as host, switch to device mode if needed */
-+	if (extcon_get_state(glue->edev, EXTCON_USB_HOST) == false)
-+		mtk_musb_set_mailbox(glue, MTK_ID_FLOAT);
-+	if (extcon_get_state(glue->edev, EXTCON_USB) == true)
-+		mtk_musb_set_mailbox(glue, MTK_VBUS_VALID);
-+}
-+
-+static irqreturn_t generic_interrupt(int irq, void *__hci)
-+{
-+	unsigned long flags;
-+	irqreturn_t retval = IRQ_NONE;
-+	struct musb *musb = __hci;
-+
-+	spin_lock_irqsave(&musb->lock, flags);
-+	musb->int_usb = musb_clearb(musb->mregs, MUSB_INTRUSB);
-+	musb->int_rx = musb_clearw(musb->mregs, MUSB_INTRRX);
-+	musb->int_tx = musb_clearw(musb->mregs, MUSB_INTRTX);
-+
-+	if (musb->int_usb || musb->int_tx || musb->int_rx)
-+		retval = musb_interrupt(musb);
-+
-+	spin_unlock_irqrestore(&musb->lock, flags);
-+
-+	return retval;
-+}
-+
-+static irqreturn_t mtk_musb_interrupt(int irq, void *dev_id)
-+{
-+	irqreturn_t retval = IRQ_NONE;
-+	struct musb *musb = (struct musb *)dev_id;
-+	u32 l1_ints;
-+
-+	l1_ints = musb_readl(musb->mregs, USB_L1INTS) &
-+			musb_readl(musb->mregs, USB_L1INTM);
-+
-+	if (l1_ints & (TX_INT_STATUS | RX_INT_STATUS | USBCOM_INT_STATUS))
-+		retval = generic_interrupt(irq, musb);
-+
-+#if defined(CONFIG_USB_INVENTRA_DMA)
-+	if (l1_ints & DMA_INT_STATUS)
-+		retval = dma_controller_irq(irq, musb->dma_controller);
-+#endif
-+	return retval;
-+}
-+
-+static u32 mtk_musb_busctl_offset(u8 epnum, u16 offset)
-+{
-+	return MTK_MUSB_TXFUNCADDR + offset + 8 * epnum;
-+}
-+
-+static u8 mtk_musb_clearb(void __iomem *addr, unsigned int offset)
-+{
-+	u8 data;
-+
-+	/* W1C */
-+	data = musb_readb(addr, offset);
-+	musb_writeb(addr, offset, data);
-+	return data;
-+}
-+
-+static u16 mtk_musb_clearw(void __iomem *addr, unsigned int offset)
-+{
-+	u16 data;
-+
-+	/* W1C */
-+	data = musb_readw(addr, offset);
-+	musb_writew(addr, offset, data);
-+	return data;
-+}
-+
-+static int mtk_musb_init(struct musb *musb)
-+{
-+	struct device *dev = musb->controller;
-+	struct mtk_glue *glue = dev_get_drvdata(dev->parent);
-+	int ret;
-+
-+	glue->musb = musb;
-+	musb->phy = glue->phy;
-+	musb->xceiv = glue->xceiv;
-+	musb->is_host = false;
-+	musb->isr = mtk_musb_interrupt;
-+	ret = phy_init(glue->phy);
-+	if (ret)
-+		return ret;
-+
-+	ret = phy_power_on(glue->phy);
-+	if (ret) {
-+		phy_exit(glue->phy);
-+		return ret;
-+	}
-+
-+	phy_set_mode(glue->phy, glue->phy_mode);
-+
-+#if defined(CONFIG_USB_INVENTRA_DMA)
-+	musb_writel(musb->mregs, MUSB_HSDMA_INTR,
-+		    DMA_INTR_STATUS_MSK | DMA_INTR_UNMASK_SET_MSK);
-+#endif
-+	musb_writel(musb->mregs, USB_L1INTM, TX_INT_STATUS | RX_INT_STATUS |
-+		    USBCOM_INT_STATUS | DMA_INT_STATUS);
-+	return 0;
-+}
-+
-+static u16 mtk_musb_get_toggle(struct musb_qh *qh, int is_out)
-+{
-+	struct musb *musb = qh->hw_ep->musb;
-+	u8 epnum = qh->hw_ep->epnum;
-+	u16 toggle;
-+
-+	if (is_out)
-+		toggle = musb_readw(musb->mregs, MUSB_TXTOG);
-+	else
-+		toggle = musb_readw(musb->mregs, MUSB_RXTOG);
-+
-+	return toggle & (1 << epnum);
-+}
-+
-+static u16 mtk_musb_set_toggle(struct musb_qh *qh, int is_out, struct urb *urb)
-+{
-+	struct musb *musb = qh->hw_ep->musb;
-+	u8 epnum = qh->hw_ep->epnum;
-+	u16 toggle;
-+
-+	toggle = usb_gettoggle(urb->dev, qh->epnum, is_out);
-+
-+	if (is_out) {
-+		musb_writew(musb->mregs, MUSB_TXTOGEN, (1 << epnum));
-+		musb_writew(musb->mregs, MUSB_TXTOG, (toggle << epnum));
-+	} else {
-+		musb_writew(musb->mregs, MUSB_RXTOGEN, (1 << epnum));
-+		musb_writew(musb->mregs, MUSB_RXTOG, (toggle << epnum));
-+	}
-+
-+	return 0;
-+}
-+
-+static int mtk_musb_set_mode(struct musb *musb, u8 mode)
-+{
-+	struct device *dev = musb->controller;
-+	struct mtk_glue *glue = dev_get_drvdata(dev->parent);
-+	enum phy_mode new_mode;
-+
-+	switch (mode) {
-+	case MUSB_HOST:
-+		new_mode = PHY_MODE_USB_HOST;
-+		mtk_musb_set_vbus(musb, 1);
-+		break;
-+	case MUSB_PERIPHERAL:
-+		new_mode = PHY_MODE_USB_DEVICE;
-+		break;
-+	case MUSB_OTG:
-+		new_mode = PHY_MODE_USB_HOST;
-+		break;
-+	default:
-+		dev_err(musb->controller->parent,
-+			"Error requested mode not supported by this kernel\n");
-+		return -EINVAL;
-+	}
-+	if (glue->phy_mode == new_mode)
-+		return 0;
-+
-+	mtk_musb_set_mailbox(glue, MTK_ID_GROUND);
-+	return 0;
-+}
-+
-+static int mtk_musb_exit(struct musb *musb)
-+{
-+	struct device *dev = musb->controller;
-+	struct mtk_glue *glue = dev_get_drvdata(dev->parent);
-+
-+	phy_power_off(glue->phy);
-+	phy_exit(glue->phy);
-+	mtk_musb_clks_disable(glue);
-+
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
-+	return 0;
-+}
-+
-+static const struct musb_platform_ops mtk_musb_ops = {
-+	.quirks = MUSB_DMA_INVENTRA,
-+	.init = mtk_musb_init,
-+	.get_toggle = mtk_musb_get_toggle,
-+	.set_toggle = mtk_musb_set_toggle,
-+	.exit = mtk_musb_exit,
-+#ifdef CONFIG_USB_INVENTRA_DMA
-+	.dma_init = musbhs_dma_controller_create_noirq,
-+	.dma_exit = musbhs_dma_controller_destroy,
-+#endif
-+	.clearb = mtk_musb_clearb,
-+	.clearw = mtk_musb_clearw,
-+	.busctl_offset = mtk_musb_busctl_offset,
-+	.set_mode = mtk_musb_set_mode,
-+	.set_vbus = mtk_musb_set_vbus,
-+};
-+
-+#define MTK_MUSB_MAX_EP_NUM	8
-+#define MTK_MUSB_RAM_BITS	11
-+
-+static struct musb_fifo_cfg mtk_musb_mode_cfg[] = {
-+	{ .hw_ep_num = 1, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 1, .style = FIFO_RX, .maxpacket = 512, },
-+	{ .hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 2, .style = FIFO_RX, .maxpacket = 512, },
-+	{ .hw_ep_num = 3, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 3, .style = FIFO_RX, .maxpacket = 512, },
-+	{ .hw_ep_num = 4, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 4, .style = FIFO_RX, .maxpacket = 512, },
-+	{ .hw_ep_num = 5, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 5, .style = FIFO_RX, .maxpacket = 512, },
-+	{ .hw_ep_num = 6, .style = FIFO_TX, .maxpacket = 1024, },
-+	{ .hw_ep_num = 6, .style = FIFO_RX, .maxpacket = 1024, },
-+	{ .hw_ep_num = 7, .style = FIFO_TX, .maxpacket = 512, },
-+	{ .hw_ep_num = 7, .style = FIFO_RX, .maxpacket = 64, },
-+};
-+
-+static const struct musb_hdrc_config mtk_musb_hdrc_config = {
-+	.fifo_cfg = mtk_musb_mode_cfg,
-+	.fifo_cfg_size = ARRAY_SIZE(mtk_musb_mode_cfg),
-+	.multipoint = true,
-+	.dyn_fifo = true,
-+	.num_eps = MTK_MUSB_MAX_EP_NUM,
-+	.ram_bits = MTK_MUSB_RAM_BITS,
-+};
-+
-+static const struct platform_device_info mtk_dev_info = {
-+	.name = "musb-hdrc",
-+	.id = PLATFORM_DEVID_AUTO,
-+	.dma_mask = DMA_BIT_MASK(32),
-+};
-+
-+static int mtk_musb_probe(struct platform_device *pdev)
-+{
-+	struct musb_hdrc_platform_data *pdata;
-+	struct mtk_glue *glue;
-+	struct platform_device_info pinfo;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct device_node *child, *extcon_node;
-+	int ret = -ENOMEM;
-+
-+	glue = devm_kzalloc(dev, sizeof(*glue), GFP_KERNEL);
-+	if (!glue)
-+		return -ENOMEM;
-+
-+	glue->dev = dev;
-+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	ret = mtk_musb_clks_get(glue);
-+	if (ret)
-+		return ret;
-+
-+	pdata->config = &mtk_musb_hdrc_config;
-+	pdata->platform_ops = &mtk_musb_ops;
-+
-+	glue->vbus = devm_regulator_get(dev, "vbus");
-+	if (IS_ERR(glue->vbus)) {
-+		dev_err(dev, "fail to get vbus\n");
-+		return PTR_ERR(glue->vbus);
-+	}
-+
-+	child = of_get_child_by_name(np, "connector");
-+	if (!child) {
-+		dev_err(dev, "failed to find usb connector node\n");
-+		return ERR_PTR(-ENODEV);
-+	}
-+
-+	extcon_node = of_parse_phandle(child, "extcon", 0);
-+	if (!extcon_node) {
-+		dev_err(dev, "failed to get extcon phandle");
-+		return ERR_PTR(-ENODEV);
-+	}
-+
-+	glue->edev = extcon_find_edev_by_node(extcon_node);
-+	if (IS_ERR(glue->edev)) {
-+		dev_err(dev, "fail to get extcon\n");
-+		return PTR_ERR(glue->edev);
-+	}
-+
-+	pdata->mode = usb_get_dr_mode(dev);
-+	switch (pdata->mode) {
-+	case USB_DR_MODE_HOST:
-+		glue->phy_mode = PHY_MODE_USB_HOST;
-+		break;
-+	case USB_DR_MODE_PERIPHERAL:
-+		glue->phy_mode = PHY_MODE_USB_DEVICE;
-+		break;
-+	default:
-+		pdata->mode = USB_DR_MODE_OTG;
-+		/* FALL THROUGH */
-+	case USB_DR_MODE_OTG:
-+		glue->phy_mode = PHY_MODE_USB_OTG;
-+		break;
-+	}
-+
-+	glue->phy = devm_of_phy_get_by_index(dev, np, 0);
-+	if (IS_ERR(glue->phy)) {
-+		dev_err(dev, "fail to getting phy %ld\n",
-+			PTR_ERR(glue->phy));
-+		return PTR_ERR(glue->phy);
-+	}
-+
-+	glue->usb_phy = usb_phy_generic_register();
-+	if (IS_ERR(glue->usb_phy)) {
-+		dev_err(dev, "fail to registering usb-phy %ld\n",
-+			PTR_ERR(glue->usb_phy));
-+		return PTR_ERR(glue->usb_phy);
-+	}
-+
-+	glue->xceiv = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-+	if (IS_ERR(glue->xceiv)) {
-+		dev_err(dev, "fail to getting usb-phy %d\n", ret);
-+		ret = PTR_ERR(glue->xceiv);
-+		goto err_unregister_usb_phy;
-+	}
-+
-+	platform_set_drvdata(pdev, glue);
-+	pm_runtime_enable(dev);
-+	pm_runtime_get_sync(dev);
-+
-+	ret = mtk_musb_clks_enable(glue);
-+	if (ret)
-+		goto err_enable_clk;
-+
-+	pinfo = mtk_dev_info;
-+	pinfo.parent = dev;
-+	pinfo.res = pdev->resource;
-+	pinfo.num_res = pdev->num_resources;
-+	pinfo.data = pdata;
-+	pinfo.size_data = sizeof(*pdata);
-+
-+	glue->musb_pdev = platform_device_register_full(&pinfo);
-+	if (IS_ERR(glue->musb_pdev)) {
-+		ret = PTR_ERR(glue->musb_pdev);
-+		dev_err(dev, "failed to register musb device: %d\n", ret);
-+		goto err_device_register;
-+	}
-+
-+	if (pdata->mode == USB_DR_MODE_OTG)
-+		mtk_otg_switch_init(glue);
-+
-+	return 0;
-+
-+err_device_register:
-+	mtk_musb_clks_disable(glue);
-+err_enable_clk:
-+	pm_runtime_put_sync(dev);
-+	pm_runtime_disable(dev);
-+err_unregister_usb_phy:
-+	usb_phy_generic_unregister(glue->usb_phy);
-+	return ret;
-+}
-+
-+static int mtk_musb_remove(struct platform_device *pdev)
-+{
-+	struct mtk_glue *glue = platform_get_drvdata(pdev);
-+	struct platform_device *usb_phy = glue->usb_phy;
-+
-+	platform_device_unregister(glue->musb_pdev);
-+	usb_phy_generic_unregister(usb_phy);
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id mtk_musb_match[] = {
-+	{.compatible = "mediatek,mtk-musb",},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mtk_musb_match);
-+#endif
-+
-+static struct platform_driver mtk_musb_driver = {
-+	.probe = mtk_musb_probe,
-+	.remove = mtk_musb_remove,
-+	.driver = {
-+		   .name = "musb-mtk",
-+		   .of_match_table = of_match_ptr(mtk_musb_match),
-+	},
-+};
-+
-+module_platform_driver(mtk_musb_driver);
-+
-+MODULE_DESCRIPTION("MediaTek MUSB Glue Layer");
-+MODULE_AUTHOR("Min Guo <min.guo@mediatek.com>");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> I have sent a few comments. The only one that is really important
+> here is the missing platform check in the suspend options. Please
+> try to address most of the other commentsm, either by changing the
+> code, or by explaining why your version is correct.
+> 
+
+Okay, try to address them.
+I send the next version as soon as possible.
+
+Thanks.
+Sugaya Taichi
+
+> 
+> 
+>       Arnd
+> 
 
 
 _______________________________________________
