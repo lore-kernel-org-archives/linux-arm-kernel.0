@@ -2,70 +2,68 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D821C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:53:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 052BDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:19:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E51A217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 01:53:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6D892147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:19:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SOa6i1D7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E51A217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NgfHenQm";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="byrxfkxR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6D892147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oKkCsyclZg/B2rgFUg0JLaZjJxbJxdFedb7Vw15opuo=; b=SOa6i1D79ZHl0+
-	JDePyLEoDeu9fkj/66yVUOYws3QWdBkhJ660+wd92qvdDye1Tb/Zq8GSZdwI++NZaG5nepl4Gh/2s
-	HiTSu6gJeucGmydnV3UnvBpZu89SQzJid/jZzdRx09dsl6fpEbf5pbno4tKSFY168ZlgzpZTefban
-	i82iZMJPLJu4R4zTwIZznX6q9RKtDi2YmtXfHBlIk3vXOrx5r/f3Z7PnaOD56D04+bSh0OCgnX5Gf
-	Ne+ovmd+RxKj86lwpLQBCt5F6TA/awnYMvmMtbDHGcj3w4pZjH/rjp1pQxRNXc9EyeoHwovdVHKXj
-	qZODcn8wMQZTGhQfRctA==;
+	List-Owner; bh=pM3LRoYwaxAfJKihh7TGJJQNgmqI9sz5J8b4R9agw3g=; b=NgfHenQmEAuyEy
+	9Ocn8zDQFEm686Y6IwN0T9ugDMzmgG676r6t0kUhquAyBstDj2Z2KUMhuTKJtWTI52Aw+zl/KJrBB
+	2vZd301YcZHlJGX7vopIJ0Fa3eHRgdhy8Ad6M8kY2Zml0VXMhLoVFSubSHt5NvgnSjWlrn95E44OJ
+	4TRHwLKEnEi/1rx7UUnfhsATKepa+0fdgAoVdigVDO23pG3Du/wRjlE6QNKd8bm31/ZqqUO8HVnka
+	mX6DWwrBARqqk0ImuiiSnbobPrsyFA9XDXhgeDHVaGtq+5mez3iYTlvnzcPR6F7Edv2Nj9AH3cEX2
+	r2FCNTpTB/8N8EJpT3gg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvubD-0002m6-EJ; Tue, 19 Feb 2019 01:53:31 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gvuzl-0001fT-L4; Tue, 19 Feb 2019 02:18:53 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvub9-0002lG-CX; Tue, 19 Feb 2019 01:53:29 +0000
-X-UUID: 1190827bdcfe47288d88b08c9b8c5fbb-20190218
-X-UUID: 1190827bdcfe47288d88b08c9b8c5fbb-20190218
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <jitao.shi@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 693473250; Mon, 18 Feb 2019 17:53:15 -0800
-Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 18 Feb 2019 17:53:14 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by mtkmbs01n1.mediatek.inc
- (172.21.101.68) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Tue, 19 Feb 2019 09:53:12 +0800
-Received: from [10.16.6.141] (10.16.6.141) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 19 Feb 2019 09:53:10 +0800
-Message-ID: <1550541190.13121.2.camel@mszsdaap41>
-Subject: Re: [PATCH] drm/mediatek: add mt8183 dpi support
-From: Jitao Shi <jitao.shi@mediatek.com>
-To: CK Hu <ck.hu@mediatek.com>
-Date: Tue, 19 Feb 2019 09:53:10 +0800
-In-Reply-To: <1550160809.6862.13.camel@mtksdaap41>
-References: <20190211045059.11821-1-jitao.shi@mediatek.com>
- <1550160809.6862.13.camel@mtksdaap41>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ id 1gvuzi-0001et-On; Tue, 19 Feb 2019 02:18:52 +0000
+Received: from guoren-Inspiron-7460 (23.83.240.247.16clouds.com
+ [23.83.240.247])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 1460A2173C;
+ Tue, 19 Feb 2019 02:18:43 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550542728;
+ bh=NSp3Oaux3Z1t7jKHeFE4mdFS+JVFVS9Qtu/OyQGaeso=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=byrxfkxRfTqEgl3PxNNOp00BPSlNGIzaj9yzlSWUIkNeG1YRcpEd5MfmLN9s3Czze
+ PN3FBT82RdBzrVocjsEpREY1CE/kWqstuFo23cWeCu/q/wssT7HFHmfGgj7QEBMNLm
+ 4wuniyGMOGrgqxY72h2yntfchLUFR9L8EzMScPak=
+Date: Tue, 19 Feb 2019 10:18:34 +0800
+From: Guo Ren <guoren@kernel.org>
+To: Arnd Bergmann <arnd@arndb.de>, Mao Han <han_mao@c-sky.com>
+Subject: Re: [PATCH 7/8] csky: Use latest system call ABI
+Message-ID: <20190219021834.GA4495@guoren-Inspiron-7460>
+References: <20190218210712.3503891-1-arnd@arndb.de>
+ <20190218210712.3503891-8-arnd@arndb.de>
 MIME-Version: 1.0
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <20190218210712.3503891-8-arnd@arndb.de>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_175327_434655_1EEE63A4 
-X-CRM114-Status: GOOD (  17.16  )
+X-CRM114-CacheID: sfid-20190218_181850_825386_06F0179A 
+X-CRM114-Status: GOOD (  14.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,133 +75,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, stonea168@163.com,
- dri-devel@lists.freedesktop.org, yingjoe.chen@mediatek.com, Ajay
- Kumar <ajaykumar.rs@samsung.com>, Vincent Palatin <vpalatin@chromium.org>,
- cawa.cheng@mediatek.com, bibby.hsieh@mediatek.com,
- Russell King <rmk+kernel@arm.linux.org.uk>,
- Thierry Reding <treding@nvidia.com>, linux-pwm@vger.kernel.org,
- Sascha Hauer <kernel@pengutronix.de>, Pawel Moll <pawel.moll@arm.com>,
- Ian Campbell <ijc+devicetree@hellion.org.uk>, Inki Dae <inki.dae@samsung.com>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- Andy Yan <andy.yan@rock-chips.com>, Matthias
- Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org, Rahul
- Sharma <rahul.sharma@samsung.com>, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, Philipp Zabel <p.zabel@pengutronix.de>,
- Kumar Gala <galak@codeaurora.org>, Sean Paul <seanpaul@chromium.org>
+Cc: linux-arch@vger.kernel.org, uclinux-h8-devel@lists.sourceforge.jp,
+ yury.norov@gmail.com, y2038@lists.linaro.org, linux-api@vger.kernel.org,
+ Palmer Dabbelt <palmer@sifive.com>, linux-kernel@vger.kernel.org,
+ linux-riscv@lists.infradead.org, Vineet Gupta <vgupta@synopsys.com>,
+ Greentime Hu <green.hu@gmail.com>, linux-hexagon@vger.kernel.org,
+ Thomas Gleixner <tglx@linutronix.de>, Guan Xuetao <gxt@pku.edu.cn>,
+ Stafford Horne <shorne@gmail.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 2019-02-15 at 00:13 +0800, CK Hu wrote:
-> Hi, Jitao:
-> 
-> On Mon, 2019-02-11 at 12:50 +0800, Jitao Shi wrote:
-> > MT8183 sample on rising and falling edge. It can reduce half data io.
-> > 
-> > Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_dpi.c | 29 +++++++++++++++++++++++++++++
-> >  1 file changed, 29 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > index 62a9d47df948..610c23334047 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > @@ -117,6 +117,7 @@ struct mtk_dpi_conf {
-> >  	unsigned int (*cal_factor)(int clock);
-> >  	u32 reg_h_fre_con;
-> >  	bool edge_sel_en;
-> > +	bool dual_edge;
-> >  };
-> >  
-> >  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
-> > @@ -353,6 +354,13 @@ static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
-> >  		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
-> >  }
-> >  
-> > +static void mtk_dpi_enable_dual_edge(struct mtk_dpi *dpi)
-> > +{
-> > +	mtk_dpi_mask(dpi, DPI_DDR_SETTING, DDR_EN | DDR_4PHASE,
-> > +		     DDR_EN | DDR_4PHASE);
-> > +	mtk_dpi_mask(dpi, DPI_OUTPUT_SETTING, EDGE_SEL, EDGE_SEL);
-> > +}
-> 
-> All these register exist in MT8173, if you do the same setting in
-> MT8173, could it also sample on rising edge and falling edge?
-> 
-> Regards,
-> CK
+Mao Han has merged csky port into glibc 2.29, so we should keep the
+__ARCH_WANT_TIME32_SYSCALLS.
 
-Hi CK,
+F.Y.I:
+han_mao@c-sky.com
 
-MT8173 has those registers. But the hw function is removed.
-So MT8173 doesn't support DPI dual edge sample.
+On Mon, Feb 18, 2019 at 10:07:11PM +0100, Arnd Bergmann wrote:
+> We don't yet have an upstream glibc port for csky, so there is no user
+> space for the existing ABI, and we can remove the definitions for 32-bit
+> time_t, off_t and struct resource.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/csky/Kconfig                   | 1 -
+>  arch/csky/include/uapi/asm/unistd.h | 2 --
+>  2 files changed, 3 deletions(-)
+> 
+> diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+> index 6959e0b1e956..398113c845f5 100644
+> --- a/arch/csky/Kconfig
+> +++ b/arch/csky/Kconfig
+> @@ -1,6 +1,5 @@
+>  config CSKY
+>  	def_bool y
+> -	select ARCH_32BIT_OFF_T
+>  	select ARCH_HAS_SYNC_DMA_FOR_CPU
+>  	select ARCH_HAS_SYNC_DMA_FOR_DEVICE
+>  	select ARCH_USE_BUILTIN_BSWAP
+> diff --git a/arch/csky/include/uapi/asm/unistd.h b/arch/csky/include/uapi/asm/unistd.h
+> index ec60e49cea66..224c9a9ab45b 100644
+> --- a/arch/csky/include/uapi/asm/unistd.h
+> +++ b/arch/csky/include/uapi/asm/unistd.h
+> @@ -2,8 +2,6 @@
+>  // Copyright (C) 2018 Hangzhou C-SKY Microsystems co.,ltd.
+>  
+>  #define __ARCH_WANT_SYS_CLONE
+> -#define __ARCH_WANT_SET_GET_RLIMIT
+Seems it's not related to y2038 issue. Is __ARCH_WANT_SET_GET_RLIMIT no
+use ?
+
+> -#define __ARCH_WANT_TIME32_SYSCALLS
 
 Best Regards
-Jitao
-
-> 
-> > +
-> >  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
-> >  					enum mtk_dpi_out_color_format format)
-> >  {
-> > @@ -509,6 +517,8 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
-> >  	mtk_dpi_config_color_format(dpi, dpi->color_format);
-> >  	mtk_dpi_config_2n_h_fre(dpi);
-> >  	mtk_dpi_config_disable_edge(dpi);
-> > +	if (dpi->conf->dual_edge)
-> > +		mtk_dpi_enable_dual_edge(dpi);
-> >  	mtk_dpi_sw_reset(dpi, false);
-> >  
-> >  	return 0;
-> > @@ -671,6 +681,16 @@ static unsigned int mt2701_calculate_factor(int clock)
-> >  		return 2;
-> >  }
-> >  
-> > +static unsigned int mt8183_calculate_factor(int clock)
-> > +{
-> > +	if (clock <= 27000)
-> > +		return 8;
-> > +	else if (clock <= 167000)
-> > +		return 4;
-> > +	else
-> > +		return 2;
-> > +}
-> > +
-> >  static const struct mtk_dpi_conf mt8173_conf = {
-> >  	.cal_factor = mt8173_calculate_factor,
-> >  	.reg_h_fre_con = 0xe0,
-> > @@ -682,6 +702,12 @@ static const struct mtk_dpi_conf mt2701_conf = {
-> >  	.edge_sel_en = true,
-> >  };
-> >  
-> > +static const struct mtk_dpi_conf mt8183_conf = {
-> > +	.cal_factor = mt8183_calculate_factor,
-> > +	.reg_h_fre_con = 0xe0,
-> > +	.dual_edge = true,
-> > +};
-> > +
-> >  static int mtk_dpi_probe(struct platform_device *pdev)
-> >  {
-> >  	struct device *dev = &pdev->dev;
-> > @@ -777,6 +803,9 @@ static const struct of_device_id mtk_dpi_of_ids[] = {
-> >  	{ .compatible = "mediatek,mt8173-dpi",
-> >  	  .data = &mt8173_conf,
-> >  	},
-> > +	{ .compatible = "mediatek,mt8183-dpi",
-> > +	  .data = &mt8183_conf,
-> > +	},
-> >  	{ },
-> >  };
-> >  
-> 
-> 
-
-
+ Guo Ren
 
 _______________________________________________
 linux-arm-kernel mailing list
