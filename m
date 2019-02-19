@@ -2,62 +2,149 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79D3CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:56:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C392C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4B4642147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:56:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BC2721902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u4Y5Cc5h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B4642147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eMjVdHV5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="BRP0O1dr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BC2721902
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=G0N020FciHbLcN2aI7FWRlIJcG+PLh8CZd7N8XysUd0=; b=u4Y5Cc5hRwXgruHgVMYo8BAMy
-	xEXsuhOCopUeOWzN0kgyiDJGxxy98bVi5Ro2GX4Sc7atX3PteaUqFMipReQyKRqXgXx/6qf9m+xXf
-	jGV2tCy9CHGt3zCIzvQc4aS+HygKXz1PhhvqeNj0YIwQBooJI4BfJVwshT4z8NGmTc7CbzvRrzP9P
-	JNFb4OIBZHzUlIiKUpP55lPUEU+2sVzPRpjeEvh155nuGMlyugOVh1gcHp5M/neKIc5lGXAeBeR26
-	p7ixdtf5W4b5aCYyMs9WscHKvqZ/ZvhxAufTG/aSg0mVsfUthrDOHYYMeJ3qu7+OdawIQ0MyJDOkf
-	yeP7qmlCQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Sf6m9ETIQZLS6XGcL7MVH0fMVmv4upxZT7GXwU78Xbk=; b=eMjVdHV5PaotW+
+	dG0EaU/jEn8nKyDlEoc6jox9e2S2G0Bu3zYNln08/TpVZ0+oh4+1hWeO8DfXr9+neiPKeMjShywf+
+	Wlp2EqZLVOMn4cCDbP7HvSEXr2mJg/E6MZrCLGi7s8+lt3gLmBPIQsYzQUfhCDSNDtpMVAF25sPDU
+	vk4cl+Y8RD+Zh5QvWB3JA78fesr5TGfgbVGnr0qs/PoeQT+AiyUzI07nDjWn+/V5U84wYxjp/Z5An
+	/gBEKn1fPfbvWHxr2UJL7Jk0uNAJX8XPS3ADCS5ckzvlFRLgLs/79OmCH8s8cZ+COq7J6HqfQ0PtH
+	muXOoYGkZB2a0vNMgeAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1Cs-0006B0-OU; Tue, 19 Feb 2019 08:56:50 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gw1DG-0006Uv-Rr; Tue, 19 Feb 2019 08:57:14 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1Cj-0005we-Dh
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:56:47 +0000
-Received: from localhost (aaubervilliers-681-1-89-68.w90-88.abo.wanadoo.fr
- [90.88.30.68]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id D335F200004;
- Tue, 19 Feb 2019 08:56:26 +0000 (UTC)
-Date: Tue, 19 Feb 2019 09:56:26 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Vasily Khoruzhick <anarsoul@gmail.com>
-Subject: Re: [PATCH v3 06/11] drm/sun4i: rgb: Add DT property to disable
- strict clock rate check
-Message-ID: <20190219085626.7poutwvm3lrilnon@flea>
-References: <20190215050957.20755-1-anarsoul@gmail.com>
- <20190215050957.20755-7-anarsoul@gmail.com>
- <20190218182629.GA14714@bogus>
- <CA+E=qVfDfDvVmKQDeh2e0SA=tm6VpBMpu9MPKUqxFPObxYFXDg@mail.gmail.com>
+ id 1gw1DC-0006TM-1X
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:57:12 +0000
+X-IronPort-AV: E=Sophos;i="5.58,387,1544511600"; d="scan'208";a="26515736"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 19 Feb 2019 01:57:07 -0700
+Received: from NAM02-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
+ 14.3.352.0; Tue, 19 Feb 2019 01:57:06 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=PRw8pyDKlsxu5OK7iTEY9F8mlG90KkDggI+1/SBrr5s=;
+ b=BRP0O1drGL796ZVuKU1rQMGFYhWaftoENxBwC0a8S3d+topo+hPku659axKpgTH4xJ0A8Wihe/9rgptUIao5LMHURqHX6LIE9/5SW4aOwWm3WVuoVUA+Wk8hD3Qe71Neq3U/crfrwhMfkwlEbxJ1H3KqSwum3MUVZQ3vUYkR5jc=
+Received: from CY4PR11MB1909.namprd11.prod.outlook.com (10.175.61.147) by
+ CY4PR11MB1845.namprd11.prod.outlook.com (10.175.82.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Tue, 19 Feb 2019 08:57:04 +0000
+Received: from CY4PR11MB1909.namprd11.prod.outlook.com
+ ([fe80::1499:c19c:26f1:32f1]) by CY4PR11MB1909.namprd11.prod.outlook.com
+ ([fe80::1499:c19c:26f1:32f1%8]) with mapi id 15.20.1622.020; Tue, 19 Feb 2019
+ 08:57:04 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <u.kleine-koenig@pengutronix.de>
+Subject: Re: [PATCH 2/4] pwm: atmel: add support for controllers with 32 bit
+ counters
+Thread-Topic: [PATCH 2/4] pwm: atmel: add support for controllers with 32 bit
+ counters
+Thread-Index: AQHUsYUm31frJ/4ukkWUPCYXEQw2XaXm6l4AgAAUtgA=
+Date: Tue, 19 Feb 2019 08:57:04 +0000
+Message-ID: <e08cbcb2-4e37-4a2e-ea79-021a2c7a25d6@microchip.com>
+References: <1548073783-22640-1-git-send-email-claudiu.beznea@microchip.com>
+ <1548073783-22640-3-git-send-email-claudiu.beznea@microchip.com>
+ <20190219074246.kcdbd5nhf43yw5ax@pengutronix.de>
+In-Reply-To: <20190219074246.kcdbd5nhf43yw5ax@pengutronix.de>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1P18901CA0003.EURP189.PROD.OUTLOOK.COM
+ (2603:10a6:801::13) To CY4PR11MB1909.namprd11.prod.outlook.com
+ (2603:10b6:903:11f::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-tagtoolbar-keys: D20190219105654489
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 28e1aa53-8eba-4e8c-9f1f-08d6964837d7
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:CY4PR11MB1845; 
+x-ms-traffictypediagnostic: CY4PR11MB1845:
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtDWTRQUjExTUIxODQ1OzIzOlpTRFp0bGJmZGRNV3NldEVJMVpCeitVMEJF?=
+ =?utf-8?B?TVFDSFNsV0JsZlVHbStCNVh5MEpJQVl5QmEyaU1ieFVtRlBBS0Y1OEoyWG4y?=
+ =?utf-8?B?cG1VM3k2UjNZZU8rNmo1bGYrQmYyWHdRc05pWjlwTzN5ZHNweSsydWRzVTVa?=
+ =?utf-8?B?UkN0OUxTS0wxUmkwS3B6M2ZyaDdlRXZyV01UckhqOHZsc1I2Snc5dlZubDRr?=
+ =?utf-8?B?YVJoQThVRldxSDNVYlowblMzemJMVnpqSUhEVTRTM2VhSW9qakNINjBLNFg5?=
+ =?utf-8?B?MW1saEZYMUF6YitPSCtLcXRONDdvVmF3NHdmcVYxYzNxYnFobVp5OWlmcWxn?=
+ =?utf-8?B?cjJQcHRoSFdQZWdSRTRFMzNzQ3FRTG9GczNtUE9adFd4Q29HNFRkRjJlL2V3?=
+ =?utf-8?B?V1pqVFFOVEFGQ1JsRzRqZSt3RVZPTzVkU2VmZjk4VFVFcXA4NmZHS1dVWVE3?=
+ =?utf-8?B?MHNLRTloajNLcFZCN2k0VWNMbnQ3c3lSdXE4UEdnSFhoUk1tOXUzSUtwUHBo?=
+ =?utf-8?B?SGFOYVgvMW5KOXVBZ0hNUEhmMlFIaW9EZDVkU2J3Vk90c0I5cEFQRHpuVnB0?=
+ =?utf-8?B?OEp6NFZGSS95bHloTE96NXdYVjBWdkswWlQ3bkNIb2d1dmZVZVJTR0x6M3pT?=
+ =?utf-8?B?OTFKTURnNTFUOHVoZ3pRYnJwR245VDJLVUdQdXNNZ2YyL3JlSWNGNWJBdS9u?=
+ =?utf-8?B?STR5RCtaL2JubUlPUldZaW04WEk5UHJIWGtNS1ZPbE12MlVSS1JWejhQUURo?=
+ =?utf-8?B?aGFtdy9oNXR2K0t5U0NHRTkzd0hwOTQ0VTliUE1CRHZhNkEydmIvNEYyUTVN?=
+ =?utf-8?B?TWFhNi9NaGhidHp2dGxKY0U2MVJSTkVTWUZsUTRITW1RTnZZQ1p6WUhZYWEw?=
+ =?utf-8?B?KzZUWCtZYWRpVE93R0VxLzE5Z21GM3RZRk9Vd2Z0VDdXVFllYUVrN0cxeHRv?=
+ =?utf-8?B?RDhwQjlYdml0U3ZDdHVOejlia1Q5blZjeEhadlg2a2ZhZ0pUWm1KUDcvNnFD?=
+ =?utf-8?B?UzIxOXV4NVpyL1luaTBpRlZHSDJEMnZMeFdHQWYvbnYxQ1pmUjVGS1BoTTAx?=
+ =?utf-8?B?NkpvRzdFc3ZFUm1sVzE2T2JweWJuWDRVcHM4bUYwZCtnRGIxaUJZdmhnVW5L?=
+ =?utf-8?B?dlJWUTZZdCtnMFo2alVnc3BIT01zNFBnNTFSaUJ2QWFsZWF3NDJuWElCenBP?=
+ =?utf-8?B?allGLzh6ZDkyK1ZJT2IyQWYySE81LzdXaEdKTG54YWU5Y08yek85WjJYQkFH?=
+ =?utf-8?B?TytyTmhrSGg2SE8xK0JUWDVOb2k4ZWpjODZRMGJiVlZkVjJmR1YvNStOL2pn?=
+ =?utf-8?B?MnJrRkxHVVlmd1plRmxwbDhrWUl5MWVuR282V1RWM1VKZUpIYWN5RmhOYVc3?=
+ =?utf-8?B?dEpVYVlyQUJvSkdTRVd0MFdXSjIwempieXN2MzlGMDdhbzFSbWIzd2NnbzRE?=
+ =?utf-8?B?VGtOd3Z1SngwQzZYeEN2SHJpNGdkaG5yNUhaVWpiQm9Pa2RBWmRBclVWaDNF?=
+ =?utf-8?B?NlpGc0VGUzc0Y0RHTWpDNmRDSTZKektaeVhsTTlLUVMzNHlQK2VEUzFmOCtH?=
+ =?utf-8?B?SHJONnhUOHJidW1STi9qRVZJYXFacjQxaU9mZjRrbXlYSkwyUnR4TVhYQjdF?=
+ =?utf-8?B?eDhPbjh1alNjUGRCZXFzZGlrZjFxa1R0L1pNL2FZMGRBRUl4T1FtSFJjYjdq?=
+ =?utf-8?B?aFJEcitmLzNjTmhwT3FNSGpqMEJkMUZzYndYQXhsakEwbjk1bjRZNEVjMEd0?=
+ =?utf-8?B?MmdkNys2L3BSeE1JdTJLamdQMG9vOTcyRWdsblVhazlmK1NmNmNKWDJmNGZK?=
+ =?utf-8?B?SURVTmtvRnd0WUpVNCtZQXhGTk1TenI2b3ZMeEs1SzkvZkE9PQ==?=
+x-microsoft-antispam-prvs: <CY4PR11MB1845B90D9BD46A39C8161059877C0@CY4PR11MB1845.namprd11.prod.outlook.com>
+x-forefront-prvs: 09538D3531
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(346002)(136003)(396003)(376002)(39860400002)(199004)(189003)(54094003)(68736007)(54906003)(316002)(72206003)(31686004)(478600001)(6246003)(66066001)(4326008)(14454004)(5660300002)(53546011)(386003)(76176011)(99286004)(52116002)(97736004)(102836004)(66574012)(105586002)(36756003)(106356001)(31696002)(6506007)(86362001)(186003)(26005)(6916009)(6486002)(6436002)(229853002)(53936002)(14444005)(256004)(446003)(11346002)(486006)(2616005)(476003)(7736002)(25786009)(2906002)(305945005)(6116002)(3846002)(71200400001)(6512007)(8936002)(8676002)(81166006)(81156014)(71190400001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR11MB1845;
+ H:CY4PR11MB1909.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: SKQ80Zu2MdbseCTajkSkkwy05637qDSxmLsxsf3tBQtZssQlUCe2dx3KQJhmVEIMXN0vNVUwPQKbJhY0A8OJTntm4nWzPEBHqwvgcPpu+Y1HL6F8lawgyiZydk7+xVJGtmlRWuXc3EynsArv/dPyH4ny54lXE5QIOPIlT3OKGbkWM3Dw6XdY4TAFEVY/l9Dm997OIHm2ynLgfTihCTNccDUVoqSPIiJ8XDUfdzrPcp0iQ6PcjmhJ1DuP8GrJrmD4XWlfLlfSmJOgL4I6HkD0S+5H2H9WJ1pd55JS54VISFwVWhd2IPk4jWOunfGLEon6Ql8yJQ/tQzWeRSBKHR8QGexXj02rogtNZv3tSvZj2UNWRRBm1b3ai2QjlD65gD3cpBIxAjY7IQKwr2bISLLi8T/TwFhD1TSC5L4PxzV9+hA=
+Content-ID: <8BF9CBF41A5E0F40A8890E8641F34482@namprd11.prod.outlook.com>
 MIME-Version: 1.0
-In-Reply-To: <CA+E=qVfDfDvVmKQDeh2e0SA=tm6VpBMpu9MPKUqxFPObxYFXDg@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+X-MS-Exchange-CrossTenant-Network-Message-Id: 28e1aa53-8eba-4e8c-9f1f-08d6964837d7
+X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 08:57:01.1011 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR11MB1845
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_005641_987070_7E3D95E2 
-X-CRM114-Status: GOOD (  38.11  )
+X-CRM114-CacheID: sfid-20190219_005710_154094_80E9214B 
+X-CRM114-Status: GOOD (  14.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,233 +156,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Archit Taneja <architt@codeaurora.org>,
- devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
-Content-Type: multipart/mixed; boundary="===============4417097840011322059=="
+Cc: mark.rutland@arm.com, linux-pwm@vger.kernel.org,
+ alexandre.belloni@bootlin.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============4417097840011322059==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="dppndfprzkjywqmh"
-Content-Disposition: inline
-
-
---dppndfprzkjywqmh
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Mon, Feb 18, 2019 at 11:33:05AM -0800, Vasily Khoruzhick wrote:
-> On Mon, Feb 18, 2019 at 10:26 AM Rob Herring <robh@kernel.org> wrote:
-> >
-> > On Thu, Feb 14, 2019 at 09:09:52PM -0800, Vasily Khoruzhick wrote:
-> > > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: r=
-gb:
-> > > Validate the clock rate") prevents some panel and bridges from workin=
-g with
-> > > sun4i driver.
-> >
-> > Sounds lile a regression that should be reverted. The fix is not a
-> > backwards compatible change either.
->=20
-> anx6345 driver isn't mainlined yet and I'm not sure if this change
-> breaks any mainlined boards. So likely there's not enough
-> justification to revert it.
->=20
-> > > Unfortunately, dotclock frequency for some modes are not achievable on
-> > > sunxi hardware, and there's a slight deviation in rate returned by
-> > > clk_round_rate(), so they fail this check.
-> > >
-> > > Experiments show that panels and bridges work fine with this slight
-> > > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
-> > > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works =
-just
-> > > fine.
-> > >
-> > > This patch adds DT property to disable strict clock rate check
-> > >
-> > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > ---
-> > >  .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 2 ++
-> > >  drivers/gpu/drm/sun4i/sun4i_rgb.c                            | 5 +++=
-++
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                           | 3 +++
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.h                           | 1 +
-> > >  4 files changed, 11 insertions(+)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-dr=
-m.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > index f426bdb42f18..18c8b053a28d 100644
-> > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > @@ -63,6 +63,8 @@ Required properties:
-> > >      Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> > >      first port should be the input endpoint. The second should be the
-> > >      output, usually to an HDMI connector.
-> > > +  - no-strict-clock-check: don't reject timings if exact dot clock c=
-an't be
-> > > +    reached.
-> >
-> > This should be the default IMO. Most panels are a single timing, so if
-> > we reject it the fallback no display?
->=20
-> As far as I remember the change was introduced to reject some modes
-> for which dotclock can't be reached when driver is used with VGA
-> bridge. So if we make it default it'll break boards with VGA bridge
-> and old DT.
->=20
-> > I thought we had some mechanism already to allow some range of
-> > frequencies. I think the chromeos guys needed something IIRC.
->=20
-> You can specify frequency range for panels, but there's nothing for
-> bridges. In my case EDID doesn't specify clock tolerance.
-
-I gave it some more though, and came up with the following patch. The
-basic idea is to leave the boundary check for the bridges that will
-have EDID and we need to filter out the modes that have no chance of
-being supported. The tolerancy used is the one defined in VESA specs,
-but I added a module parameter if you wanted to tune that.
-
-And finally, since most of our panels are single timings without any
-tolerancy, we just try our best in this case and that's it, while
-leaving the door open to support display_timings and being able to do
-more once we have an idea of what the tolerancies are.
-
-If that works for you, I'll submit it.
-
-Maxime
-
---- >8 ---
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4=
-i_rgb.c
-index f4a22689eb54..0460146aab75 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -43,6 +43,25 @@ drm_encoder_to_sun4i_rgb(struct drm_encoder *encoder)
- 			    encoder);
- }
-=20
-+static inline struct drm_connector *
-+sun4i_rgb_get_connector_from_encoder(const struct drm_encoder *encoder)
-+{
-+	struct drm_connector *connector =3D NULL, *tmp;
-+	struct drm_connector_list_iter iter;
-+
-+	drm_connector_list_iter_begin(encoder->dev, &iter);
-+	drm_for_each_connector_iter(tmp, &iter)
-+		if (tmp->encoder =3D=3D encoder) {
-+			connector =3D tmp;
-+			goto out;
-+		}
-+
-+out:
-+	drm_connector_list_iter_end(&iter);
-+
-+	return connector;
-+}
-+
- static int sun4i_rgb_get_modes(struct drm_connector *connector)
- {
- 	struct sun4i_rgb *rgb =3D
-@@ -52,11 +71,22 @@ static int sun4i_rgb_get_modes(struct drm_connector *co=
-nnector)
- 	return drm_panel_get_modes(tcon->panel);
- }
-=20
-+/*
-+ * VESA DMT defines a tolerancy of 0.5% on the pixel clock, while the
-+ * CVT spec reuses that tolerancy in its examples, so it looks to be a
-+ * good default tolerancy for the EDID-based modes.
-+ */
-+static unsigned int clock_tolerancy =3D 5;
-+module_param(clock_tolerancy, uint, 0644);
-+MODULE_PARM_DESC(clock_tolerancy,
-+		 "Tolerancy of the pixel clock in per mille");
-+
- static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
- 						 const struct drm_display_mode *mode)
- {
- 	struct sun4i_rgb *rgb =3D drm_encoder_to_sun4i_rgb(crtc);
- 	struct sun4i_tcon *tcon =3D rgb->tcon;
-+	struct drm_connector *connector =3D sun4i_rgb_get_connector_from_encoder(=
-crtc);
- 	u32 hsync =3D mode->hsync_end - mode->hsync_start;
- 	u32 vsync =3D mode->vsync_end - mode->vsync_start;
- 	unsigned long rate =3D mode->clock * 1000;
-@@ -92,15 +122,27 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struc=
-t drm_encoder *crtc,
-=20
- 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
-=20
-+	/*
-+	 * TODO: We should use the struct display_timing if available
-+	 * and / or trying to stretch the timings within that
-+	 * tolerancy to take care of panels that we wouldn't be able
-+	 * to have a exact match for.
-+	 */
-+	if (connector->connector_type =3D=3D DRM_MODE_CONNECTOR_Unknown) {
-+		DRM_DEBUG_DRIVER("RGB panel used, skipping clock rate checks");
-+		goto out;
-+	}
-+
- 	tcon->dclk_min_div =3D 6;
- 	tcon->dclk_max_div =3D 127;
- 	rounded_rate =3D clk_round_rate(tcon->dclk, rate);
--	if (rounded_rate < rate)
-+	if (rounded_rate < (rate * (1000 - clock_tolerancy) / 1000))
- 		return MODE_CLOCK_LOW;
-=20
--	if (rounded_rate > rate)
-+	if (rounded_rate > (rate * (1000 + clock_tolerancy) / 1000))
- 		return MODE_CLOCK_HIGH;
-=20
-+out:
- 	DRM_DEBUG_DRIVER("Clock rate OK\n");
-=20
- 	return MODE_OK;
---- >8 ---
-
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---dppndfprzkjywqmh
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGvEugAKCRDj7w1vZxhR
-xeBKAP9MxZ1ltRUXmwrBSWt23kf049yyLPCpPRsyb7CwajnJvQEAlOGkxZSR8jlO
-5+KD8ct/PVNMSJRQtDacxaSralb4egU=
-=PMrF
------END PGP SIGNATURE-----
-
---dppndfprzkjywqmh--
-
-
---===============4417097840011322059==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4417097840011322059==--
-
+DQoNCk9uIDE5LjAyLjIwMTkgMDk6NDIsIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3RlOg0KPiBIZWxs
+byBDbGF1ZGl1LA0KPiANCj4gT24gTW9uLCBKYW4gMjEsIDIwMTkgYXQgMTI6MzA6NTNQTSArMDAw
+MCwgQ2xhdWRpdS5CZXpuZWFAbWljcm9jaGlwLmNvbSB3cm90ZToNCj4+IEZyb206IENsYXVkaXUg
+QmV6bmVhIDxjbGF1ZGl1LmJlem5lYUBtaWNyb2NoaXAuY29tPg0KPj4NCj4+IE5ldyBTQU05WDYw
+J3MgUFdNIGNvbnRyb2xsZXIgdXNlIDMyIGJpdHMgY291bnRlcnMgdGh1cyBpdCBjb3VsZCBnZW5l
+cmF0ZQ0KPj4gc2lnbmFscyB3aXRoIGhpZ2hlciBwZXJpb2QgYW5kIGR1dHkgY3ljbGVzLiBVcGRh
+dGUgdGhlIGN1cnJlbnQgZHJpdmVyDQo+PiB0byB3b3JrIHdpdGggb2xkIGNvbnRyb2xsZXIgKHRo
+YXQgdXNlcyAxNiBiaXRzIGNvdW50ZXJzKSBhbmQgd2l0aCB0aGUNCj4+IG5ldyBTQU05WDYwJ3Mg
+Y29udHJvbGxlci4NCj4+DQo+PiBTaWduZWQtb2ZmLWJ5OiBDbGF1ZGl1IEJlem5lYSA8Y2xhdWRp
+dS5iZXpuZWFAbWljcm9jaGlwLmNvbT4NCj4+IC0tLQ0KPj4gIGRyaXZlcnMvcHdtL3B3bS1hdG1l
+bC5jIHwgMzggKysrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0tLS0tLS0NCj4+ICAxIGZp
+bGUgY2hhbmdlZCwgMjcgaW5zZXJ0aW9ucygrKSwgMTEgZGVsZXRpb25zKC0pDQo+Pg0KPj4gZGlm
+ZiAtLWdpdCBhL2RyaXZlcnMvcHdtL3B3bS1hdG1lbC5jIGIvZHJpdmVycy9wd20vcHdtLWF0bWVs
+LmMNCj4+IGluZGV4IDdlODZhNTI2NmViNi4uNDRmNGExYzlmNjBiIDEwMDY0NA0KPj4gLS0tIGEv
+ZHJpdmVycy9wd20vcHdtLWF0bWVsLmMNCj4+ICsrKyBiL2RyaXZlcnMvcHdtL3B3bS1hdG1lbC5j
+DQo+PiBAQCAtNDgsMTUgKzQ4LDE1IEBADQo+PiAgI2RlZmluZSBQV01WMl9DUFJECQkweDBDDQo+
+PiAgI2RlZmluZSBQV01WMl9DUFJEVVBECQkweDEwDQo+PiAgDQo+PiAtLyoNCj4+IC0gKiBNYXgg
+dmFsdWUgZm9yIGR1dHkgYW5kIHBlcmlvZA0KPj4gLSAqDQo+PiAtICogQWx0aG91Z2ggdGhlIGR1
+dHkgYW5kIHBlcmlvZCByZWdpc3RlciBpcyAzMiBiaXQsDQo+PiAtICogaG93ZXZlciBvbmx5IHRo
+ZSBMU0IgMTYgYml0cyBhcmUgc2lnbmlmaWNhbnQuDQo+PiAtICovDQo+PiAtI2RlZmluZSBQV01f
+TUFYX0RUWQkJMHhGRkZGDQo+PiAtI2RlZmluZSBQV01fTUFYX1BSRAkJMHhGRkZGDQo+PiAtI2Rl
+ZmluZSBQUkRfTUFYX1BSRVMJCTEwDQo+PiArLyogTWF4IHZhbHVlcyBmb3IgcGVyaW9kIGFuZCBw
+cmVzY2FsZXIgKi8NCj4+ICsNCj4+ICsvKiBPbmx5IHRoZSBMU0IgMTYgYml0cyBhcmUgc2lnbmlm
+aWNhbnQuICovDQo+PiArI2RlZmluZSBQV01fTUFYVjFfUFJECQkweEZGRkYNCj4+ICsNCj4+ICsv
+KiBBbGwgMzIgYml0cyBhcmUgc2lnbmlmaWNhbnQuICovDQo+PiArI2RlZmluZSBQV01fTUFYVjJf
+UFJECQkweEZGRkZGRkZGDQo+IA0KPiBUaGlzIHN5bWJvbCBpcyB1bnVzZWQsIHNvIEkgd29uZGVy
+IGlmIHRoZSBwYXRjaCByZWFsbHkgZG9lcyB3aGF0IHRoZQ0KPiBjb21taXQgbG9nIHByb21pc2Vz
+Lg0KDQpJdCBpcyBvbmx5IG9mIFNBTTlYNjAncyBQV00uIFBsZWFzZSBjaGVjayBwYXRjaCAzLzQu
+IE1heWJlIEkgc2hvdWxkIGhhdmUNCmJlZW4gaW50cm9kdWNlZCBpdCBpbiB0aGVyZS4gSWYgeW91
+IGNvbnNpZGVyIGl0IGlzIGJldHRlciB0byBiZSBpbnRyb2R1Y2VkDQppbiBwYXRjaCAzLzQgcGxl
+YXNlIGxldCBtZSBrbm93Lg0KDQo+IA0KPiBCZXN0IHJlZ2FyZHMNCj4gVXdlDQo+IA0KX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
+bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
+Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
