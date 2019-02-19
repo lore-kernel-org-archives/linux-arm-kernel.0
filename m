@@ -6,90 +6,89 @@ X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9131BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:51:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A6F4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:52:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FF3E21904
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:51:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CEF832147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:52:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="epK2I3MJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Xbl66mYw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FF3E21904
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="igIqlIrI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="kjbeoIwl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CEF832147C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NiAycs2fVbVzqMI5U9PevHM6kA+O1La4MF5tjVoNAXA=; b=epK2I3MJzV/Pex
-	bHOQZhWnOvyzzx+cdYpqsM5wMoFAEmKGtkgeyJXu1rvM/mT4/0R4ku0GtIOrPq1k6sGDSx8zHTM6G
-	niM51D9Kzzagk7jb+NnvY24mloDgZlCLuPZsg9mezXYzOb56c8cTQdRu+grtKXU63iGuWzMvXN5nr
-	+1Xc8Y1p6kdY370eJICJhfqKZ2yfRgzsSQasozKKXQRLkMM6PVU98lg0P1MMSqkKEGZ/hKwmsb14J
-	Eyqx1aEV+QYt4IiDaCEgUkJLX+2ouiHjTup6Y9bcZ8L/PJ4eZrESqVN6PwE2K8nZtDdQmv5L1gjxm
-	ILfpfdIacAsRmFLwnF5w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=/znM7mBXxN7Vsep0nJ8GfRK0I60LVuEL/PnyOKPhYXg=; b=igIqlIrI4pIBlJ
+	Nmdugr3XhcLa02Wa1kHo+nmQlwwe6wLJmvEvxOqZAJpqX58t93AtDkVjGbRQ2mSmlGd88lr3bIBVr
+	3hAxJ4iBD+GYxNDRFho82Pr3aAH/oBAJQQvPc62d+kntsL9Aw0/nkKGftJK+E2i2H3ONX7uwbq/47
+	SkiNl2KukD+gCd5brUiPdf47MNZLO9icTJ/HbOD0jzbIMrZpnmz7yGPRuq8gYacfdEQAAomYde5Dm
+	68L1KAa+Q5SoJDK1SS+jmZIh/ehY55CiceBGBCjmFa2W5PXxmfy7tuX21MqUrb1+16QtW/LzE8D34
+	fYTEcF5q+BtC9yJl0hUw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw17q-00036c-9K; Tue, 19 Feb 2019 08:51:38 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gw18D-0003ZX-Gm; Tue, 19 Feb 2019 08:52:01 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw17m-00035p-Uy
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:51:36 +0000
-Received: by mail-ot1-x341.google.com with SMTP id b3so32921566otp.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 00:51:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=tlV9vLB+KSMsmXO/I53mLkrat4UHKAVvOR8nqbfYTjw=;
- b=Xbl66mYw6fd/AAeklC09hLlPoGGov/UOZz7vOpQDOC6a71lsbpuv2jtTVvgJFUg38T
- FEs3q1yEXzo2JFtKPT7HA1CzP9z6LrOHQXCR4oM0GFQxlA/KwNOnnKMaG9C/FNhnHI1U
- xhCiuIcQfs+NclRvCqwHMonV1iGp9OL0KqqGc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=tlV9vLB+KSMsmXO/I53mLkrat4UHKAVvOR8nqbfYTjw=;
- b=VPxDcWr1/RYByYR68J8j/pZlDWv7xqW5nmKk4n4vVVzj6o3TfWz/z6A8y5MRL2ItUH
- vxqkhEWHtcqVjpWdpO7tgpo8hnVWdnMeq1F+ne2/KsehaCbG37RLg5697CuXYZ+EleRJ
- JEq1bT377vb1iV/muXraEw2A7A351jA3WtC1Chbw6Mcme5WS2SFEY67Q1e4srEGbfbd/
- cpwD8YFO4CfqtETU4UzOv/X9AQQpuqTSswI+cVwSF60BSe04/qcMXR3kqNUaZ0oWiQuy
- IUgSs8KAaexq1mUKc56YmVC6gxAfz9uktHM84/PDQxwPuEiY1JzOxQNY6mkXI87yXK/b
- ztFg==
-X-Gm-Message-State: AHQUAuaZFeqZzBcW06MVYbUMO5gw1Kro9NpofeTfg9+u76lIUuWonv2T
- azBpqjXmlaW1J6UkucgplOiRVmF94+Y=
-X-Google-Smtp-Source: AHgI3IZ/N0pwEBA72PxtqYVY80Qx5CMBpxB1t5Ib2uPj0eZ5eqEx7LmiGMvt9T7yIN6zDK5DNjD+Kw==
-X-Received: by 2002:a9d:6d89:: with SMTP id x9mr9260245otp.121.1550566293287; 
- Tue, 19 Feb 2019 00:51:33 -0800 (PST)
-Received: from mail-ot1-f52.google.com (mail-ot1-f52.google.com.
- [209.85.210.52])
- by smtp.gmail.com with ESMTPSA id n65sm7129308oib.12.2019.02.19.00.51.31
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 19 Feb 2019 00:51:31 -0800 (PST)
-Received: by mail-ot1-f52.google.com with SMTP id i5so32872559oto.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 00:51:31 -0800 (PST)
-X-Received: by 2002:aca:5657:: with SMTP id k84mr1883764oib.173.1550566290647; 
- Tue, 19 Feb 2019 00:51:30 -0800 (PST)
+ id 1gw185-0003PI-1f
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:51:55 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1J8pVUF086856;
+ Tue, 19 Feb 2019 02:51:31 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550566291;
+ bh=s4HYJPqyPJn3r1uSudtaaH3WEZvuI8niOjTupXXcvSM=;
+ h=From:Subject:To:CC:References:Date:In-Reply-To;
+ b=kjbeoIwlJ2ouADzwUbz07nm5+csBCIJ73GcH7O1D5/mFwWYnkZ2Rx6Zf/Lp1vw2dX
+ LOqvi0IG5Ul/8XPcymnEg/m9gnYS2HKAMO9La/30CG6OBKMXGvkt3o3QtDDyduP+yd
+ 68kAXw0O5YuibZV+zxgk0fQWYmJ2ibTyQuaxRcCE=
+Received: from DLEE100.ent.ti.com (dlee100.ent.ti.com [157.170.170.30])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1J8pVLs037891
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 19 Feb 2019 02:51:31 -0600
+Received: from DLEE111.ent.ti.com (157.170.170.22) by DLEE100.ent.ti.com
+ (157.170.170.30) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
+ Feb 2019 02:51:31 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE111.ent.ti.com
+ (157.170.170.22) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 19 Feb 2019 02:51:31 -0600
+Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1J8pQD9017838;
+ Tue, 19 Feb 2019 02:51:27 -0600
+From: Lokesh Vutla <lokeshvutla@ti.com>
+Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+To: Tony Lindgren <tony@atomide.com>
+References: <20190212162247.GK5720@atomide.com>
+ <6a274588-0fb6-2ddf-3bcc-f9e4d849ac07@ti.com>
+ <20190213152620.GS5720@atomide.com>
+ <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
+ <20190214154100.GB5720@atomide.com>
+ <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
+ <20190214174612.GF5720@atomide.com>
+ <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
+ <20190215161629.GK5720@atomide.com>
+ <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
+ <20190218143245.GC15711@atomide.com>
+Message-ID: <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
+Date: Tue, 19 Feb 2019 14:21:10 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
- <1549348966-14451-8-git-send-email-frederic.chen@mediatek.com>
- <CAAFQd5CWdZUXVb4F9BLhQdN8WHjzA8acPDx1i+WcoudsdGsfUg@mail.gmail.com>
- <1550372163.11724.59.camel@mtksdccf07>
-In-Reply-To: <1550372163.11724.59.camel@mtksdccf07>
-From: Tomasz Figa <tfiga@chromium.org>
-Date: Tue, 19 Feb 2019 17:51:19 +0900
-X-Gmail-Original-Message-ID: <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
-Message-ID: <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
-Subject: Re: [RFC PATCH V0 7/7] [media] platform: mtk-isp: Add Mediatek ISP
- Pass 1 driver
-To: Jungo Lin <jungo.lin@mediatek.com>
+In-Reply-To: <20190218143245.GC15711@atomide.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_005134_997916_29873B5D 
-X-CRM114-Status: GOOD (  23.59  )
+X-CRM114-CacheID: sfid-20190219_005153_225166_83A6C417 
+X-CRM114-Status: GOOD (  19.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,103 +100,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: frankie_chiu@mediatek.com,
- =?UTF-8?B?U2VhbiBDaGVuZyAo6YSt5piH5byYKQ==?= <Sean.Cheng@mediatek.com>,
- Frederic Chen <frederic.chen@mediatek.com>,
- =?UTF-8?B?UnlubiBXdSAo5ZCz6IKy5oGpKQ==?= <Rynn.Wu@mediatek.com>,
- =?UTF-8?B?Q2hyaXN0aWUgWXUgKOa4uOmbheaDoCk=?= <christie.yu@mediatek.com>,
- srv_heupstream@mediatek.com,
- =?UTF-8?B?SG9sbWVzIENoaW91ICjpgrHmjLop?= <holmes.chiou@mediatek.com>,
- seraph_huang@mediatek.com, Jerry-ch.Chen@mediatek.com, yuzhao@chromium.org,
- ryan_yu@mediatek.com, Sj Huang <sj.huang@mediatek.com>,
- Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
- linux-mediatek@lists.infradead.org, zwisler@chromium.org,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Hans Verkuil <hans.verkuil@cisco.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: Nishanth Menon <nm@ti.com>,
+ Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
+ Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
+ Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jungo,
+Hi Tony,
 
-On Sun, Feb 17, 2019 at 11:56 AM Jungo Lin <jungo.lin@mediatek.com> wrote:
->
-> On Wed, 2019-02-13 at 18:50 +0900, Tomasz Figa wrote:
-> > (() . ( strHi Frederic, Jungo,
-> >
-> > On Tue, Feb 5, 2019 at 3:43 PM Frederic Chen <frederic.chen@mediatek.com> wrote:
-> > >
-> > > From: Jungo Lin <jungo.lin@mediatek.com>
-> > >
-> > > This patch adds the driver for Pass unit in Mediatek's camera
-> > > ISP system. Pass 1 unit is embedded in Mediatek SOCs. It
-> > > provides RAW processing which includes optical black correction,
-> > > defect pixel correction, W/IR imbalance correction and lens
-> > > shading correction.
-> > >
-> > > The mtk-isp directory will contain drivers for multiple IP
-> > > blocks found in Mediatek ISP system. It will include ISP Pass 1
-> > > driver, sensor interface driver, DIP driver and face detection
-> > > driver.
-> >
-> > Thanks for the patches! Please see my comments inline.
-> >
->
-> Dear Thomas:
->
-> Thanks for your comments.
->
-> We will revise the source codes based on your comments.
-> Since there are many comments to fix/revise, we will categorize &
-> prioritize these with below list:
->
-> 1. Coding style issues.
-> 2. Coding defects, including unused codes.
-> 3. Driver architecture refactoring, such as removing mtk_cam_ctx,
-> unnecessary abstraction layer, etc.
->
+On 18/02/19 8:02 PM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
+>> On 2/15/2019 9:46 PM, Tony Lindgren wrote:
+>>> The dts node for the interrupt controller should describe a
+>>> proper Linux device, that is with reg entries and so on.
+>>
+>> You are asking to just keep the compatible property :)
+> 
+> Right, and then I realized this node is missing the standard
+> reg entry too. And you're saying the registers are not even
+> accissible from Linux.
+> 
+> So based on that IMO you should not even have a device tree
+> node for it at all. You should just have the interrupt
 
-Thanks for replying to the comments!
+Practically lets look at what all I am adding in the DT node. Below is one such
+example:
 
-Just to clarify, there is no need to hurry with resending a next patch
-set with only a subset of the changes. Please take your time to
-address all the comments before sending the next revision. This
-prevents forgetting about some remaining comments and also lets other
-reviewers come with new comments or some alternative ideas for already
-existing comments. Second part of my review is coming too.
+main_intr: interrupt-controller0 {
+	compatible = "ti,sci-intr";
+	interrupt-controller;
+	interrupt-parent = <&gic500>;
+	#interrupt-cells = <4>;
+	ti,sci = <&dmsc>;
+	ti,sci-dst-id = <56>;
+	ti,sci-rm-range-girq = <0x1>;
+};
 
-P.S. Please avoid top-posting on mailing lists. If replying to a
-message, please reply below the related part of that message. (I've
-moved your reply to the place in the email where it should be.)
+The following 4 properties are required at least for probing, to represent the
+hierarchy and for  interrupt definition:
+	compatible = "ti,sci-intr";
+	interrupt-controller;
+	interrupt-parent = <&gic500>;
+	#interrupt-cells = <4>;
 
-[snip]
-> > > +       phys_addr_t paddr;
-> >
-> > We shouldn't need physical address either. I suppose this is for the
-> > SCP, but then it should be a DMA address obtained from dma_map_*()
-> > with struct device pointer of the SCP.
-> >
->
-> Yes, this physical address is designed for SCP.
-> For tuning buffer, it will be touched by SCP and
-> SCP can't get the physical address by itself. So we need to get
-> this physical address in the kernel space via mtk_cam_smem_iova_to_phys
-> function call and pass it to the SCP. At the same time, DMA address
-> (daddr) is used for ISP HW.
->
+The remaining 3 properties represents the TISCI interface. Let's go step by step:
+* ti,sci = <&dmsc> :This is the phandle to the firmware protocol driver using
+which the messages are sent
+* ti,sci-dst-id = <56> : This is the TISCI device ID for the parent controller
+for which your irqs needs to be connected. As I said this cannot be queried from
+sysfw and this is the input to the messages that are send to sysfw.
+*  ti,sci-rm-range-girq = <0x1>: This define the ids using which the parent-irq
+ranges that are allocated to this interrupt router instance can be queried from
+sysfw.
+If the above 2 properties are to be added as driver phandle then for every
+instance of interrupt router in the SoC, a new compatible needs to be created. I
+don't think this is a desirable solution.
 
-Right, but my point is that in the kernel phys_addr_t is the physical
-address from the CPU point of view. Any address from device point of
-view is dma_addr_t and should be obtained from the DMA mapping API
-(even if it's numerically the same as physical address).
+With this can you tell me how can we not have a device-tree and still support
+irq allocation?
 
-Best regards,
-Tomasz
+Also, this is not the first time a driver based on a firmware is being added.
+K2g clock, power and reset drivers are based on this where device ids are being
+passed from consumers. Similarly arm scpi based drivers are also available.
+
+Thanks and regards,
+Lokesh
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
