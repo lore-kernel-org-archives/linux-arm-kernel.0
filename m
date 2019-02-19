@@ -4,131 +4,118 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C542C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:57:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95B55C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:09:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D6A582086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 20:57:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5FD1F2146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 21:09:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IQt6g37f";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Bz+zCpw6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D6A582086D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qv7bhlX8";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=davidjohnsummers.uk header.i=@davidjohnsummers.uk header.b="2elFioHm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FD1F2146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davidjohnsummers.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RG2Z8cpb39K9MFptSd1HTrUtyr3KL5xfNUVsS3cf+pQ=; b=IQt6g37fx0PmGz
-	0IDs7VVUcSdFhGbiBs9NPlGwsUzh/A0EfiO8jNM/sBYdKL9NbjVf6uYYIfLMfrWxEeCxaxy5k75HF
-	iZuEgzOaIp4mcCGWffBZQZYiBT+xHqdR+KcLMJ58T/MAkvBOss5UFUtfK/7wH9beRrhJ7c0t+SQ7a
-	Y+6nEAA0MZbNiJEukfyxa8A7lqnlA8iwMhk4mnACvuZ2zW3xyAdc0ONgDaMSLJGJj88CEpHxXtyfq
-	bAHtU6Td8bJB246zwMIOEHvr0etTTHY99Kk1OIsWl77QODbuarD5Uk4hVHg9/fO6+06BRjCnGPLXG
-	jP0KBVR4lCL1HOuZdxBg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=iIsdk8/mOiZh0E2SD0Fx6YjjnA8mi0qn96m8A25c1xU=; b=qv7bhlX8moOW3j8zMRE77QdMF
+	dvCjO8i3rlUGISmonhzRM+guhSGh7TCILUlHXlleW0eZgTnpzValp7pcrpUXk5Y+Qs/Nwc3rlyZg3
+	lmxCzbtL1y5mIti5zlUSZrDHBtermhYvQBmjLfsSQl5+7ByhoY7qqZDrt95zO7+L7g2F3o4iLutUS
+	3i4r7/6ZEZfwuF1dOiMsR52c4UNGxvMCAK4gojIP0SVjQBa5oBJhF7lwMUjdhSEV4h2NIN8f36hnn
+	qMipcC66L9k8ce4tu9za2WabqqeRdFfLMwoRxmdiUFLHC4X3hqyHldJewa8oSCDEb1HSkgjwEiKfM
+	eKiPmpXsQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwCRs-0005jE-4U; Tue, 19 Feb 2019 20:57:04 +0000
-Received: from mail-eopbgr150053.outbound.protection.outlook.com
- ([40.107.15.53] helo=EUR01-DB5-obe.outbound.protection.outlook.com)
+	id 1gwCdu-0001JS-Rm; Tue, 19 Feb 2019 21:09:30 +0000
+Received: from mail-gw.thundercloud.uk ([149.255.60.88])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwCRp-0005in-1T
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 20:57:02 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=hJvXE1OAldgE/q05edyO+x86sKSIOeHiiflBlLPr7m0=;
- b=Bz+zCpw6xcyTDeHosSh+e26ULxwtcEzvjOCHEb6ykCxx6aJRnabWSuXbAbe7tNEstzi0Mtx2l2zx0mXMPVJFTg52aPufAFw9AH3cwqdSxbSuJT9L0dsWr+78w7NRaL4RUfoaV1qg9av88LMgTdCbcErrg4Wdbvx95fmrGegjtgk=
-Received: from AM6PR04MB5863.eurprd04.prod.outlook.com (20.179.1.11) by
- AM6PR04MB4133.eurprd04.prod.outlook.com (52.135.166.144) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Tue, 19 Feb 2019 20:56:56 +0000
-Received: from AM6PR04MB5863.eurprd04.prod.outlook.com
- ([fe80::6c22:d122:2edf:d948]) by AM6PR04MB5863.eurprd04.prod.outlook.com
- ([fe80::6c22:d122:2edf:d948%5]) with mapi id 15.20.1643.014; Tue, 19 Feb 2019
- 20:56:56 +0000
-From: Leo Li <leoyang.li@nxp.com>
-To: Colin King <colin.king@canonical.com>, Roy Pledge <roy.pledge@nxp.com>,
- "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: RE: [PATCH][next] soc: fsl: dpio: fix memory leak of a struct qbman
- on error exit path
-Thread-Topic: [PATCH][next] soc: fsl: dpio: fix memory leak of a struct qbman
- on error exit path
-Thread-Index: AQHUyFwq50clv2b/DU6TNIT7uzPh/aXnmm0Q
-Date: Tue, 19 Feb 2019 20:56:56 +0000
-Message-ID: <AM6PR04MB586338893C089939732092468F7C0@AM6PR04MB5863.eurprd04.prod.outlook.com>
-References: <20190219140517.10709-1-colin.king@canonical.com>
-In-Reply-To: <20190219140517.10709-1-colin.king@canonical.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=leoyang.li@nxp.com; 
-x-originating-ip: [64.157.242.222]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 14c6c7e8-1dbd-4fe4-1a9b-08d696acc89d
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB4133; 
-x-ms-traffictypediagnostic: AM6PR04MB4133:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtBTTZQUjA0TUI0MTMzOzIzOnM1QUxXK2h3SERwQmQxRXVwMCtrOFgycTFD?=
- =?utf-8?B?VnZnbVc0aWQ2QkhvQWl1cldmWHN3TTByNnZwNWd6aThYODRzS1UrT2lnUHFy?=
- =?utf-8?B?NDRLNjJTV3o5cytTWElsblBMT3k4UWNieXU3ZlV1b1lPWGxDTXROdWlHaFVv?=
- =?utf-8?B?M0NYdldBRm04cmdwMWVjRDB4QVY3WU1FVHBRK1ZrYWVTZzNScU8rL2pvT1pE?=
- =?utf-8?B?VVFKWWJWdlMydWtUWjZZcE96cnhibkRmRU90Z3psS0dXSFdLOHoxelFMMXF2?=
- =?utf-8?B?QXh2WVpLamJocGdrcVRrRlAvNXB3YkZUdmRrdXNXUU5wUXdDVVk2YjAxZWQz?=
- =?utf-8?B?VzNHZ3VucUZmMlVUVVFqSFVKMWRaNUtQMk9JbTF1QmJYNndlV3crY3Fsa0RQ?=
- =?utf-8?B?RnhjYUEwTDNQNS94WjhTaUpEcGNrc0RQR1hPMzVIV2xyV1NQRVIzZE4rSEJ5?=
- =?utf-8?B?eHhzUkpjd1B3OHY5VVNqT09ldisxd3NadmFnZ3NtcUpxQjYwQTdGczREd3lo?=
- =?utf-8?B?QXlmdmFDTEgwZEdCUTBibEFBdkxDY0R6VCtGcGFpWFRpZ1FUVXhXcXBRRFF5?=
- =?utf-8?B?ZmFBSWRRTjdvR1dUZSt3VjJFT0tUQVNid2RoR3ZwT0trb0FtYXk2U2wxU3B1?=
- =?utf-8?B?WXdsNGNrVWJOOWhjTjJISy90L2pzRVkwQjVVNk9XQmZXMVZTZkE1U0dXbHhx?=
- =?utf-8?B?azc4ZnFOYm9oZTJxZVJYeHdDUk81QTZSV0pSQlJpOW11c0JaUnNjQnlDWmdp?=
- =?utf-8?B?eUVuYVBIaUZwVlhGQlpqRGMyWHp5Z0E3RmlReHhQTG5IemY2ejJYQmRXRjRR?=
- =?utf-8?B?amg2QlpKbjRGRlFzWHVIWFlOWDNUbnVLbjQ5WVRGalNPMFR4T2JHYUhyczFX?=
- =?utf-8?B?Y1RiZ1F6Q3ZsOU1WWEl6Zk1vbGdWMXR5bEswSVR5NG1QRkFTcVBqVUprTW9v?=
- =?utf-8?B?Vm04bGtMbjJ1ejdjREJhQnhoZUdLcGw2WXVXV1BFSTVPWEhSaEZBQ1p6SVB1?=
- =?utf-8?B?TjVQTXYrcEFSbkxRYjBuSzFrSGlSWTBKMmNZdVpxenl0NE9kMXlkeU1JRWx4?=
- =?utf-8?B?bFdtbDRLMWRCZER2czA5M042YVV3ejc0dGo2K1BheTNsaHVVQXV4eWQwTng1?=
- =?utf-8?B?TXM1VGNLUVkyc1cwbG9FM0dZRlphOVJQdHVkYVJxMUpwMVRjaWpudnc4T01a?=
- =?utf-8?B?SnJwOVlGN29YZlE0U0VjcDJ6NHVEbWN3Qy8wS01vQ3J4VnN0VDV4VEhnbi9T?=
- =?utf-8?B?cFNacU5hRU5zOGFHOUNWSmVSNWVpNzZKWmlVZlV6VDQ3Vmp4NmhFbUw1L2xs?=
- =?utf-8?B?RFFBczRjUUpwTEdBeHZXTHVDcDJuMHFCTjA0dE15b2FPQ1I4MU92M1Y2dnZh?=
- =?utf-8?B?TENCcy9tUk1QdHdFaWJxTGNmaGFUVXZ6MThnK2t4a3NIdlczVnNYSncvWmNm?=
- =?utf-8?B?Mm05WW9XdEQ5Q21GVTJDQ0w1RVhhTWRZM1pqVEF3cmNhZjhkVmtNU1VyblZY?=
- =?utf-8?B?SFJjSnFzbGJXSkpmNHNkTUpOTm01UThnTldiSzZkSlIyUTZmbklOS09jbGlT?=
- =?utf-8?B?UVBOUXJQRFlPUGhJRkZSUjBueDJKWVdYQUg2UnY4NVFQakRSWjAyQWNwdjFT?=
- =?utf-8?B?aE41dnd1ZnVpZUQxTkJZSFRpSS9vRWVCdllBSXhMZ1lOSXBJRW1yTHRlNUhW?=
- =?utf-8?Q?gPT6EOXsvyQE0SBxJEu+p27mj6ZWAILyl5/MWhO?=
-x-microsoft-antispam-prvs: <AM6PR04MB413334EA38A138B88F28ABD08F7C0@AM6PR04MB4133.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09538D3531
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(346002)(396003)(39860400002)(136003)(376002)(13464003)(199004)(189003)(86362001)(2201001)(68736007)(186003)(102836004)(3846002)(76176011)(26005)(305945005)(55016002)(97736004)(6246003)(53936002)(5660300002)(8676002)(66066001)(229853002)(7736002)(81166006)(81156014)(74316002)(4326008)(14454004)(99286004)(256004)(6436002)(33656002)(110136005)(316002)(8936002)(54906003)(2906002)(7696005)(476003)(9686003)(478600001)(25786009)(106356001)(11346002)(105586002)(446003)(2501003)(6506007)(6116002)(53546011)(71200400001)(486006)(71190400001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4133;
- H:AM6PR04MB5863.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: jVzGEMKau2jiKD0q8TS3S7SCavfV2yhr+Gkx0sT4SsC6TeWX1SG3lNZn8MSS0vZcPICM4Yh1a+K7QU54lfKKAGCn6KB3QbBbwxxkUKj92OtRSuvQoV/8VpxmPmHg8+JR7lGbZ50PWF76yNkciKFKdeTsOAra7IDGqca+2G+p+v3pYVwitdpBSjOY2H+BVtVHZVDF9zNFW/i1w2eeYxAUEZWmdLSgZvtGeNfCZbRRuI5A5iz3rELhAB+M1RIrEE/pIuXJHy5wgCqvQ0C1mY2WGKcU6UqY9E/Kr//eaIWo6Aj6ybm5oxst9XV9B7/pDuRtS8lwUzxBBflNkSCxIlLL/ImdiyAdcr54TwvkP7/gbYMkqT5buPt6allrV7E4hTT17qk3gGgNd2sR1bDF4PB2SThPThUOhe7eTCK23OA329k=
+ id 1gwCdr-0001J3-Dy
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 21:09:29 +0000
+Received: from mailbsf01.thundercloud.uk (mail-gw.thundercloud.uk
+ [149.255.60.72])
+ by mail-gw.thundercloud.uk (Postfix) with ESMTPS id C549162A77C2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 21:09:25 +0000 (GMT)
+X-ASG-Debug-ID: 1550610563-05541312653109a0001-tbGyMd
+Received: from cloud706.unlimitedwebhosting.co.uk (no-dns-yet.unlimited.uk.net
+ [149.255.62.7]) by mailbsf01.thundercloud.uk with ESMTP id PiPKd6rm7cMTKc7b
+ (version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO) for
+ <linux-arm-kernel@lists.infradead.org>; Tue, 19 Feb 2019 21:09:23 +0000 (GMT)
+X-Barracuda-Envelope-From: beagleboard@davidjohnsummers.uk
+X-Barracuda-Effective-Source-IP: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Apparent-Source-IP: 149.255.62.7
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=davidjohnsummers.uk; s=default; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=q0ySjtH8j43IV9rMNu6araMj86TY/R79rsof0VLvboQ=; b=2elFioHmdMd+QNe0H8MA4XBc8h
+ PUVK8uihwM+t5Uf0Y4P28yaUc/2z6zBz53xSTerUMxLAeNVGeu9s1BvilNppsGyQyHbKD1uWJd2mA
+ +H04xrDG4CR7X3dqdKBI+xmKfHgN2HzQo16446+ljXYDI6EE50J9F2gEYputbfbFx+r2FDxR5GeTf
+ 0uSEaGOvOFx43WPLMW6U/Rz97DCA4ebjxIWKpgW/xZk39icL3UiFxXmCdNhZ5/e9PbYmmgqcZY2Yu
+ Z7/AZYxZhJqnBR2vLF4j0s+nsOh+5NcVx/e3OormKY/hKc4y+DIm5jAcBNhryCU8Pe6FN4MHTeXtF
+ vHCPOqlg==;
+Received: from [87.114.170.31] (port=59590 helo=[192.168.2.187])
+ by cloud706.unlimitedwebhosting.co.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
+ (envelope-from <beagleboard@davidjohnsummers.uk>)
+ id 1gwCdm-000L5r-Pf; Tue, 19 Feb 2019 21:09:22 +0000
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
+To: Rob Herring <robh@kernel.org>, Vasily Khoruzhick <anarsoul@gmail.com>
+X-ASG-Orig-Subj: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add
+ rtl8723bs-bluetooth
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com> <20190218211035.GA28145@bogus>
+ <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+ <1245842044.588056.1550527701604@email.ionos.de>
+ <CA+E=qVdMNmVkytCzXqYgJtV196-G=c_bWx+aLvs=Y0iuRpjdRg@mail.gmail.com>
+ <CAL_JsqLROpJMoEPLXaAL_JG1SNufstMDmB4xy_V_p4=duHKPSA@mail.gmail.com>
+From: David Summers <beagleboard@davidjohnsummers.uk>
+Message-ID: <6a26ff97-0b9c-cfdd-9428-74580694220a@davidjohnsummers.uk>
+Date: Tue, 19 Feb 2019 21:09:21 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 14c6c7e8-1dbd-4fe4-1a9b-08d696acc89d
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 20:56:56.2823 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4133
+In-Reply-To: <CAL_JsqLROpJMoEPLXaAL_JG1SNufstMDmB4xy_V_p4=duHKPSA@mail.gmail.com>
+Content-Language: en-PH
+X-AntiAbuse: This header was added to track abuse,
+ please include it with any abuse report
+X-AntiAbuse: Primary Hostname - cloud706.unlimitedwebhosting.co.uk
+X-AntiAbuse: Original Domain - lists.infradead.org
+X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
+X-AntiAbuse: Sender Address Domain - davidjohnsummers.uk
+X-Get-Message-Sender-Via: cloud706.unlimitedwebhosting.co.uk: authenticated_id:
+ davidjoh/from_h
+X-Authenticated-Sender: cloud706.unlimitedwebhosting.co.uk: beagleboard@davidjohnsummers.uk
+X-Source: 
+X-Source-Args: 
+X-Source-Dir: 
+X-Barracuda-Connect: no-dns-yet.unlimited.uk.net[149.255.62.7]
+X-Barracuda-Start-Time: 1550610563
+X-Barracuda-Encrypted: ECDHE-RSA-AES256-GCM-SHA384
+X-Barracuda-URL: https://149.255.60.72:443/cgi-mod/mark.cgi
+X-Virus-Scanned: by bsmtpd at thundercloud.uk
+X-Barracuda-Scan-Msg-Size: 3136
+X-Barracuda-BRTS-Status: 1
+X-Barracuda-Spam-Score: 0.00
+X-Barracuda-Spam-Status: No, SCORE=0.00 using global scores of TAG_LEVEL=1000.0
+ QUARANTINE_LEVEL=1000.0 KILL_LEVEL=2.0 tests=BSF_SC0_MISMATCH_TO
+X-Barracuda-Spam-Report: Code version 3.2, rules version 3.2.3.67592
+ Rule breakdown below
+ pts rule name              description
+ ---- ---------------------- --------------------------------------------------
+ 0.00 BSF_SC0_MISMATCH_TO    Envelope rcpt doesn't match header
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_125701_086912_E513F1C0 
-X-CRM114-Status: GOOD (  16.02  )
+X-CRM114-CacheID: sfid-20190219_130927_615707_FCC78406 
+X-CRM114-Status: GOOD (  15.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,53 +127,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "kernel-janitors@vger.kernel.org" <kernel-janitors@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Stefan Wahren <stefan.wahren@i2se.com>, Mark Rutland <mark.rutland@arm.com>,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev <netdev@vger.kernel.org>,
+ Marcel Holtmann <marcel@holtmann.org>,
+ "open list:BLUETOOTH DRIVERS" <linux-bluetooth@vger.kernel.org>,
+ Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On 19/02/2019 14:17, Rob Herring wrote:
+> On Mon, Feb 18, 2019 at 4:28 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> On Mon, Feb 18, 2019 at 2:08 PM Stefan Wahren <stefan.wahren@i2se.com> wrote:
+>>> Hi Vasily,
+>> Hi Stefan,
+>>
+>>>> Vasily Khoruzhick <anarsoul@gmail.com> hat am 18. Februar 2019 um 22:24 geschrieben:
+>>>>
+>>>>
+>>>> On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
+>>>>> On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+>>>>>> Add binding document for bluetooth part of RTL8723BS/RTL8723CS
+>>>>>>
+>>>>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>>>>>> ---
+>>>>>>   .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+>>>>>>   1 file changed, 35 insertions(+)
+>>>>>>   create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>>>>> new file mode 100644
+>>>>>> index 000000000000..8357f242ae4c
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>>>>> @@ -0,0 +1,35 @@
+>>>>>> +RTL8723BS/RTL8723CS Bluetooth
+>>>>>> +---------------------
+>>>>>> +
+>>>>>> +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+>>>>>> +BT is connected over serial. It speaks H5 protocol with few extra commands
+>>>>>> +to upload firmware and change module speed.
+>>>>>> +
+>>>>>> +Required properties:
+>>>>>> +
+>>>>>> + - compatible: should be one of the following:
+>>>>>> +   * "realtek,rtl8723bs-bt"
+>>>>>> +   * "realtek,rtl8723cs-bt"
+>>>>>> +Optional properties:
+>>>>>> +
+>>>>>> + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+>>>>>> + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+>>>>>> + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+>>>>>> + - firmware-postfix: firmware postfix to be used for firmware config
+>>> sorry, i didn't noticed your great series before. David and i working at the same stuff but for the Asus Tinker Board.
+>>>
+>>> I created a similiar yet untested patch version for hci_h5 [1]. Maybe it's useful.
+>> Looks good to me, but you may need to add firmware-postfix.
+>>
+>>> Just a comment about the binding. It's really necessary to add the reset-gpio? Can't we use the enable-gpio with inverse polarity for this?
+>> Yes, we can use enable-gpio instead of reset-gpio on pine64 and pinebook.
+> Then why do we have both? Reset and enable are distinct. The inverse
+> of enable-gpios is typically powerdown-gpios, not reset-gpios.
+>
+> Rob
 
+Both data sheets that I know:
 
-> -----Original Message-----
-> From: Colin King <colin.king@canonical.com>
-> Sent: Tuesday, February 19, 2019 8:05 AM
-> To: Roy Pledge <roy.pledge@nxp.com>; Leo Li <leoyang.li@nxp.com>;
-> linuxppc-dev@lists.ozlabs.org; linux-arm-kernel@lists.infradead.org
-> Cc: kernel-janitors@vger.kernel.org; linux-kernel@vger.kernel.org
-> Subject: [PATCH][next] soc: fsl: dpio: fix memory leak of a struct qbman on
-> error exit path
-> 
-> From: Colin Ian King <colin.king@canonical.com>
-> 
-> Currently the error check for a null reg leaks a struct qbman that was
-> allocated earlier. Fix this by kfree'ing p on the error exit path.
-> 
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+http://cit.odessa.ua/media/pdf/Intel-Compute-Stick/FN-Link_F23BDSM25-W1.pdf
+http://files.pine64.org/doc/datasheet/pine64/RTL8723BS.pdf
 
-Applied for next.  Thanks.
+BT_RST_N BT Reset IN / BT_DIS# General Purpose I/O Pin
 
-> ---
->  drivers/soc/fsl/dpio/qbman-portal.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/soc/fsl/dpio/qbman-portal.c
-> b/drivers/soc/fsl/dpio/qbman-portal.c
-> index 0bddb85c0ae5..5a73397ae79e 100644
-> --- a/drivers/soc/fsl/dpio/qbman-portal.c
-> +++ b/drivers/soc/fsl/dpio/qbman-portal.c
-> @@ -180,6 +180,7 @@ struct qbman_swp *qbman_swp_init(const struct
-> qbman_swp_desc *d)
->  	reg = qbman_read_register(p, QBMAN_CINH_SWP_CFG);
->  	if (!reg) {
->  		pr_err("qbman: the portal is not enabled!\n");
-> +		kfree(p);
->  		return NULL;
->  	}
-> 
-> --
-> 2.20.1
+So from the datasheet there is only one pin. And from its name it sounds 
+like reset.
+
+This said though the datasheets of these Realtek devices are a bit thin ....
+
 
 _______________________________________________
 linux-arm-kernel mailing list
