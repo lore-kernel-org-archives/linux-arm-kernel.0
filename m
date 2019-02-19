@@ -2,22 +2,21 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A7A60C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 12:52:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 70B95C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:01:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 768C3204EC
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 12:52:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3766720823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:01:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rBY6uTge"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 768C3204EC
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHk1Ax1A"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3766720823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,51 +24,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aIT6qRbOVLwONgTb7/eVwrd1r8CPH7tI77xgUSO5AvU=; b=rBY6uTgei8pR82
-	Z12bMAWDuOmtxfIXt/Q9wf+YMQCZSU268aYflWKUTIKFnNPLYD3fG/d3eF9Qyb3iTLMaDOyVshjWa
-	tf0pVSMqWTqqLePziI0RDWX2giVwICTnDLzGKq6Kj7eyTgFy+Fi886Qencs/ntLZ/O+jdJds9ze/F
-	PdWgi4T1xAHk4Gu+u18iiIvqyE+fQpH5mzueM2jHjJdgm8JScHR7iCQiqYSRD/9b0eMl5H/WjDmys
-	0GYjCHIEioXaWGPf/IcYYXE1riiyyqX9vVCKhSKMVXonKpjCnfxBirru0UNbS2WsbjT9e0ikUtsGJ
-	rbUoZYYTHQlln5z4D5IQ==;
+	List-Owner; bh=Pl2PosI7chDx6lTfdiCdAbxyj9ifWvZVGc1ix/5F08M=; b=aHk1Ax1AVo0qX1
+	ji+f1bN+YP7dlB7uf+yhYvl2E0RZYLU29iEa1H41o6VTeWnxqWA+LEo3/MTBuAAYoorP2HNJDWnjM
+	Ww1NENC+8tVoUdtTQOKJyF6fX726NX695UmIsHzcHT4kZ0EUkQ2xIRq47SZ3GZ828AMAZ2IeOXrYY
+	k3AuALYtrEVX+3OVoFc+SYt+zwkqy3bO4hHBxecp+LxfY5tpTXFeBPcy2RKjPGa3u2o82KZjrqIbh
+	67gP56keonxwdqGjOEqMIKMjOMVdTU9WAHH5ax4/0ZrYgCZxpmrm1oNZIPRfPBhRupY99ichHItX3
+	NX88MVB2dbVfqDOow1QA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw4sr-0000mn-Se; Tue, 19 Feb 2019 12:52:25 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw4sl-0000iQ-1Z
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 12:52:23 +0000
-Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <mfe@pengutronix.de>)
- id 1gw4se-00076t-IG; Tue, 19 Feb 2019 13:52:12 +0100
-Received: from mfe by pty.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <mfe@pengutronix.de>)
- id 1gw4sd-0003rh-7U; Tue, 19 Feb 2019 13:52:11 +0100
-Date: Tue, 19 Feb 2019 13:52:11 +0100
-From: Marco Felsch <m.felsch@pengutronix.de>
-To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH] dt-bindings: imx: update scu resource id headfile
-Message-ID: <20190219125211.2pg2bqxner4klcb5@pengutronix.de>
-References: <1550566601-11497-1-git-send-email-Anson.Huang@nxp.com>
+	id 1gw51v-0004O4-EU; Tue, 19 Feb 2019 13:01:47 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw51r-0004NX-6N
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 13:01:44 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 26B58EBD;
+ Tue, 19 Feb 2019 05:01:42 -0800 (PST)
+Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E6A863F720;
+ Tue, 19 Feb 2019 05:01:40 -0800 (PST)
+Date: Tue, 19 Feb 2019 13:01:38 +0000
+From: Will Deacon <will.deacon@arm.com>
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Subject: Re: [PATCH 0/9] 52-bit kernel + user VAs
+Message-ID: <20190219130138.GI8501@fuggles.cambridge.arm.com>
+References: <20190218170245.14915-1-steve.capper@arm.com>
+ <CAKv+Gu_xOFXLwKsrFo-rBXdgk4O6zm6xPHB+tv1XjDjzyrjhEA@mail.gmail.com>
+ <20190219124825.GH8501@fuggles.cambridge.arm.com>
+ <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1550566601-11497-1-git-send-email-Anson.Huang@nxp.com>
-X-Sent-From: Pengutronix Hildesheim
-X-URL: http://www.pengutronix.de/
-X-IRC: #ptxdist @freenode
-X-Accept-Language: de,en
-X-Accept-Content-Type: text/plain
-X-Uptime: 13:50:58 up 31 days, 17:32, 37 users,  load average: 0.14, 0.05, 0.02
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
-X-SA-Exim-Mail-From: mfe@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+In-Reply-To: <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
+User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_045219_245238_F7008C6C 
-X-CRM114-Status: GOOD (  12.92  )
+X-CRM114-CacheID: sfid-20190219_050143_249969_46A46B16 
+X-CRM114-Status: GOOD (  31.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,142 +72,113 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- Aisheng Dong <aisheng.dong@nxp.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, crecklin@redhat.com,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Steve Capper <steve.capper@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Anson,
-
-On 19-02-19 09:01, Anson Huang wrote:
-> Update i.MX SCU resource ID table according to latest
-> system controller firmware.
-
-will this happen every time the scu firmware gets a update?
-
-Regards,
-Marco
-
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  include/dt-bindings/firmware/imx/rsrc.h | 39 +++++++++++++++++++--------------
->  1 file changed, 22 insertions(+), 17 deletions(-)
+On Tue, Feb 19, 2019 at 01:51:51PM +0100, Ard Biesheuvel wrote:
+> On Tue, 19 Feb 2019 at 13:48, Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > On Tue, Feb 19, 2019 at 01:13:32PM +0100, Ard Biesheuvel wrote:
+> > > On Mon, 18 Feb 2019 at 18:05, Steve Capper <steve.capper@arm.com> wrote:
+> > > >
+> > > > This patch series adds support for 52-bit kernel VAs using some of the
+> > > > machinery already introduced by the 52-bit userspace VA code in 5.0.
+> > > >
+> > > > As 52-bit virtual address support is an optional hardware feature,
+> > > > software support for 52-bit kernel VAs needs to be deduced at early boot
+> > > > time. If HW support is not available, the kernel falls back to 48-bit.
+> > > >
+> > > > A significant proportion of this series focuses on "de-constifying"
+> > > > VA_BITS related constants.
+> > > >
+> > > > In order to allow for a KASAN shadow that changes size at boot time, one
+> > > > must fix the KASAN_SHADOW_END for both 48 & 52-bit VAs and "grow" the
+> > > > start address. Also, it is highly desirable to maintain the same
+> > > > function addresses in the kernel .text between VA sizes. Both of these
+> > > > requirements necessitate us to flip the kernel address space halves s.t.
+> > > > the direct linear map occupies the lower addresses.
+> > > >
+> > > > One obvious omission is 52-bit kernel VA + 48-bit userspace VA which I
+> > > > can add with some more #ifdef'ery if needed.
+> > > >
+> > >
+> > > Hi Steve,
+> > >
+> > > Apologies if I am bringing up things that have been addressed
+> > > internally already. We discussed the 52-bit kernel VA work at
+> > > plumber's at some point, and IIUC, KASAN is the complicating factor
+> > > when it comes to having compile time constants for VA_BITS_MIN,
+> > > VA_BITS_MAX and PAGE_OFFSET, right?
+> > >
+> > > To clarify what I mean, please refer to the diagram below, which
+> > > describes a hybrid 48/52 kernel VA arrangement that does not rely on
+> > > runtime variable quantities. (VA_BITS_MIN == 48, VA_BITS_MAX == 52)
+> > >
+> > > +------------------- (~0) -------------------------+
+> > > |                                                |
+> > > |            PCI IO / fixmap spaces              |
+> > > |                                                |
+> > > +------------------------------------------------+
+> > > |                                                |
+> > > |             kernel/vmalloc space               |
+> > > |                                                |
+> > > +------------------------------------------------+
+> > > |                                                |
+> > > |                module space                    |
+> > > |                                                |
+> > > +------------------------------------------------+
+> > > |                                                |
+> > > |                BPF space                       |
+> > > |                                                |
+> > > +------------------------------------------------+
+> > > |                                                |
+> > > |                                                |
+> > > |   vmemmap space (size based on VA_BITS_MAX)    |
+> > > |                                                |
+> > > |                                                |
+> > > +-- linear/vmalloc split based on VA_BITS_MIN -- +
+> > > |                                                |
+> > > |    linear mapping (48 bit addressable region)  |
+> > > |                                                |
+> > > +------------------------------------------------+
+> > > |                                                |
+> > > |    linear mapping (52 bit addressable region)  |
+> > > |                                                |
+> > > +------ PAGE_OFFSET based on VA_BITS_MAX --------+
+> > >
+> > > Since KASAN is what is preventing this, would it be acceptable for
+> > > KASAN to only be supported when you use a true 48 bit or a true 52 bit
+> > > configuration, and disable it for the 48/52 hybrid configuration?
+> > >
+> > > Just thinking out loud (and in ASCII art :-))
+> >
+> > TBH, if we end up having support for 52-bit kernel VA, I'd be inclined to
+> > drop the 48/52 configuration altogether. But Catalin's on holiday at the
+> > moment, and may have a different opinion ;)
+> >
 > 
-> diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
-> index 4481f2d..ad747a8 100644
-> --- a/include/dt-bindings/firmware/imx/rsrc.h
-> +++ b/include/dt-bindings/firmware/imx/rsrc.h
-> @@ -36,15 +36,15 @@
->  #define IMX_SC_R_DC_0_BLIT1		20
->  #define IMX_SC_R_DC_0_BLIT2		21
->  #define IMX_SC_R_DC_0_BLIT_OUT		22
-> -#define IMX_SC_R_DC_0_CAPTURE0		23
-> -#define IMX_SC_R_DC_0_CAPTURE1		24
-> +#define IMX_SC_R_PERF			23
-> +#define IMX_SC_R_UNUSED5		24
->  #define IMX_SC_R_DC_0_WARP		25
-> -#define IMX_SC_R_DC_0_INTEGRAL0		26
-> -#define IMX_SC_R_DC_0_INTEGRAL1		27
-> +#define IMX_SC_R_UNUSED7		26
-> +#define IMX_SC_R_UNUSED8		27
->  #define IMX_SC_R_DC_0_VIDEO0		28
->  #define IMX_SC_R_DC_0_VIDEO1		29
->  #define IMX_SC_R_DC_0_FRAC0		30
-> -#define IMX_SC_R_DC_0_FRAC1		31
-> +#define IMX_SC_R_UNUSED6		31
->  #define IMX_SC_R_DC_0			32
->  #define IMX_SC_R_GPU_2_PID0		33
->  #define IMX_SC_R_DC_0_PLL_0		34
-> @@ -53,17 +53,17 @@
->  #define IMX_SC_R_DC_1_BLIT1		37
->  #define IMX_SC_R_DC_1_BLIT2		38
->  #define IMX_SC_R_DC_1_BLIT_OUT		39
-> -#define IMX_SC_R_DC_1_CAPTURE0		40
-> -#define IMX_SC_R_DC_1_CAPTURE1		41
-> +#define IMX_SC_R_UNUSED9		40
-> +#define IMX_SC_R_UNUSED10		41
->  #define IMX_SC_R_DC_1_WARP		42
-> -#define IMX_SC_R_DC_1_INTEGRAL0		43
-> -#define IMX_SC_R_DC_1_INTEGRAL1		44
-> +#define IMX_SC_R_UNUSED11		43
-> +#define IMX_SC_R_UNUSED12		44
->  #define IMX_SC_R_DC_1_VIDEO0		45
->  #define IMX_SC_R_DC_1_VIDEO1		46
->  #define IMX_SC_R_DC_1_FRAC0		47
-> -#define IMX_SC_R_DC_1_FRAC1		48
-> +#define IMX_SC_R_UNUSED13		48
->  #define IMX_SC_R_DC_1			49
-> -#define IMX_SC_R_GPU_3_PID0		50
-> +#define IMX_SC_R_UNUSED14		50
->  #define IMX_SC_R_DC_1_PLL_0		51
->  #define IMX_SC_R_DC_1_PLL_1		52
->  #define IMX_SC_R_SPI_0			53
-> @@ -303,8 +303,8 @@
->  #define IMX_SC_R_M4_0_UART		287
->  #define IMX_SC_R_M4_0_I2C		288
->  #define IMX_SC_R_M4_0_INTMUX		289
-> -#define IMX_SC_R_M4_0_SIM		290
-> -#define IMX_SC_R_M4_0_WDOG		291
-> +#define IMX_SC_R_UNUSED15		290
-> +#define IMX_SC_R_UNUSED16		291
->  #define IMX_SC_R_M4_0_MU_0B		292
->  #define IMX_SC_R_M4_0_MU_0A0		293
->  #define IMX_SC_R_M4_0_MU_0A1		294
-> @@ -323,8 +323,8 @@
->  #define IMX_SC_R_M4_1_UART		307
->  #define IMX_SC_R_M4_1_I2C		308
->  #define IMX_SC_R_M4_1_INTMUX		309
-> -#define IMX_SC_R_M4_1_SIM		310
-> -#define IMX_SC_R_M4_1_WDOG		311
-> +#define IMX_SC_R_UNUSED17		310
-> +#define IMX_SC_R_UNUSED18		311
->  #define IMX_SC_R_M4_1_MU_0B		312
->  #define IMX_SC_R_M4_1_MU_0A0		313
->  #define IMX_SC_R_M4_1_MU_0A1		314
-> @@ -337,7 +337,7 @@
->  #define IMX_SC_R_IRQSTR_SCU2		321
->  #define IMX_SC_R_IRQSTR_DSP		322
->  #define IMX_SC_R_ELCDIF_PLL		323
-> -#define IMX_SC_R_UNUSED6		324
-> +#define IMX_SC_R_OCRAM			324
->  #define IMX_SC_R_AUDIO_PLL_0		325
->  #define IMX_SC_R_PI_0			326
->  #define IMX_SC_R_PI_0_PWM_0		327
-> @@ -554,6 +554,11 @@
->  #define IMX_SC_R_VPU_MU_3		538
->  #define IMX_SC_R_VPU_ENC_1		539
->  #define IMX_SC_R_VPU			540
-> -#define IMX_SC_R_LAST			541
-> +#define IMX_SC_R_DMA_5_CH0		541
-> +#define IMX_SC_R_DMA_5_CH1		542
-> +#define IMX_SC_R_DMA_5_CH2		543
-> +#define IMX_SC_R_DMA_5_CH3		544
-> +#define IMX_SC_R_ATTESTATION		545
-> +#define IMX_SC_R_LAST			546
->  
->  #endif /* __DT_BINDINGS_RSCRC_IMX_H */
-> -- 
-> 2.7.4
-> 
-> 
-> 
+> But that implies that you cannot have an image that supports 52-bit
+> kernel VAs but can still boot on hardware that does not implement
+> support for it. If that is acceptable, then none of this hoop jumping
+> that Steve is doing in these patches is necessary to begin with,
+> right?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sorry, I misunderstood what you meant by a "48/52 hybrid configuration". I
+thought you were referring to the configuration where userspace is 52-bit
+and the kernel is 48-bit, which is something I think we can drop if we gain
+support for 52-bit kernel.
+
+Now that I understand what you mean, I think disabling KASAN would be fine
+as long as it's a runtime thing and the kernel continues to work in every
+other respect.
+
+Will
 
 _______________________________________________
 linux-arm-kernel mailing list
