@@ -2,74 +2,60 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49B65C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:21:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E4AAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:23:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CA3921848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:21:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DDE8121848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:23:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t4mlLq8J"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CA3921848
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="im/7syvr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DDE8121848
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hisilicon.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IJg4BcPv+/vaEha/6d2u5c6te3GgA4kM1TMsvrfjRP0=; b=t4mlLq8JqNXzO8
-	rM3Y/VsoMOdmvduRw6l9XPeN4x04W8IWs40DquXObe/2Wrd/byeYHkthOY0rZap/4XHgSiQHW5qVK
-	AZoiaXHSJ52teNJ6domDvaAAume+2ztcLTrP+VOBqYs5z5vglPvQXSgD9Vhx2svZWueGF8hI5Pdh5
-	vKZn6+Mo3k1lcRxbWwk8PXvhHa+/dEaHmLQrM9qBJMUi8Zb6vW/hTz7Ln3hAIjWbHRe2CE9nhxJur
-	TOwr0FMVuIokDwJwrCPmJzASVwZYc9rQwUd1beSVhyiPzIIMu8RaSJO8ya0rrARhT3DSNX+4ZeP8j
-	BrJ0bLDCp+kAe0dA0v0Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=bwd3Sjgv3p5L3/ZX6zRHgTKOqWGYoOcjGJZw5mdchWE=; b=im/7syvrgE3Tj/
+	4MK5T/mn8b8TYut3C+TxGRbvOHnqtLZGUEBvXah1zNtje0UilDi0wPpX/4vFbcscNhcoWHEAOaDLq
+	IAkFUQ6ehQ+hU/va4/LsilDZsKQi8FvZe0jGGzEKhcToTRI4pvb0QxuJ+PBj+vxmHQim5rQLH8I+c
+	yTpaajTaWkzzYcvw2lYX2pZ8Jb5COnSW5kcsj7kZK0eXLb/jT8aWcvGuZ944yzNbHKjimhDcZ+R0z
+	qLrkPBBZAodXbgM4QKs0aE0+fVEU3CjtmReqXVRL4eOLi3BcKGt+llTsn5Re+3dm8ye5VUIQ1O5Z0
+	87FvSq94KC/MxIBqpWOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1ac-0002Z7-Sc; Tue, 19 Feb 2019 09:21:22 +0000
-Received: from mail-qt1-f194.google.com ([209.85.160.194])
+	id 1gw1cr-0002wp-4l; Tue, 19 Feb 2019 09:23:41 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1aa-0002Ym-53
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:21:21 +0000
-Received: by mail-qt1-f194.google.com with SMTP id o6so22327887qtk.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 01:21:18 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=YaRJXWMPwMF5dOfThdKY2XaRgXEOtBxAahcDGKBFIjY=;
- b=DdPkzSf3DEgeJ8UfUUkwr3aZQNnJ6pxUOEuA7YHLGDA1+x/cOywBmB5aX/fRHVP/lQ
- yUk8/OT9as2QFUscJWHP2u/SytAegLfVmTJDzBPnjXacTMcHZ6qlgoXZpmKvhOsKipqB
- bnRepbvl0x4SdLQka127Y33AkjLzu0ziaDqruCONpfMvilf0SXWTsgqILv97OGjDU/BF
- Zoxdc3X9c61985NN3FrsyCU3iDmmINs2sNGv4nE8SIahDwa5GTnIubWthcA8zL6shm3P
- qas+7cWMzm+X61PMLvWmNwSqZMhKWy7IN6TvFT+M+9R2mgdlzIx2P/rkui6ho/pB8TqO
- 5Sew==
-X-Gm-Message-State: AHQUAuZGPjhef2o/tFF9WTYGyk8GIVm6hsP5Md9nkcfDwa8h2IxJNXq5
- YPozsgQZXT5jwr13eP+LfUSHzT/udH7BbCRePfo=
-X-Google-Smtp-Source: AHgI3IZa7a2MFIPVdfBN9ABbvVneQCmsRaOOBg/wA5iD7KfxHwGBiQJ32bmJ/wzm27PHOhJbEMrZgqQU9YhM2nQg6MI=
-X-Received: by 2002:ac8:237b:: with SMTP id b56mr7506433qtb.343.1550568077655; 
- Tue, 19 Feb 2019 01:21:17 -0800 (PST)
+ id 1gw1co-0002tI-5i
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:23:39 +0000
+Received: from DGGEMS403-HUB.china.huawei.com (unknown [172.30.72.59])
+ by Forcepoint Email with ESMTP id D8BD498BC1813DEED724;
+ Tue, 19 Feb 2019 17:23:29 +0800 (CST)
+Received: from localhost.localdomain (10.67.212.132) by
+ DGGEMS403-HUB.china.huawei.com (10.3.19.203) with Microsoft SMTP Server id
+ 14.3.408.0; Tue, 19 Feb 2019 17:23:21 +0800
+From: Shaokun Zhang <zhangshaokun@hisilicon.com>
+To: <linux-arm-kernel@lists.infradead.org>, <kvmarm@lists.cs.columbia.edu>
+Subject: [PATCH] KVM: arm/arm64: Remove unused gpa_end variable
+Date: Tue, 19 Feb 2019 17:22:21 +0800
+Message-ID: <1550568141-22796-1-git-send-email-zhangshaokun@hisilicon.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-References: <1549628778-30785-1-git-send-email-sugaya.taichi@socionext.com>
- <CAK8P3a026P7tZpJ7gsZbf_MnJJ0eVv60ggGXYndX9kCDLpNy4Q@mail.gmail.com>
- <7266af3b-aeec-4c29-c96e-ee0d21d3e867@socionext.com>
-In-Reply-To: <7266af3b-aeec-4c29-c96e-ee0d21d3e867@socionext.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Tue, 19 Feb 2019 10:21:01 +0100
-Message-ID: <CAK8P3a09+K7ZPBgHs45Z2e_w6DPzXDMPT+DpXBowT0SBu8oCtw@mail.gmail.com>
-Subject: Re: [PATCH v2 04/15] ARM: milbeaut: Add basic support for Milbeaut
- m10v SoC
-To: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+X-Originating-IP: [10.67.212.132]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_012120_190614_173E0CF0 
-X-CRM114-Status: GOOD (  15.36  )
+X-CRM114-CacheID: sfid-20190219_012338_387415_F1C7C27E 
+X-CRM114-Status: GOOD (  10.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,46 +67,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 19, 2019 at 8:12 AM Sugaya, Taichi
-<sugaya.taichi@socionext.com> wrote:
-> On 2019/02/18 21:15, Arnd Bergmann wrote:
-> > On Fri, Feb 8, 2019 at 1:26 PM Sugaya Taichi
-> > <sugaya.taichi@socionext.com> wrote:
->
-> >> +static int __init m10v_pm_init(void)
-> >> +{
-> >> +       suspend_set_ops(&m10v_pm_ops);
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +late_initcall(m10v_pm_init);
-> >
-> > This requires a check to ensure you are actually on the right platform,
-> > otherwise you break suspend/resume in a multiplatform kernel running
-> > on anything other than milbeaut.
-> >
->
-> OK.
-> I think the solution is adding a "if statement with mlbeaut compatible"
-> above suspend_set_ops(&m10v_pm_ops).
+The 'gpa_end' local variable is never used and let's remove it.
 
-Right, you can either use a call to of_machine_is_compatible(),
-or you add a machine descriptor with OF_MACHINE_START()
-and use this as the init_late() callback.
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+---
+ virt/kvm/arm/mmu.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-      Arnd
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 30251e288629..eac6ff15bd3a 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1598,14 +1598,13 @@ static void kvm_send_hwpoison_signal(unsigned long address,
+ static bool fault_supports_stage2_pmd_mappings(struct kvm_memory_slot *memslot,
+ 					       unsigned long hva)
+ {
+-	gpa_t gpa_start, gpa_end;
++	gpa_t gpa_start;
+ 	hva_t uaddr_start, uaddr_end;
+ 	size_t size;
+ 
+ 	size = memslot->npages * PAGE_SIZE;
+ 
+ 	gpa_start = memslot->base_gfn << PAGE_SHIFT;
+-	gpa_end = gpa_start + size;
+ 
+ 	uaddr_start = memslot->userspace_addr;
+ 	uaddr_end = uaddr_start + size;
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
