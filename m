@@ -4,91 +4,56 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4922AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:20:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8287DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:21:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 148442147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:20:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4EEC32147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:21:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZosdKmDf";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mNKReiKM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 148442147A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kSJNAknu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4EEC32147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ni2kmuiGBZFHMtYqP7ebQQnOtyGzOqGvPWqsakzMlpI=; b=ZosdKmDf1YRfvb
-	bmJrglZTRHZmLr8wHSBQ2XFSxASdjm2i/FeCCgA0H4GNts4HJGABPqgEG1aBImQFTH8+PbXGDsZ3l
-	oUrok+0ivhAsy1jxwUj51++JUOFFMURHLO9iQG91t61PEcnost8pA+p37JLQWI/KIFkpP3XJmBzTl
-	5kzWaw+L8576Je5R68e9xNqaxog4JTvTEwZR5x7gDvkvDKl4+HqMmvG3tio5S6HS9iLQaLhAr+r6I
-	I5T5Kg9LBJrLQAamhNTtJxKSSGhRLNx8xq0AMBvjK2sdhQtTAwdatq8CM4pvFDtJ+qhSINrSGnK+a
-	S+nsrWJjCCk6X5KZHxhQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
+	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EJLkSPatEQaoktiSMCu49AuwOSFhuIspn/b5kp7YxZg=; b=kSJNAknusYMqfW
+	PvPOtyMUW/bbUw7qWPwhjzhE7YNnSklo4oWti1JXEkzAzfV7ZxVSE37/WJGlvUD8s/qWEyw6VF9/+
+	y7YMI85H3u7aMxtMWIx28Xn0ahHJeOg8yWGRUns4EaMTDHiM6dtLgB/8FJ+svTqQEpc3s0RwWYjFN
+	vRec4fbsFi7Nb+VLlVNLz2KnRpEjkjSVR/r/eL/U2PAHATIqpOxopfDvRfoQSuoBBxRmKeJoEv9yc
+	SzpUxHPzyDnJc/Jc0nC0U5dItSDV+lVwthRi8i8Gf3A/3KYPI/UdDeVf7bZdDJHx4/cYkOSgiQw0l
+	TYxLshCHqLsNIb7JvpiQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw87f-0000Z2-VL; Tue, 19 Feb 2019 16:19:55 +0000
-Received: from lelv0142.ext.ti.com ([198.47.23.249])
+	id 1gw895-00025C-1P; Tue, 19 Feb 2019 16:21:23 +0000
+Received: from relay3-d.mail.gandi.net ([217.70.183.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw87U-0000MG-KW
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 16:19:52 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1JGJRV7068946;
- Tue, 19 Feb 2019 10:19:27 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550593167;
- bh=jOHJT6UlWarzkLKFO+IUQMq3LQJx+t9vnGb9QzLYNGE=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=mNKReiKMsPr1GCPgDNz7PB6+FcgtZfH5chulHPIJdVQHJH0YYEIWqwKCao768O8D1
- 9lWqzJfXVytHmGGfsPmMkBCAqNBeTnJadD7VG4tf+rgfncJ15TjfVLR/y5VlAKnvLq
- 8dUW4S0F7jCPebaypB0SYW7N3+5jiMGqieUyJ+H8=
-Received: from DFLE100.ent.ti.com (dfle100.ent.ti.com [10.64.6.21])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1JGJRNs080509
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 19 Feb 2019 10:19:27 -0600
-Received: from DFLE108.ent.ti.com (10.64.6.29) by DFLE100.ent.ti.com
- (10.64.6.21) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
- Feb 2019 10:19:27 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 19 Feb 2019 10:19:27 -0600
-Received: from [172.22.216.198] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1JGJM1E018181;
- Tue, 19 Feb 2019 10:19:23 -0600
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-To: Tony Lindgren <tony@atomide.com>
-References: <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
- <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
- <20190215161629.GK5720@atomide.com>
- <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
- <20190218143245.GC15711@atomide.com>
- <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
- <20190219153537.GJ15711@atomide.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <6aa37276-0833-fdf5-575b-c3ca14f776a6@ti.com>
-Date: Tue, 19 Feb 2019 21:49:21 +0530
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ id 1gw890-00024k-Hz
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 16:21:20 +0000
+X-Originating-IP: 90.53.137.203
+Received: from localhost (alyon-652-1-306-203.w90-53.abo.wanadoo.fr
+ [90.53.137.203]) (Authenticated sender: gregory.clement@bootlin.com)
+ by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id 2F7DC60006;
+ Tue, 19 Feb 2019 16:21:02 +0000 (UTC)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: Re: [GIT PULL] ARM: mvebu: dt for v5.1 (#1)
+In-Reply-To: <CAK8P3a1+anoAJvXmU8xCVnyuEAVC-Hs055ybZjmUmfJRdd0x=w@mail.gmail.com>
+References: <87k1ia561h.fsf@FE-laptop>
+ <CAK8P3a1+anoAJvXmU8xCVnyuEAVC-Hs055ybZjmUmfJRdd0x=w@mail.gmail.com>
+Date: Tue, 19 Feb 2019 17:21:02 +0100
+Message-ID: <87r2c321ht.fsf@FE-laptop>
 MIME-Version: 1.0
-In-Reply-To: <20190219153537.GJ15711@atomide.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_081944_892494_1A22D4CF 
-X-CRM114-Status: GOOD (  29.64  )
+X-CRM114-CacheID: sfid-20190219_082118_745182_BCBA535E 
+X-CRM114-Status: GOOD (  10.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,130 +65,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ arm-soc <arm@kernel.org>, Olof Johansson <olof@lixom.net>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 2/19/2019 9:05 PM, Tony Lindgren wrote:
-> * Lokesh Vutla <lokeshvutla@ti.com> [190219 08:51]:
->> Hi Tony,
->>
->> On 18/02/19 8:02 PM, Tony Lindgren wrote:
->>> * Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
->>>> On 2/15/2019 9:46 PM, Tony Lindgren wrote:
->>>>> The dts node for the interrupt controller should describe a
->>>>> proper Linux device, that is with reg entries and so on.
->>>>
->>>> You are asking to just keep the compatible property :)
->>>
->>> Right, and then I realized this node is missing the standard
->>> reg entry too. And you're saying the registers are not even
->>> accissible from Linux.
->>>
->>> So based on that IMO you should not even have a device tree
->>> node for it at all. You should just have the interrupt
->>
->> Practically lets look at what all I am adding in the DT node. Below is one such
->> example:
->>
->> main_intr: interrupt-controller0 {
->> 	compatible = "ti,sci-intr";
->> 	interrupt-controller;
->> 	interrupt-parent = <&gic500>;
->> 	#interrupt-cells = <4>;
->> 	ti,sci = <&dmsc>;
->> 	ti,sci-dst-id = <56>;
->> 	ti,sci-rm-range-girq = <0x1>;
->> };
->>
->> The following 4 properties are required at least for probing, to represent the
->> hierarchy and for  interrupt definition:
->> 	compatible = "ti,sci-intr";
->> 	interrupt-controller;
->> 	interrupt-parent = <&gic500>;
->> 	#interrupt-cells = <4>;
->>
->> The remaining 3 properties represents the TISCI interface. Let's go step by step:
->> * ti,sci = <&dmsc> :This is the phandle to the firmware protocol driver using
->> which the messages are sent
->> * ti,sci-dst-id = <56> : This is the TISCI device ID for the parent controller
->> for which your irqs needs to be connected. As I said this cannot be queried from
->> sysfw and this is the input to the messages that are send to sysfw.
-> 
-> Let's not add anything that does not describe hardware to the device
-> tree. This is ID is an invented number used by the firmware.
-> 
->> *  ti,sci-rm-range-girq = <0x1>: This define the ids using which the parent-irq
->> ranges that are allocated to this interrupt router instance can be queried from
->> sysfw.
->> If the above 2 properties are to be added as driver phandle then for every
->> instance of interrupt router in the SoC, a new compatible needs to be created. I
->> don't think this is a desirable solution.
-> 
-> To me it seems that the interrupt router _must_ have proper IO
-> configuration registers available to the Linux running SoC.
-> 
-> Are you sure the interrupt route does not have proper IO
-> configuration registers available for the Linux running SoC?
-> 
-> If the there are not, I'd be surprised how the SoC is designed :)
-> 
-> So assuming it does, you should just use the standard device tree
-> reg property to differentiate between the various interrupt router
-> instances. And then you can have the driver talk to the firmware
-> in a way where the driver instances are separate even if no IO
-> access to these shared registers is done by the Linux running SoC.
-> 
-> But see also the mux comment below.
-> 
->> With this can you tell me how can we not have a device-tree and still support
->> irq allocation?
-> 
-> Using standard dts reg property to differentiate the interrupt
-> router instances. And if the interrupt router is a mux, you should
-> treat it as a mux rather than a chained interrupt controller.
-> 
-> We do have drivers/mux nowadays, not sure if it helps in this case
-> as at least timer interrupts need to be configured very early.
-> 
->> Also, this is not the first time a driver based on a firmware is being added.
->> K2g clock, power and reset drivers are based on this where device ids are being
->> passed from consumers. Similarly arm scpi based drivers are also available.
-> 
-> Having drivers communicate with firmware is quite standard.
-
-yes. How different is this from any of the above mentioned drivers using
-firmware specific ids. Like sci pm domain[1] driver utilizes the same
-device id for enabling any device in the system. Similarly clock
-driver[2] uses the same device ids and clock ids specified by firmware.
-There are more which similarly represents firmware ids from DT.
-
-[1] Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
-[2] Documentation/devicetree/bindings/clock/ti,sci-clk.txt
-
-Thanks and regards,
-Lokesh
-
-> 
-> However, stuffing firmware specific data to the device tree
-> does not describe the hardware and must not be done.
-> 
-> Regards,
-> 
-> Tony
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQXJuZCwKIAogT24gdmVuLiwgZsOpdnIuIDE1IDIwMTksIEFybmQgQmVyZ21hbm4gPGFybmRA
+YXJuZGIuZGU+IHdyb3RlOgoKPiBPbiBGcmksIEZlYiA4LCAyMDE5IGF0IDEwOjIyIFBNIEdyZWdv
+cnkgQ0xFTUVOVAo+IDxncmVnb3J5LmNsZW1lbnRAYm9vdGxpbi5jb20+IHdyb3RlOgo+Cj4+Cj4+
+IC0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0t
+LS0tLS0tLS0KPj4gQW5kcmV3IEx1bm4gKDEpOgo+PiAgICAgICBhcmNoOiBhcm06IGR0czogUmVt
+b3ZlIGRpc2FibGVkIG1hcnZlbGwsZHNhIHByb3BlcnRpZXMKPj4KPj4gIGFyY2gvYXJtL2Jvb3Qv
+ZHRzL2FybWFkYS0zNzAtcmQuZHRzICAgICAgICAgICAgfCA0MiAtLS0tLS0tLS0tLS0tLS0tLS0t
+Cj4+ICBhcmNoL2FybS9ib290L2R0cy9hcm1hZGEtMzg4LWNsZWFyZm9nLmR0cyAgICAgIHwgNTgg
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KPj4gIGFyY2gvYXJtL2Jvb3QvZHRzL2FybWFkYS14
+cC1saW5rc3lzLW1hbWJhLmR0cyAgfCA0NyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0KPj4gIGFyY2gv
+YXJtL2Jvb3QvZHRzL2tpcmt3b29kLWRpcjY2NS5kdHMgICAgICAgICAgfCA0NyAtLS0tLS0tLS0t
+LS0tLS0tLS0tLS0KPj4gIGFyY2gvYXJtL2Jvb3QvZHRzL2tpcmt3b29kLWxpbmtzeXMtdmlwZXIu
+ZHRzICAgfCA0NyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0KPj4gIGFyY2gvYXJtL2Jvb3QvZHRzL2tp
+cmt3b29kLW12ODhmNjI4MWd0dy1nZS5kdHMgfCA0NyAtLS0tLS0tLS0tLS0tLS0tLS0tLS0KPj4g
+IGFyY2gvYXJtL2Jvb3QvZHRzL2tpcmt3b29kLXJkODhmNjI4MS5kdHNpICAgICAgfCA0MSAtLS0t
+LS0tLS0tLS0tLS0tLS0KPj4gIDcgZmlsZXMgY2hhbmdlZCwgMzI5IGRlbGV0aW9ucygtKQo+Cj4g
+Q291bGQgeW91IGhhdmUgYSBsb29rIGF0IHRoZXNlIHdhcm5pbmdzIGFuZCBzZW5kIGEgZm9sbG93
+LXVwIHB1bGwgcmVxdWVzdD8KPgo+IC4uL2FyY2gvYXJtL2Jvb3QvZHRzL2tpcmt3b29kLXJkODhm
+NjI4MS16MC5kdHM6MjEuNC0xNjogV2FybmluZwo+IChyZWdfZm9ybWF0KTogL2RzYS9zd2l0Y2hA
+MDpyZWc6IHByb3BlcnR5IGhhcyBpbnZhbGlkIGxlbmd0aCAoOCBieXRlcykKPiAoI2FkZHJlc3Mt
+Y2VsbHMgPT0gMiwgI3NpemUtY2VsbHMgPT0gMSkKPiAuLi9hcmNoL2FybS9ib290L2R0cy9raXJr
+d29vZC1yZDg4ZjYyODEtejAuZHRzOjIzLjUtMTU6IFdhcm5pbmcKPiAocmVnX2Zvcm1hdCk6IC9k
+c2Evc3dpdGNoQDAvcG9ydEA0OnJlZzogcHJvcGVydHkgaGFzIGludmFsaWQgbGVuZ3RoICg0Cj4g
+Ynl0ZXMpICgjYWRkcmVzcy1jZWxscyA9PSAyLCAjc2l6ZS1jZWxscyA9PSAxKQo+IGFyY2gvYXJt
+L2Jvb3QvZHRzL2tpcmt3b29kLXJkODhmNjI4MS16MC5kdGI6IFdhcm5pbmcKPiAocGNpX2Rldmlj
+ZV9idXNfbnVtKTogRmFpbGVkIHByZXJlcXVpc2l0ZSAncmVnX2Zvcm1hdCcKPiBhcmNoL2FybS9i
+b290L2R0cy9raXJrd29vZC1yZDg4ZjYyODEtejAuZHRiOiBXYXJuaW5nIChpMmNfYnVzX3JlZyk6
+Cj4gRmFpbGVkIHByZXJlcXVpc2l0ZSAncmVnX2Zvcm1hdCcKPiBhcmNoL2FybS9ib290L2R0cy9r
+aXJrd29vZC1yZDg4ZjYyODEtejAuZHRiOiBXYXJuaW5nIChzcGlfYnVzX3JlZyk6Cj4gRmFpbGVk
+IHByZXJlcXVpc2l0ZSAncmVnX2Zvcm1hdCcKPiAuLi9hcmNoL2FybS9ib290L2R0cy9raXJrd29v
+ZC1yZDg4ZjYyODEtejAuZHRzOjIwLjEyLTI2LjU6IFdhcm5pbmcKPiAoYXZvaWRfZGVmYXVsdF9h
+ZGRyX3NpemUpOiAvZHNhL3N3aXRjaEAwOiBSZWx5aW5nIG9uIGRlZmF1bHQKPiAjYWRkcmVzcy1j
+ZWxscyB2YWx1ZQo+IC4uL2FyY2gvYXJtL2Jvb3QvZHRzL2tpcmt3b29kLXJkODhmNjI4MS16MC5k
+dHM6MjAuMTItMjYuNTogV2FybmluZwo+IChhdm9pZF9kZWZhdWx0X2FkZHJfc2l6ZSk6IC9kc2Ev
+c3dpdGNoQDA6IFJlbHlpbmcgb24gZGVmYXVsdAo+ICNzaXplLWNlbGxzIHZhbHVlCj4gLi4vYXJj
+aC9hcm0vYm9vdC9kdHMva2lya3dvb2QtcmQ4OGY2MjgxLXowLmR0czoyMi4xMS0yNS42OiBXYXJu
+aW5nCj4gKGF2b2lkX2RlZmF1bHRfYWRkcl9zaXplKTogL2RzYS9zd2l0Y2hAMC9wb3J0QDQ6IFJl
+bHlpbmcgb24gZGVmYXVsdAo+ICNhZGRyZXNzLWNlbGxzIHZhbHVlCj4gLi4vYXJjaC9hcm0vYm9v
+dC9kdHMva2lya3dvb2QtcmQ4OGY2MjgxLXowLmR0czoyMi4xMS0yNS42OiBXYXJuaW5nCj4gKGF2
+b2lkX2RlZmF1bHRfYWRkcl9zaXplKTogL2RzYS9zd2l0Y2hAMC9wb3J0QDQ6IFJlbHlpbmcgb24g
+ZGVmYXVsdAo+ICNzaXplLWNlbGxzIHZhbHVlCj4KClllcyBzdXJlLiBJIHJlYWxpemUgdGhhdCBJ
+IHRlc3QgdGhlIGJ1aWxkIHdpdGggdGhlIHdyb25nIGRlZmNvbmZpZwoobXZlYnVfdjdfZGVmY29u
+ZmlnIGluc3RlYWQgb2YgbXZlYnVfdjVfZGVmY29uZmlnKSB3aGljaCBtYWRlIG1lIG1pc3MKdGhl
+c2Ugd2FybmluZ3MuIEkgYW0gZ29pbmcgdG8gc2VuZCBhIHBhdGNoIHRvIGZpeCBpdCBhbmQgdGhl
+biBJIHdpbGwgZG8gYQpmb2xsb3ctdXAgcHVsbCByZXF1ZXN0LgoKR3JlZ29yeQoKCj4gVGhhbmtz
+LAo+Cj4gICAgICAgQXJuZAoKLS0gCkdyZWdvcnkgQ2xlbWVudCwgQm9vdGxpbgpFbWJlZGRlZCBM
+aW51eCBhbmQgS2VybmVsIGVuZ2luZWVyaW5nCmh0dHA6Ly9ib290bGluLmNvbQoKX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBt
+YWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9s
+aXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
