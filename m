@@ -6,65 +6,75 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF27FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:19:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D13BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:46:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AC59620855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:19:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CBA4C21903
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:46:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KGah3Fj4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC59620855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dpX7Rj6i"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBA4C21903
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=tQsMa04HyYMGf3ze6+RBohW6H139jDpwlb6JFTVfMv4=; b=KGah3Fj4rPOwEX45LAw2sps05
-	k4tNdhnvKnNiCGwe0FdEuyodkCMYplBLOHWWcHDp04MgRDVDH9HSrgDUTTL2NNWG3qwTmO636qnz1
-	ohayYCt1TvDuQ2LpFiwTvxyAUvKqtfE+BIeUon+x2gxHmSxl5CmAWIfozqmaaDamclYE4POxBD4yl
-	/oj4/PdtgtqBxnH4OwpmfjYHoe4GJ/RWvsdIg6I+6ttLoBPrW4pJSNOQZJr14cFFzdW31gliPxO3W
-	URUtbgD+54YCUmGmadwUOcuGQbMomLqilLD2JpscAKDvAsXmhYssaVcKVgiPclbS3oiT07YrNtUUA
-	D5OnADziA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LByeDrofhmD83sxQJj/yvfxv87WBE1mv/77XaarwmGU=; b=dpX7Rj6iketMRI
+	933aoT6tGjA3CSVcVuwlSU5u/UNN2vGczJ4JBFauPjUIPNamvFvK7dMcqlvpU4If7YxIXisFMw8pE
+	M78ysqgdr6Ge/dAceusxUO+PYTbLj7h/NMSOAAc+DyqvnlZLLXKgj/vGmHhhVwN0EeXfMaBHg6hqY
+	pYSYIEOVkOBi3gyUJT/VvKvlE8pbm1+dM0eL1eTfmNE4uDGGXD4j+OVBLPSRfe3f/HvsGxE3Hq0Ok
+	6rLL2PBsrHZ51pTaj5epQ2BtGsHbPnvw8IGRCfk5E8OAwemjrlCHcuemoA496333q/FTq5JDCE+uT
+	HM+MKvRZjSl9w6xoGCFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw0cF-00074o-QP; Tue, 19 Feb 2019 08:18:59 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw0cD-00074O-7a
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:18:58 +0000
-Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
- by mx.socionext.com with ESMTP; 19 Feb 2019 17:18:56 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 511526117D;
- Tue, 19 Feb 2019 17:18:56 +0900 (JST)
-Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
- Tue, 19 Feb 2019 17:18:56 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by iyokan.css.socionext.com (Postfix) with ESMTP id 030CA404DC;
- Tue, 19 Feb 2019 17:18:56 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id E2159121B6C;
- Tue, 19 Feb 2019 17:18:55 +0900 (JST)
-Subject: Re: [PATCH v2 03/15] dt-bindings: Add documentation for Milbeaut SoCs
-To: Masahiro Yamada <yamada.masahiro@socionext.com>
-References: <1549628764-30587-1-git-send-email-sugaya.taichi@socionext.com>
- <CAK7LNARTX4_phfcXRXUKGp_V0k_q_RKjL6A3Kz=Hxyqj6VXW+Q@mail.gmail.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <e28fd693-8ec9-3e89-7f98-62661c80e42b@socionext.com>
-Date: Tue, 19 Feb 2019 17:18:55 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gw13E-0001Sn-GU; Tue, 19 Feb 2019 08:46:52 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw13A-0001SM-2x
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:46:50 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1J8fxGX029951; Tue, 19 Feb 2019 09:46:37 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2qpc74y9a8-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Tue, 19 Feb 2019 09:46:37 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A743C3A;
+ Tue, 19 Feb 2019 08:46:34 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 451252524;
+ Tue, 19 Feb 2019 08:46:34 +0000 (GMT)
+Received: from [10.48.0.167] (10.75.127.51) by SFHDAG5NODE3.st.com
+ (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Tue, 19 Feb
+ 2019 09:46:33 +0100
+Subject: Re: [PATCH v4 3/3] pwm: core: add consumer device link
+To: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
+References: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
+ <1550139951-25788-4-git-send-email-fabrice.gasnier@st.com>
+ <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+Message-ID: <53bc3d80-8732-46be-caef-015998c9ad0e@st.com>
+Date: Tue, 19 Feb 2019 09:46:32 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <CAK7LNARTX4_phfcXRXUKGp_V0k_q_RKjL6A3Kz=Hxyqj6VXW+Q@mail.gmail.com>
+In-Reply-To: <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
 Content-Language: en-US
+X-Originating-IP: [10.75.127.51]
+X-ClientProxiedBy: SFHDAG2NODE3.st.com (10.75.127.6) To SFHDAG5NODE3.st.com
+ (10.75.127.15)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-19_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_001857_385592_AE800EFA 
-X-CRM114-Status: GOOD (  22.67  )
+X-CRM114-CacheID: sfid-20190219_004648_416030_6B3052B0 
+X-CRM114-Status: GOOD (  18.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,74 +86,61 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ tduszyns@gmail.com, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
+ thierry.reding@gmail.com, linux-pwm@vger.kernel.org, mcoquelin.stm32@gmail.com,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On 2019/02/19 10:25, Masahiro Yamada wrote:
-> On Fri, Feb 8, 2019 at 9:26 PM Sugaya Taichi
-> <sugaya.taichi@socionext.com> wrote:
->>
->> This adds a DT binding documentation for the M10V and its evaluation
->> board.
->>
->> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
->> ---
->>   Documentation/devicetree/bindings/arm/milbeaut.txt | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/milbeaut.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/milbeaut.txt b/Documentation/devicetree/bindings/arm/milbeaut.txt
-> 
-> 
-> 
-> I added uniphier SoC/board binding into
-> 
-> Documentation/devicetree/bindings/arm/socionext/uniphier.txt
-> 
-> 
-> You can milbeaut.txt to the socionext directory as well.
-> 
-
-Thank you for informing. I found the directory there.
-I will add the "milbeaut.txt(yaml)" there.
-
-Thanks,
-Sugaya Taichi
-
-> 
-> 
-> 
->> new file mode 100644
->> index 0000000..9fd053a
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/milbeaut.txt
->> @@ -0,0 +1,6 @@
->> +Milbeaut platforms device tree bindings
->> +---------------------------------------
->> +
->> +- Milbeaut M10V Evaluation Board
->> +    Required root node properties:
->> +      - compatible = "socionext,milbeaut-m10v-evb", "socionext,sc2000a";
->> --
->> 1.9.1
->>
-> 
-> 
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMi8xOC8xOSA2OjIyIFBNLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90ZToKPiBIZWxsbywKPiAK
+PiBPbiBUaHUsIEZlYiAxNCwgMjAxOSBhdCAxMToyNTo1MUFNICswMTAwLCBGYWJyaWNlIEdhc25p
+ZXIgd3JvdGU6Cj4+IEFkZCBhIGRldmljZSBsaW5rIGJldHdlZW4gdGhlIFBXTSBjb25zdW1lciBh
+bmQgdGhlIFBXTSBwcm92aWRlci4gVGhpcwo+PiBlbmZvcmNlcyB0aGUgUFdNIHVzZXIgdG8gZ2V0
+IHN1c3BlbmRlZCBiZWZvcmUgdGhlIFBXTSBwcm92aWRlci4gSXQKPj4gYWxsb3dzIHByb3BlciBz
+eW5jaHJvbml6YXRpb24gb2Ygc3VzcGVuZC9yZXN1bWUgc2VxdWVuY2VzOiB0aGUgUFdNIHVzZXIK
+Pj4gaXMgcmVzcG9uc2libGUgZm9yIHByb3Blcmx5IHN0b3BwaW5nIFBXTSwgYmVmb3JlIHRoZSBw
+cm92aWRlciBnZXRzCj4+IHN1c3BlbmRlZDogc2VlIFsxXS4gQWRkIHRoZSBkZXZpY2UgbGluayBp
+bjoKPj4gLSBvZl9wd21fZ2V0KCkKPj4gLSBwd21fZ2V0KCkKPj4gLSBkZXZtXypwd21fZ2V0KCkg
+dmFyaWFudHMKPj4gYXMgaXQgcmVxdWlyZXMgYSByZWZlcmVuY2UgdG8gdGhlIGRldmljZSBmb3Ig
+dGhlIFBXTSBjb25zdW1lci4KPj4KPj4gWzFdIGh0dHBzOi8vbGttbC5vcmcvbGttbC8yMDE5LzIv
+NS83NzAKPj4KPj4gU3VnZ2VzdGVkLWJ5OiBUaGllcnJ5IFJlZGluZyA8dGhpZXJyeS5yZWRpbmdA
+Z21haWwuY29tPgo+PiBTaWduZWQtb2ZmLWJ5OiBGYWJyaWNlIEdhc25pZXIgPGZhYnJpY2UuZ2Fz
+bmllckBzdC5jb20+Cj4+IC0tLQo+PiBDaGFuZ2VzIGluIHY0Ogo+PiAtIHJld29yayBlcnJvciBo
+YW5kbGluZyBmb2xsb3dpbmcgVGhpZXJyeSdzIGNvbW1lbnRzCj4+IC0gdHVybi9zcGxpdCBwcl9k
+ZWJ1ZygpIGludG8gZGV2X2VycigpL3ByX3dhcm4oKS4KPj4KPj4gQ2hhbmdlcyBpbiB2MzoKPj4g
+LSBhZGQgc3RydWN0IGRldmljZSB0byBvZl9nZXRfcHdtKCkgYXJndW1lbnRzIHRvIGhhbmRsZSBk
+ZXZpY2UgbGluayBmcm9tCj4+ICAgdGhlcmUgYXMgZGlzY3Vzc2VkIHdpdGggVXdlLgo+PiAtLS0K
+Pj4gIGRyaXZlcnMvcHdtL2NvcmUuYyAgfCA1MCArKysrKysrKysrKysrKysrKysrKysrKysrKysr
+KysrKysrKysrKysrKysrKysrKy0tLQo+PiAgaW5jbHVkZS9saW51eC9wd20uaCB8ICA2ICsrKyst
+LQo+PiAgMiBmaWxlcyBjaGFuZ2VkLCA1MSBpbnNlcnRpb25zKCspLCA1IGRlbGV0aW9ucygtKQo+
+Pgo+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9wd20vY29yZS5jIGIvZHJpdmVycy9wd20vY29yZS5j
+Cj4+IGluZGV4IDE1ODFmNmEuLjY0ZTEwYTYgMTAwNjQ0Cj4+IC0tLSBhL2RyaXZlcnMvcHdtL2Nv
+cmUuYwo+PiArKysgYi9kcml2ZXJzL3B3bS9jb3JlLmMKPj4gQEAgLTYzNiw4ICs2MzYsMzUgQEAg
+c3RhdGljIHN0cnVjdCBwd21fY2hpcCAqb2Zfbm9kZV90b19wd21jaGlwKHN0cnVjdCBkZXZpY2Vf
+bm9kZSAqbnApCj4+ICAJcmV0dXJuIEVSUl9QVFIoLUVQUk9CRV9ERUZFUik7Cj4+ICB9Cj4+ICAK
+Pj4gK3N0YXRpYyBzdHJ1Y3QgZGV2aWNlX2xpbmsgKnB3bV9kZXZpY2VfbGlua19hZGQoc3RydWN0
+IGRldmljZSAqZGV2LAo+PiArCQkJCQkgICAgICAgc3RydWN0IHB3bV9kZXZpY2UgKnB3bSkKPj4g
+K3sKPj4gKwlzdHJ1Y3QgZGV2aWNlX2xpbmsgKmRsOwo+PiArCj4+ICsJaWYgKCFkZXYpIHsKPj4g
+KwkJLyoKPj4gKwkJICogTm8gZGV2aWNlIGZvciB0aGUgUFdNIGNvbnN1bWVyIGhhcyBiZWVuIHBy
+b3ZpZGVkLiBJdCBtYXkKPj4gKwkJICogaW1wYWN0IHRoZSBQTSBzZXF1ZW5jZSBvcmRlcmluZzog
+dGhlIFBXTSBzdXBwbGllciBtYXkgZ2V0Cj4+ICsJCSAqIHN1c3BlbmRlZCBiZWZvcmUgdGhlIGNv
+bnN1bWVyLgo+PiArCQkgKi8KPj4gKwkJcHJfd2Fybigibm8gY29uc3VtZXIgZGV2LCBjYW4ndCBj
+cmVhdGUgZGV2aWNlIGxpbmsgdG8gJXNcbiIsCj4+ICsJCQlkZXZfbmFtZShwd20tPmNoaXAtPmRl
+dikpOwo+IAo+IE1heWJlIHVzZSBkZXZfd2Fybihwd20tPmNoaXAtPmRldiwgLi4uKSA/CgpIaSBV
+d2UsCgpJJ20gd29uZGVyaW5nIGEgYml0IGFib3V0IHRoaXM6IEluIHRoaXMgY2FzZSwgdGhlIGNh
+bGxlciB0aGF0IGRvZXNuJ3QKcHJvdmlkZSBhIHN0cnVjdCBkZXZpY2UgKiwgUFdNIHByb3ZpZGVy
+IGlzbid0IHJlc3BvbnNpYmxlIGZvciB0aGF0LiBTbyBJCmp1c3QgaG9wZSB0aGlzIHdvdWxkbid0
+IGJlIG1pc3MtbGVhZGluZyA/Cgo+IAo+PiArCQlyZXR1cm4gTlVMTDsKPj4gKwl9Cj4+ICsKPj4g
+KwlkbCA9IGRldmljZV9saW5rX2FkZChkZXYsIHB3bS0+Y2hpcC0+ZGV2LCBETF9GTEFHX0FVVE9S
+RU1PVkVfQ09OU1VNRVIpOwo+PiArCWlmICghZGwpIHsKPj4gKwkJZGV2X2VycihkZXYsICJmYWls
+ZWQgdG8gY3JlYXRlIGRldmljZSBsaW5rIHRvICVzXG4iLAo+PiArCQkJZGV2X25hbWUocHdtLT5j
+aGlwLT5kZXYpKTsKPj4gKwkJCXJldHVybiBFUlJfUFRSKC1FSU5WQUwpOwo+IAo+IGJyb2tlbiBp
+bmRlbnRpb24uCgpPb3BzLCBJJ2xsIGZpeCBpdC4KClRoYW5rcywKRmFicmljZQoKPiAKPj4gKwl9
+Cj4+ICsKPj4gKwlyZXR1cm4gZGw7Cj4+ICt9Cj4+ICsKPiAKPiBCZXN0IHJlZ2FyZHMKPiBVd2UK
+PiAKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
+LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
+Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
+bS1rZXJuZWwK
