@@ -2,65 +2,83 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70B95C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:01:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 38A2FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:03:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3766720823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:01:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0610820823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 13:03:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHk1Ax1A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3766720823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="par0/TEy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="h1QOqPHx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0610820823
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Pl2PosI7chDx6lTfdiCdAbxyj9ifWvZVGc1ix/5F08M=; b=aHk1Ax1AVo0qX1
-	ji+f1bN+YP7dlB7uf+yhYvl2E0RZYLU29iEa1H41o6VTeWnxqWA+LEo3/MTBuAAYoorP2HNJDWnjM
-	Ww1NENC+8tVoUdtTQOKJyF6fX726NX695UmIsHzcHT4kZ0EUkQ2xIRq47SZ3GZ828AMAZ2IeOXrYY
-	k3AuALYtrEVX+3OVoFc+SYt+zwkqy3bO4hHBxecp+LxfY5tpTXFeBPcy2RKjPGa3u2o82KZjrqIbh
-	67gP56keonxwdqGjOEqMIKMjOMVdTU9WAHH5ax4/0ZrYgCZxpmrm1oNZIPRfPBhRupY99ichHItX3
-	NX88MVB2dbVfqDOow1QA==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=tJTU1FI0q6DzO8HBpO2TX3rv3EYNBVpB+/AvnDLUK0Q=; b=par
+	0/TEyxFWBiZDZkHhxcrMrCXnwQSSDjPMGk8sjV364AzVgVKGAOsfSE4ZtnbrDNm6LlXIyE+1zoJnr
+	kjHQD1Oc6D+1jK6AtR5ffQT7VXkGdTW1mxziz+WCDzRtqBhObzGSo8yQL7M6j1rWrC5/NB3b5HPDn
+	9zu9e148VqJUA+CxJ6H5XcuN1ovYLhkA2N0HeZMGd/j/XPY1FRyatcV2fYL97ISrGZK5IwYaIbru5
+	91Xlb4tz43OE1W97f3RZbn/GboyfbxbeS2on338supd6COvwXm2ovZ4gj/ici2QqABUK17FcJaC8H
+	D7aGKH6WCPcSC+LqevTyvE1N2Bn0FWw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw51v-0004O4-EU; Tue, 19 Feb 2019 13:01:47 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw51r-0004NX-6N
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 13:01:44 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 26B58EBD;
- Tue, 19 Feb 2019 05:01:42 -0800 (PST)
-Received: from fuggles.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E6A863F720;
- Tue, 19 Feb 2019 05:01:40 -0800 (PST)
-Date: Tue, 19 Feb 2019 13:01:38 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Subject: Re: [PATCH 0/9] 52-bit kernel + user VAs
-Message-ID: <20190219130138.GI8501@fuggles.cambridge.arm.com>
-References: <20190218170245.14915-1-steve.capper@arm.com>
- <CAKv+Gu_xOFXLwKsrFo-rBXdgk4O6zm6xPHB+tv1XjDjzyrjhEA@mail.gmail.com>
- <20190219124825.GH8501@fuggles.cambridge.arm.com>
- <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
-User-Agent: Mutt/1.11.1+86 (6f28e57d73f2) ()
+	id 1gw53c-0004kJ-Ii; Tue, 19 Feb 2019 13:03:32 +0000
+Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw53Y-0004jg-UL; Tue, 19 Feb 2019 13:03:30 +0000
+Received: by mail-ed1-x544.google.com with SMTP id h58so16647208edb.5;
+ Tue, 19 Feb 2019 05:03:28 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id;
+ bh=4otjqvATyvxwtVAjMO64Wyk2yKEX+nv7+hkGyQumr8Q=;
+ b=h1QOqPHxb0dQS+i1scczue+yDCPTQWMTBzaoASbFniIE0ODG40vXqeIzi+Pq0rz1Pt
+ A7YKhhJNlRDoAoz0sFPc4wkwIKSCmFMuojSewnexBiYUzm8MrqJlnukvjaifafdSRwlm
+ qeIhew2m+wtB4chjLAYenrPbUUS9qgAGha76UnoB+fYUF4u1jBKvm6cmwnmcCx9tBUOE
+ pmEPgCP+ecrqcUKj9Iy7wMY40Z6LyhlQlRtJPqIOscY/UuIUnw3hD/9CEZnHMhJzctRM
+ PsaBC3lcxgrREHZ0p8hTnrfMOgPRPBRrYFo4G+nJU62jq0xyXbNtxBMGN3N3pGZ10uz2
+ 9sBA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=4otjqvATyvxwtVAjMO64Wyk2yKEX+nv7+hkGyQumr8Q=;
+ b=OEkLQUP2G8X8YiAABrT6nBgjZYzzSqA5loMecvDiaQYkYPptTKDcErdX7cVyDA+YLQ
+ i7bMI1zTEQiZoTCK0fHZwPbX9dSfTZVff2e1bRuYt/Og/AC1bsorEirOAOuiog1lF68h
+ +wFxALYUBh3UeP5IMnvT/Yo36NRBI8bvd7A6YKgpHxWjH4jfSH4NkeCFe5Or91ulD/Te
+ +cc8CfZk4Pn8UfI8TfCqnVibN3hQrwoVj+0tTw6SzuBzlekdTFZefbAqG57hlMYijmAt
+ 6goRf2H9/jtHxguxnB0oycYMpd+QphpDuyyaBwoz099v1zJDfTY6Pd4o/+H7f3zTvGM8
+ WUpQ==
+X-Gm-Message-State: AHQUAub4qXXp2x3jWsybCjyyKhL3BS9QZeVu8aqIsrmPVFwOom7eysve
+ lTA2hYJnQE3Kszd+kQ9eYe8=
+X-Google-Smtp-Source: AHgI3IZtJFi/bzGmxFTbDze/yTGnMZmPq4B8GqNOp622LvTMvtcFMSOQKD/BXMh0fO8vkhrgX9M9xQ==
+X-Received: by 2002:a17:906:68f:: with SMTP id
+ u15mr19903730ejb.147.1550581406801; 
+ Tue, 19 Feb 2019 05:03:26 -0800 (PST)
+Received: from debian.home (ip51ccf9cd.speed.planet.nl. [81.204.249.205])
+ by smtp.gmail.com with ESMTPSA id q3sm3707505eja.40.2019.02.19.05.03.25
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 19 Feb 2019 05:03:26 -0800 (PST)
+From: Johan Jonker <jbx6244@gmail.com>
+To: heiko@sntech.de
+Subject: [PATCH] ARM: dts: rockchip: remove disable-wp from rv1108-elgin-r1
+ emmc node
+Date: Tue, 19 Feb 2019 14:03:17 +0100
+Message-Id: <20190219130317.2817-1-jbx6244@gmail.com>
+X-Mailer: git-send-email 2.11.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_050143_249969_46A46B16 
-X-CRM114-Status: GOOD (  31.98  )
+X-CRM114-CacheID: sfid-20190219_050328_972034_12AD6909 
+X-CRM114-Status: GOOD (  10.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,113 +90,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, crecklin@redhat.com,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Steve Capper <steve.capper@arm.com>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
+ robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 19, 2019 at 01:51:51PM +0100, Ard Biesheuvel wrote:
-> On Tue, 19 Feb 2019 at 13:48, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > On Tue, Feb 19, 2019 at 01:13:32PM +0100, Ard Biesheuvel wrote:
-> > > On Mon, 18 Feb 2019 at 18:05, Steve Capper <steve.capper@arm.com> wrote:
-> > > >
-> > > > This patch series adds support for 52-bit kernel VAs using some of the
-> > > > machinery already introduced by the 52-bit userspace VA code in 5.0.
-> > > >
-> > > > As 52-bit virtual address support is an optional hardware feature,
-> > > > software support for 52-bit kernel VAs needs to be deduced at early boot
-> > > > time. If HW support is not available, the kernel falls back to 48-bit.
-> > > >
-> > > > A significant proportion of this series focuses on "de-constifying"
-> > > > VA_BITS related constants.
-> > > >
-> > > > In order to allow for a KASAN shadow that changes size at boot time, one
-> > > > must fix the KASAN_SHADOW_END for both 48 & 52-bit VAs and "grow" the
-> > > > start address. Also, it is highly desirable to maintain the same
-> > > > function addresses in the kernel .text between VA sizes. Both of these
-> > > > requirements necessitate us to flip the kernel address space halves s.t.
-> > > > the direct linear map occupies the lower addresses.
-> > > >
-> > > > One obvious omission is 52-bit kernel VA + 48-bit userspace VA which I
-> > > > can add with some more #ifdef'ery if needed.
-> > > >
-> > >
-> > > Hi Steve,
-> > >
-> > > Apologies if I am bringing up things that have been addressed
-> > > internally already. We discussed the 52-bit kernel VA work at
-> > > plumber's at some point, and IIUC, KASAN is the complicating factor
-> > > when it comes to having compile time constants for VA_BITS_MIN,
-> > > VA_BITS_MAX and PAGE_OFFSET, right?
-> > >
-> > > To clarify what I mean, please refer to the diagram below, which
-> > > describes a hybrid 48/52 kernel VA arrangement that does not rely on
-> > > runtime variable quantities. (VA_BITS_MIN == 48, VA_BITS_MAX == 52)
-> > >
-> > > +------------------- (~0) -------------------------+
-> > > |                                                |
-> > > |            PCI IO / fixmap spaces              |
-> > > |                                                |
-> > > +------------------------------------------------+
-> > > |                                                |
-> > > |             kernel/vmalloc space               |
-> > > |                                                |
-> > > +------------------------------------------------+
-> > > |                                                |
-> > > |                module space                    |
-> > > |                                                |
-> > > +------------------------------------------------+
-> > > |                                                |
-> > > |                BPF space                       |
-> > > |                                                |
-> > > +------------------------------------------------+
-> > > |                                                |
-> > > |                                                |
-> > > |   vmemmap space (size based on VA_BITS_MAX)    |
-> > > |                                                |
-> > > |                                                |
-> > > +-- linear/vmalloc split based on VA_BITS_MIN -- +
-> > > |                                                |
-> > > |    linear mapping (48 bit addressable region)  |
-> > > |                                                |
-> > > +------------------------------------------------+
-> > > |                                                |
-> > > |    linear mapping (52 bit addressable region)  |
-> > > |                                                |
-> > > +------ PAGE_OFFSET based on VA_BITS_MAX --------+
-> > >
-> > > Since KASAN is what is preventing this, would it be acceptable for
-> > > KASAN to only be supported when you use a true 48 bit or a true 52 bit
-> > > configuration, and disable it for the 48/52 hybrid configuration?
-> > >
-> > > Just thinking out loud (and in ASCII art :-))
-> >
-> > TBH, if we end up having support for 52-bit kernel VA, I'd be inclined to
-> > drop the 48/52 configuration altogether. But Catalin's on holiday at the
-> > moment, and may have a different opinion ;)
-> >
-> 
-> But that implies that you cannot have an image that supports 52-bit
-> kernel VAs but can still boot on hardware that does not implement
-> support for it. If that is acceptable, then none of this hoop jumping
-> that Steve is doing in these patches is necessary to begin with,
-> right?
+The mmc.txt didn't explicitly say disable-wp is for SD card slot only,
+but that is what it was designed for in the first place.
+Remove all disable-wp from emmc or sdio controllers.
 
-Sorry, I misunderstood what you meant by a "48/52 hybrid configuration". I
-thought you were referring to the configuration where userspace is 52-bit
-and the kernel is 48-bit, which is something I think we can drop if we gain
-support for 52-bit kernel.
+Signed-off-by: Johan Jonker <jbx6244@gmail.com>
+---
+ arch/arm/boot/dts/rv1108-elgin-r1.dts | 1 -
+ 1 file changed, 1 deletion(-)
 
-Now that I understand what you mean, I think disabling KASAN would be fine
-as long as it's a runtime thing and the kernel continues to work in every
-other respect.
+diff --git a/arch/arm/boot/dts/rv1108-elgin-r1.dts b/arch/arm/boot/dts/rv1108-elgin-r1.dts
+index 1c4507b..b1db924 100644
+--- a/arch/arm/boot/dts/rv1108-elgin-r1.dts
++++ b/arch/arm/boot/dts/rv1108-elgin-r1.dts
+@@ -37,7 +37,6 @@
+ &emmc {
+ 	bus-width = <8>;
+ 	cap-mmc-highspeed;
+-	disable-wp;
+ 	no-sd;
+ 	no-sdio;
+ 	non-removable;
+-- 
+2.11.0
 
-Will
 
 _______________________________________________
 linux-arm-kernel mailing list
