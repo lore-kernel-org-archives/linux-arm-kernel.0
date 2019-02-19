@@ -2,67 +2,81 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25B01C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:35:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65D15C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:36:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAD3221736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:35:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 358CC21736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:36:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="P/0kwgtu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAD3221736
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cy3Lp90P";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="aPYEDZ9K"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 358CC21736
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RunS2J4ZV9vbFsgyXgIt49eig9G+abz+1Lz9pf6AYKA=; b=P/0kwgtu83XLn2
-	50fMj/wugmd0eLEl1bSmntDmrexmX4WHSarddFh9mtUve5dFK3oWPB4PtQTHxHJfPYWb0xt7xoZdu
-	oDG6Jf1tW0nZjMunxNgSjJ59fqgMiVvnB9Ru5LmgC72T3AhQnEaJuvPIJpoSujW6B3yGsGeO0T7Mo
-	G4oLrZBrirHwRoy+iv58lvnXNJfrZMGBJ2nIce9iHFvwRsLlhPLLYH+b9p2Wx5pvE8x7ro1DaC/sX
-	MK3gz27PB1nFWrYl2LhE+xO0eJ4HIY5xUDeJoFyWoPxErXt9jtpJWSEVQY+aeUq03q37nBIImjdqU
-	oRfEbhZs3hTQbHcDxBCQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Date:Message-ID:To:Subject
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=om/YAd89uL3AG+ljBgzClOMQEIlP8pkHEIRJh0i6y7k=; b=cy3Lp90PMKODUe
+	EzkW+YNG9BHCN41+JSIDHeck+RYvL57qq/yNZ3o3C2hfnMADWjYvyxDibi/njTvyXKiIVEpt8a4bh
+	cQ7Z0hnjfpwsIXzR3oGWFm0bErKaxaSoth83e+dgMx10Le7OoUt841xKLZjl2R6IhKebzUSYE9OIu
+	G9IbgHcxRyfZTj5GUETbRl3AC8k82kwZEVIFwl3mpCbnN/9wOMFpK2i6lgfymR79jp5GM1oBrq7Ua
+	aNoH4s0iRuOmKCxNywnlfiuIKrh6umI14OgGYTTurM7BsjPKNce3aKDxy/EsfJQviVJDd6r4jH7Mi
+	PPwZH9DacuR4S5ydvC0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw7Qy-0000a8-Fi; Tue, 19 Feb 2019 15:35:48 +0000
-Received: from muru.com ([72.249.23.125])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw7Qu-0000ZR-Mn
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 15:35:46 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id EE1F780B6;
- Tue, 19 Feb 2019 15:35:50 +0000 (UTC)
-Date: Tue, 19 Feb 2019 07:35:37 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Lokesh Vutla <lokeshvutla@ti.com>
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-Message-ID: <20190219153537.GJ15711@atomide.com>
-References: <20190213152620.GS5720@atomide.com>
- <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
- <20190214154100.GB5720@atomide.com>
- <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
- <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
- <20190215161629.GK5720@atomide.com>
- <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
- <20190218143245.GC15711@atomide.com>
- <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
+	id 1gw7RF-0000pe-Cz; Tue, 19 Feb 2019 15:36:05 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw7Qz-0000Z0-Gc
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 15:35:54 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1JFZSCW043704;
+ Tue, 19 Feb 2019 09:35:28 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550590528;
+ bh=4PrH0TQwu7J5KUJpX8zk5kAk/zk0aTFzWqhhHD8gES8=;
+ h=From:Subject:To:CC:Date;
+ b=aPYEDZ9KP4XWZBxxAHn4xApWbS+gzQaTXr7n2yXH7LYeUgX9GePLsRPy8FwW+9LMl
+ REq4IRpSNNtkSlz0C1thmiba+KXp5WBRPJjT0giOpmDXw5LoQDDEK9HfqM5a49psEY
+ Rp3B/QClXplsglca/Ein7f6Fydesd2JEG1HHMBgU=
+Received: from DLEE102.ent.ti.com (dlee102.ent.ti.com [157.170.170.32])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1JFZSAC030494
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 19 Feb 2019 09:35:28 -0600
+Received: from DLEE105.ent.ti.com (157.170.170.35) by DLEE102.ent.ti.com
+ (157.170.170.32) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
+ Feb 2019 09:35:28 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE105.ent.ti.com
+ (157.170.170.35) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 19 Feb 2019 09:35:28 -0600
+Received: from [172.24.190.172] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1JFZPhi020806;
+ Tue, 19 Feb 2019 09:35:26 -0600
+From: Sekhar Nori <nsekhar@ti.com>
+Subject: [GIT PULL] DaVinci SoC updates for v5.1 (part 3)
+To: ARM-SoC Maintainers <arm@kernel.org>
+Message-ID: <26892a0a-c6c4-6409-44cf-1f407ac21482@ti.com>
+Date: Tue, 19 Feb 2019 21:05:25 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_073544_786491_45F67FA1 
-X-CRM114-Status: GOOD (  24.16  )
+X-CRM114-CacheID: sfid-20190219_073550_073565_1E3DF0C5 
+X-CRM114-Status: GOOD (  19.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,111 +88,147 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>,
+ Linux ARM Kernel List <linux-arm-kernel@lists.infradead.org>,
+ Kevin Hilman <khilman@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Lokesh Vutla <lokeshvutla@ti.com> [190219 08:51]:
-> Hi Tony,
-> 
-> On 18/02/19 8:02 PM, Tony Lindgren wrote:
-> > * Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
-> >> On 2/15/2019 9:46 PM, Tony Lindgren wrote:
-> >>> The dts node for the interrupt controller should describe a
-> >>> proper Linux device, that is with reg entries and so on.
-> >>
-> >> You are asking to just keep the compatible property :)
-> > 
-> > Right, and then I realized this node is missing the standard
-> > reg entry too. And you're saying the registers are not even
-> > accissible from Linux.
-> > 
-> > So based on that IMO you should not even have a device tree
-> > node for it at all. You should just have the interrupt
-> 
-> Practically lets look at what all I am adding in the DT node. Below is one such
-> example:
-> 
-> main_intr: interrupt-controller0 {
-> 	compatible = "ti,sci-intr";
-> 	interrupt-controller;
-> 	interrupt-parent = <&gic500>;
-> 	#interrupt-cells = <4>;
-> 	ti,sci = <&dmsc>;
-> 	ti,sci-dst-id = <56>;
-> 	ti,sci-rm-range-girq = <0x1>;
-> };
-> 
-> The following 4 properties are required at least for probing, to represent the
-> hierarchy and for  interrupt definition:
-> 	compatible = "ti,sci-intr";
-> 	interrupt-controller;
-> 	interrupt-parent = <&gic500>;
-> 	#interrupt-cells = <4>;
-> 
-> The remaining 3 properties represents the TISCI interface. Let's go step by step:
-> * ti,sci = <&dmsc> :This is the phandle to the firmware protocol driver using
-> which the messages are sent
-> * ti,sci-dst-id = <56> : This is the TISCI device ID for the parent controller
-> for which your irqs needs to be connected. As I said this cannot be queried from
-> sysfw and this is the input to the messages that are send to sysfw.
+Hi Arnd, Olof,
 
-Let's not add anything that does not describe hardware to the device
-tree. This is ID is an invented number used by the firmware.
+This is a late request to pull some further SoC updates for DaVinci.
+The patches have been in the works for a while, but we received the
+final maintainer acks only yesterday.
 
-> *  ti,sci-rm-range-girq = <0x1>: This define the ids using which the parent-irq
-> ranges that are allocated to this interrupt router instance can be queried from
-> sysfw.
-> If the above 2 properties are to be added as driver phandle then for every
-> instance of interrupt router in the SoC, a new compatible needs to be created. I
-> don't think this is a desirable solution.
+I hope we can merge this for v5.1. We have further clean-ups for
+mach-davinci planned, and it will be good to get this out of the
+way.
 
-To me it seems that the interrupt router _must_ have proper IO
-configuration registers available to the Linux running SoC.
+I have run randconfig builds with a previous version of this series.
+I am running afresh with this branch too. The branch merges without
+conflicts into latest linux-next/master.
 
-Are you sure the interrupt route does not have proper IO
-configuration registers available for the Linux running SoC?
+Thanks,
+Sekhar
 
-If the there are not, I'd be surprised how the SoC is designed :)
+The following changes since commit 23fa70e40a42e8dfeac654b8cc0e5b463e54af25:
 
-So assuming it does, you should just use the standard device tree
-reg property to differentiate between the various interrupt router
-instances. And then you can have the driver talk to the firmware
-in a way where the driver instances are separate even if no IO
-access to these shared registers is done by the Linux running SoC.
+  usb: ohci-da8xx: remove unused callbacks from platform data (2019-02-12 13:48:59 +0530)
 
-But see also the mux comment below.
+are available in the Git repository at:
 
-> With this can you tell me how can we not have a device-tree and still support
-> irq allocation?
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v5.1/soc-part3
 
-Using standard dts reg property to differentiate the interrupt
-router instances. And if the interrupt router is a mux, you should
-treat it as a mux rather than a chained interrupt controller.
+for you to fetch changes up to 49b654fd43b29e8decaa38035eed9ca8f221e48a:
 
-We do have drivers/mux nowadays, not sure if it helps in this case
-as at least timer interrupts need to be configured very early.
+  ARM: davinci: remove intc related fields from davinci_soc_info (2019-02-19 20:04:07 +0530)
 
-> Also, this is not the first time a driver based on a firmware is being added.
-> K2g clock, power and reset drivers are based on this where device ids are being
-> passed from consumers. Similarly arm scpi based drivers are also available.
+----------------------------------------------------------------
+DaVinci SoC updates for v5.1 (part 3)
+-------------------------------------
+This pull request gets rid of mach-davinci private interrupt controller
+implmentations (aintc and cp_initc) and moves them to drivers/irqchip.
 
-Having drivers communicate with firmware is quite standard.
+mach/irqs.h usage outside of mach-davinci has been rid of.
 
-However, stuffing firmware specific data to the device tree
-does not describe the hardware and must not be done.
+The driver changes (input and irqchip) have been acked by respective
+maintainers.
 
-Regards,
+----------------------------------------------------------------
+Bartosz Golaszewski (37):
+      input: davinci_keyscan: remove unnecessary includes
+      ARM: davinci: remove intc_host_map from davinci_soc_info struct
+      ARM: davinci: aintc: use irq domain
+      ARM: davinci: select GENERIC_IRQ_MULTI_HANDLER
+      ARM: davinci: remove davinci_intc_type
+      ARM: davinci: pull davinci_intc_base into the respective intc drivers
+      ARM: davinci: wrap HW interrupt numbers with a macro
+      ARM: davinci: select SPARSE_IRQ
+      ARM: davinci: make irqs.h a local header
+      ARM: davinci: aintc: drop GPL license boilerplate
+      ARM: davinci: aintc: wrap davinci_irq_init() with a helper
+      ARM: davinci: aintc: use a common prefix for symbols in the driver
+      ARM: davinci: aintc: drop the 00 prefix from register offsets
+      ARM: davinci: aintc: use writel_relaxed()
+      irqchip: davinci-aintc: add a new config structure
+      ARM: davinci: aintc: use the new irqchip config structure in dm* SoCs
+      ARM: davinci: aintc: use the new config structure
+      ARM: davinci: aintc: unify error handling
+      ARM: davinci: aintc: request memory region before remapping it
+      ARM: davinci: aintc: remove the timer-specific irq_set_handler()
+      ARM: davinci: aintc: remove unnecessary includes
+      irqchip: davinci-aintc: move the driver to drivers/irqchip
+      ARM: davinci: cp-intc: remove cp_intc.h
+      ARM: davinci: cp-intc: add a wrapper around cp_intc_init()
+      irqchip: davinci-cp-intc: add a new config structure
+      ARM: davinci: cp-intc: add the new config structures for da8xx SoCs
+      ARM: davinci: cp-intc: use a common prefix for all symbols
+      ARM: davinci: cp-intc: convert all hex numbers to lowercase
+      ARM: davinci: cp-intc: use the new-style config structure
+      ARM: davinci: cp-intc: request the memory region before remapping it
+      ARM: davinci: cp-intc: improve coding style
+      ARM: davinci: cp-intc: unify error handling
+      ARM: davinci: cp-intc: use readl/writel_relaxed()
+      ARM: davinci: cp-intc: drop GPL license boilerplate
+      ARM: davinci: cp-intc: remove redundant comments
+      irqchip: davinci-cp-intc: move the driver to drivers/irqchip
+      ARM: davinci: remove intc related fields from davinci_soc_info
 
-Tony
+ arch/arm/Kconfig                                 |   2 +
+ arch/arm/mach-davinci/Kconfig                    |  19 +-
+ arch/arm/mach-davinci/Makefile                   |   3 -
+ arch/arm/mach-davinci/asp.h                      |   8 +-
+ arch/arm/mach-davinci/board-da830-evm.c          |   5 +-
+ arch/arm/mach-davinci/board-da850-evm.c          |   5 +-
+ arch/arm/mach-davinci/board-dm355-evm.c          |   2 +-
+ arch/arm/mach-davinci/board-dm355-leopard.c      |   2 +-
+ arch/arm/mach-davinci/board-dm365-evm.c          |   2 +-
+ arch/arm/mach-davinci/board-dm644x-evm.c         |   8 +-
+ arch/arm/mach-davinci/board-dm646x-evm.c         |   6 +-
+ arch/arm/mach-davinci/board-mityomapl138.c       |   3 +-
+ arch/arm/mach-davinci/board-neuros-osd2.c        |   2 +-
+ arch/arm/mach-davinci/board-omapl138-hawk.c      |   3 +-
+ arch/arm/mach-davinci/board-sffsdr.c             |   2 +-
+ arch/arm/mach-davinci/common.c                   |   3 -
+ arch/arm/mach-davinci/cp_intc.c                  | 215 -------------------
+ arch/arm/mach-davinci/cp_intc.h                  |  57 -----
+ arch/arm/mach-davinci/da830.c                    | 128 ++---------
+ arch/arm/mach-davinci/da850.c                    | 154 +++-----------
+ arch/arm/mach-davinci/davinci.h                  |   4 +
+ arch/arm/mach-davinci/devices-da8xx.c            | 147 ++++++-------
+ arch/arm/mach-davinci/devices.c                  |  40 ++--
+ arch/arm/mach-davinci/dm355.c                    |  78 ++++---
+ arch/arm/mach-davinci/dm365.c                    | 102 +++++----
+ arch/arm/mach-davinci/dm644x.c                   |  68 +++---
+ arch/arm/mach-davinci/dm646x.c                   |  82 ++++---
+ arch/arm/mach-davinci/include/mach/common.h      |  14 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h       |   2 +
+ arch/arm/mach-davinci/include/mach/entry-macro.S |  39 ----
+ arch/arm/mach-davinci/irq.c                      | 117 ----------
+ arch/arm/mach-davinci/{include/mach => }/irqs.h  |   4 -
+ arch/arm/mach-davinci/usb-da8xx.c                |   9 +-
+ arch/arm/mach-davinci/usb.c                      |  15 +-
+ drivers/input/keyboard/davinci_keyscan.c         |   4 -
+ drivers/irqchip/Kconfig                          |  10 +
+ drivers/irqchip/Makefile                         |   2 +
+ drivers/irqchip/irq-davinci-aintc.c              | 163 ++++++++++++++
+ drivers/irqchip/irq-davinci-cp-intc.c            | 260 +++++++++++++++++++++++
+ include/linux/irqchip/irq-davinci-aintc.h        |  27 +++
+ include/linux/irqchip/irq-davinci-cp-intc.h      |  25 +++
+ 41 files changed, 880 insertions(+), 961 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/cp_intc.c
+ delete mode 100644 arch/arm/mach-davinci/cp_intc.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-davinci/irq.c
+ rename arch/arm/mach-davinci/{include/mach => }/irqs.h (98%)
+ create mode 100644 drivers/irqchip/irq-davinci-aintc.c
+ create mode 100644 drivers/irqchip/irq-davinci-cp-intc.c
+ create mode 100644 include/linux/irqchip/irq-davinci-aintc.h
+ create mode 100644 include/linux/irqchip/irq-davinci-cp-intc.h
 
 _______________________________________________
 linux-arm-kernel mailing list
