@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 56AFBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:02:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 15217C10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:02:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2799F2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:02:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D2C92217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:02:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fB6xq3pN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2799F2147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SJF7WeVs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2C92217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4hDX7ZohHr9NNBwgIN3JJ1bARUFuLjbWV1O3GrEeyUY=; b=fB6xq3pNpRxqLx
-	lm6Ca/mOyGES3nLk0iPnUAF7NlBGc5dY2PM3o+omm4Ay9hYd2w2k3yRE7N7u1DEq8Hbq1lDclRYpZ
-	EyFSXWpeSM/sbGewAsD5Hre4/gFzLpXWV07F7dvj72zwVq0bWt2rj5/UIQiqiGqxpQzh7Hry/dhxF
-	fYx/OHr+NU2dVEpTd86SgLeXqtrYwhL9uhIOEpGgf/lCeIz8M+U+3K5Lv+u3zK/NwjRiPnUt8/EZg
-	g9rBanD5IMYSn++FuKHbwrgrxk4sCZSUxO592Gg3OdAYCBkfxhWFoBS9WzMnSE2sfWzaQb6ygp8aN
-	EH0rUOL1S7qcF8bdIkOQ==;
+	List-Owner; bh=I+hgX0gbzy6nvQ6LOVg6zvYeiAMTMwYVmphWSlQngVk=; b=SJF7WeVsnUr/WR
+	K3BV3jlQqV79h+s2m9IhFkOdyB+gGSeHwQXrCPxLLWFy7kx0tbHq1iT8zR+s+GtLVxSJIPp+zbp2K
+	ncLbSuRVMy6Jxt0XJmADRtixM9i6AGQsrdDMgyDWF9++F81n8+QmExS7nhhnji8v12ktCcYnzuJd+
+	ZF+AkAW4XWRhxHNN7LP/zgdwpjzlYnsFGvRdDuK9gESzMmllozxm1oE3knsf4/rOF2zcIz35R5XMe
+	3k4Q+6/gJdkbsWkCEy8XaZ9ud4DFIgCJs795oQiF3f1Y+3e+RkAyt66qYqQR+41+P9AA2Lo+MnqvA
+	VCcWx+5nD2WOshLzODsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw8mr-0000vi-Va; Tue, 19 Feb 2019 17:02:29 +0000
-Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+	id 1gw8n1-00016Q-GF; Tue, 19 Feb 2019 17:02:39 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw8mb-0000d4-8O
+ id 1gw8mb-0000d7-J8
  for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 17:02:16 +0000
 X-Originating-IP: 90.53.137.203
 Received: from localhost (alyon-652-1-306-203.w90-53.abo.wanadoo.fr
  [90.53.137.203])
  (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id BB48F2000D;
- Tue, 19 Feb 2019 17:02:09 +0000 (UTC)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id CC8FB1BF20D;
+ Tue, 19 Feb 2019 17:02:05 +0000 (UTC)
 From: Alexandre Belloni <alexandre.belloni@bootlin.com>
 To: Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH 3/7] clk: at91: sckc: handle different RC startup time
-Date: Tue, 19 Feb 2019 18:01:56 +0100
-Message-Id: <20190219170200.3608-4-alexandre.belloni@bootlin.com>
+Subject: [PATCH 1/7] dt-bindings: clock: at91: new sckc bindings
+Date: Tue, 19 Feb 2019 18:01:54 +0100
+Message-Id: <20190219170200.3608-2-alexandre.belloni@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190219170200.3608-1-alexandre.belloni@bootlin.com>
 References: <20190219170200.3608-1-alexandre.belloni@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_090213_447412_29946B54 
-X-CRM114-Status: GOOD (  10.14  )
+X-CRM114-CacheID: sfid-20190219_090213_773142_4AFDE46D 
+X-CRM114-Status: GOOD (  11.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,7 +69,8 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org,
  Alexandre Belloni <alexandre.belloni@bootlin.com>,
- linux-kernel@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Rob Herring <robh@kernel.org>, linux-kernel@vger.kernel.org,
+ Michael Turquette <mturquette@baylibre.com>,
  Claudiu Beznea <claudiu.beznea@microchip.com>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
@@ -77,59 +78,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The sama5d3 slow RC oscillator as a different startup time than all the
-previous SoCs. Handle that using its own compatible.
+Remove the need for child nodes in the sckc binding to be able to remove
+dtc warnings and have a more modern binding.
 
+Also document optional properties.
+
+Cc: Rob Herring <robh@kernel.org>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- drivers/clk/at91/sckc.c | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+ .../devicetree/bindings/clock/at91-clock.txt  | 30 ++++++++-----------
+ 1 file changed, 12 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-index 470aef586f57..e76b1d64e905 100644
---- a/drivers/clk/at91/sckc.c
-+++ b/drivers/clk/at91/sckc.c
-@@ -321,7 +321,8 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 	return hw;
- }
+diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
+index e9f70fcdfe80..cb838c1c4bdd 100644
+--- a/Documentation/devicetree/bindings/clock/at91-clock.txt
++++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
+@@ -8,29 +8,23 @@ Slow Clock controller:
  
--static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
-+static void __init at91sam9x5_sckc_register(struct device_node *np,
-+					    unsigned int rc_osc_startup_us)
- {
- 	const char *parent_names[2] = { "slow_rc_osc", "slow_osc" };
- 	void __iomem *regbase = of_iomap(np, 0);
-@@ -334,7 +335,7 @@ static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
- 		return;
+ Required properties:
+ - compatible : shall be one of the following:
+-	"atmel,at91sam9x5-sckc" or
++	"atmel,at91sam9x5-sckc",
++	"atmel,sama5d3-sckc" or
+ 	"atmel,sama5d4-sckc":
+ 		at91 SCKC (Slow Clock Controller)
+-		This node contains the slow clock definitions.
+-
+-	"atmel,at91sam9x5-clk-slow-osc":
+-		at91 slow oscillator
+-
+-	"atmel,at91sam9x5-clk-slow-rc-osc":
+-		at91 internal slow RC oscillator
+-- reg : defines the IO memory reserved for the SCKC.
+-- #size-cells : shall be 0 (reg is used to encode clk id).
+-- #address-cells : shall be 1 (reg is used to encode clk id).
++- #clock-cells : shall be 0.
++- clocks : shall be the input parent clock phandle for the clock.
  
- 	hw = at91_clk_register_slow_rc_osc(regbase, parent_names[0], 32768,
--					   50000000, 75);
-+					   50000000, rc_osc_startup_us);
- 	if (IS_ERR(hw))
- 		return;
++Optional properties:
++- atmel,osc-bypass : boolean property. Set this when a clock signal is directly
++  provided on XIN.
  
-@@ -371,9 +372,21 @@ static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
- 	if (child)
- 		of_clk_add_hw_provider(child, of_clk_hw_simple_get, hw);
- }
-+
-+static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
-+{
-+	at91sam9x5_sckc_register(np, 75);
-+}
- CLK_OF_DECLARE(at91sam9x5_clk_sckc, "atmel,at91sam9x5-sckc",
- 	       of_at91sam9x5_sckc_setup);
+ For example:
+-	sckc: sckc@fffffe50 {
+-		compatible = "atmel,sama5d3-pmc";
+-		reg = <0xfffffe50 0x4>
+-		#size-cells = <0>;
+-		#address-cells = <1>;
+-
+-		/* put at91 slow clocks here */
++	sckc@fffffe50 {
++		compatible = "atmel,at91sam9x5-sckc";
++		reg = <0xfffffe50 0x4>;
++		clocks = <&slow_xtal>;
++		#clock-cells = <0>;
+ 	};
  
-+static void __init of_sama5d3_sckc_setup(struct device_node *np)
-+{
-+	at91sam9x5_sckc_register(np, 500);
-+}
-+CLK_OF_DECLARE(sama5d3_clk_sckc, "atmel,sama5d3-sckc",
-+	       of_sama5d3_sckc_setup);
-+
- static int clk_sama5d4_slow_osc_prepare(struct clk_hw *hw)
- {
- 	struct clk_sama5d4_slow_osc *osc = to_clk_sama5d4_slow_osc(hw);
+ Power Management Controller (PMC):
 -- 
 2.20.1
 
