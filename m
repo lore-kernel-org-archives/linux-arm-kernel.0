@@ -2,88 +2,137 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9C70DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D72E4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6DA6321902
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6B7421902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:01:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pEQMhDTi";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="QKSbY6rl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6DA6321902
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ns8VwA90";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="gZNcKY6R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6B7421902
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=s4rVJyK7rljsq/Zy1KnVAf2SSb18lCRYaGiv786wAJs=; b=pEQMhDTirz66QhgWYNLiHe/7D
-	iA/3rmo3IBIDj0y/eOd22fhybfe6A6+7W6BYKphy0v7bPIn2nKmnfW7o+XMYMqwqDgARX3hgJQNMs
-	AAnvuwo2fXgdcZ5S812O0Y729S/PyI/PRPxoAsncIOiKy6Nhotu9zSUMcULTI5cQdur6v5l67qAc4
-	57gmWM2srjA+bufAncmXcXQK0Nyy88an0rnL5zee2pJJPoZLPvaBS9Z1NUF/Fnoj1hy2vFQtrdgtT
-	2gZY08heyOuX8j9mGz4ptcIUoN61H+v7h7Nn4WM9sEgBPBInq1zqonlrFLINZiI0DmzaTioxBWmWa
-	a4k4twpFQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=oQnNz2qai3rCiO0UKwtwN6GNsqf52I4UxlXzgxtlYwE=; b=Ns8VwA90rEoCe2
+	jU89gign5NNxBOFkGKhvpsla1A0ucYjZAjYCUWsSQAjaQz5ZNg39InWY4W82RweSPSX4HcMF6SGQG
+	17UIXsO92X52xTMt4LTovZtrb04nB6uyfzRnQ/zaNH4f4igXSGpcpxVY+jfF+npliqcy+rp7Fwl6O
+	QbuJ0Sh91Sp7FN4fGDF+0a/FG7aZOr59cZ3iUlSUDrr/F95WgyOTix7w5Y92vn+Oadl/dcjtWcp3e
+	GspqwFiMJepj1ecV9XMLPwKPpHlvSOO83j7Go2lP4y05YKcx9l5nlp8aP54aaWnxrQ7wzUfEplQ94
+	NsnorF05ctNGgJeoH3EA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1H8-0000Iq-A8; Tue, 19 Feb 2019 09:01:14 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
+	id 1gw1HU-0000aa-HP; Tue, 19 Feb 2019 09:01:36 +0000
+Received: from mail-eopbgr00051.outbound.protection.outlook.com ([40.107.0.51]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1H0-0000I8-T7
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:01:12 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c6bc5d10000>; Tue, 19 Feb 2019 01:01:05 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 19 Feb 2019 01:01:06 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 19 Feb 2019 01:01:06 -0800
-Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Tue, 19 Feb
- 2019 09:01:04 +0000
-Subject: Re: [PATCH V6 2/7] clocksource: tegra: add Tegra210 timer support
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
- <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>, Thomas
- Gleixner <tglx@linutronix.de>
-References: <20190201161654.18315-1-josephl@nvidia.com>
- <20190201161654.18315-3-josephl@nvidia.com>
- <3849a41f-ab36-d7e0-b2ce-1aa5c4e34aec@linaro.org>
- <87731d61-10f6-0842-a90f-0c78ffba9ef7@nvidia.com>
- <d2aff40c-5ec5-ad66-0d69-a76cdd6c0e9c@linaro.org>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <a9b6e870-258d-492f-1f1d-5d6ceea24795@nvidia.com>
-Date: Tue, 19 Feb 2019 17:00:55 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <d2aff40c-5ec5-ad66-0d69-a76cdd6c0e9c@linaro.org>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL103.nvidia.com (172.20.187.11) To
- HQMAIL101.nvidia.com (172.20.187.10)
+ id 1gw1HF-0000QB-3A
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:01:28 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=8Dp2FTwaLI0Smk1dCKR30JbI+2Lf5+AGn27pC+eXOJs=;
+ b=gZNcKY6Rn280dkzWoRz8hFfg5/5g5XkugSG3/t1joSHcxk6vOJPu9L/hU0esXapn6ZHd6WoYyqTQwV7oPLGDIpoxu0XQAsf5GjFPsiUtEJwy0o6jgLwxJussM33Vo1oshIFT3Zlu0DEacw72nDuMSVFeSvbOXOF+u5rCbqdQmdo=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3642.eurprd04.prod.outlook.com (52.134.65.24) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.19; Tue, 19 Feb 2019 09:01:16 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Tue, 19 Feb 2019
+ 09:01:16 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>, Aisheng Dong
+ <aisheng.dong@nxp.com>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: [PATCH] dt-bindings: imx: update scu resource id headfile
+Thread-Topic: [PATCH] dt-bindings: imx: update scu resource id headfile
+Thread-Index: AQHUyDGr6JcuNwk39kK74/kE/Vm17w==
+Date: Tue, 19 Feb 2019 09:01:15 +0000
+Message-ID: <1550566601-11497-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1550566865; bh=Of4rckaBTBqLneyOBEUuKLGJJlzZ4kNfxRlShvTeqDk=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=QKSbY6rl1KF1YrRJquZIHwyPTETZqepZduF23SQDETBLYDSJY6OgfT/x6ZKME5iL2
- sP1kk09TW9Z5i9pBiFZBR1+odIGP2fCn9Re2MvhciQ4DayMS8JLjq+pOdnK6HwFjLG
- IQvh7x+GwDXf+s40E1DhVlTOs1RJnzoDmirsKFYndIZ1xkiaSpP0AX77AEss5KP6rV
- azK8h32QzC8bEMfPM9aRNMT/MSBoIlp34IJk7YPQ7p71evnpBg0DSGV6Q2SLaqny+0
- pOxLd2cQgENSmUWtwKiu3f4hCZfhD6cF2WczGRuC+AxHFG/jAuTg5zoe94+RHjDIh5
- iw8k0QE0i6Wsg==
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0151.apcprd02.prod.outlook.com
+ (2603:1096:201:1f::11) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: cc78e73a-7225-4921-7e77-08d69648cdf2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3642; 
+x-ms-traffictypediagnostic: DB3PR0402MB3642:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3642;
+ 23:ywsPChIwFi5ljUQ19aqv/mOgLvZ+KNg4a6dhn?=
+ =?iso-8859-1?Q?NTcLqoIOWlTHfXEJei+SfsfIqciPiZvY20+7xcCofS36mSNoJhumAiziXe?=
+ =?iso-8859-1?Q?VF1RlxD5kA03CE9RCue/bdi4Mt1zv9gKy9JkP+SX4U8KvoHfsMEJmmJivc?=
+ =?iso-8859-1?Q?bCNDoW8+rBKOL3onRVXaEl3EzgmfjdDUmg2YY2QFbLf8ECnUwS9xv1ubAe?=
+ =?iso-8859-1?Q?wwvgF5MZ+75LYinwtk2Qufape/SKG/BQWRH5C6H967pN7pzfVqAoxUHZOU?=
+ =?iso-8859-1?Q?iP3ggfO0mmITucK11wr4w3LYU4eixkQOyQOOI2RdcEknyUK52GFg5oOXWY?=
+ =?iso-8859-1?Q?KNuX3f+FeF2QxpU37bA+usI7jl5j9YhIvqqJSWdIka2us9ckiAR0VOtbHM?=
+ =?iso-8859-1?Q?tWkoEOLtmlpCyaStLqPsXk1oxtjGOosFOljj5WISOvhXWXt91gCZUzwHl1?=
+ =?iso-8859-1?Q?UbhsEn93QiUq7ECwLnB7r8DPZJuqELLbbjH3grv19oHkgx8eoZSQb5THrx?=
+ =?iso-8859-1?Q?GIPUYGOthSPhX4uM56WSRSS72bff8vwjcohT253vBrzk0fLIKW6w6Wxqes?=
+ =?iso-8859-1?Q?x/lkYJxWaqgN98TkBTJJ/zbo6dLRL6uubgzY4j3ydxJ63tRYq2nrtOliTO?=
+ =?iso-8859-1?Q?VkISnYrTyu2gNhYzPQXNZjFJs4iRGEpl/QLU6bffoU5Npx26iaCRV3Y8ff?=
+ =?iso-8859-1?Q?bWc8wuHUWBu1eOIEbSza2gOQ3VHONGaOnAPuY63FCaBEWrt6QhP1MMtatT?=
+ =?iso-8859-1?Q?q40Zohu8/k2RBOPyuO/Qra3N1FSk0W6suAxEZQ6DzezcgaRFAzJh75T24k?=
+ =?iso-8859-1?Q?CH+HSNWOSsxMalDxymnSzD9xXgbQfB0Tx/ROtDcG7Oil4TRMp9PtULdG5Q?=
+ =?iso-8859-1?Q?4/xpcw/HuGBpZ6QVdGaKasmW9IJfRpqHShJVcRLZAIYUM10wkh/LmDtUPk?=
+ =?iso-8859-1?Q?g4FE6X+oe88nd9y2lN/ugHIEdKgYuz43qR3sxFLL/9sWEAL7nk3jhcTi4T?=
+ =?iso-8859-1?Q?aaYp2MaE3BjS/jgPAwHkvgKQ4U0EadmFaDATP3K9vh5tQwocQzrc+ZbFce?=
+ =?iso-8859-1?Q?Ocu6Fm9nU2jIUPZcrCi4KgDrjepTi/IVfQ3kwRLt4EIf5SGMl6vCD1nz7v?=
+ =?iso-8859-1?Q?QeulvGdc5iTyPD+/smLimFT3mlL4VyRjqA2hWQeUyU8u3xLOiqmtTmnE/3?=
+ =?iso-8859-1?Q?fyPvuwr27n8a3jWlhVeuZzOw/1PmxBBvVQVeSiAvwYJkPH+NyhK8qEfJ+V?=
+ =?iso-8859-1?Q?avwrZrnTdk2hQo/E7Rxg2XO98qEi2IXTq9PbObAXj+N93AWyrX2YdfpMNR?=
+ =?iso-8859-1?Q?aCnc=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3642E723BCF30ED446BCC2D9F57C0@DB3PR0402MB3642.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09538D3531
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(136003)(396003)(376002)(39860400002)(346002)(189003)(199004)(52116002)(25786009)(316002)(110136005)(99286004)(2501003)(4326008)(36756003)(106356001)(97736004)(6116002)(3846002)(478600001)(66066001)(105586002)(53936002)(2616005)(486006)(8676002)(6436002)(68736007)(14454004)(8936002)(476003)(305945005)(2906002)(26005)(186003)(7736002)(6512007)(256004)(14444005)(102836004)(7416002)(81156014)(6506007)(5660300002)(386003)(86362001)(2201001)(15650500001)(6486002)(81166006)(50226002)(71190400001)(71200400001)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3642;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 6r7GudruMI69rKNUAc+dv2GDjbJHvMxRs99/7i6cCNVmx1A1Jtp7F6LC7PZrrALT7n5vRJlG+o5EN9coesfbHJTcX8Wx83x/2Sz/6FWx0Wm/5aI1NOIYkDLxs1DQvZCC/O3dEMKCRChcoxCvn+mtHhAv2w9IbKL1CLq9Kp3BJylRXV9U9id/3kFYUisiHCuV82peyEwzrlU/M1onxMxMt9sK6K+RMk/h3MrR+JPg4fdByOs507iCM7GeohNpI7mrbOc84wknqEZ4G3ewTe5MMaSpub4A1187nT7A00xGUyw+6v8ujTAz685ep1GpmJGYw2d4GtLhPvI4O5GRFPz7Zlo5fGmCilbb61uiIjsOjmJWCjgw/9w1lGNVnQMizVLDjeFwBkfpItEZOXh7HfjCpS/FoSW4rDYvbbK6Su71i1w=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: cc78e73a-7225-4921-7e77-08d69648cdf2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 09:01:10.0296 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3642
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_010106_957392_343E723A 
-X-CRM114-Status: GOOD (  15.40  )
+X-CRM114-CacheID: sfid-20190219_010121_544560_EC41F44A 
+X-CRM114-Status: UNSURE (   8.90  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,75 +144,118 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: dl-linux-imx <linux-imx@nxp.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi8xOC8xOSA1OjM5IFBNLCBEYW5pZWwgTGV6Y2FubyB3cm90ZToKPiBPbiAxOC8wMi8yMDE5
-IDEwOjAxLCBKb3NlcGggTG8gd3JvdGU6Cj4+IE9uIDIvMTUvMTkgMTE6MTQgUE0sIERhbmllbCBM
-ZXpjYW5vIHdyb3RlOgo+Pj4gT24gMDEvMDIvMjAxOSAxNzoxNiwgSm9zZXBoIExvIHdyb3RlOgo+
-Pj4+IEFkZCBzdXBwb3J0IGZvciB0aGUgVGVncmEyMTAgdGltZXIgdGhhdCBydW5zIGF0IG9zY2ls
-bGF0b3IgY2xvY2sKPj4+PiAoVE1SMTAtVE1SMTMpLiBXZSBuZWVkIHRoZXNlIHRpbWVycyB0byB3
-b3JrIGFzIGNsb2NrIGV2ZW50IGRldmljZSBhbmQgdG8KPj4+PiByZXBsYWNlIHRoZSBBUk12OCBh
-cmNoaXRlY3RlZCB0aW1lciBkdWUgdG8gaXQgY2FuJ3Qgc3Vydml2ZSBhY3Jvc3MgdGhlCj4+Pj4g
-cG93ZXIgY3ljbGUgb2YgdGhlIENQVSBjb3JlIG9yIENQVVBPUkVTRVQgc2lnbmFsLiBTbyBpdCBj
-YW4ndCBiZSBhCj4+Pj4gd2FrZS11cAo+Pj4+IHNvdXJjZSB3aGVuIENQVSBzdXNwZW5kcyBpbiBw
-b3dlciBkb3duIHN0YXRlLgo+Pj4+Cj4+Pj4gQWxzbyBjb252ZXJ0IHRoZSBvcmlnaW5hbCBkcml2
-ZXIgdG8gdXNlIHRpbWVyLW9mIEFQSS4KPj4+Pgo+Pj4+IENjOiBEYW5pZWwgTGV6Y2FubyA8ZGFu
-aWVsLmxlemNhbm9AbGluYXJvLm9yZz4KPj4+PiBDYzogVGhvbWFzIEdsZWl4bmVyIDx0Z2x4QGxp
-bnV0cm9uaXguZGU+Cj4+Pj4gQ2M6IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmcKPj4+PiBT
-aWduZWQtb2ZmLWJ5OiBKb3NlcGggTG8gPGpvc2VwaGxAbnZpZGlhLmNvbT4KPj4+PiBBY2tlZC1i
-eTogVGhpZXJyeSBSZWRpbmcgPHRyZWRpbmdAbnZpZGlhLmNvbT4KPj4+PiBBY2tlZC1ieTogSm9u
-IEh1bnRlciA8am9uYXRoYW5oQG52aWRpYS5jb20+Cj4+Pj4gLS0tCj4+Pj4gdjY6Cj4+Pj4gIMKg
-ICogcmVmaW5lIHRoZSB0aW1lciBkZWZpbmVzCj4+Pj4gIMKgICogYWRkIGFjayB0YWcgZnJvbSBK
-b24uCj4+Pj4gdjU6Cj4+Pj4gIMKgICogYWRkIGFjayB0YWcgZnJvbSBUaGllcnJ5Cj4+Pj4gdjQ6
-Cj4+Pj4gIMKgICogbWVyZ2UgdGltZXItdGVncmEyMTAuYyBpbiBwcmV2aW91cyB2ZXJzaW9uIGlu
-dG8gdGltZXItdGVncmEyMC5jCj4+Pj4gdjM6Cj4+Pj4gIMKgICogdXNlIHRpbWVyLW9mIEFQSQo+
-Pj4+IHYyOgo+Pj4+ICDCoCAqIGFkZCBlcnJvciBjbGVhbi11cCBjb2RlCj4+Pj4gLS0tCltzbmlw
-XQo+Pj4+ICvCoMKgwqAgZm9yX2VhY2hfcG9zc2libGVfY3B1KGNwdSkgewo+Pj4+ICvCoMKgwqDC
-oMKgwqDCoCBzdHJ1Y3QgdGltZXJfb2YgKmNwdV90bzsKPj4+PiArCj4+Pj4gK8KgwqDCoMKgwqDC
-oMKgIGNwdV90byA9IHBlcl9jcHVfcHRyKCZ0ZWdyYV90bywgY3B1KTsKPj4+PiArwqDCoMKgwqDC
-oMKgwqAgY3B1X3RvLT5vZl9iYXNlLmJhc2UgPSB0aW1lcl9yZWdfYmFzZSArCj4+Pj4gVElNRVJf
-QkFTRV9GT1JfQ1BVKGNwdSk7Cj4+Pj4gK8KgwqDCoMKgwqDCoMKgIGNwdV90by0+b2ZfY2xrLnJh
-dGUgPSB0aW1lcl9vZl9yYXRlKHRvKTsKPj4+PiArwqDCoMKgwqDCoMKgwqAgY3B1X3RvLT5jbGtl
-dnQuY3B1bWFzayA9IGNwdW1hc2tfb2YoY3B1KTsKPj4+PiArCj4+Pj4gK8KgwqDCoMKgwqDCoMKg
-IGNwdV90by0+Y2xrZXZ0LmlycSA9Cj4+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgaXJxX29m
-X3BhcnNlX2FuZF9tYXAobnAsIElSUV9JRFhfRk9SX0NQVShjcHUpKTsKPj4+PiArwqDCoMKgwqDC
-oMKgwqAgaWYgKCFjcHVfdG8tPmNsa2V2dC5pcnEpIHsKPj4+PiArwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoCBwcl9lcnIoIiVzOiBjYW4ndCBtYXAgSVJRIGZvciBDUFUlZFxuIiwKPj4+PiArwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIF9fZnVuY19fLCBjcHUpOwo+Pj4+ICvCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgIHJldCA9IC1FSU5WQUw7Cj4+Pj4gK8KgwqDCoMKgwqDCoMKgwqDC
-oMKgwqAgZ290byBvdXQ7Cj4+Pj4gK8KgwqDCoMKgwqDCoMKgIH0KPj4+PiArCj4+Pj4gK8KgwqDC
-oMKgwqDCoMKgIGlycV9zZXRfc3RhdHVzX2ZsYWdzKGNwdV90by0+Y2xrZXZ0LmlycSwgSVJRX05P
-QVVUT0VOKTsKPj4+PiArwqDCoMKgwqDCoMKgwqAgcmV0ID0gcmVxdWVzdF9pcnEoY3B1X3RvLT5j
-bGtldnQuaXJxLCB0ZWdyYV90aW1lcl9pc3IsCj4+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgwqAgSVJRRl9USU1FUiB8IElSUUZfTk9CQUxBTkNJTkcsCj4+Pj4gK8KgwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgY3B1X3RvLT5jbGtldnQubmFtZSwgJmNwdV90by0+
-Y2xrZXZ0KTsKPj4+PiArwqDCoMKgwqDCoMKgwqAgaWYgKHJldCkgewo+Pj4+ICvCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgIHByX2VycigiJXM6IGNhbm5vdCBzZXR1cCBpcnEgJWQgZm9yIENQVSVkXG4i
-LAo+Pj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgX19mdW5jX18sIGNwdV90by0+
-Y2xrZXZ0LmlycSwgY3B1KTsKPj4+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCByZXQgPSAtRUlO
-VkFMOwo+Pj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGdvdG8gb3V0X2lycTsKPj4+PiArwqDC
-oMKgwqDCoMKgwqAgfQo+Pj4+ICvCoMKgwqAgfQo+Pj4KPj4+IFlvdSBzaG91bGQgY29uZmlndXJl
-IHRoZSB0aW1lciBpbiB0aGUgdGVncmFfdGltZXJfc2V0dXAoKSBmdW5jdGlvbgo+Pj4gaW5zdGVh
-ZCBvZiB1c2luZyB0aGlzIGNwdSBsb29wLgo+Pj4KPj4KPj4gSSB0aGluayBJIHN0aWxsIG5lZWQg
-dG8gbGVhdmUgJ2lycV9vZl9wYXJzZV9hbmRfbWFwJyBhbmQgJ3JlcXVlc3RfaXJxJwo+PiBoZXJl
-LiBJcyB0aGF0IG9rPwo+IAo+IFBlcmhhcHMgeW91IGNhbiBzdG9yZSB0aGUgbnAgcG9pbnRlciBp
-biB0aGUgcHJpdmF0ZSBkYXRhIHN0cnVjdHVyZSBvZgo+IHRpbWVyLW9mIGFuZCBsZXQgdGhlIHRp
-bWVyX29mIEFQSSB0byByZXRyaWV2ZSB0aGUgaXJxIGluIHRoZSBjcHVocAo+IGNhbGxiYWNrcy4K
-PiAKPiBpcnFfb2ZfcGFyc2VfYW5kX21hcCB3aWxsIGJlIGNhbGxlZCBieSB0aW1lci1vZi4KPiAK
-PiBJJ20gbm90IHN1cmUgaXJxX3NldF9zdGF0dXNfZmxhZ3MgcmVhbGx5IG9wZXJhdGVzIG9uIHRo
-ZSBpcnEgYmVjYXVzZSBpdAo+IGlzIGNhbGxlZCBhZnRlciByZXF1ZXN0X2lycS4KPiAKCkkgZGlk
-IHNvbWUgZXhwZXJpbWVudHMgdG9kYXkuIFRoZSAnaXJxX29mX3BhcnNlX2FuZF9tYXAnLCAncmVx
-dWVzdF9pcnEnIAphbmQgJ3NldHVwX2lycScgYXJlIG5vdCBhYmxlIHRvIHJ1biBpbiB0aGUgYXRv
-bWljIHNlY3Rpb24gdGhhdCAKdGVncmFfdGltZXJfc2V0dXAgd291bGQgYmUgdHJpZ2dlcmVkIGlu
-LgoKU28gSSB0aGluayBJIHN0aWxsIG5lZWQgdG8gbGVhdmUgdGhlIElSUSBjb25maWd1cmF0aW9u
-IGNvZGUgaGVyZSBpbiB0aGUgCmxvb3AuIFNob3VsZCBJIG1vdmUgb3RoZXJzIHRvICd0ZWdyYV90
-aW1lcl9zZXR1cCcgb3IganVzdCBrZWVwIGFzIHRoZSAKc2FtZSBpbiB0aGlzIHBhdGNoPwoKVGhh
-bmtzLApKb3NlcGgKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMu
-aW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZv
-L2xpbnV4LWFybS1rZXJuZWwK
+Update i.MX SCU resource ID table according to latest
+system controller firmware.
+
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ include/dt-bindings/firmware/imx/rsrc.h | 39 +++++++++++++++++++--------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
+
+diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
+index 4481f2d..ad747a8 100644
+--- a/include/dt-bindings/firmware/imx/rsrc.h
++++ b/include/dt-bindings/firmware/imx/rsrc.h
+@@ -36,15 +36,15 @@
+ #define IMX_SC_R_DC_0_BLIT1		20
+ #define IMX_SC_R_DC_0_BLIT2		21
+ #define IMX_SC_R_DC_0_BLIT_OUT		22
+-#define IMX_SC_R_DC_0_CAPTURE0		23
+-#define IMX_SC_R_DC_0_CAPTURE1		24
++#define IMX_SC_R_PERF			23
++#define IMX_SC_R_UNUSED5		24
+ #define IMX_SC_R_DC_0_WARP		25
+-#define IMX_SC_R_DC_0_INTEGRAL0		26
+-#define IMX_SC_R_DC_0_INTEGRAL1		27
++#define IMX_SC_R_UNUSED7		26
++#define IMX_SC_R_UNUSED8		27
+ #define IMX_SC_R_DC_0_VIDEO0		28
+ #define IMX_SC_R_DC_0_VIDEO1		29
+ #define IMX_SC_R_DC_0_FRAC0		30
+-#define IMX_SC_R_DC_0_FRAC1		31
++#define IMX_SC_R_UNUSED6		31
+ #define IMX_SC_R_DC_0			32
+ #define IMX_SC_R_GPU_2_PID0		33
+ #define IMX_SC_R_DC_0_PLL_0		34
+@@ -53,17 +53,17 @@
+ #define IMX_SC_R_DC_1_BLIT1		37
+ #define IMX_SC_R_DC_1_BLIT2		38
+ #define IMX_SC_R_DC_1_BLIT_OUT		39
+-#define IMX_SC_R_DC_1_CAPTURE0		40
+-#define IMX_SC_R_DC_1_CAPTURE1		41
++#define IMX_SC_R_UNUSED9		40
++#define IMX_SC_R_UNUSED10		41
+ #define IMX_SC_R_DC_1_WARP		42
+-#define IMX_SC_R_DC_1_INTEGRAL0		43
+-#define IMX_SC_R_DC_1_INTEGRAL1		44
++#define IMX_SC_R_UNUSED11		43
++#define IMX_SC_R_UNUSED12		44
+ #define IMX_SC_R_DC_1_VIDEO0		45
+ #define IMX_SC_R_DC_1_VIDEO1		46
+ #define IMX_SC_R_DC_1_FRAC0		47
+-#define IMX_SC_R_DC_1_FRAC1		48
++#define IMX_SC_R_UNUSED13		48
+ #define IMX_SC_R_DC_1			49
+-#define IMX_SC_R_GPU_3_PID0		50
++#define IMX_SC_R_UNUSED14		50
+ #define IMX_SC_R_DC_1_PLL_0		51
+ #define IMX_SC_R_DC_1_PLL_1		52
+ #define IMX_SC_R_SPI_0			53
+@@ -303,8 +303,8 @@
+ #define IMX_SC_R_M4_0_UART		287
+ #define IMX_SC_R_M4_0_I2C		288
+ #define IMX_SC_R_M4_0_INTMUX		289
+-#define IMX_SC_R_M4_0_SIM		290
+-#define IMX_SC_R_M4_0_WDOG		291
++#define IMX_SC_R_UNUSED15		290
++#define IMX_SC_R_UNUSED16		291
+ #define IMX_SC_R_M4_0_MU_0B		292
+ #define IMX_SC_R_M4_0_MU_0A0		293
+ #define IMX_SC_R_M4_0_MU_0A1		294
+@@ -323,8 +323,8 @@
+ #define IMX_SC_R_M4_1_UART		307
+ #define IMX_SC_R_M4_1_I2C		308
+ #define IMX_SC_R_M4_1_INTMUX		309
+-#define IMX_SC_R_M4_1_SIM		310
+-#define IMX_SC_R_M4_1_WDOG		311
++#define IMX_SC_R_UNUSED17		310
++#define IMX_SC_R_UNUSED18		311
+ #define IMX_SC_R_M4_1_MU_0B		312
+ #define IMX_SC_R_M4_1_MU_0A0		313
+ #define IMX_SC_R_M4_1_MU_0A1		314
+@@ -337,7 +337,7 @@
+ #define IMX_SC_R_IRQSTR_SCU2		321
+ #define IMX_SC_R_IRQSTR_DSP		322
+ #define IMX_SC_R_ELCDIF_PLL		323
+-#define IMX_SC_R_UNUSED6		324
++#define IMX_SC_R_OCRAM			324
+ #define IMX_SC_R_AUDIO_PLL_0		325
+ #define IMX_SC_R_PI_0			326
+ #define IMX_SC_R_PI_0_PWM_0		327
+@@ -554,6 +554,11 @@
+ #define IMX_SC_R_VPU_MU_3		538
+ #define IMX_SC_R_VPU_ENC_1		539
+ #define IMX_SC_R_VPU			540
+-#define IMX_SC_R_LAST			541
++#define IMX_SC_R_DMA_5_CH0		541
++#define IMX_SC_R_DMA_5_CH1		542
++#define IMX_SC_R_DMA_5_CH2		543
++#define IMX_SC_R_DMA_5_CH3		544
++#define IMX_SC_R_ATTESTATION		545
++#define IMX_SC_R_LAST			546
+ 
+ #endif /* __DT_BINDINGS_RSCRC_IMX_H */
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
