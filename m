@@ -2,75 +2,71 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EF8B3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:53:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88ECDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:55:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C15DA2147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:53:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AA3E2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:55:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PfD1fVZX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C15DA2147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S+HZbjY5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AA3E2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FRT8XN1ZRnS5HYfGtT8yk3u/kVgAf2LBKvpIFxWKgbs=; b=PfD1fVZXknHECP
-	LfKZWS/mFeq6ZQfJ2MOY/+ca/2A4lc8+0U3x3vKtS3sPTKmVC0XpdgBfd5iwSpITaYAmWr7pNqJU4
-	tCq5Somr0a31VN3Sv3S1T/++o8dQD5GHw9fZN0PAFrsc8hdZvBMffMXRkwAm0WBf5fbdSK4RcIyn2
-	1tKeuhlFbZ7XJ3E6o9rqOI/mTf3LZUzErJ5xNtONxU3WFyijWJIZ7JxHoy5SmlQosuloDLLolrbOs
-	BZsoRqIu319og4Fo28O28Mx+l76PXjoyM8dq56eH4t6/rw+3zxnHcFpNUt43kygzfNrJJQYJ8qJm6
-	ErePsNLzz34YLhA+SQWg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=t5kLS11HOyfzEsSrAwlrH1glCH8vbgDv9TRt1NsuOIs=; b=S+HZbjY59uZrtz
+	8D9caVTTJXScEiCh3mhkC/QX96Vc0XKKrsx+dAEjZMtZNPu5zNLZMV48WkpSyFa4H6cgaiOtrTNzI
+	uZ+jbW0MSKK2WX2Dj1Sg5N3Qoz6wAV08bm496Pv7UcgJlQn6GCgNI/TRVljQy5Tt1hh2DeSf+PSBF
+	K8oQxbStxrqkf8YBzfl5cJ46x2cZazwYK7A3H4sRsPjYq0HqHXWerYQegV5FPvQfUjZEZxyybWi39
+	VlTuH9qxGamrPgkYl6tyP0I7bXrNRlmLOlUude39qi3Is7+N5jLBARvdV0BwivLwh30JUn6DOJjju
+	0Xcvrt0IYf4apcJUkQVg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw19k-0003uC-1m; Tue, 19 Feb 2019 08:53:36 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw19g-0003tE-07
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:53:34 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7E26AEBD;
- Tue, 19 Feb 2019 00:53:28 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7A3693F675;
- Tue, 19 Feb 2019 00:53:25 -0800 (PST)
-Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
-To: Linus Torvalds <torvalds@linux-foundation.org>,
- "H. Peter Anvin" <hpa@zytor.com>
-References: <20190213140025.GB6346@brain-police>
- <20190213142524.GW32494@hirez.programming.kicks-ass.net>
- <dd33cc20-f335-0e4c-e3f4-02497ecc3710@arm.com>
- <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
- <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
- <20190213222146.GC32494@hirez.programming.kicks-ass.net>
- <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
- <20190214101429.GD32494@hirez.programming.kicks-ass.net>
- <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <8a3f9094-63a7-7fe2-bb4d-6deb5c022596@arm.com>
-Date: Tue, 19 Feb 2019 08:53:22 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gw1BX-0005cQ-BI; Tue, 19 Feb 2019 08:55:27 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gw1BT-0005bk-Ef
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:55:25 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gw1BO-0003qJ-H8; Tue, 19 Feb 2019 09:55:18 +0100
+Received: from ukl by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gw1BM-0004ss-Ho; Tue, 19 Feb 2019 09:55:16 +0100
+Date: Tue, 19 Feb 2019 09:55:16 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Fabrice Gasnier <fabrice.gasnier@st.com>
+Subject: Re: [PATCH v4 3/3] pwm: core: add consumer device link
+Message-ID: <20190219085516.dz5ux37kdszqkisy@pengutronix.de>
+References: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
+ <1550139951-25788-4-git-send-email-fabrice.gasnier@st.com>
+ <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
+ <53bc3d80-8732-46be-caef-015998c9ad0e@st.com>
 MIME-Version: 1.0
-In-Reply-To: <CAHk-=wj4Ws1s3iw+w62jcFdnarWhiVxs9zCBjoo7WysxRVZAgQ@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <53bc3d80-8732-46be-caef-015998c9ad0e@st.com>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_005332_397154_FBC50630 
-X-CRM114-Status: GOOD (  19.32  )
+X-CRM114-CacheID: sfid-20190219_005523_703417_698E96AD 
+X-CRM114-Status: GOOD (  20.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,59 +78,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Denys Vlasenko <dvlasenk@redhat.com>, Josh Poimboeuf <jpoimboe@redhat.com>,
- Peter Zijlstra <peterz@infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
- Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- Brian Gerst <brgerst@gmail.com>, Borislav Petkov <bp@alien8.de>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ tduszyns@gmail.com, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
+ thierry.reding@gmail.com, linux-pwm@vger.kernel.org, mcoquelin.stm32@gmail.com,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Tue, Feb 19, 2019 at 09:46:32AM +0100, Fabrice Gasnier wrote:
+> On 2/18/19 6:22 PM, Uwe Kleine-K=F6nig wrote:
+> > Hello,
+> > =
 
+> > On Thu, Feb 14, 2019 at 11:25:51AM +0100, Fabrice Gasnier wrote:
+> >> Add a device link between the PWM consumer and the PWM provider. This
+> >> enforces the PWM user to get suspended before the PWM provider. It
+> >> allows proper synchronization of suspend/resume sequences: the PWM user
+> >> is responsible for properly stopping PWM, before the provider gets
+> >> suspended: see [1]. Add the device link in:
+> >> - of_pwm_get()
+> >> - pwm_get()
+> >> - devm_*pwm_get() variants
+> >> as it requires a reference to the device for the PWM consumer.
+> >>
+> >> [1] https://lkml.org/lkml/2019/2/5/770
+> >>
+> >> Suggested-by: Thierry Reding <thierry.reding@gmail.com>
+> >> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >> ---
+> >> Changes in v4:
+> >> - rework error handling following Thierry's comments
+> >> - turn/split pr_debug() into dev_err()/pr_warn().
+> >>
+> >> Changes in v3:
+> >> - add struct device to of_get_pwm() arguments to handle device link fr=
+om
+> >>   there as discussed with Uwe.
+> >> ---
+> >>  drivers/pwm/core.c  | 50 ++++++++++++++++++++++++++++++++++++++++++++=
++++---
+> >>  include/linux/pwm.h |  6 ++++--
+> >>  2 files changed, 51 insertions(+), 5 deletions(-)
+> >>
+> >> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> >> index 1581f6a..64e10a6 100644
+> >> --- a/drivers/pwm/core.c
+> >> +++ b/drivers/pwm/core.c
+> >> @@ -636,8 +636,35 @@ static struct pwm_chip *of_node_to_pwmchip(struct=
+ device_node *np)
+> >>  	return ERR_PTR(-EPROBE_DEFER);
+> >>  }
+> >>  =
 
-On 19/02/2019 00:24, Linus Torvalds wrote:
-> On Mon, Feb 18, 2019 at 2:31 PM H. Peter Anvin <hpa@zytor.com> wrote:
->>
->> The question is what "fix it" means. I'm really concerned about AC escapes,
->> and everyone else should be, too.
-> 
-> I do think that it might be the right thing to do to add some kind of
-> WARN_ON_ONCE() for AC being set in various can-reschedule situations.
-> 
-> We'd just have to abstract it sanely. I'm sure arm64 has the exact
-> same issue with PAN - maybe it saves properly, but the same "we
-> wouldn't want to go through the scheduler with PAN clear".
-> 
+> >> +static struct device_link *pwm_device_link_add(struct device *dev,
+> >> +					       struct pwm_device *pwm)
+> >> +{
+> >> +	struct device_link *dl;
+> >> +
+> >> +	if (!dev) {
+> >> +		/*
+> >> +		 * No device for the PWM consumer has been provided. It may
+> >> +		 * impact the PM sequence ordering: the PWM supplier may get
+> >> +		 * suspended before the consumer.
+> >> +		 */
+> >> +		pr_warn("no consumer dev, can't create device link to %s\n",
+> >> +			dev_name(pwm->chip->dev));
+> > =
 
-As of right now, we have the same issue on arm64 as on x86. We don't
-currently save the PAN bit on task switch, but I have a patch to do that.
+> > Maybe use dev_warn(pwm->chip->dev, ...) ?
+> =
 
-Unless we decide to go down the route of warning against uses of
-schedule() inside.
+> Hi Uwe,
+> =
 
-As for the abstraction, I had this patch[1] that added another primitive
-for the user_access API (although this might not be suited for x86 if
-you also want to check DF). However, an issue that appears is where to
-perform the check to cover enough ground.
+> I'm wondering a bit about this: In this case, the caller that doesn't
+> provide a struct device *, PWM provider isn't responsible for that. So I
+> just hope this wouldn't be miss-leading ?
 
-Checking inside the schedule() code you only cover cases where things
-have already gone wrong, and not the use of functions that are unsafe to
-call inside a user_access region.
+IMHO it's more the wording that might make the message misleading. If
+you use
 
-[1]
-http://lists.infradead.org/pipermail/linux-arm-kernel/2019-January/625385.html
+	dev_warn(pwm->chip->dev, "No consumer device specified to create a device =
+link to\n");
 
-Cheers,
+that's completely fine in my eyes.
+ =
 
--- 
-Julien Thierry
+Best regards
+Uwe
+
+-- =
+
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
