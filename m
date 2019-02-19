@@ -2,58 +2,62 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1C8BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:00:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5D06C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:03:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F52B21736
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:00:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6C5421736
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:03:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tc27TyEz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F52B21736
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="puzD4Ny3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6C5421736
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=5nX9dKYMngOCpwwXGhQaBs/mWRbb4gv8JlbcrrEmHFU=; b=Tc27TyEzf03qBq
-	3KzlPysWk+cX7yLY1TtWAF2fdqapann8I2d/JMry0sHI5y5MLA2j/lGroZsD7EbQmMgsd3cERznLj
-	uqXh6N8+Zt9/fTJX9AsUEotJfDWTCEoVbM7fNQMNkpsNGUFEDQsGt3mWiy2DIUzCBwoEJZeZAHg9R
-	MeV2S8/d7rCk+kOrmmxWV/1DX3JpAFtD2VQCeJyjnZ81dnpbofGP7gwCRYgUajX/BveCmYZ2VH1Ld
-	8MFqYZeZhxK4u6etncL1yhqbyVO5CU7ukKo6ip82b+3I7bEByBn0JcSjWJTYCFeJgT5sJYdltE5og
-	Wx52H2qjywlzNjrQiImA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=eAQVLgmJhJbYyc7+KuUt/mwt76glc+kD/vl1Lo+RfKQ=; b=puzD4Ny38Tt0ohBlKkWtcumn8
+	kubp6RXrSc4+O11VFIbKwFIlJ7k6OzSQqgsLW1wYcYsq5VqqOSz5qPY4eps0r3yWItQhCrhKxYx1G
+	ZxDnldS1CcigAglXFeWkaL3Wg5gBw7KPbZChJ8Vg8RsIkw0evEb9HZOo1w2w/Dc112vvRfGcn1qH3
+	Bld3UtyR4q4fDsv8IRx0PhUksw8gPBHLFX9NMnmL/mp1QZuCDxtJ5yQJB00zyUBo2GRq9CZVoYbF6
+	jnmaswIWik6+O872nHxWQlg5nD/RaBXVR2Csb4WmefKIq5+xHQwOGLrFhDqG27YZaUz08zZCrgcqj
+	h9xYYSZgQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw6sM-0006cG-W8; Tue, 19 Feb 2019 15:00:02 +0000
-Received: from relay12.mail.gandi.net ([217.70.178.232])
+	id 1gw6vf-0008AU-54; Tue, 19 Feb 2019 15:03:27 +0000
+Received: from relay9-d.mail.gandi.net ([217.70.183.199])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw6sI-0006bX-1b
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 15:00:00 +0000
-Received: from localhost (alyon-652-1-306-203.w90-53.abo.wanadoo.fr
- [90.53.137.203]) (Authenticated sender: gregory.clement@bootlin.com)
- by relay12.mail.gandi.net (Postfix) with ESMTPSA id 7506E20000A;
- Tue, 19 Feb 2019 14:59:48 +0000 (UTC)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Subject: Re: [PATCH] ARM: dts: armada-xp: fix Armada XP boards NAND description
-In-Reply-To: <20190215153042.8973-1-thomas.petazzoni@bootlin.com>
-References: <20190215153042.8973-1-thomas.petazzoni@bootlin.com>
-Date: Tue, 19 Feb 2019 15:59:47 +0100
-Message-ID: <87bm373jto.fsf@FE-laptop>
+ id 1gw6va-00089l-5h
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 15:03:25 +0000
+X-Originating-IP: 90.88.23.190
+Received: from localhost (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr
+ [90.88.23.190]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 81528FF811;
+ Tue, 19 Feb 2019 15:03:12 +0000 (UTC)
+Date: Tue, 19 Feb 2019 16:03:11 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH 2/5] nvmem: sunxi-sid: add support for H5's SID controller
+Message-ID: <20190219150311.yfqkr5svs6b3arjy@flea>
+References: <20190217162316.14111-1-tiny.windzz@gmail.com>
+ <20190217162316.14111-3-tiny.windzz@gmail.com>
+ <20190218084931.fdut6d4cgwkwvihx@flea>
+ <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
 MIME-Version: 1.0
+In-Reply-To: <CAGb2v65Frw+=DjcuqNUPd-UG6qsiVDBH0bd5btx+5=ns7VAQrQ@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_065958_379936_8EB2979D 
-X-CRM114-Status: GOOD (  13.22  )
+X-CRM114-CacheID: sfid-20190219_070322_659555_7C1A2B2C 
+X-CRM114-Status: GOOD (  24.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,114 +69,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Miquel Raynal <miquel.raynal@bootlin.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Yangtao Li <tiny.windzz@gmail.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Content-Type: multipart/mixed; boundary="===============5678646953369122584=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgVGhvbWFzLAogCiBPbiB2ZW4uLCBmw6l2ci4gMTUgMjAxOSwgVGhvbWFzIFBldGF6em9uaSA8
-dGhvbWFzLnBldGF6em9uaUBib290bGluLmNvbT4gd3JvdGU6Cgo+IENvbW1pdCAzYjc5OTE5OTQ2
-Y2QyY2Y0ZGFjNDc4NDJhZmM5YTg5M2FjZWM0ZWQ3ICgiQVJNOiBkdHM6Cj4gYXJtYWRhLTM3MC14
-cDogdXBkYXRlIE5BTkQgbm9kZSB3aXRoIG5ldyBiaW5kaW5ncyIpIHVwZGF0ZWQgc29tZQo+IE1h
-cnZlbGwgQXJtYWRhIERUIGRlc2NyaXB0aW9uIHRvIHVzZSB0aGUgbmV3IE5BTkQgY29udHJvbGxl
-ciBiaW5kaW5ncywKPiBidXQgZGlkIGl0IGluY29ycmVjdGx5IGZvciBhIG51bWJlciBvZiBib2Fy
-ZHM6IGFybWFkYS14cC1ncCwKPiBhcm1hZGEteHAtZGIgYW5kIGFybWFkYS14cC1sZW5vdm8taXg0
-LTMwMGQuIER1ZSB0byB0aGlzLCB0aGUgTkFORCBpcwo+IG5vIGxvbmdlciBkZXRlY3RlZCBvbiB0
-aG9zZSBwbGF0Zm9ybXMuCj4KPiBUaGlzIGNvbW1pdCBmaXhlcyB0aGF0IGJ5IHByb3Blcmx5IHVz
-aW5nIHRoZSBuZXcgTkFORCBEVCBiaW5kaW5nLiBUaGlzCj4gY29tbWl0IHdhcyBydW50aW1lLXRl
-c3RlZCBvbiBBcm1hZGEgWFAgR1AsIHRoZSB0d28gb3RoZXIgcGxhdGZvcm1zIGFyZQo+IG9ubHkg
-Y29tcGlsZS10ZXN0ZWQuCj4KPiBGaXhlczogM2I3OTkxOTk0NmNkMiAoIkFSTTogZHRzOiBhcm1h
-ZGEtMzcwLXhwOiB1cGRhdGUgTkFORCBub2RlIHdpdGggbmV3IGJpbmRpbmdzIikKPiBDYzogTWlx
-dWVsIFJheW5hbCA8bWlxdWVsLnJheW5hbEBib290bGluLmNvbT4KPiBTaWduZWQtb2ZmLWJ5OiBU
-aG9tYXMgUGV0YXp6b25pIDx0aG9tYXMucGV0YXp6b25pQGJvb3RsaW4uY29tPgoKQXBwbGllZCBv
-biBtdmVidS9maXhlcwoKVGhhbmtzLAoKR3JlZ29yeQo+IC0tLQo+ICBhcmNoL2FybS9ib290L2R0
-cy9hcm1hZGEteHAtZGIuZHRzICAgICAgICAgICAgfCA0NiArKysrKy0tLS0tCj4gIGFyY2gvYXJt
-L2Jvb3QvZHRzL2FybWFkYS14cC1ncC5kdHMgICAgICAgICAgICB8IDEzICstLQo+ICAuLi4vYm9v
-dC9kdHMvYXJtYWRhLXhwLWxlbm92by1peDQtMzAwZC5kdHMgICAgfCA4NSArKysrKysrKysrLS0t
-LS0tLS0tCj4gIDMgZmlsZXMgY2hhbmdlZCwgNzYgaW5zZXJ0aW9ucygrKSwgNjggZGVsZXRpb25z
-KC0pCj4KPiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvYXJtYWRhLXhwLWRiLmR0cyBi
-L2FyY2gvYXJtL2Jvb3QvZHRzL2FybWFkYS14cC1kYi5kdHMKPiBpbmRleCBmM2FjNzQ4M2FmZWQu
-LjVkMDRkYzY4Y2Y1NyAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9hcm1hZGEteHAt
-ZGIuZHRzCj4gKysrIGIvYXJjaC9hcm0vYm9vdC9kdHMvYXJtYWRhLXhwLWRiLmR0cwo+IEBAIC0x
-NDQsMzAgKzE0NCwzMiBAQAo+ICAJCQkJc3RhdHVzID0gIm9rYXkiOwo+ICAJCQl9Owo+ICAKPiAt
-CQkJbmFuZEBkMDAwMCB7Cj4gKwkJCW5hbmQtY29udHJvbGxlckBkMDAwMCB7Cj4gIAkJCQlzdGF0
-dXMgPSAib2theSI7Cj4gLQkJCQlsYWJlbCA9ICJweGEzeHhfbmFuZC0wIjsKPiAtCQkJCW51bS1j
-cyA9IDwxPjsKPiAtCQkJCW1hcnZlbGwsbmFuZC1rZWVwLWNvbmZpZzsKPiAtCQkJCW5hbmQtb24t
-Zmxhc2gtYmJ0Owo+IC0KPiAtCQkJCXBhcnRpdGlvbnMgewo+IC0JCQkJCWNvbXBhdGlibGUgPSAi
-Zml4ZWQtcGFydGl0aW9ucyI7Cj4gLQkJCQkJI2FkZHJlc3MtY2VsbHMgPSA8MT47Cj4gLQkJCQkJ
-I3NpemUtY2VsbHMgPSA8MT47Cj4gLQo+IC0JCQkJCXBhcnRpdGlvbkAwIHsKPiAtCQkJCQkJbGFi
-ZWwgPSAiVS1Cb290IjsKPiAtCQkJCQkJcmVnID0gPDAgMHg4MDAwMDA+Owo+IC0JCQkJCX07Cj4g
-LQkJCQkJcGFydGl0aW9uQDgwMDAwMCB7Cj4gLQkJCQkJCWxhYmVsID0gIkxpbnV4IjsKPiAtCQkJ
-CQkJcmVnID0gPDB4ODAwMDAwIDB4ODAwMDAwPjsKPiAtCQkJCQl9Owo+IC0JCQkJCXBhcnRpdGlv
-bkAxMDAwMDAwIHsKPiAtCQkJCQkJbGFiZWwgPSAiRmlsZXN5c3RlbSI7Cj4gLQkJCQkJCXJlZyA9
-IDwweDEwMDAwMDAgMHgzZjAwMDAwMD47Cj4gIAo+ICsJCQkJbmFuZEAwIHsKPiArCQkJCQlyZWcg
-PSA8MD47Cj4gKwkJCQkJbGFiZWwgPSAicHhhM3h4X25hbmQtMCI7Cj4gKwkJCQkJbmFuZC1yYiA9
-IDwwPjsKPiArCQkJCQluYW5kLW9uLWZsYXNoLWJidDsKPiArCj4gKwkJCQkJcGFydGl0aW9ucyB7
-Cj4gKwkJCQkJCWNvbXBhdGlibGUgPSAiZml4ZWQtcGFydGl0aW9ucyI7Cj4gKwkJCQkJCSNhZGRy
-ZXNzLWNlbGxzID0gPDE+Owo+ICsJCQkJCQkjc2l6ZS1jZWxscyA9IDwxPjsKPiArCj4gKwkJCQkJ
-CXBhcnRpdGlvbkAwIHsKPiArCQkJCQkJCWxhYmVsID0gIlUtQm9vdCI7Cj4gKwkJCQkJCQlyZWcg
-PSA8MCAweDgwMDAwMD47Cj4gKwkJCQkJCX07Cj4gKwkJCQkJCXBhcnRpdGlvbkA4MDAwMDAgewo+
-ICsJCQkJCQkJbGFiZWwgPSAiTGludXgiOwo+ICsJCQkJCQkJcmVnID0gPDB4ODAwMDAwIDB4ODAw
-MDAwPjsKPiArCQkJCQkJfTsKPiArCQkJCQkJcGFydGl0aW9uQDEwMDAwMDAgewo+ICsJCQkJCQkJ
-bGFiZWwgPSAiRmlsZXN5c3RlbSI7Cj4gKwkJCQkJCQlyZWcgPSA8MHgxMDAwMDAwIDB4M2YwMDAw
-MDA+Owo+ICsJCQkJCQl9Owo+ICAJCQkJCX07Cj4gIAkJCQl9Owo+ICAJCQl9Owo+IGRpZmYgLS1n
-aXQgYS9hcmNoL2FybS9ib290L2R0cy9hcm1hZGEteHAtZ3AuZHRzIGIvYXJjaC9hcm0vYm9vdC9k
-dHMvYXJtYWRhLXhwLWdwLmR0cwo+IGluZGV4IDExMzllOTQ2OWE4My4uYjRjY2E1MDdjZjEzIDEw
-MDY0NAo+IC0tLSBhL2FyY2gvYXJtL2Jvb3QvZHRzL2FybWFkYS14cC1ncC5kdHMKPiArKysgYi9h
-cmNoL2FybS9ib290L2R0cy9hcm1hZGEteHAtZ3AuZHRzCj4gQEAgLTE2MCwxMiArMTYwLDE1IEBA
-Cj4gIAkJCQlzdGF0dXMgPSAib2theSI7Cj4gIAkJCX07Cj4gIAo+IC0JCQluYW5kQGQwMDAwIHsK
-PiArCQkJbmFuZC1jb250cm9sbGVyQGQwMDAwIHsKPiAgCQkJCXN0YXR1cyA9ICJva2F5IjsKPiAt
-CQkJCWxhYmVsID0gInB4YTN4eF9uYW5kLTAiOwo+IC0JCQkJbnVtLWNzID0gPDE+Owo+IC0JCQkJ
-bWFydmVsbCxuYW5kLWtlZXAtY29uZmlnOwo+IC0JCQkJbmFuZC1vbi1mbGFzaC1iYnQ7Cj4gKwo+
-ICsJCQkJbmFuZEAwIHsKPiArCQkJCQlyZWcgPSA8MD47Cj4gKwkJCQkJbGFiZWwgPSAicHhhM3h4
-X25hbmQtMCI7Cj4gKwkJCQkJbmFuZC1yYiA9IDwwPjsKPiArCQkJCQluYW5kLW9uLWZsYXNoLWJi
-dDsKPiArCQkJCX07Cj4gIAkJCX07Cj4gIAkJfTsKPiAgCj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJt
-L2Jvb3QvZHRzL2FybWFkYS14cC1sZW5vdm8taXg0LTMwMGQuZHRzIGIvYXJjaC9hcm0vYm9vdC9k
-dHMvYXJtYWRhLXhwLWxlbm92by1peDQtMzAwZC5kdHMKPiBpbmRleCBiYmJiMzg4ODhiYjguLjg3
-ZGNiNTAyZjcyZCAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9hcm1hZGEteHAtbGVu
-b3ZvLWl4NC0zMDBkLmR0cwo+ICsrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL2FybWFkYS14cC1sZW5v
-dm8taXg0LTMwMGQuZHRzCj4gQEAgLTgxLDQ5ICs4MSw1MiBAQAo+ICAKPiAgCQkJfTsKPiAgCj4g
-LQkJCW5hbmRAZDAwMDAgewo+ICsJCQluYW5kLWNvbnRyb2xsZXJAZDAwMDAgewo+ICAJCQkJc3Rh
-dHVzID0gIm9rYXkiOwo+IC0JCQkJbGFiZWwgPSAicHhhM3h4X25hbmQtMCI7Cj4gLQkJCQludW0t
-Y3MgPSA8MT47Cj4gLQkJCQltYXJ2ZWxsLG5hbmQta2VlcC1jb25maWc7Cj4gLQkJCQluYW5kLW9u
-LWZsYXNoLWJidDsKPiAtCj4gLQkJCQlwYXJ0aXRpb25zIHsKPiAtCQkJCQljb21wYXRpYmxlID0g
-ImZpeGVkLXBhcnRpdGlvbnMiOwo+IC0JCQkJCSNhZGRyZXNzLWNlbGxzID0gPDE+Owo+IC0JCQkJ
-CSNzaXplLWNlbGxzID0gPDE+Owo+IC0KPiAtCQkJCQlwYXJ0aXRpb25AMCB7Cj4gLQkJCQkJCWxh
-YmVsID0gInUtYm9vdCI7Cj4gLQkJCQkJCXJlZyA9IDwweDAwMDAwMDAwIDB4MDAwZTAwMDA+Owo+
-IC0JCQkJCQlyZWFkLW9ubHk7Cj4gLQkJCQkJfTsKPiAtCj4gLQkJCQkJcGFydGl0aW9uQGUwMDAw
-IHsKPiAtCQkJCQkJbGFiZWwgPSAidS1ib290LWVudiI7Cj4gLQkJCQkJCXJlZyA9IDwweDAwMGUw
-MDAwIDB4MDAwMjAwMDA+Owo+IC0JCQkJCQlyZWFkLW9ubHk7Cj4gLQkJCQkJfTsKPiAtCj4gLQkJ
-CQkJcGFydGl0aW9uQDEwMDAwMCB7Cj4gLQkJCQkJCWxhYmVsID0gInUtYm9vdC1lbnYyIjsKPiAt
-CQkJCQkJcmVnID0gPDB4MDAxMDAwMDAgMHgwMDAyMDAwMD47Cj4gLQkJCQkJCXJlYWQtb25seTsK
-PiAtCQkJCQl9Owo+IC0KPiAtCQkJCQlwYXJ0aXRpb25AMTIwMDAwIHsKPiAtCQkJCQkJbGFiZWwg
-PSAiekltYWdlIjsKPiAtCQkJCQkJcmVnID0gPDB4MDAxMjAwMDAgMHgwMDQwMDAwMD47Cj4gLQkJ
-CQkJfTsKPiAtCj4gLQkJCQkJcGFydGl0aW9uQDUyMDAwMCB7Cj4gLQkJCQkJCWxhYmVsID0gImlu
-aXRyZCI7Cj4gLQkJCQkJCXJlZyA9IDwweDAwNTIwMDAwIDB4MDA0MDAwMDA+Owo+IC0JCQkJCX07
-Cj4gIAo+IC0JCQkJCXBhcnRpdGlvbkBlMDAwMDAgewo+IC0JCQkJCQlsYWJlbCA9ICJib290IjsK
-PiAtCQkJCQkJcmVnID0gPDB4MDBlMDAwMDAgMHgzZjIwMDAwMD47Cj4gKwkJCQluYW5kQDAgewo+
-ICsJCQkJCXJlZyA9IDwwPjsKPiArCQkJCQlsYWJlbCA9ICJweGEzeHhfbmFuZC0wIjsKPiArCQkJ
-CQluYW5kLXJiID0gPDA+Owo+ICsJCQkJCW5hbmQtb24tZmxhc2gtYmJ0Owo+ICsKPiArCQkJCQlw
-YXJ0aXRpb25zIHsKPiArCQkJCQkJY29tcGF0aWJsZSA9ICJmaXhlZC1wYXJ0aXRpb25zIjsKPiAr
-CQkJCQkJI2FkZHJlc3MtY2VsbHMgPSA8MT47Cj4gKwkJCQkJCSNzaXplLWNlbGxzID0gPDE+Owo+
-ICsKPiArCQkJCQkJcGFydGl0aW9uQDAgewo+ICsJCQkJCQkJbGFiZWwgPSAidS1ib290IjsKPiAr
-CQkJCQkJCXJlZyA9IDwweDAwMDAwMDAwIDB4MDAwZTAwMDA+Owo+ICsJCQkJCQkJcmVhZC1vbmx5
-Owo+ICsJCQkJCQl9Owo+ICsKPiArCQkJCQkJcGFydGl0aW9uQGUwMDAwIHsKPiArCQkJCQkJCWxh
-YmVsID0gInUtYm9vdC1lbnYiOwo+ICsJCQkJCQkJcmVnID0gPDB4MDAwZTAwMDAgMHgwMDAyMDAw
-MD47Cj4gKwkJCQkJCQlyZWFkLW9ubHk7Cj4gKwkJCQkJCX07Cj4gKwo+ICsJCQkJCQlwYXJ0aXRp
-b25AMTAwMDAwIHsKPiArCQkJCQkJCWxhYmVsID0gInUtYm9vdC1lbnYyIjsKPiArCQkJCQkJCXJl
-ZyA9IDwweDAwMTAwMDAwIDB4MDAwMjAwMDA+Owo+ICsJCQkJCQkJcmVhZC1vbmx5Owo+ICsJCQkJ
-CQl9Owo+ICsKPiArCQkJCQkJcGFydGl0aW9uQDEyMDAwMCB7Cj4gKwkJCQkJCQlsYWJlbCA9ICJ6
-SW1hZ2UiOwo+ICsJCQkJCQkJcmVnID0gPDB4MDAxMjAwMDAgMHgwMDQwMDAwMD47Cj4gKwkJCQkJ
-CX07Cj4gKwo+ICsJCQkJCQlwYXJ0aXRpb25ANTIwMDAwIHsKPiArCQkJCQkJCWxhYmVsID0gImlu
-aXRyZCI7Cj4gKwkJCQkJCQlyZWcgPSA8MHgwMDUyMDAwMCAweDAwNDAwMDAwPjsKPiArCQkJCQkJ
-fTsKPiArCj4gKwkJCQkJCXBhcnRpdGlvbkBlMDAwMDAgewo+ICsJCQkJCQkJbGFiZWwgPSAiYm9v
-dCI7Cj4gKwkJCQkJCQlyZWcgPSA8MHgwMGUwMDAwMCAweDNmMjAwMDAwPjsKPiArCQkJCQkJfTsK
-PiAgCQkJCQl9Owo+ICAJCQkJfTsKPiAgCQkJfTsKPiAtLSAKPiAyLjIwLjEKPgoKLS0gCkdyZWdv
-cnkgQ2xlbWVudCwgQm9vdGxpbgpFbWJlZGRlZCBMaW51eCBhbmQgS2VybmVsIGVuZ2luZWVyaW5n
-Cmh0dHA6Ly9ib290bGluLmNvbQoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5l
-bEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4v
-bGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+
+--===============5678646953369122584==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="a5jbqqvrdaqbxyhn"
+Content-Disposition: inline
+
+
+--a5jbqqvrdaqbxyhn
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+Hi,
+
+On Mon, Feb 18, 2019 at 05:19:40PM +0800, Chen-Yu Tsai wrote:
+> On Mon, Feb 18, 2019 at 4:49 PM Maxime Ripard <maxime.ripard@bootlin.com>=
+ wrote:
+> >
+> > On Sun, Feb 17, 2019 at 11:23:13AM -0500, Yangtao Li wrote:
+> > > Add support for H5's SID controller.
+> > >
+> > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > > ---
+> > >  drivers/nvmem/sunxi_sid.c | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> > >
+> > > diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
+> > > index 570a2e354f30..036029e90921 100644
+> > > --- a/drivers/nvmem/sunxi_sid.c
+> > > +++ b/drivers/nvmem/sunxi_sid.c
+> > > @@ -219,11 +219,17 @@ static const struct sunxi_sid_cfg sun50i_a64_cf=
+g =3D {
+> > >       .size =3D 0x100,
+> > >  };
+> > >
+> > > +static const struct sunxi_sid_cfg sun50i_h5_cfg =3D {
+> > > +     .value_offset =3D 0x200,
+> > > +     .size =3D 0x100,
+> > > +};
+> >
+> > IIRC, there was an endianness issue on the newer SoCs, with the driver
+> > converting the data from big endian to little endian, while it's
+> > actually stored little endian in the SID.
+>=20
+> About that, it seems the internals are either little endian or native (sa=
+me
+> as the bus). Either way the nvmem the driver currently exposes is wrong.
+
+Do you mean that it can be configured either way, or it's little
+endian and since you are running a little endian system you can't
+tell?
+
+> My idea is to keep the current one with the current name, but have it not
+> associate itself with the DT node. We then register an extra one, called
+> "sunxi-sid-native" which uses the native endian. This one will be associa=
+ted
+> with the DT node, so the THS driver can consume nvmem cells.
+>=20
+> What do you think?
+
+I thought about this some more, and I don't think anyone really has
+used the sysfs interface for it. Since the data are in an unusable
+order (without an additional conversion at least), we would have had a
+bug report by now (just like we had when someone tried to use it for
+the thermal calibration).
+
+So maybe the easy way out is just to disable the conversion on the
+affected SoCs, and see if anyone complains?
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--a5jbqqvrdaqbxyhn
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXGwarwAKCRDj7w1vZxhR
+xRlQAP9SuuNNe+uQxmVUomjF7GRR7ixRMF2zFKil/KKkT6MwzQD+LppkfKh/by7K
+sUOXOlTBwGw8BGOtEByqkfFONxx9/wo=
+=n1MX
+-----END PGP SIGNATURE-----
+
+--a5jbqqvrdaqbxyhn--
+
+
+--===============5678646953369122584==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============5678646953369122584==--
+
