@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11EEAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 22:39:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 61FA7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 22:39:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB04B2147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 22:39:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 220D42147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 22:39:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f3cqjnTf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gateworks-com.20150623.gappssmtp.com header.i=@gateworks-com.20150623.gappssmtp.com header.b="kbboV7la"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB04B2147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TDdpgkvi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gateworks-com.20150623.gappssmtp.com header.i=@gateworks-com.20150623.gappssmtp.com header.b="bxtyAho8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 220D42147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gateworks.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,62 +26,62 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=zYnWZ4o8dBZ9oE1PlhkU5KcJUWiApSrfcESQ+o7iIwQ=; b=f3c
-	qjnTfi8H2wfDCPyULn/opMmpa/7ieqL24RKha3hg/gJqdNbXsG/VOfn7jBj3yipWhMSBJVhqCPWLi
-	unaucg4KD4XZ/iQnioLwZedQx2m0DcZV2Afj82sgRcWCT2A2Y1Z9Th+7LqaOXmNVZk2/0dFyZuT5u
-	8cN1RRzEddw+9zftZq3NHzxCs8Q/u5mmRLj5HCE50YSOV5XP4VKZN9eTt9irliORm0pnhvBWPQ0qO
-	QLv67iV5RphDT1HmTbbf2QoHE9dKyQdQkIkV5QAQnhfLExeQQyZxsOLVqDA9pdMDuGoj3zLtS7LrJ
-	bNyS1z55mgwDRD+I5xvVG1uMOxc4aZA==;
+	References:List-Owner; bh=WaEK26XjkDAebKGf7yxXPHs8XFMH71VRsUpWMQA41A8=; b=TDd
+	pgkvinlhRXcz7dkXX1Yfc0/3A5Ve/1sMUkKhjif4NYRsMfcZvL9wiUPoMJ6koIbM60VlAM64PAcFO
+	fuVKO7db7hLGAtMSD5svkkjZ31vuvEYwHT8ASqSdHDj5cxHil26TJyHm+LcW5qnvTIO+nWpJQUDNh
+	/Gcx5wfNJImtNO2SP7v/b+EeOzIIOfiarkey01JUPWtiHmXlBWkuD5k8j+WqbMBLHnJcFOPmFiSuv
+	eDPKOL/0wCSypyxBZb9+IfWn8IqLNp9b7ebKvS89jV2k5opn+vna7Hr9DhsdqAakilLrov8TsSDHJ
+	zuZd+8L0M961Fn+awmJ3nM/UFqjkUYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwE2j-0004b2-C7; Tue, 19 Feb 2019 22:39:13 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gwE3J-0004w5-4v; Tue, 19 Feb 2019 22:39:49 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwE2g-0004ae-3C
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 22:39:11 +0000
-Received: by mail-pl1-x642.google.com with SMTP id p8so11135561plo.2
+ id 1gwE3G-0004vg-Gg
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 22:39:48 +0000
+Received: by mail-pl1-x643.google.com with SMTP id y10so11145342plp.0
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 14:39:08 -0800 (PST)
+ Tue, 19 Feb 2019 14:39:46 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=gateworks-com.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id;
- bh=wYabNxobeAIdUWqIshzsjfAVFGm3QlmnuSS/oA9tp58=;
- b=kbboV7laHOxNWz+zaORI1rJq+NiRNBrKu5WoTY92cH2465MTSl4M4C31ZkQBDNjbhd
- KriFWGnxUE7PkU7NYHMI4chcpVKOueYe/RfgsSpCuWQoA/KOZniC//heeCC7h+C8krGq
- dC3go08VCKspWhTIxLLOjvhUXs9FyPt7GPpkJLjWdsyom8KmJzQCWUxFPucLCgfdnS/H
- On79LJWMTBagsi/sAg6IF8mK/sA3uI5DShXXuNSk6WUqEbfpPlb3IP44h7rqdWcpZseO
- us4S6ov73OyebNFtX3dVLCXPx16kVG7RaiGyiCN/5lhgqE0mS0HCeTdIWvPM97okcWiV
- TnEQ==
+ bh=tFnwwfXVIadkG/0Jn+8Avs7Kim6cd4s+EMyehNf3HFE=;
+ b=bxtyAho8PeIJhTNP5oEMlPni+/bjgO6Rn+eWpgS/+itYD4mgHzJtOYU1LrekE61U46
+ qk9Id0LmBGElK6XbP96mO/osMiw3Y2pPB4HUm+6CPsKyJTkJJIunMMTYQ+jCZt/sBEkV
+ xORi5/3MjRa/4UQoUptQgNLH/DraOSE/XSjFoNdPNDO8XYtndHZhLGTiVKbDXTh8PdMR
+ +UHs932FWc1pOZSlDWhQJKhsLMGRCNb0+6J/dpzN6RvofG8p80bpIHJOp0t/OpDtNMhb
+ PnsiBYhtJ/jRQGApUGjj+1e4SWMvhzpuRseRbZ3zDxdGoUWbRE+zju0N/tNZzYu7SlQJ
+ YJiA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=wYabNxobeAIdUWqIshzsjfAVFGm3QlmnuSS/oA9tp58=;
- b=CMq52S3B24Iq9gfKWZNok1PrTjG2ruhg+YCwrI22RXllFa+w/6EEyHsZpX8fJpjUoK
- 8l8JzIITMfDOWe4kuRiMqHhuM3CPXq62+/gNnLKFUP+2PXteX4x1KpfwdPsJO0xDUg/k
- Qxwjyr3Mw19XJrkcG8eiF8HGWsSXRjoKM+lcBKWiZthBdncW6peeFZKL/8kHdCxGFCVQ
- tDJtULPwGC+l95owlx1SqH0QgQCUVJns1hOtmpToM4w+OdvyUinOv8YdZyhseVWhL4Mb
- XuiUQb6c09qb6zvsSFNu8cHHWp4H6avJ/k5bOEHE/3TAiaq0tJl5CpWe3yKMFwMJM/2Q
- c8BA==
-X-Gm-Message-State: AHQUAubjmGaQz3s8zPJTTWPtW2fIo8oabgALRQmBb8UdsKdLdCPHw9zG
- sT7UfqyntDzkOOCSpzhSpInkFg==
-X-Google-Smtp-Source: AHgI3IYy1uTgPjzfToXOPlQIwDR++aqXm/vQDF2mwnT8vRVj4TqDeDndiA5Xvz2XHVD491UK9RnF5g==
-X-Received: by 2002:a17:902:3143:: with SMTP id
- w61mr34019522plb.253.1550615947820; 
- Tue, 19 Feb 2019 14:39:07 -0800 (PST)
+ bh=tFnwwfXVIadkG/0Jn+8Avs7Kim6cd4s+EMyehNf3HFE=;
+ b=ZjWiEv1jMG3mDXel9E9C08ruq+ivMhvPpGAHf+3H6x2yOCo/dt6WQLphNpnPK8mDZo
+ kPVh1QBY1SZXkTG1hL/DHhOdUgqjShfxrNuLz440C9iWlHvqL7i9f/tEbj3IGnn0z4Xt
+ 0MlPLk/I3XCzTo2EXwO7pWa3lSt8D1ljSQgDRksmTq8dGsKjmp/W0RSQdTYV3Rx+yo/o
+ q2Jl88x+LNXx2fihMeX4TkaLyuaetOdDVHAripvS4XXA0BWnlhXiVItQlCJpwIEByULn
+ dAJfQmZOM8RD5ak4lSj49n/dT/BCsDDqWgXKAN/nt5pPS6eBbStB23g7O11/enAurF9R
+ PCSQ==
+X-Gm-Message-State: AHQUAuYe0aUHc/6Jy3ZPOe+n1KXt4u198uaoBQTCl41kDs931Qs9hSmr
+ 2RkzUdyHcErCciWhaBu0kJGFiQ==
+X-Google-Smtp-Source: AHgI3IaHa6rHVmCTBnLyS0VUKWDVjFEzZa7xyQn7Fqy1ibFUJIR7hDyMyNdDbS6kM8EWDXRFbRX46Q==
+X-Received: by 2002:a17:902:bc3:: with SMTP id
+ 61mr33536003plr.15.1550615985482; 
+ Tue, 19 Feb 2019 14:39:45 -0800 (PST)
 Received: from tharvey.pdc.gateworks.com
  (68-189-91-139.static.snlo.ca.charter.com. [68.189.91.139])
- by smtp.gmail.com with ESMTPSA id z67sm8950714pfi.152.2019.02.19.14.39.06
+ by smtp.gmail.com with ESMTPSA id e9sm70955154pfh.42.2019.02.19.14.39.44
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 19 Feb 2019 14:39:06 -0800 (PST)
+ Tue, 19 Feb 2019 14:39:44 -0800 (PST)
 From: Tim Harvey <tharvey@gateworks.com>
 To: Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH] ARM: dts: imx: Add TDA19971 HDMI Receiver to GW551x
-Date: Tue, 19 Feb 2019 14:38:50 -0800
-Message-Id: <20190219223850.8811-1-tharvey@gateworks.com>
+Subject: [PATCH] ARM: dts: imx: Add TDA19971 HDMI Receiver to GW54xx
+Date: Tue, 19 Feb 2019 14:39:37 -0800
+Message-Id: <20190219223937.8901-1-tharvey@gateworks.com>
 X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_143910_276859_CE2BE638 
-X-CRM114-Status: GOOD (  13.61  )
+X-CRM114-CacheID: sfid-20190219_143946_550920_B05FD64B 
+X-CRM114-Status: GOOD (  16.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,31 +100,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The GW551x has a TDA19971 HDMI reciver hooked up to the IMX IPU1_CSI0
-via 16bit data and sync.
+The GW54xx has a front-panel microHDMI connector routed to a TDA19971
+which is connected the the IPU CSI when using IMX6Q.
 
 Signed-off-by: Tim Harvey <tharvey@gateworks.com>
 ---
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 138 ++++++++++++++++++++++++++
- 1 file changed, 138 insertions(+)
+ arch/arm/boot/dts/imx6q-gw54xx.dts    | 105 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi |  29 ++++++-
+ 2 files changed, 131 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-index 4e21b3849394..61430f0780d8 100644
---- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -46,6 +46,8 @@
-  */
- 
- #include <dt-bindings/gpio/gpio.h>
+diff --git a/arch/arm/boot/dts/imx6q-gw54xx.dts b/arch/arm/boot/dts/imx6q-gw54xx.dts
+index 56e5b5050fcf..0477120d5718 100644
+--- a/arch/arm/boot/dts/imx6q-gw54xx.dts
++++ b/arch/arm/boot/dts/imx6q-gw54xx.dts
+@@ -12,10 +12,30 @@
+ /dts-v1/;
+ #include "imx6q.dtsi"
+ #include "imx6qdl-gw54xx.dtsi"
 +#include <dt-bindings/media/tda1997x.h>
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
  
  / {
- 	/* these are used by bootloader for disabling nodes */
-@@ -98,6 +100,50 @@
- 		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
- 	};
+ 	model = "Gateworks Ventana i.MX6 Dual/Quad GW54XX";
+ 	compatible = "gw,imx6q-gw54xx", "gw,ventana", "fsl,imx6q";
 +
 +	sound-digital {
 +		compatible = "simple-audio-card";
@@ -144,48 +141,24 @@ index 4e21b3849394..61430f0780d8 100644
 +			};
 +		};
 +	};
-+};
-+
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>; /* AUD5<->tda1997x */
-+	status = "okay";
-+
-+	ssi1 {
-+		fsl,audmux-port = <0>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(4+8) | /* RXFS */
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(4+8) | /* RXC */
-+			IMX_AUDMUX_V2_PTCR_SYN)
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
-+		>;
-+	};
-+
-+	aud5 {
-+		fsl,audmux-port = <4>;
-+		fsl,port-config = <
-+			IMX_AUDMUX_V2_PTCR_SYN
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(0)>;
-+	};
  };
  
- &can1 {
-@@ -263,6 +309,60 @@
- 		#gpio-cells = <2>;
+ &i2c3 {
+@@ -35,6 +55,61 @@
+ 			};
+ 		};
  	};
- 
-+	tda1997x: tda1997x@48 {
++
++	tda1997x: codec@48 {
 +		compatible = "nxp,tda19971";
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&pinctrl_tda1997x>;
 +		reg = <0x48>;
 +		interrupt-parent = <&gpio1>;
 +		interrupts = <7 IRQ_TYPE_LEVEL_LOW>;
-+		DOVDD-supply = <&reg_3p3>;
-+		AVDD-supply = <&reg_1p8b>;
-+		DVDD-supply = <&reg_1p8a>;
++		DOVDD-supply = <&reg_3p3v>;
++		AVDD-supply = <&sw4_reg>;
++		DVDD-supply = <&sw4_reg>;
 +		#sound-dai-cells = <0>;
 +		nxp,audout-format = "i2s";
 +		nxp,audout-layout = <0>;
@@ -232,23 +205,8 @@ index 4e21b3849394..61430f0780d8 100644
 +	pinctrl-0 = <&pinctrl_ipu1_csi0>;
  };
  
- &pcie {
-@@ -320,6 +420,14 @@
- };
- 
- &iomuxc {
-+	pinctrl_audmux: audmuxgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+			MX6QDL_PAD_DISP0_DAT14__AUD5_RXC	0x130b0
-+			MX6QDL_PAD_DISP0_DAT13__AUD5_RXFS	0x130b0
-+		>;
-+	};
-+
- 	pinctrl_flexcan1: flexcan1grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX	0x1b0b1
-@@ -375,6 +483,30 @@
+ &ipu2_csi1_from_ipu2_csi1_mux {
+@@ -63,6 +138,30 @@
  		>;
  	};
  
@@ -276,22 +234,92 @@ index 4e21b3849394..61430f0780d8 100644
 +		>;
 +	};
 +
- 	pinctrl_pcie: pciegrp {
+ 	pinctrl_ipu2_csi1: ipu2_csi1grp {
  		fsl,pins = <
- 			MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x1b0b0 /* PCIE RST */
-@@ -399,6 +531,12 @@
+ 			MX6QDL_PAD_EIM_EB2__IPU2_CSI1_DATA19    0x1b0b0
+@@ -78,4 +177,10 @@
+ 			MX6QDL_PAD_EIM_A16__IPU2_CSI1_PIXCLK    0x1b0b0
  		>;
  	};
- 
++
 +	pinctrl_tda1997x: tda1997xgrp {
 +		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__GPIO1_IO07		0x1b0b0
++			MX6QDL_PAD_GPIO_7__GPIO1_IO07	0x1b0b0
++		>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+index a1a6fb5541e1..0ef221212845 100644
+--- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
+@@ -10,6 +10,7 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/sound/fsl-imx-audmux.h>
+ 
+ / {
+ 	/* these are used by bootloader for disabling nodes */
+@@ -114,12 +115,12 @@
+ 		};
+ 	};
+ 
+-	sound {
++	sound-analog {
+ 		compatible = "fsl,imx6q-ventana-sgtl5000",
+ 			     "fsl,imx-audio-sgtl5000";
+ 		model = "sgtl5000-audio";
+ 		ssi-controller = <&ssi1>;
+-		audio-codec = <&codec>;
++		audio-codec = <&sgtl5000>;
+ 		audio-routing =
+ 			"MIC_IN", "Mic Jack",
+ 			"Mic Jack", "Mic Bias",
+@@ -133,6 +134,25 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_audmux>; /* AUD4<->sgtl5000 */
+ 	status = "okay";
++
++	ssi2 {
++		fsl,audmux-port = <1>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(4+8) | /* RXFS */
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(4+8) | /* RXC */
++			IMX_AUDMUX_V2_PTCR_SYN)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(4)
 +		>;
 +	};
 +
- 	pinctrl_uart2: uart2grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
++	aud5 {
++		fsl,audmux-port = <4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(1)>;
++	};
+ };
+ 
+ &can1 {
+@@ -331,7 +351,7 @@
+ 	pinctrl-0 = <&pinctrl_i2c3>;
+ 	status = "okay";
+ 
+-	codec: sgtl5000@a {
++	sgtl5000: codec@a {
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		clocks = <&clks IMX6QDL_CLK_CKO>;
+@@ -475,6 +495,9 @@
+ 			MX6QDL_PAD_SD2_DAT2__AUD4_TXD		0x110b0
+ 			MX6QDL_PAD_SD2_DAT1__AUD4_TXFS		0x130b0
+ 			MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0 /* AUD4_MCK */
++			MX6QDL_PAD_EIM_D25__AUD5_RXC            0x130b0
++			MX6QDL_PAD_DISP0_DAT19__AUD5_RXD        0x130b0
++			MX6QDL_PAD_EIM_D24__AUD5_RXFS           0x130b0
+ 		>;
+ 	};
+ 
 -- 
 2.17.1
 
