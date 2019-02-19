@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72DF6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:37:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D4736C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:46:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4513B2085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:37:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A5057217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 02:46:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W/W5boEa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4513B2085A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a4TtsPun"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5057217D9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HzWeVlFa4jYK3oFn5qacQntiEp62rnFvhvNRfCooNxE=; b=W/W5boEaXU7GnQ
-	R/n/3LgH8sIc7EPdO6zqJuTIDxGCfraCVlwMUjKBIhWVvaZfmq7GC9mCSJ1Jg4d2VH5H64XGWGVol
-	0jbREXt4WQ0kgQbQTwkL2dkfhU/tjTDPvk0W+2rjYI4ni1kLVizoWjBSGk6KtNZiJXq5jXQ/attYY
-	3uC/1i80q5tBnvoj6j2hS4m9fnzW6DhCgojYAOIWWYou44YUqo+FEOmd/SFj8M/LkM9xNd8COnDdn
-	N8R+Yrak5SdMV5L1xjZgS6am73RyZOw18rIAdRJiuS9tiyoiaES/CaEDGIzWe4vBqZHgqHXyabI1Z
-	83oj4W7YMdeZO/eZGyEw==;
+	List-Owner; bh=h87CRWy4iFdDTAemPbxKAsGpc+tQAETqzAUys/DQFOc=; b=a4TtsPun/pfk1V
+	jZSDj+AN6MVG2qdeQU8ihT7sj2ok+e2/hojseJHSd8vafFuueBXs0nsV2AOAkzHHpNS9PemI2pIiw
+	X5y0RFQtKpgNU31DiZz8t5eeCzVKgTJnOd0xdyF9+FOXkkKD8/r1PPAe+xEP93jKM5eywzU7AIrlt
+	9fnxNyuD2XB3kZTO57UVzNkUvT99MjdOXKVQVw+SIB2JcNMOZM2UFRcL6j/u5x4A8kQyLUsTHOjgp
+	se2IHh7khfmyIhkYLPOpb2r7iXtnAfSdgCxcGN+QXHz1G/lj/gBCxNf/fHHHz0q+vlXF7FKJWKPae
+	Tp0cgGHMey5VVkgDUTKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvvHF-0007gZ-HW; Tue, 19 Feb 2019 02:36:57 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gvvQU-0002m4-KU; Tue, 19 Feb 2019 02:46:30 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvvHB-0007g8-TT; Tue, 19 Feb 2019 02:36:55 +0000
-X-UUID: 1080ae0293b54e0f9d3529bb5f7acd4f-20190218
-X-UUID: 1080ae0293b54e0f9d3529bb5f7acd4f-20190218
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
- (envelope-from <ck.hu@mediatek.com>)
+ id 1gvvQR-0002lS-KC; Tue, 19 Feb 2019 02:46:29 +0000
+X-UUID: 93f010448c234fafa7f1165da60dd8c8-20190218
+X-UUID: 93f010448c234fafa7f1165da60dd8c8-20190218
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <zhiyong.tao@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1666428587; Mon, 18 Feb 2019 18:36:40 -0800
-Received: from MTKMBS33DR.mediatek.inc (172.27.6.106) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 18 Feb 2019 18:36:39 -0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- MTKMBS33DR.mediatek.inc (172.27.6.106) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 10:36:36 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 19 Feb 2019 10:36:35 +0800
-Message-ID: <1550543795.4018.3.camel@mtksdaap41>
-Subject: Re: [PATCH] drm/mediatek: add mt8183 dpi support
-From: CK Hu <ck.hu@mediatek.com>
-To: Jitao Shi <jitao.shi@mediatek.com>
-Date: Tue, 19 Feb 2019 10:36:35 +0800
-In-Reply-To: <1550541190.13121.2.camel@mszsdaap41>
-References: <20190211045059.11821-1-jitao.shi@mediatek.com>
- <1550160809.6862.13.camel@mtksdaap41> <1550541190.13121.2.camel@mszsdaap41>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
+ with ESMTP id 882622133; Mon, 18 Feb 2019 18:46:01 -0800
+Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 18 Feb 2019 18:46:00 -0800
+Received: from MTKCAS36.mediatek.inc (172.27.4.186) by mtkmbs08n1.mediatek.inc
+ (172.21.101.55) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Tue, 19 Feb 2019 10:45:58 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS36.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 19 Feb 2019 10:45:57 +0800
+Message-ID: <1550544357.4739.32.camel@mhfsdcap03>
+Subject: Re: [PATCH v7 3/6] dt-bindings: pinctrl: mt8183: add binding document
+From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+To: Rob Herring <robh@kernel.org>
+Date: Tue, 19 Feb 2019 10:45:57 +0800
+In-Reply-To: <20190218163211.GB2714@bogus>
+References: <1550210558-30516-1-git-send-email-erin.lo@mediatek.com>
+ <1550210558-30516-4-git-send-email-erin.lo@mediatek.com>
+ <20190218163211.GB2714@bogus>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_183653_957097_502DDE20 
-X-CRM114-Status: GOOD (  18.69  )
+X-CRM114-CacheID: sfid-20190218_184627_670791_DFC300B3 
+X-CRM114-Status: GOOD (  28.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,141 +79,172 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- David Airlie <airlied@linux.ie>, stonea168@163.com,
- dri-devel@lists.freedesktop.org, yingjoe.chen@mediatek.com, Ajay
- Kumar <ajaykumar.rs@samsung.com>, Vincent Palatin <vpalatin@chromium.org>,
- cawa.cheng@mediatek.com, bibby.hsieh@mediatek.com,
- Russell King <rmk+kernel@arm.linux.org.uk>,
- Thierry Reding <treding@nvidia.com>, linux-pwm@vger.kernel.org,
- Sascha Hauer <kernel@pengutronix.de>, Pawel Moll <pawel.moll@arm.com>,
- Ian Campbell <ijc+devicetree@hellion.org.uk>, Inki Dae <inki.dae@samsung.com>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- Andy Yan <andy.yan@rock-chips.com>, Matthias
- Brugger <matthias.bgg@gmail.com>, eddie.huang@mediatek.com,
- linux-arm-kernel@lists.infradead.org, Rahul
- Sharma <rahul.sharma@samsung.com>, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, Philipp Zabel <p.zabel@pengutronix.de>,
- Kumar Gala <galak@codeaurora.org>, Sean Paul <seanpaul@chromium.org>
+ Jason Cooper <jason@lakedaemon.net>,
+ srv_heupstream <srv_heupstream@mediatek.com>,
+ Marc Zyngier <marc.zyngier@arm.com>, Greg
+ Kroah-Hartman <gregkh@linuxfoundation.org>, Erin Lo <erin.lo@mediatek.com>,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ linux-clk@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ linux-serial@vger.kernel.org, mars.cheng@mediatek.com,
+ Matthias Brugger <matthias.bgg@gmail.com>, yingjoe.chen@mediatek.com,
+ Thomas Gleixner <tglx@linutronix.de>, eddie.huang@mediatek.com,
+ Linus Walleij <linus.walleij@linaro.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi, Jitao:
+On Mon, 2019-02-18 at 10:32 -0600, Rob Herring wrote:
+> On Fri, Feb 15, 2019 at 02:02:35PM +0800, Erin Lo wrote:
+> > From: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > 
+> > The commit adds mt8183 compatible node in binding document.
+> > 
+> > Signed-off-by: Zhiyong Tao <zhiyong.tao@mediatek.com>
+> > Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pinctrl/pinctrl-mt8183.txt | 115 +++++++++++++++++++++
+> >  1 file changed, 115 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > new file mode 100644
+> > index 0000000..364e673
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt8183.txt
+> > @@ -0,0 +1,115 @@
+> > +* Mediatek MT8183 Pin Controller
+> > +
+> > +The Mediatek's Pin controller is used to control SoC pins.
+> > +
+> > +Required properties:
+> > +- compatible: value should be one of the following.
+> > +	"mediatek,mt8183-pinctrl", compatible with mt8183 pinctrl.
+> > +- gpio-controller : Marks the device node as a gpio controller.
+> > +- #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
+> > +  binding is used, the amount of cells must be specified as 2. See the below
+> > +  mentioned gpio binding representation for description of particular cells.
+> > +- gpio-ranges : gpio valid number range.
+> > +- reg: physicall address base for gpio base registers. There are nine
+> > +  physicall address base in mt8183. They are 0x10005000, 0x11F20000,
+> > +  0x11E80000, 0x11E70000, 0x11E90000, 0x11D30000, 0x11D20000, 0x11C50000,
+> > +  0x11F30000.
+> 
+> You don't need to list out each address, just what each address is. (Or 
+> just '9 GPIO base addresses'.)
 
-On Tue, 2019-02-19 at 09:53 +0800, Jitao Shi wrote:
-> On Fri, 2019-02-15 at 00:13 +0800, CK Hu wrote:
-> > Hi, Jitao:
-> > 
-> > On Mon, 2019-02-11 at 12:50 +0800, Jitao Shi wrote:
-> > > MT8183 sample on rising and falling edge. It can reduce half data io.
-> > > 
-> > > Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> > > ---
-> > >  drivers/gpu/drm/mediatek/mtk_dpi.c | 29 +++++++++++++++++++++++++++++
-> > >  1 file changed, 29 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > > index 62a9d47df948..610c23334047 100644
-> > > --- a/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > > +++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
-> > > @@ -117,6 +117,7 @@ struct mtk_dpi_conf {
-> > >  	unsigned int (*cal_factor)(int clock);
-> > >  	u32 reg_h_fre_con;
-> > >  	bool edge_sel_en;
-> > > +	bool dual_edge;
-> > >  };
-> > >  
-> > >  static void mtk_dpi_mask(struct mtk_dpi *dpi, u32 offset, u32 val, u32 mask)
-> > > @@ -353,6 +354,13 @@ static void mtk_dpi_config_disable_edge(struct mtk_dpi *dpi)
-> > >  		mtk_dpi_mask(dpi, dpi->conf->reg_h_fre_con, 0, EDGE_SEL_EN);
-> > >  }
-> > >  
-> > > +static void mtk_dpi_enable_dual_edge(struct mtk_dpi *dpi)
-> > > +{
-> > > +	mtk_dpi_mask(dpi, DPI_DDR_SETTING, DDR_EN | DDR_4PHASE,
-> > > +		     DDR_EN | DDR_4PHASE);
-> > > +	mtk_dpi_mask(dpi, DPI_OUTPUT_SETTING, EDGE_SEL, EDGE_SEL);
-> > > +}
-> > 
-> > All these register exist in MT8173, if you do the same setting in
-> > MT8173, could it also sample on rising edge and falling edge?
-> > 
-> > Regards,
-> > CK
+==>ok, we will change it.
 > 
-> Hi CK,
+> > +
+> > +	Eg: <&pio 6 0>
 > 
-> MT8173 has those registers. But the hw function is removed.
-> So MT8173 doesn't support DPI dual edge sample.
-
-OK, please add this information in commit message.
-
-Regards,
-CK
-
+> How is this an example of reg? Seems something is missing.
 > 
-> Best Regards
-> Jitao
+> > +	<[phandle of the gpio controller node]
+> > +	[line number within the gpio controller]
+> > +	[flags]>
+> > +
+> > +	Values for gpio specifier:
+> > +	- Line number: is a value between 0 to 202.
+> > +	- Flags:  bit field of flags, as defined in <dt-bindings/gpio/gpio.h>.
+> > +            Only the following flags are supported:
+> > +            0 - GPIO_ACTIVE_HIGH
+> > +            1 - GPIO_ACTIVE_LOW
+> > +
+> > +Optional properties:
+> > +- reg-names: gpio base register names. There are nine gpio base register
+> > +  names in mt8183. They are "iocfg0", "iocfg1", "iocfg2", "iocfg3", "iocfg4",
+> > +  "iocfg5", "iocfg6", "iocfg7", "iocfg8".
+> > +- interrupt-controller: Marks the device node as an interrupt controller
+> > +- #interrupt-cells: Should be two.
+> > +- interrupts : The interrupt outputs from the controller.
 > 
+> outputs? More than 1? If so, need to say what they are and the order.
+> 
+==> there is only use one interrupt in mt8183. we will change
+"interrupts" to "interrupt" in v8.
+> > +
+> > +Please refer to pinctrl-bindings.txt in this directory for details of the
+> > +common pinctrl bindings used by client devices.
+> > +
+> > +Subnode format
+> > +A pinctrl node should contain at least one subnodes representing the
+> > +pinctrl groups available on the machine. Each subnode will list the
+> > +pins it needs, and how they should be configured, with regard to muxer
+> > +configuration, pullups, drive strength, input enable/disable and input schmitt.
+> > +
+> > +    node {
+> > +	pinmux = <PIN_NUMBER_PINMUX>;
+> > +	GENERIC_PINCONFIG;
+> > +    };
+> > +
+> > +Required properties:
+> > +- pinmux: integer array, represents gpio pin number and mux setting.
+> > +    Supported pin number and mux varies for different SoCs, and are defined
+> > +    as macros in boot/dts/<soc>-pinfunc.h directly.
+> > +
+> > +Optional properties:
+> > +- GENERIC_PINCONFIG: is the generic pinconfig options to use, bias-disable,
+> > +    bias-pull-down, bias-pull-up, input-enable, input-disable, output-low, output-high,
+> > +    input-schmitt-enable, input-schmitt-disable and drive-strength are valid.
+> > +
+> > +    Some special pins have extra pull up strength, there are R0 and R1 pull-up
+> > +    resistors available, but for user, it's only need to set R1R0 as 00, 01, 10 or 11.
+> > +    So when config mediatek,pull-up-adv or mediatek,pull-down-adv,
+> > +    it support arguments for those special pins.
+> > +
+> > +    When config drive-strength, it can support some arguments, such as
+> > +    MTK_DRIVE_4mA, MTK_DRIVE_6mA, etc. See dt-bindings/pinctrl/mt65xx.h.
+> > +
+> > +Examples:
+> > +
+> > +#include "mt8183-pinfunc.h"
+> > +
+> > +...
+> > +{
+> > +	pio: pinctrl@10005000 {
+> > +		compatible = "mediatek,mt8183-pinctrl";
+> > +		reg = <0 0x10005000 0 0x1000>,
+> > +		      <0 0x11F20000 0 0x1000>,
+> > +		      <0 0x11E80000 0 0x1000>,
+> > +		      <0 0x11E70000 0 0x1000>,
+> > +		      <0 0x11E90000 0 0x1000>,
+> > +		      <0 0x11D30000 0 0x1000>,
+> > +		      <0 0x11D20000 0 0x1000>,
+> > +		      <0 0x11C50000 0 0x1000>,
+> > +		      <0 0x11F30000 0 0x1000>;
+> > +		reg-names = "iocfg0", "iocfg1", "iocfg2",
+> > +			    "iocfg3", "iocfg4", "iocfg5",
+> > +			    "iocfg6", "iocfg7", "iocfg8";
+> > +		gpio-controller;
+> > +		#gpio-cells = <2>;
+> > +		gpio-ranges = <&pio 0 0 192>;
+> > +		interrupt-controller;
+> > +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> > +		interrupt-parent = <&gic>;
+> > +		#interrupt-cells = <2>;
+> > +
+> > +		i2c0_pins_a: i2c0 {
+> > +			pins1 {
+> > +				pinmux = <PINMUX_GPIO48__FUNC_SCL5>,
+> > +					 <PINMUX_GPIO49__FUNC_SDA5>;
+> > +				mediatek,pull-up-adv = <11>;
+> > +			};
+> > +		};
+> > +
+> > +		i2c1_pins_a: i2c1 {
+> > +			pins {
+> > +				pinmux = <PINMUX_GPIO50__FUNC_SCL3>,
+> > +					 <PINMUX_GPIO51__FUNC_SDA3>;
+> > +				mediatek,pull-down-adv = <10>;
+> > +			};
+> > +		};
+> > +		...
+> > +	};
+> > +};
+> > -- 
+> > 1.9.1
 > > 
-> > > +
-> > >  static void mtk_dpi_config_color_format(struct mtk_dpi *dpi,
-> > >  					enum mtk_dpi_out_color_format format)
-> > >  {
-> > > @@ -509,6 +517,8 @@ static int mtk_dpi_set_display_mode(struct mtk_dpi *dpi,
-> > >  	mtk_dpi_config_color_format(dpi, dpi->color_format);
-> > >  	mtk_dpi_config_2n_h_fre(dpi);
-> > >  	mtk_dpi_config_disable_edge(dpi);
-> > > +	if (dpi->conf->dual_edge)
-> > > +		mtk_dpi_enable_dual_edge(dpi);
-> > >  	mtk_dpi_sw_reset(dpi, false);
-> > >  
-> > >  	return 0;
-> > > @@ -671,6 +681,16 @@ static unsigned int mt2701_calculate_factor(int clock)
-> > >  		return 2;
-> > >  }
-> > >  
-> > > +static unsigned int mt8183_calculate_factor(int clock)
-> > > +{
-> > > +	if (clock <= 27000)
-> > > +		return 8;
-> > > +	else if (clock <= 167000)
-> > > +		return 4;
-> > > +	else
-> > > +		return 2;
-> > > +}
-> > > +
-> > >  static const struct mtk_dpi_conf mt8173_conf = {
-> > >  	.cal_factor = mt8173_calculate_factor,
-> > >  	.reg_h_fre_con = 0xe0,
-> > > @@ -682,6 +702,12 @@ static const struct mtk_dpi_conf mt2701_conf = {
-> > >  	.edge_sel_en = true,
-> > >  };
-> > >  
-> > > +static const struct mtk_dpi_conf mt8183_conf = {
-> > > +	.cal_factor = mt8183_calculate_factor,
-> > > +	.reg_h_fre_con = 0xe0,
-> > > +	.dual_edge = true,
-> > > +};
-> > > +
-> > >  static int mtk_dpi_probe(struct platform_device *pdev)
-> > >  {
-> > >  	struct device *dev = &pdev->dev;
-> > > @@ -777,6 +803,9 @@ static const struct of_device_id mtk_dpi_of_ids[] = {
-> > >  	{ .compatible = "mediatek,mt8173-dpi",
-> > >  	  .data = &mt8173_conf,
-> > >  	},
-> > > +	{ .compatible = "mediatek,mt8183-dpi",
-> > > +	  .data = &mt8183_conf,
-> > > +	},
-> > >  	{ },
-> > >  };
-> > >  
-> > 
-> > 
-> 
-> 
 
 
 
