@@ -1,71 +1,92 @@
 Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Level: *
+X-Spam-Status: No, score=1.1 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,FSL_HELO_FAKE,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
+	autolearn=no autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F373FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:11:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A659C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:32:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C5622217D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:11:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57551217D7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 05:32:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DCXbDayf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5622217D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DUE44doJ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="gc35xBK2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57551217D7
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=yryMwWrHPXUTTg9ptSGs80saNFf2JNm7Rwq67m+sGAA=; b=DCXbDayf8ic/kZ+li0ITj6ve+
-	1twl3XXwRCHvSe+RdWgVmzF0sjY6Y6ks9SyS95xNBbyx0ymQwJ8q8OUpPos2e5Sae7S5Azr+Z+3D+
-	3ZFgjGsDDlfRB0HZZerpp31s4NHklxsDKkbf7Fte1v1H8fgDgT2ff0YR0IRyMgETuTiNx7OtDGgBH
-	LT8pYrEdN53BNRCLQkldQ5Vea1T1MezJivYWQvMGfFfBuFJVMdWd8VRO5atGBMUNoY7zg6H3JrhjZ
-	Xh7oPJZZlp6cjbNgsf5/wxdAN9IjfDKl0rImb+XG5DmL3KiLFHH7MDqXecwWqZDn1GrrGX1X0WRuK
-	FHQYC0zmA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=op4atEufDgTXoDyYba7gTvEyGLH72xUx5U4UGmOF69M=; b=DUE44doJZ9VwAQ
+	n0DUjPL1URIwHpnh0XEapuakNpkGjTloaz9DtJ7ckQc0VJElWAQKpe1bMWGkljjLhqkYhkIPMctfN
+	MScqfC9rJXP6iXQ4zCDIKDSc2q8gWOgP2oXTqp5pkPF/F3SQMVlKs3ItxCF8tpxvpyBC110Q/Pcvj
+	uvobhbdRgZbfwAE9E0wgkGoL10rS6/Nv0nUVS56mvQf4iNorPLNOJYZ7j+4+X7x48fNL2UjcZOOLC
+	j+Lg5d9VXS+Sll7Rj/9mqFf4KIRWKqSGXvaDxzSRWsfbiYWlATyTixJVmLqOc09J9tsUfpqc/y22i
+	ZZiDFSgJBs4ncIdoRHNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvxgp-0008GI-Rc; Tue, 19 Feb 2019 05:11:31 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvxgm-0008FI-BT
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 05:11:29 +0000
-Received: from unknown (HELO kinkan-ex.css.socionext.com) ([172.31.9.52])
- by mx.socionext.com with ESMTP; 19 Feb 2019 14:11:22 +0900
-Received: from mail.mfilter.local (m-filter-1 [10.213.24.61])
- by kinkan-ex.css.socionext.com (Postfix) with ESMTP id EF03C180C10;
- Tue, 19 Feb 2019 14:11:22 +0900 (JST)
-Received: from 172.31.9.51 (172.31.9.51) by m-FILTER with ESMTP;
- Tue, 19 Feb 2019 14:11:22 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by kinkan.css.socionext.com (Postfix) with ESMTP id 695371A04E1;
- Tue, 19 Feb 2019 14:11:22 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 50878120459;
- Tue, 19 Feb 2019 14:11:22 +0900 (JST)
-Subject: Re: [PATCH v2 13/15] ARM: dts: milbeaut: Add device tree set for the
- Milbeaut M10V board
-To: Arnd Bergmann <arnd@arndb.de>
-References: <1549628920-32623-1-git-send-email-sugaya.taichi@socionext.com>
- <CAK8P3a15mLEgVAh1+jQ+GqOcQa0zhrePWofo8iGkTs5_bd=TmQ@mail.gmail.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <ba5bb646-7fa6-e98f-4ac2-47c55c8f82ba@socionext.com>
-Date: Tue, 19 Feb 2019 14:11:21 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gvy0p-0005pH-WC; Tue, 19 Feb 2019 05:32:12 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gvy0n-0005oS-I4
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 05:32:10 +0000
+Received: by mail-it1-x141.google.com with SMTP id v72so3503486itc.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 18 Feb 2019 21:32:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=N3a1F+phTWNP4vUdqbdRG2LlbC8gmOfizcSGQCqcX2o=;
+ b=gc35xBK2JBhKjw035oTY1u93BDW82QcWBUDh0TI0DviPy3CeCAzv7UjcT9TBy+JNXD
+ lXsqfikYlopTFD18nTHjmmRrxttVYtwzVpdrcmcShD2mF0FD+Y2mPGor4BJ+JyWMkPEF
+ 4WDiECLbmuY+tNd3wpir2eUCE5HFOoUVxhvpG6f8UjS7IMrSRDbkoXfZbnvCnf1E+xpy
+ Gb2iaVw9vsJrlo8mFuMRiG9pQMgi2y9rMP6W/VBNr1Pq8BIMegopo5fRM5cCHHRzONVc
+ O/Xlf5nReRAxB9UeaX5jp8SO8MCBrq7et2MGGu2s6g7pXO7MPqGB0DajNG+e+Z61lxQj
+ 25UA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=N3a1F+phTWNP4vUdqbdRG2LlbC8gmOfizcSGQCqcX2o=;
+ b=GS0uhC+lJaKvbgiwidCCTLhpYMlBeD2JN7Uz4P5rjbAcFFiGFBRuYIwdgrZUVI+Ive
+ BlQuRkdWaI9f+XV93HEm9UeEKe2aN38z2gn2PYaRaDA2v4LJHwmY3bG7OGFeyihzuAcN
+ 18BdmsfwajhhMekbcu1375Nji5Qld+YahC7YkobH3jvMqi2spZu8ddByS8isreXuOcif
+ 7wEkO94Me2FQ8D1ppjsHJgOFU8pK0YZfhVz3mH4WsCgNOY4Jn/QJVuaysKK1QFgzA6Ll
+ w5BknPDzi4bcl0ACQ7g6oLKCSSyp7YahqGq1MOoq1y6t0LaY23QqGwWiCHCHK0dp7bMn
+ BoEw==
+X-Gm-Message-State: AHQUAuZ0F0ub5qL52qdS/rka7Or1rlcQDT8T0i6XkOD4tMnxMRzeKwqI
+ 1LxXUqRhFxpZCA/ne33l/UMWIg==
+X-Google-Smtp-Source: AHgI3IZ5ltUtXza7ruJZojlSoyiNc3n4l7gI2q26hEETIjvCNdzWMCapc6G79N9F+MyPSvpcyvD6wQ==
+X-Received: by 2002:a6b:4a09:: with SMTP id w9mr17157160iob.260.1550554327823; 
+ Mon, 18 Feb 2019 21:32:07 -0800 (PST)
+Received: from google.com ([2620:15c:183:0:a0c3:519e:9276:fc96])
+ by smtp.gmail.com with ESMTPSA id k26sm6197007iol.14.2019.02.18.21.32.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 18 Feb 2019 21:32:07 -0800 (PST)
+Date: Mon, 18 Feb 2019 22:32:05 -0700
+From: Yu Zhao <yuzhao@google.com>
+To: Anshuman Khandual <anshuman.khandual@arm.com>
+Subject: Re: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
+Message-ID: <20190219053205.GA124985@google.com>
+References: <20190214211642.2200-1-yuzhao@google.com>
+ <20190218231319.178224-1-yuzhao@google.com>
+ <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <CAK8P3a15mLEgVAh1+jQ+GqOcQa0zhrePWofo8iGkTs5_bd=TmQ@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_211128_512471_DB7093BB 
-X-CRM114-Status: GOOD (  21.53  )
+X-CRM114-CacheID: sfid-20190218_213209_625374_53A2B689 
+X-CRM114-Status: GOOD (  14.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,54 +98,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, Rob Herring <robh+dt@kernel.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-arch@vger.kernel.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
+ Jun Yao <yaojun8558363@gmail.com>, linux-mm@kvack.org,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Joel Fernandes <joel@joelfernandes.org>,
+ "Kirill A . Shutemov" <kirill@shutemov.name>,
+ Andrew Morton <akpm@linux-foundation.org>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-Thank you for you comments.
-
-On 2019/02/18 21:09, Arnd Bergmann wrote:
-> On Fri, Feb 8, 2019 at 1:28 PM Sugaya Taichi
-> <sugaya.taichi@socionext.com> wrote:
->> +
->> +       aliases {
->> +               serial1 = &uart1;
->> +       };
+On Tue, Feb 19, 2019 at 09:51:01AM +0530, Anshuman Khandual wrote:
 > 
-> Maybe start with serial0 here? It seems unusual to start
-> counting at 1.
 > 
+> On 02/19/2019 04:43 AM, Yu Zhao wrote:
+> > For pte page, use pgtable_page_ctor(); for pmd page, use
+> > pgtable_pmd_page_ctor() if not folded; and for the rest (pud,
+> > p4d and pgd), don't use any.
+> pgtable_page_ctor()/dtor() is not optional for any level page table page
+> as it determines the struct page state and zone statistics.
 
-The M10V evaluation board(EVB) uses a console with uart ch1, so this 
-alias number is derived from the used channel one.
-Therefore it is no problem to change the alias number to 0.
+This is not true. pgtable_page_ctor() is only meant for user pte
+page. The name isn't perfect (we named it this way before we had
+split pmd page table lock, and never bothered to change it).
 
->> +       chosen {
->> +               bootargs = "init=/sbin/finit rootwait earlycon";
-> 
-> The /sbin/finit argument seems user space specific, so you probably don't
-> want this in the dts file but rather pass it from the boot loader.
-> Possible drop the bootargs entirely.
-> 
+The commit cccd843f54be ("mm: mark pages in use for page tables")
+clearly states so:
+  Note that only pages currently accounted as NR_PAGETABLES are
+  tracked as PageTable; this does not include pgd/p4d/pud/pmd pages.
 
-Okay, remove the arg from the dts and add to bootargs instead.
+I'm sure if we go back further, we can find similar stories: we
+don't set PageTable on page tables other than pte; and we don't
+account page tables other than pte. I don't have any objection if
+you want change these two. But please make sure they are consistent
+across all archs.
 
-Thanks,
-Sugaya Taichi
+> We should not skip it for any page table page.
 
->       Arnd
-> 
+In fact, calling it on pmd/pud/p4d is peculiar, and may even be
+considered wrong. AFAIK, no other arch does so.
 
+> As stated before pgtable_pmd_page_ctor() is not a replacement for
+> pgtable_page_ctor().
+
+pgtable_pmd_page_ctor() must be used on user pmd. For kernel pmd,
+it's okay to use pgtable_page_ctor() instead only because kernel
+doesn't have thp.
 
 _______________________________________________
 linux-arm-kernel mailing list
