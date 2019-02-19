@@ -2,23 +2,22 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26633C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:45:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28B43C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:18:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EAF0721479
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 15:45:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ECA242147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:18:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rt9NjRJr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nLIwY9eB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EAF0721479
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p4Yc+mOb";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="ktsv9md1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECA242147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,64 +25,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VhpGwxNvTKuuiS7cJubNABP3HNvWnqzgTCTeIw+F0SY=; b=rt9NjRJrspJlkQ
-	vPkK9bo3qifkwiGUtKK06J3st8CbWgaTAwy/jPnS/q7+6bCzrZl+Ok4mp+SFs9bZnZ4s3sZdasYrS
-	5hBhl2ppAWEqAkueeOomoUmKHu+CmfYKDf2zdGF4rUr6Qgvnsju2CFq6SKrRTt/9sZajiP7+HY1wQ
-	Tti16Nw08k3XtB+Tgebp4YAmKXRLeaBCRpi9qWX+1LpFxFp+zhoV3Cyp+7KSN3WdwOK2w74ae1YKU
-	pkEsy38Q4iDQKtm1hwXe4LEMcxXm/8UEH+Wic3R5l+199mG8FO8jxbMy6IO2h0K0F9i8pom4tvz64
-	z4h4eJo0l9XyPEFJEPgg==;
+	List-Owner; bh=Esujtq8azRHLHCDIej51GA/YgMZY1Vijfo+Mw7K5Zf0=; b=p4Yc+mObzxG4Ov
+	TMcIDLALzfPW7VXLVA4800mxYCsfElzoBaOyHWKThsV8Fu0i7EzIVgHaTyYXIhhLBgz/wLMeCDs3w
+	z6YQZYlMQJ9wwpsLjtzbqk6LwRYpajb6ewLTTcvFa9OYSCH0MtLOgya2s9da2pbXb5lTqa6ujwGta
+	RzQ4nQtkXXIOCvSKe1VW2qinzhy0AE1mmemy8ozxyIahLryheVyz0Hdh2O0vy+citdnlsqkVdgiq8
+	+cj1SlJl5+7ujvccTlCbuzUmqx6jEQDRKryFFA4jbGf+venwSUHraaO+RD1Gnxyo3b28/m7y034el
+	iIN0q/FXkIDf/1oiRtPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw7aL-0004ac-54; Tue, 19 Feb 2019 15:45:29 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gw86O-0008GS-3V; Tue, 19 Feb 2019 16:18:36 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw7aG-0004Zt-U4
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 15:45:26 +0000
-Received: by mail-ot1-x341.google.com with SMTP id v62so26044453otb.3
+ id 1gw86K-0008G7-FH
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 16:18:34 +0000
+Received: by mail-it1-x143.google.com with SMTP id l15so7518558iti.4
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 07:45:23 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ Tue, 19 Feb 2019 08:18:32 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6SXixnP1uB12tQFqeyWAESUifdIBOYcEtd51ILghy/0=;
- b=nLIwY9eByKwMiV+KedBU4AqLJ+NDgpzi+bVP6sfI1ZflIjvT46f0hx3ahsVfRVcXjZ
- 6gf7jYnhobrGub0FTOHKF5Evtym3SUNAfppVwVmK76aGk48VDhLUoFUaVdQjUT1JCSlv
- hRdQHDqRvG5Uy2mUiydeqMC3XTsYqSBNWYWJHqy4b72mv+kDJzRjF/6uHFVCmNjcX+Z5
- FG2sXPv1EchE2P4rChDUV6h0CnLnS5hYV2iOzS2aG7TTtzQvZYnI8Ip9J5pqcRRHX4sq
- MqWFgCTxphJZaO4F7aCR5rMXYwuxjkgAqwHsOtiEiOTXRoIg8YgsWl9P+831jvAyOiBq
- QHLg==
+ :cc; bh=bnTJd4mCCK+0Y3QbJw8kqJZAFpFDr+KR944bBUp80kg=;
+ b=ktsv9md12WMWolVhfmDSy1Se+JsUOWlhFc4Uo/mZ4ARdBlCZ03Aq+ogE6Z4GOSmJDT
+ 6IhOG1Xo6FdbJgLjH7bGNmOLuMZ4wo3OyQ29uLlpaCz6vZ1zSjUY3aBReNvYDSsYImgp
+ ZZxQPheBadnaSrxLwSrULW6pKHpn8vnttFtvbs8zthJguyQXO+/X8cN04lRiil+DhnsU
+ rq22BnMDTw2rfqYCQlpmb8RvhfG0wWSN6aEbZPlNx/cFdgPemLFKFNe4oR0U1SN/Xg9u
+ S5hMJjFc0YnWmc0ky9TZ5YEa5yXtyH+iLpy0/aHVsGQVcbO9FGxeyILXg67bh8bahAtJ
+ HpdA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=6SXixnP1uB12tQFqeyWAESUifdIBOYcEtd51ILghy/0=;
- b=DXsyeO+r/UnjhDMAHF24bsMvGg7G+JwKkT2s/yI5t9KIC+vO6F9oKjxt72A6+Jvn8/
- 5vs8xYWeIZdmJgfNJ1HPbgCAkqX8550YJvfSABobCdZhj2z7jtW9dV2B/WOkiZLENvhS
- NeXcu6rmDTV3w20W1ECUpQyHosRrn85jkFLBtbaOaEX7OMJuw997YzAswia1gFcRHjrs
- QDlEnmsDE63IBFf4l0tIfXDTqDTXWRnNTFmBCAhT7K7Ieqrxo2uPLsi40zYEIUblIt7z
- ExCWL+hV3v6yJo6NQd79I2js1qMjTfLfK6/UjsrUFRzWu9RuLuJUVjE6AlQ15L0x4vMT
- iGmA==
-X-Gm-Message-State: AHQUAuZzQeow/x1+SKmZARg1Lm0Gdp+UU2V5k/q6rOVqwBmoY1/TKV3T
- LF5SIbx20BWU2LMDDTLfvTrle5lYAlh79qmrQgQ=
-X-Google-Smtp-Source: AHgI3IbnGOAS212QaCkAiR6TUopvKSjmSwiQdY6wjzzawp66h6adtbeC3t/+DlS2uqqyd7R9WljgUAL5zvukELADr3E=
-X-Received: by 2002:a05:6830:1193:: with SMTP id
- u19mr16719262otq.221.1550591123044; 
- Tue, 19 Feb 2019 07:45:23 -0800 (PST)
+ bh=bnTJd4mCCK+0Y3QbJw8kqJZAFpFDr+KR944bBUp80kg=;
+ b=XK17qVU/r8Vg883pSrM2GbZVKGt5NNgqGHv3ZjMVVxAYs1nOgYzqykOSbZUWFw+jB4
+ ErI74+8V4ZCHJxiQFJjrUqWpE6rF03ujnx6//xRy66DR31D9tjKwdRjgjWD7jCDyEnS+
+ X89kvDz5Y09jrypVgK6WMDM+xd6NcKbpiFHhLYCRjMSorC1WjMp31NUoG3FFTPBbcptY
+ G4vu/0lu7kcNfLInnqXla6O4ZiNq89use2W6JCx9bZFgXER7NeCdCu4bCf3fKclq0B0v
+ CEu1PeXxSZd4vlmAkczqKIHTzVsAV9YaGbbTrz6jlqBZY0dqjctyyZdwljOgkunwVymS
+ W/IQ==
+X-Gm-Message-State: AHQUAubpxygpowRcFFexBHJOMwvUprE2TpNdOLNYZbF3hCTwETsv2yXQ
+ 57SKuclv5sgACMOGNApK0S23EwVgSSAPrJgrXiTmXw==
+X-Google-Smtp-Source: AHgI3IZ/lr43D41EVbJi6PNzMsD1EpmoimswMGWMmQIcdv7noE6Xc+rXTQWCxtRdA9D+lTlHW07XYk70S1619YXZiYY=
+X-Received: by 2002:a24:56d0:: with SMTP id o199mr3025325itb.158.1550593111421; 
+ Tue, 19 Feb 2019 08:18:31 -0800 (PST)
 MIME-Version: 1.0
-References: <20190215050957.20755-1-anarsoul@gmail.com>
- <20190215050957.20755-7-anarsoul@gmail.com>
- <20190218182629.GA14714@bogus>
- <CA+E=qVfDfDvVmKQDeh2e0SA=tm6VpBMpu9MPKUqxFPObxYFXDg@mail.gmail.com>
- <20190219085626.7poutwvm3lrilnon@flea>
-In-Reply-To: <20190219085626.7poutwvm3lrilnon@flea>
-From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Tue, 19 Feb 2019 07:44:56 -0800
-Message-ID: <CA+E=qVfV8ds-zb0oG1-g8c-ReCSnZjfUjvAHbZf1zBf8H-xUcw@mail.gmail.com>
-Subject: Re: [PATCH v3 06/11] drm/sun4i: rgb: Add DT property to disable
- strict clock rate check
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+References: <20190218170245.14915-1-steve.capper@arm.com>
+ <CAKv+Gu_xOFXLwKsrFo-rBXdgk4O6zm6xPHB+tv1XjDjzyrjhEA@mail.gmail.com>
+ <20190219124825.GH8501@fuggles.cambridge.arm.com>
+ <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
+ <20190219130138.GI8501@fuggles.cambridge.arm.com>
+ <CAKv+Gu9qLiGDfT+yC2-pLhzepYNOfvJ4Squjgmy6u-t3HCJrAw@mail.gmail.com>
+ <20190219135640.GA15458@capper-debian.cambridge.arm.com>
+In-Reply-To: <20190219135640.GA15458@capper-debian.cambridge.arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 19 Feb 2019 17:18:18 +0100
+Message-ID: <CAKv+Gu82_vmeztgCe_y5+pXR27CRUzWBszk+ZEmxXZw9zpRNtA@mail.gmail.com>
+Subject: Re: [PATCH 0/9] 52-bit kernel + user VAs
+To: Steve Capper <Steve.Capper@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_074524_998048_A7719FEC 
-X-CRM114-Status: GOOD (  44.59  )
+X-CRM114-CacheID: sfid-20190219_081832_525960_30CF3E35 
+X-CRM114-Status: GOOD (  41.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,194 +94,183 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Archit Taneja <architt@codeaurora.org>,
- devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
- Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: "crecklin@redhat.com" <crecklin@redhat.com>,
+ Marc Zyngier <Marc.Zyngier@arm.com>, Catalin Marinas <Catalin.Marinas@arm.com>,
+ Will Deacon <Will.Deacon@arm.com>, nd <nd@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 19, 2019 at 12:56 AM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
+On Tue, 19 Feb 2019 at 14:56, Steve Capper <Steve.Capper@arm.com> wrote:
 >
-> On Mon, Feb 18, 2019 at 11:33:05AM -0800, Vasily Khoruzhick wrote:
-> > On Mon, Feb 18, 2019 at 10:26 AM Rob Herring <robh@kernel.org> wrote:
+> On Tue, Feb 19, 2019 at 02:15:26PM +0100, Ard Biesheuvel wrote:
+> > On Tue, 19 Feb 2019 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
 > > >
-> > > On Thu, Feb 14, 2019 at 09:09:52PM -0800, Vasily Khoruzhick wrote:
-> > > > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
-> > > > Validate the clock rate") prevents some panel and bridges from working with
-> > > > sun4i driver.
+> > > On Tue, Feb 19, 2019 at 01:51:51PM +0100, Ard Biesheuvel wrote:
+> > > > On Tue, 19 Feb 2019 at 13:48, Will Deacon <will.deacon@arm.com> wrote:
+> > > > >
+> > > > > On Tue, Feb 19, 2019 at 01:13:32PM +0100, Ard Biesheuvel wrote:
+> > > > > > On Mon, 18 Feb 2019 at 18:05, Steve Capper <steve.capper@arm.com> wrote:
+> > > > > > >
+> > > > > > > This patch series adds support for 52-bit kernel VAs using some of the
+> > > > > > > machinery already introduced by the 52-bit userspace VA code in 5.0.
+> > > > > > >
+> > > > > > > As 52-bit virtual address support is an optional hardware feature,
+> > > > > > > software support for 52-bit kernel VAs needs to be deduced at early boot
+> > > > > > > time. If HW support is not available, the kernel falls back to 48-bit.
+> > > > > > >
+> > > > > > > A significant proportion of this series focuses on "de-constifying"
+> > > > > > > VA_BITS related constants.
+> > > > > > >
+> > > > > > > In order to allow for a KASAN shadow that changes size at boot time, one
+> > > > > > > must fix the KASAN_SHADOW_END for both 48 & 52-bit VAs and "grow" the
+> > > > > > > start address. Also, it is highly desirable to maintain the same
+> > > > > > > function addresses in the kernel .text between VA sizes. Both of these
+> > > > > > > requirements necessitate us to flip the kernel address space halves s.t.
+> > > > > > > the direct linear map occupies the lower addresses.
+> > > > > > >
+> > > > > > > One obvious omission is 52-bit kernel VA + 48-bit userspace VA which I
+> > > > > > > can add with some more #ifdef'ery if needed.
+> > > > > > >
+> > > > > >
+> > > > > > Hi Steve,
+> > > > > >
+> > > > > > Apologies if I am bringing up things that have been addressed
+> > > > > > internally already. We discussed the 52-bit kernel VA work at
+> > > > > > plumber's at some point, and IIUC, KASAN is the complicating factor
+> > > > > > when it comes to having compile time constants for VA_BITS_MIN,
+> > > > > > VA_BITS_MAX and PAGE_OFFSET, right?
+> > > > > >
+> > > > > > To clarify what I mean, please refer to the diagram below, which
+> > > > > > describes a hybrid 48/52 kernel VA arrangement that does not rely on
+> > > > > > runtime variable quantities. (VA_BITS_MIN == 48, VA_BITS_MAX == 52)
+> > > > > >
+> > > > > > +------------------- (~0) -------------------------+
+> > > > > > |                                                |
+> > > > > > |            PCI IO / fixmap spaces              |
+> > > > > > |                                                |
+> > > > > > +------------------------------------------------+
+> > > > > > |                                                |
+> > > > > > |             kernel/vmalloc space               |
+> > > > > > |                                                |
+> > > > > > +------------------------------------------------+
+> > > > > > |                                                |
+> > > > > > |                module space                    |
+> > > > > > |                                                |
+> > > > > > +------------------------------------------------+
+> > > > > > |                                                |
+> > > > > > |                BPF space                       |
+> > > > > > |                                                |
+> > > > > > +------------------------------------------------+
+> > > > > > |                                                |
+> > > > > > |                                                |
+> > > > > > |   vmemmap space (size based on VA_BITS_MAX)    |
+> > > > > > |                                                |
+> > > > > > |                                                |
+> > > > > > +-- linear/vmalloc split based on VA_BITS_MIN -- +
+> > > > > > |                                                |
+> > > > > > |    linear mapping (48 bit addressable region)  |
+> > > > > > |                                                |
+> > > > > > +------------------------------------------------+
+> > > > > > |                                                |
+> > > > > > |    linear mapping (52 bit addressable region)  |
+> > > > > > |                                                |
+> > > > > > +------ PAGE_OFFSET based on VA_BITS_MAX --------+
+> > > > > >
+> > > > > > Since KASAN is what is preventing this, would it be acceptable for
+> > > > > > KASAN to only be supported when you use a true 48 bit or a true 52 bit
+> > > > > > configuration, and disable it for the 48/52 hybrid configuration?
+> > > > > >
+> > > > > > Just thinking out loud (and in ASCII art :-))
+> > > > >
+> > > > > TBH, if we end up having support for 52-bit kernel VA, I'd be inclined to
+> > > > > drop the 48/52 configuration altogether. But Catalin's on holiday at the
+> > > > > moment, and may have a different opinion ;)
+> > > > >
+> > > >
+> > > > But that implies that you cannot have an image that supports 52-bit
+> > > > kernel VAs but can still boot on hardware that does not implement
+> > > > support for it. If that is acceptable, then none of this hoop jumping
+> > > > that Steve is doing in these patches is necessary to begin with,
+> > > > right?
 > > >
-> > > Sounds lile a regression that should be reverted. The fix is not a
-> > > backwards compatible change either.
-> >
-> > anx6345 driver isn't mainlined yet and I'm not sure if this change
-> > breaks any mainlined boards. So likely there's not enough
-> > justification to revert it.
-> >
-> > > > Unfortunately, dotclock frequency for some modes are not achievable on
-> > > > sunxi hardware, and there's a slight deviation in rate returned by
-> > > > clk_round_rate(), so they fail this check.
-> > > >
-> > > > Experiments show that panels and bridges work fine with this slight
-> > > > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
-> > > > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
-> > > > fine.
-> > > >
-> > > > This patch adds DT property to disable strict clock rate check
-> > > >
-> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> > > > ---
-> > > >  .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 2 ++
-> > > >  drivers/gpu/drm/sun4i/sun4i_rgb.c                            | 5 +++++
-> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                           | 3 +++
-> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.h                           | 1 +
-> > > >  4 files changed, 11 insertions(+)
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > index f426bdb42f18..18c8b053a28d 100644
-> > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > @@ -63,6 +63,8 @@ Required properties:
-> > > >      Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> > > >      first port should be the input endpoint. The second should be the
-> > > >      output, usually to an HDMI connector.
-> > > > +  - no-strict-clock-check: don't reject timings if exact dot clock can't be
-> > > > +    reached.
+> > > Sorry, I misunderstood what you meant by a "48/52 hybrid configuration". I
+> > > thought you were referring to the configuration where userspace is 52-bit
+> > > and the kernel is 48-bit, which is something I think we can drop if we gain
+> > > support for 52-bit kernel.
 > > >
-> > > This should be the default IMO. Most panels are a single timing, so if
-> > > we reject it the fallback no display?
+> > > Now that I understand what you mean, I think disabling KASAN would be fine
+> > > as long as it's a runtime thing and the kernel continues to work in every
+> > > other respect.
+> > >
 > >
-> > As far as I remember the change was introduced to reject some modes
-> > for which dotclock can't be reached when driver is used with VGA
-> > bridge. So if we make it default it'll break boards with VGA bridge
-> > and old DT.
+> > No, it would be a limitation of the 52-bit config which also supports
+> > 48-bit-VA-only-h/w that the address space is laid out in such a way
+> > that there is simply no room for the KASAN shadow region, since it
+> > would have to live in the 48-bit addressable area, but be big enough
+> > to cover 52 bits of VA, which is impossible.
 > >
-> > > I thought we had some mechanism already to allow some range of
-> > > frequencies. I think the chromeos guys needed something IIRC.
+> > For the vmemmap space, we could live with sizing it statically to
+> > cover a 52-bit VA linear region, but the KASAN shadow region is simply
+> > too big.
 > >
-> > You can specify frequency range for panels, but there's nothing for
-> > bridges. In my case EDID doesn't specify clock tolerance.
+> > So if KASAN support in that configuration is a requirement, then I
+> > agree with Steve's approach, but it does imply that quite a number of
+> > formerly compile-time constants now get turned into runtime variables.
+> >
+> > Steve, do you have any idea what the impact of that is?
 >
-> I gave it some more though, and came up with the following patch. The
-> basic idea is to leave the boundary check for the bridges that will
-> have EDID and we need to filter out the modes that have no chance of
-> being supported. The tolerancy used is the one defined in VESA specs,
-> but I added a module parameter if you wanted to tune that.
+> Hi Guys,
 >
-> And finally, since most of our panels are single timings without any
-> tolerancy, we just try our best in this case and that's it, while
-> leaving the door open to support display_timings and being able to do
-> more once we have an idea of what the tolerancies are.
+> The KASAN region only really necessitates two things: 1) that we think
+> about the end address of the region (which is invariant) rather than the
+> start address; and that 2) we flip the kernel VA space. IIUC both these
+> changes have a neglible perf impact.
 >
-> If that works for you, I'll submit it.
+> As for VA_BITS_ACTUAL, we need this in a few places: KVM mapping
+> support, and the big one phys_to/from_virt. For phys_to/from_virt the
+> logic is changed s.t. we use a variable lookup for translation but this
+> is folded into a new variable physvirt_offset (before the patch we used
+> a single variable read too).
+>
+> Again IIUC there should be a minimal perf impact (unless one tries to do
+> cat /sys/kernel/debug/kernel_page_tables with KASAN enabled - but that
+> can be optimised later).
+>
+> I didn't have the patience for ASCII art ;-), but I have a picture of
+> what I think it looks like here:
+> https://s3.amazonaws.com/connect.linaro.org/yvr18/presentations/yvr18-119.pdf
+> What I've tried to do is have most parts of the kernel VA space
+> invariant between 48/52 bits. If it's helpful I can type this up into a
+> document/commit log message?
+>
+> For this series I have tried to introduce VA_BITS_MIN in its own patch
+> and also VA_BITS_ACTUAL into its own patch to make it easier to follow.
+>
 
-Maxime, thanks for your patch but  it doesn't work for me. Pinebook
-needs 1% tolerance. Having it as a module parameter means that no
-distro will be able to boot on Pinebook out of the box.
+OK, perhaps I am just rephrasing what you essentially implemented
+already, but let me try to explain a bit better what I mean:
 
-> Maxime
->
-> --- >8 ---
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> index f4a22689eb54..0460146aab75 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> @@ -43,6 +43,25 @@ drm_encoder_to_sun4i_rgb(struct drm_encoder *encoder)
->                             encoder);
->  }
->
-> +static inline struct drm_connector *
-> +sun4i_rgb_get_connector_from_encoder(const struct drm_encoder *encoder)
-> +{
-> +       struct drm_connector *connector = NULL, *tmp;
-> +       struct drm_connector_list_iter iter;
-> +
-> +       drm_connector_list_iter_begin(encoder->dev, &iter);
-> +       drm_for_each_connector_iter(tmp, &iter)
-> +               if (tmp->encoder == encoder) {
-> +                       connector = tmp;
-> +                       goto out;
-> +               }
-> +
-> +out:
-> +       drm_connector_list_iter_end(&iter);
-> +
-> +       return connector;
-> +}
-> +
->  static int sun4i_rgb_get_modes(struct drm_connector *connector)
->  {
->         struct sun4i_rgb *rgb =
-> @@ -52,11 +71,22 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
->         return drm_panel_get_modes(tcon->panel);
->  }
->
-> +/*
-> + * VESA DMT defines a tolerancy of 0.5% on the pixel clock, while the
-> + * CVT spec reuses that tolerancy in its examples, so it looks to be a
-> + * good default tolerancy for the EDID-based modes.
-> + */
-> +static unsigned int clock_tolerancy = 5;
-> +module_param(clock_tolerancy, uint, 0644);
-> +MODULE_PARM_DESC(clock_tolerancy,
-> +                "Tolerancy of the pixel clock in per mille");
-> +
->  static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
->                                                  const struct drm_display_mode *mode)
->  {
->         struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(crtc);
->         struct sun4i_tcon *tcon = rgb->tcon;
-> +       struct drm_connector *connector = sun4i_rgb_get_connector_from_encoder(crtc);
->         u32 hsync = mode->hsync_end - mode->hsync_start;
->         u32 vsync = mode->vsync_end - mode->vsync_start;
->         unsigned long rate = mode->clock * 1000;
-> @@ -92,15 +122,27 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
->
->         DRM_DEBUG_DRIVER("Vertical parameters OK\n");
->
-> +       /*
-> +        * TODO: We should use the struct display_timing if available
-> +        * and / or trying to stretch the timings within that
-> +        * tolerancy to take care of panels that we wouldn't be able
-> +        * to have a exact match for.
-> +        */
-> +       if (connector->connector_type == DRM_MODE_CONNECTOR_Unknown) {
-> +               DRM_DEBUG_DRIVER("RGB panel used, skipping clock rate checks");
-> +               goto out;
-> +       }
-> +
->         tcon->dclk_min_div = 6;
->         tcon->dclk_max_div = 127;
->         rounded_rate = clk_round_rate(tcon->dclk, rate);
-> -       if (rounded_rate < rate)
-> +       if (rounded_rate < (rate * (1000 - clock_tolerancy) / 1000))
->                 return MODE_CLOCK_LOW;
->
-> -       if (rounded_rate > rate)
-> +       if (rounded_rate > (rate * (1000 + clock_tolerancy) / 1000))
->                 return MODE_CLOCK_HIGH;
->
-> +out:
->         DRM_DEBUG_DRIVER("Clock rate OK\n");
->
->         return MODE_OK;
-> --- >8 ---
->
->
-> --
-> Maxime Ripard, Bootlin
-> Embedded Linux and Kernel engineering
-> https://bootlin.com
+- we flip the VA space in the way you suggest
+- we limit the size of the top half of the address space to 47 bits
+- KASAN region growns downwards from (~0) << 47
+- we define PAGE_OFFSET as (~0) << 52, regardless of whether the h/w
+supports LVA or not
+- however, we tweak the phys/virt translation so that memory appears
+in the 48-bit addressable part of the linear region on non-LVA
+hardware
+
+The latter basically means that the KASAN shadow region will intersect
+the linear region, but whether we map memory or shadow pages there
+depends on the h/w config at runtime.
+
+The heart of the matter is probably the different placement of the
+memory inside the linear region, depending on whether the h/w is LVA
+capable or not, which is also reflected in your physvirt_offset. I am
+just trying to figure out why we need VA_BITS_ACTUAL to be a runtime
+variable.
 
 _______________________________________________
 linux-arm-kernel mailing list
