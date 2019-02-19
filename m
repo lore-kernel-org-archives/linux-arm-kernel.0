@@ -2,79 +2,94 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D13BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:46:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9131BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:51:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CBA4C21903
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:46:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5FF3E21904
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:51:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dpX7Rj6i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CBA4C21903
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="epK2I3MJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Xbl66mYw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FF3E21904
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LByeDrofhmD83sxQJj/yvfxv87WBE1mv/77XaarwmGU=; b=dpX7Rj6iketMRI
-	933aoT6tGjA3CSVcVuwlSU5u/UNN2vGczJ4JBFauPjUIPNamvFvK7dMcqlvpU4If7YxIXisFMw8pE
-	M78ysqgdr6Ge/dAceusxUO+PYTbLj7h/NMSOAAc+DyqvnlZLLXKgj/vGmHhhVwN0EeXfMaBHg6hqY
-	pYSYIEOVkOBi3gyUJT/VvKvlE8pbm1+dM0eL1eTfmNE4uDGGXD4j+OVBLPSRfe3f/HvsGxE3Hq0Ok
-	6rLL2PBsrHZ51pTaj5epQ2BtGsHbPnvw8IGRCfk5E8OAwemjrlCHcuemoA496333q/FTq5JDCE+uT
-	HM+MKvRZjSl9w6xoGCFQ==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=NiAycs2fVbVzqMI5U9PevHM6kA+O1La4MF5tjVoNAXA=; b=epK2I3MJzV/Pex
+	bHOQZhWnOvyzzx+cdYpqsM5wMoFAEmKGtkgeyJXu1rvM/mT4/0R4ku0GtIOrPq1k6sGDSx8zHTM6G
+	niM51D9Kzzagk7jb+NnvY24mloDgZlCLuPZsg9mezXYzOb56c8cTQdRu+grtKXU63iGuWzMvXN5nr
+	+1Xc8Y1p6kdY370eJICJhfqKZ2yfRgzsSQasozKKXQRLkMM6PVU98lg0P1MMSqkKEGZ/hKwmsb14J
+	Eyqx1aEV+QYt4IiDaCEgUkJLX+2ouiHjTup6Y9bcZ8L/PJ4eZrESqVN6PwE2K8nZtDdQmv5L1gjxm
+	ILfpfdIacAsRmFLwnF5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw13E-0001Sn-GU; Tue, 19 Feb 2019 08:46:52 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gw17q-00036c-9K; Tue, 19 Feb 2019 08:51:38 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw13A-0001SM-2x
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:46:50 +0000
-Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1J8fxGX029951; Tue, 19 Feb 2019 09:46:37 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qpc74y9a8-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Tue, 19 Feb 2019 09:46:37 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id A743C3A;
- Tue, 19 Feb 2019 08:46:34 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 451252524;
- Tue, 19 Feb 2019 08:46:34 +0000 (GMT)
-Received: from [10.48.0.167] (10.75.127.51) by SFHDAG5NODE3.st.com
- (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Tue, 19 Feb
- 2019 09:46:33 +0100
-Subject: Re: [PATCH v4 3/3] pwm: core: add consumer device link
-To: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
-References: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
- <1550139951-25788-4-git-send-email-fabrice.gasnier@st.com>
- <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-Message-ID: <53bc3d80-8732-46be-caef-015998c9ad0e@st.com>
-Date: Tue, 19 Feb 2019 09:46:32 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ id 1gw17m-00035p-Uy
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:51:36 +0000
+Received: by mail-ot1-x341.google.com with SMTP id b3so32921566otp.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 00:51:34 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=tlV9vLB+KSMsmXO/I53mLkrat4UHKAVvOR8nqbfYTjw=;
+ b=Xbl66mYw6fd/AAeklC09hLlPoGGov/UOZz7vOpQDOC6a71lsbpuv2jtTVvgJFUg38T
+ FEs3q1yEXzo2JFtKPT7HA1CzP9z6LrOHQXCR4oM0GFQxlA/KwNOnnKMaG9C/FNhnHI1U
+ xhCiuIcQfs+NclRvCqwHMonV1iGp9OL0KqqGc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=tlV9vLB+KSMsmXO/I53mLkrat4UHKAVvOR8nqbfYTjw=;
+ b=VPxDcWr1/RYByYR68J8j/pZlDWv7xqW5nmKk4n4vVVzj6o3TfWz/z6A8y5MRL2ItUH
+ vxqkhEWHtcqVjpWdpO7tgpo8hnVWdnMeq1F+ne2/KsehaCbG37RLg5697CuXYZ+EleRJ
+ JEq1bT377vb1iV/muXraEw2A7A351jA3WtC1Chbw6Mcme5WS2SFEY67Q1e4srEGbfbd/
+ cpwD8YFO4CfqtETU4UzOv/X9AQQpuqTSswI+cVwSF60BSe04/qcMXR3kqNUaZ0oWiQuy
+ IUgSs8KAaexq1mUKc56YmVC6gxAfz9uktHM84/PDQxwPuEiY1JzOxQNY6mkXI87yXK/b
+ ztFg==
+X-Gm-Message-State: AHQUAuaZFeqZzBcW06MVYbUMO5gw1Kro9NpofeTfg9+u76lIUuWonv2T
+ azBpqjXmlaW1J6UkucgplOiRVmF94+Y=
+X-Google-Smtp-Source: AHgI3IZ/N0pwEBA72PxtqYVY80Qx5CMBpxB1t5Ib2uPj0eZ5eqEx7LmiGMvt9T7yIN6zDK5DNjD+Kw==
+X-Received: by 2002:a9d:6d89:: with SMTP id x9mr9260245otp.121.1550566293287; 
+ Tue, 19 Feb 2019 00:51:33 -0800 (PST)
+Received: from mail-ot1-f52.google.com (mail-ot1-f52.google.com.
+ [209.85.210.52])
+ by smtp.gmail.com with ESMTPSA id n65sm7129308oib.12.2019.02.19.00.51.31
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 19 Feb 2019 00:51:31 -0800 (PST)
+Received: by mail-ot1-f52.google.com with SMTP id i5so32872559oto.9
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 00:51:31 -0800 (PST)
+X-Received: by 2002:aca:5657:: with SMTP id k84mr1883764oib.173.1550566290647; 
+ Tue, 19 Feb 2019 00:51:30 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.51]
-X-ClientProxiedBy: SFHDAG2NODE3.st.com (10.75.127.6) To SFHDAG5NODE3.st.com
- (10.75.127.15)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-19_06:, , signatures=0
+References: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
+ <1549348966-14451-8-git-send-email-frederic.chen@mediatek.com>
+ <CAAFQd5CWdZUXVb4F9BLhQdN8WHjzA8acPDx1i+WcoudsdGsfUg@mail.gmail.com>
+ <1550372163.11724.59.camel@mtksdccf07>
+In-Reply-To: <1550372163.11724.59.camel@mtksdccf07>
+From: Tomasz Figa <tfiga@chromium.org>
+Date: Tue, 19 Feb 2019 17:51:19 +0900
+X-Gmail-Original-Message-ID: <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
+Message-ID: <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
+Subject: Re: [RFC PATCH V0 7/7] [media] platform: mtk-isp: Add Mediatek ISP
+ Pass 1 driver
+To: Jungo Lin <jungo.lin@mediatek.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_004648_416030_6B3052B0 
-X-CRM114-Status: GOOD (  18.93  )
+X-CRM114-CacheID: sfid-20190219_005134_997916_29873B5D 
+X-CRM114-Status: GOOD (  23.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,61 +101,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
- tduszyns@gmail.com, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
- thierry.reding@gmail.com, linux-pwm@vger.kernel.org, mcoquelin.stm32@gmail.com,
- linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: frankie_chiu@mediatek.com,
+ =?UTF-8?B?U2VhbiBDaGVuZyAo6YSt5piH5byYKQ==?= <Sean.Cheng@mediatek.com>,
+ Frederic Chen <frederic.chen@mediatek.com>,
+ =?UTF-8?B?UnlubiBXdSAo5ZCz6IKy5oGpKQ==?= <Rynn.Wu@mediatek.com>,
+ =?UTF-8?B?Q2hyaXN0aWUgWXUgKOa4uOmbheaDoCk=?= <christie.yu@mediatek.com>,
+ srv_heupstream@mediatek.com,
+ =?UTF-8?B?SG9sbWVzIENoaW91ICjpgrHmjLop?= <holmes.chiou@mediatek.com>,
+ seraph_huang@mediatek.com, Jerry-ch.Chen@mediatek.com, yuzhao@chromium.org,
+ ryan_yu@mediatek.com, Sj Huang <sj.huang@mediatek.com>,
+ Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ linux-mediatek@lists.infradead.org, zwisler@chromium.org,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Hans Verkuil <hans.verkuil@cisco.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMi8xOC8xOSA2OjIyIFBNLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90ZToKPiBIZWxsbywKPiAK
-PiBPbiBUaHUsIEZlYiAxNCwgMjAxOSBhdCAxMToyNTo1MUFNICswMTAwLCBGYWJyaWNlIEdhc25p
-ZXIgd3JvdGU6Cj4+IEFkZCBhIGRldmljZSBsaW5rIGJldHdlZW4gdGhlIFBXTSBjb25zdW1lciBh
-bmQgdGhlIFBXTSBwcm92aWRlci4gVGhpcwo+PiBlbmZvcmNlcyB0aGUgUFdNIHVzZXIgdG8gZ2V0
-IHN1c3BlbmRlZCBiZWZvcmUgdGhlIFBXTSBwcm92aWRlci4gSXQKPj4gYWxsb3dzIHByb3BlciBz
-eW5jaHJvbml6YXRpb24gb2Ygc3VzcGVuZC9yZXN1bWUgc2VxdWVuY2VzOiB0aGUgUFdNIHVzZXIK
-Pj4gaXMgcmVzcG9uc2libGUgZm9yIHByb3Blcmx5IHN0b3BwaW5nIFBXTSwgYmVmb3JlIHRoZSBw
-cm92aWRlciBnZXRzCj4+IHN1c3BlbmRlZDogc2VlIFsxXS4gQWRkIHRoZSBkZXZpY2UgbGluayBp
-bjoKPj4gLSBvZl9wd21fZ2V0KCkKPj4gLSBwd21fZ2V0KCkKPj4gLSBkZXZtXypwd21fZ2V0KCkg
-dmFyaWFudHMKPj4gYXMgaXQgcmVxdWlyZXMgYSByZWZlcmVuY2UgdG8gdGhlIGRldmljZSBmb3Ig
-dGhlIFBXTSBjb25zdW1lci4KPj4KPj4gWzFdIGh0dHBzOi8vbGttbC5vcmcvbGttbC8yMDE5LzIv
-NS83NzAKPj4KPj4gU3VnZ2VzdGVkLWJ5OiBUaGllcnJ5IFJlZGluZyA8dGhpZXJyeS5yZWRpbmdA
-Z21haWwuY29tPgo+PiBTaWduZWQtb2ZmLWJ5OiBGYWJyaWNlIEdhc25pZXIgPGZhYnJpY2UuZ2Fz
-bmllckBzdC5jb20+Cj4+IC0tLQo+PiBDaGFuZ2VzIGluIHY0Ogo+PiAtIHJld29yayBlcnJvciBo
-YW5kbGluZyBmb2xsb3dpbmcgVGhpZXJyeSdzIGNvbW1lbnRzCj4+IC0gdHVybi9zcGxpdCBwcl9k
-ZWJ1ZygpIGludG8gZGV2X2VycigpL3ByX3dhcm4oKS4KPj4KPj4gQ2hhbmdlcyBpbiB2MzoKPj4g
-LSBhZGQgc3RydWN0IGRldmljZSB0byBvZl9nZXRfcHdtKCkgYXJndW1lbnRzIHRvIGhhbmRsZSBk
-ZXZpY2UgbGluayBmcm9tCj4+ICAgdGhlcmUgYXMgZGlzY3Vzc2VkIHdpdGggVXdlLgo+PiAtLS0K
-Pj4gIGRyaXZlcnMvcHdtL2NvcmUuYyAgfCA1MCArKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKysrKysrKysrKy0tLQo+PiAgaW5jbHVkZS9saW51eC9wd20uaCB8ICA2ICsrKyst
-LQo+PiAgMiBmaWxlcyBjaGFuZ2VkLCA1MSBpbnNlcnRpb25zKCspLCA1IGRlbGV0aW9ucygtKQo+
-Pgo+PiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9wd20vY29yZS5jIGIvZHJpdmVycy9wd20vY29yZS5j
-Cj4+IGluZGV4IDE1ODFmNmEuLjY0ZTEwYTYgMTAwNjQ0Cj4+IC0tLSBhL2RyaXZlcnMvcHdtL2Nv
-cmUuYwo+PiArKysgYi9kcml2ZXJzL3B3bS9jb3JlLmMKPj4gQEAgLTYzNiw4ICs2MzYsMzUgQEAg
-c3RhdGljIHN0cnVjdCBwd21fY2hpcCAqb2Zfbm9kZV90b19wd21jaGlwKHN0cnVjdCBkZXZpY2Vf
-bm9kZSAqbnApCj4+ICAJcmV0dXJuIEVSUl9QVFIoLUVQUk9CRV9ERUZFUik7Cj4+ICB9Cj4+ICAK
-Pj4gK3N0YXRpYyBzdHJ1Y3QgZGV2aWNlX2xpbmsgKnB3bV9kZXZpY2VfbGlua19hZGQoc3RydWN0
-IGRldmljZSAqZGV2LAo+PiArCQkJCQkgICAgICAgc3RydWN0IHB3bV9kZXZpY2UgKnB3bSkKPj4g
-K3sKPj4gKwlzdHJ1Y3QgZGV2aWNlX2xpbmsgKmRsOwo+PiArCj4+ICsJaWYgKCFkZXYpIHsKPj4g
-KwkJLyoKPj4gKwkJICogTm8gZGV2aWNlIGZvciB0aGUgUFdNIGNvbnN1bWVyIGhhcyBiZWVuIHBy
-b3ZpZGVkLiBJdCBtYXkKPj4gKwkJICogaW1wYWN0IHRoZSBQTSBzZXF1ZW5jZSBvcmRlcmluZzog
-dGhlIFBXTSBzdXBwbGllciBtYXkgZ2V0Cj4+ICsJCSAqIHN1c3BlbmRlZCBiZWZvcmUgdGhlIGNv
-bnN1bWVyLgo+PiArCQkgKi8KPj4gKwkJcHJfd2Fybigibm8gY29uc3VtZXIgZGV2LCBjYW4ndCBj
-cmVhdGUgZGV2aWNlIGxpbmsgdG8gJXNcbiIsCj4+ICsJCQlkZXZfbmFtZShwd20tPmNoaXAtPmRl
-dikpOwo+IAo+IE1heWJlIHVzZSBkZXZfd2Fybihwd20tPmNoaXAtPmRldiwgLi4uKSA/CgpIaSBV
-d2UsCgpJJ20gd29uZGVyaW5nIGEgYml0IGFib3V0IHRoaXM6IEluIHRoaXMgY2FzZSwgdGhlIGNh
-bGxlciB0aGF0IGRvZXNuJ3QKcHJvdmlkZSBhIHN0cnVjdCBkZXZpY2UgKiwgUFdNIHByb3ZpZGVy
-IGlzbid0IHJlc3BvbnNpYmxlIGZvciB0aGF0LiBTbyBJCmp1c3QgaG9wZSB0aGlzIHdvdWxkbid0
-IGJlIG1pc3MtbGVhZGluZyA/Cgo+IAo+PiArCQlyZXR1cm4gTlVMTDsKPj4gKwl9Cj4+ICsKPj4g
-KwlkbCA9IGRldmljZV9saW5rX2FkZChkZXYsIHB3bS0+Y2hpcC0+ZGV2LCBETF9GTEFHX0FVVE9S
-RU1PVkVfQ09OU1VNRVIpOwo+PiArCWlmICghZGwpIHsKPj4gKwkJZGV2X2VycihkZXYsICJmYWls
-ZWQgdG8gY3JlYXRlIGRldmljZSBsaW5rIHRvICVzXG4iLAo+PiArCQkJZGV2X25hbWUocHdtLT5j
-aGlwLT5kZXYpKTsKPj4gKwkJCXJldHVybiBFUlJfUFRSKC1FSU5WQUwpOwo+IAo+IGJyb2tlbiBp
-bmRlbnRpb24uCgpPb3BzLCBJJ2xsIGZpeCBpdC4KClRoYW5rcywKRmFicmljZQoKPiAKPj4gKwl9
-Cj4+ICsKPj4gKwlyZXR1cm4gZGw7Cj4+ICt9Cj4+ICsKPiAKPiBCZXN0IHJlZ2FyZHMKPiBVd2UK
-PiAKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
-LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
-Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
-bS1rZXJuZWwK
+Hi Jungo,
+
+On Sun, Feb 17, 2019 at 11:56 AM Jungo Lin <jungo.lin@mediatek.com> wrote:
+>
+> On Wed, 2019-02-13 at 18:50 +0900, Tomasz Figa wrote:
+> > (() . ( strHi Frederic, Jungo,
+> >
+> > On Tue, Feb 5, 2019 at 3:43 PM Frederic Chen <frederic.chen@mediatek.com> wrote:
+> > >
+> > > From: Jungo Lin <jungo.lin@mediatek.com>
+> > >
+> > > This patch adds the driver for Pass unit in Mediatek's camera
+> > > ISP system. Pass 1 unit is embedded in Mediatek SOCs. It
+> > > provides RAW processing which includes optical black correction,
+> > > defect pixel correction, W/IR imbalance correction and lens
+> > > shading correction.
+> > >
+> > > The mtk-isp directory will contain drivers for multiple IP
+> > > blocks found in Mediatek ISP system. It will include ISP Pass 1
+> > > driver, sensor interface driver, DIP driver and face detection
+> > > driver.
+> >
+> > Thanks for the patches! Please see my comments inline.
+> >
+>
+> Dear Thomas:
+>
+> Thanks for your comments.
+>
+> We will revise the source codes based on your comments.
+> Since there are many comments to fix/revise, we will categorize &
+> prioritize these with below list:
+>
+> 1. Coding style issues.
+> 2. Coding defects, including unused codes.
+> 3. Driver architecture refactoring, such as removing mtk_cam_ctx,
+> unnecessary abstraction layer, etc.
+>
+
+Thanks for replying to the comments!
+
+Just to clarify, there is no need to hurry with resending a next patch
+set with only a subset of the changes. Please take your time to
+address all the comments before sending the next revision. This
+prevents forgetting about some remaining comments and also lets other
+reviewers come with new comments or some alternative ideas for already
+existing comments. Second part of my review is coming too.
+
+P.S. Please avoid top-posting on mailing lists. If replying to a
+message, please reply below the related part of that message. (I've
+moved your reply to the place in the email where it should be.)
+
+[snip]
+> > > +       phys_addr_t paddr;
+> >
+> > We shouldn't need physical address either. I suppose this is for the
+> > SCP, but then it should be a DMA address obtained from dma_map_*()
+> > with struct device pointer of the SCP.
+> >
+>
+> Yes, this physical address is designed for SCP.
+> For tuning buffer, it will be touched by SCP and
+> SCP can't get the physical address by itself. So we need to get
+> this physical address in the kernel space via mtk_cam_smem_iova_to_phys
+> function call and pass it to the SCP. At the same time, DMA address
+> (daddr) is used for ISP HW.
+>
+
+Right, but my point is that in the kernel phys_addr_t is the physical
+address from the CPU point of view. Any address from device point of
+view is dma_addr_t and should be obtained from the DMA mapping API
+(even if it's numerically the same as physical address).
+
+Best regards,
+Tomasz
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
