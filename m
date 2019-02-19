@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 38F04C10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:03:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9EF6EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:03:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B4BA2183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:03:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6D0832147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 17:03:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S53Q1PGn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B4BA2183F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rqv1NQe/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6D0832147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g9SXtMfuwXh99XrhRa/4xBicojg/lvmW4HnTR4vmRvg=; b=S53Q1PGnYs2koD
-	vMbUBz4y/4HpH+YFoFNPyiCSztgaT7iS8MlTXWAo7FaFY3Dp0F6e/sPG6MhrzDXP/vQn/RYKiGH9L
-	YR61UrD3Yl3XWhE09wNPG4eb+8Bbn1l6h21rlggYlMLrrbjzXTHQZ1hXeKjpQebf2hgJc0IfKfpIx
-	WGUwZagdVjFR14L+QnThqcqQygUYhXlLpxDX5bmOk9CmuTqtYnc5od3ToSyznBbeXv2D8JcN1VD00
-	HhT1sLIgfc2Jo8BqEVoOn37FWf8ivoyQ6MM4MmHNd/j5W9AL0UEAJrGjOwkv14j5RPTgWecU+X6bc
-	DXxzpeeMU+BTtKFIvWiA==;
+	List-Owner; bh=pcvj73r3M7td+wyTYu6Fxn4V8OpqpYxrd/uMfV13tM0=; b=rqv1NQe/0zvc0b
+	HYo4vtVvbSr9f0G3xxw6qYqp9v71lOBWq+YL4z05OEIr0YGAT6FBWqrkGJ/FVTdxZbDHG2O3txCTp
+	w6CaqcZDD+Acom8N1xvg52dvnX8C3OOTp7vZCvn7p/GO5M7BsoKwk07n/7atdiKJHViPHjioHBjva
+	tKhJxt3JnV+mqnspIE5iWtoFTadwXFoGOcQZ2RBHam12u0hni6OA+Hb3H/vrtSr+oCTAFPK9DAmt/
+	JQEMhBJV0LijQkfG1OhxOOOm7SuVrSItc8b4z/7jWNbPMDBvwbUrYk+owBbci69awJz/Ck/vX+Y0u
+	37nqe2B7hKdstnMQf7tQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw8nN-0001cZ-UN; Tue, 19 Feb 2019 17:03:01 +0000
+	id 1gw8na-0001sW-Br; Tue, 19 Feb 2019 17:03:14 +0000
 Received: from relay5-d.mail.gandi.net ([217.70.183.197])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw8md-0000eK-Ls
+ id 1gw8mc-0000d9-5Q
  for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 17:02:17 +0000
 X-Originating-IP: 90.53.137.203
 Received: from localhost (alyon-652-1-306-203.w90-53.abo.wanadoo.fr
  [90.53.137.203])
  (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 0C73D1C0018;
- Tue, 19 Feb 2019 17:02:12 +0000 (UTC)
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 6ADCE1C000A;
+ Tue, 19 Feb 2019 17:02:11 +0000 (UTC)
 From: Alexandre Belloni <alexandre.belloni@bootlin.com>
 To: Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH 5/7] ARM: dts: at91: at91sam9g45: switch to new sckc bindings
-Date: Tue, 19 Feb 2019 18:01:58 +0100
-Message-Id: <20190219170200.3608-6-alexandre.belloni@bootlin.com>
+Subject: [PATCH 4/7] ARM: dts: at91: at91sam9x5: switch to new sckc bindings
+Date: Tue, 19 Feb 2019 18:01:57 +0100
+Message-Id: <20190219170200.3608-5-alexandre.belloni@bootlin.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190219170200.3608-1-alexandre.belloni@bootlin.com>
 References: <20190219170200.3608-1-alexandre.belloni@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_090215_857480_08B83E3D 
-X-CRM114-Status: GOOD (  10.40  )
+X-CRM114-CacheID: sfid-20190219_090214_809092_B65A26AB 
+X-CRM114-Status: GOOD (  10.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,33 +81,31 @@ Remove the child nodes of the sckc as they are not necessary anymore.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 25 +++----------------------
- 1 file changed, 3 insertions(+), 22 deletions(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi | 23 +++--------------------
+ 1 file changed, 3 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index d16db1fa7e15..74a011077d54 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -1257,30 +1257,11 @@
- 				};
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 07443a387a8f..ff50f49842f4 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -148,28 +148,11 @@
+ 				clocks = <&pmc PMC_TYPE_CORE PMC_MCK>;
  			};
  
--			sckc@fffffd50 {
-+			clk32k: sckc@fffffd50 {
+-			sckc@fffffe50 {
++			clk32k: sckc@fffffe50 {
  				compatible = "atmel,at91sam9x5-sckc";
- 				reg = <0xfffffd50 0x4>;
+ 				reg = <0xfffffe50 0x4>;
 -
 -				slow_osc: slow_osc {
 -					compatible = "atmel,at91sam9x5-clk-slow-osc";
 -					#clock-cells = <0>;
--					atmel,startup-time-usec = <1200000>;
 -					clocks = <&slow_xtal>;
 -				};
 -
 -				slow_rc_osc: slow_rc_osc {
 -					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
 -					#clock-cells = <0>;
--					atmel,startup-time-usec = <75>;
 -					clock-frequency = <32768>;
 -					clock-accuracy = <50000000>;
 -				};
@@ -115,13 +113,13 @@ index d16db1fa7e15..74a011077d54 100644
 -				clk32k: slck {
 -					compatible = "atmel,at91sam9x5-clk-slow";
 -					#clock-cells = <0>;
--					clocks = <&slow_rc_osc &slow_osc>;
+-					clocks = <&slow_rc_osc>, <&slow_osc>;
 -				};
 +				clocks = <&slow_xtal>;
 +				#clock-cells = <0>;
  			};
  
- 			rtc@fffffd20 {
+ 			tcb0: timer@f8008000 {
 -- 
 2.20.1
 
