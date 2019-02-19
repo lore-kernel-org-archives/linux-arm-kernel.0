@@ -2,73 +2,89 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0228AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:44:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6AD70C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 04:07:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C42FC2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 03:44:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 37F79217D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 04:07:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vh4S+lYM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C42FC2075C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tzqSvpIl";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="Pon7C6so";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ZXnqq/mu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37F79217D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=CjN5AXcA7d5h3XZAEj0KC5wONrdie67z0ZrnIFfFSBo=; b=Vh4S+lYMWxh+S+9Z5X5WG1K8W
-	ipF+jrXsDYWxKcsGFEGpHOLJQlJ/Dmn2kicIKKt/vI+9svTOL/k6nHvyzaKh9PufI8NYLbZ/Cl6ej
-	ilejQMSWmXByi6P+gKkkwSR2apnJvlwNK9I9aOZZx2z0bYH1bw9f59sD9jrEFlKiZYgPcSSHhsfLv
-	eOKGJjfT9Qggyvpy2b/nreHizVDNb/6grTM83xX3Ta8ulajkVGqUsAJ2LSVOltmn6grptu0AnFkNy
-	Y2liDWwU6KcF4tbURRTGihOdKSFb0aXh3YvX5oWmZX73r6rtlf8aMgDGljoj26xCrRE9bpNw2NSUX
-	Pvd0FlrKA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=qx57NOv2igOVeUtTTHcLfkqSsWahol8Bedh7NxSK+gk=; b=tzqSvpIlrSsXpe
+	95OUDqP9eYrgcBDjnFLXpgOiPHKkGJK7HMnbQbjf1m8/FSTwM4so8b2xOY7w6pLqojaXnCfOpvXaH
+	jEi/zLzTYVTDImUhju+/Iv4bOnW9/9IJV6H+xsD9LFrz9QLi8m+ZMOOddJuGpzBtu1gltjLJ9O+Dk
+	GJwLgTFirqmL3kJ6Z1O+9N6yrwEu90lrRmsoy+dE0WwaiJJdQVzXaznQVLq0dZP2t5zUoDLhTLvcE
+	t9v4iga1YoS3xsqnUqUh++NIXopt6nzti7Rs6mTO4t91M460xWmdiA0KrMqw3+JwGu+7cPEIAJRst
+	OTBm/1WUci+bubsH2SbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gvwKU-0005ZJ-BU; Tue, 19 Feb 2019 03:44:22 +0000
-Received: from mga03.intel.com ([134.134.136.65])
+	id 1gvwgU-0004QS-Vd; Tue, 19 Feb 2019 04:07:06 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gvwKP-0005YL-HX
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 03:44:20 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga003.jf.intel.com ([10.7.209.27])
- by orsmga103.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 18 Feb 2019 19:44:14 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,385,1544515200"; d="scan'208";a="127491915"
-Received: from linux.intel.com ([10.54.29.200])
- by orsmga003.jf.intel.com with ESMTP; 18 Feb 2019 19:44:14 -0800
-Received: from [10.254.86.162] (kliang2-mobl1.ccr.corp.intel.com
- [10.254.86.162])
+ id 1gvwgR-0004Q2-Fd; Tue, 19 Feb 2019 04:07:05 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 143E0607DD; Tue, 19 Feb 2019 04:07:01 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1550549222;
+ bh=uGVscGjQWC/OWhL7Z0iOTmLrqP/qoK8+9ZkjZ8C43BM=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=Pon7C6somlLT8MvPhjFlnoGcMVaWSSzK0917xz20W7aIlNxIB1QOe9KZV29+mZlTV
+ t1oclUOyWx5h2OoqLLs05Elv12gHi40B3M7O69Efz8byrD0uSkqC7o5YHqtturlNbp
+ jyfH9qC7vWBnbuUc/RjFWElI3iPNfCrktm8oF5QU=
+Received: from potku.adurom.net (88-114-240-156.elisa-laajakaista.fi
+ [88.114.240.156])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by linux.intel.com (Postfix) with ESMTPS id 58CD1580238;
- Mon, 18 Feb 2019 19:44:12 -0800 (PST)
-Subject: Re: [PATCH 03/13] mm: Add generic p?d_large() macros
-To: Steven Price <steven.price@arm.com>, Peter Zijlstra <peterz@infradead.org>
-References: <20190215170235.23360-1-steven.price@arm.com>
- <20190215170235.23360-4-steven.price@arm.com>
- <20190218113134.GU32477@hirez.programming.kicks-ass.net>
- <aad21496-a86b-ca91-70b7-0c23ea6fefd3@arm.com>
-From: "Liang, Kan" <kan.liang@linux.intel.com>
-Message-ID: <8a74c111-b099-8d18-5fb0-422909a1367a@linux.intel.com>
-Date: Mon, 18 Feb 2019 22:44:10 -0500
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.1
+ (Authenticated sender: kvalo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 8F703607DE;
+ Tue, 19 Feb 2019 04:06:57 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1550549221;
+ bh=uGVscGjQWC/OWhL7Z0iOTmLrqP/qoK8+9ZkjZ8C43BM=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=ZXnqq/muos6OXLaGdJKEDSMuxWkMSt5fMt5AiOjzHffWHaINR9QBRRQ9V/cx9OMLz
+ pxj7UO2fOgPNA4pO/jWk/7wtmXJ7XiPfQzP8jRnWvzEoEa5w5bHis+TIGXof08T445
+ pA8fOkp4+Qwf+Sr3hk8lbntI8nmamfR9JC5VaTV8=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 8F703607DE
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=kvalo@codeaurora.org
+From: Kalle Valo <kvalo@codeaurora.org>
+To: Masahiro Yamada <yamada.masahiro@socionext.com>
+Subject: Re: [PATCH 1/2] wireless: mt76: call hweight8() instead of
+ __sw_hweight8()
+References: <1550469571-25933-1-git-send-email-yamada.masahiro@socionext.com>
+ <1550469571-25933-2-git-send-email-yamada.masahiro@socionext.com>
+ <877edxt1f1.fsf@kamboji.qca.qualcomm.com>
+ <87tvh0syq2.fsf@kamboji.qca.qualcomm.com>
+ <87pnrosy29.fsf@kamboji.qca.qualcomm.com>
+ <CAK7LNAQMgFXw=rtpdPNZ=xpLw-SiwKGAgM__Owvqd1EhTCUntQ@mail.gmail.com>
+Date: Tue, 19 Feb 2019 06:06:54 +0200
+In-Reply-To: <CAK7LNAQMgFXw=rtpdPNZ=xpLw-SiwKGAgM__Owvqd1EhTCUntQ@mail.gmail.com>
+ (Masahiro Yamada's message of "Tue, 19 Feb 2019 10:13:27 +0900")
+Message-ID: <878sycs9pd.fsf@kamboji.qca.qualcomm.com>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/24.5 (gnu/linux)
 MIME-Version: 1.0
-In-Reply-To: <aad21496-a86b-ca91-70b7-0c23ea6fefd3@arm.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190218_194417_633014_F1BA8B16 
-X-CRM114-Status: GOOD (  23.97  )
+X-CRM114-CacheID: sfid-20190218_200703_560670_6421756C 
+X-CRM114-Status: GOOD (  18.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,99 +96,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Dave Hansen <dave.hansen@linux.intel.com>,
- James Morse <james.morse@arm.com>, Arnd Bergmann <arnd@arndb.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Catalin Marinas <catalin.marinas@arm.com>, x86@kernel.org,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- linux-mm@kvack.org, =?UTF-8?B?SsOpcsO0bWUgR2xpc3Nl?= <jglisse@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- kirill@shutemov.name, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: Networking <netdev@vger.kernel.org>, X86 ML <x86@kernel.org>,
+ linux-wireless@vger.kernel.org,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "David S. Miller" <davem@davemloft.net>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Ingo Molnar <mingo@redhat.com>,
+ Borislav Petkov <bp@alien8.de>, "H . Peter Anvin" <hpa@zytor.com>,
+ Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Thomas Gleixner <tglx@linutronix.de>, Christoph Hellwig <hch@lst.de>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Felix Fietkau <nbd@nbd.name>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Masahiro Yamada <yamada.masahiro@socionext.com> writes:
 
-
-On 2/18/2019 9:19 AM, Steven Price wrote:
-> On 18/02/2019 11:31, Peter Zijlstra wrote:
->> On Fri, Feb 15, 2019 at 05:02:24PM +0000, Steven Price wrote:
->>> From: James Morse <james.morse@arm.com>
->>>
->>> Exposing the pud/pgd levels of the page tables to walk_page_range() means
->>> we may come across the exotic large mappings that come with large areas
->>> of contiguous memory (such as the kernel's linear map).
->>>
->>> For architectures that don't provide p?d_large() macros, provided a
->>> does nothing default.
+> On Tue, Feb 19, 2019 at 4:38 AM Kalle Valo <kvalo@codeaurora.org> wrote:
 >>
->> Kan was going to fix that for all archs I think..
+>> Kalle Valo <kvalo@codeaurora.org> writes:
+>>
+>> > Kalle Valo <kvalo@codeaurora.org> writes:
+>> >
+>> >> Masahiro Yamada <yamada.masahiro@socionext.com> writes:
+>> >>
+>> >>> __sw_hweight8() is just internal implementation.
+>> >>>
+>> >>> Drivers should use the common API, hweight8().
+>> >>>
+>> >>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> >>
+>> >> Acked-by: Kalle Valo <kvalo@codeaurora.org>
+>> >>
+>> >>> This patch should go to x86 tree along with 2/2.
+>> >>>
+>> >>> Otherwise, all{yes,mod}config of x86 would be broken.
+>> >>>
+>> >>> This patch is trivial enough.
+>> >>> I want ACK from the net/wireless maintainer
+>> >>> so that this can go in via x86 tree.
+>> >>
+>> >> Sounds good to me, feel free to push via the x86 tree.
+>> >
+>> > Actually, can you wait a bit? Felix just reminded me that we have a
+>> > similar patch pending from Ben Hutchings:
+>> >
+>> > https://patchwork.kernel.org/patch/10808203/
+>> >
+>> > And it seems there are two instances of __sw_hweight8, at least in my
+>> > wireless-drivers-next tree:
+>> >
+>> > drivers/net/wireless/mediatek/mt76/mac80211.c: int i, nstream =
+>> > __sw_hweight8(dev->antenna_mask);
+>> > drivers/net/wireless/mediatek/mt76/mac80211.c: int n_chains =
+>> > __sw_hweight8(dev->antenna_mask);
+>> >
+>> > So we need to think what to do.
+>>
+>> I think the best would be that Felix applies Ben's patch to the wireless
+>> tree and I'll push it to Linus during the next merge window (via
+>> net-next). Simpler and less conflicts that way.
+>>
+>> So Masahiro, could you hold your x86 patch for a while until the mt76
+>> patch will be in Linus' tree? That should not take more than two weeks,
+>> I think.
 >
+> Sure.
+> I will resend 2/2 later.
 
-Yes, I'm still working on a generic function to retrieve page size.
-The generic p?d_large() issue has been fixed. However, I found that the 
-pgd_page() is not generic either. I'm still working on it.
-I will update you on the other thread when all issues are fixed.
+Great, thanks!
 
-
-
-> The latest series I can find from Kan is still x86 specific. I'm happy
-> to rebase onto something else if Kan has an implementation already
-> (please point me in the right direction). Otherwise Kan is obviously
-> free to base on these changes.
->
-
-My implementation is similar as yours. I'm happy to re-base on your changes.
-
-Could you please also add a generic p4d_large()?
-
-Thanks,
-Kan
-
-> Steve
-> 
->> See:
->>
->>    http://lkml.kernel.org/r/20190204105409.GA17550@hirez.programming.kicks-ass.net
->>
->>> Signed-off-by: James Morse <james.morse@arm.com>
->>> Signed-off-by: Steven Price <steven.price@arm.com>
->>> ---
->>>   include/asm-generic/pgtable.h | 10 ++++++++++
->>>   1 file changed, 10 insertions(+)
->>>
->>> diff --git a/include/asm-generic/pgtable.h b/include/asm-generic/pgtable.h
->>> index 05e61e6c843f..7630d663cd51 100644
->>> --- a/include/asm-generic/pgtable.h
->>> +++ b/include/asm-generic/pgtable.h
->>> @@ -1186,4 +1186,14 @@ static inline bool arch_has_pfn_modify_check(void)
->>>   #define mm_pmd_folded(mm)	__is_defined(__PAGETABLE_PMD_FOLDED)
->>>   #endif
->>>   
->>> +#ifndef pgd_large
->>> +#define pgd_large(x)	0
->>> +#endif
->>> +#ifndef pud_large
->>> +#define pud_large(x)	0
->>> +#endif
->>> +#ifndef pmd_large
->>> +#define pmd_large(x)	0
->>> +#endif
->>> +
->>>   #endif /* _ASM_GENERIC_PGTABLE_H */
->>> -- 
->>> 2.20.1
->>>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel@lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
+-- 
+Kalle Valo
 
 _______________________________________________
 linux-arm-kernel mailing list
