@@ -6,145 +6,74 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C392C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20370C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5BC2721902
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C366E21902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 08:57:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eMjVdHV5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="BRP0O1dr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BC2721902
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YkFyKNHa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C366E21902
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=i2se.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Sf6m9ETIQZLS6XGcL7MVH0fMVmv4upxZT7GXwU78Xbk=; b=eMjVdHV5PaotW+
-	dG0EaU/jEn8nKyDlEoc6jox9e2S2G0Bu3zYNln08/TpVZ0+oh4+1hWeO8DfXr9+neiPKeMjShywf+
-	Wlp2EqZLVOMn4cCDbP7HvSEXr2mJg/E6MZrCLGi7s8+lt3gLmBPIQsYzQUfhCDSNDtpMVAF25sPDU
-	vk4cl+Y8RD+Zh5QvWB3JA78fesr5TGfgbVGnr0qs/PoeQT+AiyUzI07nDjWn+/V5U84wYxjp/Z5An
-	/gBEKn1fPfbvWHxr2UJL7Jk0uNAJX8XPS3ADCS5ckzvlFRLgLs/79OmCH8s8cZ+COq7J6HqfQ0PtH
-	muXOoYGkZB2a0vNMgeAA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XGT35Oc2AQAqMQdsLjwd/e/JAQW74sgkqVTvTgcgv/Y=; b=YkFyKNHaTc8YcM
+	Z5txFHlEtSQpcmdWcea+92j5txa4WIK2ZCUeKRyhBnwUPWvhdNQLIT24Dzv//6vNeGld8jHdi7cS+
+	eo/HG2VH5EY5KpJ4wEfon/y4g5SNDKdELfKHCGOF4EGzeWHc7HYCwv/3fmHe9kD5f/Q46F5qIxmPy
+	QL2N/bwhoZclY6h/DQWL94w+y5N6IVRCNnixifxZu5ONPXf1hQrGoFPv7zciEG7FYgJalC9tTLrKZ
+	ZS0apfwAku3A2mSpgpN1+tEZoAdLkFhyjUDgm9qoEMjwO+yCzdsv78IhK46BFm9NeDvBeLA9giS1H
+	XAVSUjYLE4jX4PfNwRvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw1DG-0006Uv-Rr; Tue, 19 Feb 2019 08:57:14 +0000
-Received: from esa4.microchip.iphmx.com ([68.232.154.123])
+	id 1gw1DP-0006fQ-6r; Tue, 19 Feb 2019 08:57:23 +0000
+Received: from mout.kundenserver.de ([212.227.17.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw1DC-0006TM-1X
+ id 1gw1D9-0006Rs-Vc
  for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 08:57:12 +0000
-X-IronPort-AV: E=Sophos;i="5.58,387,1544511600"; d="scan'208";a="26515736"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 19 Feb 2019 01:57:07 -0700
-Received: from NAM02-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Tue, 19 Feb 2019 01:57:06 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=PRw8pyDKlsxu5OK7iTEY9F8mlG90KkDggI+1/SBrr5s=;
- b=BRP0O1drGL796ZVuKU1rQMGFYhWaftoENxBwC0a8S3d+topo+hPku659axKpgTH4xJ0A8Wihe/9rgptUIao5LMHURqHX6LIE9/5SW4aOwWm3WVuoVUA+Wk8hD3Qe71Neq3U/crfrwhMfkwlEbxJ1H3KqSwum3MUVZQ3vUYkR5jc=
-Received: from CY4PR11MB1909.namprd11.prod.outlook.com (10.175.61.147) by
- CY4PR11MB1845.namprd11.prod.outlook.com (10.175.82.16) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Tue, 19 Feb 2019 08:57:04 +0000
-Received: from CY4PR11MB1909.namprd11.prod.outlook.com
- ([fe80::1499:c19c:26f1:32f1]) by CY4PR11MB1909.namprd11.prod.outlook.com
- ([fe80::1499:c19c:26f1:32f1%8]) with mapi id 15.20.1622.020; Tue, 19 Feb 2019
- 08:57:04 +0000
-From: <Claudiu.Beznea@microchip.com>
-To: <u.kleine-koenig@pengutronix.de>
-Subject: Re: [PATCH 2/4] pwm: atmel: add support for controllers with 32 bit
- counters
-Thread-Topic: [PATCH 2/4] pwm: atmel: add support for controllers with 32 bit
- counters
-Thread-Index: AQHUsYUm31frJ/4ukkWUPCYXEQw2XaXm6l4AgAAUtgA=
-Date: Tue, 19 Feb 2019 08:57:04 +0000
-Message-ID: <e08cbcb2-4e37-4a2e-ea79-021a2c7a25d6@microchip.com>
-References: <1548073783-22640-1-git-send-email-claudiu.beznea@microchip.com>
- <1548073783-22640-3-git-send-email-claudiu.beznea@microchip.com>
- <20190219074246.kcdbd5nhf43yw5ax@pengutronix.de>
-In-Reply-To: <20190219074246.kcdbd5nhf43yw5ax@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: VI1P18901CA0003.EURP189.PROD.OUTLOOK.COM
- (2603:10a6:801::13) To CY4PR11MB1909.namprd11.prod.outlook.com
- (2603:10b6:903:11f::19)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Claudiu.Beznea@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-tagtoolbar-keys: D20190219105654489
-x-originating-ip: [94.177.32.154]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 28e1aa53-8eba-4e8c-9f1f-08d6964837d7
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:CY4PR11MB1845; 
-x-ms-traffictypediagnostic: CY4PR11MB1845:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtDWTRQUjExTUIxODQ1OzIzOlpTRFp0bGJmZGRNV3NldEVJMVpCeitVMEJF?=
- =?utf-8?B?TVFDSFNsV0JsZlVHbStCNVh5MEpJQVl5QmEyaU1ieFVtRlBBS0Y1OEoyWG4y?=
- =?utf-8?B?cG1VM3k2UjNZZU8rNmo1bGYrQmYyWHdRc05pWjlwTzN5ZHNweSsydWRzVTVa?=
- =?utf-8?B?UkN0OUxTS0wxUmkwS3B6M2ZyaDdlRXZyV01UckhqOHZsc1I2Snc5dlZubDRr?=
- =?utf-8?B?YVJoQThVRldxSDNVYlowblMzemJMVnpqSUhEVTRTM2VhSW9qakNINjBLNFg5?=
- =?utf-8?B?MW1saEZYMUF6YitPSCtLcXRONDdvVmF3NHdmcVYxYzNxYnFobVp5OWlmcWxn?=
- =?utf-8?B?cjJQcHRoSFdQZWdSRTRFMzNzQ3FRTG9GczNtUE9adFd4Q29HNFRkRjJlL2V3?=
- =?utf-8?B?V1pqVFFOVEFGQ1JsRzRqZSt3RVZPTzVkU2VmZjk4VFVFcXA4NmZHS1dVWVE3?=
- =?utf-8?B?MHNLRTloajNLcFZCN2k0VWNMbnQ3c3lSdXE4UEdnSFhoUk1tOXUzSUtwUHBo?=
- =?utf-8?B?SGFOYVgvMW5KOXVBZ0hNUEhmMlFIaW9EZDVkU2J3Vk90c0I5cEFQRHpuVnB0?=
- =?utf-8?B?OEp6NFZGSS95bHloTE96NXdYVjBWdkswWlQ3bkNIb2d1dmZVZVJTR0x6M3pT?=
- =?utf-8?B?OTFKTURnNTFUOHVoZ3pRYnJwR245VDJLVUdQdXNNZ2YyL3JlSWNGNWJBdS9u?=
- =?utf-8?B?STR5RCtaL2JubUlPUldZaW04WEk5UHJIWGtNS1ZPbE12MlVSS1JWejhQUURo?=
- =?utf-8?B?aGFtdy9oNXR2K0t5U0NHRTkzd0hwOTQ0VTliUE1CRHZhNkEydmIvNEYyUTVN?=
- =?utf-8?B?TWFhNi9NaGhidHp2dGxKY0U2MVJSTkVTWUZsUTRITW1RTnZZQ1p6WUhZYWEw?=
- =?utf-8?B?KzZUWCtZYWRpVE93R0VxLzE5Z21GM3RZRk9Vd2Z0VDdXVFllYUVrN0cxeHRv?=
- =?utf-8?B?RDhwQjlYdml0U3ZDdHVOejlia1Q5blZjeEhadlg2a2ZhZ0pUWm1KUDcvNnFD?=
- =?utf-8?B?UzIxOXV4NVpyL1luaTBpRlZHSDJEMnZMeFdHQWYvbnYxQ1pmUjVGS1BoTTAx?=
- =?utf-8?B?NkpvRzdFc3ZFUm1sVzE2T2JweWJuWDRVcHM4bUYwZCtnRGIxaUJZdmhnVW5L?=
- =?utf-8?B?dlJWUTZZdCtnMFo2alVnc3BIT01zNFBnNTFSaUJ2QWFsZWF3NDJuWElCenBP?=
- =?utf-8?B?allGLzh6ZDkyK1ZJT2IyQWYySE81LzdXaEdKTG54YWU5Y08yek85WjJYQkFH?=
- =?utf-8?B?TytyTmhrSGg2SE8xK0JUWDVOb2k4ZWpjODZRMGJiVlZkVjJmR1YvNStOL2pn?=
- =?utf-8?B?MnJrRkxHVVlmd1plRmxwbDhrWUl5MWVuR282V1RWM1VKZUpIYWN5RmhOYVc3?=
- =?utf-8?B?dEpVYVlyQUJvSkdTRVd0MFdXSjIwempieXN2MzlGMDdhbzFSbWIzd2NnbzRE?=
- =?utf-8?B?VGtOd3Z1SngwQzZYeEN2SHJpNGdkaG5yNUhaVWpiQm9Pa2RBWmRBclVWaDNF?=
- =?utf-8?B?NlpGc0VGUzc0Y0RHTWpDNmRDSTZKektaeVhsTTlLUVMzNHlQK2VEUzFmOCtH?=
- =?utf-8?B?SHJONnhUOHJidW1STi9qRVZJYXFacjQxaU9mZjRrbXlYSkwyUnR4TVhYQjdF?=
- =?utf-8?B?eDhPbjh1alNjUGRCZXFzZGlrZjFxa1R0L1pNL2FZMGRBRUl4T1FtSFJjYjdq?=
- =?utf-8?B?aFJEcitmLzNjTmhwT3FNSGpqMEJkMUZzYndYQXhsakEwbjk1bjRZNEVjMEd0?=
- =?utf-8?B?MmdkNys2L3BSeE1JdTJLamdQMG9vOTcyRWdsblVhazlmK1NmNmNKWDJmNGZK?=
- =?utf-8?B?SURVTmtvRnd0WUpVNCtZQXhGTk1TenI2b3ZMeEs1SzkvZkE9PQ==?=
-x-microsoft-antispam-prvs: <CY4PR11MB1845B90D9BD46A39C8161059877C0@CY4PR11MB1845.namprd11.prod.outlook.com>
-x-forefront-prvs: 09538D3531
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(346002)(136003)(396003)(376002)(39860400002)(199004)(189003)(54094003)(68736007)(54906003)(316002)(72206003)(31686004)(478600001)(6246003)(66066001)(4326008)(14454004)(5660300002)(53546011)(386003)(76176011)(99286004)(52116002)(97736004)(102836004)(66574012)(105586002)(36756003)(106356001)(31696002)(6506007)(86362001)(186003)(26005)(6916009)(6486002)(6436002)(229853002)(53936002)(14444005)(256004)(446003)(11346002)(486006)(2616005)(476003)(7736002)(25786009)(2906002)(305945005)(6116002)(3846002)(71200400001)(6512007)(8936002)(8676002)(81166006)(81156014)(71190400001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR11MB1845;
- H:CY4PR11MB1909.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: SKQ80Zu2MdbseCTajkSkkwy05637qDSxmLsxsf3tBQtZssQlUCe2dx3KQJhmVEIMXN0vNVUwPQKbJhY0A8OJTntm4nWzPEBHqwvgcPpu+Y1HL6F8lawgyiZydk7+xVJGtmlRWuXc3EynsArv/dPyH4ny54lXE5QIOPIlT3OKGbkWM3Dw6XdY4TAFEVY/l9Dm997OIHm2ynLgfTihCTNccDUVoqSPIiJ8XDUfdzrPcp0iQ6PcjmhJ1DuP8GrJrmD4XWlfLlfSmJOgL4I6HkD0S+5H2H9WJ1pd55JS54VISFwVWhd2IPk4jWOunfGLEon6Ql8yJQ/tQzWeRSBKHR8QGexXj02rogtNZv3tSvZj2UNWRRBm1b3ai2QjlD65gD3cpBIxAjY7IQKwr2bISLLi8T/TwFhD1TSC5L4PxzV9+hA=
-Content-ID: <8BF9CBF41A5E0F40A8890E8641F34482@namprd11.prod.outlook.com>
+Received: from [192.168.178.52] ([109.104.34.73]) by mrelayeu.kundenserver.de
+ (mreue106 [212.227.15.183]) with ESMTPSA (Nemesis) id
+ 1MKbwg-1gdFs63oVQ-00L0kR; Tue, 19 Feb 2019 09:56:50 +0100
+Subject: Re: [PATCH 3/8] dt-bindings: net: bluetooth: Add rtl8723bs-bluetooth
+To: Vasily Khoruzhick <anarsoul@gmail.com>, Rob Herring <robh@kernel.org>
+References: <20190118170232.16142-1-anarsoul@gmail.com>
+ <20190118170232.16142-4-anarsoul@gmail.com> <20190218211035.GA28145@bogus>
+ <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+From: Stefan Wahren <stefan.wahren@i2se.com>
+Message-ID: <6a61bca4-c458-6d98-68e6-ef49b191019c@i2se.com>
+Date: Tue, 19 Feb 2019 09:56:47 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 28e1aa53-8eba-4e8c-9f1f-08d6964837d7
-X-MS-Exchange-CrossTenant-originalarrivaltime: 19 Feb 2019 08:57:01.1011 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR11MB1845
-X-OriginatorOrg: microchip.com
+In-Reply-To: <CA+E=qVdq5GORg-t-vVXM3zBxy3Aq93iCE+zmcGgLFBMcnTDgfw@mail.gmail.com>
+Content-Language: en-US
+X-Provags-ID: V03:K1:wht6XshRJSZw5SLNmwIESxEopFXtFOue70HBGTSF/lanmGZEk/Y
+ R2ylCRKk0ZRx6XLP5vaFMef1GNeaefi06BeJpMcw9UtD7Q7bxr+ET8taXfQH8ddiYw/QpRa
+ TEd2D9XH9H9ImIVf68UKptZBYgQ/jZ3aVvJCXjMEXWUjp1p8THWwtMDNL0F5OdShGBaS6lF
+ Gv/k2tJ7sfldcRjdijX6Q==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:FJk39dRHJ7M=:kxq/7OnfQ6e1kyQzD0rjo5
+ Wbt6Kw4DCj6DPRl+7ABjSCDOmy8TwsPgTDYPIac1Eh1QdVkmSlgpyTLA2MTPURAVKsAhTXhgP
+ sZmg2JDOBtmQxeDlMdUSeV3VNIYigmmuZO7FNihU0tOXkv3npcYouhg3RVNYVgmGSFUkzkh97
+ 1XIUj4yDmlKUZKGcOl2bJ4ZwXGBHeiXYirv/29wxg2tTjGt5txzhFD3QIlwMBtIg9Plzt5CV8
+ SptsFJIlkm79oNPY3kxJBUg81lv5ZcyZNyldlu9jZzslHibQayU1yrqvny3GrPLDmSDmqdZnz
+ x94rsRxj6Ja3PMFhmPWjzqB8DsNUbZA4BwmE9BTbNubUibnGN1jHxSJ55idB2NoPkFgR0unWa
+ ChnBHFHeH+BzLLFil3o2v8ec2+XT5g+ttu4FCWCo/GcbnCvAnA7WxlHX6fxYVOI2T6vU2QHb3
+ tU8t0ZsOsAeKFCY3AQztTfgpGaLShMOaNYo0tlidbnTFEEZTzqkm8Z9H2JL4QmKUEzlWfYm6g
+ lUKBxJsvddupDqOABB84gTmNDy76XLQA+viMVAKtotoTi/08vUttulCWGvghpzySBzbiezho2
+ KEVh57ndTMWpU8Y+d7sU3IzTGyjzjqzHJ1Me94cl7++iISJPakBObaxTVOEqK3hCmmmTxBVfT
+ RnnreOH7CmarQvv0yHTUCVvMN5RoKXG5b0qeLNwerxgfaxilHeQNkG9I0WfKpehkMQfvxW383
+ lddEDeyq8JFXZdGlmh9WUQPg5Pi25tyZJKeImhfe9N6sV3z1fKVt9r8I28wKZanKg2C2Be3/w
+ guTPTlsUJxqQL2sYoHikoXyRAnXgULrvSb4Uq27ANyy03fCzC1OCgu9IYFPzOAdgnRJ9vae68
+ hN+W9KQj2vtH5XpwzxcQ==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_005710_154094_80E9214B 
-X-CRM114-Status: GOOD (  14.74  )
+X-CRM114-CacheID: sfid-20190219_005708_426206_D8A11F82 
+X-CRM114-Status: GOOD (  17.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -156,46 +85,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-pwm@vger.kernel.org,
- alexandre.belloni@bootlin.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
- linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
- thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Johan Hedberg <johan.hedberg@gmail.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>, netdev@vger.kernel.org,
+ Marcel Holtmann <marcel@holtmann.org>, linux-bluetooth@vger.kernel.org,
+ Chen-Yu Tsai <wens@csie.org>, "David S. Miller" <davem@davemloft.net>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-DQoNCk9uIDE5LjAyLjIwMTkgMDk6NDIsIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3RlOg0KPiBIZWxs
-byBDbGF1ZGl1LA0KPiANCj4gT24gTW9uLCBKYW4gMjEsIDIwMTkgYXQgMTI6MzA6NTNQTSArMDAw
-MCwgQ2xhdWRpdS5CZXpuZWFAbWljcm9jaGlwLmNvbSB3cm90ZToNCj4+IEZyb206IENsYXVkaXUg
-QmV6bmVhIDxjbGF1ZGl1LmJlem5lYUBtaWNyb2NoaXAuY29tPg0KPj4NCj4+IE5ldyBTQU05WDYw
-J3MgUFdNIGNvbnRyb2xsZXIgdXNlIDMyIGJpdHMgY291bnRlcnMgdGh1cyBpdCBjb3VsZCBnZW5l
-cmF0ZQ0KPj4gc2lnbmFscyB3aXRoIGhpZ2hlciBwZXJpb2QgYW5kIGR1dHkgY3ljbGVzLiBVcGRh
-dGUgdGhlIGN1cnJlbnQgZHJpdmVyDQo+PiB0byB3b3JrIHdpdGggb2xkIGNvbnRyb2xsZXIgKHRo
-YXQgdXNlcyAxNiBiaXRzIGNvdW50ZXJzKSBhbmQgd2l0aCB0aGUNCj4+IG5ldyBTQU05WDYwJ3Mg
-Y29udHJvbGxlci4NCj4+DQo+PiBTaWduZWQtb2ZmLWJ5OiBDbGF1ZGl1IEJlem5lYSA8Y2xhdWRp
-dS5iZXpuZWFAbWljcm9jaGlwLmNvbT4NCj4+IC0tLQ0KPj4gIGRyaXZlcnMvcHdtL3B3bS1hdG1l
-bC5jIHwgMzggKysrKysrKysrKysrKysrKysrKysrKysrKysrLS0tLS0tLS0tLS0NCj4+ICAxIGZp
-bGUgY2hhbmdlZCwgMjcgaW5zZXJ0aW9ucygrKSwgMTEgZGVsZXRpb25zKC0pDQo+Pg0KPj4gZGlm
-ZiAtLWdpdCBhL2RyaXZlcnMvcHdtL3B3bS1hdG1lbC5jIGIvZHJpdmVycy9wd20vcHdtLWF0bWVs
-LmMNCj4+IGluZGV4IDdlODZhNTI2NmViNi4uNDRmNGExYzlmNjBiIDEwMDY0NA0KPj4gLS0tIGEv
-ZHJpdmVycy9wd20vcHdtLWF0bWVsLmMNCj4+ICsrKyBiL2RyaXZlcnMvcHdtL3B3bS1hdG1lbC5j
-DQo+PiBAQCAtNDgsMTUgKzQ4LDE1IEBADQo+PiAgI2RlZmluZSBQV01WMl9DUFJECQkweDBDDQo+
-PiAgI2RlZmluZSBQV01WMl9DUFJEVVBECQkweDEwDQo+PiAgDQo+PiAtLyoNCj4+IC0gKiBNYXgg
-dmFsdWUgZm9yIGR1dHkgYW5kIHBlcmlvZA0KPj4gLSAqDQo+PiAtICogQWx0aG91Z2ggdGhlIGR1
-dHkgYW5kIHBlcmlvZCByZWdpc3RlciBpcyAzMiBiaXQsDQo+PiAtICogaG93ZXZlciBvbmx5IHRo
-ZSBMU0IgMTYgYml0cyBhcmUgc2lnbmlmaWNhbnQuDQo+PiAtICovDQo+PiAtI2RlZmluZSBQV01f
-TUFYX0RUWQkJMHhGRkZGDQo+PiAtI2RlZmluZSBQV01fTUFYX1BSRAkJMHhGRkZGDQo+PiAtI2Rl
-ZmluZSBQUkRfTUFYX1BSRVMJCTEwDQo+PiArLyogTWF4IHZhbHVlcyBmb3IgcGVyaW9kIGFuZCBw
-cmVzY2FsZXIgKi8NCj4+ICsNCj4+ICsvKiBPbmx5IHRoZSBMU0IgMTYgYml0cyBhcmUgc2lnbmlm
-aWNhbnQuICovDQo+PiArI2RlZmluZSBQV01fTUFYVjFfUFJECQkweEZGRkYNCj4+ICsNCj4+ICsv
-KiBBbGwgMzIgYml0cyBhcmUgc2lnbmlmaWNhbnQuICovDQo+PiArI2RlZmluZSBQV01fTUFYVjJf
-UFJECQkweEZGRkZGRkZGDQo+IA0KPiBUaGlzIHN5bWJvbCBpcyB1bnVzZWQsIHNvIEkgd29uZGVy
-IGlmIHRoZSBwYXRjaCByZWFsbHkgZG9lcyB3aGF0IHRoZQ0KPiBjb21taXQgbG9nIHByb21pc2Vz
-Lg0KDQpJdCBpcyBvbmx5IG9mIFNBTTlYNjAncyBQV00uIFBsZWFzZSBjaGVjayBwYXRjaCAzLzQu
-IE1heWJlIEkgc2hvdWxkIGhhdmUNCmJlZW4gaW50cm9kdWNlZCBpdCBpbiB0aGVyZS4gSWYgeW91
-IGNvbnNpZGVyIGl0IGlzIGJldHRlciB0byBiZSBpbnRyb2R1Y2VkDQppbiBwYXRjaCAzLzQgcGxl
-YXNlIGxldCBtZSBrbm93Lg0KDQo+IA0KPiBCZXN0IHJlZ2FyZHMNCj4gVXdlDQo+IA0KX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5l
-bCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6
-Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+Hi Vasily,
+
+Am 18.02.19 um 22:24 schrieb Vasily Khoruzhick:
+> On Mon, Feb 18, 2019 at 1:10 PM Rob Herring <robh@kernel.org> wrote:
+>> On Fri, Jan 18, 2019 at 09:02:27AM -0800, Vasily Khoruzhick wrote:
+>>> Add binding document for bluetooth part of RTL8723BS/RTL8723CS
+>>>
+>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>>> ---
+>>>  .../bindings/net/rtl8723bs-bluetooth.txt      | 35 +++++++++++++++++++
+>>>  1 file changed, 35 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>> new file mode 100644
+>>> index 000000000000..8357f242ae4c
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/net/rtl8723bs-bluetooth.txt
+>>> @@ -0,0 +1,35 @@
+>>> +RTL8723BS/RTL8723CS Bluetooth
+>>> +---------------------
+>>> +
+>>> +RTL8723CS/RTL8723CS is WiFi + BT chip. WiFi part is connected over SDIO, while
+>>> +BT is connected over serial. It speaks H5 protocol with few extra commands
+>>> +to upload firmware and change module speed.
+>>> +
+>>> +Required properties:
+>>> +
+>>> + - compatible: should be one of the following:
+>>> +   * "realtek,rtl8723bs-bt"
+>>> +   * "realtek,rtl8723cs-bt"
+>>> +Optional properties:
+>>> +
+>>> + - device-wake-gpios: GPIO specifier, used to wakeup the BT module (active high)
+>>> + - enable-gpios: GPIO specifier, used to enable the BT module (active high)
+>>> + - host-wake-gpios: GPIO specifier, used to wakeup the host processor (active high)
+>>> + - firmware-postfix: firmware postfix to be used for firmware config
+>> How is this used?
+> rtl8723bs-bt needs 2 firmware binaries -- one is actual firmware,
+> another is firmware config which is specific to the board. If
+> firmware-postfix is specified, driver appends it to the name of config
+> and requests board-specific config while loading firmware. I.e. if
+> 'pine64' is specified as firmware-postfix driver will load
+> rtl8723bs_config-pine64.bin.
+
+this is a common problem (e.g. brcmfmac has the same problem [1]).
+
+Why not using the "model" property instead of inventing a new software
+specific property?
+
+[1] - https://patchwork.kernel.org/patch/10764463/
+
+>
+>> Rob
+>>
+> _
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
