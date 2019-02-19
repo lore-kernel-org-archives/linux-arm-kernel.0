@@ -4,85 +4,91 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 28B43C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:18:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4922AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:20:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECA242147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:18:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 148442147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 16:20:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p4Yc+mOb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="ktsv9md1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECA242147A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZosdKmDf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="mNKReiKM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 148442147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Esujtq8azRHLHCDIej51GA/YgMZY1Vijfo+Mw7K5Zf0=; b=p4Yc+mObzxG4Ov
-	TMcIDLALzfPW7VXLVA4800mxYCsfElzoBaOyHWKThsV8Fu0i7EzIVgHaTyYXIhhLBgz/wLMeCDs3w
-	z6YQZYlMQJ9wwpsLjtzbqk6LwRYpajb6ewLTTcvFa9OYSCH0MtLOgya2s9da2pbXb5lTqa6ujwGta
-	RzQ4nQtkXXIOCvSKe1VW2qinzhy0AE1mmemy8ozxyIahLryheVyz0Hdh2O0vy+citdnlsqkVdgiq8
-	+cj1SlJl5+7ujvccTlCbuzUmqx6jEQDRKryFFA4jbGf+venwSUHraaO+RD1Gnxyo3b28/m7y034el
-	iIN0q/FXkIDf/1oiRtPQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ni2kmuiGBZFHMtYqP7ebQQnOtyGzOqGvPWqsakzMlpI=; b=ZosdKmDf1YRfvb
+	bmJrglZTRHZmLr8wHSBQ2XFSxASdjm2i/FeCCgA0H4GNts4HJGABPqgEG1aBImQFTH8+PbXGDsZ3l
+	oUrok+0ivhAsy1jxwUj51++JUOFFMURHLO9iQG91t61PEcnost8pA+p37JLQWI/KIFkpP3XJmBzTl
+	5kzWaw+L8576Je5R68e9xNqaxog4JTvTEwZR5x7gDvkvDKl4+HqMmvG3tio5S6HS9iLQaLhAr+r6I
+	I5T5Kg9LBJrLQAamhNTtJxKSSGhRLNx8xq0AMBvjK2sdhQtTAwdatq8CM4pvFDtJ+qhSINrSGnK+a
+	S+nsrWJjCCk6X5KZHxhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw86O-0008GS-3V; Tue, 19 Feb 2019 16:18:36 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
+	id 1gw87f-0000Z2-VL; Tue, 19 Feb 2019 16:19:55 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw86K-0008G7-FH
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 16:18:34 +0000
-Received: by mail-it1-x143.google.com with SMTP id l15so7518558iti.4
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 08:18:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=bnTJd4mCCK+0Y3QbJw8kqJZAFpFDr+KR944bBUp80kg=;
- b=ktsv9md12WMWolVhfmDSy1Se+JsUOWlhFc4Uo/mZ4ARdBlCZ03Aq+ogE6Z4GOSmJDT
- 6IhOG1Xo6FdbJgLjH7bGNmOLuMZ4wo3OyQ29uLlpaCz6vZ1zSjUY3aBReNvYDSsYImgp
- ZZxQPheBadnaSrxLwSrULW6pKHpn8vnttFtvbs8zthJguyQXO+/X8cN04lRiil+DhnsU
- rq22BnMDTw2rfqYCQlpmb8RvhfG0wWSN6aEbZPlNx/cFdgPemLFKFNe4oR0U1SN/Xg9u
- S5hMJjFc0YnWmc0ky9TZ5YEa5yXtyH+iLpy0/aHVsGQVcbO9FGxeyILXg67bh8bahAtJ
- HpdA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=bnTJd4mCCK+0Y3QbJw8kqJZAFpFDr+KR944bBUp80kg=;
- b=XK17qVU/r8Vg883pSrM2GbZVKGt5NNgqGHv3ZjMVVxAYs1nOgYzqykOSbZUWFw+jB4
- ErI74+8V4ZCHJxiQFJjrUqWpE6rF03ujnx6//xRy66DR31D9tjKwdRjgjWD7jCDyEnS+
- X89kvDz5Y09jrypVgK6WMDM+xd6NcKbpiFHhLYCRjMSorC1WjMp31NUoG3FFTPBbcptY
- G4vu/0lu7kcNfLInnqXla6O4ZiNq89use2W6JCx9bZFgXER7NeCdCu4bCf3fKclq0B0v
- CEu1PeXxSZd4vlmAkczqKIHTzVsAV9YaGbbTrz6jlqBZY0dqjctyyZdwljOgkunwVymS
- W/IQ==
-X-Gm-Message-State: AHQUAubpxygpowRcFFexBHJOMwvUprE2TpNdOLNYZbF3hCTwETsv2yXQ
- 57SKuclv5sgACMOGNApK0S23EwVgSSAPrJgrXiTmXw==
-X-Google-Smtp-Source: AHgI3IZ/lr43D41EVbJi6PNzMsD1EpmoimswMGWMmQIcdv7noE6Xc+rXTQWCxtRdA9D+lTlHW07XYk70S1619YXZiYY=
-X-Received: by 2002:a24:56d0:: with SMTP id o199mr3025325itb.158.1550593111421; 
- Tue, 19 Feb 2019 08:18:31 -0800 (PST)
+ id 1gw87U-0000MG-KW
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 16:19:52 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1JGJRV7068946;
+ Tue, 19 Feb 2019 10:19:27 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550593167;
+ bh=jOHJT6UlWarzkLKFO+IUQMq3LQJx+t9vnGb9QzLYNGE=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=mNKReiKMsPr1GCPgDNz7PB6+FcgtZfH5chulHPIJdVQHJH0YYEIWqwKCao768O8D1
+ 9lWqzJfXVytHmGGfsPmMkBCAqNBeTnJadD7VG4tf+rgfncJ15TjfVLR/y5VlAKnvLq
+ 8dUW4S0F7jCPebaypB0SYW7N3+5jiMGqieUyJ+H8=
+Received: from DFLE100.ent.ti.com (dfle100.ent.ti.com [10.64.6.21])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1JGJRNs080509
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 19 Feb 2019 10:19:27 -0600
+Received: from DFLE108.ent.ti.com (10.64.6.29) by DFLE100.ent.ti.com
+ (10.64.6.21) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
+ Feb 2019 10:19:27 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE108.ent.ti.com
+ (10.64.6.29) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 19 Feb 2019 10:19:27 -0600
+Received: from [172.22.216.198] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1JGJM1E018181;
+ Tue, 19 Feb 2019 10:19:23 -0600
+Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+To: Tony Lindgren <tony@atomide.com>
+References: <20190213152620.GS5720@atomide.com>
+ <4791de04-63af-4c5e-db9c-47634fcb8dc9@ti.com>
+ <20190214154100.GB5720@atomide.com>
+ <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
+ <20190214174612.GF5720@atomide.com>
+ <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
+ <20190215161629.GK5720@atomide.com>
+ <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
+ <20190218143245.GC15711@atomide.com>
+ <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
+ <20190219153537.GJ15711@atomide.com>
+From: Lokesh Vutla <lokeshvutla@ti.com>
+Message-ID: <6aa37276-0833-fdf5-575b-c3ca14f776a6@ti.com>
+Date: Tue, 19 Feb 2019 21:49:21 +0530
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-References: <20190218170245.14915-1-steve.capper@arm.com>
- <CAKv+Gu_xOFXLwKsrFo-rBXdgk4O6zm6xPHB+tv1XjDjzyrjhEA@mail.gmail.com>
- <20190219124825.GH8501@fuggles.cambridge.arm.com>
- <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
- <20190219130138.GI8501@fuggles.cambridge.arm.com>
- <CAKv+Gu9qLiGDfT+yC2-pLhzepYNOfvJ4Squjgmy6u-t3HCJrAw@mail.gmail.com>
- <20190219135640.GA15458@capper-debian.cambridge.arm.com>
-In-Reply-To: <20190219135640.GA15458@capper-debian.cambridge.arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Tue, 19 Feb 2019 17:18:18 +0100
-Message-ID: <CAKv+Gu82_vmeztgCe_y5+pXR27CRUzWBszk+ZEmxXZw9zpRNtA@mail.gmail.com>
-Subject: Re: [PATCH 0/9] 52-bit kernel + user VAs
-To: Steve Capper <Steve.Capper@arm.com>
+In-Reply-To: <20190219153537.GJ15711@atomide.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_081832_525960_30CF3E35 
-X-CRM114-Status: GOOD (  41.63  )
+X-CRM114-CacheID: sfid-20190219_081944_892494_1A22D4CF 
+X-CRM114-Status: GOOD (  29.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,183 +100,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "crecklin@redhat.com" <crecklin@redhat.com>,
- Marc Zyngier <Marc.Zyngier@arm.com>, Catalin Marinas <Catalin.Marinas@arm.com>,
- Will Deacon <Will.Deacon@arm.com>, nd <nd@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Nishanth Menon <nm@ti.com>,
+ Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
+ Peter Ujfalusi <peter.ujfalusi@ti.com>, marc.zyngier@arm.com,
+ Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 19 Feb 2019 at 14:56, Steve Capper <Steve.Capper@arm.com> wrote:
->
-> On Tue, Feb 19, 2019 at 02:15:26PM +0100, Ard Biesheuvel wrote:
-> > On Tue, 19 Feb 2019 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
-> > >
-> > > On Tue, Feb 19, 2019 at 01:51:51PM +0100, Ard Biesheuvel wrote:
-> > > > On Tue, 19 Feb 2019 at 13:48, Will Deacon <will.deacon@arm.com> wrote:
-> > > > >
-> > > > > On Tue, Feb 19, 2019 at 01:13:32PM +0100, Ard Biesheuvel wrote:
-> > > > > > On Mon, 18 Feb 2019 at 18:05, Steve Capper <steve.capper@arm.com> wrote:
-> > > > > > >
-> > > > > > > This patch series adds support for 52-bit kernel VAs using some of the
-> > > > > > > machinery already introduced by the 52-bit userspace VA code in 5.0.
-> > > > > > >
-> > > > > > > As 52-bit virtual address support is an optional hardware feature,
-> > > > > > > software support for 52-bit kernel VAs needs to be deduced at early boot
-> > > > > > > time. If HW support is not available, the kernel falls back to 48-bit.
-> > > > > > >
-> > > > > > > A significant proportion of this series focuses on "de-constifying"
-> > > > > > > VA_BITS related constants.
-> > > > > > >
-> > > > > > > In order to allow for a KASAN shadow that changes size at boot time, one
-> > > > > > > must fix the KASAN_SHADOW_END for both 48 & 52-bit VAs and "grow" the
-> > > > > > > start address. Also, it is highly desirable to maintain the same
-> > > > > > > function addresses in the kernel .text between VA sizes. Both of these
-> > > > > > > requirements necessitate us to flip the kernel address space halves s.t.
-> > > > > > > the direct linear map occupies the lower addresses.
-> > > > > > >
-> > > > > > > One obvious omission is 52-bit kernel VA + 48-bit userspace VA which I
-> > > > > > > can add with some more #ifdef'ery if needed.
-> > > > > > >
-> > > > > >
-> > > > > > Hi Steve,
-> > > > > >
-> > > > > > Apologies if I am bringing up things that have been addressed
-> > > > > > internally already. We discussed the 52-bit kernel VA work at
-> > > > > > plumber's at some point, and IIUC, KASAN is the complicating factor
-> > > > > > when it comes to having compile time constants for VA_BITS_MIN,
-> > > > > > VA_BITS_MAX and PAGE_OFFSET, right?
-> > > > > >
-> > > > > > To clarify what I mean, please refer to the diagram below, which
-> > > > > > describes a hybrid 48/52 kernel VA arrangement that does not rely on
-> > > > > > runtime variable quantities. (VA_BITS_MIN == 48, VA_BITS_MAX == 52)
-> > > > > >
-> > > > > > +------------------- (~0) -------------------------+
-> > > > > > |                                                |
-> > > > > > |            PCI IO / fixmap spaces              |
-> > > > > > |                                                |
-> > > > > > +------------------------------------------------+
-> > > > > > |                                                |
-> > > > > > |             kernel/vmalloc space               |
-> > > > > > |                                                |
-> > > > > > +------------------------------------------------+
-> > > > > > |                                                |
-> > > > > > |                module space                    |
-> > > > > > |                                                |
-> > > > > > +------------------------------------------------+
-> > > > > > |                                                |
-> > > > > > |                BPF space                       |
-> > > > > > |                                                |
-> > > > > > +------------------------------------------------+
-> > > > > > |                                                |
-> > > > > > |                                                |
-> > > > > > |   vmemmap space (size based on VA_BITS_MAX)    |
-> > > > > > |                                                |
-> > > > > > |                                                |
-> > > > > > +-- linear/vmalloc split based on VA_BITS_MIN -- +
-> > > > > > |                                                |
-> > > > > > |    linear mapping (48 bit addressable region)  |
-> > > > > > |                                                |
-> > > > > > +------------------------------------------------+
-> > > > > > |                                                |
-> > > > > > |    linear mapping (52 bit addressable region)  |
-> > > > > > |                                                |
-> > > > > > +------ PAGE_OFFSET based on VA_BITS_MAX --------+
-> > > > > >
-> > > > > > Since KASAN is what is preventing this, would it be acceptable for
-> > > > > > KASAN to only be supported when you use a true 48 bit or a true 52 bit
-> > > > > > configuration, and disable it for the 48/52 hybrid configuration?
-> > > > > >
-> > > > > > Just thinking out loud (and in ASCII art :-))
-> > > > >
-> > > > > TBH, if we end up having support for 52-bit kernel VA, I'd be inclined to
-> > > > > drop the 48/52 configuration altogether. But Catalin's on holiday at the
-> > > > > moment, and may have a different opinion ;)
-> > > > >
-> > > >
-> > > > But that implies that you cannot have an image that supports 52-bit
-> > > > kernel VAs but can still boot on hardware that does not implement
-> > > > support for it. If that is acceptable, then none of this hoop jumping
-> > > > that Steve is doing in these patches is necessary to begin with,
-> > > > right?
-> > >
-> > > Sorry, I misunderstood what you meant by a "48/52 hybrid configuration". I
-> > > thought you were referring to the configuration where userspace is 52-bit
-> > > and the kernel is 48-bit, which is something I think we can drop if we gain
-> > > support for 52-bit kernel.
-> > >
-> > > Now that I understand what you mean, I think disabling KASAN would be fine
-> > > as long as it's a runtime thing and the kernel continues to work in every
-> > > other respect.
-> > >
-> >
-> > No, it would be a limitation of the 52-bit config which also supports
-> > 48-bit-VA-only-h/w that the address space is laid out in such a way
-> > that there is simply no room for the KASAN shadow region, since it
-> > would have to live in the 48-bit addressable area, but be big enough
-> > to cover 52 bits of VA, which is impossible.
-> >
-> > For the vmemmap space, we could live with sizing it statically to
-> > cover a 52-bit VA linear region, but the KASAN shadow region is simply
-> > too big.
-> >
-> > So if KASAN support in that configuration is a requirement, then I
-> > agree with Steve's approach, but it does imply that quite a number of
-> > formerly compile-time constants now get turned into runtime variables.
-> >
-> > Steve, do you have any idea what the impact of that is?
->
-> Hi Guys,
->
-> The KASAN region only really necessitates two things: 1) that we think
-> about the end address of the region (which is invariant) rather than the
-> start address; and that 2) we flip the kernel VA space. IIUC both these
-> changes have a neglible perf impact.
->
-> As for VA_BITS_ACTUAL, we need this in a few places: KVM mapping
-> support, and the big one phys_to/from_virt. For phys_to/from_virt the
-> logic is changed s.t. we use a variable lookup for translation but this
-> is folded into a new variable physvirt_offset (before the patch we used
-> a single variable read too).
->
-> Again IIUC there should be a minimal perf impact (unless one tries to do
-> cat /sys/kernel/debug/kernel_page_tables with KASAN enabled - but that
-> can be optimised later).
->
-> I didn't have the patience for ASCII art ;-), but I have a picture of
-> what I think it looks like here:
-> https://s3.amazonaws.com/connect.linaro.org/yvr18/presentations/yvr18-119.pdf
-> What I've tried to do is have most parts of the kernel VA space
-> invariant between 48/52 bits. If it's helpful I can type this up into a
-> document/commit log message?
->
-> For this series I have tried to introduce VA_BITS_MIN in its own patch
-> and also VA_BITS_ACTUAL into its own patch to make it easier to follow.
->
 
-OK, perhaps I am just rephrasing what you essentially implemented
-already, but let me try to explain a bit better what I mean:
 
-- we flip the VA space in the way you suggest
-- we limit the size of the top half of the address space to 47 bits
-- KASAN region growns downwards from (~0) << 47
-- we define PAGE_OFFSET as (~0) << 52, regardless of whether the h/w
-supports LVA or not
-- however, we tweak the phys/virt translation so that memory appears
-in the 48-bit addressable part of the linear region on non-LVA
-hardware
+On 2/19/2019 9:05 PM, Tony Lindgren wrote:
+> * Lokesh Vutla <lokeshvutla@ti.com> [190219 08:51]:
+>> Hi Tony,
+>>
+>> On 18/02/19 8:02 PM, Tony Lindgren wrote:
+>>> * Lokesh Vutla <lokeshvutla@ti.com> [190216 03:30]:
+>>>> On 2/15/2019 9:46 PM, Tony Lindgren wrote:
+>>>>> The dts node for the interrupt controller should describe a
+>>>>> proper Linux device, that is with reg entries and so on.
+>>>>
+>>>> You are asking to just keep the compatible property :)
+>>>
+>>> Right, and then I realized this node is missing the standard
+>>> reg entry too. And you're saying the registers are not even
+>>> accissible from Linux.
+>>>
+>>> So based on that IMO you should not even have a device tree
+>>> node for it at all. You should just have the interrupt
+>>
+>> Practically lets look at what all I am adding in the DT node. Below is one such
+>> example:
+>>
+>> main_intr: interrupt-controller0 {
+>> 	compatible = "ti,sci-intr";
+>> 	interrupt-controller;
+>> 	interrupt-parent = <&gic500>;
+>> 	#interrupt-cells = <4>;
+>> 	ti,sci = <&dmsc>;
+>> 	ti,sci-dst-id = <56>;
+>> 	ti,sci-rm-range-girq = <0x1>;
+>> };
+>>
+>> The following 4 properties are required at least for probing, to represent the
+>> hierarchy and for  interrupt definition:
+>> 	compatible = "ti,sci-intr";
+>> 	interrupt-controller;
+>> 	interrupt-parent = <&gic500>;
+>> 	#interrupt-cells = <4>;
+>>
+>> The remaining 3 properties represents the TISCI interface. Let's go step by step:
+>> * ti,sci = <&dmsc> :This is the phandle to the firmware protocol driver using
+>> which the messages are sent
+>> * ti,sci-dst-id = <56> : This is the TISCI device ID for the parent controller
+>> for which your irqs needs to be connected. As I said this cannot be queried from
+>> sysfw and this is the input to the messages that are send to sysfw.
+> 
+> Let's not add anything that does not describe hardware to the device
+> tree. This is ID is an invented number used by the firmware.
+> 
+>> *  ti,sci-rm-range-girq = <0x1>: This define the ids using which the parent-irq
+>> ranges that are allocated to this interrupt router instance can be queried from
+>> sysfw.
+>> If the above 2 properties are to be added as driver phandle then for every
+>> instance of interrupt router in the SoC, a new compatible needs to be created. I
+>> don't think this is a desirable solution.
+> 
+> To me it seems that the interrupt router _must_ have proper IO
+> configuration registers available to the Linux running SoC.
+> 
+> Are you sure the interrupt route does not have proper IO
+> configuration registers available for the Linux running SoC?
+> 
+> If the there are not, I'd be surprised how the SoC is designed :)
+> 
+> So assuming it does, you should just use the standard device tree
+> reg property to differentiate between the various interrupt router
+> instances. And then you can have the driver talk to the firmware
+> in a way where the driver instances are separate even if no IO
+> access to these shared registers is done by the Linux running SoC.
+> 
+> But see also the mux comment below.
+> 
+>> With this can you tell me how can we not have a device-tree and still support
+>> irq allocation?
+> 
+> Using standard dts reg property to differentiate the interrupt
+> router instances. And if the interrupt router is a mux, you should
+> treat it as a mux rather than a chained interrupt controller.
+> 
+> We do have drivers/mux nowadays, not sure if it helps in this case
+> as at least timer interrupts need to be configured very early.
+> 
+>> Also, this is not the first time a driver based on a firmware is being added.
+>> K2g clock, power and reset drivers are based on this where device ids are being
+>> passed from consumers. Similarly arm scpi based drivers are also available.
+> 
+> Having drivers communicate with firmware is quite standard.
 
-The latter basically means that the KASAN shadow region will intersect
-the linear region, but whether we map memory or shadow pages there
-depends on the h/w config at runtime.
+yes. How different is this from any of the above mentioned drivers using
+firmware specific ids. Like sci pm domain[1] driver utilizes the same
+device id for enabling any device in the system. Similarly clock
+driver[2] uses the same device ids and clock ids specified by firmware.
+There are more which similarly represents firmware ids from DT.
 
-The heart of the matter is probably the different placement of the
-memory inside the linear region, depending on whether the h/w is LVA
-capable or not, which is also reflected in your physvirt_offset. I am
-just trying to figure out why we need VA_BITS_ACTUAL to be a runtime
-variable.
+[1] Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
+[2] Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+
+Thanks and regards,
+Lokesh
+
+> 
+> However, stuffing firmware specific data to the device tree
+> does not describe the hardware and must not be done.
+> 
+> Regards,
+> 
+> Tony
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
