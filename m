@@ -2,90 +2,80 @@ Return-Path: <SRS0=g9E6=Q2=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C6B6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:49:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4984FC10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:54:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A4AC2146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:49:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 169BB2146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 19 Feb 2019 09:54:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jNFH+fjf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="q50igjyU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A4AC2146E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q3EhenuC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 169BB2146E
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lAwGe+F+uMb6WRicayxLHEbC31aFgRx42QnDm9l18+4=; b=jNFH+fjfjiKrAg
-	zY0W1cUId9QMf6stlaYf7tXezVk3USMwQ7/VdldYb0V/3CqNdwMDQHFLzGIiMqWQ4i8DOYaNHR9hl
-	lJzDNAVwm3nZeCSc2SfqT4Anor+RO3LMtvUeIb3OSwTyPJ7NZBFZ1cpWdAaG4+3yx5NRLTVcysAUD
-	J/dOV+UzJsvYxqZvbLms/w/YnhoyXvDxiNlP9h2sltPKJAU08BUKaJzAkQ8jbrtMKMDrEauiuY+Mn
-	vQagaDVwTKOR605pO0/BY+pqas+3RD61GTUpxGS+/E08TW/nBAbAYl7oy+awCtqMOwdb4+zjRgIjK
-	YHApU/omGgGL3d7Z2edg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uvW0A9BXGESxO4wf4HViergy8sp2wlQGT01rItZ9IdY=; b=Q3EhenuCvCbsv6
+	GMSwmYkUqjGEqQnIwE6cf+nDt2B1HtT+lxY3Fe9E9G+9Qq9pExN/VrFPOacvF8apCj9eMCW8Vq73b
+	B1a86dm1n7RIO3RD2lGlgM4eLUgakVJxUy4mEGAzudE9IbHPm4ER7WtfdHDKZXNJoCqIhmw4vpKjw
+	ATm4FzdYLHHzpQd9+4JADcQOCzXb+IUbuZxx8bCxMQavwBrRJ5Rs/X3H1its+h2fa8slH7nDOgdkk
+	Qhjua1wOFKRJhEOjZKBHOhCZSE/ImhLdlZsvuv+nGLdx7DM7vJpYJwfoYI0mmKSLbq8Wox6q+hYNH
+	jsDmnWpIX0OFLXIozGSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gw21x-0005zE-4g; Tue, 19 Feb 2019 09:49:37 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gw26l-0007Xs-Ad; Tue, 19 Feb 2019 09:54:35 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gw21t-0005yu-89
- for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:49:35 +0000
-Received: by mail-lj1-x242.google.com with SMTP id s5-v6so16792608ljd.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 01:49:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=ceFCSGNoNWqq4YNDYdMfd0R6+0aefkkTFSwlzn3bDMc=;
- b=q50igjyUXGTbdP2dtEYYaPbL4i99WirmmzhAVPlv+S+XTrjQcDAXaMgNCRwlqI2p1h
- kFynGICCSdYbQEvpCzsdJ+ycZ8h2z5VGSecilLwhHCcPE4rDhm7NjDPy6h30bkgGpSPR
- LmkVbvKagfs7bp/KyqpSQ5peufL01o9bHLTY9TZ5s0RHAW0Db1ISTGIL6gVka+q9dc+h
- DCjkm/PKWBk/2oLr7axonWKyT9BWPgoU+egZoGWt5bQWmYHPco9Qt7kpPBdFKD5nqgel
- 7LPfX3YreztHtnN9jOsP0iLvT86XUQx5caJ7Jvufpy1aggKZ0884pJz5eKQOxHqinTRN
- jErQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=ceFCSGNoNWqq4YNDYdMfd0R6+0aefkkTFSwlzn3bDMc=;
- b=YjPnXxkEHHVs8l1p8MGW2H/ZqSHRXjI236TO0amLWjVSsCCs4048SswmBxWmLbJm+N
- +5E/qfwShedcaOOrKtdDE5d1GXiwvU7Nl2O9rZ0AgIQ5J6DWZZBVU8nZi+4vLYrBdBPj
- 8N/4NN1RxLfG+01YTriKMTm+T3RRZucfz1cvdAWIc56BtYGTPRckByzH0DdJ7yIejnuN
- BozIoBm5HpyB2AmUMHJkgcPe55K9jr6lXiWw/gKl7kUr9fNGCqFP9GHq8q3odQFQyaqC
- vh7l81/eet2+sKisPMoz6diTxFCx8rsqxEOm8X5O1+4epchUu0mZYpHU4KOdkThr0ruX
- QN4A==
-X-Gm-Message-State: AHQUAuaPogkKHK5zYqChVapLgvpYJY1YjlZFg8zTQCMgNUMRaN3H0wK4
- SY8VvQkxhDfGOa08Q90AwOFBtEkRz/G/9ZTDP6X5yA==
-X-Google-Smtp-Source: AHgI3IYsae3AMyaa7jkN8e9h6ArVPBkR535/IDlsxe3Uwr0X0LXfFZ6l+PcQHAeYndpX5oPVjC1VymuTR5sD0VSszj0=
-X-Received: by 2002:a2e:251:: with SMTP id 78mr11030225ljc.90.1550569770704;
- Tue, 19 Feb 2019 01:49:30 -0800 (PST)
+ id 1gw26h-0007Ww-BT
+ for linux-arm-kernel@lists.infradead.org; Tue, 19 Feb 2019 09:54:33 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1J9pPpe027674; Tue, 19 Feb 2019 10:54:22 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2qr6x5jjsk-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Tue, 19 Feb 2019 10:54:22 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B2EAA34;
+ Tue, 19 Feb 2019 09:54:21 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 6AF822750;
+ Tue, 19 Feb 2019 09:54:21 +0000 (GMT)
+Received: from [10.48.0.167] (10.75.127.51) by SFHDAG5NODE3.st.com
+ (10.75.127.15) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Tue, 19 Feb
+ 2019 10:54:20 +0100
+Subject: Re: [PATCH v4 3/3] pwm: core: add consumer device link
+To: =?UTF-8?Q?Uwe_Kleine-K=c3=b6nig?= <u.kleine-koenig@pengutronix.de>
+References: <1550139951-25788-1-git-send-email-fabrice.gasnier@st.com>
+ <1550139951-25788-4-git-send-email-fabrice.gasnier@st.com>
+ <20190218172223.lw3e5tn5hzsow6tg@pengutronix.de>
+ <53bc3d80-8732-46be-caef-015998c9ad0e@st.com>
+ <20190219085516.dz5ux37kdszqkisy@pengutronix.de>
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+Message-ID: <b4f42c35-df0e-8b61-6132-39a453a3b11c@st.com>
+Date: Tue, 19 Feb 2019 10:54:20 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-References: <a9718ae1e97a5911f47874fe23c00ef297d7fed8.1548158832.git.baolin.wang@linaro.org>
- <CAK8P3a2zkhrZLMi5KZ5=fGJCt85dad3_pZC0o7GqcwJkk4es9w@mail.gmail.com>
- <CAMz4ku+PR4bHtcPu2uT2f974+FWJVi8Tp3WzmuqE1TS-M-QawQ@mail.gmail.com>
- <CAMz4kuLEut0LqZ4bSAGJDufE8xHr6DgZ3Z1RCLQ10q_k6MUesw@mail.gmail.com>
- <CAK8P3a1Zq6XjymG3sAaHGeNRxU5UXPfJPbi0A9s47cTVK7vC3g@mail.gmail.com>
- <CAMz4kuL=B53xLk4SFbrwWeUhp4P9zbUfOmXgftQCEjVSwOnD5A@mail.gmail.com>
- <CAK8P3a03rPjWQvGrDupoTAywVmjCZdpSJpqW9Sv=NVPR2uwZeQ@mail.gmail.com>
- <CAMz4kuKnVppCB0-9LVgq8bya6=iWPhMcrHL_N53QfiU5Kn9YAA@mail.gmail.com>
- <CAMuHMdWPZGYpvANL_V=YszPWjtTA+ZnU6GVDmn188LC=eC005Q@mail.gmail.com>
-In-Reply-To: <CAMuHMdWPZGYpvANL_V=YszPWjtTA+ZnU6GVDmn188LC=eC005Q@mail.gmail.com>
-From: Baolin Wang <baolin.wang@linaro.org>
-Date: Tue, 19 Feb 2019 17:49:19 +0800
-Message-ID: <CAMz4ku+yzwaww5o06tz9-8n99UfiVh6d5UB2L12RYMpTow6K3w@mail.gmail.com>
-Subject: Re: [PATCH 1/3] dt-bindings: dmaengine: Add one new cell to present
- hardware slave id
-To: Geert Uytterhoeven <geert@linux-m68k.org>
+In-Reply-To: <20190219085516.dz5ux37kdszqkisy@pengutronix.de>
+Content-Language: en-US
+X-Originating-IP: [10.75.127.51]
+X-ClientProxiedBy: SFHDAG7NODE2.st.com (10.75.127.20) To SFHDAG5NODE3.st.com
+ (10.75.127.15)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-19_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_014933_416785_E289F57E 
-X-CRM114-Status: GOOD (  33.00  )
+X-CRM114-CacheID: sfid-20190219_015431_698323_909A9A6C 
+X-CRM114-Status: GOOD (  19.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,119 +87,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
- eric.long@unisoc.com, arm-soc <arm@kernel.org>, Arnd Bergmann <arnd@arndb.de>,
- Lyra Zhang <zhang.lyra@gmail.com>, Mark Brown <broonie@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Olof Johansson <olof@lixom.net>,
- Orson Zhai <orsonzhai@gmail.com>, Dan Williams <dan.j.williams@intel.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, alexandre.torgue@st.com,
+ tduszyns@gmail.com, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
+ thierry.reding@gmail.com, linux-pwm@vger.kernel.org, mcoquelin.stm32@gmail.com,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Geert,
-
-On Tue, 19 Feb 2019 at 17:30, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
->
-> Hi Baolin,
->
-> On Tue, Feb 19, 2019 at 4:15 AM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > On Mon, 18 Feb 2019 at 20:23, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Mon, Feb 18, 2019 at 11:52 AM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > > On Mon, 18 Feb 2019 at 18:31, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > >
-> > > > > On Tue, Feb 12, 2019 at 9:25 AM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > > > > On Fri, 1 Feb 2019 at 19:53, Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > > > > > On Thu, 31 Jan 2019 at 00:52, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > > > > > > On Tue, Jan 22, 2019 at 2:21 PM Baolin Wang <baolin.wang@linaro.org> wrote:
-> > > > > > > > >
-> > > > > > > > >  Client:
-> > > > > > > > >  DMA clients connected to the Spreadtrum DMA controller must use the format
-> > > > > > > > > -described in the dma.txt file, using a two-cell specifier for each channel.
-> > > > > > > > > -The two cells in order are:
-> > > > > > > > > +described in the dma.txt file, using a three-cell specifier for each channel.
-> > > > > > > > > +The three cells in order are:
-> > > > > > > > >  1. A phandle pointing to the DMA controller.
-> > > > > > > > >  2. The channel id.
-> > > > > > > > > +3. The hardware slave id which is used for clients to trigger DMA engine
-> > > > > > > > > +automatically.
-> > > > > > > >
-> > > > > > > > I notice that this is an incompatible binding change. Is that necessary?
-> > > > > > > > If the current code works, I'd suggest allowing both #dma-cells=<2>
-> > > > > > > > and <3>, and then implementing both in the driver.
-> > > > > > >
-> > > > > > > Yes, this is necessary.
-> > > > > > >
-> > > > > > > Yes, current code can work, but the problem is that the DMA clients
-> > > > > > > must add one property (something like "sprd,slave-id") to specify the
-> > > > > > > slave id. So considering this, we want to change the dma-cells to 2,
-> > > > > > > including dma channel and dma slave id, which can avoid introducing
-> > > > > > > some similar properties for DMA clients.
-> > > > > > >
-> > > > > > > Now there are no DMA clients in mainline for Spreadtrum platform, and
-> > > > > > > we want to upstream our first DMA clients: SPI controller. So no other
-> > > > > > > drivers need to change when we changing dma cells. Thanks.
-> > > > > >
-> > > > > > Do you have any other concerns about this patch set? If not, I think
-> > > > > > Vinod can apply this patch set. Thanks.
-> > > > >
-> > > > > Sorry for the late reply. Yes, this makes sense since there are no
-> > > > > existing users then. For the DT changes going through the dmaengine
-> > > > > tree
-> > > > >
-> > > > > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > > >
-> > > > Thanks for your reviewing.
-> > > >
-> > > > >
-> > > > > One more question, to make sure we don't need to edit it again:
-> > > > > Why do you need both a 'channel id' and a 'slave id' here? Is this
-> > > > > a strict hardware requirement for your DMA engine? In many
-> > > > > other designs, only a DMA request line number needs to
-> > > > > be described, and I think this would correspond to what you
-> > > > > call the 'hardware slave id' in your documentation.
-> > > >
-> > > > I try to explain why we need the slave id.
-> > > >
-> > > > For our DMA engine driver, we have software request mode and hardware
-> > > > request mode. For software request mode, the DMA engine driver need
-> > > > trigger DMA to start transfer manually. But for hardware request mode,
-> > > > we just set one unique slave id corresponding to the slave hardware to
-> > > > the DMA engine, then the slave hardware can trigger DMA automatically.
-> > > > And the slave id is not always same with the channel id according to
-> > > > the SoC design, so we add one cell to specify the slave id.
-> > >
-> > > I did understand the need for a slave-id, I was instead wondering about
-> > > the channel-id number. On many SoCs, all channels are equal, and you
-> > > just have to pick one of those with the right capabilities for a particular
-> > > slave.
-> >
-> > Yes, all channels are equal. We just set a unique slave id for the
-> > channel for a particular slave. For example, the SPI slave can use
-> > channel 10 for tx transfer by setting slave id 11, or it also can use
-> > channel 9 for tx transfer by setting same slave id 11.
->
-> So the channel selection is software policy, not hardware description, and
-> thus doesn't belong in DT?
->
-> Can't the DMA engine driver allocate channels dynamically, removing the
-> need to specify this in DT?
-
-In theory we can do as you suggested. But we still want to
-manage/assign the DMA channel resources manually for one SoC, we can
-make sure some important DMA slaves (such as audio)  can request a DMA
-channel at runtime firstly, another benefit is that it is easy to
-debug since we can easily know which channel is assigned for this
-slave.
-
--- 
-Baolin Wang
-Best Regards
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMi8xOS8xOSA5OjU1IEFNLCBVd2UgS2xlaW5lLUvDtm5pZyB3cm90ZToKPiBPbiBUdWUsIEZl
+YiAxOSwgMjAxOSBhdCAwOTo0NjozMkFNICswMTAwLCBGYWJyaWNlIEdhc25pZXIgd3JvdGU6Cj4+
+IE9uIDIvMTgvMTkgNjoyMiBQTSwgVXdlIEtsZWluZS1Lw7ZuaWcgd3JvdGU6Cj4+PiBIZWxsbywK
+Pj4+Cj4+PiBPbiBUaHUsIEZlYiAxNCwgMjAxOSBhdCAxMToyNTo1MUFNICswMTAwLCBGYWJyaWNl
+IEdhc25pZXIgd3JvdGU6Cj4+Pj4gQWRkIGEgZGV2aWNlIGxpbmsgYmV0d2VlbiB0aGUgUFdNIGNv
+bnN1bWVyIGFuZCB0aGUgUFdNIHByb3ZpZGVyLiBUaGlzCj4+Pj4gZW5mb3JjZXMgdGhlIFBXTSB1
+c2VyIHRvIGdldCBzdXNwZW5kZWQgYmVmb3JlIHRoZSBQV00gcHJvdmlkZXIuIEl0Cj4+Pj4gYWxs
+b3dzIHByb3BlciBzeW5jaHJvbml6YXRpb24gb2Ygc3VzcGVuZC9yZXN1bWUgc2VxdWVuY2VzOiB0
+aGUgUFdNIHVzZXIKPj4+PiBpcyByZXNwb25zaWJsZSBmb3IgcHJvcGVybHkgc3RvcHBpbmcgUFdN
+LCBiZWZvcmUgdGhlIHByb3ZpZGVyIGdldHMKPj4+PiBzdXNwZW5kZWQ6IHNlZSBbMV0uIEFkZCB0
+aGUgZGV2aWNlIGxpbmsgaW46Cj4+Pj4gLSBvZl9wd21fZ2V0KCkKPj4+PiAtIHB3bV9nZXQoKQo+
+Pj4+IC0gZGV2bV8qcHdtX2dldCgpIHZhcmlhbnRzCj4+Pj4gYXMgaXQgcmVxdWlyZXMgYSByZWZl
+cmVuY2UgdG8gdGhlIGRldmljZSBmb3IgdGhlIFBXTSBjb25zdW1lci4KPj4+Pgo+Pj4+IFsxXSBo
+dHRwczovL2xrbWwub3JnL2xrbWwvMjAxOS8yLzUvNzcwCj4+Pj4KPj4+PiBTdWdnZXN0ZWQtYnk6
+IFRoaWVycnkgUmVkaW5nIDx0aGllcnJ5LnJlZGluZ0BnbWFpbC5jb20+Cj4+Pj4gU2lnbmVkLW9m
+Zi1ieTogRmFicmljZSBHYXNuaWVyIDxmYWJyaWNlLmdhc25pZXJAc3QuY29tPgo+Pj4+IC0tLQo+
+Pj4+IENoYW5nZXMgaW4gdjQ6Cj4+Pj4gLSByZXdvcmsgZXJyb3IgaGFuZGxpbmcgZm9sbG93aW5n
+IFRoaWVycnkncyBjb21tZW50cwo+Pj4+IC0gdHVybi9zcGxpdCBwcl9kZWJ1ZygpIGludG8gZGV2
+X2VycigpL3ByX3dhcm4oKS4KPj4+Pgo+Pj4+IENoYW5nZXMgaW4gdjM6Cj4+Pj4gLSBhZGQgc3Ry
+dWN0IGRldmljZSB0byBvZl9nZXRfcHdtKCkgYXJndW1lbnRzIHRvIGhhbmRsZSBkZXZpY2UgbGlu
+ayBmcm9tCj4+Pj4gICB0aGVyZSBhcyBkaXNjdXNzZWQgd2l0aCBVd2UuCj4+Pj4gLS0tCj4+Pj4g
+IGRyaXZlcnMvcHdtL2NvcmUuYyAgfCA1MCArKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
+KysrKysrKysrKysrKysrKy0tLQo+Pj4+ICBpbmNsdWRlL2xpbnV4L3B3bS5oIHwgIDYgKysrKy0t
+Cj4+Pj4gIDIgZmlsZXMgY2hhbmdlZCwgNTEgaW5zZXJ0aW9ucygrKSwgNSBkZWxldGlvbnMoLSkK
+Pj4+Pgo+Pj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL3B3bS9jb3JlLmMgYi9kcml2ZXJzL3B3bS9j
+b3JlLmMKPj4+PiBpbmRleCAxNTgxZjZhLi42NGUxMGE2IDEwMDY0NAo+Pj4+IC0tLSBhL2RyaXZl
+cnMvcHdtL2NvcmUuYwo+Pj4+ICsrKyBiL2RyaXZlcnMvcHdtL2NvcmUuYwo+Pj4+IEBAIC02MzYs
+OCArNjM2LDM1IEBAIHN0YXRpYyBzdHJ1Y3QgcHdtX2NoaXAgKm9mX25vZGVfdG9fcHdtY2hpcChz
+dHJ1Y3QgZGV2aWNlX25vZGUgKm5wKQo+Pj4+ICAJcmV0dXJuIEVSUl9QVFIoLUVQUk9CRV9ERUZF
+Uik7Cj4+Pj4gIH0KPj4+PiAgCj4+Pj4gK3N0YXRpYyBzdHJ1Y3QgZGV2aWNlX2xpbmsgKnB3bV9k
+ZXZpY2VfbGlua19hZGQoc3RydWN0IGRldmljZSAqZGV2LAo+Pj4+ICsJCQkJCSAgICAgICBzdHJ1
+Y3QgcHdtX2RldmljZSAqcHdtKQo+Pj4+ICt7Cj4+Pj4gKwlzdHJ1Y3QgZGV2aWNlX2xpbmsgKmRs
+Owo+Pj4+ICsKPj4+PiArCWlmICghZGV2KSB7Cj4+Pj4gKwkJLyoKPj4+PiArCQkgKiBObyBkZXZp
+Y2UgZm9yIHRoZSBQV00gY29uc3VtZXIgaGFzIGJlZW4gcHJvdmlkZWQuIEl0IG1heQo+Pj4+ICsJ
+CSAqIGltcGFjdCB0aGUgUE0gc2VxdWVuY2Ugb3JkZXJpbmc6IHRoZSBQV00gc3VwcGxpZXIgbWF5
+IGdldAo+Pj4+ICsJCSAqIHN1c3BlbmRlZCBiZWZvcmUgdGhlIGNvbnN1bWVyLgo+Pj4+ICsJCSAq
+Lwo+Pj4+ICsJCXByX3dhcm4oIm5vIGNvbnN1bWVyIGRldiwgY2FuJ3QgY3JlYXRlIGRldmljZSBs
+aW5rIHRvICVzXG4iLAo+Pj4+ICsJCQlkZXZfbmFtZShwd20tPmNoaXAtPmRldikpOwo+Pj4KPj4+
+IE1heWJlIHVzZSBkZXZfd2Fybihwd20tPmNoaXAtPmRldiwgLi4uKSA/Cj4+Cj4+IEhpIFV3ZSwK
+Pj4KPj4gSSdtIHdvbmRlcmluZyBhIGJpdCBhYm91dCB0aGlzOiBJbiB0aGlzIGNhc2UsIHRoZSBj
+YWxsZXIgdGhhdCBkb2Vzbid0Cj4+IHByb3ZpZGUgYSBzdHJ1Y3QgZGV2aWNlICosIFBXTSBwcm92
+aWRlciBpc24ndCByZXNwb25zaWJsZSBmb3IgdGhhdC4gU28gSQo+PiBqdXN0IGhvcGUgdGhpcyB3
+b3VsZG4ndCBiZSBtaXNzLWxlYWRpbmcgPwo+IAo+IElNSE8gaXQncyBtb3JlIHRoZSB3b3JkaW5n
+IHRoYXQgbWlnaHQgbWFrZSB0aGUgbWVzc2FnZSBtaXNsZWFkaW5nLiBJZgo+IHlvdSB1c2UKPiAK
+PiAJZGV2X3dhcm4ocHdtLT5jaGlwLT5kZXYsICJObyBjb25zdW1lciBkZXZpY2Ugc3BlY2lmaWVk
+IHRvIGNyZWF0ZSBhIGRldmljZSBsaW5rIHRvXG4iKTsKPiAKPiB0aGF0J3MgY29tcGxldGVseSBm
+aW5lIGluIG15IGV5ZXMuCgpUaGFua3MgZm9yIHRoZSBzdWdnZXN0aW9uLCBJJ2xsIHVwZGF0ZSB0
+aGlzIGFzIHdlbGwgaW4gdjUuCgpCZXN0IHJlZ2FyZHMsCkZhYnJpY2UKPiAgCj4gQmVzdCByZWdh
+cmRzCj4gVXdlCj4gCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3Rz
+LmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5m
+by9saW51eC1hcm0ta2VybmVsCg==
