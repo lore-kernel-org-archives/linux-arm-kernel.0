@@ -2,53 +2,88 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CA339C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:34:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00F5CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9A7D921738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:34:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C15B62146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DyXJc+ma"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A7D921738
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K2dEeo5L";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="g8ey+LPa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C15B62146F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Oaqb4AxBofRtsWM5/w7s9+ri9TKonSs/MCNH6dGuFdI=; b=DyXJc+maET2rNx
-	8SOC8Nj7Zs++9MgG5RYY0D3hFYVNx3x/rdTd+519ifZLJWyT+eQjKQIxfOrO803+vvqxFncWI4iHF
-	oR8tIietnROBiHE4m78n/EYIWmNA8qwgkmz90hV3lBdQu5UFLFB+DKcA3iCqO8+dXoSSURv85vy+/
-	BkqOpHM/4bb8k1bJabcF32an2mzJor1MhgIvfn43J3wVqoqxznE2BkA0tAJ7J+obEe9IW6/7UWKE4
-	GuLOSSkzaqrQa6+JnnFY/ep3WQEoDC05RLtZB7ouMOXhh6Y4aWqFHj1xos0bv94NIJUKGp+t3/okH
-	DWJiCkDGXrxjkPn3lFKQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=OY4+mbH9Jba1422MNXY+i5b9oopHtGO4pxcSQR69kQs=; b=K2dEeo5L0b2pNf
+	a1uQCGEWI320rvv4f3kHVEQLWFLrYmhuxmp5gH5Ke+PrnM4gXqydTasTt0eQVjOmm4Cj2UwR9tuvG
+	TuOZQdJQt9lmP3REbrxu6WtDHpoFHDrjtkiZia5F/KWd7R/4lIhq0E/SIRLdirKgGUysdNPTbAuHV
+	JOjB5gFXwfjT7paKzgneaocZfzUGKyl97gyczCZ6MLgJ3k/GMIhvC4tQR6cPAoKOGxg2EfQalb0NZ
+	pDuTGq5W0b+C2/aO4HKly8mDiXOkGWbLWcsCrNcZPrPFujt78zn4uNHva3/73b51Ck92W0Kgn5Ijj
+	Hvp1htQzhPwpumc2WBgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwGm2-000492-7h; Wed, 20 Feb 2019 01:34:10 +0000
-Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gwGlz-00048r-IW; Wed, 20 Feb 2019 01:34:07 +0000
-Date: Tue, 19 Feb 2019 17:34:07 -0800
-From: Matthew Wilcox <willy@infradead.org>
-To: Anshuman Khandual <anshuman.khandual@arm.com>
-Subject: Re: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
-Message-ID: <20190220013407.GD12668@bombadil.infradead.org>
-References: <20190214211642.2200-1-yuzhao@google.com>
- <20190218231319.178224-1-yuzhao@google.com>
- <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
- <20190219053205.GA124985@google.com>
- <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
+	id 1gwHAQ-0003wx-Px; Wed, 20 Feb 2019 01:59:22 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwHAF-0003mx-D3
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 01:59:13 +0000
+Received: by mail-pl1-x641.google.com with SMTP id c4so6323414pls.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 17:59:09 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=0AhAkdD5gUkatrgiNywh2j86mG6voK+vMLb21Nz6l14=;
+ b=g8ey+LPaM/bLLOK/8rDS4SpWU8T3BIIz3s2kWJLlgYxtaNJEV7DlDx0tKwJA0zJZeE
+ 7oJ/fZOGx8JYOLZRjyXVwIXfKDDOaoRhYuDxTssG9EA4hRxH09zb5BGX9Fr+/APACBJ5
+ EpezqnLoHwVby2FjvuHQ1nOknq7Wq51qcsqE/KlbfCnv9njXr18M7ucS5dgJay3DdoyK
+ JBf3x7sPyNOCrCR6lxfRcxN7uBT+PZHMSyE/or652QCkvR++KDAEifd4HzwYev7907z6
+ 4PMyHuQy6JuUU6mq7D/68ZrwHL40CXJpcv2692AjRwJ6d2U6Fqu3AWXd0Tnkq9QQ9CvQ
+ t16A==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=0AhAkdD5gUkatrgiNywh2j86mG6voK+vMLb21Nz6l14=;
+ b=JUsMHKRK8hujDzRY34Wbgglab9APL1g4LhN51rSG/DNTVSfwl57z31S36io5U/SsSN
+ WvS33pzWIIytW+Vjr4g/YJ2lZL5Qdvlw3b+GGke5Jd68Vxny9x7u2bBF1RrHE3WC+GNz
+ tCXNBFZU7j6Ruy3jj1vnBZtkzfz6XxgqxpItd/dW39bF+S2Ght+YLKTBKa4fqgupibZp
+ t/ZB6nAa1r6060zSh0ho1zBrAOfKV3qaW6aeTB6YiNnQxu/DIwo2lasNBkm/6iDQEriU
+ zpTc679bnYDkDMtkaNTEISY2q18JEfedVLrjc+TRzOobVvDsbqYtIphfg4FflRcLjozK
+ LASA==
+X-Gm-Message-State: AHQUAubeNN2Bf/16XTJdj0cXmPR0QqI0Vk3bPGv6zv+1GZOK3yM8LIjW
+ plxxNbudbcgGFCgFs3nFI7s=
+X-Google-Smtp-Source: AHgI3IarupgyVmOC5WCvUDeU76ra+IXRYsp11Idz32OislVJe2GyEFOsd/Z1NZ304VFlHrlZu+O+Jg==
+X-Received: by 2002:a17:902:6681:: with SMTP id
+ e1mr33612362plk.98.1550627948547; 
+ Tue, 19 Feb 2019 17:59:08 -0800 (PST)
+Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
+ [24.22.235.96])
+ by smtp.gmail.com with ESMTPSA id h3sm2562525pgv.38.2019.02.19.17.59.07
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 19 Feb 2019 17:59:07 -0800 (PST)
+From: Andrey Smirnov <andrew.smirnov@gmail.com>
+To: Shawn Guo <shawnguo@kernel.org>
+Subject: [PATCH v3 0/5] PCIE support for i.MX8MQ (DT changes)
+Date: Tue, 19 Feb 2019 17:58:52 -0800
+Message-Id: <20190220015857.7136-1-andrew.smirnov@gmail.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190219_175911_470654_C741558F 
+X-CRM114-Status: GOOD (  10.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -60,70 +95,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-arch@vger.kernel.org,
- Yu Zhao <yuzhao@google.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
- Jun Yao <yaojun8558363@gmail.com>, linux-mm@kvack.org,
- "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
- Chintan Pandya <cpandya@codeaurora.org>,
- Joel Fernandes <joel@joelfernandes.org>,
- "Kirill A . Shutemov" <kirill@shutemov.name>,
- Andrew Morton <akpm@linux-foundation.org>, Laura Abbott <labbott@redhat.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Andrey Smirnov <andrew.smirnov@gmail.com>, linux-kernel@vger.kernel.org,
+ linux-imx@nxp.com, Fabio Estevam <fabio.estevam@nxp.com>,
+ Leonard Crestez <leonard.crestez@nxp.com>, Chris Healy <cphealy@gmail.com>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 19, 2019 at 11:47:12AM +0530, Anshuman Khandual wrote:
-> + Matthew Wilcox
-> On 02/19/2019 11:02 AM, Yu Zhao wrote:
-> > On Tue, Feb 19, 2019 at 09:51:01AM +0530, Anshuman Khandual wrote:
-> >>
-> >>
-> >> On 02/19/2019 04:43 AM, Yu Zhao wrote:
-> >>> For pte page, use pgtable_page_ctor(); for pmd page, use
-> >>> pgtable_pmd_page_ctor() if not folded; and for the rest (pud,
-> >>> p4d and pgd), don't use any.
-> >> pgtable_page_ctor()/dtor() is not optional for any level page table page
-> >> as it determines the struct page state and zone statistics.
-> > 
-> > This is not true. pgtable_page_ctor() is only meant for user pte
-> > page. The name isn't perfect (we named it this way before we had
-> > split pmd page table lock, and never bothered to change it).
-> > 
-> > The commit cccd843f54be ("mm: mark pages in use for page tables")
+Everyone:
 
-Where did you get that commit ID from?  In Linus' tree, it's
-1d40a5ea01d53251c23c7be541d3f4a656cfc537
+This series contains all of the i.MX Device Tree changes I made to
+enable support of PCIe on i.MX8MQ EVK.
 
-> > clearly states so:
-> >   Note that only pages currently accounted as NR_PAGETABLES are
-> >   tracked as PageTable; this does not include pgd/p4d/pud/pmd pages.
-> 
-> I think the commit is the following one and it does say so. But what is
-> the rationale of tagging only PTE page as PageTable and updating the zone
-> stat but not doing so for higher level page table pages ? Are not they
-> used as page table pages ? Should not they count towards NR_PAGETABLE ?
-> 
-> 1d40a5ea01d53251c ("mm: mark pages in use for page tables")
+NOTE: Immutable brach containing imx8mq-reset.h used in "arm64: dts:
+Add nodes for PCIe IP blocks" is availible in [reset-imx8mq]
 
-I think they should all be accounted towards NR_PAGETABLE and marked
-as being PageTable.  Somebody needs to make the case for that and
-send the patches.  That patch even says that there should be follow-up
-patches to do that.  I've been a little busy and haven't got back to it.
-I thought you said you were going to do it.
+Feedback is welcome!
 
-> pgtable_page_ctor/dtor() use across arch is not consistent and there is a need
-> for generalization which has been already acknowledged earlier. But for now we
-> can atleast fix this on arm64.
-> 
-> https://lore.kernel.org/lkml/1547619692-7946-1-git-send-email-anshuman.khandual@arm.com/
+Changes since [v2]:
 
-... were you not listening when you were told that was completely
-inadequate?
+    - Fixed various nits pointed out by Lucas
+
+    - Collected Acked-by and Reviewed-by from Lucas
+
+    - Moved EVK's WiFi reset pin configuration into a separate pinmux
+      entry.
+
+Changes since [v1]:
+
+    - Dropped unsupported IRQ from PCIe nodes (a leftover from vendor tree)
+
+    - Added "pcie_aux" clock and moved clock configuration to board
+      file since "pcie_bus" clock is now board specific
+
+Thanks,
+Andrey Smirnov
+
+[reset-imx8mq] git://git.pengutronix.de/pza/linux reset/imx8mq
+[v1] https://lore.kernel.org/lkml/20190131204333.31846-1-andrew.smirnov@gmail.com/
+[v2] https://lore.kernel.org/lkml/20190208002941.30343-1-andrew.smirnov@gmail.com
+
+Andrey Smirnov (5):
+  arm64: dts: imx8mq: Mark iomuxc_gpr as i.MX6Q compatible
+  arm64: dts: imx8mq: Add a node for SRC IP block
+  arm64: dts: imx8mq: Combine PCIE power domains
+  arm64: dts: imx8mq: Add nodes for PCIe IP blocks
+  arm64: dts: imx8mq-evk: Enable PCIE0 interface
+
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 42 ++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 84 +++++++++++++++++++-
+ 2 files changed, 124 insertions(+), 2 deletions(-)
+
+-- 
+2.20.1
 
 
 _______________________________________________
