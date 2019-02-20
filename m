@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-6.3 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7CCDDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:41:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94EBEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:41:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C2412089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:41:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 56A4A2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:41:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="reRthxO0";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="hVUUxusI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C2412089F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kOfz5NYv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Fbx5kM0y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56A4A2089F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,41 +26,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AhygPTPUCsJoDare+p54xm3qhc+L4uCLzRD12YGNA3w=; b=reRthxO0rFwMaQ
-	GLaqWaPeeM8u9NISfU4MavSoCkiXgzu/CTeHJ/k9WL1Zb5MTucZbWCaylHUXB/DAdN9rE9mkcDQvN
-	dEQCIBeoFUYqY907jxg++ztlqtp03/VCNmYDhfIoiDUkbd2SgzIS75y/9nvTJw866yI1tEIsrhK0z
-	YipMqSH32vBkrH1eas9GWriKfw+EBH2QXeurUFbd60ZYD3xipZfEI/u5GgDwcB6vzRK0MsBCTMFTR
-	tOcdViPyGc0HjOC8/cRDScI/q3mytlfvpadVrd3YqH0RHEEdVuR/h4mxuNyW8KyRWhzqyZOS2Sfsh
-	QlBSOTghRBG6WGI9wDgQ==;
+	List-Owner; bh=IhYfTRnFveiOVmtiPudSr2MhPLf1K6QwYLpOrqkhMro=; b=kOfz5NYvCeT4tu
+	M2+n3ZquoNGbOK39vz1nfiptOT+WkPis+lKtdaxfBYPWAds9ULua2++iILP4YIs+K/PREuVI23gYp
+	oAMUdyMMD2s1H/v5m6QV9soGWYVu4L8cRE3rnDQqLjfoQBQrS59x1EPSznmRJ4t6TejFR4/ExM14S
+	xSEvWp4ucxVbkX1ft2yB01KV7P1ds0pjTSuZJ8Q3IRmGS2uxY2FUHA3Y5zlp8xoDEBcF/Fs2CDT7P
+	fVLJ5xt5I8zQ5PSCTmUTlG2NZicbUSYA98/cY1CBvlkbeOCjhY5XP9FoDq4xVPMUy37YoGfcMhRwU
+	CPdDtnGWxtFpDE+TAJSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwQFX-0005wb-By; Wed, 20 Feb 2019 11:41:15 +0000
-Received: from mail-eopbgr60058.outbound.protection.outlook.com ([40.107.6.58]
+	id 1gwQG0-0006Kk-Is; Wed, 20 Feb 2019 11:41:44 +0000
+Received: from mail-db3eur04on0624.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0c::624]
  helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwQF7-0005GX-RW
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:40:52 +0000
+ id 1gwQFD-0005Sm-JK
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:41:00 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=/d05lR3NTuVTq3uNuMBJwqYC0/xFoppKgvi3jTd3/L0=;
- b=hVUUxusIGebqnZOo/AyvEStah1tDaKe1fPxaI0br38a+btX6zJ5SLIuDQ8E+5RnraZ3nVwlMz064b7/2WZ3NpsJkYHxB92iSok3sBGxoiCrpF5poqJJnQ5EMH/qdZ1c+m8t2HGFbpgxg3XoOSOuY9DOjvRq2LHGoOQndU7Yz1l4=
+ bh=66lBuPnT7BDBPQcI8Nv6QxBT8Qk825Pi1B0VQELDVwE=;
+ b=Fbx5kM0yeo5gT4J/gSDH3RpilAdFtXKZeF2jJqMyiFiAq0XUidFHO9RChbQi+nYZDrfmynzVLjaSy3r7j9zMvQNYfcpmJeb5thXZoW0B32MRo+6WoKT5fYw4VyREa5mSk5PRZz6e6+h7PDQekzG0D4lN6FuvnBIf44vLYFLpntQ=
 Received: from AM6PR04MB4215.eurprd04.prod.outlook.com (52.135.168.141) by
  AM6PR04MB6152.eurprd04.prod.outlook.com (20.179.6.79) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Wed, 20 Feb 2019 11:40:47 +0000
+ 15.20.1622.19; Wed, 20 Feb 2019 11:40:51 +0000
 Received: from AM6PR04MB4215.eurprd04.prod.outlook.com
  ([fe80::e944:6749:3ee6:4e08]) by AM6PR04MB4215.eurprd04.prod.outlook.com
  ([fe80::e944:6749:3ee6:4e08%5]) with mapi id 15.20.1622.020; Wed, 20 Feb 2019
- 11:40:47 +0000
+ 11:40:51 +0000
 From: Aisheng Dong <aisheng.dong@nxp.com>
 To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Subject: [PATCH V4 3/4] irq: imx-irqsteer: change to use reg_num instead of
- irq_group
-Thread-Topic: [PATCH V4 3/4] irq: imx-irqsteer: change to use reg_num instead
- of irq_group
-Thread-Index: AQHUyREf2RnhG/en0kyiwRnjFIZLUw==
-Date: Wed, 20 Feb 2019 11:40:47 +0000
-Message-ID: <1550662447-8565-4-git-send-email-aisheng.dong@nxp.com>
+Subject: [PATCH V4 4/4] irq: imx: irqsteer: add multi output interrupts support
+Thread-Topic: [PATCH V4 4/4] irq: imx: irqsteer: add multi output interrupts
+ support
+Thread-Index: AQHUyREhEvd4FRk+jEqxfGczDO8qTw==
+Date: Wed, 20 Feb 2019 11:40:51 +0000
+Message-ID: <1550662447-8565-5-git-send-email-aisheng.dong@nxp.com>
 References: <1550662447-8565-1-git-send-email-aisheng.dong@nxp.com>
 In-Reply-To: <1550662447-8565-1-git-send-email-aisheng.dong@nxp.com>
 Accept-Language: zh-CN, en-US
@@ -76,58 +76,59 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: e46c687f-f95a-45bd-3802-08d69728418b
+x-ms-office365-filtering-correlation-id: e0649e01-ca57-4081-0abc-08d6972843cb
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR04MB6152; 
 x-ms-traffictypediagnostic: AM6PR04MB6152:
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM6PR04MB6152;
- 23:uDR+Rp+O3xDv47zkj8RsX+D4wbBvokZU0VlItwo?=
- =?iso-8859-1?Q?iK8LHSkS71nTIjF8/XdyIFxVdom6F0p+qbnqghZG31NOCeChl4eWnZ1EGs?=
- =?iso-8859-1?Q?HseiEyg6w1q6vqrgIoj6U0qzFeY02BXNVbvoKARK+0xppn7HZ3CSRFsmEv?=
- =?iso-8859-1?Q?Ptt9+9eFNQi5txqAzOHTaIVyLvgohaGcEewLtuby9uFDFedp2cZwiEHF24?=
- =?iso-8859-1?Q?NHMDHMZQx0OArjQ5z1r8iDUBs+0jLyzZiO5JxFmrvbToRhQ0AdGwxGm6OL?=
- =?iso-8859-1?Q?VwEw5XUFz/7baOcoV4nWJMnVfQ6FYw0KouAoickZ35LgwAmzUndbhIGxUU?=
- =?iso-8859-1?Q?WnrNBuoSSyVHwbjdrobv/HvkkuGSDUuH92FiqqXjlWlWjkf6veiAIQ+zmY?=
- =?iso-8859-1?Q?ypMDIjcXGg0Mu0/KfCdaBpDWBmJiZ2ySA4O/qUKq64XTwKCKN/sLxSU429?=
- =?iso-8859-1?Q?YzZFD2qpiy64XrrkeoE1RNOpkbCr0fB1kHzOoBYZ+Z7wKE+VsjZRzUTn3n?=
- =?iso-8859-1?Q?W67kPU4B1F0fLeeBNaMFG7CCVEXtyZeC3g4veEN7SpLtBLZoIJ6vhzZDmS?=
- =?iso-8859-1?Q?jP5HhMXDnVeg0+hwqfmbgM7PWLsFzUIOmw8OopOJtqxBeJaCP01mN6ouEu?=
- =?iso-8859-1?Q?D5N0Zky9Y3sfkTFObjC8jIvTnr7ezFLu6tI0f/7SA2aVd8OF4Ay8Ra0vmZ?=
- =?iso-8859-1?Q?Ipsg7DYFkCE2aIKwT7/oXw18lkccEFDFhUMNSo1MXhL+BQnzhe9Ktxk587?=
- =?iso-8859-1?Q?9qWeZxFzHhv6qJQbXL7PkOf+brkIiUh2iFWQYDJF1FCH/Nav8mXUwYptIu?=
- =?iso-8859-1?Q?kcHAZdJUoAN8CyoIi9SfhOut7j/IJkybdhEbZMG6maHfv82k+9fKMNNFcl?=
- =?iso-8859-1?Q?4SjBDK1g9BHW2c4jsunDntQ5PmcRkSlCfVIhg5PlFF7gTVGKXPjAG+TQ5t?=
- =?iso-8859-1?Q?HJvDXy7JSKHKiYju3q/mT5paNRJsSXL4KD/bgVTPxNBqs4ICX1a68ZZrg/?=
- =?iso-8859-1?Q?NurOG/UqN44kl+NaYTsbh7Vums2ZaamV/xeg87AMT+/tmG0bh0us3H4LEn?=
- =?iso-8859-1?Q?hFKTzgp6gXmwEKYj99UqoYgmus9ySs7XepqMposQh77b9m/SMp5orx9yhK?=
- =?iso-8859-1?Q?wCGCeM2wbSKTxDfpF5BR7XGv+hB+gX33I7HDCBTZ0HktLzl6Rd+sWeZJAF?=
- =?iso-8859-1?Q?IAtez0p1OQYrLrm4EbBqylFpW//F7r5FuFlqYeI6lkvmmHkhISl1+huDMk?=
- =?iso-8859-1?Q?leRaoDlzghVSSxc89S0OC3o2OHgKNRLL2KVMGnjujrdupT1df30pnx8Qn0?=
- =?iso-8859-1?Q?myzBSQ+4akH0UutwTies/I80xMgjGNPdXvGoZO88OLrXA=3D=3D?=
-x-microsoft-antispam-prvs: <AM6PR04MB6152852A1759FA2E02C5E7E8807D0@AM6PR04MB6152.eurprd04.prod.outlook.com>
+ 23:hvh/C3oWqU7DX75ajO29XGzkK1xuRwTa7YYxkaY?=
+ =?iso-8859-1?Q?kBKssoc8SoCAy0IDT3Jy7blYMqd2tw77Je6yKN0ktlR0ITKntxMk5Nukl6?=
+ =?iso-8859-1?Q?tOnA0fYLJI83Wq3HJTKkAJsh47B1CYtYhawMdPSdbHGcY5d35Z8UYcScAs?=
+ =?iso-8859-1?Q?EUmSCdMfayt78F9Zr6nPKh8dl5DRsJU97pqoDkxWG1XGHeM1dZJODxw25f?=
+ =?iso-8859-1?Q?A8gni6ttFXyYTcdMRQqG8+bEHylqk8uscnL44elhXk0fNr8Z8jS/brqIYc?=
+ =?iso-8859-1?Q?MZq1epEShCCAgOxqjADufPbrwZJumtPqpqwHcnqjs4mMcGJAajoagDIg5X?=
+ =?iso-8859-1?Q?OLVaQQODUFxFZSj7FnFlTp91lLY3xfDrj5H8nTvwP3BCpzSmIel6K/ZT7z?=
+ =?iso-8859-1?Q?rFsS0/aN5NGvyraLJXlMHtTmAJisBLLqHKSf1JLPQmpF46oYK73SjuZ/Tr?=
+ =?iso-8859-1?Q?8DJZdopsFOYKei7P1uMHo0sEJ9wJ8Um9uSvE7q+CfDZ1JMikEoGgawXgfY?=
+ =?iso-8859-1?Q?ZcrM/Jte1oYjZS30NmAE+NfzYpzPZtjy6h1dFqrENypbkrGjs8VFwXbwia?=
+ =?iso-8859-1?Q?f4WN2r3LccFPc3XjwRtzv66x2tNo8STUPSw6UIeGkcv9nMfJrO6GKmSsCx?=
+ =?iso-8859-1?Q?8+abMzFBTKPAIB9rGBCManGA+LXj9jZmeV9ynd4B5nqNz9TMGUIGtCWsgm?=
+ =?iso-8859-1?Q?xwyYTqsgMbHloMoIQW2aFO/4G7ytCJxEeY36d0kYVTD3wuK7bD2HGuqBuG?=
+ =?iso-8859-1?Q?GLAuAl9n/bzSxNpr3DRVQhP3ossW0cSVsZo11p0IIljiRoUoMBDMtDAeYT?=
+ =?iso-8859-1?Q?jtz2zz+JTA9JT/D3yYX4hVjQyoX6reCVC3zXOtMRlfTooU4gHOiOWCZpTD?=
+ =?iso-8859-1?Q?gYPsyBYfbBPtuFzD/g1hWNI0/Mk6ObKSnDmNdAHHJtsZqCdLbjL68kRskV?=
+ =?iso-8859-1?Q?F/M9e+JImV8alRBoAPCXxL+vy+BMZoOOcqtHyD6fErS0ZO6Fzk+Fxb2woM?=
+ =?iso-8859-1?Q?hgY46NFbmsz/7hK2pHfv/J51jcwFE1kfozuBzz6qhrT2RUu1C4IRfnutmN?=
+ =?iso-8859-1?Q?cuWKXtfzOnDY6Jy1/rCeMzHOMTjESbk4Bo5NGH558445PUr9H6eEiQ/I9+?=
+ =?iso-8859-1?Q?OeLRISko7AFL4mqgWeDIFIOZFZhypPlLIVIJGBNLHRqpHLt70wnwCofitv?=
+ =?iso-8859-1?Q?fxwQDDOeH/y8IG8MdKWoU802U+2pEINZTwpOO4363uAzupA/fR0eNn4O0l?=
+ =?iso-8859-1?Q?hiAsPLARlM9m1HC04N/+B5dgHSdEUiuI/10YhCZ6jdVsKpZc0mWoI1hk5j?=
+ =?iso-8859-1?Q?XHTxFAbMIFCWnx+7g8GRPJVtLHolt78OrBSij71F5HpH6CLablfPXLfEg/?=
+ =?iso-8859-1?Q?mb3kxJUU=3D?=
+x-microsoft-antispam-prvs: <AM6PR04MB61521AB60AAB7EE723B590EB807D0@AM6PR04MB6152.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0954EE4910
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(396003)(136003)(366004)(346002)(376002)(189003)(199004)(486006)(8676002)(97736004)(81156014)(11346002)(2616005)(446003)(36756003)(478600001)(81166006)(476003)(53936002)(316002)(4326008)(5640700003)(25786009)(50226002)(44832011)(52116002)(7736002)(305945005)(76176011)(186003)(26005)(2351001)(99286004)(106356001)(8936002)(105586002)(6512007)(14444005)(386003)(256004)(6506007)(2906002)(86362001)(6486002)(71200400001)(54906003)(102836004)(6916009)(6116002)(68736007)(66066001)(71190400001)(14454004)(6436002)(2501003)(3846002)(5660300002);
+ SFS:(10009020)(39860400002)(396003)(136003)(366004)(346002)(376002)(54534003)(189003)(199004)(486006)(8676002)(97736004)(81156014)(11346002)(2616005)(446003)(36756003)(478600001)(81166006)(476003)(53936002)(316002)(4326008)(5640700003)(25786009)(50226002)(44832011)(52116002)(7736002)(305945005)(76176011)(186003)(26005)(2351001)(99286004)(106356001)(8936002)(105586002)(6512007)(14444005)(386003)(256004)(6506007)(2906002)(86362001)(6486002)(71200400001)(54906003)(102836004)(6916009)(6116002)(68736007)(66066001)(71190400001)(14454004)(6436002)(2501003)(3846002)(5660300002);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB6152;
  H:AM6PR04MB4215.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: eEW13h8ND/RsCouhE9Eyq7PNCeC1jxvoWjoiBqCwfVHcXd8oPKqe0swRmV2KvJIemaJrEcvj4FfYTm11Sroj8gRyqPctmN9iX0A/U7ZHj0WzWSpo9BN/bTIcIaC45cOVGmey+8DjuQ+GnAOYksQHiqG2UVSeBowSzQol+kF66Y0HlH9BmpKbAQSduPCBmmzeD+sdJNCRoV0Z6zWTp5x911pzTaLL5ZSwGpdFJHNolnH9WTEe14bDFON3JEoS7J7/J1fO4f2ovTsEZCUylwJNtjsVd5WEw16U90JqMy+XXxNZrE7P0MbpXyPrWeD5NSorqmh63cu6YU6kDdXVE/vA9KNHqE4cgoX9OYc3S6eNuhZAwUOovYUmpybsUGKCXwi3E7EsZ1QPZWS7Wh+pa99VhHEXSmnSc/5/gy4XL5agpLg=
+x-microsoft-antispam-message-info: UGLlFBsnfwDZaeLOfNqIzpTOsM5xXy1YkEahAB4euiGuyPs3aMu2MMy5h9zl1BJs1tvns1mE8x026KQop6rZeMwcdExl59rIK5NNGjJiw54xz6j5bjX87vn9cFiJBfzM3xl/9mpKn9ckGSgo/SBNdeMvDJc6WR3IpsySnBfb5urvY1O6B2Pv6nv0ZM5pn38IvFBhrM21bDJTcMEyc+R9GYGHZYebeKSsPZfI4JP3tKzCUiosWTdcLLpOxFojSSTW0piYlCPwfijX69uPTln5G0xVYw9dYsHrVqRVZYs1e+Gjho63oxKLHlZB8F9ZXP5vueRxrB8Fh6s5AoMcNHfl6qelKYJf8foqliLoVXGlVZv49cTovG8pLVncFtZWTfEKDfIj8wsah+JtVrytzAeUcx/6Wc4WWic1e6Z2LxaJll0=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e46c687f-f95a-45bd-3802-08d69728418b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:40:44.1009 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: e0649e01-ca57-4081-0abc-08d6972843cb
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:40:47.8346 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB6152
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_034050_293241_29E5F623 
-X-CRM114-Status: GOOD (  15.51  )
+X-CRM114-CacheID: sfid-20190220_034055_978323_1C1CB1CF 
+X-CRM114-Status: GOOD (  17.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,149 +152,202 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-One group can manage 64 interrupts by using two registers (e.g. STATUS/SET).
-However, the integrated irqsteer may support only 32 interrupts which
-needs only one register in a group. But the current driver assume there's
-a mininum of two registers in a group which result in a wrong register map
-for 32 interrupts per channel irqsteer. Let's use the reg_num caculated by
-interrupts per channel instead of irq_group to cover this case.
+One irqsteer channel can support up to 8 output interrupts.
 
 Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Lucas Stach <l.stach@pengutronix.de>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-v2->v4:
+ChangeLog:
+v3->v4:
  * no changes
+v2->v3:
+ * add error check for imx_irqsteer_get_hwirq_base
+ * use DIV_ROUND_UP
+ * merge 'hwirq +=32' into for loop
+ * common error path in probe to avoid replicating clk_disable_unprepare
 v1->v2:
- * The using of property name updated accordingly
+ * calculate irq_count by fsl,num-irqs instead of parsing interrupts
+   property from devicetree to match the input interrupts and outputs
+ * improve output interrupt handler by searching only two registers
+   withint the same group
 ---
- drivers/irqchip/irq-imx-irqsteer.c | 35 +++++++++++++++++++----------------
- 1 file changed, 19 insertions(+), 16 deletions(-)
+ drivers/irqchip/irq-imx-irqsteer.c | 88 +++++++++++++++++++++++++++++---------
+ 1 file changed, 68 insertions(+), 20 deletions(-)
 
 diff --git a/drivers/irqchip/irq-imx-irqsteer.c b/drivers/irqchip/irq-imx-irqsteer.c
-index 5b3f1d7..67ed862 100644
+index 67ed862..d1098f4 100644
 --- a/drivers/irqchip/irq-imx-irqsteer.c
 +++ b/drivers/irqchip/irq-imx-irqsteer.c
-@@ -13,7 +13,7 @@
+@@ -10,6 +10,7 @@
+ #include <linux/irqchip/chained_irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
++#include <linux/of_irq.h>
  #include <linux/of_platform.h>
  #include <linux/spinlock.h>
  
--#define CTRL_STRIDE_OFF(_t, _r)	(_t * 8 * _r)
-+#define CTRL_STRIDE_OFF(_t, _r)	(_t * 4 * _r)
- #define CHANCTRL		0x0
- #define CHANMASK(n, t)		(CTRL_STRIDE_OFF(t, 0) + 0x4 * (n) + 0x4)
- #define CHANSET(n, t)		(CTRL_STRIDE_OFF(t, 1) + 0x4 * (n) + 0x4)
-@@ -26,7 +26,7 @@ struct irqsteer_data {
+@@ -21,10 +22,13 @@
+ #define CHAN_MINTDIS(t)		(CTRL_STRIDE_OFF(t, 3) + 0x4)
+ #define CHAN_MASTRSTAT(t)	(CTRL_STRIDE_OFF(t, 3) + 0x8)
+ 
++#define CHAN_MAX_OUTPUT_INT	0x8
++
+ struct irqsteer_data {
+ 	void __iomem		*regs;
  	struct clk		*ipg_clk;
- 	int			irq;
+-	int			irq;
++	int			irq[CHAN_MAX_OUTPUT_INT];
++	int			irq_count;
  	raw_spinlock_t		lock;
--	int			irq_groups;
-+	int			reg_num;
+ 	int			reg_num;
  	int			channel;
- 	struct irq_domain	*domain;
- 	u32			*saved_reg;
-@@ -35,7 +35,7 @@ struct irqsteer_data {
- static int imx_irqsteer_get_reg_index(struct irqsteer_data *data,
- 				      unsigned long irqnum)
+@@ -87,23 +91,47 @@ static const struct irq_domain_ops imx_irqsteer_domain_ops = {
+ 	.xlate		= irq_domain_xlate_onecell,
+ };
+ 
++static int imx_irqsteer_get_hwirq_base(struct irqsteer_data *data, u32 irq)
++{
++	int i;
++
++	for (i = 0; i < data->irq_count; i++) {
++		if (data->irq[i] == irq)
++			return i * 64;
++	}
++
++	return -EINVAL;
++}
++
+ static void imx_irqsteer_irq_handler(struct irq_desc *desc)
  {
--	return (data->irq_groups * 2 - irqnum / 32 - 1);
-+	return (data->reg_num - irqnum / 32 - 1);
- }
- 
- static void imx_irqsteer_irq_unmask(struct irq_data *d)
-@@ -46,9 +46,9 @@ static void imx_irqsteer_irq_unmask(struct irq_data *d)
- 	u32 val;
- 
- 	raw_spin_lock_irqsave(&data->lock, flags);
--	val = readl_relaxed(data->regs + CHANMASK(idx, data->irq_groups));
-+	val = readl_relaxed(data->regs + CHANMASK(idx, data->reg_num));
- 	val |= BIT(d->hwirq % 32);
--	writel_relaxed(val, data->regs + CHANMASK(idx, data->irq_groups));
-+	writel_relaxed(val, data->regs + CHANMASK(idx, data->reg_num));
- 	raw_spin_unlock_irqrestore(&data->lock, flags);
- }
- 
-@@ -60,9 +60,9 @@ static void imx_irqsteer_irq_mask(struct irq_data *d)
- 	u32 val;
- 
- 	raw_spin_lock_irqsave(&data->lock, flags);
--	val = readl_relaxed(data->regs + CHANMASK(idx, data->irq_groups));
-+	val = readl_relaxed(data->regs + CHANMASK(idx, data->reg_num));
- 	val &= ~BIT(d->hwirq % 32);
--	writel_relaxed(val, data->regs + CHANMASK(idx, data->irq_groups));
-+	writel_relaxed(val, data->regs + CHANMASK(idx, data->reg_num));
- 	raw_spin_unlock_irqrestore(&data->lock, flags);
- }
- 
-@@ -94,13 +94,13 @@ static void imx_irqsteer_irq_handler(struct irq_desc *desc)
+ 	struct irqsteer_data *data = irq_desc_get_handler_data(desc);
+-	int i;
++	int hwirq;
++	int irq, i;
  
  	chained_irq_enter(irq_desc_get_chip(desc), desc);
  
--	for (i = 0; i < data->irq_groups * 64; i += 32) {
-+	for (i = 0; i < data->reg_num * 32; i += 32) {
- 		int idx = imx_irqsteer_get_reg_index(data, i);
+-	for (i = 0; i < data->reg_num * 32; i += 32) {
+-		int idx = imx_irqsteer_get_reg_index(data, i);
++	irq = irq_desc_get_irq(desc);
++	hwirq = imx_irqsteer_get_hwirq_base(data, irq);
++	if (hwirq < 0) {
++		pr_warn("%s: unable to get hwirq base for irq %d\n",
++			__func__, irq);
++		return;
++	}
++
++	for (i = 0; i < 2; i++, hwirq += 32) {
++		int idx = imx_irqsteer_get_reg_index(data, hwirq);
  		unsigned long irqmap;
  		int pos, virq;
  
++		if (hwirq >= data->reg_num * 32)
++			break;
++
  		irqmap = readl_relaxed(data->regs +
--				       CHANSTATUS(idx, data->irq_groups));
-+				       CHANSTATUS(idx, data->reg_num));
+ 				       CHANSTATUS(idx, data->reg_num));
  
  		for_each_set_bit(pos, &irqmap, 32) {
- 			virq = irq_find_mapping(data->domain, pos + i);
-@@ -146,12 +146,15 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+-			virq = irq_find_mapping(data->domain, pos + i);
++			virq = irq_find_mapping(data->domain, pos + hwirq);
+ 			if (virq)
+ 				generic_handle_irq(virq);
+ 		}
+@@ -117,7 +145,8 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct irqsteer_data *data;
+ 	struct resource *res;
+-	int ret;
++	u32 irqs_num;
++	int i, ret;
+ 
+ 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+ 	if (!data)
+@@ -130,12 +159,6 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
+ 		return PTR_ERR(data->regs);
+ 	}
+ 
+-	data->irq = platform_get_irq(pdev, 0);
+-	if (data->irq <= 0) {
+-		dev_err(&pdev->dev, "failed to get irq\n");
+-		return -ENODEV;
+-	}
+-
+ 	data->ipg_clk = devm_clk_get(&pdev->dev, "ipg");
+ 	if (IS_ERR(data->ipg_clk)) {
+ 		ret = PTR_ERR(data->ipg_clk);
+@@ -146,11 +169,15 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
  
  	raw_spin_lock_init(&data->lock);
  
--	of_property_read_u32(np, "fsl,irq-groups", &data->irq_groups);
-+	of_property_read_u32(np, "fsl,num-irqs", &data->reg_num);
+-	of_property_read_u32(np, "fsl,num-irqs", &data->reg_num);
++	of_property_read_u32(np, "fsl,num-irqs", &irqs_num);
  	of_property_read_u32(np, "fsl,channel", &data->channel);
  
-+	/* one register bit map represents 32 input interrupts */
-+	data->reg_num /= 32;
-+
+-	/* one register bit map represents 32 input interrupts */
+-	data->reg_num /= 32;
++	/*
++	 * There is one output irq for each group of 64 inputs.
++	 * One register bit map can represent 32 input interrupts.
++	 */
++	data->irq_count = DIV_ROUND_UP(irqs_num, 64);
++	data->reg_num = irqs_num / 32;
+ 
  	if (IS_ENABLED(CONFIG_PM_SLEEP)) {
  		data->saved_reg = devm_kzalloc(&pdev->dev,
--					sizeof(u32) * data->irq_groups * 2,
-+					sizeof(u32) * data->reg_num,
- 					GFP_KERNEL);
- 		if (!data->saved_reg)
- 			return -ENOMEM;
-@@ -166,7 +169,7 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
- 	/* steer all IRQs into configured channel */
- 	writel_relaxed(BIT(data->channel), data->regs + CHANCTRL);
- 
--	data->domain = irq_domain_add_linear(np, data->irq_groups * 64,
-+	data->domain = irq_domain_add_linear(np, data->reg_num * 32,
+@@ -173,23 +200,44 @@ static int imx_irqsteer_probe(struct platform_device *pdev)
  					     &imx_irqsteer_domain_ops, data);
  	if (!data->domain) {
  		dev_err(&pdev->dev, "failed to create IRQ domain\n");
-@@ -199,9 +202,9 @@ static void imx_irqsteer_save_regs(struct irqsteer_data *data)
+-		clk_disable_unprepare(data->ipg_clk);
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto out;
+ 	}
+ 
+-	irq_set_chained_handler_and_data(data->irq, imx_irqsteer_irq_handler,
+-					 data);
++	if (!data->irq_count || data->irq_count > CHAN_MAX_OUTPUT_INT) {
++		ret = -EINVAL;
++		goto out;
++	}
++
++	for (i = 0; i < data->irq_count; i++) {
++		data->irq[i] = irq_of_parse_and_map(np, i);
++		if (!data->irq[i]) {
++			ret = -EINVAL;
++			goto out;
++		}
++
++		irq_set_chained_handler_and_data(data->irq[i],
++						 imx_irqsteer_irq_handler,
++						 data);
++	}
+ 
+ 	platform_set_drvdata(pdev, data);
+ 
+ 	return 0;
++out:
++	clk_disable_unprepare(data->ipg_clk);
++	return ret;
+ }
+ 
+ static int imx_irqsteer_remove(struct platform_device *pdev)
  {
- 	int i;
+ 	struct irqsteer_data *irqsteer_data = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < irqsteer_data->irq_count; i++)
++		irq_set_chained_handler_and_data(irqsteer_data->irq[i],
++						 NULL, NULL);
  
--	for (i = 0; i < data->irq_groups * 2; i++)
-+	for (i = 0; i < data->reg_num; i++)
- 		data->saved_reg[i] = readl_relaxed(data->regs +
--						CHANMASK(i, data->irq_groups));
-+						CHANMASK(i, data->reg_num));
- }
+-	irq_set_chained_handler_and_data(irqsteer_data->irq, NULL, NULL);
+ 	irq_domain_remove(irqsteer_data->domain);
  
- static void imx_irqsteer_restore_regs(struct irqsteer_data *data)
-@@ -209,9 +212,9 @@ static void imx_irqsteer_restore_regs(struct irqsteer_data *data)
- 	int i;
- 
- 	writel_relaxed(BIT(data->channel), data->regs + CHANCTRL);
--	for (i = 0; i < data->irq_groups * 2; i++)
-+	for (i = 0; i < data->reg_num; i++)
- 		writel_relaxed(data->saved_reg[i],
--			       data->regs + CHANMASK(i, data->irq_groups));
-+			       data->regs + CHANMASK(i, data->reg_num));
- }
- 
- static int imx_irqsteer_suspend(struct device *dev)
+ 	clk_disable_unprepare(irqsteer_data->ipg_clk);
 -- 
 2.7.4
 
