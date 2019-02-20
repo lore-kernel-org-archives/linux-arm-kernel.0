@@ -2,65 +2,69 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C323C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:42:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4F163C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:56:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 165FE2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:42:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21E302146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:56:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N/EOu9pz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 165FE2075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mh+tK4Dt";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LKBRAHo7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21E302146E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
+	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cdaYxfe7AiqO0lnqQYyYo4is057YtX9wWQ2s3f3Wi3Q=; b=N/EOu9pz71vlkr
-	QV4+cpmGWNTjGgkhL6QaRAmGpn6ppO0eBo60Tef/H5bRVk+TzyPXn63RGrDO7itvGAe6u7JUzFR/k
-	ArWFh0riLeOnbZ6udCzUfaidUoc1JB8j7mjwPwt608eRH6mdELot0MjvKTBrjDJ6gw6b0irrKAOse
-	h2GHVOEomUZTSbLRDTZjfwldIEdGF7L2Lz9tSD15vpANwNSqtBxa+GaMF5Rq+ZIRf94/D01+y0CGf
-	se9clXcXFqPwxfkWrFfFr8WDxzDGA2m8SRmELwNPzEf7RM/BXb4k58hCmGk+NsHQoSQpYs27JhIFc
-	afUa5FbsmEKBjcFPACgg==;
+	List-Owner; bh=+7yzuJUlQpVl/udjabiDUdl6lzpvh6nVsAVNWkQIpto=; b=mh+tK4DtsSnR7L
+	GFwjp3TfvzoDIvqOgKjNYW5TYUsSh8q+cxK/aJmA2pUT1sGNyvo0TZYWofz2bizW9Z6ybGPfsOMyI
+	JT2A/tuasXpxCGV5lmvJH3f0YU70VpG112g3x13mB96kP5THZlLTQEPz0oSgWBke/tPkXr84trH7q
+	gCO3oP9IyQidBIichrfMYvGBj5fsP4fI4k/XbbMPzSn2ElxFUgSia7ep2lbrptWSnRnyVm8NNB460
+	gwtTt49jYKGHaB8VphDHw4+/o7+/pDCmJDIGtOQjFTJefxN/mY2a19fOaT8IwQHkwnuJjBWO4DmL7
+	AYFktclhWShskWwKzaDg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwYgu-0002HJ-DS; Wed, 20 Feb 2019 20:42:04 +0000
-Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
+	id 1gwYur-0002O4-NV; Wed, 20 Feb 2019 20:56:29 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwYgr-0002GB-4u
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 20:42:02 +0000
-Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
- (using TLSv1 with cipher AES256-SHA (256/256 bits))
- (Client did not present a certificate)
- (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id DFD2512536DA8;
- Wed, 20 Feb 2019 12:41:55 -0800 (PST)
-Date: Wed, 20 Feb 2019 12:41:55 -0800 (PST)
-Message-Id: <20190220.124155.2226787912266109280.davem@davemloft.net>
-To: tony@atomide.com
-Subject: Re: [PATCH 6/6] net: ethernet: ti: cpsw: deprecate cpsw-phy-sel driver
-From: David Miller <davem@davemloft.net>
-In-Reply-To: <20190220203326.GT15711@atomide.com>
-References: <1550676319-6440-7-git-send-email-grygorii.strashko@ti.com>
- <20190220.112244.1206973642383679896.davem@davemloft.net>
- <20190220203326.GT15711@atomide.com>
-X-Mailer: Mew version 6.8 on Emacs 26.1
-Mime-Version: 1.0
-X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
- (shards.monkeyblade.net [149.20.54.216]);
- Wed, 20 Feb 2019 12:41:56 -0800 (PST)
+ id 1gwYuo-0002Na-34
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 20:56:27 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 65F1F2089F;
+ Wed, 20 Feb 2019 20:56:25 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550696185;
+ bh=i19Yd9t0tE1oyBSiiT8riqBloLBi5GvIMO+tNvl7dh0=;
+ h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
+ b=LKBRAHo7onXu9aIkZmqrDVtw/bnpLf+T7Dorop5sTL2CIUqROn40D5i08vN0PNUba
+ AqVwXXENsLoS0IIoA9sep3P0NP4/SyFNFLb2ymfhmadeGqs4yvfQ2zdS5lVBD5E543
+ 8h0tOHLzMVNQr7/XP6tLs04ZkH2LXtoM7haxcglY=
+MIME-Version: 1.0
+Subject: RE: [PATCH V3 4/5] dt-bindings: imx8-clock: add a53 and a72 clock id
+Message-ID: <155069618457.77512.12216138806698646030@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.8
+References: <1548335800-6438-1-git-send-email-aisheng.dong@nxp.com>
+ <1548335800-6438-5-git-send-email-aisheng.dong@nxp.com>
+ <20190213221818.GA13126@bogus>
+ <AM6PR04MB4215A70B99715434A3770532807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <AM6PR04MB4215A70B99715434A3770532807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
+To: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>
+Date: Wed, 20 Feb 2019 12:56:24 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_124201_201561_3053771B 
-X-CRM114-Status: UNSURE (   8.80  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190220_125626_171375_DA7B68C9 
+X-CRM114-Status: GOOD (  21.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,38 +76,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, grygorii.strashko@ti.com,
- netdev@vger.kernel.org, nsekhar@ti.com, linux-kernel@vger.kernel.org,
- kishon@ti.com, robh+dt@kernel.org, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Wed, 20 Feb 2019 12:33:26 -0800
-
-> * David Miller <davem@davemloft.net> [190220 19:23]:
->> From: Grygorii Strashko <grygorii.strashko@ti.com>
->> Date: Wed, 20 Feb 2019 17:25:19 +0200
->> 
->> > Deprecate cpsw-phy-sel driver as it's been replaced with new
->> > TI phy-gmii-sel PHY driver.
->> > 
->> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> 
->> Acked-by: David S. Miller <davem@davemloft.net>
+Quoting Aisheng Dong (2019-02-19 23:07:46)
+> > From: Rob Herring [mailto:robh@kernel.org]
+> > Sent: Thursday, February 14, 2019 6:18 AM
+> > On Thu, Jan 24, 2019 at 01:22:45PM +0000, Aisheng Dong wrote:
+> > > Add a53 and a72 clock id, as there's still no users, we update
+> > > IMX_LSIO_MEM_CLK base to start from 6 to allow a53 and a72 clock id to
+> > > be continued with a35 clk.
+> > >
+> > > Cc: Stephen Boyd <sboyd@kernel.org>
+> > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: devicetree@vger.kernel.org
+> > > Cc: Shawn Guo <shawnguo@kernel.org>
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Cc: Michael Turquette <mturquette@baylibre.com>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > > ---
+> > > v1->v2:
+> > >  * change cpu clock to cpu cluster clock per Rob's suggestion
+> > > ---
+> > >  include/dt-bindings/clock/imx8-clock.h | 6 ++++--
+> > >  1 file changed, 4 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/include/dt-bindings/clock/imx8-clock.h
+> > > b/include/dt-bindings/clock/imx8-clock.h
+> > > index b149e63..dcce744 100644
+> > > --- a/include/dt-bindings/clock/imx8-clock.h
+> > > +++ b/include/dt-bindings/clock/imx8-clock.h
+> > > @@ -14,10 +14,12 @@
+> > >  /* CPU */
+> > >  #define IMX_A35_CLK                                        1
+> > >  #define IMX_CPU_CLUSTER_A35_CLK                            1
+> > > +#define IMX_CPU_CLUSTER_A53_CLK                            2
+> > > +#define IMX_CPU_CLUSTER_A72_CLK                            3
+> > 
+> > I still don't get this. How many clock outputs does the clock controller have for
+> > CPUs? If 3, then this is correct. If it's the same clock controller bits across
+> > different SoCs, then just name it something like IMX_CPU_CLUSTER_CLK and
+> > reuse the same ID.
+> > 
 > 
-> Thanks for the ack, but actually I'd prefer you to pick
-> this patch at some future date. I suggest Grygorii just
-> repost this one after v5.1-rc1.
+> For SCU firmware based platforms like mx8qxp/qm, the clocks are provided
+> by SCU firmware via SCU firmware call with unique IDs. So it's safe to use a common
+> Clock IDs file.
+> 
+> But please ignore patch 3 and 4 first because we still met a few limitations with
+> current approach due to the device availability may vary a bit across CPUs and
+> Subsystems.
+> 
+> We formerly planned to add all new IDs for each SS and dynamically check availability
+> in driver. That can be done but that may involve a lot effort and may result in more
+> changes In driver. Also hard to upstream device tree code due to dependency on Clock IDs.
+> 
+> To relief this situation, we want to move the clock definition into device tree which
+> can fully decouple the dependency of Clock ID definition from device tree.
+> And no frequent changes required in clock driver.
+> 
+> I will send a patch set to do it later.
+> 
 
-It's so much easier if you group this with those DT changes, they
-logically belong together as well and it helps someone reading
-the changes in the tree also if they are side by side.
-
-Why don't you want to integrate this with them?
+Ok. I'll take this as a signal to drop these from the clk review queue.
+Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
