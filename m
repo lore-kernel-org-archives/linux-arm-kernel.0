@@ -2,133 +2,185 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C61CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:39:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DB3A0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:41:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 35E2620880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:39:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A950221848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:41:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kv9DIfS/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="MVoegQ3Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35E2620880
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kGbI/RwF";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="iX/Crxho"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A950221848
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZGH88Ou8IXdGY01F5bQBD+DCreKIjXzBa0tH8xbNZa4=; b=Kv9DIfS/k71Bor
-	64B274S9+vi2IGMfcn8AX61piH5XYbbBqjFVYSg5P75melQjtSm3SX0Ls6xkOP2MkbDRR7bIQYd38
-	ieJnq7NbGIy3v1CrQCoo/BO00+yW7jM7XozhPQmonq1NvqFOU6K14LC8TvrZmNlTE+FP9ESPJIB9r
-	Dy8zkkAI+76mVlK2ygXNMO+qnLVxW7RoQUxA5Vih+F6c+N/rE18Byia/jljjYHv0rU3qt7Z34HZdg
-	fJ0KPZbn2ULM7fZj5xh8nUEov5bcuk2HORFEp2dWNTYrxQQ99GaVeITV64E07zD7d2IpyvKOpZM+s
-	QC8kbpUODdY5/3Q+3wcw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=TQ35cHgPmo8nhtw6USbjPTeV8cljJQeawxttEjClt2Q=; b=kGbI/RwFazUZXZ
+	njPk1vHkJEaIsCB0YF+3QHcWFRvZPhdEBrYbznaWvAC/D+zKtSCvgH0Q/aCjJWaylzc0VmwUBT/Na
+	/2tX59uqAg09ySbvS1mzZZwrG3XragTWi1y6PHXwqdIEjFWjFOwj2N8uN3TuH5ygPq+pNF0g70oMs
+	MzoUz00k6aEjzaAQLxKo57NKL84zeayIV8a3ZJeO7XQ1oOeOeAzjErySfCvSEhmugniagjv8RhdNS
+	xyYsLpNW3IL+HoIYk86qpa+rI5iIokouqUjkH0KHtHQHQjcA99gpAdYDxq2+XIDzJVnNC5C3BLoqD
+	vvi9d7iFXehXkfseGuwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwT1j-0004hN-BO; Wed, 20 Feb 2019 14:39:11 +0000
-Received: from mail-eopbgr70080.outbound.protection.outlook.com ([40.107.7.80]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gwT4I-0006Qh-Ec; Wed, 20 Feb 2019 14:41:50 +0000
+Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwT1E-0003xo-Vq
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 14:38:47 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=rDhpSEnggYlC4rAniuU47I3jqCrYlqv1+iNpmmAMQCU=;
- b=MVoegQ3YrjtBihRJ0CnhbJB+FpTUAYz8q+tUPtioUXf1EI556UvS4Ae7P8MTy9RGEwq+9btY3QlTkYGcRkjz7t9mkKq6UavySD2hoeAXAG/Aj+dpioxVsx2d/+p0GiRq7qJnipKvi3dUUqIYvNod7XYhDdvNPnVNXSznOkhlkf0=
-Received: from AM6PR04MB4215.eurprd04.prod.outlook.com (52.135.168.141) by
- AM6PR04MB4917.eurprd04.prod.outlook.com (20.177.33.156) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1601.21; Wed, 20 Feb 2019 14:38:36 +0000
-Received: from AM6PR04MB4215.eurprd04.prod.outlook.com
- ([fe80::e944:6749:3ee6:4e08]) by AM6PR04MB4215.eurprd04.prod.outlook.com
- ([fe80::e944:6749:3ee6:4e08%5]) with mapi id 15.20.1622.020; Wed, 20 Feb 2019
- 14:38:36 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 3/3] firmware: imx: scu-pd: decouple the SS information from
- domain names
-Thread-Topic: [PATCH 3/3] firmware: imx: scu-pd: decouple the SS information
- from domain names
-Thread-Index: AQHUySn2+FLHWnHhe0qpwYe4cxsiAA==
-Date: Wed, 20 Feb 2019 14:38:36 +0000
-Message-ID: <1550673013-21462-4-git-send-email-aisheng.dong@nxp.com>
-References: <1550673013-21462-1-git-send-email-aisheng.dong@nxp.com>
-In-Reply-To: <1550673013-21462-1-git-send-email-aisheng.dong@nxp.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR03CA0074.apcprd03.prod.outlook.com
- (2603:1096:203:72::14) To AM6PR04MB4215.eurprd04.prod.outlook.com
- (2603:10a6:209:4f::13)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 8d49c6de-a761-450d-1255-08d697411897
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB4917; 
-x-ms-traffictypediagnostic: AM6PR04MB4917:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM6PR04MB4917;
- 23:NBRuCZ/yxqn+58FGUJIQYL4GmzZBBHIDV2zmuqf?=
- =?iso-8859-1?Q?/cAEnZo9hIQeWqxKgI+NUeVolwXljrgcmHcvnu8AYn2bltqsJ95kTUyLDe?=
- =?iso-8859-1?Q?kVwY0KHBoQeRvQJgtNP9E3jlyYemABT0YVnYx97vKTqyUkqERc/6eGxiL6?=
- =?iso-8859-1?Q?FGGITvKkGSPHJj5JMJR2Pb15DAW49PbZ83AqZzQcNBGoZqzkGyo3EE0L3I?=
- =?iso-8859-1?Q?CUsD3itt5q7Psmih1XbjEKj2MPKzuWGrU/L8pasjGL3br7dp8xpNvt1Oe5?=
- =?iso-8859-1?Q?K5fssQ5nDsLcR81u+cr0arEzVYb9mA02aSW8CEa8bAbxHbzgBcFeeUfRYt?=
- =?iso-8859-1?Q?AgyX9LZp9t9UnB3CiZAUZlrvmc3FzPNZkPuVbw7j5YuoJVKHnAW/YQf1Zi?=
- =?iso-8859-1?Q?3s7WF+4pr5hdEiJU8248nXDD6ffKsZi/UJPPstOHN7vPXoa8tR4JP6zMe3?=
- =?iso-8859-1?Q?NmNCEwB3CuvHb864FPezCdbaOzGtccWeIw/C+Fto6epoKawUJMv1z6Dfro?=
- =?iso-8859-1?Q?TEbBz48dP4u4VffbziUHMmdTtiHyt5dGyBF1kU32qFl+MmCDpnCCA7qK4V?=
- =?iso-8859-1?Q?+R/puzuGC9HLIOMFQddEZBeiVkkOFnkGePUneGY7FcpQM23JiQ4zSuwU5n?=
- =?iso-8859-1?Q?XNtlTwYdiM+uiLUrB2kUbm/WkKULXBSrfGN77/cTz83uKVRrn9nmXNnavO?=
- =?iso-8859-1?Q?KqTBlsHWGNnG2YwILro/MGC6JQt7UH6r6F/HHDAATIE+4H78C13Pe0wa/I?=
- =?iso-8859-1?Q?VnKsWJdrwNmqD+H6q7hbkAcn4uT/Der0nw21EkPUvIeIWEVZhtI6YTJkfP?=
- =?iso-8859-1?Q?lDRlVW4vxXWtTpMrxaTiTDfdzacjtGwKUM1M+bndqOJtYeZA4ZF05pFrHY?=
- =?iso-8859-1?Q?3MFrtV59qacmxjW7hSFTpmqMJORoR5wDCro0eX5qOYR7btvYuc4UFV1ZO9?=
- =?iso-8859-1?Q?xE/VEdh0LdhELxe1KeaARwi/OBOYxBRRCkdFdgKdUm5UvK+HHYH+LJUuVm?=
- =?iso-8859-1?Q?ZZUPL80KanceHT71AXkoPtlH76IdWp8DQE6bG25xYWdKXaCMd4LdlXeHL7?=
- =?iso-8859-1?Q?1NpMIT3Dx3ieFOmEZl1fMf0l7GFK4OA4ZwzIG7tBcUVF6dgjw7HFAtxd+r?=
- =?iso-8859-1?Q?TBNiU/UwA/0bRebu2uxts1WVNwEEeHY975XLvPW1reN5EtTIN2+MGE9dhU?=
- =?iso-8859-1?Q?uPbcHbyNkHsSw7DotlrXUJ17ap40rDfor8B7UZhMDYu5IMSPaEo2yqDG8O?=
- =?iso-8859-1?Q?+5BKYtUOGOLXAZ9JdC5kp19kVbtgUGM3h+cUCMgtNy3tQz7GRtjH53+Ijv?=
- =?iso-8859-1?Q?Y2tjB2wT5FHBgw1hPbCcCgu?=
-x-microsoft-antispam-prvs: <AM6PR04MB49170A10C35C02A58BF64720807D0@AM6PR04MB4917.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0954EE4910
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(376002)(136003)(346002)(366004)(39860400002)(189003)(199004)(8676002)(305945005)(97736004)(71190400001)(7736002)(14454004)(81166006)(8936002)(256004)(52116002)(2906002)(81156014)(2501003)(478600001)(6512007)(50226002)(5660300002)(71200400001)(53936002)(68736007)(316002)(54906003)(6486002)(6506007)(6436002)(106356001)(44832011)(86362001)(36756003)(5640700003)(2616005)(486006)(6916009)(186003)(3846002)(476003)(4326008)(25786009)(6116002)(26005)(99286004)(102836004)(2351001)(446003)(11346002)(386003)(105586002)(66066001)(76176011);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4917;
- H:AM6PR04MB4215.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: kffireKtF0YuodszUh3QrxhnweAXS/5rIemMk8eoI8M62swxREBd/+TM1KUYT8oT39+C5U/YYzpAgqzD5faSK+Zoy/gD0osZINloywuGadPsghgF8kM4YEWsmQE25FIbQ0ygFVozTEpv2J/oRB/ZQZijVmqAuCBorNX0NoBakG6yG1RhT9+yttZ+YhV4ZJAsKv9nO9gJsT0euF/6sLtgG+FLg3fRjzhn2PaswZCKVmIooecJbQOzs/ZUD2bpjjBus8EOR11MmrqmYqFyovoMjAwQb+4MHyd8mW4ouTHb/pP75H5ulr/OlVISVeYk1D0Q0yl+1yHeSrZTJEBSid+UCYnYK001SQpyCZFtbn+kZD39zRyifQkqGdGCUlBavmzZevlvTKC6DpZ0dQ2gZjwjNO/R3MXa/8IHIF+iVNQGd7Q=
+ id 1gwT4E-0006Pu-E1; Wed, 20 Feb 2019 14:41:48 +0000
+Received: by mail-ed1-x544.google.com with SMTP id c55so2318466edb.0;
+ Wed, 20 Feb 2019 06:41:46 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=CBJ/jYcxY4IE/wR03AgMgWoxos0191S0tyXQcXmAnaE=;
+ b=iX/CrxhoEfxMyxAR0b13Ce0tUr/BIRW6y9DTBFW8nYr3aw+y6g93x7OC6pEq7YlZ2c
+ DKV/0OqEshJR6lHN6g4R+Ddwbi91GTa3/pV6dbYVeqpbROBsohBG+Wx0pPPEw/b13cEi
+ 4oxwpasJwZxM78L+6HtPXdcS830JUAOhTwYMVBEKgzbTTi4EAlLTQgcbA6rTW7wsFawt
+ WXyz6J3yuEXEC4U7rZN85xKxVf0gY9vkfK1OozbYJFOc2ED39X7XMmwXrneTta4FX6QG
+ e4WMARHd37UZR1fxMm0tVwS6j23YcHOSpXfLz2nDlqumLWM5mfRNr+sgnIf9Yldasacz
+ BSmQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=CBJ/jYcxY4IE/wR03AgMgWoxos0191S0tyXQcXmAnaE=;
+ b=WVQhAqGm28YrYE7B0U6qViEel3tBuxtq0hTpYrgmmHm1efUrY0AIMICv9EK/PoU08U
+ x8NudoHk6t9gS11u0enz15cXDveK0uLv98m6xfShugnQTgtXm4jCOUzE2EIWz8X/qmWV
+ 16wkgDueFnm2kzGYGZbJdSw7KA2qOGoCxZhN2/egXsyb9lsqENRIrss0VfnheoG+Crzy
+ B/ffhZpKSSxrhaIOPcrZid0DED82vg6cE8W0Fz/oLi2fgPTuxT2fyCEtN9aP2ct5zUYK
+ WW9EL3dSmjw/axO9Si9a10flOGb8TQEOvIhL3LW+4iR0OU1b0p0Te/as3INa55J8o1zu
+ x/wA==
+X-Gm-Message-State: AHQUAuaBC9a6olgrJpU9cW5oQvFSmzkyLPAyYnBKvcDGUi8cyS/+m1tZ
+ whA9SLjEA98HPkkCj7MnCAvlSMRY
+X-Google-Smtp-Source: AHgI3Ibod9i4kuO6cksYY8IvmPyk1/pXWjx4qlAX62qA+2LCHs1rOc2pl9jAYokr/oons5NLgy8loA==
+X-Received: by 2002:a50:cdc3:: with SMTP id h3mr28160289edj.208.1550673704184; 
+ Wed, 20 Feb 2019 06:41:44 -0800 (PST)
+Received: from ziggy.stardust ([37.223.146.9])
+ by smtp.gmail.com with ESMTPSA id h44sm3913525edh.34.2019.02.20.06.41.42
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Wed, 20 Feb 2019 06:41:43 -0800 (PST)
+Subject: Re: [PATCH v4 3/3] i2c: mediatek: Add i2c support for MediaTek MT8183
+To: Qii Wang <qii.wang@mediatek.com>, wsa@the-dreams.de
+References: <1550666030-30211-1-git-send-email-qii.wang@mediatek.com>
+ <1550666030-30211-4-git-send-email-qii.wang@mediatek.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <40bf7264-1fc7-320a-1122-1782b57c5b53@gmail.com>
+Date: Wed, 20 Feb 2019 15:41:41 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8d49c6de-a761-450d-1255-08d697411897
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 14:38:32.6031 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4917
+In-Reply-To: <1550666030-30211-4-git-send-email-qii.wang@mediatek.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_063841_229290_DFE25BAA 
-X-CRM114-Status: GOOD (  12.30  )
+X-CRM114-CacheID: sfid-20190220_064146_496134_05AABEF2 
+X-CRM114-Status: GOOD (  20.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,156 +192,319 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
- "dongas86@gmail.com" <dongas86@gmail.com>,
- "khilman@kernel.org" <khilman@kernel.org>,
- "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
- "rjw@rjwysocki.net" <rjw@rjwysocki.net>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>
+Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ srv_heupstream@mediatek.com, robh@kernel.org, leilk.liu@mediatek.com,
+ linux-kernel@vger.kernel.org, liguo.zhang@mediatek.com,
+ linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
+ xinping.qian@mediatek.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As resource power domain service is provided by SCU firmware, no
-SS information required. So we can remove the SS indicator from
-the domain names, then the domains defined can be better shared
-among different SCU based platforms.
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: linux-pm@vger.kernel.org
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/firmware/imx/scu-pd.c | 92 ++++++++++++++++++++++---------------------
- 1 file changed, 48 insertions(+), 44 deletions(-)
 
-diff --git a/drivers/firmware/imx/scu-pd.c b/drivers/firmware/imx/scu-pd.c
-index 48f49f8..cd745b9 100644
---- a/drivers/firmware/imx/scu-pd.c
-+++ b/drivers/firmware/imx/scu-pd.c
-@@ -87,49 +87,51 @@ struct imx_sc_pd_soc {
- 
- static const struct imx_sc_pd_range imx8qxp_scu_pd_ranges[] = {
- 	/* LSIO SS */
--	{ "lsio-pwm", IMX_SC_R_PWM_0, 8, true, 0 },
--	{ "lsio-gpio", IMX_SC_R_GPIO_0, 8, true, 0 },
--	{ "lsio-gpt", IMX_SC_R_GPT_0, 5, true, 0 },
--	{ "lsio-kpp", IMX_SC_R_KPP, 1, false, 0 },
--	{ "lsio-fspi", IMX_SC_R_FSPI_0, 2, true, 0 },
--	{ "lsio-mu", IMX_SC_R_MU_0A, 14, true, 0 },
-+	{ "pwm", IMX_SC_R_PWM_0, 8, true, 0 },
-+	{ "gpio", IMX_SC_R_GPIO_0, 8, true, 0 },
-+	{ "gpt", IMX_SC_R_GPT_0, 5, true, 0 },
-+	{ "kpp", IMX_SC_R_KPP, 1, false, 0 },
-+	{ "fspi", IMX_SC_R_FSPI_0, 2, true, 0 },
-+	{ "mu", IMX_SC_R_MU_0A, 14, true, 0 },
- 
- 	/* CONN SS */
--	{ "con-usb", IMX_SC_R_USB_0, 2, true, 0 },
--	{ "con-usb0phy", IMX_SC_R_USB_0_PHY, 1, false, 0 },
--	{ "con-usb2", IMX_SC_R_USB_2, 1, false, 0 },
--	{ "con-usb2phy", IMX_SC_R_USB_2_PHY, 1, false, 0 },
--	{ "con-sdhc", IMX_SC_R_SDHC_0, 3, true, 0 },
--	{ "con-enet", IMX_SC_R_ENET_0, 2, true, 0 },
--	{ "con-nand", IMX_SC_R_NAND, 1, false, 0 },
--	{ "con-mlb", IMX_SC_R_MLB_0, 1, true, 0 },
--
--	/* Audio DMA SS */
--	{ "adma-audio-pll0", IMX_SC_R_AUDIO_PLL_0, 1, false, 0 },
--	{ "adma-audio-pll1", IMX_SC_R_AUDIO_PLL_1, 1, false, 0 },
--	{ "adma-audio-clk-0", IMX_SC_R_AUDIO_CLK_0, 1, false, 0 },
--	{ "adma-dma0-ch", IMX_SC_R_DMA_0_CH0, 16, true, 0 },
--	{ "adma-dma1-ch", IMX_SC_R_DMA_1_CH0, 16, true, 0 },
--	{ "adma-dma2-ch", IMX_SC_R_DMA_2_CH0, 5, true, 0 },
--	{ "adma-asrc0", IMX_SC_R_ASRC_0, 1, false, 0 },
--	{ "adma-asrc1", IMX_SC_R_ASRC_1, 1, false, 0 },
--	{ "adma-esai0", IMX_SC_R_ESAI_0, 1, false, 0 },
--	{ "adma-spdif0", IMX_SC_R_SPDIF_0, 1, false, 0 },
--	{ "adma-sai", IMX_SC_R_SAI_0, 3, true, 0 },
--	{ "adma-amix", IMX_SC_R_AMIX, 1, false, 0 },
--	{ "adma-mqs0", IMX_SC_R_MQS_0, 1, false, 0 },
--	{ "adma-dsp", IMX_SC_R_DSP, 1, false, 0 },
--	{ "adma-dsp-ram", IMX_SC_R_DSP_RAM, 1, false, 0 },
--	{ "adma-can", IMX_SC_R_CAN_0, 3, true, 0 },
--	{ "adma-ftm", IMX_SC_R_FTM_0, 2, true, 0 },
--	{ "adma-lpi2c", IMX_SC_R_I2C_0, 4, true, 0 },
--	{ "adma-adc", IMX_SC_R_ADC_0, 1, true, 0 },
--	{ "adma-lcd", IMX_SC_R_LCD_0, 1, true, 0 },
--	{ "adma-lcd0-pwm", IMX_SC_R_LCD_0_PWM_0, 1, true, 0 },
--	{ "adma-lpuart", IMX_SC_R_UART_0, 4, true, 0 },
--	{ "adma-lpspi", IMX_SC_R_SPI_0, 4, true, 0 },
--
--	/* VPU SS  */
-+	{ "usb", IMX_SC_R_USB_0, 2, true, 0 },
-+	{ "usb0phy", IMX_SC_R_USB_0_PHY, 1, false, 0 },
-+	{ "usb2", IMX_SC_R_USB_2, 1, false, 0 },
-+	{ "usb2phy", IMX_SC_R_USB_2_PHY, 1, false, 0 },
-+	{ "sdhc", IMX_SC_R_SDHC_0, 3, true, 0 },
-+	{ "enet", IMX_SC_R_ENET_0, 2, true, 0 },
-+	{ "nand", IMX_SC_R_NAND, 1, false, 0 },
-+	{ "mlb", IMX_SC_R_MLB_0, 1, true, 0 },
-+
-+	/* AUDIO SS */
-+	{ "audio-pll0", IMX_SC_R_AUDIO_PLL_0, 1, false, 0 },
-+	{ "audio-pll1", IMX_SC_R_AUDIO_PLL_1, 1, false, 0 },
-+	{ "audio-clk-0", IMX_SC_R_AUDIO_CLK_0, 1, false, 0 },
-+	{ "dma0-ch", IMX_SC_R_DMA_0_CH0, 16, true, 0 },
-+	{ "dma1-ch", IMX_SC_R_DMA_1_CH0, 16, true, 0 },
-+	{ "dma2-ch", IMX_SC_R_DMA_2_CH0, 5, true, 0 },
-+	{ "asrc0", IMX_SC_R_ASRC_0, 1, false, 0 },
-+	{ "asrc1", IMX_SC_R_ASRC_1, 1, false, 0 },
-+	{ "esai0", IMX_SC_R_ESAI_0, 1, false, 0 },
-+	{ "spdif0", IMX_SC_R_SPDIF_0, 1, false, 0 },
-+	{ "sai", IMX_SC_R_SAI_0, 3, true, 0 },
-+	{ "amix", IMX_SC_R_AMIX, 1, false, 0 },
-+	{ "mqs0", IMX_SC_R_MQS_0, 1, false, 0 },
-+	{ "dsp", IMX_SC_R_DSP, 1, false, 0 },
-+	{ "dsp-ram", IMX_SC_R_DSP_RAM, 1, false, 0 },
-+
-+	/* DMA SS */
-+	{ "can", IMX_SC_R_CAN_0, 3, true, 0 },
-+	{ "ftm", IMX_SC_R_FTM_0, 2, true, 0 },
-+	{ "lpi2c", IMX_SC_R_I2C_0, 4, true, 0 },
-+	{ "adc", IMX_SC_R_ADC_0, 1, true, 0 },
-+	{ "lcd", IMX_SC_R_LCD_0, 1, true, 0 },
-+	{ "lcd0-pwm", IMX_SC_R_LCD_0_PWM_0, 1, true, 0 },
-+	{ "lpuart", IMX_SC_R_UART_0, 4, true, 0 },
-+	{ "lpspi", IMX_SC_R_SPI_0, 4, true, 0 },
-+
-+	/* VPU SS */
- 	{ "vpu", IMX_SC_R_VPU, 1, false, 0 },
- 	{ "vpu-pid", IMX_SC_R_VPU_PID0, 8, true, 0 },
- 	{ "vpu-dec0", IMX_SC_R_VPU_DEC_0, 1, false, 0 },
-@@ -139,14 +141,16 @@ static const struct imx_sc_pd_range imx8qxp_scu_pd_ranges[] = {
- 	{ "gpu0-pid", IMX_SC_R_GPU_0_PID0, 4, true, 0 },
- 
- 	/* HSIO SS */
--	{ "hsio-pcie-b", IMX_SC_R_PCIE_B, 1, false, 0 },
--	{ "hsio-serdes-1", IMX_SC_R_SERDES_1, 1, false, 0 },
-+	{ "pcie-b", IMX_SC_R_PCIE_B, 1, false, 0 },
-+	{ "serdes-1", IMX_SC_R_SERDES_1, 1, false, 0 },
- 	{ "hsio-gpio", IMX_SC_R_HSIO_GPIO, 1, false, 0 },
- 
--	/* MIPI/LVDS SS */
-+	/* MIPI SS */
- 	{ "mipi0", IMX_SC_R_MIPI_0, 1, false, 0 },
- 	{ "mipi0-pwm0", IMX_SC_R_MIPI_0_PWM_0, 1, false, 0 },
- 	{ "mipi0-i2c", IMX_SC_R_MIPI_0_I2C_0, 2, true, 0 },
-+
-+	/* LVDS SS */
- 	{ "lvds0", IMX_SC_R_LVDS_0, 1, false, 0 },
- 
- 	/* DC SS */
--- 
-2.7.4
+On 20/02/2019 13:33, Qii Wang wrote:
+> Add i2c compatible for MT8183. Compare to MT2712 i2c controller,
+> MT8183 has different registers, offsets and clock.
+> 
+> Signed-off-by: Qii Wang <qii.wang@mediatek.com>
 
+So you introduce arb clock, ltiming (what is this exactly) and the new SoC in
+one commit. I'd prefer to split that up and explain shortly in the commit
+message why they are needed. More comments inline.
+
+> ---
+>  drivers/i2c/busses/i2c-mt65xx.c |   89 ++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 84 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> index 428ac99..82eedbd 100644
+> --- a/drivers/i2c/busses/i2c-mt65xx.c
+> +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/slab.h>
+>  
+>  #define I2C_RS_TRANSFER			(1 << 4)
+> +#define I2C_ARB_LOST			(1 << 3)
+>  #define I2C_HS_NACKERR			(1 << 2)
+>  #define I2C_ACKERR			(1 << 1)
+>  #define I2C_TRANSAC_COMP		(1 << 0)
+> @@ -76,6 +77,8 @@
+>  #define I2C_CONTROL_DIR_CHANGE          (0x1 << 4)
+>  #define I2C_CONTROL_ACKERR_DET_EN       (0x1 << 5)
+>  #define I2C_CONTROL_TRANSFER_LEN_CHANGE (0x1 << 6)
+> +#define I2C_CONTROL_DMAACK_EN           (0x1 << 8)
+> +#define I2C_CONTROL_ASYNC_MODE          (0x1 << 9)
+>  #define I2C_CONTROL_WRAPPER             (0x1 << 0)
+>  
+>  #define I2C_DRV_NAME		"i2c-mt65xx"
+> @@ -130,6 +133,8 @@ enum I2C_REGS_OFFSET {
+>  	OFFSET_DEBUGCTRL,
+>  	OFFSET_TRANSFER_LEN_AUX,
+>  	OFFSET_CLOCK_DIV,
+> +	/* MT8183 only regs */
+> +	OFFSET_LTIMING,
+>  };
+>  
+>  static const u16 mt_i2c_regs_v1[] = {
+> @@ -159,6 +164,32 @@ enum I2C_REGS_OFFSET {
+>  	[OFFSET_CLOCK_DIV] = 0x70,
+>  };
+>  
+> +static const u16 mt_i2c_regs_v2[] = {
+> +	[OFFSET_DATA_PORT] = 0x0,
+> +	[OFFSET_SLAVE_ADDR] = 0x4,
+> +	[OFFSET_INTR_MASK] = 0x8,
+> +	[OFFSET_INTR_STAT] = 0xc,
+> +	[OFFSET_CONTROL] = 0x10,
+> +	[OFFSET_TRANSFER_LEN] = 0x14,
+> +	[OFFSET_TRANSAC_LEN] = 0x18,
+> +	[OFFSET_DELAY_LEN] = 0x1c,
+> +	[OFFSET_TIMING] = 0x20,
+> +	[OFFSET_START] = 0x24,
+> +	[OFFSET_EXT_CONF] = 0x28,
+> +	[OFFSET_LTIMING] = 0x2c,
+> +	[OFFSET_HS] = 0x30,
+> +	[OFFSET_IO_CONFIG] = 0x34,
+> +	[OFFSET_FIFO_ADDR_CLR] = 0x38,
+> +	[OFFSET_TRANSFER_LEN_AUX] = 0x44,
+> +	[OFFSET_CLOCK_DIV] = 0x48,
+> +	[OFFSET_SOFTRESET] = 0x50,
+> +	[OFFSET_DEBUGSTAT] = 0xe0,
+> +	[OFFSET_DEBUGCTRL] = 0xe8,
+> +	[OFFSET_FIFO_STAT] = 0xf4,
+> +	[OFFSET_FIFO_THRESH] = 0xf8,
+> +	[OFFSET_DCM_EN] = 0xf88,
+> +};
+> +
+>  struct mtk_i2c_compatible {
+>  	const struct i2c_adapter_quirks *quirks;
+>  	const u16 *regs;
+> @@ -168,6 +199,7 @@ struct mtk_i2c_compatible {
+>  	unsigned char aux_len_reg: 1;
+>  	unsigned char support_33bits: 1;
+>  	unsigned char timing_adjust: 1;
+> +	unsigned char dma_sync: 1;
+>  };
+>  
+>  struct mtk_i2c {
+> @@ -181,6 +213,7 @@ struct mtk_i2c {
+>  	struct clk *clk_main;		/* main clock for i2c bus */
+>  	struct clk *clk_dma;		/* DMA clock for i2c via DMA */
+>  	struct clk *clk_pmic;		/* PMIC clock for i2c from PMIC */
+> +	struct clk *clk_arb;		/* Arbitrator clock for i2c */
+>  	bool have_pmic;			/* can use i2c pins from PMIC */
+>  	bool use_push_pull;		/* IO config push-pull mode */
+>  
+> @@ -190,6 +223,7 @@ struct mtk_i2c {
+>  	enum mtk_trans_op op;
+>  	u16 timing_reg;
+>  	u16 high_speed_reg;
+> +	u16 ltiming_reg;
+>  	unsigned char auto_restart;
+>  	bool ignore_restart_irq;
+>  	const struct mtk_i2c_compatible *dev_comp;
+> @@ -216,6 +250,7 @@ struct mtk_i2c {
+>  	.aux_len_reg = 1,
+>  	.support_33bits = 1,
+>  	.timing_adjust = 1,
+> +	.dma_sync = 0,
+>  };
+>  
+>  static const struct mtk_i2c_compatible mt6577_compat = {
+> @@ -227,6 +262,7 @@ struct mtk_i2c {
+>  	.aux_len_reg = 0,
+>  	.support_33bits = 0,
+>  	.timing_adjust = 0,
+> +	.dma_sync = 0,
+>  };
+>  
+>  static const struct mtk_i2c_compatible mt6589_compat = {
+> @@ -238,6 +274,7 @@ struct mtk_i2c {
+>  	.aux_len_reg = 0,
+>  	.support_33bits = 0,
+>  	.timing_adjust = 0,
+> +	.dma_sync = 0,
+>  };
+>  
+>  static const struct mtk_i2c_compatible mt7622_compat = {
+> @@ -249,6 +286,7 @@ struct mtk_i2c {
+>  	.aux_len_reg = 1,
+>  	.support_33bits = 0,
+>  	.timing_adjust = 0,
+> +	.dma_sync = 0,
+>  };
+>  
+>  static const struct mtk_i2c_compatible mt8173_compat = {
+> @@ -259,6 +297,18 @@ struct mtk_i2c {
+>  	.aux_len_reg = 1,
+>  	.support_33bits = 1,
+>  	.timing_adjust = 0,
+> +	.dma_sync = 0,
+> +};
+> +
+> +static const struct mtk_i2c_compatible mt8183_compat = {
+> +	.regs = mt_i2c_regs_v2,
+> +	.pmic_i2c = 0,
+> +	.dcm = 0,
+> +	.auto_restart = 1,
+> +	.aux_len_reg = 1,
+> +	.support_33bits = 1,
+> +	.timing_adjust = 1,
+> +	.dma_sync = 1,
+>  };
+>  
+>  static const struct of_device_id mtk_i2c_of_match[] = {
+> @@ -267,6 +317,7 @@ struct mtk_i2c {
+>  	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
+>  	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
+>  	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
+> +	{ .compatible = "mediatek,mt8183-i2c", .data = &mt8183_compat },
+>  	{}
+>  };
+>  MODULE_DEVICE_TABLE(of, mtk_i2c_of_match);
+> @@ -299,8 +350,18 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
+>  		if (ret)
+>  			goto err_pmic;
+>  	}
+> +
+> +	if (i2c->clk_arb) {
+> +		ret = clk_prepare_enable(i2c->clk_arb);
+> +		if (ret)
+> +			goto err_arb;
+> +	}
+> +
+>  	return 0;
+>  
+> +err_arb:
+> +	if (i2c->have_pmic)
+> +		clk_disable_unprepare(i2c->clk_pmic);
+>  err_pmic:
+>  	clk_disable_unprepare(i2c->clk_main);
+>  err_main:
+> @@ -311,6 +372,9 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
+>  
+>  static void mtk_i2c_clock_disable(struct mtk_i2c *i2c)
+>  {
+> +	if (i2c->clk_arb)
+> +		clk_disable_unprepare(i2c->clk_arb);
+> +
+>  	if (i2c->have_pmic)
+>  		clk_disable_unprepare(i2c->clk_pmic);
+>  
+> @@ -338,6 +402,8 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
+>  
+>  	mtk_i2c_writew(i2c, i2c->timing_reg, OFFSET_TIMING);
+>  	mtk_i2c_writew(i2c, i2c->high_speed_reg, OFFSET_HS);
+> +	if (i2c->dev_comp->regs == mt_i2c_regs_v2)
+
+I'm not really happy with this check. I personally would prefer a flag or
+something which shows that we need ltiming.
+
+> +		mtk_i2c_writew(i2c, i2c->ltiming_reg, OFFSET_LTIMING);
+>  
+>  	/* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
+>  	if (i2c->have_pmic)
+> @@ -345,6 +411,9 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
+>  
+>  	control_reg = I2C_CONTROL_ACKERR_DET_EN |
+>  		      I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
+> +	if (i2c->dev_comp->dma_sync)
+> +		control_reg |= I2C_CONTROL_DMAACK_EN | I2C_CONTROL_ASYNC_MODE;
+> +
+>  	mtk_i2c_writew(i2c, control_reg, OFFSET_CONTROL);
+>  	mtk_i2c_writew(i2c, I2C_DELAY_LEN, OFFSET_DELAY_LEN);
+>  
+> @@ -434,6 +503,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+>  	unsigned int clk_src;
+>  	unsigned int step_cnt;
+>  	unsigned int sample_cnt;
+> +	unsigned int l_step_cnt;
+> +	unsigned int l_sample_cnt;
+>  	unsigned int target_speed;
+>  	int ret;
+>  
+> @@ -443,11 +514,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+>  	if (target_speed > MAX_FS_MODE_SPEED) {
+>  		/* Set master code speed register */
+>  		ret = mtk_i2c_calculate_speed(i2c, clk_src, MAX_FS_MODE_SPEED,
+> -					      &step_cnt, &sample_cnt);
+> +					      &l_step_cnt, &l_sample_cnt);
+>  		if (ret < 0)
+>  			return ret;
+>  
+> -		i2c->timing_reg = (sample_cnt << 8) | step_cnt;
+> +		i2c->timing_reg = (l_sample_cnt << 8) | l_step_cnt;
+>  
+>  		/* Set the high speed mode register */
+>  		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
+> @@ -457,6 +528,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+>  
+>  		i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
+>  			(sample_cnt << 12) | (step_cnt << 8);
+> +		i2c->ltiming_reg = (l_sample_cnt << 6) | l_step_cnt |
+> +				   (sample_cnt << 12) | (step_cnt << 9);
+
+IMHO setting these for all SoCs but then only using it for one makes things more
+complicated. Value should only be set for SoCs that need this features.
+
+>  	} else {
+>  		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
+>  					      &step_cnt, &sample_cnt);
+> @@ -467,6 +540,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
+>  
+>  		/* Disable the high speed transaction */
+>  		i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
+> +
+> +		i2c->ltiming_reg = (sample_cnt << 6) | step_cnt;
+>  	}
+>  
+>  	return 0;
+> @@ -519,13 +594,13 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+>  
+>  	/* Clear interrupt status */
+>  	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
+> -	       I2C_TRANSAC_COMP, OFFSET_INTR_STAT);
+> +			    I2C_ARB_LOST | I2C_TRANSAC_COMP, OFFSET_INTR_STAT);
+
+Did you test that this works with all the old SoCs that are already supported by
+this driver?
+
+Regards,
+Matthias
+
+>  
+>  	mtk_i2c_writew(i2c, I2C_FIFO_ADDR_CLR, OFFSET_FIFO_ADDR_CLR);
+>  
+>  	/* Enable interrupt */
+>  	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
+> -	       I2C_TRANSAC_COMP, OFFSET_INTR_MASK);
+> +			    I2C_ARB_LOST | I2C_TRANSAC_COMP, OFFSET_INTR_MASK);
+>  
+>  	/* Set transfer and transaction len */
+>  	if (i2c->op == I2C_MASTER_WRRD) {
+> @@ -659,7 +734,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+>  
+>  	/* Clear interrupt mask */
+>  	mtk_i2c_writew(i2c, ~(restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
+> -	       I2C_TRANSAC_COMP), OFFSET_INTR_MASK);
+> +			    I2C_ARB_LOST | I2C_TRANSAC_COMP), OFFSET_INTR_MASK);
+>  
+>  	if (i2c->op == I2C_MASTER_WR) {
+>  		dma_unmap_single(i2c->dev, wpaddr,
+> @@ -884,6 +959,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
+>  		return PTR_ERR(i2c->clk_dma);
+>  	}
+>  
+> +	i2c->clk_arb = devm_clk_get(&pdev->dev, "arb");
+> +	if (IS_ERR(i2c->clk_arb))
+> +		i2c->clk_arb = NULL;
+> +
+>  	clk = i2c->clk_main;
+>  	if (i2c->have_pmic) {
+>  		i2c->clk_pmic = devm_clk_get(&pdev->dev, "pmic");
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
