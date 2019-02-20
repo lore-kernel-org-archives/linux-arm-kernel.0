@@ -2,58 +2,66 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EC1DFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:30:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F416C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:39:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B76D2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:30:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 129F72089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:39:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CMZ+A0Kc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B76D2070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DlVpk6Or"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 129F72089F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=RRbpNNgrYpujMB5XHU65yIdeCz498dPbRb5gnTyCqbc=; b=CMZ+A0Kcxsk8Ux
-	n1RFbrwuFfVlYL4mkS4MJO7uKuMosAbI+RNKYZPGd1jO7gLES2ooFZ4Fh3mwDRATzzHRBIuh3sLS4
-	5fzzCu4c/XIegRuqfqZ8ccyD6OM1T1Q1SQR+vqBDdped5E9hn4VQglezam37lo3GDrRppwRlic+gD
-	h0w1Ejai8okVEXEEYb/YJmcnBrTwlgmalq7vgLXmdIcCHIpBtDZhSZ5TSr+DdBzurUkb+gXz5I6TN
-	I2U43+it8EbKr1alLSBNzomT67o2ruFnEBT3a26qVtjpIV/5s+91kLdcnpqz6y/qzf/4aeycNB//A
-	Bwoys4jcqmmZ+R3qdejw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lviq89zpYY7d0+7LAoNMKs2Hf1Vp8oSd+iU2mQyloH0=; b=DlVpk6Or5nXnv0
+	Ys2uyIyuSG1WyxLoQQzUWCXFVLG5CWre/XvDOHbopKuQbTiDV/KzjPQyeSI4EE5FtLujWTz8ict8w
+	VKoap5H220CoLH7AczGcN9sHrxijtT7vNlMcU5hFZ4B/PZEvJK/eDZQX7PZLMoGkkQmJXsjR1d3Z8
+	Ht2YqX48Ng/HS2YK3H+DxtHZdI7jG2n/TE39kN6YCx8Wr4dmlUqqwVuNrcR2Ah51VkPMYSbIJYMe2
+	JoWzbQIUzDDZv2hJDXKC3u6VBg/2Cf8qCrqvqTsTj6XwmVKkLBoLsBfkYDlWnWGxLTSjc4QcuZ78s
+	haaANlXvJyWJC0IELg2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwODE-0007fo-LP; Wed, 20 Feb 2019 09:30:44 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwOD9-0007en-Hq
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 09:30:42 +0000
-X-Originating-IP: 90.88.23.190
-Received: from localhost (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr
- [90.88.23.190]) (Authenticated sender: thomas.petazzoni@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id BC437C0016;
- Wed, 20 Feb 2019 09:30:31 +0000 (UTC)
-From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH] arm64: defconfig: enable mv-xor driver
-Date: Wed, 20 Feb 2019 10:30:24 +0100
-Message-Id: <20190220093024.10097-1-thomas.petazzoni@bootlin.com>
-X-Mailer: git-send-email 2.20.1
-MIME-Version: 1.0
+	id 1gwOLX-0001hf-OX; Wed, 20 Feb 2019 09:39:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwOLU-0001gs-Md
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 09:39:17 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 36D18A78;
+ Wed, 20 Feb 2019 01:39:13 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 491633F720;
+ Wed, 20 Feb 2019 01:39:10 -0800 (PST)
+Date: Wed, 20 Feb 2019 09:39:07 +0000
+Message-ID: <86y36are84.wl-marc.zyngier@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+Subject: Re: [PATCH v4] irqchip: gicv3-its: Use NUMA aware memory allocation
+ for	ITS tables
+In-Reply-To: <5FC3163CFD30C246ABAA99954A238FA8392C58BE@lhreml524-mbb.china.huawei.com>
+References: <20190114095019.12336-1-shameerali.kolothum.thodi@huawei.com>
+ <5FC3163CFD30C246ABAA99954A238FA8392C58BE@lhreml524-mbb.china.huawei.com>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_013041_401330_F4536889 
-X-CRM114-Status: GOOD (  10.99  )
+X-CRM114-CacheID: sfid-20190220_013916_744312_ACD8856E 
+X-CRM114-Status: GOOD (  10.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,45 +73,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- John David Anglin <dave.anglin@bell.net>, Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: "gkulkarni@marvell.com" <gkulkarni@marvell.com>,
+ "suzuki.poulose@arm.com" <suzuki.poulose@arm.com>,
+ Linuxarm <linuxarm@huawei.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "Robert.Richter@cavium.com" <Robert.Richter@cavium.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "shankerd@codeaurora.org" <shankerd@codeaurora.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The mv-xor DMA driver is used for the XOR engine found in the ARM64
-Marvell Armada 3720 SoC, so it makes sense to have it enabled in the
-arm64 defconfig. A recent boot-time regression was found in mv-xor,
-which would have been more easily noticed with this driver enabled by
-default.
+On Tue, 19 Feb 2019 11:05:38 +0000,
+Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com> wrote:
+> 
+> Hi Marc,
+> 
+> A gentle reminder on this one...
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: John David Anglin <dave.anglin@bell.net>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Thanks for that. Now applied to irqchip-next.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index c8432e24207e..cf3312e23bf2 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -594,6 +594,7 @@ CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
- CONFIG_DMA_BCM2835=m
- CONFIG_K3_DMA=y
-+CONFIG_MV_XOR=y
- CONFIG_MV_XOR_V2=y
- CONFIG_PL330_DMA=y
- CONFIG_TEGRA20_APB_DMA=y
+       M.
+
 -- 
-2.20.1
-
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
