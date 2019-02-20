@@ -4,91 +4,142 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D3DCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:14:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FB38C10F02
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:18:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0F5CC2146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:14:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65B152147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:18:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eV4blmQx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="uacPPjWm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F5CC2146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=roeck-us.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F6o+zIYP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="XN8I9nO+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65B152147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=IsrIslQW6n/ajhGEDDtIJLJMUD14IgI6YBf7KzzOfQY=; b=eV4blmQxin7qZzICuCxUMxQ44
-	vITh9R1pKQKCjHBagX9JOhDUMWCit4j69qgbBQ5hatdy0Ia3lEpEKnWAFHqDOwN89l8O+udA0U3nB
-	aJ28U8YMskrYkyuRDCb6phjvL1sEEjq9IM2tFowoX3t7mYJILv+nHDVKIlEHcQ8sYMKN9LB9NYv7t
-	1U1dx0P4DlCmE29OsvKzV0LG/eQ/Gx0JpNNsZ1nG9IrlkuXtQKrjyUPWb1iDxCVt5M0mA4XTK17U9
-	Why+j5lLM4G4R+00S8sFIxMzaFrfd0/Av/6rgRed9CL5/dUij8H1VEPfI+XjRfI4eQv2Ys9m7/cN+
-	sUukFc5tA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=fiuI4ely8sEYSH+y/hWSaov459NBGQdONXlKXuTZ8ac=; b=F6o+zIYP/MgJcO
+	jHyrdUXgslYPXPkE5Tki6nIZqOB0YZzvqpgWJ//J4srqabAXy/9RMxgxevouHzndQe2MF8baSvNnb
+	ZmjeCxVOAhi//bXmDPsF/hnuMDBl12Cfq8BZlfgJSmo+94zkn+VwvOpC+l2fMchfe9iohBdZYNL/u
+	H17FyiOr4T48Yimay6H9lVk/e8j/CNe1cLoeNeOe+npOeCb1psnDOemxDKYtGlQmjK9nHck+9wAaw
+	zLtQPKPqaZpNijskI/zpnyL10IcjLLoTxHf/ynFU2UiFRiJ5cbJABGPr9MMKxmp7rX9h5QHiEPkhB
+	aYoDT+KGt97FokYQEeBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPpM-0007TY-5i; Wed, 20 Feb 2019 11:14:12 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gwPtq-0001Ds-02; Wed, 20 Feb 2019 11:18:50 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPpC-0007NR-CM
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:14:06 +0000
-Received: by mail-pf1-x441.google.com with SMTP id h1so11753065pfo.7
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 03:14:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=sender:subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=myn5gAD5JIQ8D5KQbKA25T6rmpNeqgEG2bdsRhFufTs=;
- b=uacPPjWmxnxG6lrs9v2BFK2IOjI1vwAGps7XJVmskBTf3x+B/ZCv0YFEt1J6esjaI3
- IlCgI7l6Hobk6o9GTHrIzoXXe24yevqxJHIyQWdNH1H+rkfak1+WI5D95pY9rNdv3mg+
- l5eeC2rnlOD0Vqb5cmYwu9ex9EEJi8GC9y++cwR98271Xz02WLwEyssL9SO/c/vBfSKO
- dzoFJD51b6lC+YHxV7OaU/NA1TSjmAFzikTgtTx/L7UpNTdYdnk4HmCLhElqSvmC0zJk
- 5fWwn65q/H1jUY39HkfJu8lPe4Nge/Gz99plnTx2ImGXqsMePKkbwNFZn81HkWRPCLY+
- n8cA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:sender:subject:to:cc:references:from:message-id
- :date:user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=myn5gAD5JIQ8D5KQbKA25T6rmpNeqgEG2bdsRhFufTs=;
- b=eiY2tq54V+4xmOrVErUbySVTsbfzLAeG0lZYMyBU+sz/5Mil/fZG1mKtcrPMRUWwCb
- Z+GK6ma+SoFaOHaZ22e2WYDz/AT7xTjn8LlsyHI35gRQcKhMl7BMa7v2PupXFl+L5SJJ
- 04TJcIU7R4u+qg1JIwgPPxP9M8s14MrHjuylkyZuxA+ziuhYJ3sx5OcUomNqwHzZXbg1
- qwacaOSgcvXBi/R/+toMExkgLVZ59wfiZFZFChH5haDnbnAeh9PPQURtaUfOC0tUcKQs
- SJtAj3Da0t+4Ex3t+i2KsxaLKaEV9IMVVWZKvb93/9URcirBERKWqpSVJgQMKNKg9uEp
- qISA==
-X-Gm-Message-State: AHQUAuYAWmeKyjw41AwFvG1ys+0zsNmFqT76ReUk4vNYOKXpuyabA4Mx
- XQNMsNixTSipSmxJK/LKi0EFCeJU
-X-Google-Smtp-Source: AHgI3IYUd4leyXpunK80hsrOPkQ0kZD56dJ6LkGgyzW9sQ+wkHrnl+s9NWLJyeCcOgYNECS3mqpHKg==
-X-Received: by 2002:a63:5f0f:: with SMTP id t15mr28602670pgb.272.1550661241719; 
- Wed, 20 Feb 2019 03:14:01 -0800 (PST)
-Received: from server.roeck-us.net ([2600:1700:e321:62f0:329c:23ff:fee3:9d7c])
- by smtp.gmail.com with ESMTPSA id
- s71sm36054084pfa.122.2019.02.20.03.14.00
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 20 Feb 2019 03:14:01 -0800 (PST)
-Subject: Re: [PATCH] xsysace: Fix error handling in ace_setup
-To: Michal Simek <michal.simek@xilinx.com>
-References: <1550594996-11453-1-git-send-email-linux@roeck-us.net>
- <0e62ae52-9aec-dff9-4fdb-51c3dd0568c5@xilinx.com>
-From: Guenter Roeck <linux@roeck-us.net>
-Message-ID: <6311041f-607b-4232-feb4-3644c36c64c5@roeck-us.net>
-Date: Wed, 20 Feb 2019 03:13:59 -0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <0e62ae52-9aec-dff9-4fdb-51c3dd0568c5@xilinx.com>
+ id 1gwPtm-0001Bb-VX
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:18:48 +0000
+X-IronPort-AV: E=Sophos;i="5.58,390,1544511600"; d="scan'208";a="26588681"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 20 Feb 2019 04:18:42 -0700
+Received: from NAM03-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Wed, 20 Feb 2019 04:18:41 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=byvkFcre1KJiKRQ85NLojpGnoJaKGM3lbXgSPnbP1UA=;
+ b=XN8I9nO+wRBPcgAzqDeaAf7idLMyYmZ0TFDQYC6vS22BhMXTv3dYOjdXDQ1Cj5+xI443cHHbl7uOKq1OgCyVnNJKSFBxW+RekGYHlUW6DaUs4P2mgk7sbnCFWZPfwn5EMIeRt5DsbL2ZI8/7rByt7hTXfrqOV5+f9oWoCNB+Exo=
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
+ MWHPR11MB1791.namprd11.prod.outlook.com (10.175.53.18) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Wed, 20 Feb 2019 11:18:40 +0000
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1622.018; Wed, 20 Feb 2019
+ 11:18:40 +0000
+From: <Nicolas.Ferre@microchip.com>
+To: <alexandre.belloni@bootlin.com>, <sboyd@kernel.org>
+Subject: Re: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
+Thread-Topic: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
+Thread-Index: AQHUyQ4DTxM0lGKi0EWSxBvx5w6KNw==
+Date: Wed, 20 Feb 2019 11:18:40 +0000
+Message-ID: <23696765-c2c7-0df8-1bfd-2dfd96f65e9d@microchip.com>
+References: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
+In-Reply-To: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: LO2P265CA0227.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:b::23) To MWHPR11MB1662.namprd11.prod.outlook.com
+ (2603:10b6:301:e::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Nicolas.Ferre@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [195.6.168.232]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 5a62901f-6c66-4dfa-8c43-08d697252a82
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1791; 
+x-ms-traffictypediagnostic: MWHPR11MB1791:
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxNzkxOzIzOko0cFNNQkV6Z3hpSFpEbHZEbmowTEQ2c3p4?=
+ =?utf-8?B?YkNrZENhSTJqNkVPYXllRTlVbXNtM1hkT0JOUVhXcjFTMFpkYTFhbmR3RFI1?=
+ =?utf-8?B?MEsxeFFVR2RmY29ZV3h2ZUcwL1MvNnhOQ2lvMThhajk2aEhuNk1xZFM4MUZI?=
+ =?utf-8?B?ZkxUY0VPcXZWL2RsN0JpMmcyblMvVEt2bnRwUkQ5OHZ1NlVzcEliMmtOS1d3?=
+ =?utf-8?B?MktEQ1U4NHg5a1lTbE5ndmxTZXBsU29uSDd2UllWU2NVWUcxbWR5WWRtNkJW?=
+ =?utf-8?B?WEh0MGRHWXJySW94MC9wQ3BXTlQ4aW5Nd0w4YWhSSGVCaTlCUWRqTDljcElX?=
+ =?utf-8?B?YS9QdVJzNlJvNS9nNjd0TWliTVU2ak5WcEErN3FBblFXNVdJZFNLYm5mSytG?=
+ =?utf-8?B?Q1JuYncxelBLZlhlcVFHQ0huazZxTkdXQ2VlbVpQYWZaUXArbC82dHBqa1lF?=
+ =?utf-8?B?Qm1qL1g1YTNPV0t4Rmhia0tXRXBvNGZ1MWRyRGJrZGp4Z2dKd0s0anpGeFpo?=
+ =?utf-8?B?d0RRTXF3bGZFUkt1aWlPcGc1LzAzRnlBdWlNSTNQZnNXTmVGWCtFT0FoNTRU?=
+ =?utf-8?B?TnJDOWZRbHJ6TkZZbTVlN0dlNGNyWmVXdVhLUlJOcFdFVXZpUlZ4YXl1aTRm?=
+ =?utf-8?B?QWpZNkhnUEkxTlFuVCtDOG9kbEVXcG5WQ3JTMUdtNmFiN1AyTnkxZWNyV1RP?=
+ =?utf-8?B?VVl4blk5a0Y2OUF6M1JBRTFrNlBPc241M2pYOXJUeDd4SldmUG9wa2dEUmRJ?=
+ =?utf-8?B?YjR5Z2ZuVzVXOExXekdhVnhpQkEzWWlsZjh3UHQ1UG9malROVXNCSVgxUEJ6?=
+ =?utf-8?B?MjRJN2NqN256MzJ4ckx1V2V4VHNEQTRWOVIvQUY0aFZPYzMxMWsyRDlUMGpF?=
+ =?utf-8?B?cW5LcnBPVjJoVUdnMk1mWXRreUo3NzR0SWdDNWhzTlRIMjlJRHZpZnRSUFFa?=
+ =?utf-8?B?K3YwQU1SZWlLQkRVRkdXK1oxU1NvaFV6TWJHN3c5SFZ2YmNwVTVldnpmbXYx?=
+ =?utf-8?B?NGRrQ0x5d3BGN01oYjd4a1RIc1BXdTVEVUVwYnBCNmxBRmg5amo2NEdpS0sr?=
+ =?utf-8?B?dGdkL08vNlZqcGJ5a0w4MDh4MzlzYjcraUJmNWp5WUhKdEEzSVJJdFYweCtS?=
+ =?utf-8?B?ZVpqRS9qcWhLS2ZiZE84VXl6bkthdmQwc3U4eVBZd29aNUJYSXBLT3hoRTA0?=
+ =?utf-8?B?ak9TdGNDR3ZiVzc0THlJNmhyOEFzbzFDVWFmbFNNb0hhT1c1V0xFWnc0NWRo?=
+ =?utf-8?B?ME93b2RNbUtzVVROekk2TnRPdmdnMlAwUDhqQ0FnL0ROMStUbzQ1VFNsS1pz?=
+ =?utf-8?B?ajIzMmN3Q3BVWVlCMzVFS2o3Q0dVWXRvOERSREZGSWcyNXpYTGVPTktWOVpT?=
+ =?utf-8?B?MTBlVVRUR1BrVUZQcUVEWE5BbzMwM0wrK0lSVWEwOFNEVktxdTgvTUZEbEND?=
+ =?utf-8?B?S0lhY0Vza2NDNndJaGxwT0JZdEZJYk5rWFpOZVhUajBvMTJSN2lmR3NQM0Ra?=
+ =?utf-8?B?QS84ZmNCVXNlUDRjbnF1eERRT0ZOS0hYcHhnVVRjUmczN05QUnM5Z01DdFMr?=
+ =?utf-8?B?RVE3K0wzYjZoUGI2V2Q1MzVIaTg5eTA0MWVYTnUyVmtGb1dwaUdvU1gzSnJX?=
+ =?utf-8?B?TkNJaFRTaFp5TDlrSVY2QURESUlkeWFwWVpRbG1GNTdXaHorNEloMlpmMzNP?=
+ =?utf-8?B?MlFaZUJSZldpdEpTUG5xZEhpaERLbFZKajFKNUs4V2sxd2pnWDZrWFdIS2dU?=
+ =?utf-8?B?cm5aakgyZ25VZUFMRm5SUT09?=
+x-microsoft-antispam-prvs: <MWHPR11MB1791F8A2BBF85FC644A09C51E07D0@MWHPR11MB1791.namprd11.prod.outlook.com>
+x-forefront-prvs: 0954EE4910
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(366004)(136003)(346002)(376002)(396003)(199004)(189003)(68736007)(54906003)(305945005)(4326008)(486006)(7736002)(229853002)(478600001)(72206003)(71200400001)(71190400001)(110136005)(2616005)(5660300002)(316002)(25786009)(6486002)(14454004)(476003)(446003)(66066001)(11346002)(6116002)(105586002)(3846002)(6506007)(8676002)(106356001)(6436002)(102836004)(81156014)(8936002)(386003)(53546011)(31686004)(26005)(256004)(52116002)(36756003)(76176011)(6512007)(186003)(86362001)(31696002)(97736004)(99286004)(53936002)(6246003)(2906002)(81166006);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1791;
+ H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: qNQSH0SV4+Xd/wxC3ixOQbqEuPDIn35XhAQ63XmJzCbzIYFzTFuzHZvytR/xPa8Ad5mDCR43HGH7zNLDEu9uKzSdEJz84plNYMfWUArNugmnZ9woWT0C+30KRxx/LNiX32vooMgxltSqYDstJi0KgAg++OPjSidECqZ6r0N+SbE1ay+tzMdmUoN7vJ9UMcxGwkKflCkAOOBPjPtonnEfXR/oGun0EA3YcJRlL4wxLTMmJsxXUXTvj0CguWXHFG/IvuPKbu0upmWWxDW37vVfxyNvMpTQuasaNAapPQnmU+f6ofcvw9wCfAPb1PE/4RJXIK/Bvr/DcgKmASn4DY+2AcDV8oSKzdUfpw7adztWqfqiVqoTxjLCgvtpMXqoScaBv6cWP8dXXrdWbRbU09D84WqsqEGFVjJZd2k+qxGZi1Q=
+Content-ID: <CFF07D1261CF2D439D477F49CC1ADBD1@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5a62901f-6c66-4dfa-8c43-08d697252a82
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:18:38.5922 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1791
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_031402_665433_505DDE37 
-X-CRM114-Status: GOOD (  23.63  )
+X-CRM114-CacheID: sfid-20190220_031847_045809_FD99BAB4 
+X-CRM114-Status: GOOD (  17.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,110 +151,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jens Axboe <axboe@kernel.dk>, linux-block@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mturquette@baylibre.com, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/19/19 11:09 PM, Michal Simek wrote:
-> On 19. 02. 19 17:49, Guenter Roeck wrote:
->> If xace hardware reports a bad version number, the error handling code
->> in ace_setup() calls put_disk(), followed by queue cleanup. However, since
->> the disk data structure has the queue pointer set, put_disk() also
->> cleans and releases the queue. This results in blk_cleanup_queue()
->> accessing an already released data structure, which in turn may result
->> in a crash such as the following.
->>
->> [   10.681671] BUG: Kernel NULL pointer dereference at 0x00000040
->> [   10.681826] Faulting instruction address: 0xc0431480
->> [   10.682072] Oops: Kernel access of bad area, sig: 11 [#1]
->> [   10.682251] BE PAGE_SIZE=4K PREEMPT Xilinx Virtex440
->> [   10.682387] Modules linked in:
->> [   10.682528] CPU: 0 PID: 1 Comm: swapper Tainted: G        W         5.0.0-rc6-next-20190218+ #2
->> [   10.682733] NIP:  c0431480 LR: c043147c CTR: c0422ad8
->> [   10.682863] REGS: cf82fbe0 TRAP: 0300   Tainted: G        W          (5.0.0-rc6-next-20190218+)
->> [   10.683065] MSR:  00029000 <CE,EE,ME>  CR: 22000222  XER: 00000000
->> [   10.683236] DEAR: 00000040 ESR: 00000000
->> [   10.683236] GPR00: c043147c cf82fc90 cf82ccc0 00000000 00000000 00000000 00000002 00000000
->> [   10.683236] GPR08: 00000000 00000000 c04310bc 00000000 22000222 00000000 c0002c54 00000000
->> [   10.683236] GPR16: 00000000 00000001 c09aa39c c09021b0 c09021dc 00000007 c0a68c08 00000000
->> [   10.683236] GPR24: 00000001 ced6d400 ced6dcf0 c0815d9c 00000000 00000000 00000000 cedf0800
->> [   10.684331] NIP [c0431480] blk_mq_run_hw_queue+0x28/0x114
->> [   10.684473] LR [c043147c] blk_mq_run_hw_queue+0x24/0x114
->> [   10.684602] Call Trace:
->> [   10.684671] [cf82fc90] [c043147c] blk_mq_run_hw_queue+0x24/0x114 (unreliable)
->> [   10.684854] [cf82fcc0] [c04315bc] blk_mq_run_hw_queues+0x50/0x7c
->> [   10.685002] [cf82fce0] [c0422b24] blk_set_queue_dying+0x30/0x68
->> [   10.685154] [cf82fcf0] [c0423ec0] blk_cleanup_queue+0x34/0x14c
->> [   10.685306] [cf82fd10] [c054d73c] ace_probe+0x3dc/0x508
->> [   10.685445] [cf82fd50] [c052d740] platform_drv_probe+0x4c/0xb8
->> [   10.685592] [cf82fd70] [c052abb0] really_probe+0x20c/0x32c
->> [   10.685728] [cf82fda0] [c052ae58] driver_probe_device+0x68/0x464
->> [   10.685877] [cf82fdc0] [c052b500] device_driver_attach+0xb4/0xe4
->> [   10.686024] [cf82fde0] [c052b5dc] __driver_attach+0xac/0xfc
->> [   10.686161] [cf82fe00] [c0528428] bus_for_each_dev+0x80/0xc0
->> [   10.686314] [cf82fe30] [c0529b3c] bus_add_driver+0x144/0x234
->> [   10.686457] [cf82fe50] [c052c46c] driver_register+0x88/0x15c
->> [   10.686610] [cf82fe60] [c09de288] ace_init+0x4c/0xac
->> [   10.686742] [cf82fe80] [c0002730] do_one_initcall+0xac/0x330
->> [   10.686888] [cf82fee0] [c09aafd0] kernel_init_freeable+0x34c/0x478
->> [   10.687043] [cf82ff30] [c0002c6c] kernel_init+0x18/0x114
->> [   10.687188] [cf82ff40] [c000f2f0] ret_from_kernel_thread+0x14/0x1c
->> [   10.687349] Instruction dump:
->> [   10.687435] 3863ffd4 4bfffd70 9421ffd0 7c0802a6 93c10028 7c9e2378 93e1002c 38810008
->> [   10.687637] 7c7f1b78 90010034 4bfffc25 813f008c <81290040> 75290100 4182002c 80810008
->> [   10.688056] ---[ end trace 13c9ff51d41b9d40 ]---
->>
->> Fix the problem by setting the disk queue pointer to NULL before calling
->> put_disk(). A more comprehensive fix might be to rearrange the code
->> to check the hardware version before initializing data structures,
->> but I don't know if this would have undesirable side effects, and
->> it would increase the complexity of backporting the fix to older kernels.
->>
->> Fixes: 74489a91dd43a ("Add support for Xilinx SystemACE CompactFlash interface")
->> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
->> ---
->>   drivers/block/xsysace.c | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/drivers/block/xsysace.c b/drivers/block/xsysace.c
->> index 87ccef4bd69e..32a21b8d1d85 100644
->> --- a/drivers/block/xsysace.c
->> +++ b/drivers/block/xsysace.c
->> @@ -1090,6 +1090,8 @@ static int ace_setup(struct ace_device *ace)
->>   	return 0;
->>   
->>   err_read:
->> +	/* prevent double queue cleanup */
->> +	ace->gd->queue = NULL;
->>   	put_disk(ace->gd);
->>   err_alloc_disk:
->>   	blk_cleanup_queue(ace->queue);
->>
+On 19/02/2019 at 17:51, Alexandre Belloni wrote:
+> nck() looks at the last id in an array and unfortunately,
+> at91sam9x35_periphck has a sentinel, hence the id is 0 and the calculated
+> number of peripheral clocks is 1 instead of a maximum of 31.
 > 
-> This driver is quite old and we are not actively using/testing it.
-> Are you wiring that up with qemu?
-> 
+> Fixes: 1eabdc2f9dd8 ("clk: at91: add at91sam9x5 PMCs driver")
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 
-Not specifically; it may be wired up as uninitialized device.
-Presumably that is why it reports version 0, which causes the driver
-to bail out. It is instantiated by the devicetree file (I think).
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: <stable@vger.kernel.org> # v4.20+
 
-Guenter
+It would be nice to queue it as a fix the soonest, as it impacts 5.0 but 
+not 4.20 due to a switch from one DT binding to another (read: a real 
+regression)... But I know it's a bit late in the cycle...
 
-> Maybe it should be labeled differently in MAINTAINERS file.
+Regards,
+   Nicolas
+
+> ---
+>   drivers/clk/at91/at91sam9x5.c | 3 +--
+>   1 file changed, 1 insertion(+), 2 deletions(-)
 > 
-> Anyway whatever fix is fine for me.
-> 
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-> 
-> Thanks,
-> Michal
+> diff --git a/drivers/clk/at91/at91sam9x5.c b/drivers/clk/at91/at91sam9x5.c
+> index 2fe225a697df..d37e7ed9eb90 100644
+> --- a/drivers/clk/at91/at91sam9x5.c
+> +++ b/drivers/clk/at91/at91sam9x5.c
+> @@ -144,8 +144,7 @@ static void __init at91sam9x5_pmc_setup(struct device_node *np,
+>   		return;
+>   
+>   	at91sam9x5_pmc = pmc_data_allocate(PMC_MAIN + 1,
+> -					   nck(at91sam9x5_systemck),
+> -					   nck(at91sam9x35_periphck), 0);
+> +					   nck(at91sam9x5_systemck), 31, 0);
+>   	if (!at91sam9x5_pmc)
+>   		return;
+>   
 > 
 
 
+-- 
+Nicolas Ferre
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
