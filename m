@@ -7,53 +7,56 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79847C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:43:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3576C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:44:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 438B6206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:43:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 91A2D2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:44:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B/mdhBhE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 438B6206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aKsmdWeL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91A2D2086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=uZIVhmOQuobads0+vMQbi7Xmd3MmhRqqr31UI1bYLHM=; b=B/m
-	dhBhEjqHyc4P/1TkKIp8QivObD4x08ibgC9D98iEuwom1XFdrwOSFM32doWzVimp/d2MNkx9FYzkB
-	q97b7E0yV4MjVnIHb9g6GL50V+6w8OoR6IKpB+Pw+vMMGgDx6ERfe9yvWKzLa7TWovXnaaEj6mKri
-	HtG2TJk2X2wfx03PsKpzcQql7b/BaF8LlQpR/eh7gzzdykBWYGY9ktMGzr09G+WzkivHK2SbxoDY7
-	6yYULU0UMNeSUpUiivJYrMejCfZeD1sHySed5DYsrM/5+W+kuTmlJUV85ONix1iFCMiO2mNJA9ibI
-	3jaHHz3tF7JUBeVtml1WRfK4e64ZVcQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=lST3yU3DQj6ixNJQQXi9sNLvmQ+W5MYHS3Dds0B5lGU=; b=aKsmdWeLMfWJ7k8LncCHWSj3io
+	VUqKbqhMqSkRA8tNOO0L6dFdLvoVeeUBrPfdUIWIHfF7XTCyzTlUAsaHnggL7eSVJo5Ee+6TUeQgC
+	YeG2hSySQYOMS+fSjVADqtQsgYRBIr+5yTexkB9w8o/DfmiaHmdXzLlHn15o1gO3ie05di5i9V5Xd
+	2EdupHPrN82XbcygrJu1OKGFlMkRAom9pSzb+j2go22MowvrE0IyuqA8yj8WUmqe+HLDPkV+K/vFU
+	z8rEje9/aFtsi5U1FoQW1G2e4R9LHd6ENZkhVn/efL2pUxPUszZS5KhyhrNbnwiJd5PWfGFEc4k4F
+	oI+HI1iw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwQI6-00076Q-3g; Wed, 20 Feb 2019 11:43:54 +0000
+	id 1gwQIF-0007Hs-3n; Wed, 20 Feb 2019 11:44:03 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwQHq-0006kl-Nn
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:43:41 +0000
+ id 1gwQHx-0006x4-V5
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:43:49 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 22B5FA78;
- Wed, 20 Feb 2019 03:43:36 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 370B2A78;
+ Wed, 20 Feb 2019 03:43:45 -0800 (PST)
 Received: from login2.euhpc.arm.com (login2.euhpc.arm.com [10.6.27.34])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 743363F575;
- Wed, 20 Feb 2019 03:43:35 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 8927A3F575;
+ Wed, 20 Feb 2019 03:43:44 -0800 (PST)
 From: Vladimir Murzin <vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 1/2] arm64: virt: Relax GIC version check
-Date: Wed, 20 Feb 2019 11:43:05 +0000
-Message-Id: <1550662986-40987-1-git-send-email-vladimir.murzin@arm.com>
+Subject: [PATCH 2/2] ARM: virt: Align GIC version check with arm64 counterpart
+Date: Wed, 20 Feb 2019 11:43:06 +0000
+Message-Id: <1550662986-40987-2-git-send-email-vladimir.murzin@arm.com>
 X-Mailer: git-send-email 2.0.0
+In-Reply-To: <1550662986-40987-1-git-send-email-vladimir.murzin@arm.com>
+References: <1550662986-40987-1-git-send-email-vladimir.murzin@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_034338_983498_BD22139D 
-X-CRM114-Status: GOOD (  13.48  )
+X-CRM114-CacheID: sfid-20190220_034346_729482_9059D485 
+X-CRM114-Status: GOOD (  11.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,35 +75,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Updates to the GIC architecture allow ID_AA64PFR0_EL1.GIC to have
-values other than 0 or 1. At the moment, Linux is quite strict in the
-way it handles this field at early boot stage (cpufeature is fine) and
-will refuse to use the system register CPU interface if it doesn't
-find the value 1.
+arm64 has got relaxation on GIC version check at early boot stage due
+to update of the GIC architecture let's align ARM with that.
 
 To help backports (even though the code was correct at the time of writing)
-Fixes: 021f653791ad17e03f98aaa7fb933816ae16f161 ("irqchip: gic-v3: Initial support for GICv3")
+Fixes: e59941b9b3817c9b1dd6662d903150fe3f3c3b0b ("ARM: 8527/1: virt: enable GICv3 system registers")
 
-Reported-by: Chase Conklin <Chase.Conklin@arm.com>
 Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- arch/arm64/kernel/head.S | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/kernel/hyp-stub.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 15d79a8..eecf792 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -539,8 +539,7 @@ set_hcr:
- 	/* GICv3 system register access */
- 	mrs	x0, id_aa64pfr0_el1
- 	ubfx	x0, x0, #24, #4
--	cmp	x0, #1
--	b.ne	3f
-+	cbz	x0, 3f
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 9ef1759..fd0a723 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -179,8 +179,8 @@ ARM_BE8(orr	r7, r7, #(1 << 25))     @ HSCTLR.EE
+ 	@ Check whether GICv3 system registers are available
+ 	mrc	p15, 0, r7, c0, c1, 1	@ ID_PFR1
+ 	ubfx	r7, r7, #28, #4
+-	cmp	r7, #1
+-	bne	2f
++	teq	r7, #0
++	beq	2f
  
- 	mrs_s	x0, SYS_ICC_SRE_EL2
- 	orr	x0, x0, #ICC_SRE_EL2_SRE	// Set ICC_SRE_EL2.SRE==1
+ 	@ Enable system register accesses
+ 	mrc	p15, 4, r7, c12, c9, 5	@ ICC_HSRE
 -- 
 2.7.4
 
