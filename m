@@ -2,144 +2,66 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 596FAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:20:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C199C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:28:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2D18C2147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:20:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17D3B2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:28:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="vAJBXup7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="spe9u7FF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D18C2147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C7am53Wf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17D3B2089F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=JgoGXMlVmfKhDJsGTF4Ov8e7WGqkG9Q6Z68FroEl2OE=; b=vAJBXup7LzaJGK
-	ShROefnDc112dIKUs2wMEDqONedK43O++1MgRqiDnqhRMDHRdNDl3/BNR695jngUEhGgL8q3/7zD0
-	sbtOhiqrbmtJUtnQOE4BBbl5SttV+NeXvpBpbS/qlxkRk1php+LH0WenVRBoQm1yyyR2AQxCFABXe
-	eYC+qPHhDbayEYcbe1gY4QjYyEBXO2GMcVdzvLBssyr5sjU4VPoezNIchSEu3HYL7Nb+ZGnzXCW4+
-	81ye803IYFJHSE18slwjA+j5GwnQgFnAguiSsHilkX1bAjy2JjAVgpCoN6tbK84jD1MAEvZ62vJSC
-	YaFfk3T3iUYkBO0Yjenw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ZPQy5lSuiWOqI7UEm3vRyb+len3RSOyP/nvJhZlm9JQ=; b=C7am53WfmK/bTc
+	ayOlfu5sJcnCVwbWpzPyicgbmOJbKeAFHCCLo4E4SopHIpndcYrYYvBFp8nZ4PCaNoxyp+Q9i1mTm
+	oP/ALINhbq0Cjo9Th8eC6lEh75xo8iqoFie6MBbFQBSdQZXKfKwfD+U6yv7eG1EKf/usV6xb8Mp7Y
+	E91Nbxd4e8SrHvUTCMk2GqWW04WY7QuzaIxVx92ChSyqAZatccI8ztozJXvPjLKCoU6327my4XlnG
+	EZh1bp84CsoxzyOoI8dPY3adrhLs0KpXDx6gTP/8i6yhFMSPj1MLlm4EaeNikqUi1X6mT4kdP9sIE
+	prYvwRKRGuePQ4XdV/LA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwOza-0001in-2y; Wed, 20 Feb 2019 10:20:42 +0000
-Received: from esa3.microchip.iphmx.com ([68.232.153.233])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwOzV-0001i4-6s
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:20:39 +0000
-X-IronPort-AV: E=Sophos;i="5.58,390,1544511600"; d="scan'208";a="26993849"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 20 Feb 2019 03:20:33 -0700
-Received: from NAM05-BY2-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Wed, 20 Feb 2019 03:20:33 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=bhvdK+nH6s+2IcrGT6mwajxyhVA30VoPB7BQuVV164o=;
- b=spe9u7FFYoZi0q/t+RCs/KumMgCfYyiufARyqVYSgtZ4jw9ejesA0UZ40d+hPTdaUsNSTXosX9z63fOMk9vPgwTJhJPqZPcurrAgs2NOAfx+sSzFIwRyz4BvI5hCZQxs9gXYeUZ1+9nEHh6lKSvun8atsz+7fjKoS2UH8NcbHaw=
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
- MWHPR11MB1360.namprd11.prod.outlook.com (10.169.235.22) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.15; Wed, 20 Feb 2019 10:20:28 +0000
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1622.018; Wed, 20 Feb 2019
- 10:20:28 +0000
-From: <Nicolas.Ferre@microchip.com>
-To: <alexandre.belloni@bootlin.com>, <sboyd@kernel.org>
-Subject: Re: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
-Thread-Topic: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
-Thread-Index: AQHUyQXmTxM0lGKi0EWSxBvx5w6KNw==
-Date: Wed, 20 Feb 2019 10:20:28 +0000
-Message-ID: <c0688a84-bd8e-1874-6fab-727bb6bd657e@microchip.com>
-References: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
-In-Reply-To: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: LO2P265CA0184.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:600:a::28) To MWHPR11MB1662.namprd11.prod.outlook.com
- (2603:10b6:301:e::15)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Nicolas.Ferre@microchip.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [195.6.168.232]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: c953a26f-a962-4fa6-55b4-08d6971d092f
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1360; 
-x-ms-traffictypediagnostic: MWHPR11MB1360:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxMzYwOzIzOnJ3OEcyK0NIQllnelNMMGJLdkFNNVQ2Wjha?=
- =?utf-8?B?bWFLR1ZwNVRWN2V1eklVVnZ6Y2xvMWdIMVVhdkw3OUxBYUtBbE80QmtuVldD?=
- =?utf-8?B?cDl4RlNvNHl0M2VyUHlPYVVwVzI5blQwZDBCR2N3dVI5NkwwQzZUMVl6RnRn?=
- =?utf-8?B?dVhSNTRQVk4yNHd3S0ZEaGtwRTI5ZngzN04rWEo2TnpGTWJkL1kreFYybFlO?=
- =?utf-8?B?YkUzUDVFOExnR2lvUmRtTUxKd0RTbWRnSmdVWlVnZHV4Qk5IcEVCS2JZQ044?=
- =?utf-8?B?ZjRxeGtwa1VSL01icG1KeUhGemoxU3BVZ1RXa1pjTzBicWlKRTlLdHpqbjRT?=
- =?utf-8?B?TS9Qc0p6RUR1QTZsdThsYlRKUkZqR3ZKejdiZjRLd2NnMGNoanZuTGFJU3A4?=
- =?utf-8?B?ZENDbFFpUUZwVnoybUhTaGErUnFrRXNFemdlT0MyK1ZINzRPaTllb25MaXZu?=
- =?utf-8?B?dlVNSUdBRUNEcHIra2J2OWdMcU1BbUpZRzBvemZFWVBidFpneXUwbGt2K0tP?=
- =?utf-8?B?MTc4aHJIL01yYXpQR2o4eTQrTmdzVW9TVnAwUlBkOW9odWFzb2txZ3RpbzNw?=
- =?utf-8?B?OUJHZS92b3c2UWY5L0ZvT1ZBTkNhamcyajlWN2lKUEVhWEdkT1lsTkpHZG5Q?=
- =?utf-8?B?d2RUS1BiOVJLSXR5d083MmFwTTE3ei9jSjBVZ050a3hWYTJ1SitTdkFjTzdF?=
- =?utf-8?B?NlFuK2VldFl6djdDZjluQmxVeUxCZHBjclc3ems5SVgzbWUyVmFMVXp4M2VN?=
- =?utf-8?B?c0E4S3hWMFc3b2ZORjd0Qnh4SmxIRFVqeUFDWmF1QjBZK0lrQVFjRVpUNmNo?=
- =?utf-8?B?VllGKzFUQ29JMy9JNlpZN3FUcVBVcEZpNE5RRmJzcjV2U1FKNmtVaEdIV2p5?=
- =?utf-8?B?dlNzdHloc1JNRjZPV0U5NzB4eE5Dc1lqZk1sQWRCdzVjUXJCUFhQUWJLZHQv?=
- =?utf-8?B?cGs3K1Uxenl1RlFKWkFNNzdILy9jc2U1dlFKZTVMdm15RzFrbkM3dXpzaXRP?=
- =?utf-8?B?eUhOekxCSU5iblJ4YXJoU2FRMVhsU1o0K2JrT2N1K09LWXZVSk1PdlRTUDRW?=
- =?utf-8?B?bFdEVGNtcGgydnhyNDcxSllmT0w2MTE3MG5xb1RVVXlYT3R0U1pCM1VMb3o1?=
- =?utf-8?B?NDJ4dG9rWlVQaU4ydVpEMU5iYVl0S21PblVxYXBSWDZqU1FTQ3ZkTWpkSWZR?=
- =?utf-8?B?aTFpS3l2QjJuSkg5dmhCY0JoNU9FK0pMZVl3VnU4amtOcXlIOTcvMVZWNFdL?=
- =?utf-8?B?dDl5Q05zZzBRSmdXS2JGeDlnT1ZOd1BHZ3VDN25MNmZvVEJJS2ZhemVYRzd3?=
- =?utf-8?B?YkVGd2o4TWdQeFdXMGpPekxPK0NUVmV0aUZEVkt6TnZjRmdDOTBxOXpPK0hV?=
- =?utf-8?B?b0JFc245eVRXVTZEVG90UW55TVJObTFZMFV2M2hNemhIbW53RkhkZGpCQmdL?=
- =?utf-8?B?eEl1eHh5ZDdVMW9aSjlRWkw2K2R0S0lGbmN4ZVNHaWN3VUwrdDIvRmZreG5v?=
- =?utf-8?B?R2l2VHVWRVZGOU55YzRVMjMrT3ZwNXhOYVRocUxGNnIveFNQL01ObjVpSjhu?=
- =?utf-8?B?TDc2T2Vqa2h4a3RDczFhTnhNUzU2YkpiTkZCV1NFbXVkZHpwVFUrNXNpUUtJ?=
- =?utf-8?B?NEtQbUl3SFZCMnBOdThOT3l0OXNYbHBQZFM1anJnb2tqY0dYaER5cnZXWDBS?=
- =?utf-8?B?Tm9zc2twVitjYlRYTFVFaFZDb1MraVlGU2M0eWRSZlNtT1JEMi9lQlNMb3Ni?=
- =?utf-8?B?SXNvUlZSNDQxc0RZaWNVdz09?=
-x-microsoft-antispam-prvs: <MWHPR11MB1360BD542E7C85173EE1F7FFE07D0@MWHPR11MB1360.namprd11.prod.outlook.com>
-x-forefront-prvs: 0954EE4910
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(346002)(366004)(376002)(396003)(189003)(199004)(478600001)(53936002)(6436002)(6116002)(486006)(3846002)(256004)(11346002)(446003)(110136005)(14454004)(26005)(2906002)(316002)(97736004)(476003)(5660300002)(2616005)(71190400001)(71200400001)(72206003)(186003)(6512007)(6486002)(229853002)(31696002)(25786009)(105586002)(86362001)(106356001)(31686004)(6506007)(102836004)(66066001)(6246003)(68736007)(4326008)(386003)(53546011)(52116002)(54906003)(81156014)(81166006)(8676002)(305945005)(7736002)(99286004)(76176011)(8936002)(36756003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1360;
- H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: awh6bJ7RP6957gnTG6AWrnG5RDsUXR4enLU621sBohv3KaHDNqQLv5aa9LDSL2u/NVfvxpcCnLYZJzEw20gdhItHF2f/8Tjxt7ZYzW9NSWQO/9VemLHLuVcDfhNrv32DR6m8JqI160V0lOjV6rIzsFJ1TW/24Dme0wTY3j/o420MN38jCk/rsrHkrhRAo3TESh4uQxMYvfWMs+6ywgsb1mPSZ3fqvPSgQzx4CijXz6iAp2I8Ejzx9Afs8p/fgsBHTv1moVOmGqzfxVmSYiWTnsbIqSfkQ00NrEJ8ewvnY1jKuGiEnvI2xQscejAQnu2j8MEaWbfY6ho4WbiyZFzhYZAEHrLn9HnpC4+yYpUkScMmxl996jpyUfSAu4x+UvpHWio7egfNzoFdgcWP9b6yHHJjFNqgP6WFtXCbsRCm9H8=
-Content-ID: <8D2B0D762DF95C4E8B71AF7D7E5E5CCC@namprd11.prod.outlook.com>
+	id 1gwP6k-0003ef-Rk; Wed, 20 Feb 2019 10:28:06 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwP6h-0003eJ-KO
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:28:05 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CD738A78;
+ Wed, 20 Feb 2019 02:28:02 -0800 (PST)
+Received: from [10.162.40.115] (p8cg001049571a15.blr.arm.com [10.162.40.115])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ CE5DD3F575; Wed, 20 Feb 2019 02:27:56 -0800 (PST)
+Subject: Re: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
+To: Yu Zhao <yuzhao@google.com>
+References: <20190214211642.2200-1-yuzhao@google.com>
+ <20190218231319.178224-1-yuzhao@google.com>
+ <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
+ <20190219053205.GA124985@google.com>
+ <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
+ <20190219222828.GA68281@google.com>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <f7e4db43-b836-4ac2-1aea-922be585d8b1@arm.com>
+Date: Wed, 20 Feb 2019 15:57:59 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: c953a26f-a962-4fa6-55b4-08d6971d092f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 10:20:26.8704 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1360
-X-OriginatorOrg: microchip.com
+In-Reply-To: <20190219222828.GA68281@google.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_022037_436708_CBB8E1B4 
-X-CRM114-Status: GOOD (  15.40  )
+X-CRM114-CacheID: sfid-20190220_022803_683963_68C6E3E0 
+X-CRM114-Status: GOOD (  30.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,52 +73,184 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mturquette@baylibre.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-arch@vger.kernel.org,
+ Matthew Wilcox <willy@infradead.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
+ Jun Yao <yaojun8558363@gmail.com>, linux-mm@kvack.org,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Joel Fernandes <joel@joelfernandes.org>,
+ "Kirill A . Shutemov" <kirill@shutemov.name>,
+ Andrew Morton <akpm@linux-foundation.org>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 19/02/2019 at 17:51, Alexandre Belloni wrote:
-> nck() looks at the last id in an array and unfortunately,
-> at91sam9x35_periphck has a sentinel, hence the id is 0 and the calculated
-
-Well, the logic for all other SoC clk files is to not have such a 
-sentinel and deal differently with this type of array: why not modify 
-this file to match with others?
 
 
-> number of peripheral clocks is 1 instead of a maximum of 31.
+On 02/20/2019 03:58 AM, Yu Zhao wrote:
+> On Tue, Feb 19, 2019 at 11:47:12AM +0530, Anshuman Khandual wrote:
+>> + Matthew Wilcox
+>>
+>> On 02/19/2019 11:02 AM, Yu Zhao wrote:
+>>> On Tue, Feb 19, 2019 at 09:51:01AM +0530, Anshuman Khandual wrote:
+>>>>
+>>>>
+>>>> On 02/19/2019 04:43 AM, Yu Zhao wrote:
+>>>>> For pte page, use pgtable_page_ctor(); for pmd page, use
+>>>>> pgtable_pmd_page_ctor() if not folded; and for the rest (pud,
+>>>>> p4d and pgd), don't use any.
+>>>> pgtable_page_ctor()/dtor() is not optional for any level page table page
+>>>> as it determines the struct page state and zone statistics.
+>>>
+>>> This is not true. pgtable_page_ctor() is only meant for user pte
+>>> page. The name isn't perfect (we named it this way before we had
+>>> split pmd page table lock, and never bothered to change it).
+>>>
+>>> The commit cccd843f54be ("mm: mark pages in use for page tables")
+>>> clearly states so:
+>>>   Note that only pages currently accounted as NR_PAGETABLES are
+>>>   tracked as PageTable; this does not include pgd/p4d/pud/pmd pages.
+>>
+>> I think the commit is the following one and it does say so. But what is
+>> the rationale of tagging only PTE page as PageTable and updating the zone
+>> stat but not doing so for higher level page table pages ? Are not they
+>> used as page table pages ? Should not they count towards NR_PAGETABLE ?
+>>
+>> 1d40a5ea01d53251c ("mm: mark pages in use for page tables")
 > 
-> Fixes: 1eabdc2f9dd8 ("clk: at91: add at91sam9x5 PMCs driver")
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> ---
->   drivers/clk/at91/at91sam9x5.c | 3 +--
->   1 file changed, 1 insertion(+), 2 deletions(-)
+> Well, I was just trying to clarify how the ctor is meant to be used.
+> The rational behind it is probably another topic.
 > 
-> diff --git a/drivers/clk/at91/at91sam9x5.c b/drivers/clk/at91/at91sam9x5.c
-> index 2fe225a697df..d37e7ed9eb90 100644
-> --- a/drivers/clk/at91/at91sam9x5.c
-> +++ b/drivers/clk/at91/at91sam9x5.c
-> @@ -144,8 +144,7 @@ static void __init at91sam9x5_pmc_setup(struct device_node *np,
->   		return;
->   
->   	at91sam9x5_pmc = pmc_data_allocate(PMC_MAIN + 1,
-> -					   nck(at91sam9x5_systemck),
-> -					   nck(at91sam9x35_periphck), 0);
-> +					   nck(at91sam9x5_systemck), 31, 0);
-
-I would prefer like it's done on other SoC clk files.
-
->   	if (!at91sam9x5_pmc)
->   		return;
->   
+> For starters, the number of pmd/pud/p4d/pgd is at least two orders
+> of magnitude less than the number of pte, which makes them almost
+> negligible. And some archs use kmem for them, so it's infeasible to
+> SetPageTable on or account them in the way the ctor does on those
+> archs.
 > 
 
+I understand the kmem cases which are definitely problematic and should
+be fixed. IIRC there is a mechanism to custom init pages allocated for
+slab cache with a ctor function which in turn can call pgtable_page_ctor().
+But destructor helper support for slab has been dropped I guess.
 
--- 
-Nicolas Ferre
+
+> But, as I said, it's not something can't be changed. It's just not
+> the concern of this patch.
+
+Using pgtable_pmd_page_ctor() during PMD level pgtable page allocation
+as suggested in the patch breaks pmd_alloc_one() changes as per the
+previous proposal. Hence we all would need some agreement here.
+
+https://www.spinics.net/lists/arm-kernel/msg701960.html
+
+We can still accommodate the split PMD ptlock feature in pmd_alloc_one().
+A possible solution can be like this above and over the previous series.
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a4168d366127..c02abb2a69f7 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -9,6 +9,7 @@ config ARM64
+        select ACPI_SPCR_TABLE if ACPI
+        select ACPI_PPTT if ACPI
+        select ARCH_CLOCKSOURCE_DATA
++       select ARCH_ENABLE_SPLIT_PMD_PTLOCK if HAVE_ARCH_TRANSPARENT_HUGEPAGE
+        select ARCH_HAS_DEBUG_VIRTUAL
+        select ARCH_HAS_DEVMEM_IS_ALLOWED
+        select ARCH_HAS_DMA_COHERENT_TO_PFN
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index a02a4d1d967d..258e09fb3ce2 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -37,13 +37,29 @@ static inline void pte_free(struct mm_struct *mm, pgtable_t pte);
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
+-       return (pmd_t *)pte_alloc_one_virt(mm);
++       pgtable_t ptr;
++
++       ptr = pte_alloc_one(mm);
++       if (!ptr)
++               return 0;
++
++#if defined(CONFIG_TRANSPARENT_HUGEPAGE) && USE_SPLIT_PMD_PTLOCKS
++       ptr->pmd_huge_pte = NULL;
++#endif
++       return (pmd_t *)page_to_virt(ptr);
+ }
+ 
+ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
+ {
++       struct page *page;
++
+        BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
+-       pte_free(mm, virt_to_page(pmdp));
++       page = virt_to_page(pmdp);
++
++#if defined(CONFIG_TRANSPARENT_HUGEPAGE) && USE_SPLIT_PMD_PTLOCKS
++       VM_BUG_ON_PAGE(page->pmd_huge_pte, page);
++#endif
++       pte_free(mm, page);
+ }
+
+
+> 
+>>>
+>>> I'm sure if we go back further, we can find similar stories: we
+>>> don't set PageTable on page tables other than pte; and we don't
+>>> account page tables other than pte. I don't have any objection if
+>>> you want change these two. But please make sure they are consistent
+>>> across all archs.
+>>
+>> pgtable_page_ctor/dtor() use across arch is not consistent and there is a need
+>> for generalization which has been already acknowledged earlier. But for now we
+>> can atleast fix this on arm64.
+>>
+>> https://lore.kernel.org/lkml/1547619692-7946-1-git-send-email-anshuman.khandual@arm.com/
+> 
+> This is again not true. Please stop making claims not backed up by
+> facts. And the link is completely irrelevant to the ctor.
+> 
+> I just checked *all* arches. Only four arches call the ctor outside
+> pte_alloc_one(). They are arm, arm64, ppc and s390. The last two do
+> so not because they want to SetPageTable on or account pmd/pud/p4d/
+> pgd, but because they have to work around something, as arm/arm64
+> do.
+
+That reaffirms the fact that pgtable_page_ctor()/dtor() are getting used
+not in a consistent manner.
+
+> 
+>>
+>>>
+>>>> We should not skip it for any page table page.
+>>>
+>>> In fact, calling it on pmd/pud/p4d is peculiar, and may even be
+>>> considered wrong. AFAIK, no other arch does so.
+>>
+>> Why would it be considered wrong ? IIUC archs have their own understanding
+>> of this and there are different implementations. But doing something for
+>> PTE page and skipping for others is plain inconsistent.
+> 
+> Allocating memory that will never be used is wrong. Please look into
+> the ctor and find out what exactly it does under different configs.
+
+Are you referring to ptlock_init() --> ptlock_alloc() triggered spinlock_t
+allocations with USE_SPLIT_PTE_PTLOCKS and ALLOC_SPLIT_PTLOCKS.
+
+> 
+> And why I said "may"? Because we know there is only negligible number
+> of pmd/pud/p4d, so the memory allocated may be considered negligible
+> as well.
+
+Okay.
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
