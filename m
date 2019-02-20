@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6BD97C10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5336CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 37A962146F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D7A32146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:59:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QxRSBoUx";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="tZaofClG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 37A962146F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OZ9GKZCb";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="oNlZ3iJp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D7A32146F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=03oksFCNuOAgn071jf30a6gljFxIlBuN4fp6eRpGwt8=; b=QxRSBoUxL5jv6z
-	CxMssUyOOX7T/Ke7OH0ZHmWBCSwZjysVVM/qkXJZ7gOQ2YJu0bDdRJBZL9mwntmYNSPzNsgKIZZq5
-	+QaTJhGfI2OOKS6Hg78Iz7Cn0rNl/BYJkh6PaqAmVTQb1HHQ6qgAto7I8EPckhRqv80TyI9J/SHS/
-	HZXGiMnkutoL56jEE4MFMoqUMe733fNPugOQ/kv33GYNXrJwjY3fKqptvxb1BanJWv7S88kuDx0wS
-	aX7XPMxOhuTKjYnuwlpj6YsedXkp1n1owgcM3GoK3om2T/RrBs3vq0arSkfm8DCfJaIeeJNtv5iJA
-	liMqcc4eo5KT3A5woq+A==;
+	List-Owner; bh=IZL79TofjX2PW2of9cRkUK9LmkqCbike/i1WrecyQZM=; b=OZ9GKZCbkcaawP
+	SmouFR+32kK3ILpSMVfSb3h3zCjFYXuKhzgzwJgWRQf2+phqFloN6c6M81naP1YviTG9re5paq7gk
+	tso5GwC8lnYcyzMej0+Tld/cZNH66FWixCh8HUNdE9CaxF4L7ZuUMn/zqAuPTaPFY4gdRzHDx+6kB
+	iKoTrUYzkW8b9TiYrWb5j01Lq/aIpI904Jah2PUC+Wu2UFdmbv262TUlstwtJd7Jxrst9gZZCIXhR
+	zkr7J6KONOObXIC9HdFBdtaxcHIZqXP7/3cgDm3tA/rXHmdPukDvyv6Xjem0AOWrplREzg7mSVkNJ
+	0qg6BV6Hi/3zYl68SFhQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwHAJ-0003om-Fz; Wed, 20 Feb 2019 01:59:15 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gwHAn-0004Q4-Eo; Wed, 20 Feb 2019 01:59:45 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwHAF-0003mz-GA
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 01:59:12 +0000
-Received: by mail-pf1-x442.google.com with SMTP id i20so681200pfo.6
+ id 1gwHAH-0003nQ-UN
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 01:59:15 +0000
+Received: by mail-pl1-x642.google.com with SMTP id c4so6323475pls.11
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 19 Feb 2019 17:59:10 -0800 (PST)
+ Tue, 19 Feb 2019 17:59:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=2SRxal34wQeNyZlTUmsGVAEJJg7Go7JQ/XIJK9SAQAA=;
- b=tZaofClGEBOOIov8h4JL9zYgGCgXM0EjZZOFg921jUIJUxrDjFqzrf9FafxlAPynuX
- MMtRP7GqZN7eNqNDvGSPczf+dYlWlh9EvjQz5adxa8Ch89jZZUUrPj8vqiSanM6vUXBF
- 9wcLAhlue05bCoEJFwfq5qpqqs8IOilpojFCFXx4hqu0k8BFrO0hKS3hDOlyNKHQa8Mk
- 4BL8y7ek4m1qGX1jlNe2Yc7XH27YHj0vtdkYVPov+1cPm7Hv4AtZeZxYVeF6n1cNUaPy
- tpCYciUyW+un931rWBivM3oBXbJ5BpFZDMkW3x84GvGdVSN71U4PppY00LRI1914y0dr
- iQiw==
+ bh=WpWYHuHVnkwq1EMuW8Pn3claUxN8n48XRaznunYdNpA=;
+ b=oNlZ3iJp4MsqiqJGNwAGIoJDMCsk1Wy4uql8QgYajEEu7v8hdH1GLqYtl7bCoCnu2o
+ TFY19M2umiPqbGYesNAJ8gKq/XSx9fA249e7Oa3r97/NBEL0iXIDDLEhr/XuVf1xHXf1
+ RBvkgljp0EHgVk5TmoKzT29QDwYV1gR90Z4Xc139zbCq8SpleZ/r9GWSDhLRU66v1WxK
+ KZqALqB5GQneibPVd/P0jymXKP0y5BxGjgTvkrTKGY43PYqQwxXWz78kN6QopBzcCo7R
+ FqoH+U4PjeT9mFDyjjP5+2yA55coE1CnrYHCRUAnH1rJ/W3iCEkjV45SiKCphhbkIpD4
+ IEYw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=2SRxal34wQeNyZlTUmsGVAEJJg7Go7JQ/XIJK9SAQAA=;
- b=U11j8UMs19fdCtzCjTotuohGY5Ls1OD4XkX+WheJNgixHrtGSfoe2UDe44eT1bwQCU
- ityf3qlD64k5ivZWed2q7Ayufj2R63YXDV4sTz0/OzFWVnibPHzQ7QwlAwCH3A2tFnWK
- YHcNXGrlGOog9ejHNIUQjyeGGjfiYMqCBBRv0tUlSo9jU4U3NABMeQ1CS0tySDD4rKz6
- Ljx0HOZcDor+bZOIdnmoG4bn1r8Gb5G7hMRkDSbocRh2DnPBlq/oWTPi8Z/41WC0TWoV
- 1PnQpGpSzpgf5Xz/uMV2rxE+jZyd0p9F9KpOI6LImGW1r2Iy++/vZOiN+aim/X4Pt2uk
- ruFA==
-X-Gm-Message-State: AHQUAuYH/3iKN7KeBre75vFMtd6FxX420DnL1okqNJ/Rtcwl/r6QV234
- KEoSwZu+CrB3uLo8DptMdqg=
-X-Google-Smtp-Source: AHgI3IZj30pfN8U9fiZ88V05TZS+7EDHUJVRGvotfAXk4QhdwEsS7cu/o7nEqxPLKyBCxH3COHl7uQ==
-X-Received: by 2002:a63:5d5f:: with SMTP id o31mr26930331pgm.414.1550627949904; 
- Tue, 19 Feb 2019 17:59:09 -0800 (PST)
+ bh=WpWYHuHVnkwq1EMuW8Pn3claUxN8n48XRaznunYdNpA=;
+ b=nae6SjgtWJT+v+WdIMtyrlwXo8OOAvn6dvVVVy0pt/UIGnPFF+Hrvh7JK3js9x1ZZq
+ Q0KdsMOBExIM3oY+UvSFvpqnnNIRYTRwWRKmaizU4lNfy51icJ//2yii85qcrbhmQpRN
+ xR49aSqxTH6vBLG1zMZXlPtEmSRI8mE8HImQ3yOAmwe3rQFcPaovDvsxPnnqx8SmcYgm
+ 0pqatGbrI8FpC+EIgpszkllyg2/0PKz25B097wxd2WahZ9IOmGwkrwoa6nO7a8o/Bnzx
+ smf/Fmf0jBIoFOpzTIMXHX3SMXjMn8OGhlXvXkX/dsP/6oyhNN2LXmn7rpdrBYa70yjg
+ 5OOA==
+X-Gm-Message-State: AHQUAua3EtnVWm10GGPJVW4HQJf3Dq9YhGBkhdgMoTZJZvOMq+ilFf/j
+ kOBor8X+gZ0cVEiA6WRY3Vs=
+X-Google-Smtp-Source: AHgI3IapSHX7UhEs9Q11gejspLG9vGBTyjlU44n3Xy6UfOyr9iBBo6gaqRBvYTT9OJqOujD+A8d31g==
+X-Received: by 2002:a17:902:8f98:: with SMTP id
+ z24mr33431989plo.40.1550627951200; 
+ Tue, 19 Feb 2019 17:59:11 -0800 (PST)
 Received: from squirtle.lan (c-24-22-235-96.hsd1.wa.comcast.net.
  [24.22.235.96])
- by smtp.gmail.com with ESMTPSA id h3sm2562525pgv.38.2019.02.19.17.59.08
+ by smtp.gmail.com with ESMTPSA id h3sm2562525pgv.38.2019.02.19.17.59.09
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 19 Feb 2019 17:59:09 -0800 (PST)
+ Tue, 19 Feb 2019 17:59:10 -0800 (PST)
 From: Andrey Smirnov <andrew.smirnov@gmail.com>
 To: Shawn Guo <shawnguo@kernel.org>
-Subject: [PATCH v3 1/5] arm64: dts: imx8mq: Mark iomuxc_gpr as i.MX6Q
- compatible
-Date: Tue, 19 Feb 2019 17:58:53 -0800
-Message-Id: <20190220015857.7136-2-andrew.smirnov@gmail.com>
+Subject: [PATCH v3 2/5] arm64: dts: imx8mq: Add a node for SRC IP block
+Date: Tue, 19 Feb 2019 17:58:54 -0800
+Message-Id: <20190220015857.7136-3-andrew.smirnov@gmail.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190220015857.7136-1-andrew.smirnov@gmail.com>
 References: <20190220015857.7136-1-andrew.smirnov@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_175911_537994_6FAE1353 
-X-CRM114-Status: GOOD (  12.77  )
+X-CRM114-CacheID: sfid-20190219_175914_048571_80256C03 
+X-CRM114-Status: GOOD (  10.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,11 +108,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Mark iomuxc_gpr as compatible with "fsl,imx6q-iomuxc-gpr" in order for
-to allow i.MX6 PCIe driver to use it.
+Add a node for reset controller IP block found on i.MX8MQ.
 
 Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Chris Healy <cphealy@gmail.com>
@@ -124,22 +123,26 @@ Cc: linux-imx@nxp.com
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: linux-kernel@vger.kernel.org
 ---
- arch/arm64/boot/dts/freescale/imx8mq.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-index 892063a7c26c..f6c37bf9cbce 100644
+index f6c37bf9cbce..50436bd393ed 100644
 --- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
 +++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
-@@ -230,7 +230,7 @@
+@@ -254,6 +254,12 @@
+ 				              "clk_ext3", "clk_ext4";
  			};
  
- 			iomuxc_gpr: syscon@30340000 {
--				compatible = "fsl,imx8mq-iomuxc-gpr", "syscon";
-+				compatible = "fsl,imx8mq-iomuxc-gpr", "fsl,imx6q-iomuxc-gpr", "syscon";
- 				reg = <0x30340000 0x10000>;
- 			};
- 
++			src: src@30390000 {
++				compatible = "fsl,imx8mq-src", "syscon";
++				reg = <0x30390000 0x10000>;
++				#reset-cells = <1>;
++			};
++
+ 			gpc: gpc@303a0000 {
+ 				compatible = "fsl,imx8mq-gpc";
+ 				reg = <0x303a0000 0x10000>;
 -- 
 2.20.1
 
