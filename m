@@ -2,92 +2,83 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18A2BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 05:54:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AD413C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:03:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC0BD20C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 05:54:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D62A2147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:03:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tGhvmu4l";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="SRD0XwD+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC0BD20C01
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VKIC90X6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="lCfZdzVf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D62A2147A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=w4rLZKXQex7wxwErA34Nf70DwhHQsUy8oHVm2JUdZH8=; b=tGhvmu4leHrrNp
-	tM6Bn2zYcQ/QdQyVHiM20M56M1MDNszNH/pWfhBjcMkGJstUXiEpEJxFkvjeBD9BN/R5dDnP5Md3/
-	sBenPVIrHf9DUtETyt2oX52nNccd3ynubTPhqTuoPw9JH8xmzLkey0mlNH8PVT7m/nYhsTAbmnmVB
-	idb9KUY8ZSjspwXog0v/nli/ANkzz77h5f0DyKqLngwE/vzzyrdhRSMoFo4TaW6OxUrQspQHmbMhX
-	0qVqyUryaYyuXl8WmqKPrpK+fOHAsbJkiaSgywvpQtRBPpvtoMxk9utYGf1DYB4cBzM8ApF4MQF7i
-	0SzWYh9H2XkR9go0rZug==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=6meH52j7DIhNPZ9454Kh6ATbAS7EHYColn/Zk2VFvj4=; b=VKI
+	C90X6bWpA0namBnMf/Daywnhhy32iudTIt3SZGknhLVLDz/pNkh5EDCb+zrlkHw9a14NmaGLFV6IH
+	YznfbA/q5mpT9h+5jy0Wukf5nEWTaghi0o4NuojKwyvyYumdO6OB1i7uXE7l6Ibg3/plA3GyjyWF6
+	aNY8Dk6jFu8ZN1vZ9E4cR3CoFJHycZw4TpD1Xvz8Z0LnpbeBLwhW/UzkUwxlwPU6ca4+rPJyRKeSo
+	Gi1LlZ4rdCkBAeKXyJ5Jgjv1ySMvQxmJnTG1fJv9Q+5I+E1COowg73DtZO9Rfq0WNQ28+DgmyJPaL
+	SBup8bwu5gNF7j0GCVDh42PsMHaW3Lg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwKq4-0006ZY-Vy; Wed, 20 Feb 2019 05:54:36 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gwKyB-00011l-NB; Wed, 20 Feb 2019 06:02:59 +0000
+Received: from mail-pf1-x433.google.com ([2607:f8b0:4864:20::433])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwKq2-0006Z6-2E
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 05:54:35 +0000
-Received: from lelv0266.itg.ti.com ([10.180.67.225])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1K5sIOZ019096;
- Tue, 19 Feb 2019 23:54:18 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550642058;
- bh=sz7cGng5/KGycFJZzxpMVGsRKEFdiA/HXVdfQSBlvYQ=;
- h=Subject:To:CC:References:From:Date:In-Reply-To;
- b=SRD0XwD+qiZlm16rvhAjKUOTx9ypLmSGQoptxLQGzMoya0EjpLoxx/tiV219uN5//
- FpSYjHkZ6P1Khsrdaa9nZRT3IQockvxRA/PDkn9V+Ms/qwxjeFvJZE3oRERyTRN2u5
- rCmfnDsdq67rhc8pyFqNkeT04g0gg6RFOqrxhGuQ=
-Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
- by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1K5sIsM099366
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 19 Feb 2019 23:54:18 -0600
-Received: from DFLE110.ent.ti.com (10.64.6.31) by DFLE102.ent.ti.com
- (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 19
- Feb 2019 23:54:18 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE110.ent.ti.com
- (10.64.6.31) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Tue, 19 Feb 2019 23:54:17 -0600
-Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1K5sDjN023318;
- Tue, 19 Feb 2019 23:54:14 -0600
-Subject: Re: [PATCH v5 05/10] dt-bindings: irqchip: Introduce TISCI Interrupt
- router bindings
-To: Tony Lindgren <tony@atomide.com>
-References: <b4e821b3-f2fb-41d8-eb8c-8f4e8a19f77c@ti.com>
- <20190214174612.GF5720@atomide.com>
- <171e8597-2156-747d-d024-7b4bfc6f9186@ti.com>
- <20190215161629.GK5720@atomide.com>
- <2369739e-3bc8-257a-99e0-db2951c6777d@ti.com>
- <20190218143245.GC15711@atomide.com>
- <84b3ec21-9ce9-b9a8-80a9-75001db43a90@ti.com>
- <20190219153537.GJ15711@atomide.com>
- <6aa37276-0833-fdf5-575b-c3ca14f776a6@ti.com>
- <20190219171104.GM15711@atomide.com> <20190219175651.GN15711@atomide.com>
-From: Lokesh Vutla <lokeshvutla@ti.com>
-Message-ID: <884a59a0-81e8-738e-9f26-c2b66ec71af1@ti.com>
-Date: Wed, 20 Feb 2019 11:23:56 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190219175651.GN15711@atomide.com>
-Content-Language: en-US
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+ id 1gwKy8-000115-HF
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 06:02:57 +0000
+Received: by mail-pf1-x433.google.com with SMTP id c123so11391701pfb.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 19 Feb 2019 22:02:53 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=d6A0igDOsc3jNLySuAErsWHOJjhNYwodP/Hd1Anf35E=;
+ b=lCfZdzVfUjOoBZ+L8AhBPSXnJxoCCXiZL2BEUhM0u/EDD5wRHimQtqgOVKdwAGdkAQ
+ Q/oXwg6XKdb5HBpqN1JMFfKNQe3Aci1BcQO8YnMU+CDAnSNCTUyamtg7rPp/1wqvWbsI
+ P0sW1zttfI77GPUv8JNKqWo6ssEN3oT8rGc+Px7yzx9311+98ohUXhTG0GSXvulA3B/g
+ lRy4Vl7wfN6DdNoxzKljPaUgS3r7r2Zpyre01RJ7KAeNgfMXp+/zerRWN+knm+QbPHDJ
+ uNLbESWIvEEsxf+c/la+zTkeLUQexa4kEL6gjivyE9Tj/wh7zQ4HEwT0XZ1W1Y29dwT6
+ wcVg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=d6A0igDOsc3jNLySuAErsWHOJjhNYwodP/Hd1Anf35E=;
+ b=iphwSkIvor/IC7/S9ZfTf09NXgIZKZGiA9jenUkBfYQXPO6lIJ9KBRWwa7JAUQ/h2T
+ lKW7xFgGTZL342tyTK3qKB9nOL1YPjDteheTj/xjxkmYOgNSgwRfJ/BClzN28uV63RVl
+ SbHEAP+cer7ituI7MCgxaeEjRtHDdUGfT601sSAFAtOV3kjvdipk/IUSKr8JvVuFa6PS
+ bEouDQsKYDbxFLkNlyDXD6SsNGdsZfPlQmpy4CIr5e929m4zh16QNdKEB1d3zcyyTtq0
+ pG+DqIqKOzBUP5HJvv3sGzqslAmet9Q53Q/7hK3jqMCmtRQP1N7C2tPP2QAkv52TJm/m
+ C87g==
+X-Gm-Message-State: AHQUAuYOyrFHv77/XRfri309FkJhVNSzkBus1ofswtFFcwHD2pgWy4oH
+ QGhh9vfQSEPyvaDK2+cc+ZLJ0A==
+X-Google-Smtp-Source: AHgI3Ibb7+OEMMx+PAtTLBwWXLV97iKaVhnzkebAn/EsMfiF5pX9uBo7SLQ3+kYLg/Npf9UoKhQNWg==
+X-Received: by 2002:a63:5b1c:: with SMTP id p28mr27045620pgb.73.1550642573331; 
+ Tue, 19 Feb 2019 22:02:53 -0800 (PST)
+Received: from localhost.localdomain ([117.252.69.94])
+ by smtp.gmail.com with ESMTPSA id z1sm27945835pfi.155.2019.02.19.22.02.50
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Tue, 19 Feb 2019 22:02:52 -0800 (PST)
+From: Sumit Garg <sumit.garg@linaro.org>
+To: jens.wiklander@linaro.org
+Subject: [PATCH -next] tee: fix possible error pointer ctx dereferencing
+Date: Wed, 20 Feb 2019 11:32:27 +0530
+Message-Id: <1550642547-21968-1-git-send-email-sumit.garg@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_215434_281912_461820E2 
-X-CRM114-Status: GOOD (  18.48  )
+X-CRM114-CacheID: sfid-20190219_220256_603649_8C25CD2F 
+X-CRM114-Status: GOOD (  11.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,86 +90,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Nishanth Menon <nm@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
- marc.zyngier@arm.com, Tero Kristo <t-kristo@ti.com>,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Peter Ujfalusi <peter.ujfalusi@ti.com>, Rob Herring <robh+dt@kernel.org>,
- Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: Sumit Garg <sumit.garg@linaro.org>, linux-arm-kernel@lists.infradead.org,
+ dan.carpenter@oracle.com, linux-kernel@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Tony,
+Add check for valid ctx pointer and then only dereference ctx to
+configure supp_nowait flag.
 
-On 19/02/19 11:26 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [190219 17:11]:
->> * Lokesh Vutla <lokeshvutla@ti.com> [190219 16:19]:
->>> yes. How different is this from any of the above mentioned drivers using
->>> firmware specific ids. Like sci pm domain[1] driver utilizes the same
->>> device id for enabling any device in the system. Similarly clock
->>> driver[2] uses the same device ids and clock ids specified by firmware.
->>> There are more which similarly represents firmware ids from DT.
->>>
->>> [1] Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>> [2] Documentation/devicetree/bindings/clock/ti,sci-clk.txt
->>
->> That's horrible. We really must not use any firmware invented
->> numbers in the device as they do not describe hardware.
-> 
-> No firmware invented numbers in the device tree I mean naturally.
-> Drivers do whatever they need to do to deal with the firmware.
+Fixes: 42bf4152d8a7 ("tee: add supp_nowait flag in tee_context struct")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: Sumit Garg <sumit.garg@linaro.org>
+---
+ drivers/tee/tee_core.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Let's look at these similar other examples available inside Linux:
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index 25f3b9c..06fbfc0 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -993,7 +993,9 @@ tee_client_open_context(struct tee_context *start,
+ 	 * tee_client_open_session() if any in kernel client requires
+ 	 * different behaviour.
+ 	 */
+-	ctx->supp_nowait = true;
++	if (!IS_ERR(ctx))
++		ctx->supp_nowait = true;
++
+ 	return ctx;
+ }
+ EXPORT_SYMBOL_GPL(tee_client_open_context);
+-- 
+2.7.4
 
-1: ./Documentation/devicetree/bindings/arm/arm,scmi.txt mentions the following:
-- #clock-cells : Should be 1. Contains the Clock ID value used by SCMI commands.
-- #power-domain-cells : Should be 1. Contains the device or the power
-                                        domain ID value used by SCMI commands.
-
-2: Documentation/devicetree/bindings/arm/arm,scpi.txt mentions the following:
-- #power-domain-cells : Should be 1. Contains the device or the power
-                             domain ID value used by SCPI commands.
-
-3: Documentation/devicetree/bindings/firmware/nvidia,tegra186-bpmp.txt
-the firmware specified identifier are defined in the following header files:
-	include/dt-bindings/clock/tegra186-clock.h
-	include/dt-bindings/power/tegra186-powergate.h
-	include/dt-bindings/reset/tegra186-reset.h
-
-4. Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-mentions the following:
-"Output clocks are registered based on clock information received
-from firmware. Output clocks indexes are mentioned in
-include/dt-bindings/clock/xlnx,zynqmp-clk.h."
-
-5. Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt mentions the
-following:
- - #power-domain-cells:  Must be 1. Contains the Resource ID used by
-                          SCU commands.
-                          See detailed Resource ID list from:
-                          include/dt-bindings/firmware/imx/rsrc.h
-- The clock consumer should specify the desired clock by having the clock
-ID in its "clocks" phandle cell.
-See the full list of clock IDs from: include/dt-bindings/clock/imx8qxp-clock.
-
-6. Documentation/devicetree/bindings/arm/psci.txt have the following properties:
-- cpu_suspend   : Function ID for CPU_SUSPEND operation
-- cpu_off       : Function ID for CPU_OFF operation
-- cpu_on        : Function ID for CPU_ON operation
-- migrate       : Function ID for MIGRATE operation
-
-All the above examples uses the firmware identifiers for devices/clocks or for
-other functionalities and use them directly in DT. These are all somewhat
-similar to TI sysfw which runs on a micro-controller and tries to abstract
-certain functionalities from HLOS. There are many more such examples but I
-listed only a few users. The feedback you are providing is not going to work for
-any of the above listed firmware interfaces.
-
-Thanks and regards,
-Lokesh
 
 _______________________________________________
 linux-arm-kernel mailing list
