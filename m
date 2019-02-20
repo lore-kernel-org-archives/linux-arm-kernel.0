@@ -2,63 +2,71 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E55E8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:37:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 56DC1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:38:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B5B652183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:37:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B4DD20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:38:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i3sVIPUV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B5B652183F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QIY6ZwxJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B4DD20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=IHwE8Fv+BRxM7ry2odr7oD5DggA+JTYMQBBMaJr4LjQ=; b=i3sVIPUV3G+CIQ
-	Kd7zJTHf1wUckdq1U24sMbNo9mmbFMtGEOFu9fcWWHe0Vn+pPQDXlLCsvMuzjhrSUmslBy8zC6i6D
-	CVtnttcaVXxYtObm7xVmLesvML6J/nh1/doCQDxFAAHjjByKO0oe/9dwoBNXqIAnfJVc7Rh+HRocb
-	C9Kc6XHA3pJyh5by2klmHVXrCKMkKBO6ZqoYAU08ZyMQlAudUtXm/KpDOYB5sCAonF/3ihG58MKba
-	Oc0ZndSfZaFv8DvN4mQCvWS4R04mY4idyIjVhYYheeXFzLaxhnvYzAeZPZmkvl6uLs3G15suwbr4Z
-	RCQhsN1Aq2SzxDeLmurQ==;
+	List-Owner; bh=Tcmdb04G4NjnWncpzmjhKKHUpuUQfYw3P8kdY4gZRIw=; b=QIY6ZwxJbuE/Tw
+	YIsskps0HMMQ0II/jJ2dyyt1UxzLXjzPX87t3esYIXT12CgDs+jBPrWXpoMqtSQ6jI2aphtMikDWY
+	fy+WulCkCJs4mOlikkF4gnZvOajKQe0BJqQJ8kWPxvjyW44tR3Xe4ZfwdFLW7637d9u8IG+sZtI7b
+	XSkZPZHUVIdOixpOieO5JVj0v7c5bvXoRULGaCTqysQFvwlKf8Q1zPc6F8MkwUU4NbpgBYkoUXzL8
+	g1TT6/TMnQxgySveY/Gg/FqeDC7NZgxD9K7NkyLa8AOK66q99PSZBZanTGUDV0XwexVW6fR37pZUs
+	Rw9iXM0KGT4Np1Zte0ow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwTwG-0007DA-Co; Wed, 20 Feb 2019 15:37:36 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwTwD-0007Cf-Cr
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:37:35 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 09F2F15AB;
- Wed, 20 Feb 2019 07:37:31 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3CDC53F5C1;
- Wed, 20 Feb 2019 07:37:29 -0800 (PST)
-Date: Wed, 20 Feb 2019 15:37:26 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Dave Martin <Dave.Martin@arm.com>
-Subject: Re: [PATCH v5 12/26] KVM: arm64: Support runtime sysreg visibility
- filtering
-Message-ID: <20190220153726.GF4763@lakrids.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-13-git-send-email-Dave.Martin@arm.com>
+	id 1gwTwx-0007YS-4c; Wed, 20 Feb 2019 15:38:19 +0000
+Received: from mail-qk1-f195.google.com ([209.85.222.195])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwTwt-0007Y3-FO; Wed, 20 Feb 2019 15:38:16 +0000
+Received: by mail-qk1-f195.google.com with SMTP id z13so923547qki.2;
+ Wed, 20 Feb 2019 07:38:15 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=VGZeP1gdfWWA7QWc95vBZZ+amiRilgB61c6Don9rfb4=;
+ b=HvHNyfzfZUcMd38D1orMI4gMlf19HfiBqxpqS1dRJZIvmcV8kcjuZ1MiZ5eKycjcWw
+ poloWI+zEjtGrYOXfmoKLg9yHMKMbVGXpaHImjVDKCz3Czy9ZSz4jV0u9kT2LdVrYcps
+ y7kx2Qly4tP7GmiqiMA9PTVS/Ihub2Z8ur784eJdBtvqmS1ANwOCN6zRKfGIBsXTPk4h
+ kHOeBVCU57gOMajbYkWTde5VAPvUfudWHJCWBLEw05Vd4A8YoDx7MUX31pX8zh/bqA6Z
+ t2oJipBQzBcB+ZrEs0m8zJZMuRgNMFKMV1q4/KdpSjP97QoMKVuUwHyrU3tSh5VVta2M
+ YCWw==
+X-Gm-Message-State: AHQUAuY6cjpq1CGNOTNlRgPMPWKYSvRvHsNb1Kahe4Wu+k3FhOCnIgJG
+ a77IimtTq37xaVYCB3CZy37vNxVlCWstZVdAAFY=
+X-Google-Smtp-Source: AHgI3IZ94qvkZOTC/uSAW+I+BJiRgReG3bF4qB/dmDFAXGHFE4lYkhez459osWQGosDkT7nrXj8BirBc0CXCWmg7l0A=
+X-Received: by 2002:a37:bdc6:: with SMTP id
+ n189mr24583088qkf.330.1550677094358; 
+ Wed, 20 Feb 2019 07:38:14 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1550519559-15915-13-git-send-email-Dave.Martin@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+References: <20190218135042.GA13218@mani>
+In-Reply-To: <20190218135042.GA13218@mani>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 20 Feb 2019 16:37:58 +0100
+Message-ID: <CAK8P3a1k22OQF0iX8SR5RVS_9gfyYb19b9deuN_mNG+WF0LNGg@mail.gmail.com>
+Subject: Re: [GIT PULL] Actions ARM64 DT updates for v5.1
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_073733_435887_C23FB4B4 
-X-CRM114-Status: GOOD (  19.91  )
+X-CRM114-CacheID: sfid-20190220_073815_511173_0B9C8BE7 
+X-CRM114-Status: GOOD (  13.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,78 +78,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: arm-soc <arm@kernel.org>, linux-actions@lists.infradead.org,
+ =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 07:52:25PM +0000, Dave Martin wrote:
-> Some optional features of the Arm architecture add new system
-> registers that are not present in the base architecture.
-> 
-> Where these features are optional for the guest, the visibility of
-> these registers may need to depend on some runtime configuration,
-> such as a flag passed to KVM_ARM_VCPU_INIT.
-> 
-> For example, ZCR_EL1 and ID_AA64ZFR0_EL1 need to be hidden if SVE
-> is not enabled for the guest, even though these registers may be
-> present in the hardware and visible to the host at EL2.
-> 
-> Adding special-case checks all over the place for individual
-> registers is going to get messy as the number of conditionally-
-> visible registers grows.
-> 
-> In order to help solve this problem, this patch adds a new sysreg
-> method restrictions() that can be used to hook in any needed
-> runtime visibility checks.  This method can currently return
-> REG_NO_USER to inhibit enumeration and ioctl access to the register
-> for userspace, and REG_NO_GUEST to inhibit runtime access by the
-> guest using MSR/MRS.
-> 
-> This allows a conditionally modified view of individual system
-> registers such as the CPU ID registers, in addition to completely
-> hiding register where appropriate.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
+On Mon, Feb 18, 2019 at 2:50 PM Manivannan Sadhasivam
+<manivannan.sadhasivam@linaro.org> wrote:
 > ---
-> 
-> Changes since v4:
-> 
->  * Move from a boolean sysreg property that just suppresses register
->    enumeration via KVM_GET_REG_LIST, to a multi-flag property that
->    allows independent runtime control of MRS/MSR and user ioctl access.
-> 
->    This allows registers to be either hidden completely, or to have
->    hybrid behaviours (such as the not-enumerated, RAZ, WAZ behaviour of
->    "non-present" CPU ID regs).
+> The following changes since commit bfeffd155283772bbe78c6a05dec7c0128ee500c:
+>
+>   Linux 5.0-rc1 (2019-01-06 17:08:20 -0800)
+>
+> are available in the Git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mani/linux-actions.git tags/actions-arm64-dt-for-v5.1
+>
+> for you to fetch changes up to 9175a8116f452a515cea734c6fedee6788e6bc33:
+>
+>   arm64: dts: actions: s700-cubieboard7: Enable I2C0 and I2C1 (2019-02-16 11:32:46 +0530)
+>
+> ----------------------------------------------------------------
+> Actions ARM64 DT changes for v5.1:
+>
+> - Add interrupt properties to S900 pinctrl node
+> - Add Reset controller support for S700
+> - Add Reset controller support for S900
+> - Add pinctrl support for S700
+> - Add I2C support for S700
+> - Enable I2C0 and I2C1 for s700-cubieboard7
+>
+> ----------------------------------------------------------------
+> Manivannan Sadhasivam (3):
+>       arm64: dts: actions: Add interrupt properties to pinctrl node for S900
+>       arm64: dts: actions: Add Reset Controller support for S700 SoC
+>       arm64: dts: actions: Add Reset Controller support for S900 SoC
+>
+> Parthiban Nallathambi (2):
+>       arm64: dts: actions: s700: Add I2C controller nodes
+>       arm64: dts: actions: s700-cubieboard7: Enable I2C0 and I2C1
+>
+> Saravanan Sekar (1):
+>       arm64: dts: actions: Add pinctrl node for Actions Semi S700
 
-Sorry for bikeshedding...
+Pulled into arm/dt, but please try to improve the tag description for
+the next round: the text you have is more or less just a repeat
+of the one-line subjects of the individual patches.
 
-> +	/* Check for regs disabled by runtime config */
-> +	if (restrictions(vcpu, r) & REG_NO_GUEST) {
+Instead, what you want to do is give a high-level description of what
+is going on overall in your branch (e.g. adding multiple DT nodes for
+missing devices) and ideally some background (e.g. how much
+of the SoCs are actually described now, and how much is still
+missing here).
 
-Maybe it's worth wrapping this as something like
-
-	reg_runtime_hidden_from_guest(vcpu, r)
-
-... and avoid exposing the raw flags to all the places we have to check?
-
-[...]
-
-> +#define REG_NO_USER	(1 << 0) /* hidden from userspace ioctl interface */
-> +#define REG_NO_GUEST	(1 << 1) /* hidden from guest */
-
-Perhaps REG_USER_HIDDEN and REG_GUEST_HIDDEN?
-
-Thanks,
-Mark.
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
