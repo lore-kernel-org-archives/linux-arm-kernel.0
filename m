@@ -2,22 +2,21 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6867C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:18:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C1314C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:19:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AA29F20880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:18:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9092C20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:19:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eO8N5ZDT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AA29F20880
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GidCZ2zV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9092C20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,36 +24,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DA0WllCmN4v3XDgQCiwTW7Ti595D+DE0jB1mtMGFjeg=; b=eO8N5ZDTnl1Wqa
-	T6fb7JtFXQVKekGZtXKztsQGNpxqKFWjpW7XF1O/V8ZQy+TOoa79YB3dA3fG5DhodMm6I9y+CPn3W
-	e39IrHEsaWGejAz945zDg97k/WDnGTRFY4A20Lx0Tuw6jFM19rJT/oC2XI/urV+34TauoS5kMPL4I
-	DRGxn6hGoojSuATG7BHrekiebAZiV3BtmvqeSmxIBMbdodIFpwX1bcrF2GnWc5XFMbdEoR304VylU
-	mMtWvmF5NOWu/Wp1WlG5osamh1kNLS7AyV2xyK0vJxcCShmwHoqggZ3esVixhW3MUlgSQeCerPN0R
-	MGpsKPGKL04rs6sQfmtg==;
+	List-Owner; bh=gaPNhlsW+RqXRGCqh1n54Mf3vtVe1sT++17zoY1AGfs=; b=GidCZ2zVq8uYKI
+	dzcId4uws1leHfoWSbInpQEZ+GTjytgmyqup1U3yUlqWEYUVjZtCaNlmSmaWYO0hsWshBbqkew7PG
+	XEmj856hZKOkZFphzSLv7GGuOOb3DOxGUotwN/blt4rfZYDNQy5hXMU0Y3IRxQDX74oCSnd7MLO6f
+	y9N94DYQYfoanOpe0eMiP6EIkBiPWWMnjAz3Hm4e2LrjRAbPCtvvQYeMZ8FA6Ktt4P8qjgvw7w1+o
+	+Ta7AN4VVMcLAVbLtUJdXvjycM4dZ0UngFyQAPlFCfiGzRKJVkiadeQvADRJvaFCbGkgzCYvCT9ts
+	ZDisHUx44lpQVW0cfD6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUZc-0007Hl-PH; Wed, 20 Feb 2019 16:18:16 +0000
-Received: from muru.com ([72.249.23.125])
+	id 1gwUak-0007cD-PC; Wed, 20 Feb 2019 16:19:26 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUZZ-0007HK-Pa
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:18:15 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id EC7AB80E1;
- Wed, 20 Feb 2019 16:18:22 +0000 (UTC)
-Date: Wed, 20 Feb 2019 08:18:09 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Grygorii Strashko <grygorii.strashko@ti.com>
-Subject: Re: [PATCH 6/6] net: ethernet: ti: cpsw: deprecate cpsw-phy-sel driver
-Message-ID: <20190220161809.GR15711@atomide.com>
-References: <1550676319-6440-1-git-send-email-grygorii.strashko@ti.com>
- <1550676319-6440-7-git-send-email-grygorii.strashko@ti.com>
+ id 1gwUah-0007ba-Bk
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:19:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5A529EBD;
+ Wed, 20 Feb 2019 08:19:22 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8CF193F5C1;
+ Wed, 20 Feb 2019 08:19:20 -0800 (PST)
+Date: Wed, 20 Feb 2019 16:19:18 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Dave Martin <Dave.Martin@arm.com>
+Subject: Re: [PATCH v5 14/26] KVM: arm64/sve: Context switch the SVE registers
+Message-ID: <20190220161917.GG4763@lakrids.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1550676319-6440-7-git-send-email-grygorii.strashko@ti.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_081813_863896_205DCB86 
-X-CRM114-Status: GOOD (  13.59  )
+X-CRM114-CacheID: sfid-20190220_081923_407174_4E4CDBCC 
+X-CRM114-Status: GOOD (  14.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,82 +70,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, netdev@vger.kernel.org,
- Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
- Kishon Vijay Abraham I <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>,
- linux-omap@vger.kernel.org, "David S. Miller" <davem@davemloft.net>,
- linux-arm-kernel@lists.infradead.org
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Mon, Feb 18, 2019 at 07:52:27PM +0000, Dave Martin wrote:
+> -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> +/* Check for an FPSIMD/SVE trap and handle as appropriate */
+> +static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
+>  {
+> -	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> +	bool vhe, sve_guest, sve_host;
+> +	u8 trap_class;
 
-* Grygorii Strashko <grygorii.strashko@ti.com> [190220 15:26]:
-> Deprecate cpsw-phy-sel driver as it's been replaced with new
-> TI phy-gmii-sel PHY driver.
+Nit: elsewhere in kvm, this gets called hsr_ec. Can we use the same name
+here?
 
-I'm not going to pick up this one, seems that Dave can merge
-this later on? That is unless Dave wants to ack this one.
-
-Regards,
-
-Tony
-
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  drivers/net/ethernet/ti/Kconfig | 6 +++---
->  drivers/net/ethernet/ti/cpsw.h  | 6 ++++++
->  2 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/ti/Kconfig b/drivers/net/ethernet/ti/Kconfig
-> index bb126be1eb72..8b21b40a9fe5 100644
-> --- a/drivers/net/ethernet/ti/Kconfig
-> +++ b/drivers/net/ethernet/ti/Kconfig
-> @@ -49,10 +49,11 @@ config TI_DAVINCI_CPDMA
->  	  will be called davinci_cpdma.  This is recommended.
 >  
->  config TI_CPSW_PHY_SEL
-> -	bool
-> +	bool "TI CPSW Phy mode Selection (DEPRECATED)"
-> +	default n
->  	---help---
->  	  This driver supports configuring of the phy mode connected to
-> -	  the CPSW.
-> +	  the CPSW. DEPRECATED: use PHY_TI_GMII_SEL.
->  
->  config TI_CPSW_ALE
->  	tristate "TI CPSW ALE Support"
-> @@ -64,7 +65,6 @@ config TI_CPSW
->  	depends on ARCH_DAVINCI || ARCH_OMAP2PLUS || COMPILE_TEST
->  	select TI_DAVINCI_CPDMA
->  	select TI_DAVINCI_MDIO
-> -	select TI_CPSW_PHY_SEL
->  	select TI_CPSW_ALE
->  	select MFD_SYSCON
->  	select REGMAP
-> diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-> index cf111db3dc27..907e05fc22e4 100644
-> --- a/drivers/net/ethernet/ti/cpsw.h
-> +++ b/drivers/net/ethernet/ti/cpsw.h
-> @@ -21,7 +21,13 @@
->  			 ((mac)[2] << 16) | ((mac)[3] << 24))
->  #define mac_lo(mac)	(((mac)[4] << 0) | ((mac)[5] << 8))
->  
-> +#if IS_ENABLED(CONFIG_TI_CPSW_PHY_SEL)
->  void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave);
-> +#else
-> +static inline
-> +void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave)
-> +{}
-> +#endif
->  int ti_cm_get_macid(struct device *dev, int slave, u8 *mac_addr);
->  
->  #endif /* __CPSW_H__ */
-> -- 
-> 2.17.1
-> 
+> -	if (has_vhe())
+> -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> -			     cpacr_el1);
+> -	else
+> +	if (!system_supports_fpsimd())
+> +		return false;
+> +
+> +	if (system_supports_sve()) {
+> +		sve_guest = vcpu_has_sve(vcpu);
+> +		sve_host = vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE;
+> +		vhe = true;
+> +	} else {
+> +		sve_guest = false;
+> +		sve_host = false;
+> +		vhe = has_vhe();
+> +	}
+> +
+> +	trap_class = kvm_vcpu_trap_get_class(vcpu);
+> +	if (trap_class != ESR_ELx_EC_FP_ASIMD &&
+> +	    (!sve_guest || trap_class != ESR_ELx_EC_SVE))
+> +		return false;
+
+This is somewhat painful to decipher, but I couldn't come up with
+something that was both succint and legible.
+
+Maybe it's worth duplicating the SVE check, i.e.
+
+	if (hsr_ec != ESR_ELx_EC_FP_ASIMD &&
+	    hsr_ec != ESR_ELx_EC_SVE)
+		return false;
+
+	if (!sve_guest && hsr_ec == ESR_ELx_EC_SVE)
+		return false;
+
+... ?
+
+Thanks,
+Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
