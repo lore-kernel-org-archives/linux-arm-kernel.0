@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-4.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A41D0C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:36:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CB65C10F01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:37:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 714822146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:36:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 18E6521848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 06:37:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GQ9FC8GJ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="sIr5MJj9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 714822146E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BlQ7ZJng";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="XHDV7mp3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 18E6521848
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,46 +26,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8fXiZa8ztxJsaq1w2Zws0B5RKiy5Eu7za0PnsFV6JaY=; b=GQ9FC8GJqGMzj+
-	4NsYxEqCH2P4v1epk0SXi5dijsqs3jWj3C0EAHw2njcohRMiCTuZWmBTr10zLsVWYNLf/m6aWK449
-	jgBLUKDVxSY8qPdpdvK9HMC3WCoptt9VrAda3RQjTQm9juUaMrBNlJFZ+Wmw36/O5z9ideDie3Pou
-	4MS8rg/RVZ6hXt40Bo/T1prT2ubCDfQWZerR2z8Akfxu+E1IY2vGmvcggC+M3jtvFANSbiUN6iMLT
-	1j2GBpRhGt89krzqZLDvSYcy95qWn/Cnx7qJxQ+Czdt/xJh9PrGVcOJA0A0Wz/oEpRJihQ/Kt8FOV
-	L3u20CFa/11S9HqN3e8w==;
+	List-Owner; bh=6ma1n0j0zlwaLZX4g+O3U/gBw5LXVxQx9078Qp4EU1c=; b=BlQ7ZJngEUqVRL
+	GjzxQ3zdes2M6Xn7qhDT7TvBLcazH0h08Z6WUCFa7+JZ99kgOQpJCBmMowKBR7FpZ+KCWKcU4Yzap
+	56cVQGOfSdiQbkRznEuMEL7RPG5B4ahC0d3wlNfQ33g3vx9RoD4L4bPI9L8JMA7yfPg19JqhMX0q5
+	txe3kjxa/QBaUqD/1/eIuPUL3xRsfjY1oOvRTgK8Co0jx4p0FelNRnuVgps+iCAtVqHn9/UYbXkgo
+	y1KYj5/T+q37ACBso7W2Bwk/d584GnUR1lH+YUULwTpd3M4U9kQFi8+JvPo5dV5urquA4fJYr6zc5
+	eWTU8bGE6secI3b4K5Sg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwLUg-0005EI-Ls; Wed, 20 Feb 2019 06:36:34 +0000
-Received: from mail-db5eur03on0617.outbound.protection.outlook.com
- ([2a01:111:f400:fe0a::617]
+	id 1gwLVx-0005VN-BF; Wed, 20 Feb 2019 06:37:53 +0000
+Received: from mail-eopbgr40064.outbound.protection.outlook.com ([40.107.4.64]
  helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwLUd-0005Ds-Ij
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 06:36:33 +0000
+ id 1gwLVu-0005V3-M8
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 06:37:52 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=tONR45tNJhx9H8beOwM2lxRSNLX78lZ8C7Y6AXx2fto=;
- b=sIr5MJj9nuA45ERgP/bKcQjh11CJ6TBdF9RaBRH1YRKSr3wtP5II524pIQripJHGEU3dYDjjV/Kj3yIgCQoY6/wB1jG3PAN6tgyaAhjBvHok8IYq2OfWhvQTubMrsGUpuOraCLLJ6HGVkcHy3B0pqFO0kWLC4bp/ojOXrn7P8DY=
+ bh=BYcSBU73h3bsetvxWc9hflX+f9X5+Ay2aJtW9dGL1/w=;
+ b=XHDV7mp35ngD3V+uF34Zjvpi4aL2RqgDmeJljSxae98lDl25d/PviRYq/TKstS52q5BpWXmnaFPjf7BoDGjYs0DCDCKvE9SunZRqg3rFhtIp2vt7YeP/PO3CrOh8uBITusb+C39FY+DyOfsmy1FDo6NtaRI2aWiBMaynPnBKwDQ=
 Received: from AM6PR04MB4215.eurprd04.prod.outlook.com (52.135.168.141) by
  AM6PR04MB6040.eurprd04.prod.outlook.com (20.179.6.147) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Wed, 20 Feb 2019 06:36:27 +0000
+ 15.20.1622.19; Wed, 20 Feb 2019 06:37:47 +0000
 Received: from AM6PR04MB4215.eurprd04.prod.outlook.com
  ([fe80::e944:6749:3ee6:4e08]) by AM6PR04MB4215.eurprd04.prod.outlook.com
  ([fe80::e944:6749:3ee6:4e08%5]) with mapi id 15.20.1622.020; Wed, 20 Feb 2019
- 06:36:27 +0000
+ 06:37:47 +0000
 From: Aisheng Dong <aisheng.dong@nxp.com>
 To: Rob Herring <robh@kernel.org>, Marc Zyngier <marc.zyngier@arm.com>
-Subject: RE: [PATCH V3 1/4] dt-binding: irq: imx-irqsteer: use irq number
- instead of group number
-Thread-Topic: [PATCH V3 1/4] dt-binding: irq: imx-irqsteer: use irq number
- instead of group number
-Thread-Index: AQHUuTt5Spk4kSNY5kK4EHnWuE5BYKXazGsAgAOXlwCACfaDgA==
-Date: Wed, 20 Feb 2019 06:36:27 +0000
-Message-ID: <AM6PR04MB4215574A539086C4B0386A01807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
+Subject: RE: [PATCH V3 2/4] dt-bindings: irq: imx-irqsteer: add multi output
+ interrupts support
+Thread-Topic: [PATCH V3 2/4] dt-bindings: irq: imx-irqsteer: add multi output
+ interrupts support
+Thread-Index: AQHUuTt8PgNPpOmrA0+KGlk6eJo216XazA+AgAOYwACACfX6gA==
+Date: Wed, 20 Feb 2019 06:37:47 +0000
+Message-ID: <AM6PR04MB421536C38BF72B8739485304807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
 References: <1548921464-28917-1-git-send-email-aisheng.dong@nxp.com>
- <1548921464-28917-2-git-send-email-aisheng.dong@nxp.com>
- <8db40cd7-7695-0267-c626-26ebe086b2b8@arm.com> <20190213222700.GA31052@bogus>
-In-Reply-To: <20190213222700.GA31052@bogus>
+ <1548921464-28917-3-git-send-email-aisheng.dong@nxp.com>
+ <23f5f2f0-79b8-b9f7-9f46-972966563596@arm.com> <20190213222952.GA4814@bogus>
+In-Reply-To: <20190213222952.GA4814@bogus>
 Accept-Language: zh-CN, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -74,58 +73,58 @@ authentication-results: spf=none (sender IP is )
  smtp.mailfrom=aisheng.dong@nxp.com; 
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 1b818746-6c0f-476a-31c2-08d696fdbd99
+x-ms-office365-filtering-correlation-id: 576d6a34-5bbf-4208-235c-08d696fded98
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:AM6PR04MB6040; 
 x-ms-traffictypediagnostic: AM6PR04MB6040:
 x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; AM6PR04MB6040;
- 23:av/pXP6huq25LMzS+49vJnFFnEME2P1rF22cTS0TH?=
- =?us-ascii?Q?csDqSTKcrQxhRWkfFm4qkEN2NJWL/VCF9l7uKQl8jRUSPaobuwy/9SbMPrWa?=
- =?us-ascii?Q?UJSDhnnwL8Ybpd+M9PppPnR524jWZdF7/iuOw0THrbe/xyEhD5HUhV+TpESF?=
- =?us-ascii?Q?2dv4ZsbIQObRs/SPEIaz2KJVPVtn8gz0cSQpWkof8cce1rfPOrM7verznukJ?=
- =?us-ascii?Q?/PtmwUX3dMh0PFPzJaG1C7HWvw+UW0WilN2bj3x5cPB0b6kHg+4XZigz3sXv?=
- =?us-ascii?Q?0GCmIf5bf0V0ZH0ZkQ1qW/BwLRrHO/wxxwKguQ3i+1Dl3tCkwjt8kIGbqmUe?=
- =?us-ascii?Q?k1ksdI5/vrcCF+cjHpY1UZbLz4kbwroCmNMsuZ/0FSYRmJHmcDUqioXdVOHQ?=
- =?us-ascii?Q?hnMK5HvG2Q/Gtn+DNOgMHkxXnqiecjrKQy20O/1/pSl5kE5wFyv3P61yabtQ?=
- =?us-ascii?Q?GE5KiC0CieNNxqaP0UrlCBwbeuIbUj87JHMHKsLnyLB67GJbszlcyWMMw0ED?=
- =?us-ascii?Q?ei7nfx+08PS5jjeOuL7FgF6PTbwPwi1HhzrwfwpW3PuSwTQXu1G2izBOSwwY?=
- =?us-ascii?Q?wKFGP/o4l2UgR+CLF39VWgHeFmHSIUxn5cx6PJUgA7fyHmAZ+h8Q6ysUrgZ0?=
- =?us-ascii?Q?6yC7SHkU1bTceE59bnvYwak68pvBBRtgMF9OMPcQQlAFwdRIc1R02PqfTPoC?=
- =?us-ascii?Q?X4kW0n35RGjQyZKaPlO6VAkpSSDJyTXq0hcXOOSo5uZbahj7PGJBTQoYZuBl?=
- =?us-ascii?Q?p1bhVKjMk8nHXI8bwhkjO0F28CMXLl8/owV2hNShoOUa5yptu8P1CpIwoqnz?=
- =?us-ascii?Q?8JXFr8Uy4k/NSDC40hGjpTl+YvemLVMNAgJ9AxngfDb4mh+Rrckw58KtiBmC?=
- =?us-ascii?Q?3bT7saDc9ER6qXjuEqxHDgGB+kHWTm2dY5ir8cmDJJWZYkzlsmWfsQCCOaLP?=
- =?us-ascii?Q?IJiNPcd6S+MUAbitMFgJJQozJAgnhG3l6sjQG6kTaKuf45VZy5o4rN+tFgcj?=
- =?us-ascii?Q?85/AAtlozPm+TLoBQnk7Z8rwGj5OZaU1pUMOIjvz+1w1GbqODjJykBTLqgCv?=
- =?us-ascii?Q?exA+urKSq9l3OII5WEqac01nI246GHuX8E4kmFEarvuMIzUqKw3tBGRXYJNN?=
- =?us-ascii?Q?Zpanoli4eLMD0goLRIB98P4ZCYUwG4KdOzuz3CgmreDZy3hLqljPP5zSKeVG?=
- =?us-ascii?Q?OwEYYbn7gasRtXowUb8eZV92NdRC5e75l9L97QiIAQ80Wwces2oNF5hlFsa6?=
- =?us-ascii?Q?JcaUDNEer1pi8cy83HMbuymd5ASUSFjsKSle58QjJCrRxb5wj13MFSCtxY0I?=
- =?us-ascii?Q?a99tDoGMItVbjx0xlneYvU=3D?=
-x-microsoft-antispam-prvs: <AM6PR04MB6040BF11A95D5F6FA17D0BB1807D0@AM6PR04MB6040.eurprd04.prod.outlook.com>
+ 23:Cda21D/+tm8EGyazBi23SyslW/LtaHzpHsSBK4S7r?=
+ =?us-ascii?Q?KvgEodoETzRQ0+1Ol2TawZ91Z+s9+oP+yKMI2tsn46HS01oH4bcU99td7HG5?=
+ =?us-ascii?Q?8Yu3SCdDFD8jwUFC+Ml9NMbFSTgZfS2Hbk1AlTu8ClMZ182+5pUfwUWALWda?=
+ =?us-ascii?Q?B87sp0rVX+6i/A+3NgyaU0C+3/C9lvl+BPW/DOvIOZCHEG/iGIPlrqZ9n1Kl?=
+ =?us-ascii?Q?+K6BpkpzHPo9NZ9h93xLbw8QyuDzyyjalt+bcl4tAmPqhpXklX++pq7hz+Uu?=
+ =?us-ascii?Q?6YfnbPZwTcTkQxVMSycbxZnHvrt5xQG74MriH45qSQNScQUiP3SvdV9Kz9ZV?=
+ =?us-ascii?Q?5ox1Yb+1vBlRq7uBE6BloGW3L/H82H+qHAXX28RwzZe9CNwZwe6+2rxxQ8S/?=
+ =?us-ascii?Q?tNtgYkRaQAPBnrIaA0TiGDLSEOWFxsgu2srBkaD0D/9yPHyyCfw9IQAb9sD4?=
+ =?us-ascii?Q?pqVFMbwkmUt8sWMGRYH10IiKwzkkAo+UcSHc3FpDUeoqb8sq/FuUl49EI8XB?=
+ =?us-ascii?Q?75g+zBeQYo3BnsPjPc+Gqg5/rE1hyFJsZ2jaIj7jRU9yvkfc8o8kuX1z/g3s?=
+ =?us-ascii?Q?/zcJCpnP1Rk3en2qNtxzPQtn2yxWMqOGxEcy/yA3u7DvtlqtMPGCUTxFzrJ4?=
+ =?us-ascii?Q?9Tb7sq2RHg81A7LfTBYyR5a31cZ+HBmN8XeSd4jbiv85gcvaWA5r2We6mEdw?=
+ =?us-ascii?Q?2avrXK37aE8tayO9FdNntqNhXD+DJUw04RLjqi0qjytMAc6zqmjRbn9meYCk?=
+ =?us-ascii?Q?4toPJaDffu4EI4HnqBIg+NMWSbzKti8ZtbjSSrBfhq5Y0fkzbiJB3LfpBChi?=
+ =?us-ascii?Q?XPHmuO4ObFt6O2+T/HyTAHK1C14717/qTffip6e/v06siUjG7A02jqLZF3F8?=
+ =?us-ascii?Q?FXbmZu4dFniSqhXp72lgAbEhUzOYgYZF2n0yQuWyLC0TvG0PNkuO1orhCXHb?=
+ =?us-ascii?Q?HduvxwYrgxyI09e8/cfdqaIfcOo1N8LpORL/uxo1qqxeE1e3SffeUh1mvcco?=
+ =?us-ascii?Q?Dp3TmQflG3wGeBl+msCMbXtstz4YmN6lHhbWae37A0XNSBcJxZqXq4VD9JrN?=
+ =?us-ascii?Q?V/wxt166woJCtezM3LUDq8hX7ysBJLUI2bgy4r6iT2o9WYTsD5Dn0m2ueuwA?=
+ =?us-ascii?Q?KbQh7K40U34bi/wz0xgvhMxDdsG8QeDJEtJaAJjZsVyAbtUfO67hhxHDWQxJ?=
+ =?us-ascii?Q?RWmgPDUzzOn33xWvL+q5A6mfesUKLwf7zIJ6Xs0+OTYsFCjVJzRMcsaq+DOl?=
+ =?us-ascii?Q?qIVhOV4gj3SoVH7v9j5Ej4EPexDXTnWbPYxRAinqRvFs6Swo2Ysnch3CND9F?=
+ =?us-ascii?B?UT09?=
+x-microsoft-antispam-prvs: <AM6PR04MB60408DC1675E66E557B56FEB807D0@AM6PR04MB6040.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0954EE4910
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(39860400002)(366004)(376002)(396003)(346002)(189003)(199004)(51914003)(54534003)(54906003)(4326008)(53936002)(53546011)(6246003)(186003)(9686003)(25786009)(316002)(102836004)(5660300002)(86362001)(6506007)(478600001)(26005)(55016002)(66066001)(71200400001)(71190400001)(7696005)(81156014)(486006)(81166006)(93886005)(256004)(8936002)(229853002)(2906002)(7736002)(305945005)(11346002)(446003)(476003)(76176011)(3846002)(6116002)(74316002)(99286004)(97736004)(106356001)(8676002)(68736007)(105586002)(14454004)(110136005)(6436002)(33656002)(44832011);
+ SFS:(10009020)(136003)(39860400002)(366004)(376002)(396003)(346002)(189003)(199004)(54534003)(54906003)(4326008)(53936002)(53546011)(6246003)(186003)(9686003)(25786009)(316002)(102836004)(5660300002)(86362001)(6506007)(478600001)(26005)(55016002)(66066001)(71200400001)(71190400001)(7696005)(81156014)(486006)(81166006)(93886005)(256004)(8936002)(229853002)(2906002)(7736002)(305945005)(11346002)(446003)(476003)(76176011)(3846002)(6116002)(74316002)(99286004)(97736004)(106356001)(8676002)(68736007)(105586002)(14454004)(110136005)(6436002)(33656002)(44832011);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB6040;
  H:AM6PR04MB4215.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: Omy4lASQRNgLk77cVndQepp9TaVocM+1qQSvhz95f5CoahjG5Hvb5omzrGVuTGJ968EY19CZi9nShoh/VvzbfVlUgYPuConySqw+ty94J40fZHi3UTUy9M7AHGMylCUUqTpzKeRoOEKYVTr3F4VbHPHAzN9DILpVQHPWhTdXUDrKJ05PQNdSfLLDHKhaf5laKOL6NSpBOulbxqkOJ2px/L/6/v+oLy1zAudqP+xZGSgOrxDHY33aUe754SaCtLVzpCv1DyLrK8x0Zg9//RN8LUJSic/CTEs0OLnaGyqKHgwNP7RIEN0r8ux7u0CN/sPstyHBDFTHRlZXu0jtMJ/vu/P89S1GQAz9nxUV2GLw7naXaYe3qnwiN1eoRvX/G75YwX7PabHAkoejDaE0xnM99tWXLJoFkRnyzLsgqJrR6LE=
+x-microsoft-antispam-message-info: D3VINvihY/9jpNCsq6xztD7drrTjqxvOd26M40z3ipxBEPmnDz1/FFDgjTwnCYmud8BVfd8/hpZebB1AAPThpWAwVDg+eTD380XCzBtoGIpwC1lATGpd5+UrveL2PQtnw++8J+vMtsTaR/xl64KeG8GSdXNhEgh05sobhm8rqhII2Mhb2QhNUIF9QlZt1hJdbRK/Scj/q/OlskxzAQE2B6k7lwsDvP+hGhmQakjXf5Kn0EGM5gsk3UhzFNYTl9anZtFDrNA7HjgMvJOmDEW6fEgyN7EnzFSr87UzKFMYBjnLc8TWI+QMpucuFp1N4o8S672iNiCDdhyAPpiv8BuCgJ6AsZyvWSoZ3pqM7P+i9xxctpLuFFvLtdaxDKrLFXpRwJW5dOoJVxDvooFg/wmY1UqPLnZ5qxjINHLRK7lnwME=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 1b818746-6c0f-476a-31c2-08d696fdbd99
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 06:36:27.0529 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 576d6a34-5bbf-4208-235c-08d696fded98
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 06:37:47.5596 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB6040
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_223631_721165_E77F3D6D 
-X-CRM114-Status: GOOD (  20.77  )
+X-CRM114-CacheID: sfid-20190219_223750_722468_A4414AD5 
+X-CRM114-Status: GOOD (  18.65  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -149,79 +148,67 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 > From: Rob Herring [mailto:robh@kernel.org]
-> Sent: Thursday, February 14, 2019 6:27 AM> 
-> On Mon, Feb 11, 2019 at 03:35:40PM +0000, Marc Zyngier wrote:
+> Sent: Thursday, February 14, 2019 6:30 AM
+> On Mon, Feb 11, 2019 at 03:34:23PM +0000, Marc Zyngier wrote:
 > > On 31/01/2019 08:03, Aisheng Dong wrote:
-> > > Not all 64 interrupts may be used in one group. e.g. most irqsteer
-> > > in imx8qxp and imx8qm subsystems supports only 32 interrupts.
-> > >
-> > > As the IP integration parameters are Channel number and interrupts
-> > > number, let's use fsl,irqs-num to represents how many interrupts
-> > > supported by this irqsteer channel.
+> > > One irqsteer channel can support up to 8 output interrupts.
 > > >
 > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > > > Cc: Rob Herring <robh+dt@kernel.org>
+> > > Cc: Lucas Stach <l.stach@pengutronix.de>
 > > > Cc: Shawn Guo <shawnguo@kernel.org>
 > > > Cc: devicetree@vger.kernel.org
-> > > Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 > > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > > > ---
 > > > ChangeLog:
-> > >  v1->v2:
-> > >   * change property name fsl,irqs-per-chan to fsl,num-irqs.
+> > > v2->v3:
+> > >  * fix a typo
+> > > v1->v2:
+> > >  * remove one unnecessary note.
 > > > ---
-> > >  .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt       | 6
-> +++---
-> > >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > >  .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt        | 5
+> +++--
+> > >  1 file changed, 3 insertions(+), 2 deletions(-)
 > > >
 > > > diff --git
 > > > a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqstee
 > > > r.txt
 > > > b/Documentation/devicetree/bindings/interrupt-controller/fsl,irqstee
 > > > r.txt
-> > > index 45790ce..6d0a41b 100644
+> > > index 6d0a41b..582991c 100644
 > > > ---
 > > > a/Documentation/devicetree/bindings/interrupt-controller/fsl,irqstee
 > > > r.txt
 > > > +++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,irq
 > > > +++ steer.txt
-> > > @@ -16,8 +16,8 @@ Required properties:
-> > >  - #interrupt-cells: Specifies the number of cells needed to encode an
-> > >    interrupt source. The value must be 1.
-> > >  - fsl,channel: The output channel that all input IRQs should be steered
-> into.
-> > > -- fsl,irq-groups: Number of IRQ groups managed by this controller
-> instance.
-> > > -  Each group manages 64 input interrupts.
-> > > +- fsl,num-irqs: Number of input interrupts of this channel.
-> > > +  Should be multiple of 32 input interrupts and up to 512 interrupts.
-> > >
-> > >  Example:
-> > >
-> > > @@ -28,7 +28,7 @@ Example:
-> > >  		clocks = <&clk IMX8MQ_CLK_DISP_APB_ROOT>;
-> > >  		clock-names = "ipg";
-> > >  		fsl,channel = <0>;
-> > > -		fsl,irq-groups = <1>;
-> > > +		fsl,num-irqs = <64>;
-> > >  		interrupt-controller;
-> > >  		#interrupt-cells = <1>;
-> > >  	};
+> > > @@ -6,8 +6,9 @@ Required properties:
+> > >  	- "fsl,imx8m-irqsteer"
+> > >  	- "fsl,imx-irqsteer"
+> > >  - reg: Physical base address and size of registers.
+> > > -- interrupts: Should contain the parent interrupt line used to
+> > > multiplex the
+> > > -  input interrupts.
+> > > +- interrupts: Should contain the up to 8 parent interrupt lines
+> > > +used to
+> > > +  multiplex the input interrupts. They should be specified
+> > > +sequentially
+> > > +  from output 0 to 7.
+> > >  - clocks: Should contain one clock for entry in clock-names
+> > >    see Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > >  - clock-names:
 > > >
 > >
-> > This is a change to an existing binding, so I'd need the Ack from a DT
-> > maintainer before I can queue this.
+> > I'd like an Ack from a DT person, as this is a change to an existing
+> > binding.
 > 
-> The DT maintainer doesn't care as long as there's an explanation that says it's
-> breaking compatibility and why it is okay to do so. This one doesn't do that.
-> 
+> It's fine as long as old kernels ignore extra entries and new kernels still support
+> a single entry. Otherwise, it needs a explanation.
 
-Got it.
-I will add them and resend, thanks for the suggestion.
+Yes, it's like that. No compatibility break.
 
 Regards
 Dong Aisheng
-
+> 
 > Rob
 
 _______________________________________________
