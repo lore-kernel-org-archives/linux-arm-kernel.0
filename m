@@ -2,80 +2,80 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F0A6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:07:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79422C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:07:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1A5A20685
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:07:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4AA2220685
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:07:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hQ8SCak6";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="kBz7zU80"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1A5A20685
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aIbP3FG5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="B3+FNuBg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4AA2220685
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W7u0AmrxU1r8bNWN+x4rT5cbZf8371jBLS1pJgWbeQg=; b=hQ8SCak6XU87sT
-	kmowlfnq1FKTaV+nH2fPsb/7Ae+cB3YFY3cnbXfzNHTJl1yRMgWVDln12Xe+IUVaR3yMGDgD0vHXK
-	RQfB5pu3NDxNCHNDLX8SSJRhDw0mGUT2hVj3nb8tuuPg+pdg683LtTV1PuejBnbWaf5r1276HASM2
-	oJyKJNoWj9m3zONOq+dxkERO38WUtahxFqnWt5MMKrEM0OcSL1mRU/x6mUeUQvFmhsrzfILo6tU4z
-	BP5NbE4gmeyb0a57e6SvqiHkQ2NGdbtWkZtOlEEHAvgsRfjpwM3Lnhsn7gwSlE/8RnW0dHPYnK9a1
-	KENeCXh7FFrmtzjYpHXQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=pnKrESUnJABfi65K8+QMmmMnp2z+3taHDAsmALRNRsI=; b=aIbP3FG5LspL9n
+	NDtVjX90/X8YtY2sJxPxO9NGpUBZ57bl4ESJCX4t7rmmahQLYGSTBjjBCDXNDdVwmJsHRpw3nZAiB
+	LcvUPnBemmveHwelsHFnK0OTsQvH2FE63eHd3L9oT893L41w9rsIMSs9gSVTyR5laHR+x/QZb3ZC/
+	SmQzqtr+QU1OS20aFLHHTtplTdYmu9J329afCqBr4nh06/mG4rxWkGyfc3XVsqu0kMVKSP7Bxpz4H
+	JNbTt7MW6qmooV7eDprPErgHSRlxSERdmtOcuMROC9El5tP50XZsASkEGPtMgBRuTUSbs0zO8J1A9
+	Ui2gxCAyd+SjWmxwVLUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPio-0004Ik-3g; Wed, 20 Feb 2019 11:07:26 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gwPjE-0004Yj-I4; Wed, 20 Feb 2019 11:07:52 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPim-0004Ia-BD
- for linux-arm-kernel@bombadil.infradead.org; Wed, 20 Feb 2019 11:07:24 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=M2JVAEuXX6bjQ+A7htB3fLoknpK3v/SScVb3+dv8xr0=; b=kBz7zU807W6+Zs4hsgg/czhFB
- yrvkW5aJDpkSj8gqlfBHR2eVcFggMnB++kirOlSk0kBdSQXU8eXAGW9xXfNaFkjMmoSN2szFqdNM2
- 073wIDrtpzwG9vAUDF0ED8HFNTLDQCL9Y3yVZwXIFKQ2nIRBJQMitYWxV/xqNbK7oyiPKAtWgSyEb
- RoERvwKDnMx/G0gBFJLb7oVyjECZeiGJgBckMRZayniOPLVKcEZCfx9DngwZg/k9cKAKrROcT2X2B
- Ji9cqTgK8b96DVKdCMEtp6PApZBXBHdnuVQ4N6bS983pdaqaPEJlgLjVezL/gi6ferOLHYX/+PqCT
- CD/Z3Rfrw==;
-Received: from relay10.mail.gandi.net ([217.70.178.230])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPii-0006T5-2z
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:07:21 +0000
-Received: from localhost (alyon-652-1-153-126.w109-212.abo.wanadoo.fr
- [109.212.12.126])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay10.mail.gandi.net (Postfix) with ESMTPSA id 57F0E240020;
- Wed, 20 Feb 2019 11:06:43 +0000 (UTC)
-Date: Wed, 20 Feb 2019 12:06:43 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Claudiu.Beznea@microchip.com
-Subject: Re: [PATCH v2 2/3] clk: at91: sckc: add support for SAM9X60
-Message-ID: <20190220110643.GI11432@piout.net>
-References: <1550146447-1441-1-git-send-email-claudiu.beznea@microchip.com>
- <1550146447-1441-3-git-send-email-claudiu.beznea@microchip.com>
- <20190218212007.GW10129@piout.net>
- <c00fb195-1688-6ac4-a606-5e08509a2c39@microchip.com>
+ id 1gwPjB-0004YO-El
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:07:50 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1KB6txm029128;
+ Wed, 20 Feb 2019 05:06:55 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550660815;
+ bh=ZQw1I1NRB6o7UE3y1cZkf6QM2DXwprOwHvCKdEFQKYk=;
+ h=From:To:CC:Subject:Date;
+ b=B3+FNuBgsc+hkbEUIN2O2dLzg8iVq2je9paQM/o6Z/vxE37RlMY75L3vmoqBped3/
+ dr3kaTGzb11Mx2GsSgiG/5gp+hYEGc2XwSY/PzKfW7lgG+6g2cFxlH3bmBi8K97czV
+ TOwCLkeTkYCOBV4ARxZ+ttGw3IAzKHpJySWEqVaA=
+Received: from DLEE105.ent.ti.com (dlee105.ent.ti.com [157.170.170.35])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1KB6th0031290
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 20 Feb 2019 05:06:55 -0600
+Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE105.ent.ti.com
+ (157.170.170.35) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 20
+ Feb 2019 05:06:54 -0600
+Received: from dflp32.itg.ti.com (10.64.6.15) by DLEE110.ent.ti.com
+ (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 20 Feb 2019 05:06:54 -0600
+Received: from psplinux063.india.ti.com (ileax41-snat.itg.ti.com
+ [10.172.224.153])
+ by dflp32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1KB6qGG024401;
+ Wed, 20 Feb 2019 05:06:53 -0600
+From: Sekhar Nori <nsekhar@ti.com>
+To: Arnd Bergmann <arnd@arndb.de>
+Subject: [PATCH] ARM: davinci: fix build failure with allnoconfig
+Date: Wed, 20 Feb 2019 16:36:52 +0530
+Message-ID: <20190220110652.25988-1-nsekhar@ti.com>
+X-Mailer: git-send-email 2.16.2
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <c00fb195-1688-6ac4-a606-5e08509a2c39@microchip.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_060720_375814_72256577 
-X-CRM114-Status: GOOD (  31.37  )
+X-CRM114-CacheID: sfid-20190220_030749_567101_C2CE543B 
+X-CRM114-Status: GOOD (  14.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,104 +87,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, sboyd@kernel.org,
- mturquette@baylibre.com, linux-kernel@vger.kernel.org,
- Ludovic.Desroches@microchip.com, robh+dt@kernel.org, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: David Lechner <david@lechnology.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>,
+ Kevin Hilman <khilman@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 19/02/2019 09:17:43+0000, Claudiu.Beznea@microchip.com wrote:
-> 
-> 
-> On 18.02.2019 23:20, Alexandre Belloni wrote:
-> > On 14/02/2019 12:14:32+0000, Claudiu.Beznea@microchip.com wrote:
-> >> From: Claudiu Beznea <claudiu.beznea@microchip.com>
-> >>
-> >> Add support for SAM9X60.
-> >>
-> >> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
-> >> ---
-> >>  drivers/clk/at91/sckc.c | 30 ++++++++++++++++++++++++++++++
-> >>  1 file changed, 30 insertions(+)
-> >>
-> >> diff --git a/drivers/clk/at91/sckc.c b/drivers/clk/at91/sckc.c
-> >> index b7163d3a2269..b3075c51d260 100644
-> >> --- a/drivers/clk/at91/sckc.c
-> >> +++ b/drivers/clk/at91/sckc.c
-> >> @@ -459,6 +459,36 @@ static void __init of_at91sam9x5_sckc_setup(struct device_node *np)
-> >>  CLK_OF_DECLARE(at91sam9x5_clk_sckc, "atmel,at91sam9x5-sckc",
-> >>  	       of_at91sam9x5_sckc_setup);
-> >>  
-> >> +static const struct clk_slow_offsets at91sam9x60_offsets = {
-> >> +	.cr_rcen = AT91_SCKC_OFFSET_INVALID,
-> >> +	.cr_osc32en = 1,
-> >> +	.cr_osc32byp = 2,
-> >> +	.cr_oscsel = 24,
-> >> +};
-> >> +
-> >> +static void __init of_at91sam9x60_sckc_setup(struct device_node *np)
-> >> +{
-> >> +	struct device_node *childnp;
-> >> +	void (*clk_setup)(struct device_node *np, void __iomem *io,
-> >> +			  const struct clk_slow_offsets *offsets);
-> >> +	const struct of_device_id *clk_id;
-> >> +	void __iomem *regbase = of_iomap(np, 0);
-> >> +
-> >> +	if (!regbase)
-> >> +		return;
-> >> +
-> >> +	for_each_child_of_node(np, childnp) {
-> >> +		clk_id = of_match_node(sckc_clk_ids, childnp);
-> >> +		if (!clk_id)
-> >> +			continue;
-> >> +		clk_setup = clk_id->data;
-> >> +		clk_setup(childnp, regbase, &at91sam9x60_offsets);
-> >> +	}
-> > 
-> > You actually need to have new bindings. The sam9x60 registration should
-> > look more like the sama5d4 registration. I have a rework for the sam9x5
-> > sckc that I will send this week to have a proper binding (i.e: no
-> > children).
-> 
-> Does this means that this would also solve the problem I tried to address
-> with this patch?
-> 
+allnoconfig build with just ARCH_DAVINCI enabled
+fails because drivers/clk/davinci/* depends on
+REGMAP being enabled.
 
-I've sent the series now. It doesn't solve this particular issue.
+Fix it by selecting REGMAP_MMIO when building in
+DaVinci support.
 
-> > 
-> > However, there is a fundamental change in the sam9x60, previously, the
-> > sckc had only one output clock. the sam9x60 has both td_slck and
-> > md_slck. Both need to be accessible because they are input to the PMC.
-> 
-> I was guided by the fact that md_slck is generated by the always on slow RC
-> oscillator (part of slow clock controller) and since there is no control
-> for it on slow clock controller there is no need to be described by this
-> driver.
-> 
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Well, then it would need to be added as an input to the sckc which would
-mean that you still need to change the binding. This doesn't matter too
-much but else your clock tree would be wrong.
-
-> > 
-> > This means you will have to register the sckc with of_clk_hw_onecell_get
-> > as the get callback.
-> 
-> Ok, I'll look into it.
-> 
-> > 
-> > We could still decide to do the same with sam9x5 even if it has only one
-> > output clock.
-> > 
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 664e918e2624..eb50c0978860 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -593,6 +593,7 @@ config ARCH_DAVINCI
+ 	select HAVE_IDE
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select PM_GENERIC_DOMAINS_OF if PM && OF
++	select REGMAP_MMIO
+ 	select RESET_CONTROLLER
+ 	select USE_OF
+ 	select ZONE_DMA
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.16.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
