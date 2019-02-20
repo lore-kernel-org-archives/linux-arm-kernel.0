@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A928AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:54:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17688C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:54:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7921B2183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:54:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB8E82083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:54:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oo6clA/w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7921B2183F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X7sCiqMb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB8E82083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OoThSQ4tt6uTL5j7Tmnt4pFC0bt5FBjy4KoXYVKkafI=; b=Oo6clA/w9xWGi/
-	/TX5G0HyzJBGo9lCqy37o4gBAj2LTWRt+Kwcnnq+9BElhNVM6MU8CtLvZGNVWv17DgOX3TewY6jmC
-	NBJtPEASwuXCScuX69/GgxRcQZpcdWI7QWcneze9S/nf9Eo+j2dDyn8mwic8TK0OJybKKjK0d1oL0
-	CelSzQ71FuOEJwg3XVZPe0PNTYCQKjBHszQogQnNfF//H+nOgnlDzxmnFQRZCSSX/7Yi5CpLs1jtU
-	8ZBDCw6TFZ1RhfwxPFL0TfuDoREWmFY6ooSS1BYHkeO7Uj+WdZO0Muhv8Cv1D3hIgc/BKNlwYGVRY
-	GJiT34eUouFFSveDRT7w==;
+	List-Owner; bh=DeU/QaxImFp43kg8sfsMreqoVdWUc0cF7zsJ1kXYgI8=; b=X7sCiqMbAlAwQ7
+	0qDltRCAFe/GXuoGOmtG2Hk8+qCQG3pUFeJDegvvnKaHrHUvdtc/jWegbQSEViS7bs6aG2aQKiSsl
+	7zEiypoHB7phVqS3/BrVOHl6zGYh4BRp5np+zUaRT7iPpF5oTcQXoca6EukgQv0M9Fz/vWS4EYJ/f
+	va0r3LJiUWWWDiZ+xOJooD2dtUzMwslz+RcvXz5O4fB3TPbgudy5gtFr+wjAKZttXIZRV8OwbToie
+	oQN37hc3P171JXIbrMonPfqp+LcmtBhsbhY9oUgJ7vYu9E7dZMB3yCLLNwExXYVj7IVUGzdez3vbs
+	9dYRvpAMGJkrMYlFMSkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwMi7-00007b-4b; Wed, 20 Feb 2019 07:54:31 +0000
+	id 1gwMiJ-0000LR-7N; Wed, 20 Feb 2019 07:54:43 +0000
 Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwMhz-0008Ul-G7; Wed, 20 Feb 2019 07:54:24 +0000
-X-UUID: 368622f3f47f42ada0e46c6b5a6862a9-20190219
-X-UUID: 368622f3f47f42ada0e46c6b5a6862a9-20190219
+ id 1gwMhz-0008Uf-G6; Wed, 20 Feb 2019 07:54:24 +0000
+X-UUID: 6f0d2cf2bf78466696e89aefc8ce59bb-20190219
+X-UUID: 6f0d2cf2bf78466696e89aefc8ce59bb-20190219
 Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
  (envelope-from <jerry-ch.chen@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1662368699; Tue, 19 Feb 2019 23:53:12 -0800
-Received: from mtkmbs08n1.mediatek.inc (172.21.101.55) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 23:53:10 -0800
+ with ESMTP id 1668174344; Tue, 19 Feb 2019 23:53:10 -0800
+Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 19 Feb 2019 23:53:08 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 20 Feb 2019 15:53:09 +0800
+ mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 20 Feb 2019 15:53:07 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Wed, 20 Feb 2019 15:53:09 +0800
+ Frontend Transport; Wed, 20 Feb 2019 15:53:07 +0800
 From: Jerry-ch Chen <Jerry-Ch.chen@mediatek.com>
 To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
  <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
-Subject: [RFC PATCH V0 6/7] media: platform: Add Mediatek FD driver KConfig
-Date: Wed, 20 Feb 2019 15:48:12 +0800
-Message-ID: <1550648893-42050-7-git-send-email-Jerry-Ch.chen@mediatek.com>
+Subject: [RFC PATCH V0 3/7] [media] dt-bindings: mt8183: Added FD-SMEM
+ dt-bindings
+Date: Wed, 20 Feb 2019 15:48:09 +0800
+Message-ID: <1550648893-42050-4-git-send-email-Jerry-Ch.chen@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
 References: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_235423_567228_20CD980F 
-X-CRM114-Status: GOOD (  10.13  )
+X-CRM114-CacheID: sfid-20190219_235423_569076_2B3880E7 
+X-CRM114-Status: GOOD (  10.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,46 +89,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds KConfig for Mediatek Face Detection driver (FD).
-FD is embedded in Mediatek SoCs. It can provide hardware
-accelerated face detection function.
+This patch adds the DT binding documentation for the shared memory
+between Face Detection unit of the camera system and the co-processor
+in Mediatek SoCs.
 
 Signed-off-by: Jerry-ch Chen <jerry-ch.chen@mediatek.com>
 ---
- drivers/media/platform/Kconfig         |  2 ++
- drivers/media/platform/mtk-isp/Kconfig | 10 ++++++++++
- 2 files changed, 12 insertions(+)
- create mode 100644 drivers/media/platform/mtk-isp/Kconfig
+ .../devicetree/bindings/media/mediatek,fd_smem.txt | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/mediatek,fd_smem.txt
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index a505e9f..ef08d48 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -32,6 +32,8 @@ source "drivers/media/platform/davinci/Kconfig"
- 
- source "drivers/media/platform/omap/Kconfig"
- 
-+source "drivers/media/platform/mtk-isp/Kconfig"
-+
- config VIDEO_ASPEED
- 	tristate "Aspeed AST2400 and AST2500 Video Engine driver"
- 	depends on VIDEO_V4L2
-diff --git a/drivers/media/platform/mtk-isp/Kconfig b/drivers/media/platform/mtk-isp/Kconfig
+diff --git a/Documentation/devicetree/bindings/media/mediatek,fd_smem.txt b/Documentation/devicetree/bindings/media/mediatek,fd_smem.txt
 new file mode 100644
-index 0000000..096d2cb
+index 0000000..6f7c836
 --- /dev/null
-+++ b/drivers/media/platform/mtk-isp/Kconfig
-@@ -0,0 +1,10 @@
-+config VIDEO_MEDIATEK_FD_SUPPORT
-+	bool "Mediatek face detection processing function"
++++ b/Documentation/devicetree/bindings/media/mediatek,fd_smem.txt
+@@ -0,0 +1,28 @@
++Mediatek FD Shared Memory Device
 +
-+	default n
-+	help
-+		Support the basic hardware accelerated face detectioin feature.
++Mediatek FD Shared Memory Device is used to manage shared memory
++among CPU, FD and coprocessor. It is associated with a reserved
++memory region (Please see Documentation/devicetree/bindings/
++reserved-memory/mediatek,reserve-memory-fd_smem.txt) and
++provide the context to allocate memory with dma addresses.
 +
-+		FD driver provide face detection function, it can detect
-+		faces of Rotation-in-Plane from -180 degrees to +180 degrees
-+		and Rotation-off-Plane from -90 degrees to +90 degrees.
++Required properties:
++- compatible: Shall be "mediatek,fd_smem"
++
++- iommus: Shall point to the respective IOMMU block with master port
++  as argument. Please set the ports which may be accessed
++  through the common path. You can see
++  Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
++  for the detail.
++
++- mediatek,larb: must contain the local arbiters in the current SoCs.
++  Please set the larb of imgsys for FD if you are using FD function.
++  You can see Documentation/devicetree/bindings/memory-controllers/
++  mediatek,smi-larb.txt for the detail.
++
++Example:
++	fd_smem: fd_smem {
++		compatible = "mediatek,fd_smem";
++		mediatek,larb = <&larb5>;
++		iommus = <&iommu M4U_PORT_CAM_IMGI>;
++	};
 -- 
 1.9.1
 
