@@ -2,83 +2,57 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BAD74C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:42:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D0E1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:49:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8D5EE2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:42:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D2AEB2089F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:49:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QyEoiktM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="twHREtIo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D5EE2089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UEBkrg7o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2AEB2089F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TTeZt5I2XyrOiiWprhWRE0jzDOX1faWPdF1KHiqx8go=; b=QyEoiktMK4yA6s
-	MhccbTmrSYI9LfmXBfWN91Lwl8TTlxTKBijfO9QzFi7J+FEKJCW4nZAQkh+/Z1rxNZHccdP9a9mu/
-	6d2yhqbkAMuk8uHcNB1bF9cuKSLWc4HC9xTKzWN5Xf/KYG/i9Ws5lvRxcsxYk+R2eTzVhLjJalS6k
-	AxQihiQSaPGbSwLZVbBv3E34YDq2ifZFfeHKGNVE1uqsDRKMXja1wKJTfOWfd4M24qLFs3InkrJKJ
-	o4hdsSTT4mftFtydp8qf7MglgTxkwZdLOCi7+dgC2+SEB2c3tKKJowiQlJoB5jM0FnLiWLwyUqAd6
-	HZlufHByPMQR51AAScxw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=z7KFuMYCILZwHcUPm5nzmrO3aWfzRG769tnZabB5YRs=; b=UEBkrg7ocIUqqX
+	ucaV5nxihxlNJQ/RorowNAX4jKNn+DdsHdahoyl9yRH1ty17vvCo0xJsrCGsUJ7URdjxtFerV+gAF
+	jtEQDoYNkQ6TV9ElKhDsT6rZ++1yRlYXbLOYgjn2Z9PuH0Un7IVndRWv04l6qdxyAcCE6t/zDQyfD
+	KxRqrQXWZy0emoIOhKMZ+GPuHUFkItrQihGtDrd18aJcEl/Itg9Gfzf27ywmrF1b/8NTfn1MplA8Q
+	0IMlKxt4BwVF+MFXxApKvMshvvWYMvAeWbjmNuPkZE4uN4ReGlw3mzkh2R7pAOnwp7clY1sD1UdvP
+	QuHvT+pUyL10zAGa8haA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwOOA-0003IX-L6; Wed, 20 Feb 2019 09:42:02 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gwOUs-0005Sw-9D; Wed, 20 Feb 2019 09:48:58 +0000
+Received: from relay12.mail.gandi.net ([217.70.178.232])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwOO6-0003HL-8L
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 09:41:59 +0000
-Received: by mail-lj1-x243.google.com with SMTP id s5-v6so20145948ljd.12
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 01:41:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=coW99miv52Oebix0UpxqugpmQqA6e89avvbbbDjxFyE=;
- b=twHREtIo4ImtaX/cgoO1GofFO3Mv3V2td0STXWoNTH6MfzJgQFY1EgUoEc/E6YRf3A
- +oy7QZLbd/8YXVqodIsf+MkfoLauf6jDvStSd5HQRPVCSJxYZvbzg+AMjka1MD5fLpBH
- 1AZe0Pbx0ACYsLs54ZY3G2H30cmSvb4LQwstsxPnR5+Wt8ijIR8bTLeZ9T4qIVKt5ucG
- Wn4oCz6FOrAlpQvHaoz7URC1OJtPjHFQx+KqaGdDGKFDQ5Q7Gd0jJ4F6pXMsLr0m56ui
- vcEvC1KM8fwcdqRHMa7EN4BvcIe24hYo4D4gmxmE73fwX5vIEZdOLSgF4ZlEB+IhYvk1
- fxwQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=coW99miv52Oebix0UpxqugpmQqA6e89avvbbbDjxFyE=;
- b=BJoDqsjKoZb9onr6MBKAgsNT7dD3F5vyWB2qokiOCDOthANuimhxunYI9v7SDIKDVH
- RanMdi21rnOGEsA0CVMrFIec90cxkt0wxthCF8C1W3mnWjDGQ+RMNiqg93NrC0598G5j
- FwHi8nKFZIbaXbhb1Bc7aoRdCsVeFEbk6R3AFrmTPpUIZH7Mrn56bBkGYsD2pm/nFHqb
- Qv2yEuKC7Wc4wfv3NE3ST2aXg8MJW0Zbfdvd9MRkGZhiwmJbYx3eWB/NbiomRecaoYaM
- QzXfO//zkDQ3utSGel3R3q7Ts8PIoDve+2Z5fY1EJca97gZooouVeVGnBHX6V/l8BVsd
- A98w==
-X-Gm-Message-State: AHQUAuZyevpLu2K2BEu0diXhiYKWiGo7Xtft/1O0WuH0lQ9BoGKMk9CL
- la+smxcWsWG3Wni5qD3oMA/YgU0KqMJnTLoYFMVC5w==
-X-Google-Smtp-Source: AHgI3IbUqbLT+SRx4BO45Bm00sPCeH8GZZhxXBS14tqNdIXqzSEl8UfNJ21vroYjYvAFj9IW9ozMDa4HJ8otsw1IF8k=
-X-Received: by 2002:a2e:6109:: with SMTP id
- v9-v6mr19804106ljb.126.1550655715094; 
- Wed, 20 Feb 2019 01:41:55 -0800 (PST)
+ id 1gwOUp-0005SA-DH
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 09:48:57 +0000
+Received: from localhost (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr
+ [90.88.23.190]) (Authenticated sender: thomas.petazzoni@bootlin.com)
+ by relay12.mail.gandi.net (Postfix) with ESMTPSA id 534AB200015;
+ Wed, 20 Feb 2019 09:48:46 +0000 (UTC)
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+To: Bjorn Helgaas <bhelgaas@google.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, linux-pci@vger.kernel.org
+Subject: [PATCH 0/2] PCI: fix pci-mvebu after conversion to common bridge emul
+ code
+Date: Wed, 20 Feb 2019 10:48:39 +0100
+Message-Id: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-References: <1550163266-19975-1-git-send-email-alexandre.torgue@st.com>
-In-Reply-To: <1550163266-19975-1-git-send-email-alexandre.torgue@st.com>
-From: Linus Walleij <linus.walleij@linaro.org>
-Date: Wed, 20 Feb 2019 10:41:43 +0100
-Message-ID: <CACRpkdbaBzRZTea4nmm8b-wt9iUipPLaY1MbaAKEPxoY+HFVjA@mail.gmail.com>
-Subject: Re: [PATCH 0/2] pinctrl STM32 updates
-To: Alexandre Torgue <alexandre.torgue@st.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_014158_367910_C66216D6 
-X-CRM114-Status: UNSURE (   8.05  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190220_014855_594252_AEE1E040 
+X-CRM114-Status: GOOD (  10.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,28 +64,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- linux-stm32@st-md-mailman.stormreply.com
+Cc: Andrew Lunn <andrew@lunn.ch>, Russell King <linux@arm.linux.org.uk>,
+ Jason Cooper <jason@lakedaemon.net>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Leigh Brown <leigh@solinno.co.uk>,
+ =?UTF-8?q?Lu=C3=ADs=20Mendes?= <luis.p.mendes@gmail.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 14, 2019 at 5:54 PM Alexandre Torgue
-<alexandre.torgue@st.com> wrote:
+Hello,
 
-> Please find 2 updates for STM32 pinctrl driver:
->
->  -Fix a memory leak issue present since the beginning of the driver.
->  -Handle error case when a hwspinlock can't get locked.
+This set of two patches aim at fixing some regression reported by two
+users (Luis and Leigh), that were introduced by the conversion of the
+pci-mvebu driver to the common PCI bridge emulation code shared
+between pci-aardvark and pci-mvebu.
 
-Patches applied for v5.1.
+Due to this conversion, some registers of the PCI configuration that
+used to be read-only are now read-write, making the Linux PCI core
+believe that some features are implemented by the PCI bridge. Namely
+in the case of pci-mvebu, the prefetchable memory base/limit registers
+were read-only, while they are now read-write. Due to this, the Linux
+PCI core now believes it can configure a prefetchable memory area, but
+this is not supported by pci-mvebu, which does not have the logic to
+create the appropriate MBUs windows.
 
-Yours,
-Linus Walleij
+This set of two commits allow PCI controller code to tell the PCI
+bridge emulation logic about their capabilities. Because we envision
+that other capabilities than prefetchable memory support might need to
+be communicated from the PCI controller code to the PCI bridge
+emulation code in the future, we introduce a "flags" argument, even if
+for now only one flag is supported.
+
+Lorenzo, let me know what you think about this approach. I am open to
+suggestions if the proposed approach is not satisfying.
+
+Both patches have been confirmed by Luis and Leigh to fix the
+regression, but I'll let them give a formal Tested-by.
+
+Best regards,
+
+Thomas Petazzoni
+
+Thomas Petazzoni (2):
+  PCI: pci-bridge-emul: Create per-bridge copy of register behavior
+  PCI: pci-bridge-emul: Extend pci_bridge_emul_init() with flags
+
+ drivers/pci/controller/pci-aardvark.c |  2 +-
+ drivers/pci/controller/pci-mvebu.c    |  2 +-
+ drivers/pci/pci-bridge-emul.c         | 86 ++++++++++++++++++---------
+ drivers/pci/pci-bridge-emul.h         | 13 +++-
+ 4 files changed, 73 insertions(+), 30 deletions(-)
+
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
