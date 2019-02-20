@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DDDE8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:53:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9B0FC10F01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:53:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD3242083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:53:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BAF6E21902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:53:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iEvkNoIr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD3242083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dk7c8rGW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BAF6E21902
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=dAmGmF+DPUlLsHKD4N3bVAVaI26SOwukXQi5six42qY=; b=iEvkNoIrJxuFDd
-	FvYNuVe7dI8WyxnaaqZpWy+zPvy2Y4SG3GIFhEYlTljB9TsbBdSvbitTQsLCxI1QPBHD3ZtJjFMzt
-	fzVstdUVTO83fG8vdbFhnueWjA6N5l8WWUFtft/uPRGHAaccZoH7UbrJn7UZ64VbY1p23kCsxS+qe
-	TeDv/soqolRRkGX8zmSNeYe/QQAWkrb2IfQpiD2Jw2d+eaWksYcCCjlfoN6dQt6h/qeHjsk2Ipa79
-	+4ALXKtwpMv1fYZ3ezMitq6xAIbwzw5a6UrfuC+4OlHUcTFLPjPaYZ1yRmAce4Aq/29+q3uVmfOAg
-	m+L+0t0MRKuLAKW4xPWA==;
+	List-Owner; bh=akwW9zxi8R6XatZAg1DJnbKqgUItteY1aqPTGC5H0Us=; b=dk7c8rGWc7r2P+
+	+6hPuEuUphKxeKMrYrwZnoX0kT9+BgadRwkScbrRnWe69V1bKARoQ4XlAS7h8+LuD2fPrKFeH31zY
+	V/F+6vlk5Y3dl4VuHZDmryq1LKNazIk96BcNE4P4zMK7irdSe8OIh9vrpspJ+8yVRn9kO97raOrGp
+	Zo36rSK4SBTAvxfkUSbsm/E0gZi7cHkfh7YzGGxYc5msJhL3WfiJ+jBsigmEdxmGpG1QGB1hwWZDT
+	BmbIBQSLOMYakInNGzjODLCzOfeLDYBA9J3UaCU+cnc/7EUp5Ukn8AcahnncKdvM+ga4f0bgi1yo7
+	UOwlalL1XRsKPDdhIzNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwMhC-0007hd-F8; Wed, 20 Feb 2019 07:53:34 +0000
+	id 1gwMhQ-0007xH-Mn; Wed, 20 Feb 2019 07:53:48 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwMh8-0007f5-4Z; Wed, 20 Feb 2019 07:53:31 +0000
-X-UUID: 02df3bdb4e7545bd8d1e663d511fcd41-20190219
-X-UUID: 02df3bdb4e7545bd8d1e663d511fcd41-20190219
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw01.mediatek.com
+ id 1gwMh9-0007fa-4m; Wed, 20 Feb 2019 07:53:32 +0000
+X-UUID: bfe9108e66444499bb1f25f396aaff9b-20190219
+X-UUID: bfe9108e66444499bb1f25f396aaff9b-20190219
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
  (envelope-from <jerry-ch.chen@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1634595623; Tue, 19 Feb 2019 23:53:16 -0800
-Received: from mtkmbs08n2.mediatek.inc (172.21.101.56) by
+ with ESMTP id 634939563; Tue, 19 Feb 2019 23:53:11 -0800
+Received: from MTKMBS06N1.mediatek.inc (172.21.101.129) by
  MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 23:53:14 -0800
+ 15.0.1395.4; Tue, 19 Feb 2019 23:53:10 -0800
 Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs08n2.mediatek.inc (172.21.101.56) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 20 Feb 2019 15:53:06 +0800
+ mtkmbs06n1.mediatek.inc (172.21.101.129) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 20 Feb 2019 15:53:08 +0800
 Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas09.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Wed, 20 Feb 2019 15:53:06 +0800
+ Frontend Transport; Wed, 20 Feb 2019 15:53:08 +0800
 From: Jerry-ch Chen <Jerry-Ch.chen@mediatek.com>
 To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
  <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
-Subject: [RFC PATCH V0 2/7] dts: arm64: mt8183: Add FD shared memory node
-Date: Wed, 20 Feb 2019 15:48:08 +0800
-Message-ID: <1550648893-42050-3-git-send-email-Jerry-Ch.chen@mediatek.com>
+Subject: [RFC PATCH V0 5/7] dts: arm64: mt8183: Add FD nodes
+Date: Wed, 20 Feb 2019 15:48:11 +0800
+Message-ID: <1550648893-42050-6-git-send-email-Jerry-Ch.chen@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
 References: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: D27CED0A05996E2DCA23017B0A95C7F7563A5A8802F811BE44925405C41ABEFB2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_235330_181164_61068A66 
+X-CRM114-CacheID: sfid-20190219_235331_194847_C5588AE3 
 X-CRM114-Status: UNSURE (   8.33  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
@@ -90,33 +89,46 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds a shared memory region used on mt8183 for exchanging
-meta data between co-processor and Face Detection (FD) unit.
+This patch adds nodes for Face Detection (FD) unit. FD is embedded
+in Mediatek SoCs and works with the co-processor to perform face
+detection on the input data and image and output detected face result.
 
 Signed-off-by: Jerry-ch Chen <jerry-ch.chen@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8183.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8183.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-index c3a516e..b3d8dfd 100644
+index b3d8dfd..45c7e2f 100644
 --- a/arch/arm64/boot/dts/mediatek/mt8183.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
-@@ -134,6 +134,14 @@
- 		clock-output-names = "clk26m";
- 	};
+@@ -440,6 +440,26 @@
+ 			#clock-cells = <1>;
+ 		};
  
-+	reserve-memory-fd_smem {
-+		compatible = "mediatek,reserve-memory-fd_smem";
-+		no-map;
-+		size = <0 0x00100000>;  /*1 MB share mem size */
-+		alignment = <0 0x1000>;
-+		alloc-ranges = <0 0x40000000 0 0x10000000>;
-+	};
++		fd_smem: fd_smem {
++			compatible = "mediatek,fd_smem";
++			mediatek,larb = <&larb5>;
++			iommus = <&iommu M4U_PORT_CAM_IMGI>;
++		};
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
++		fd:fd@1502b000 {
++			compatible = "mediatek,fd";
++			mediatek,larb = <&larb5>;
++			mediatek,vpu = <&vpu>;
++			iommus = <&iommu M4U_PORT_CAM_FDVT_RP>,
++				 <&iommu M4U_PORT_CAM_FDVT_WR>,
++				 <&iommu M4U_PORT_CAM_FDVT_RB>;
++			reg = <0 0x1502b000 0 0x1000>;
++			interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&imgsys CLK_IMG_FDVT>;
++			clock-names = "FD_CLK_IMG_FD";
++			smem_device = <&fd_smem>;
++		};
++
+ 		vdecsys: syscon@16000000 {
+ 			compatible = "mediatek,mt8183-vdecsys", "syscon";
+ 			reg = <0 0x16000000 0 0x1000>;
 -- 
 1.9.1
 
