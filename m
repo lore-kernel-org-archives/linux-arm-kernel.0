@@ -2,86 +2,86 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E6EDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 13:16:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF86BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 13:18:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48A142085A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 13:16:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7FA192183F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 13:18:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J7XEUwXz";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="qZ58E2+R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48A142085A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m/jjL4Cp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="bc+n4ZGm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7FA192183F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cv+fk6VI1Y+NEVQ/u/IxrnEu6CamGMSKYBLkXFiNn4s=; b=J7XEUwXzJwU2Sm
-	bowHdzaTsXRV5uM5HVfxAg5m/RNuwlYPIQK+hIKEl6pyH96RoocWLzGfQyJTngs2jWrddOs7k81Wp
-	0h+PBXjRd4ivC2fSjnf274DNeS/loZPAXncl9euhTDTwf3oXZAHHiqo4GYX6GiC6b/2OzSddWCckU
-	YHNR08HEPDrW8B58y/vvxqlQPl1YartKOTLKTz2PXZ5ir3ABi3ctzr0iwaWps7EAE7/w6R/BAT/2E
-	8a1kzdqvZV0IfT6ojywGHpAAikiQcDnlMOh9c7NVJAc4xBgTP4Nloifn7TTK0A3YBqZNKTvz5gjv7
-	TtqCjLI13nIX2oYdOvFg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=09imbYHD0NDVipIjFNwpSpjTkWJbOCv9Pf//dmbZd4I=; b=m/jjL4CprzLbvR
+	oqfh58gf1TAb5AL0CbXSSjSWrGZZYvtT4gOj57hnIaKV5ZHIalh3IhFU/qNjt0XJYOn3Nux3+VTsa
+	p07pZbaYcZORt9nRSvjo/O0fLZvJfgkdZL8/vxh2Eh6E59aQOZY4JES02vO9y6UJ2FnpmarmSEHbz
+	dKBiLTq8nuiVegd2O7IWZdO670E5fhVt9v02MMB33C7Q6u6iUYwm2jrClKQsOqy8xa1Taeku8Z5Vp
+	srNxHdJw7L2ZizhQYbzwTPh7KPmUysV8pgmb9ScFHRov+uhewXZUIitHxA2huFZuxDlztcS2qNpDh
+	/z7yBWtfbrWrgugsuNQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwRjl-0001Xc-GJ; Wed, 20 Feb 2019 13:16:33 +0000
-Received: from mail-yw1-xc42.google.com ([2607:f8b0:4864:20::c42])
+	id 1gwRlH-0001qI-Fr; Wed, 20 Feb 2019 13:18:07 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwRjf-0001XA-Tg
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 13:16:29 +0000
-Received: by mail-yw1-xc42.google.com with SMTP id o184so9164150ywo.5
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 05:16:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=FAlIGQCYj27WzYwAN2yS5eVNYPmVEv6xTu9i5VkvUJg=;
- b=qZ58E2+Rz+r4uOfnHb7+Rvb8IW0J3Lskl7qEDQYV3wOB5bgYbsNDWOvQ8vCEOdF1O3
- 7zRYpgJaxYUCKjkND2yugrlnWdC5WdQD55m5BxOzJTkXfT6ECI9WQpauzaMdennYsKaD
- bxLRQ+Ibr9AfEqngwb0KX04f2LGDf5C2o+j74cDFjdOZUDrYm628h9MlSssVoOKh5dM7
- /MzHSso0AL1NyTfc1EqgkS76Y40jawGBbIMoxY2UnsTZM/p/GceRQQZ7qzXBxS/gqBi5
- CIRZyiHDi1bIhgSlyUiaZo7fCcjIBt5Ez3jMqzMfC6BJBdnqEw5pr167xoaWy1T55q1A
- demQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=FAlIGQCYj27WzYwAN2yS5eVNYPmVEv6xTu9i5VkvUJg=;
- b=JxYOdw1KDdIIodhzTnTCWKWB7sO/aa2LoBM1u8Q9+6dnwcfEWt/pJIqkxHy6RwF/gx
- tU3uE5CkBQ0Z4X1KRVgMRpGGe07wwjD+rEGa1gttslPyCBBB68z3DoMmYjar42j2GHMI
- u/8l7uvmpa4wYEyivEZ5XbWvCfJ8gxj26yuLTP/uW9W0hlnsy3LfAIZsI9SolJVnUx0N
- pHCDVkc804wHFs87s1CEpeYvyATUN0wy3P/WpVxFl4p+afNrQqihGvWUqt8hjrnXgeK2
- e2DroF4NARhW4lUU2kRQ6GkrGdw+uW0noOnftkLoFYkBJ4A6X68xr1F7tmuNJenOdU0c
- ba1g==
-X-Gm-Message-State: AHQUAubVEre+4FF9yc7sOfg7qiPpUbapiXP2P717GshghzVP4/bl4WfV
- j5RUxKKDHc3lJunfetyZuqiJG6OpskKgA2EE80e5Uw==
-X-Google-Smtp-Source: AHgI3IYYQq9FKrCXNUp5a3y1mW0Opvom5VBRxBQe6l6oivu6QLLeBzvfsccSA2SJy6Wfefn/E/Iz17sCC7rzniMWpR4=
-X-Received: by 2002:a81:20d4:: with SMTP id
- g203mr28331506ywg.142.1550668585192; 
- Wed, 20 Feb 2019 05:16:25 -0800 (PST)
+ id 1gwRlC-0001pq-WE
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 13:18:05 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1KDHcES097511;
+ Wed, 20 Feb 2019 07:17:38 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550668658;
+ bh=VrlBz4j0umMYHfaozOqh6huHGwZYLnLNBA1TE12Z5vw=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=bc+n4ZGmVawl1xzr01Q0U4dCj4JYrlbllVZg5Ayh96+qCxDFSWLJs7biVfClS02mo
+ VEeddUkmGFvxnvkkiKrJA/EKzLHvhOs1OMU781HxVasismUbxfZRU/2bR8wGeK4Wb0
+ 2QF63ZzAJ5ZBtBpanYDEhcbd/1cVOLCbriPTpQNA=
+Received: from DLEE114.ent.ti.com (dlee114.ent.ti.com [157.170.170.25])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1KDHcsL039727
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Wed, 20 Feb 2019 07:17:38 -0600
+Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE114.ent.ti.com
+ (157.170.170.25) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 20
+ Feb 2019 07:17:38 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Wed, 20 Feb 2019 07:17:38 -0600
+Received: from [172.24.190.117] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1KDHYw8011068;
+ Wed, 20 Feb 2019 07:17:34 -0600
+Subject: Re: [PATCH v5 06/10] irqchip: ti-sci-intr: Add support for Interrupt
+ Router driver
+To: Marc Zyngier <marc.zyngier@arm.com>
+References: <20190212074237.2875-1-lokeshvutla@ti.com>
+ <20190212074237.2875-7-lokeshvutla@ti.com>
+ <20190218155217.5195f118@why.wild-wind.fr.eu.org>
+From: Lokesh Vutla <lokeshvutla@ti.com>
+Message-ID: <1c2f2610-2be4-c145-4786-eabf3a07bc47@ti.com>
+Date: Wed, 20 Feb 2019 18:47:16 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <1550648704-11545-1-git-send-email-sugaya.taichi@socionext.com>
- <CAK8P3a0rwi=uDFYiF50e5HkYoDQUA6_VSWDMiAVeTMaRzeE6oQ@mail.gmail.com>
- <dbe814ed-3cf2-f72e-b7fa-23cf41e9e42b@socionext.com>
- <CAK8P3a38qgw8LeX=Y_nG53HzjnXjHESekgnJ6jtW_xvd7Zvq-Q@mail.gmail.com>
-In-Reply-To: <CAK8P3a38qgw8LeX=Y_nG53HzjnXjHESekgnJ6jtW_xvd7Zvq-Q@mail.gmail.com>
-From: Masami Hiramatsu <masami.hiramatsu@linaro.org>
-Date: Wed, 20 Feb 2019 22:16:14 +0900
-Message-ID: <CAA93ih2t34qwVB==LoF2odOCEOd9EE06i3hz0eTuonnXjJCyDw@mail.gmail.com>
-Subject: Re: [PATCH v3 9/9] ARM: configs: Add Milbeaut M10V defconfig
-To: Arnd Bergmann <arnd@arndb.de>
+In-Reply-To: <20190218155217.5195f118@why.wild-wind.fr.eu.org>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_051627_975848_FFCAC7FB 
-X-CRM114-Status: GOOD (  21.24  )
+X-CRM114-CacheID: sfid-20190220_051803_116527_61CE4327 
+X-CRM114-Status: GOOD (  34.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,46 +93,540 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>, "Sugaya,
- Taichi" <sugaya.taichi@socionext.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jassi Brar <jaswinder.singh@linaro.org>, soc@kernel.org,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Nishanth Menon <nm@ti.com>,
+ Device Tree Mailing List <devicetree@vger.kernel.org>, jason@lakedaemon.net,
+ Peter Ujfalusi <peter.ujfalusi@ti.com>, Tony Lindgren <tony@atomide.com>,
+ Sekhar Nori <nsekhar@ti.com>, linux-kernel@vger.kernel.org,
+ Tero Kristo <t-kristo@ti.com>, Rob Herring <robh+dt@kernel.org>,
+ Santosh Shilimkar <ssantosh@kernel.org>, tglx@linutronix.de,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgQXJuZCwKMjAxOeW5tDLmnIgyMOaXpSjmsLQpIDIxOjI4IEFybmQgQmVyZ21hbm4gPGFybmRA
-YXJuZGIuZGU+Ogo+Cj4gT24gV2VkLCBGZWIgMjAsIDIwMTkgYXQgMTI6MjcgUE0gU3VnYXlhLCBU
-YWljaGkKPiA8c3VnYXlhLnRhaWNoaUBzb2Npb25leHQuY29tPiB3cm90ZToKPiA+Cj4gPiBIaQo+
-ID4KPiA+IE9uIDIwMTkvMDIvMjAgMTg6MjgsIEFybmQgQmVyZ21hbm4gd3JvdGU6Cj4gPiA+IE9u
-IFdlZCwgRmViIDIwLCAyMDE5IGF0IDg6NDQgQU0gU3VnYXlhIFRhaWNoaQo+ID4gPiA8c3VnYXlh
-LnRhaWNoaUBzb2Npb25leHQuY29tPiB3cm90ZToKPiA+ID4KPiA+ID4+IGRpZmYgLS1naXQgYS9h
-cmNoL2FybS9jb25maWdzL21pbGJlYXV0X20xMHZfZGVmY29uZmlnIGIvYXJjaC9hcm0vY29uZmln
-cy9taWxiZWF1dF9tMTB2X2RlZmNvbmZpZwo+ID4gPj4gbmV3IGZpbGUgbW9kZSAxMDA2NDQKPiA+
-ID4+IGluZGV4IDAwMDAwMDAuLmEyNjMyMTEKPiA+ID4+IC0tLSAvZGV2L251bGwKPiA+ID4+ICsr
-KyBiL2FyY2gvYXJtL2NvbmZpZ3MvbWlsYmVhdXRfbTEwdl9kZWZjb25maWcKPiA+ID4+IEBAIC0w
-LDAgKzEsMTc1IEBACj4gPiA+Cj4gPiA+IEkgbm8gbG9uZ2VyIHNlZSBhbnl0aGluZyBoZXJlIHRo
-YXQgc2hvdWxkIGJlIHR1cm5lZCBvZmYsIGJ1dCB5b3UKPiA+ID4gbWlnaHQgd2FudCB0byBydW4g
-J21ha2Ugc2F2ZWRlZmNvbmZpZycgYW5kIHVzZSB0aGUgb3V0cHV0IG9mIHRoYXQsCj4gPiA+IHRv
-IG1ha2UgaXQgZWFzaWVyIHRvIGtlZXAgaXQgdXAgdG8gZGF0ZS4KPiA+ID4KPiA+Cj4gPiBJIGdv
-dCBpdCwgSSB1c2UgdGhlIG91dHB1dCBvZiAnbWFrZSBzYXZlZGVmY29uZmlnJy4KPiA+IE9uZSBx
-dWVzdGlvbiwgaXMgdGhhdCBPSyB0byBhZGQgc29tZSBvcHRpb25zIG9uIGl0Pwo+ID4gICAtQmVj
-YXVzZSAiQ09ORklHX0FSQ0hfTUlMQkVBVVQiIHdhcyBub3QgbGlzdGVkLgo+Cj4gV2hhdCBJJ2Qg
-ZG8gaGVyZSBpcyB0byBhcHBseSBhbGwgdGhlIHBhdGNoZXMgeW91IHdhbnQgdG8gZ2V0IG1lcmdl
-ZCBpbgo+IHRoZSBuZXh0IGZldyByZWxlYXNlcyBiZWZvcmUgcnVubmluZyAnc2F2ZWRlZmNvbmZp
-ZycgYW5kIHVzZSB0aGUgb3V0cHV0Cj4gb2YgdGhhdC4KCkxldCBtZSBjaGVjay4gV291bGQgeW91
-IG1lYW4gdGhhdCB0aGUgZGVmY29uZmlnIHdpbGwgaW5jbHVkZSBhbGwgdGhvc2UKZHJpdmVycyBj
-b25maWdzLCB3aGljaCB3aWxsIG5vdCBhcHBlYXIgYXQgdGhpcyBtb21lbnQ/Cgo+IElmIHlvdSBh
-bHJlYWR5IGtub3cgdGhhdCB5b3Ugd2lsbCBuZWVkIHRoZSBvcHRpb25zLCBpbmNsdWRpbmcKPiB0
-aGVtIG5vdyBtZWFucyB5b3UgZG9uJ3QgaGF2ZSB0byB1cGRhdGUgdGhlIGRlZmNvbmZpZyBmaWxl
-Cj4gYXMgbXVjaCBpbiB0aGUgZnV0dXJlLgoKSSBqdXN0IGNvbmNlcm4gdGhhdCBpZiBvdGhlciBz
-dWJzeXN0ZW0gbWFpbnRhaW5lciBjb21tZW50cwpvbiB0aGUgY29uZmlnIG5hbWUuIEV2ZW4gaW4g
-dGhhdCBjYXNlLCBjYW4gd2UganVzdCB1cGRhdGUgdGhlCmRlZmNvbmZpZyB3aXRoIG5ldyBuYW1l
-PwoKVGhhbmsgeW91LAoKLS0gCk1hc2FtaSBIaXJhbWF0c3UKCl9fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0
-CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFk
-ZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+Hi Marc,
+
+On 18/02/19 9:22 PM, Marc Zyngier wrote:
+> On Tue, 12 Feb 2019 13:12:33 +0530
+> Lokesh Vutla <lokeshvutla@ti.com> wrote:
+> 
+>> Texas Instruments' K3 generation SoCs has an IP Interrupt Router
+>> that does allows for redirection of input interrupts to host
+>> interrupt controller. Interrupt Router inputs are either from a
+>> peripheral or from an Interrupt Aggregator which is another
+>> interrupt controller.
+>>
+>> Configuration of the interrupt router registers can only be done by
+>> a system co-processor and the driver needs to send a message to this
+>> co processor over TISCI protocol.
+>>
+>> Add support for Interrupt Router driver over TISCI protocol.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>> Changes since v4:
+>> - Moved the ti_sci irq resource handling to ti-sci-common.c from ti_sci.c.
+>>   Firmware maintainer rejected the idea of having this in firmware
+>> driver as the resource handling is specific to the client.
+>> - Obtain the number of peripheral interrupts attached to INTR by
+>> parsing DT. Using this information store the max irqs that can be
+>> allocated to INTA. This is done for pre allocating the INTA
+>> irqs(vints) during inta driver probe.
+>>   This will not work for cases where there are more that 1 INTAs
+>> attached to INTR, but wanted to show this approach as suggested by
+>> Marc.
+> 
+> Or not.
+> 
+>>
+>>  MAINTAINERS                         |   3 +
+>>  drivers/irqchip/Kconfig             |  11 +
+>>  drivers/irqchip/Makefile            |   1 +
+>>  drivers/irqchip/irq-ti-sci-common.c | 131 ++++++++++++
+>>  drivers/irqchip/irq-ti-sci-common.h |  59 ++++++
+>>  drivers/irqchip/irq-ti-sci-intr.c   | 315
+>> ++++++++++++++++++++++++++++ 6 files changed, 520 insertions(+)
+>>  create mode 100644 drivers/irqchip/irq-ti-sci-common.c
+>>  create mode 100644 drivers/irqchip/irq-ti-sci-common.h
+>>  create mode 100644 drivers/irqchip/irq-ti-sci-intr.c
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index c918d9b2ee18..823eeb672cf0 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -15065,6 +15065,9 @@ F:
+>> Documentation/devicetree/bindings/clock/ti,sci-clk.txt F:
+>> drivers/clk/keystone/sci-clk.c F:	drivers/reset/reset-ti-sci.c
+>>  F:
+>> Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>> +F:	drivers/irqchip/irq-ti-sci-intr.c +F:
+>> drivers/irqchip/irq-ti-sci-common.c +F:
+>> drivers/irqchip/irq-ti-sci-common.h 
+>>  Texas Instruments ASoC drivers
+>>  M:	Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+>> index 3d1e60779078..a8d9bed0254b 100644
+>> --- a/drivers/irqchip/Kconfig
+>> +++ b/drivers/irqchip/Kconfig
+>> @@ -406,6 +406,17 @@ config IMX_IRQSTEER
+>>  	help
+>>  	  Support for the i.MX IRQSTEER interrupt
+>> multiplexer/remapper. 
+>> +config TI_SCI_INTR_IRQCHIP
+>> +	bool
+>> +	depends on TI_SCI_PROTOCOL && ARCH_K3
+>> +	select IRQ_DOMAIN
+>> +	select IRQ_DOMAIN_HIERARCHY
+>> +	help
+>> +	  This enables the irqchip driver support for K3 Interrupt
+>> router
+>> +	  over TI System Control Interface available on some new
+>> TI's SoCs.
+>> +	  If you wish to use interrupt router irq resources managed
+>> by the
+>> +	  TI System Controller, say Y here. Otherwise, say N.
+>> +
+>>  endmenu
+>>  
+>>  config SIFIVE_PLIC
+>> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+>> index c93713d24b86..0499fae148a9 100644
+>> --- a/drivers/irqchip/Makefile
+>> +++ b/drivers/irqchip/Makefile
+>> @@ -94,3 +94,4 @@ obj-$(CONFIG_CSKY_APB_INTC)		+=
+>> irq-csky-apb-intc.o obj-$(CONFIG_SIFIVE_PLIC)		+=
+>> irq-sifive-plic.o obj-$(CONFIG_IMX_IRQSTEER)		+=
+>> irq-imx-irqsteer.o obj-$(CONFIG_MADERA_IRQ)		+=
+>> irq-madera.o +obj-$(CONFIG_TI_SCI_INTR_IRQCHIP)	+=
+>> irq-ti-sci-intr.o irq-ti-sci-common.o diff --git
+>> a/drivers/irqchip/irq-ti-sci-common.c
+>> b/drivers/irqchip/irq-ti-sci-common.c new file mode 100644 index
+>> 000000000000..79d9c4e8ea14 --- /dev/null
+>> +++ b/drivers/irqchip/irq-ti-sci-common.c
+>> @@ -0,0 +1,131 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Common Code for TISCI IRQCHIP drivers
+>> + *
+>> + * Copyright (C) 2019 Texas Instruments Incorporated -
+>> http://www.ti.com/
+>> + *	Lokesh Vutla <lokeshvutla@ti.com>
+>> + */
+>> +
+>> +#include <linux/of.h>
+>> +#include <linux/bitmap.h>
+>> +#include <linux/device.h>
+>> +#include <linux/soc/ti/ti_sci_protocol.h>
+>> +#include "irq-ti-sci-common.h"
+>> +
+>> +/**
+>> + * ti_sci_get_free_resource() - Get a free resource from TISCI
+>> resource.
+>> + * @res:	Pointer to the TISCI resource
+>> + *
+>> + * Return: resource num if all went ok else TI_SCI_RESOURCE_NULL.
+>> + */
+>> +u16 ti_sci_get_free_resource(struct ti_sci_resource *res)
+>> +{
+>> +	u16 set, free_bit;
+>> +
+>> +	mutex_lock(&res->request_mutex);
+>> +	for (set = 0; set < res->sets; set++) {
+>> +		free_bit =
+>> find_first_zero_bit(res->desc[set].res_map,
+>> +					       res->desc[set].num);
+>> +		if (free_bit != res->desc[set].num) {
+>> +			set_bit(free_bit, res->desc[set].res_map);
+>> +			mutex_unlock(&res->request_mutex);
+>> +			return res->desc[set].start + free_bit;
+>> +		}
+>> +	}
+>> +	mutex_unlock(&res->request_mutex);
+>> +
+>> +	return TI_SCI_RESOURCE_NULL;
+>> +}
+>> +
+>> +/**
+>> + * ti_sci_release_resource() - Release a resource from TISCI
+>> resource.
+>> + * @res:	Pointer to the TISCI resource
+>> + * @id:		Resource id to be released.
+>> + */
+>> +void ti_sci_release_resource(struct ti_sci_resource *res, u16 id)
+>> +{
+>> +	u16 set;
+>> +
+>> +	mutex_lock(&res->request_mutex);
+>> +	for (set = 0; set < res->sets; set++) {
+>> +		if (res->desc[set].start <= id &&
+>> +		    (res->desc[set].num + res->desc[set].start) > id)
+>> +			clear_bit(id - res->desc[set].start,
+>> +				  res->desc[set].res_map);
+>> +	}
+>> +	mutex_unlock(&res->request_mutex);
+>> +}
+>> +
+>> +u32 ti_sci_get_num_resources(struct ti_sci_resource *res)
+>> +{
+>> +	u32 count = 0, set;
+>> +
+>> +	for (set = 0; set < res->sets; set++)
+>> +		count += res->desc[set].num;
+>> +
+>> +	return count;
+>> +}
+>> +
+>> +/**
+>> + * devm_ti_sci_get_of_resource() - Get a TISCI resource assigned to
+>> a device
+>> + * @handle:	TISCI handle
+>> + * @dev:	Device pointer to which the resource is assigned
+>> + * @of_prop:	property name by which the resource are
+>> represented
+>> + *
+>> + * Return: Pointer to ti_sci_resource if all went well else
+>> appropriate
+>> + *	   error pointer.
+>> + */
+>> +struct ti_sci_resource *
+>> +devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
+>> +			    struct device *dev, u32 dev_id, char
+>> *of_prop) +{
+>> +	struct ti_sci_resource *res;
+>> +	u32 resource_subtype;
+>> +	int i, ret;
+>> +
+>> +	res = devm_kzalloc(dev, sizeof(*res), GFP_KERNEL);
+>> +	if (!res)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	res->sets =
+>> of_property_count_elems_of_size(dev_of_node(dev), of_prop,
+>> +						    sizeof(u32));
+>> +	if (res->sets < 0) {
+>> +		dev_err(dev, "%s resource type ids not available\n",
+>> of_prop);
+>> +		return ERR_PTR(res->sets);
+>> +	}
+>> +
+>> +	res->desc = devm_kcalloc(dev, res->sets, sizeof(*res->desc),
+>> +				 GFP_KERNEL);
+>> +	if (!res->desc)
+>> +		return ERR_PTR(-ENOMEM);
+>> +
+>> +	for (i = 0; i < res->sets; i++) {
+>> +		ret = of_property_read_u32_index(dev_of_node(dev),
+>> of_prop, i,
+>> +						 &resource_subtype);
+>> +		if (ret)
+>> +			return ERR_PTR(-EINVAL);
+>> +
+>> +		ret = handle->ops.rm_core_ops.get_range(handle,
+>> dev_id,
+>> +
+>> resource_subtype,
+>> +
+>> &res->desc[i].start,
+>> +
+>> &res->desc[i].num);
+>> +		if (ret) {
+>> +			dev_err(dev, "dev = %d subtype %d not
+>> allocated for this host\n",
+>> +				dev_id, resource_subtype);
+>> +			return ERR_PTR(ret);
+>> +		}
+>> +
+>> +		dev_dbg(dev, "dev = %d, subtype = %d, start = %d,
+>> num = %d\n",
+>> +			dev_id, resource_subtype, res->desc[i].start,
+>> +			res->desc[i].num);
+>> +
+>> +		res->desc[i].res_map =
+>> +			devm_kzalloc(dev,
+>> BITS_TO_LONGS(res->desc[i].num) *
+>> +				     sizeof(*res->desc[i].res_map),
+>> GFP_KERNEL);
+>> +		if (!res->desc[i].res_map)
+>> +			return ERR_PTR(-ENOMEM);
+>> +	}
+>> +	mutex_init(&res->request_mutex);
+>> +
+>> +	return res;
+>> +}
+>> diff --git a/drivers/irqchip/irq-ti-sci-common.h
+>> b/drivers/irqchip/irq-ti-sci-common.h new file mode 100644
+>> index 000000000000..60c4b28bebab
+>> --- /dev/null
+>> +++ b/drivers/irqchip/irq-ti-sci-common.h
+>> @@ -0,0 +1,59 @@
+>> +/* SPDX-License-Identifier: GPL-2.0 */
+>> +/*
+>> + * Common header file for TISCI IRQCHIP drivers
+>> + *
+>> + * Copyright (C) 2019 Texas Instruments Incorporated -
+>> http://www.ti.com/
+>> + *	Lokesh Vutla <lokeshvutla@ti.com>
+>> + */
+>> +
+>> +#ifndef __TI_SCI_COMMON_IRQCHIP_H
+>> +#define __TI_SCI_COMMON_IRQCHIP_H
+>> +
+>> +#include <linux/mutex.h>
+>> +
+>> +#define TI_SCI_RESOURCE_NULL	0xffff
+>> +#define TI_SCI_DEV_ID_MASK	0xffff
+>> +#define TI_SCI_DEV_ID_SHIFT	16
+>> +#define TI_SCI_IRQ_ID_MASK	0xffff
+>> +#define TI_SCI_IRQ_ID_SHIFT	0
+>> +#define TI_SCI_VINT_IRQ		BIT(0)
+>> +#define HWIRQ_TO_DEVID(hwirq)	(((hwirq) >>
+>> (TI_SCI_DEV_ID_SHIFT)) & \
+>> +				 (TI_SCI_DEV_ID_MASK))
+>> +#define HWIRQ_TO_IRQID(hwirq)	((hwirq) & (TI_SCI_IRQ_ID_MASK))
+>> +#define TO_HWIRQ(dev, index)	((((dev) & TI_SCI_DEV_ID_MASK)
+>> << \
+>> +				 TI_SCI_DEV_ID_SHIFT) | \
+>> +				((index) & TI_SCI_IRQ_ID_MASK))
+>> +
+>> +/**
+>> + * struct ti_sci_resource_desc - Description of TI SCI resource
+>> instance range.
+>> + * @start:	Start index of the resource.
+>> + * @num:	Number of resources.
+>> + * @res_map:	Bitmap to manage the allocation of these
+>> resources.
+>> + */
+>> +struct ti_sci_resource_desc {
+>> +	u16 start;
+>> +	u16 num;
+>> +	unsigned long *res_map;
+>> +};
+>> +
+>> +/**
+>> + * struct ti_sci_resource - Structure representing a resource
+>> assigned
+>> + *			    to a device.
+>> + * @sets:		Number of sets available from this resource
+>> type
+>> + * @request_mutex:	mutex to protect request and release of
+>> resources.
+>> + * @desc:		Array of resource descriptors.
+>> + */
+>> +struct ti_sci_resource {
+>> +	u16 sets;
+>> +	/* Mutex to protect request and release of resources */
+>> +	struct mutex request_mutex;
+>> +	struct ti_sci_resource_desc *desc;
+>> +};
+>> +
+>> +u16 ti_sci_get_free_resource(struct ti_sci_resource *res);
+>> +void ti_sci_release_resource(struct ti_sci_resource *res, u16 id);
+>> +u32 ti_sci_get_num_resources(struct ti_sci_resource *res);
+>> +struct ti_sci_resource *
+>> +devm_ti_sci_get_of_resource(const struct ti_sci_handle *handle,
+>> +			    struct device *dev, u32 dev_id, char
+>> *of_prop); +#endif /*__TI_SCI_COMMON_IRQCHIP_H */
+> 
+> Most the above "common" should be a separate patch, really. Also, why
+
+ok will move this into a separate patch.
+
+> isn't the whole resource management part of the firmware interface? I
+> see that "Firmware maintainer rejected the idea", but I don't really
+> buy the rational. I don't see anything irq specific to the whole
+> devm_ti_sci_get_of_resource and co, to be honest.
+
+I guess the concern is mostly about the way ids are represented from DT. Using
+this every tisci client should mandate to have separate DT property for each of
+its resource.
+
+> 
+>> diff --git a/drivers/irqchip/irq-ti-sci-intr.c b/drivers/irqchip/irq-ti-sci-intr.c
+>> new file mode 100644
+>> index 000000000000..7e224552a735
+>> --- /dev/null
+>> +++ b/drivers/irqchip/irq-ti-sci-intr.c
+>> @@ -0,0 +1,315 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * Texas Instruments' K3 Interrupt Router irqchip driver
+>> + *
+>> + * Copyright (C) 2018-2019 Texas Instruments Incorporated - http://www.ti.com/
+>> + *	Lokesh Vutla <lokeshvutla@ti.com>
+>> + */
+
+[..snip..]
+
+>> +	err = ti_sci_intr_irq_domain_translate(domain, fwspec, &hwirq, &type);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	vint_irq = fwspec->param[3] & TI_SCI_VINT_IRQ;
+>> +
+>> +	err = ti_sci_intr_alloc_gic_irq(domain, virq, hwirq, type, vint_irq);
+>> +	if (err)
+>> +		return err;
+>> +
+>> +	err = irq_domain_set_hwirq_and_chip(domain, virq, hwirq,
+>> +					    &ti_sci_intr_irq_chip,
+>> +					    (void *)vint_irq);
+> 
+> I think I see what you're trying to achieve. I suggest you look a
+> uintptr_t instead of playing with unrelated data types whose semantic
+> really doesn't apply here.
+
+As you commented on the dt-bindings patch to differentiate vints using the INTA
+ids, this will not be needed anymore. Will completely drop this.
+
+> 
+>> +	if (err) {
+>> +		ti_sci_intr_irq_domain_free(domain, virq, 1);
+>> +		return err;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct irq_domain_ops ti_sci_intr_irq_domain_ops = {
+>> +	.alloc		= ti_sci_intr_irq_domain_alloc,
+>> +	.free		= ti_sci_intr_irq_domain_free,
+>> +	.translate	= ti_sci_intr_irq_domain_translate,
+>> +};
+>> +
+>> +static int ti_sci_intr_irq_domain_probe(struct platform_device *pdev)
+>> +{
+>> +	struct irq_domain *parent_domain, *domain;
+>> +	struct device_node *parent_node, *dn;
+>> +	struct ti_sci_intr_irq_domain *intr;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct of_phandle_iterator it;
+>> +	int ret, count, intsize;
+>> +
+>> +	parent_node = of_irq_find_parent(dev_of_node(dev));
+>> +	if (!parent_node) {
+>> +		dev_err(dev, "Failed to get IRQ parent node\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	parent_domain = irq_find_host(parent_node);
+>> +	if (!parent_domain) {
+>> +		dev_err(dev, "Failed to find IRQ parent domain\n");
+>> +		return -ENODEV;
+>> +	}
+>> +
+>> +	intr = devm_kzalloc(dev, sizeof(*intr), GFP_KERNEL);
+>> +	if (!intr)
+>> +		return -ENOMEM;
+>> +
+>> +	intr->sci = devm_ti_sci_get_by_phandle(dev, "ti,sci");
+>> +	if (IS_ERR(intr->sci)) {
+>> +		ret = PTR_ERR(intr->sci);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "ti,sci read fail %d\n", ret);
+>> +		intr->sci = NULL;
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = of_property_read_u32(dev_of_node(dev), "ti,sci-dst-id",
+>> +				   (u32 *)&intr->dst_id);
+>> +	if (ret) {
+>> +		dev_err(dev, "missing 'ti,sci-dst-id' property\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	intr->dst_irq = devm_ti_sci_get_of_resource(intr->sci, dev,
+>> +						    intr->dst_id,
+>> +						    "ti,sci-rm-range-girq");
+>> +	if (IS_ERR(intr->dst_irq)) {
+>> +		dev_err(dev, "Destination irq resource allocation failed\n");
+>> +		return PTR_ERR(intr->dst_irq);
+>> +	}
+>> +
+>> +	domain = irq_domain_add_hierarchy(parent_domain, 0, 0, dev_of_node(dev),
+>> +					  &ti_sci_intr_irq_domain_ops, intr);
+>> +	if (!domain) {
+>> +		dev_err(dev, "Failed to allocate IRQ domain\n");
+>> +		return -ENOMEM;
+>> +	}
+>> +
+>> +	if (of_property_read_u32(dev_of_node(dev), "#interrupt-cells",
+>> +				 &intsize))
+>> +		return -EINVAL;
+>> +
+>> +	count = 0;
+>> +	for_each_node_with_property(dn, "interrupts") {
+>> +		if (of_irq_find_parent(dn) != dev_of_node(dev))
+>> +			continue;
+>> +		count += of_property_count_elems_of_size(dn, "interrupts",
+>> +							 sizeof(u32) * intsize);
+>> +	}
+>> +
+>> +	for_each_node_with_property(dn, "interrupts-extended") {
+>> +		of_for_each_phandle(&it, ret, dn, "interrupts-extended",
+>> +				    "#interrupt-cells", 0) {
+>> +			if (it.node == dev_of_node(dev))
+>> +				count++;
+>> +		}
+>> +	}
+> 
+> What is this trying to do? Counting the number of interrupt descriptors
+> in the whole system? What does this even mean?
+
+I am just trying for max utilization of GIC interrupts available for this. Since
+inta vints are not represented in DT, total gic available - whatever is in DT
+gives the max interrupts that can be used for the child INTA.
+
+> 
+> What I suggested was to allocate the required number of interrupts
+> for a given device, based on the requirements of that device. I also
+
+okay, then Ill get the number of interrupts needed for INTA from DT.
+
+> suggested to investigate the x86 two phase allocation mechanism for the
+> INTA driver.
+
+Sorry, Ill try to explore this path. Any pointers to the doc/code will be really
+helpful :)
+
+Thanks and regards,
+Lokesh
+
+> 
+> I never suggested that you'd parse the DT to guess how many interrupts
+> you'd need to allocate...
+> 
+> 	M.
+> 
+>> +
+>> +	intr->vint_irqs = ti_sci_get_num_resources(intr->dst_irq) - count;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct of_device_id ti_sci_intr_irq_domain_of_match[] = {
+>> +	{ .compatible = "ti,sci-intr", },
+>> +	{ /* sentinel */ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, ti_sci_intr_irq_domain_of_match);
+>> +
+>> +static struct platform_driver ti_sci_intr_irq_domain_driver = {
+>> +	.probe = ti_sci_intr_irq_domain_probe,
+>> +	.driver = {
+>> +		.name = "ti-sci-intr",
+>> +		.of_match_table = ti_sci_intr_irq_domain_of_match,
+>> +	},
+>> +};
+>> +module_platform_driver(ti_sci_intr_irq_domain_driver);
+>> +
+>> +MODULE_AUTHOR("Lokesh Vutla <lokeshvutla@ticom>");
+>> +MODULE_DESCRIPTION("K3 Interrupt Router driver over TI SCI protocol");
+>> +MODULE_LICENSE("GPL v2");
+> 
+> 
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
