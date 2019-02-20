@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 249A7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:27:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 668FCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:27:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E98B720880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:27:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 315D620880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:27:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="k8sMeNLr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="HN0vlY9F"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E98B720880
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iTL2QmKx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="QzNS0q5I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 315D620880
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,59 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+Edfa3x1nj5Yc+YErNsF4uvN8XufS1TKjU8gD8dP5Oc=; b=k8sMeNLrBOHzJg
-	zalZKE1hEPlYyOaAh9KmNfsIxgxqHtol6DdKRdDp0cy+DCnl94Dx5LZM2RMOzaQYPJeiYdF+jv60P
-	HUJTCpRHgHg/2v+n3bdmJ7BhfoDOwu8+oQp9zynTmPpyn7GCa8Y0GCGScd/zd5/b/PVJhhvQn6m6m
-	VkeEg5gtG5NVQp1My7XoBxYTPYG5GY6B0e3pO1kgscl1aKqHdShXw45EPs8n7nPyMpOb2X3lj9aCY
-	4G9fwI452t3wQz3pqxUcvIxS8lmVQZNaUw3U5MScpGaCTbFv6fxZwIwVB6EDVyEgg34KHznjezW45
-	lMBEs0UpCXtIgiSPJJGA==;
+	List-Owner; bh=gMc24S+u/2oZuOtJ0XikwN6NKOn6RJi5y5OPAp5pFVY=; b=iTL2QmKxaa+odR
+	WGaP3bvAPL5VlOV55oEiwLBt52hzxgMtKsk38/Gglk1T38yOq+1GwDRL9DEg24DtkYtgseI25MSPu
+	1vGfwxqKGlL7fJtNM/RiXJ6ciZuVuCFvE0NFcZEhFM3P//iwf/9dt8AG2UJZ5+1J9zQ0fekCXYts/
+	qn9q/KFSlHk0kalfOfkWpCue2yqfHJrvY8/haf6Z9A1rLJoCA1hEQ/hTyooaQgJBMbbuQ1IhN00tS
+	qr+MhrM6xadQR1SBeWxw38xcpm1CUZxSphmmTJkUlv4sW7AYjYMV3AlofOW0GchE2RMaDycefxLoa
+	0zPpBri/xtxHApUBloIA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwTlz-0000pq-Bb; Wed, 20 Feb 2019 15:26:59 +0000
-Received: from fllv0015.ext.ti.com ([198.47.19.141])
+	id 1gwTmA-00014J-Gv; Wed, 20 Feb 2019 15:27:10 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwTlA-0008Dl-JV
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:26:11 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1KFQ4qW038933;
- Wed, 20 Feb 2019 09:26:04 -0600
+ id 1gwTlA-0008Ez-WB
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:26:12 +0000
+Received: from lelv0265.itg.ti.com ([10.180.67.224])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1KFQ6Yp055615;
+ Wed, 20 Feb 2019 09:26:06 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550676364;
- bh=HuxdkIRK+DOoxOUB/YEkxnna/Uj67674gzf+iunjIqw=;
+ s=ti-com-17Q1; t=1550676366;
+ bh=soHH5poEO7ca8kvQgbJfShmQkZiM0uE0tzRZPtn/RYg=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=HN0vlY9Fcs5tYQ6xZg+2Br6AvnfjrYI+/LVRq3lDSE1roB3PFVkjePPNA1U0/NXGR
- 5wsnWqaPSrheZ1VuQ6OR8xpISxOXeHiDWnIsNB2cgCBHfcAlvdkSQTXuZoaVHXwCU0
- kpb8HXRTMK5rZOwLdWvtgPaLLBjabFN39U8xPwK4=
-Received: from DFLE107.ent.ti.com (dfle107.ent.ti.com [10.64.6.28])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1KFQ4bq103601
+ b=QzNS0q5IPXL9oU/6kxfOdHmYa6S+d1JL5SXnmOtsGyCRZnxs/fwguTOgEETOl/msv
+ IQ3NCWvpOk14cP5hgozeUQcziYtqTZ/u7U2OwLbW/bYMGgLouLjyMeCsvNqPPNHCJp
+ llRWtXz0lHhyX1nUQqHEnc+9hfyvQ5287sTdLDWE=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1KFQ6x6085427
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Wed, 20 Feb 2019 09:26:04 -0600
-Received: from DFLE108.ent.ti.com (10.64.6.29) by DFLE107.ent.ti.com
- (10.64.6.28) with Microsoft SMTP Server (version=TLS1_2,
+ Wed, 20 Feb 2019 09:26:06 -0600
+Received: from DFLE113.ent.ti.com (10.64.6.34) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Wed, 20
- Feb 2019 09:26:04 -0600
-Received: from dlep33.itg.ti.com (157.170.170.75) by DFLE108.ent.ti.com
- (10.64.6.29) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 09:26:05 -0600
+Received: from dflp33.itg.ti.com (10.64.6.16) by DFLE113.ent.ti.com
+ (10.64.6.34) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Wed, 20 Feb 2019 09:26:04 -0600
+ Wed, 20 Feb 2019 09:26:05 -0600
 Received: from localhost (ileax41-snat.itg.ti.com [10.172.224.153])
- by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1KFQ3cT022842;
- Wed, 20 Feb 2019 09:26:03 -0600
+ by dflp33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1KFQ4ql006629;
+ Wed, 20 Feb 2019 09:26:05 -0600
 From: Grygorii Strashko <grygorii.strashko@ti.com>
 To: "David S. Miller" <davem@davemloft.net>, Kishon Vijay Abraham I
  <kishon@ti.com>, Rob Herring <robh+dt@kernel.org>, Tony Lindgren
  <tony@atomide.com>
-Subject: [PATCH 4/6] ARM: dts: am335x: switch to use phy-gmii-sel
-Date: Wed, 20 Feb 2019 17:25:17 +0200
-Message-ID: <1550676319-6440-5-git-send-email-grygorii.strashko@ti.com>
+Subject: [PATCH 5/6] dt-bindings: net: ti: deprecate cpsw-phy-sel bindings
+Date: Wed, 20 Feb 2019 17:25:18 +0200
+Message-ID: <1550676319-6440-6-git-send-email-grygorii.strashko@ti.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1550676319-6440-1-git-send-email-grygorii.strashko@ti.com>
 References: <1550676319-6440-1-git-send-email-grygorii.strashko@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_072608_931224_FFDE5091 
-X-CRM114-Status: GOOD (  18.45  )
+X-CRM114-CacheID: sfid-20190220_072609_816194_5F469BC8 
+X-CRM114-Status: GOOD (  16.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,221 +99,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Switch to use phy-gmii-sel PHY instead of cpsw-phy-sel.
+The cpsw-phy-sel driver was replaced with new PHY driver phy-gmii-sel, so
+deprecate cpsw-phy-sel bindings.
 
+Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- arch/arm/boot/dts/am335x-baltos-ir2110.dts        |  4 ----
- arch/arm/boot/dts/am335x-baltos-ir3220.dts        |  4 ----
- arch/arm/boot/dts/am335x-baltos-ir5221.dts        |  4 ----
- arch/arm/boot/dts/am335x-chiliboard.dts           |  4 ----
- arch/arm/boot/dts/am335x-icev2.dts                |  4 ----
- arch/arm/boot/dts/am335x-igep0033.dtsi            |  4 ----
- arch/arm/boot/dts/am335x-lxm.dts                  |  4 ----
- arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi |  5 -----
- arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts    |  5 -----
- arch/arm/boot/dts/am335x-phycore-som.dtsi         |  4 ----
- arch/arm/boot/dts/am33xx-l4.dtsi                  | 15 ++++++++-------
- 11 files changed, 8 insertions(+), 49 deletions(-)
+ Documentation/devicetree/bindings/net/cpsw-phy-sel.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir2110.dts b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-index 75de1e723303..50dcf1290ac6 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir2110.dts
-@@ -72,7 +72,3 @@
- 	dual_emac_res_vlan = <2>;
- 	phy-handle = <&phy1>;
- };
--
--&phy_sel {
--	rmii-clock-ext = <1>;
--};
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir3220.dts b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-index 1b215c425c57..f3f1abd26470 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir3220.dts
-@@ -114,7 +114,3 @@
- 	dual_emac_res_vlan = <2>;
- 	phy-handle = <&phy1>;
- };
--
--&phy_sel {
--	rmii-clock-ext = <1>;
--};
-diff --git a/arch/arm/boot/dts/am335x-baltos-ir5221.dts b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-index 832ead864dc5..42f473f0ed77 100644
---- a/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-+++ b/arch/arm/boot/dts/am335x-baltos-ir5221.dts
-@@ -133,10 +133,6 @@
- 	phy-handle = <&phy1>;
- };
+diff --git a/Documentation/devicetree/bindings/net/cpsw-phy-sel.txt b/Documentation/devicetree/bindings/net/cpsw-phy-sel.txt
+index 764c0c79b43d..5d76f991c027 100644
+--- a/Documentation/devicetree/bindings/net/cpsw-phy-sel.txt
++++ b/Documentation/devicetree/bindings/net/cpsw-phy-sel.txt
+@@ -1,4 +1,4 @@
+-TI CPSW Phy mode Selection Device Tree Bindings
++TI CPSW Phy mode Selection Device Tree Bindings (DEPRECATED)
+ -----------------------------------------------
  
--&phy_sel {
--	rmii-clock-ext = <1>;
--};
--
- &dcan1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&dcan1_pins>;
-diff --git a/arch/arm/boot/dts/am335x-chiliboard.dts b/arch/arm/boot/dts/am335x-chiliboard.dts
-index 9c2a947aacf5..4a869534db50 100644
---- a/arch/arm/boot/dts/am335x-chiliboard.dts
-+++ b/arch/arm/boot/dts/am335x-chiliboard.dts
-@@ -151,10 +151,6 @@
- 	phy-mode = "rmii";
- };
- 
--&phy_sel {
--	rmii-clock-ext;
--};
--
- /* USB */
- &usb {
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/am335x-icev2.dts b/arch/arm/boot/dts/am335x-icev2.dts
-index f2005ecca74f..9ac775c71072 100644
---- a/arch/arm/boot/dts/am335x-icev2.dts
-+++ b/arch/arm/boot/dts/am335x-icev2.dts
-@@ -484,10 +484,6 @@
- 	dual_emac;
- };
- 
--&phy_sel {
--	rmii-clock-ext;
--};
--
- &davinci_mdio {
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&davinci_mdio_default>;
-diff --git a/arch/arm/boot/dts/am335x-igep0033.dtsi b/arch/arm/boot/dts/am335x-igep0033.dtsi
-index 55b4c94cfafb..cbd22f25de95 100644
---- a/arch/arm/boot/dts/am335x-igep0033.dtsi
-+++ b/arch/arm/boot/dts/am335x-igep0033.dtsi
-@@ -123,10 +123,6 @@
- 	phy-mode = "rmii";
- };
- 
--&phy_sel {
--	rmii-clock-ext;
--};
--
- &elm {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/am335x-lxm.dts b/arch/arm/boot/dts/am335x-lxm.dts
-index 481edcfaf121..d0e8e720a4d6 100644
---- a/arch/arm/boot/dts/am335x-lxm.dts
-+++ b/arch/arm/boot/dts/am335x-lxm.dts
-@@ -328,10 +328,6 @@
- 	dual_emac_res_vlan = <3>;
- };
- 
--&phy_sel {
--	rmii-clock-ext;
--};
--
- &mac {
- 	pinctrl-names = "default", "sleep";
- 	pinctrl-0 = <&cpsw_default>;
-diff --git a/arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi b/arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi
-index 14f781953475..cb5913a69837 100644
---- a/arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-moxa-uc-2100-common.dtsi
-@@ -159,11 +159,6 @@
- 	status = "okay";
- };
- 
--&phy_sel {
--	reg= <0x44e10650 0xf5>;
--	rmii-clock-ext;
--};
--
- &sham {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts b/arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts
-index 5a58efc0c874..e562ce40f290 100644
---- a/arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts
-+++ b/arch/arm/boot/dts/am335x-moxa-uc-8100-me-t.dts
-@@ -446,11 +446,6 @@
- 	dual_emac_res_vlan = <2>;
- };
- 
--&phy_sel {
--	reg= <0x44e10650 0xf5>;
--	rmii-clock-ext;
--};
--
- &sham {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-index 428a25e952b0..015adb626b03 100644
---- a/arch/arm/boot/dts/am335x-phycore-som.dtsi
-+++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-@@ -100,10 +100,6 @@
- 	status = "okay";
- };
- 
--&phy_sel {
--	rmii-clock-ext;
--};
--
- /* I2C Busses */
- &am33xx_pinmux {
- 	i2c0_pins: pinmux_i2c0 {
-diff --git a/arch/arm/boot/dts/am33xx-l4.dtsi b/arch/arm/boot/dts/am33xx-l4.dtsi
-index 7b818d9d2eab..f813131f8461 100644
---- a/arch/arm/boot/dts/am33xx-l4.dtsi
-+++ b/arch/arm/boot/dts/am33xx-l4.dtsi
-@@ -279,12 +279,6 @@
- 				#pinctrl-cells = <1>;
- 				ranges = <0 0 0x2000>;
- 
--				phy_sel: cpsw-phy-sel@650 {
--					compatible = "ti,am3352-cpsw-phy-sel";
--					reg= <0x650 0x4>;
--					reg-names = "gmii-sel";
--				};
--
- 				am33xx_pinmux: pinmux@800 {
- 					compatible = "pinctrl-single";
- 					reg = <0x800 0x238>;
-@@ -302,6 +296,12 @@
- 					#size-cells = <1>;
- 					ranges = <0 0 0x800>;
- 
-+					phy_gmii_sel: phy-gmii-sel {
-+						compatible = "ti,am3352-phy-gmii-sel";
-+						reg = <0x650 0x4>;
-+						#phy-cells = <2>;
-+					};
-+
- 					scm_clocks: clocks {
- 						#address-cells = <1>;
- 						#size-cells = <0>;
-@@ -717,7 +717,6 @@
- 				interrupts = <40 41 42 43>;
- 				ranges = <0 0 0x8000>;
- 				syscon = <&scm_conf>;
--				cpsw-phy-sel = <&phy_sel>;
- 				status = "disabled";
- 
- 				davinci_mdio: mdio@1000 {
-@@ -733,11 +732,13 @@
- 				cpsw_emac0: slave@200 {
- 					/* Filled in by U-Boot */
- 					mac-address = [ 00 00 00 00 00 00 ];
-+					phys = <&phy_gmii_sel 1 1>;
- 				};
- 
- 				cpsw_emac1: slave@300 {
- 					/* Filled in by U-Boot */
- 					mac-address = [ 00 00 00 00 00 00 ];
-+					phys = <&phy_gmii_sel 2 1>;
- 				};
- 			};
- 		};
+ Required properties:
 -- 
 2.17.1
 
