@@ -2,125 +2,73 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,UNPARSEABLE_RELAY
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CFA0CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:14:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ADD95C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:32:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A01442183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:14:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7B34F2147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:32:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I8BjL/b/";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="u4BqGJR6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A01442183F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VNmUlEgN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7B34F2147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iMBmZts/l17dWVCz++4XC0trvqJNDXj5TsL+SFNqBz4=; b=I8BjL/b/pi8rWD
-	cIJ06JVTvmEGxDiHqmq1EdBI6MP5n8NIdg8mHP/LvZ2umftzsjC/4c50fZJN2N9SzcXCzrZVPKy6e
-	kZnrFLcuI835L3YUhGdyvnYiPDu1s9+y+8xOmh47PmsMKApD2jVtpcVuQjbRXziGMVaaWC/UwurGV
-	AXHRg4Mugxsoxfhna9MoiSdkF+DXvVAuGn2kC9f4bU5ur/qLlZ8goZbHdt6+XG2EChjKmZ/J4JDf2
-	eq0BbqaoGMkQbikXlR0zkO2ZQ/DJImXG3o9oq1xs5b6ABeg2aU8TfqlkEk0gAjBsKqdvnAN6UJtYQ
-	oydu6jX/vOvuocnkBPew==;
+	List-Owner; bh=boE10CNuZc5o3Afm5INHmkE3XPYbxiJzuJJnGme2MXo=; b=VNmUlEgNRTtTQE
+	1X/xxHqlGGeeIMGWBgqUyrTTlla4Vwi+8gV90apWe7HHooVNDlGTcW18ayppYCeLLsYbUIE/YFH6g
+	R0tPaFPh8i3Z6lLKDyYCEIr9WZX4iRLhLkov5lrk9Qy2G9+8qSEedyLQBVqdf2LaV2FhsU9qYEtil
+	IK7ebWmMD+cYLpMiSbtFOMLb/3ZHniu/udohOoMEDuZp9VcQKbc6yiKPZgcjFv94gEUKTgDAqyWjz
+	voMGTrwdo1SZTXV+bDwuqrrjUhTGb60stvqZDHJ1Fe4fiOG63ABm/bHfYAzTJgAsq9ml9rKatrwva
+	Aayoq2WW5F2pb6pCCf1g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwM5D-0006Iv-La; Wed, 20 Feb 2019 07:14:19 +0000
-Received: from mail-eopbgr140047.outbound.protection.outlook.com
- ([40.107.14.47] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
+	id 1gwMMG-0005xt-ED; Wed, 20 Feb 2019 07:31:56 +0000
+Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwM5A-0006IY-BV
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 07:14:18 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=92+nlmtOPYVEF7DPl1jCkqK+n6Q3ip6R+75nG4wEcKU=;
- b=u4BqGJR6OVexfMZVlMoyMer7X+iGnKRC6P2phEqQOG9yVwJ1ATGsj2HVaCVxKHk7vddL6N4kGzGS4ehrWIf3+hcjtPDBptq9cjqledF1raiZZkOzzbu8cWGQ7I8CatOjyNSslq8/3HICCbzLttuf+Oh+JHX2vqdoYKPd1osMVek=
-Received: from AM6PR04MB4215.eurprd04.prod.outlook.com (52.135.168.141) by
- AM6PR04MB4888.eurprd04.prod.outlook.com (20.177.33.151) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Wed, 20 Feb 2019 07:14:13 +0000
-Received: from AM6PR04MB4215.eurprd04.prod.outlook.com
- ([fe80::e944:6749:3ee6:4e08]) by AM6PR04MB4215.eurprd04.prod.outlook.com
- ([fe80::e944:6749:3ee6:4e08%5]) with mapi id 15.20.1622.020; Wed, 20 Feb 2019
- 07:14:13 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>, Stephen Boyd
- <sboyd@codeaurora.org>
-Subject: RE: [PATCH 1/1] clk: imx: scu: add set parent support
-Thread-Topic: [PATCH 1/1] clk: imx: scu: add set parent support
-Thread-Index: AQHUuKEx5wW/zvLIHEGxAAYc3mdDGaXoZj/g
-Date: Wed, 20 Feb 2019 07:14:12 +0000
-Message-ID: <AM6PR04MB4215F04E5D9CFF45AA7B3054807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
-References: <1548855205-12249-1-git-send-email-aisheng.dong@nxp.com>
-In-Reply-To: <1548855205-12249-1-git-send-email-aisheng.dong@nxp.com>
-Accept-Language: zh-CN, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: f9bbd3eb-28a7-4589-183d-08d697030432
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM6PR04MB4888; 
-x-ms-traffictypediagnostic: AM6PR04MB4888:
-x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; AM6PR04MB4888;
- 23:+6cl4slSnZVmqkkhsHF8kF+wdqWYbdsswAgjKR6yD?=
- =?us-ascii?Q?GdQdRK08ExuowV9r3u/IfyfVvm1XL23SG+qee0VKLIZp3ZltJqJBM8SCl/mU?=
- =?us-ascii?Q?Xak5RWqtbwmE70aNizDqGFzc9OgH8jwADpRh/AGonsqIefcuzLvlGmh97zXm?=
- =?us-ascii?Q?+qUFw0k869M1/6ldXuq1UK/5UuguoAVh3rpwPHJxlovogttGOb3xaHkmBmWX?=
- =?us-ascii?Q?JT0+eOhv5BTeOQNH/SWL6SFKipSUIp+oUjQT7aPOniA8eEO2HhGeRREstgEp?=
- =?us-ascii?Q?U1Fer4l9PASt+z75qVQmhIw9TCK4IkPJfaN3NLjvKoW1+Gw/NoKYptRlnsm2?=
- =?us-ascii?Q?HJF8SXyKB1sHibM7S/OUMI7CwFlFs1RWupfvYmgoUXhBMWHSzCg9rKsnKCW6?=
- =?us-ascii?Q?FNu4TpbIK8GTs872HZEAhGQXhRmieartmY4WywbX3E+I6wXqRwE6MF4ApV0E?=
- =?us-ascii?Q?2zTNZ50c0L5IKGy3zD27OP6w6gH03oDXHtDeTZLhZ0623fCgcpBtX6wm3S2V?=
- =?us-ascii?Q?SEtGetY8eyABzu3hD1cnAjJttx08iddgzj4eTbcJqGOtAP3W4YfmjihRifM7?=
- =?us-ascii?Q?+8MPGnS/ydWzz8h0dg75jb/Ef3W41VmXyfY/scOnyK3M8Khqq4lwucksJe4M?=
- =?us-ascii?Q?HQqKPEHSacMlEB6LllF4LYKOElcLGr7aBEXrzPMopL2Bm+hlU/7MWW1ne04Q?=
- =?us-ascii?Q?vStB0vGAg2DFc1cqPf8A54qxhUNFTg/d54YJU10Gpl6bcaIoEHcMBTwr7nb0?=
- =?us-ascii?Q?Y0zKTj/56jCgKY+5If6mTPkEMxpfn/JWetdH8W4Ms0CrBFOuacOZkIIeGSlN?=
- =?us-ascii?Q?7Sr3mtM7ySFPQ5bsCkoSdk9ihqqswO4Q5VYbs4XyYwPZsrf8xhBA2YTj3No6?=
- =?us-ascii?Q?mg1shDNARHMwz5M4KY6ZCQapao8URUKwmV5e5JaWiLvlmCk0AqTxNWmsNtzT?=
- =?us-ascii?Q?7sIiF5MBZ2gwlzXWTt7j34OCr8kDDAzudiwxcHVsFZ+0N/qWMlJ4KxuCyLCx?=
- =?us-ascii?Q?EvPU+lwkcwFnCVuNKG9626j2V0+2Fy0zAn8Ikr7a/32ZPiqzkS7ZmjQmt4xc?=
- =?us-ascii?Q?0EZEony7h7nE2UCQTbEM++cREVeQiM9hSuP1d7d1Eo6IruqegIWpYUloSoQA?=
- =?us-ascii?Q?uybm5mu2eCtogWwhma8w6jqS2trGdEWkKdEAbxmVNkNLaTabRxI6YFSaeWl4?=
- =?us-ascii?Q?is4H2vKPS90iGx0ActdDlHde/5q661Qh/Nl3R1/2oggohc7OPit2PGQJ4ALM?=
- =?us-ascii?Q?JIFc+xQwSczwsUgv18=3D?=
-x-microsoft-antispam-prvs: <AM6PR04MB4888EA9DF7A53A9025079F8E807D0@AM6PR04MB4888.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0954EE4910
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(376002)(346002)(136003)(396003)(189003)(199004)(476003)(110136005)(11346002)(446003)(316002)(44832011)(102836004)(6506007)(26005)(186003)(4326008)(54906003)(486006)(229853002)(68736007)(105586002)(106356001)(2501003)(86362001)(2906002)(8676002)(9686003)(8936002)(6436002)(7736002)(97736004)(74316002)(53936002)(66066001)(25786009)(81166006)(81156014)(6246003)(14444005)(256004)(305945005)(71200400001)(71190400001)(478600001)(33656002)(3846002)(6116002)(14454004)(76176011)(55016002)(99286004)(5660300002)(7696005);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB4888;
- H:AM6PR04MB4215.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 4ryxiy0Q8c20+Gws6d2ABq4yigx6TnE8kRzAKCCNAWVQ4wF7Uf+hdMhACOfn8Nu8SvrKM5SSX/WjE3b9ymeCTnF7znKhvTJoR2Vf280MfHMqOUzZN2AZ//Kms0cMGr/jDthEfETORZ/jg9/wxP9qbnowvskQa0Fmomst+cDNpAhZ6erXnRTM2j1piNKy22Nj7sgGqGUuZTK3xWsQ8wDcYKoaTKsQO/CzdD+ET0Dkv/lj6XKeN7Y1WKCzHzQQZGMBQoatIQvAcXG1HX8+oU6IBkvsMxC1bVl/qLf3mgADkJBHLlnBcXLpquOoXMqtZPibqAJ9nQZRkdR+Dmn/F2KGhMFqjhTE4F5FXA9wiCrDeuHWR/Kvs4se43qkmjs4nQSyd9ApET3anBoRbJNT2tpnOjfDSja8N6diUQ0xeNtAW2Y=
+ id 1gwMLc-0005J4-BU; Wed, 20 Feb 2019 07:31:20 +0000
+X-UUID: 8177241d9b7c464e91cee0496fa891bc-20190219
+X-UUID: 8177241d9b7c464e91cee0496fa891bc-20190219
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
+ (envelope-from <jungo.lin@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 1389506669; Tue, 19 Feb 2019 23:31:11 -0800
+Received: from MTKMBS01N1.mediatek.inc (172.21.101.68) by
+ MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 19 Feb 2019 23:31:09 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs01n1.mediatek.inc (172.21.101.68) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 20 Feb 2019 15:31:07 +0800
+Received: from [172.21.84.99] (172.21.84.99) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Wed, 20 Feb 2019 15:31:07 +0800
+Message-ID: <1550647867.11724.80.camel@mtksdccf07>
+Subject: Re: [RFC PATCH V0 7/7] [media] platform: mtk-isp: Add Mediatek ISP
+ Pass 1 driver
+From: Jungo Lin <jungo.lin@mediatek.com>
+To: Tomasz Figa <tfiga@chromium.org>
+Date: Wed, 20 Feb 2019 15:31:07 +0800
+In-Reply-To: <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
+References: <1549348966-14451-1-git-send-email-frederic.chen@mediatek.com>
+ <1549348966-14451-8-git-send-email-frederic.chen@mediatek.com>
+ <CAAFQd5CWdZUXVb4F9BLhQdN8WHjzA8acPDx1i+WcoudsdGsfUg@mail.gmail.com>
+ <1550372163.11724.59.camel@mtksdccf07>
+ <CAAFQd5CaXz_Lqz8NhGK4DvaxPvuYLj-Y73sG7wFaqW44j+tZQw@mail.gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: f9bbd3eb-28a7-4589-183d-08d697030432
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 07:14:12.9841 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB4888
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_231416_399973_56CD8CF9 
-X-CRM114-Status: GOOD (  17.58  )
+X-CRM114-CacheID: sfid-20190219_233116_620473_98333A0F 
+X-CRM114-Status: GOOD (  26.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -132,181 +80,133 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: ryan.yu@mediatek.com, frankie.chiu@mediatek.com, ryan_yu@mediatek.com,
+ Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>,
+ Rynn Wu =?UTF-8?Q?=28=E5=90=B3=E8=82=B2=E6=81=A9=29?= <Rynn.Wu@mediatek.com>,
+ Jerry-ch.Chen@mediatek.com, Hans Verkuil <hans.verkuil@cisco.com>,
+ frankie_chiu@mediatek.com, Frederic Chen <frederic.chen@mediatek.com>,
+ Seraph.Huang@mediatek.com,
+ Linux Media Mailing List <linux-media@vger.kernel.org>,
+ Holmes Chiou =?UTF-8?Q?=28=E9=82=B1=E6=8C=BA=29?= <holmes.chiou@mediatek.com>,
+ seraph_huang@mediatek.com, Sj Huang <sj.huang@mediatek.com>,
+ yuzhao@chromium.org, linux-mediatek@lists.infradead.org, Matthias
+ Brugger <matthias.bgg@gmail.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ "list@263.net:IOMMU DRIVERS
+ <iommu@lists.linux-foundation.org>, Joerg  Roedel <joro@8bytes.org>,
+ " <linux-arm-kernel@lists.infradead.org>,
+ Sean Cheng =?UTF-8?Q?=28=E9=84=AD=E6=98=87=E5=BC=98=29?=
+ <Sean.Cheng@mediatek.com>, srv_heupstream@mediatek.com,
+ Christie Yu =?UTF-8?Q?=28=E6=B8=B8=E9=9B=85=E6=83=A0=29?=
+ <christie.yu@mediatek.com>, zwisler@chromium.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Ping
+On Tue, 2019-02-19 at 17:51 +0900, Tomasz Figa wrote:
+> Hi Jungo,
+> 
+> On Sun, Feb 17, 2019 at 11:56 AM Jungo Lin <jungo.lin@mediatek.com> wrote:
+> >
+> > On Wed, 2019-02-13 at 18:50 +0900, Tomasz Figa wrote:
+> > > (() . ( strHi Frederic, Jungo,
+> > >
+> > > On Tue, Feb 5, 2019 at 3:43 PM Frederic Chen <frederic.chen@mediatek.com> wrote:
+> > > >
+> > > > From: Jungo Lin <jungo.lin@mediatek.com>
+> > > >
+> > > > This patch adds the driver for Pass unit in Mediatek's camera
+> > > > ISP system. Pass 1 unit is embedded in Mediatek SOCs. It
+> > > > provides RAW processing which includes optical black correction,
+> > > > defect pixel correction, W/IR imbalance correction and lens
+> > > > shading correction.
+> > > >
+> > > > The mtk-isp directory will contain drivers for multiple IP
+> > > > blocks found in Mediatek ISP system. It will include ISP Pass 1
+> > > > driver, sensor interface driver, DIP driver and face detection
+> > > > driver.
+> > >
+> > > Thanks for the patches! Please see my comments inline.
+> > >
+> >
+> > Dear Thomas:
+> >
+> > Thanks for your comments.
+> >
+> > We will revise the source codes based on your comments.
+> > Since there are many comments to fix/revise, we will categorize &
+> > prioritize these with below list:
+> >
+> > 1. Coding style issues.
+> > 2. Coding defects, including unused codes.
+> > 3. Driver architecture refactoring, such as removing mtk_cam_ctx,
+> > unnecessary abstraction layer, etc.
+> >
+> 
+> Thanks for replying to the comments!
+> 
+> Just to clarify, there is no need to hurry with resending a next patch
+> set with only a subset of the changes. Please take your time to
+> address all the comments before sending the next revision. This
+> prevents forgetting about some remaining comments and also lets other
+> reviewers come with new comments or some alternative ideas for already
+> existing comments. Second part of my review is coming too.
+> 
+> P.S. Please avoid top-posting on mailing lists. If replying to a
+> message, please reply below the related part of that message. (I've
+> moved your reply to the place in the email where it should be.)
+> 
+> [snip]
 
-> From: Aisheng Dong
-> Sent: Wednesday, January 30, 2019 9:39 PM
->
-> Add clk scu set parents support.
+Hi, Tomasz,
+
+Thanks for your advice.
+We will prepare the next patch set after all comments are revised.
+
+
+> > > > +       phys_addr_t paddr;
+> > >
+> > > We shouldn't need physical address either. I suppose this is for the
+> > > SCP, but then it should be a DMA address obtained from dma_map_*()
+> > > with struct device pointer of the SCP.
+> > >
+> >
+> > Yes, this physical address is designed for SCP.
+> > For tuning buffer, it will be touched by SCP and
+> > SCP can't get the physical address by itself. So we need to get
+> > this physical address in the kernel space via mtk_cam_smem_iova_to_phys
+> > function call and pass it to the SCP. At the same time, DMA address
+> > (daddr) is used for ISP HW.
+> >
 > 
-> Cc: Stephen Boyd <sboyd@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/clk/imx/clk-scu.c | 87
-> +++++++++++++++++++++++++++++++++++++++++++++--
->  drivers/clk/imx/clk-scu.h | 16 ++++++++-
->  2 files changed, 100 insertions(+), 3 deletions(-)
+> Right, but my point is that in the kernel phys_addr_t is the physical
+> address from the CPU point of view. Any address from device point of
+> view is dma_addr_t and should be obtained from the DMA mapping API
+> (even if it's numerically the same as physical address).
 > 
-> diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c index
-> 7ccf7ed..3c13c41 100644
-> --- a/drivers/clk/imx/clk-scu.c
-> +++ b/drivers/clk/imx/clk-scu.c
-> @@ -66,6 +66,41 @@ struct imx_sc_msg_get_clock_rate {  };
+
+OK.
+In order to clarify the address usage, is it ok to rename "dma_addr_t
+scp_addr"?
+Moreover, below function will be also renamed.
+dma_addr_t mtk_cam_smem_iova_to_scp_phys(struct device *dev,
+				      dma_addr_t iova)
+Could you help us to review?
+If you have any better suggestion, please kindly let us know.
+
+
+Best regards,
+
+Jungo
+
+> Best regards,
+> Tomasz
 > 
->  /*
-> + * struct imx_sc_msg_get_clock_parent - clock get parent protocol
-> + * @hdr: SCU protocol header
-> + * @req: get parent request protocol
-> + * @resp: get parent response protocol
-> + *
-> + * This structure describes the SCU protocol of clock get parent  */
-> +struct imx_sc_msg_get_clock_parent {
-> +	struct imx_sc_rpc_msg hdr;
-> +	union {
-> +		struct req_get_clock_parent {
-> +			__le16 resource;
-> +			u8 clk;
-> +		} __packed req;
-> +		struct resp_get_clock_parent {
-> +			u8 parent;
-> +		} resp;
-> +	} data;
-> +};
-> +
-> +/*
-> + * struct imx_sc_msg_set_clock_parent - clock set parent protocol
-> + * @hdr: SCU protocol header
-> + * @req: set parent request protocol
-> + *
-> + * This structure describes the SCU protocol of clock set parent  */
-> +struct imx_sc_msg_set_clock_parent {
-> +	struct imx_sc_rpc_msg hdr;
-> +	__le16 resource;
-> +	u8 clk;
-> +	u8 parent;
-> +} __packed;
-> +
-> +/*
->   * struct imx_sc_msg_req_clock_enable - clock gate protocol
->   * @hdr: SCU protocol header
->   * @resource: clock resource to gate
-> @@ -173,6 +208,49 @@ static int clk_scu_set_rate(struct clk_hw *hw,
-> unsigned long rate,
->  	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true);  }
-> 
-> +static u8 clk_scu_get_parent(struct clk_hw *hw) {
-> +	struct clk_scu *clk = to_clk_scu(hw);
-> +	struct imx_sc_msg_get_clock_parent msg;
-> +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> +	int ret;
-> +
-> +	hdr->ver = IMX_SC_RPC_VERSION;
-> +	hdr->svc = IMX_SC_RPC_SVC_PM;
-> +	hdr->func = IMX_SC_PM_FUNC_GET_CLOCK_PARENT;
-> +	hdr->size = 2;
-> +
-> +	msg.data.req.resource = cpu_to_le16(clk->rsrc_id);
-> +	msg.data.req.clk = clk->clk_type;
-> +
-> +	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
-> +	if (ret) {
-> +		pr_err("%s: failed to get clock parent %d\n",
-> +		       clk_hw_get_name(hw), ret);
-> +		return 0;
-> +	}
-> +
-> +	return le32_to_cpu(msg.data.resp.parent);
-> +}
-> +
-> +static int clk_scu_set_parent(struct clk_hw *hw, u8 index) {
-> +	struct clk_scu *clk = to_clk_scu(hw);
-> +	struct imx_sc_msg_set_clock_parent msg;
-> +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> +
-> +	hdr->ver = IMX_SC_RPC_VERSION;
-> +	hdr->svc = IMX_SC_RPC_SVC_PM;
-> +	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_PARENT;
-> +	hdr->size = 2;
-> +
-> +	msg.resource = cpu_to_le16(clk->rsrc_id);
-> +	msg.clk = clk->clk_type;
-> +	msg.parent = index;
-> +
-> +	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true); }
-> +
->  static int sc_pm_clock_enable(struct imx_sc_ipc *ipc, u16 resource,
->  			      u8 clk, bool enable, bool autog)  { @@ -228,11 +306,14
-> @@ static const struct clk_ops clk_scu_ops = {
->  	.recalc_rate = clk_scu_recalc_rate,
->  	.round_rate = clk_scu_round_rate,
->  	.set_rate = clk_scu_set_rate,
-> +	.get_parent = clk_scu_get_parent,
-> +	.set_parent = clk_scu_set_parent,
->  	.prepare = clk_scu_prepare,
->  	.unprepare = clk_scu_unprepare,
->  };
-> 
-> -struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type)
-> +struct clk_hw *__imx_clk_scu(const char *name, const char * const *parents,
-> +			     int num_parents, u32 rsrc_id, u8 clk_type)
->  {
->  	struct clk_init_data init;
->  	struct clk_scu *clk;
-> @@ -248,7 +329,9 @@ struct clk_hw *imx_clk_scu(const char *name, u32
-> rsrc_id, u8 clk_type)
-> 
->  	init.name = name;
->  	init.ops = &clk_scu_ops;
-> -	init.num_parents = 0;
-> +	init.parent_names = parents;
-> +	init.num_parents = num_parents;
-> +
->  	/*
->  	 * Note on MX8, the clocks are tightly coupled with power domain
->  	 * that once the power domain is off, the clock status may be diff --git
-> a/drivers/clk/imx/clk-scu.h b/drivers/clk/imx/clk-scu.h index 52c1746..2bcfaf0
-> 100644
-> --- a/drivers/clk/imx/clk-scu.h
-> +++ b/drivers/clk/imx/clk-scu.h
-> @@ -10,7 +10,21 @@
->  #include <linux/firmware/imx/sci.h>
-> 
->  int imx_clk_scu_init(void);
-> -struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type);
-> +
-> +struct clk_hw *__imx_clk_scu(const char *name, const char * const *parents,
-> +			     int num_parents, u32 rsrc_id, u8 clk_type);
-> +
-> +static inline struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id,
-> +					 u8 clk_type)
-> +{
-> +	return __imx_clk_scu(name, NULL, 0, rsrc_id, clk_type); }
-> +
-> +static inline struct clk_hw *imx_clk_scu2(const char *name, const char *
-> const *parents,
-> +					  int num_parents, u32 rsrc_id, u8 clk_type) {
-> +	return __imx_clk_scu(name, parents, num_parents, rsrc_id, clk_type); }
-> 
->  struct clk_hw *imx_clk_lpcg_scu(const char *name, const char
-> *parent_name,
->  				unsigned long flags, void __iomem *reg,
-> --
-> 2.7.4
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek@lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+
 
 
 _______________________________________________
