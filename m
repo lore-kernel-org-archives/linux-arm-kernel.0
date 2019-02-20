@@ -2,82 +2,87 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AAE0C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8DD6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2C8422147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7CAFC2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuORV6S6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="aUZj46IR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C8422147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g7n0fag5";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="RmlccQeC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7CAFC2147C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=Kci+kJ8h+cp7buvLLMaK4CDKEdSN9d1HYgbHFe4iQIE=; b=SuO
-	RV6S6vXqVH/r4xUJHdky3FoTZkmVUUGxlStAagXXK78tT4b5MrC319NkaxUTGHfYr4TOK/sWf5/gT
-	SHhEDzdNnfsolboC/ye7LPN5521wJ5lELhQpikXegk4r4/GZK++wml8+o207i4nNiujd+Ig3572Pk
-	QmpQLogtpmsUxzVnMc2ZYV8B2BhvIuBa3sgykN0MS9jPxcqKMs21noxoIxWvYjTMnRyu/fVou+4EV
-	Qe+vYHBh6gFBN/630SjUWd+Epz0mYtp48eoBZLTYRzF5EhbB42fPUD6wQe5SXam5LZdGOjma4oteR
-	vcwegWwgqR6QUKk3Eu7jf+6M+pKpp1w==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=++MsDtHZ/lnxUs6pJ+xDHshejnFz2fXj55TDiN2uCpI=; b=g7n0fag5tKl8yJwickWlSPEBFp
+	uMDFQcPnomx3+IgzcfhljebBTIti82wBMRYl/TNwKYe3gs9ESsRSye0dit8BGIi0M6aRcZLEPHcXr
+	EAuR98kyBmpGH99bhpFgwIIq+zqWUJOjH7y1MK29kKKXTcdKZ0KSvso/cF6C7t1pTkhdeGlA98HdE
+	gKIa32VTW6sQxGSkxZ9KTJ6RpJP1h3j+W86l66gBs/oer/xQCiIboSMIG4mk+OlzVvff0NTTTYHNk
+	RwU/7Iy2sngvhskzIPQAE4gjmc/NRKAhpY1clD/Yq3cOH3ZZNoQm2pqTunKZabN0nqRhUbcgGJlq0
+	kDpGbsag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUp2-0005Dg-SB; Wed, 20 Feb 2019 16:34:12 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gwUpH-0005Vd-Pk; Wed, 20 Feb 2019 16:34:27 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUoz-0005D0-2e
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:34:11 +0000
-Received: by mail-pg1-x543.google.com with SMTP id s198so12127758pgs.2
+ id 1gwUp2-0005DW-6h
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:34:13 +0000
+Received: by mail-pl1-x641.google.com with SMTP id m10so2810379plt.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 08:34:08 -0800 (PST)
+ Wed, 20 Feb 2019 08:34:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=3BWkOhTkkswDxf0FP7V9XAIUNHK7O40ffyu257dAaTY=;
- b=aUZj46IRGnkuSkRUWj0nYxAonh1J6EkNT/y4rr1tH8pGk5NypxqYTuQGiYsPsE3XRv
- Xiy6pRLJSj5/nQb7W0v+t8CUqDDWUmxp4rXtpYRfEzdFihPrjgp/Vk3Lgn2SD0wr890M
- GMKL8YWs5Rh5PN6aofXra2UQZdazKe/2M+n6I=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=5JMpbtJFok6NmyP09wHWoeTClnCNAZoek3gSUOSs3x0=;
+ b=RmlccQeCYowaxbJ7ccWoPEOLRf/t0oWGtdbuaYzv+WOyd9XtLfEjlHPhzZT9uyTbsy
+ ZMB4mcyyQn/rwdJnS5z3g6L6BxV/EdbgUBowBsNpsUH5zS3JouwtPVvIi8QXrp5+BIQq
+ hNf1+ASiQ2Z1/AYpTJBwW2GP83LFjCRPr39s8=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=3BWkOhTkkswDxf0FP7V9XAIUNHK7O40ffyu257dAaTY=;
- b=G2hqPWW4tYJ6cuNfDKxPBYCqYZkI5ZFGrU1ca8DCmdSKn8wsZc2eLt//DNfDcSMfuu
- 0VxZjJJkKQ2Vc/yjWKvWroYtzirevmPfeTwgKOPmTT0seLoa8laQvAjqzC0sKHZzAINU
- lYxZHJ5V5j+Hq9RExXZWuNZsbCAiqjvZIAiaVAZ20rKa3s/WOumhX1mZC+OLNhpzlmQd
- Gl6yCrzO0Svm/+8VmGrCue3Nj9VL/2e9fxxMYA7dJyPExlkYj/j4i0cQO6YQjzZLc/Fv
- xQP+p9W/NwTglAOE+35H0aTauKO6fdEQ3sx5nfDRbS3ou6y3aHAdO+bDNucTqvbgVGXF
- Th/Q==
-X-Gm-Message-State: AHQUAuYic9X3gz4K8x+rBRYneIm6mXDEuY9dT6a78XtlrXwBicKjdFP7
- N2ri+8KvVTlqKtTT2OthQXFF7g==
-X-Google-Smtp-Source: AHgI3IYSJLYMwme1v91novIPjbuXRyKVN3exUtRlX5MVCQx7Vp2iq0J0P/Zkr5gUTDZGSw0ZY2F9Zw==
-X-Received: by 2002:a62:9917:: with SMTP id d23mr36693549pfe.88.1550680447687; 
- Wed, 20 Feb 2019 08:34:07 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=5JMpbtJFok6NmyP09wHWoeTClnCNAZoek3gSUOSs3x0=;
+ b=We50FjjxI3M27UkyoYwe+/X07HhkedXY2Sz3daSiLNe1vMdXcAt9JMsjf5DqGL1eQG
+ F4M8+YEwWZyF755DZ2EcfgHZASOmKzCwukhoy331DPfSeGJhPoKxZ9AECtvVnz+Rn988
+ xSZNTGIbwPQWLa3kYd5dlf9F0O/xcBWwosfuWGoOwCnZz5WEmivQJWDNsegJSW298ZBv
+ 0wPdGEkug4gz2xTbfajxRvabv5c3DOBbPhmqeBTVBAlgo/z8vzlpsrjuLqfAgKGbZ9WF
+ C4d6hivaT8k+atq78x/PdK5yJz7Bghgkt6CdKYjtrAGly9Xqqssx4UYfI4rKKOr8a+lM
+ KkoQ==
+X-Gm-Message-State: AHQUAubD7cQZpZqhc0QHO3AwpzngoPBVJOD2QRySkExDtL44WBNaDj9j
+ u173UXpECqPiTclOt0lSqsCPQg==
+X-Google-Smtp-Source: AHgI3IY8WjyHVjXGBqE+g1rHOxfoj6OPgU0zvCl8moah1jJaqkXrjklULWWDfZcULwCmIUPaJhEeVg==
+X-Received: by 2002:a17:902:6b4b:: with SMTP id
+ g11mr36696005plt.92.1550680451148; 
+ Wed, 20 Feb 2019 08:34:11 -0800 (PST)
 Received: from mannams-OptiPlex-7010.dhcp.broadcom.net ([192.19.234.250])
- by smtp.gmail.com with ESMTPSA id t10sm26556717pfa.151.2019.02.20.08.34.04
+ by smtp.gmail.com with ESMTPSA id t10sm26556717pfa.151.2019.02.20.08.34.07
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Wed, 20 Feb 2019 08:34:06 -0800 (PST)
+ Wed, 20 Feb 2019 08:34:10 -0800 (PST)
 From: Srinath Mannam <srinath.mannam@broadcom.com>
 To: Bjorn Helgaas <bhelgaas@google.com>,
  Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Ray Jui <rjui@broadcom.com>,
  Scott Branden <sbranden@broadcom.com>
-Subject: [PATCH v3 0/2] Add IPROC PCIe new features
-Date: Wed, 20 Feb 2019 22:03:53 +0530
-Message-Id: <1550680435-9706-1-git-send-email-srinath.mannam@broadcom.com>
+Subject: [PATCH v3 1/2] PCI: iproc: Add CRS check in config read
+Date: Wed, 20 Feb 2019 22:03:54 +0530
+Message-Id: <1550680435-9706-2-git-send-email-srinath.mannam@broadcom.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1550680435-9706-1-git-send-email-srinath.mannam@broadcom.com>
+References: <1550680435-9706-1-git-send-email-srinath.mannam@broadcom.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_083409_131076_ECCD09C2 
-X-CRM114-Status: UNSURE (   9.70  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190220_083412_245371_CB576B63 
+X-CRM114-Status: GOOD (  16.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,26 +103,91 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch set extends support of new IPROC PCIe host controller features
- - Add CRS check using controller register status flags
- - Add outbound window mapping configuration for 32-bit I/O region
+In the current implementation, config read output data 0xffff0001 is
+assumed as CRS completion. But sometimes 0xffff0001 can be a valid data.
 
-This patch set is based on Linux-5.0-rc2.
+IPROC PCIe host controller PAXB v2 has a register to show config read
+status flags like SC, UR, CRS and CA. So that extra check is added to
+confirm the CRS using status flags before reissue config read.
 
-Changes from v2:
-  - Based on Lorenzo Pieralisi comments, commit logs are expanded.
+Signed-off-by: Srinath Mannam <srinath.mannam@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+---
+ drivers/pci/controller/pcie-iproc.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-Changes from v1:
-  - Addressed Bjorn Helgaas comments.
-  - Removed set order mode patch from patchset.
-
-Srinath Mannam (2):
-  PCI: iproc: Add CRS check in config read
-  PCI: iproc: Add outbound configuration for 32-bit I/O region
-
- drivers/pci/controller/pcie-iproc.c | 44 +++++++++++++++++++++++++++++++++----
- 1 file changed, 40 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/pci/controller/pcie-iproc.c b/drivers/pci/controller/pcie-iproc.c
+index c20fd6b..b882255 100644
+--- a/drivers/pci/controller/pcie-iproc.c
++++ b/drivers/pci/controller/pcie-iproc.c
+@@ -60,6 +60,10 @@
+ #define APB_ERR_EN_SHIFT		0
+ #define APB_ERR_EN			BIT(APB_ERR_EN_SHIFT)
+ 
++#define CFG_RD_SUCCESS			0
++#define CFG_RD_UR			1
++#define CFG_RD_CRS			2
++#define CFG_RD_CA			3
+ #define CFG_RETRY_STATUS		0xffff0001
+ #define CFG_RETRY_STATUS_TIMEOUT_US	500000 /* 500 milliseconds */
+ 
+@@ -289,6 +293,9 @@ enum iproc_pcie_reg {
+ 	IPROC_PCIE_IARR4,
+ 	IPROC_PCIE_IMAP4,
+ 
++	/* config read status */
++	IPROC_PCIE_CFG_RD_STATUS,
++
+ 	/* link status */
+ 	IPROC_PCIE_LINK_STATUS,
+ 
+@@ -350,6 +357,7 @@ static const u16 iproc_pcie_reg_paxb_v2[] = {
+ 	[IPROC_PCIE_IMAP3]		= 0xe08,
+ 	[IPROC_PCIE_IARR4]		= 0xe68,
+ 	[IPROC_PCIE_IMAP4]		= 0xe70,
++	[IPROC_PCIE_CFG_RD_STATUS]	= 0xee0,
+ 	[IPROC_PCIE_LINK_STATUS]	= 0xf0c,
+ 	[IPROC_PCIE_APB_ERR_EN]		= 0xf40,
+ };
+@@ -474,10 +482,12 @@ static void __iomem *iproc_pcie_map_ep_cfg_reg(struct iproc_pcie *pcie,
+ 	return (pcie->base + offset);
+ }
+ 
+-static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
++static unsigned int iproc_pcie_cfg_retry(struct iproc_pcie *pcie,
++					 void __iomem *cfg_data_p)
+ {
+ 	int timeout = CFG_RETRY_STATUS_TIMEOUT_US;
+ 	unsigned int data;
++	u32 status;
+ 
+ 	/*
+ 	 * As per PCIe spec r3.1, sec 2.3.2, CRS Software Visibility only
+@@ -498,6 +508,15 @@ static unsigned int iproc_pcie_cfg_retry(void __iomem *cfg_data_p)
+ 	 */
+ 	data = readl(cfg_data_p);
+ 	while (data == CFG_RETRY_STATUS && timeout--) {
++		/*
++		 * CRS state is set in CFG_RD status register
++		 * This will handle the case where CFG_RETRY_STATUS is
++		 * valid config data.
++		 */
++		status = iproc_pcie_read_reg(pcie, IPROC_PCIE_CFG_RD_STATUS);
++		if (status != CFG_RD_CRS)
++			return data;
++
+ 		udelay(1);
+ 		data = readl(cfg_data_p);
+ 	}
+@@ -576,7 +595,7 @@ static int iproc_pcie_config_read(struct pci_bus *bus, unsigned int devfn,
+ 	if (!cfg_data_p)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+-	data = iproc_pcie_cfg_retry(cfg_data_p);
++	data = iproc_pcie_cfg_retry(pcie, cfg_data_p);
+ 
+ 	*val = data;
+ 	if (size <= 2)
 -- 
 2.7.4
 
