@@ -2,93 +2,101 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B2C6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:26:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BECAAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:40:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6762F20859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:26:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 854B220851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:40:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="axERuWis";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="gsOTKs4h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6762F20859
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4q0FIQP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 854B220851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kwiboo.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=D5rH4lhU7u+QsSH/2IgGyVCd5v7vVVgLFeNjGN6f8fo=; b=axERuWis/EClQV
-	CqB3JCJM6w/ziQ+59oaQb2MVwscIp8tdvMFg8AJQDFhZmmYUImSzmBCIWGJVxsHO572z8lW3ZwI2t
-	eAsIcOf+s2v2KPleyylU0LA4Po6CGyI9U3ykwS/cewcoFGMRx2aHRFd7YkKyZVM6VKqmEyVRTWiy6
-	r1QJxX0LIpK5+9ZHN1HapGng+gA0CL0mhnTny9FpPaCSOaeNPHuHAQt14V4nBJuKUiZt12jk1S41P
-	Z0XTb7dt0/Z6d2WxqlVRzwYIjZDetm7OTkHzGh3fw2ZL4FjgebFfyy/JgGcbqVRb2bKcsT3Bl2OJT
-	Pmza7DiWkzUvc7D9BgpA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=tj0EZkNbSh4AbnIB9wEWlnXqAtU189kAEXYPiFoHz7I=; b=U4q0FIQPrzJDx2
+	FsIMzHjZ677BmIaCFnlT2f3biztnXvY2ElJKVPKbSv8rHo7EPtX8G7Us5udQO4iTH/5iOT+JWExDz
+	mAfp7rQy8/7u4KGDbOwlsphfqALygM0iQZPxk35D58l+wKr+Pr6Yl+Z6iyFO98kK80Rhp/9BlMLv2
+	Ms/4n44ZijzA9XSBuLBweGim9tNKI+C02Qe3xWV6rqTz+CzgLW9nnreRZOII687280Zerx/9Doi+W
+	4YafJWuUncwqHBjOJlEsSElzD9cNzQvcexS2HlWuqZi1YJpODNlQhFSzcJy09vY7UgnIi7fG2y1o9
+	1mTWfBJwhdW8PXe6lxuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwaKA-00070l-JD; Wed, 20 Feb 2019 22:26:42 +0000
-Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
+	id 1gwaXJ-0002yn-NO; Wed, 20 Feb 2019 22:40:17 +0000
+Received: from mail-ve1eur02olkn080c.outbound.protection.outlook.com
+ ([2a01:111:f400:fe06::80c]
+ helo=EUR02-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwaK6-0006ze-NO
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 22:26:40 +0000
-Received: by mail-ua1-x944.google.com with SMTP id q17so8834040uam.0
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 14:26:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=sDpL3gmbczax8ALdj7IVEn/cdMFCR2mdLaVqooKyfDU=;
- b=gsOTKs4hDJpCcYxXFAhd3Mw19bPjFasvElf6Yd9ikqATCYiclmkqOMIuNsxSoWBTPs
- cvv7KgIQk6dYFFcC6p6vp/e6zA3KSvygM6ZzD1xDWenkLj9Umc2pmNvwwnaR2e9iG5Eh
- /zlPXUrpCbDsPF9sQP3jSKppTz0LqL6aRU0M0=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=sDpL3gmbczax8ALdj7IVEn/cdMFCR2mdLaVqooKyfDU=;
- b=Z/mQ4nCijOhPYy7EKPW3JsO43phUC8WxBGa3W8U6ChZhlAxZLobYCqg9MlbQ81RTtY
- cALC9B28Ytm0j76u40cMjNQdPsW9CLtA0hSGk0CViYMCHAz01Ugu0l+YvZJD+0se0SHv
- Jk3svaEMTs+AWO+NeZzdNqyeuqQpHK5KjSxG64WMXyycpNZRKyL61hqefwcvBoO7U43q
- +K9mxc5YuQOrMdxxJcdbjBFxEy8c5Edu4FX5MCodvLqHI2dnHgHWnsmZKL8UPpt9eNjX
- WlQvjBZ36Jvn+t5uJRdEtwzn1tyWbeSD/RnugON0DptxlckH6myXst2DbDsHteR84rUh
- dxJA==
-X-Gm-Message-State: AHQUAuadV0xmtSxx1fR694vjape7z25tUcwFxygTXTIWa+6TV+5zHMtc
- 8KrYd2IHhl6Rj1g3FFWRX6spBMQ+iCA=
-X-Google-Smtp-Source: AHgI3IY7fX88WnCtbXrhAM+MDrpU0yiXs5zrE/C7Fv6j9J40ohJ896llb2WUUBBJDDtmQQOaGK2frA==
-X-Received: by 2002:ab0:6888:: with SMTP id t8mr18731916uar.87.1550701593989; 
- Wed, 20 Feb 2019 14:26:33 -0800 (PST)
-Received: from mail-vs1-f44.google.com (mail-vs1-f44.google.com.
- [209.85.217.44])
- by smtp.gmail.com with ESMTPSA id l193sm7010762vka.19.2019.02.20.14.26.30
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 20 Feb 2019 14:26:30 -0800 (PST)
-Received: by mail-vs1-f44.google.com with SMTP id u13so14062496vsk.0
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 14:26:30 -0800 (PST)
-X-Received: by 2002:a67:ec81:: with SMTP id h1mr19076075vsp.188.1550701589790; 
- Wed, 20 Feb 2019 14:26:29 -0800 (PST)
+ id 1gwaXF-0002e4-DL; Wed, 20 Feb 2019 22:40:15 +0000
+Received: from VE1EUR02FT040.eop-EUR02.prod.protection.outlook.com
+ (10.152.12.58) by VE1EUR02HT020.eop-EUR02.prod.protection.outlook.com
+ (10.152.13.72) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1580.10; Wed, 20 Feb
+ 2019 22:40:06 +0000
+Received: from AM3PR03MB0966.eurprd03.prod.outlook.com (10.152.12.59) by
+ VE1EUR02FT040.mail.protection.outlook.com (10.152.13.217) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id
+ 15.20.1580.10 via Frontend Transport; Wed, 20 Feb 2019 22:40:06 +0000
+Received: from AM3PR03MB0966.eurprd03.prod.outlook.com
+ ([fe80::8011:1f4d:3804:e5f3]) by AM3PR03MB0966.eurprd03.prod.outlook.com
+ ([fe80::8011:1f4d:3804:e5f3%10]) with mapi id 15.20.1643.014; Wed, 20 Feb
+ 2019 22:40:06 +0000
+From: Jonas Karlman <jonas@kwiboo.se>
+To: "dri-devel@lists.freedesktop.org" <dri-devel@lists.freedesktop.org>,
+ "linux-rockchip@lists.infradead.org" <linux-rockchip@lists.infradead.org>
+Subject: [PATCH] drm/rockchip: vop: reset scale mode when win is disabled
+Thread-Topic: [PATCH] drm/rockchip: vop: reset scale mode when win is disabled
+Thread-Index: AQHUyW05H5dNG+/wEE607ybuV0Af9w==
+Date: Wed, 20 Feb 2019 22:40:06 +0000
+Message-ID: <AM3PR03MB0966DE3E19BACE07328CD637AC7D0@AM3PR03MB0966.eurprd03.prod.outlook.com>
+Accept-Language: sv-SE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: AM6P193CA0027.EURP193.PROD.OUTLOOK.COM
+ (2603:10a6:209:3e::40) To AM3PR03MB0966.eurprd03.prod.outlook.com
+ (2a01:111:e400:884c::23)
+x-incomingtopheadermarker: OriginalChecksum:07B09172BD2F7D4BC5C1748A13EE5499F8B953BB47035F112553B387E03C06F9;
+ UpperCasedChecksum:F50CF5423A08EAB22D129A083D0148D264ADC4814803F3108621B221D9F69C72;
+ SizeAsReceived:8680; Count:62
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-tmn: [UZkNIAOMz8V0gxymtiAWGeKq7clYol4R]
+x-microsoft-original-message-id: <20190220223951.18757-1-jonas@kwiboo.se>
+x-ms-publictraffictype: Email
+x-incomingheadercount: 62
+x-eopattributedmessage: 0
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(2017031323274)(2017031322404)(2017031324274)(1601125500)(1603101475)(1701031045);
+ SRVR:VE1EUR02HT020; 
+x-ms-traffictypediagnostic: VE1EUR02HT020:
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0; RULEID:(4566010)(82015058);
+ SRVR:VE1EUR02HT020; BCL:0; PCL:0; RULEID:; SRVR:VE1EUR02HT020; 
+x-microsoft-antispam-message-info: kPjagEvzxBJ835bcET2DQSF/32aBd0kY0WXP+qWMBBkFXHrmPT0mNa8JH9sd/qsg
 MIME-Version: 1.0
-References: <20190211181531.GA3238@embeddedor>
- <CAJKOXPeHp7sKkZ+jXmTXk5GEF_7G5ujfm3Lw==G3T4thfD+F7Q@mail.gmail.com>
- <CAGXu5jLMWrb4Dszv5YSyoGt5Lb3S1oE8EnKsTou7=7Nq1rEEVQ@mail.gmail.com>
- <155027728836.115909.11546859472583324712@swboyd.mtv.corp.google.com>
-In-Reply-To: <155027728836.115909.11546859472583324712@swboyd.mtv.corp.google.com>
-From: Kees Cook <keescook@chromium.org>
-Date: Wed, 20 Feb 2019 14:26:06 -0800
-X-Gmail-Original-Message-ID: <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
-Message-ID: <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
-Subject: Re: [PATCH] clk: samsung: s3c2443: Mark expected switch fall-through
-To: Stephen Boyd <sboyd@kernel.org>
+X-OriginatorOrg: outlook.com
+X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 54485d23-c432-40fe-8436-6091d627118c
+X-MS-Exchange-CrossTenant-Network-Message-Id: 54d57983-ff30-4883-825e-08d697845b99
+X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 54485d23-c432-40fe-8436-6091d627118c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 22:40:04.4805 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Internet
+X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VE1EUR02HT020
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_142638_763856_19B6CB66 
-X-CRM114-Status: GOOD (  21.31  )
+X-CRM114-CacheID: sfid-20190220_144013_452614_F49997C7 
+X-CRM114-Status: UNSURE (   9.72  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,62 +108,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
- Michael Turquette <mturquette@baylibre.com>,
- Tomasz Figa <tomasz.figa@gmail.com>, Krzysztof Kozlowski <krzk@kernel.org>,
- LKML <linux-kernel@vger.kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
- Kukjin Kim <kgene@kernel.org>, Sylwester Nawrocki <s.nawrocki@samsung.com>,
- linux-clk@vger.kernel.org,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Heiko Stuebner <heiko@sntech.de>, Jonas Karlman <jonas@kwiboo.se>, David
+ Airlie <airlied@linux.ie>, Sandy Huang <hjc@rock-chips.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Daniel Vetter <daniel@ffwll.ch>, Ezequiel Garcia <ezequiel@collabora.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 15, 2019 at 4:34 PM Stephen Boyd <sboyd@kernel.org> wrote:
-> Quoting Kees Cook (2019-02-12 10:57:05)
-> > On Mon, Feb 11, 2019 at 11:41 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > >
-> > > It is just the GCC which has to be fixed not the code. You want to
-> > > adjust the code for specific version of GCC and what if GCC changes
-> > > its warning? For example GCC might require "fall through: "... or any
-> > > other syntax. Another point - what about clang's syntax?
-> >
-> > -Wimplicit-fallthrough=3 is stricter and maps to -Wextra, hence its
-> > choice. GCC's levels were chosen based on the existing linters, static
-> > analyzers, etc. The patterns are unlikely to change (see the gcc
-> > man-page).
-> >
-> > Clang doesn't recognize anything in C mode (hopefully this will be
-> > fixed in the future[1]).
-> >
-> > As long as one of the compilers is able to check this, we'll avoid the
-> > bugs associated with this mis-pattern. Gustavo's efforts here have
-> > found kind of a lot of bugs, so I think it's worth a little churn to
-> > add these (and make minor adjustments to existing comments).
->
-> Just curious, what compilation phase does this check run in? Could we
-> gain a macro like FALLTHRU or even lowercase 'fallthru' that expanded to
-> whatever the compiler wants to see and then there would only be "one
-> way" to do this?  It would alleviate the above concerns, but maybe I'm
-> rehashing something that's already been proposed and rejected.
+NV12 framebuffers produced by the VPU shows distorted on RK3288
+after win has been disabled when scaling is active.
 
-When this got discussed a while back, the thinking was that since
-we're also dealing with static analyzers (e.g. Coverity) and IDEs that
-literally parse comments in the code, it was most sensible (at least
-for now, prior to there being a formal C "fall through" statement --
-there is for C++ but not yet for C), we'd stick to explicit comments.
-In theory, we will be able to do a tree-wide change to add the C
-statement once it exists.
+This issue can be reproduced using a 1080p modeset by:
+- Scale a 1280x720 NV12 framebuffer to 1920x1080 on win0
+- Disable win0
+- Display a 1920x1080 NV12 framebuffer without scaling on win0
+- Output will now show the framebuffer distorted
 
-> Of course, I'm happy to merge any of these patches that tweak things so
-> no worries either way.
+And by:
+- Scale a 1280x720 NV12 framebuffer to 1920x1080
+- Change to a 720p modeset (win gets disabled and scaling reset to none)
+- Output will now show the framebuffer distorted
 
-Thanks! :)
+Fix this by setting scale mode to none when win is disabled.
 
+Fixes: 4c156c21c794 ("drm/rockchip: vop: support plane scale")
+Signed-off-by: Jonas Karlman <jonas@kwiboo.se>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index fb70fb486fbf..cdbb47566cac 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -511,6 +511,18 @@ static void vop_core_clks_disable(struct vop *vop)
+ 	clk_disable(vop->hclk);
+ }
+ 
++static void vop_win_disable(struct vop *vop, const struct vop_win_data *win)
++{
++	if (win->phy->scl && win->phy->scl->ext) {
++		VOP_SCL_SET_EXT(vop, win, yrgb_hor_scl_mode, SCALE_NONE);
++		VOP_SCL_SET_EXT(vop, win, yrgb_ver_scl_mode, SCALE_NONE);
++		VOP_SCL_SET_EXT(vop, win, cbcr_hor_scl_mode, SCALE_NONE);
++		VOP_SCL_SET_EXT(vop, win, cbcr_ver_scl_mode, SCALE_NONE);
++	}
++
++	VOP_WIN_SET(vop, win, enable, 0);
++}
++
+ static int vop_enable(struct drm_crtc *crtc)
+ {
+ 	struct vop *vop = to_vop(crtc);
+@@ -556,7 +568,7 @@ static int vop_enable(struct drm_crtc *crtc)
+ 		struct vop_win *vop_win = &vop->win[i];
+ 		const struct vop_win_data *win = vop_win->data;
+ 
+-		VOP_WIN_SET(vop, win, enable, 0);
++		vop_win_disable(vop, win);
+ 	}
+ 	spin_unlock(&vop->reg_lock);
+ 
+@@ -700,7 +712,7 @@ static void vop_plane_atomic_disable(struct drm_plane *plane,
+ 
+ 	spin_lock(&vop->reg_lock);
+ 
+-	VOP_WIN_SET(vop, win, enable, 0);
++	vop_win_disable(vop, win);
+ 
+ 	spin_unlock(&vop->reg_lock);
+ }
+@@ -1476,7 +1488,7 @@ static int vop_initial(struct vop *vop)
+ 		int channel = i * 2 + 1;
+ 
+ 		VOP_WIN_SET(vop, win, channel, (channel + 1) << 4 | channel);
+-		VOP_WIN_SET(vop, win, enable, 0);
++		vop_win_disable(vop, win);
+ 		VOP_WIN_SET(vop, win, gate, 1);
+ 	}
+ 
 -- 
-Kees Cook
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
