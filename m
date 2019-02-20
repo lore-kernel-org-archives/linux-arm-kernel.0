@@ -2,145 +2,59 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EEF4AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:48:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16866C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:50:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BEA752147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:48:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8BE02147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:50:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eF/1bQYp";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="x05J1kIf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEA752147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XIJq3hiO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8BE02147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LVe9waZKoJVea8a4hmq9NyEvz4Rr756imUV4ah3lECo=; b=eF/1bQYpX6BL3Q
-	kF05ZrsQbB1CJU+QjicfjsgSloQlyC3zAqz4I9fZXQKqgYDvMeepBL0ztzUgovmdHXLavIj9T/GqD
-	QcP4YgxkfG3ubIIVvRryuX+s2xc+L2JgKtb5cSno8y2ZT2J5jEfpQyerWzVtvzlRRDFFF+K7Awf3C
-	gFMh9olpdC+ggCgaDJ297w+YPjezjYJnS7EIMuW9FF1P6V8cyMrHCHjgC9S+cIJJC2OWKBI/ocEY/
-	L2GH2p3Ebujqpyf4JcHlGug4qUZjrodUsC2OLTWYiizaCS5ZxPhpOVtl/u9HfuJWYkNqfrBM8LLnc
-	SFbeEKi5RTtkhfomT1tA==;
+	List-Owner; bh=vm6S/oUMBfcNifnPpKi41ufa9BT94E7pJxPaI1FFEkM=; b=XIJq3hiO6qoELT
+	8TuGXyFpUxNmM3VhgNTMTdJKpL4bFtUk+iB5RhSq03l0nYwrTV1p0aHWdchRDUnpmZEdHK53/M2Pm
+	9RaSFlMiR2UtdlJykAm0SdQX/GY34y6LZcGk24wxBNRVoVjw+zhZs/FEUy71ES9qtrbb0Qkmn08Hg
+	ki4RGatzjF4BkrFGj4Yp183dC7//0UHVl2WbknpavOV35cV+/kvKQvPDYobk/6xEjw1FnhALv4ecI
+	l3abHgxmGT7c+RrRL8HlbGzy2j0zLjkIMQTr0XdlqrcmUhE1hFmh9k68iiaYpc1JwwgP8nH3cSRHd
+	zqOoBksC3ge5r9E89jhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPQR-0001ph-Lv; Wed, 20 Feb 2019 10:48:27 +0000
-Received: from esa2.microchip.iphmx.com ([68.232.149.84])
+	id 1gwPSi-0003OT-6X; Wed, 20 Feb 2019 10:50:48 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPQO-0001pD-Of
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:48:26 +0000
-X-IronPort-AV: E=Sophos;i="5.58,390,1544511600"; d="scan'208";a="26850568"
-Received: from smtpout.microchip.com (HELO email.microchip.com)
- ([198.175.253.82])
- by esa2.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 20 Feb 2019 03:48:22 -0700
-Received: from NAM04-SN1-obe.outbound.protection.outlook.com (10.10.215.89) by
- email.microchip.com (10.10.76.38) with Microsoft SMTP Server (TLS) id
- 14.3.352.0; Wed, 20 Feb 2019 03:48:22 -0700
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=microchiptechnology.onmicrosoft.com;
- s=selector1-microchiptechnology-onmicrosoft-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=q6cA/mPCYjtMs0Fgbmf9+uTVqExX6BYDmLxrp1T1Mm4=;
- b=x05J1kIffLPFSfAGPRUggyZ1RHbY+gd1Y74on1I5AldKbxdqYQbLlnhiCHKFVzYrrDGGKT1IQaZkq2GXqWv/tz0u6gIj3gQveo7x4zEsNWEf5TbW74cexDrWQPfvgk4+Uyw8SPyNHZzSdXMDh5pApOZUlsXesRVD+l6olZES3wE=
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
- MWHPR11MB1869.namprd11.prod.outlook.com (10.175.53.148) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Wed, 20 Feb 2019 10:48:20 +0000
-Received: from MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
- ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1622.018; Wed, 20 Feb 2019
- 10:48:19 +0000
-From: <Nicolas.Ferre@microchip.com>
-To: <alexandre.belloni@bootlin.com>
-Subject: Re: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
-Thread-Topic: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
-Thread-Index: AQHUyQXmTxM0lGKi0EWSxBvx5w6KN6XofCSAgAAFXoA=
-Date: Wed, 20 Feb 2019 10:48:19 +0000
-Message-ID: <93fd1515-ee75-75ae-a51f-f3f0e0b2bc74@microchip.com>
-References: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
- <c0688a84-bd8e-1874-6fab-727bb6bd657e@microchip.com>
- <20190220102901.GH11432@piout.net>
-In-Reply-To: <20190220102901.GH11432@piout.net>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: LO2P265CA0392.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:600:f::20) To MWHPR11MB1662.namprd11.prod.outlook.com
- (2603:10b6:301:e::15)
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [195.6.168.232]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 8d518163-8a54-4b26-212a-08d69720ed5e
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:MWHPR11MB1869; 
-x-ms-traffictypediagnostic: MWHPR11MB1869:
-x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxODY5OzIzOmFSM2JWajRMMGdpWVlpU3NHbUdtUzFzella?=
- =?utf-8?B?VXEyYU9wNldpVmthL1k1Tk9KOThRdGd4bENlNnprdzV6N1gxcXVxZnBqdTJ5?=
- =?utf-8?B?eGdqSHZXcmh3UWJBOEJsTWwzVHIveGU5U0RjRXMyZkZKY2hPSjRHYVgzeE9V?=
- =?utf-8?B?UmpCNXE3YjN3dVdsdnR5MXpVVXNTaVBYdTNPS1VCbWNkOWlpTkx0cWplcXlk?=
- =?utf-8?B?U282bU1zdTV6eU5hRHlpY0kwUXZHcS9iUy9qZDhMNWMwUi9QMndnTTVrVTNy?=
- =?utf-8?B?SjFibGY5U2hKbEtrWDlKU2NvL2hwbHl0Q29GUTR6R0RONGV5SEl2TWtzNmM1?=
- =?utf-8?B?WTNGRGhQY3JSSlZTQk5uWm0rVi9jNmZqYzlybUdQdjJSbHQ3MGVwdGxScy9P?=
- =?utf-8?B?QktDNmxBZFhqWlZmRHVYZlRZWVgrL3FIOEhUdkNSbkxMZ3BEdm9yc1M0R1R1?=
- =?utf-8?B?TTlHbGpLVnZENlpOMEVHZXA0blBoRWhMaEpOTklFYWxaellmUXVBdzRubVl4?=
- =?utf-8?B?RDVBa0RxY2VFVFdONnZ6UmtNU09KSjRHQVA5S1RYR3FsMXdMbFhhMS9ITFkz?=
- =?utf-8?B?SHFYZlU3bVRzeE1SaStOUzhWMjlxQ2hwUW1HR2ZqbEdoVkJkZUhGNUcrWTlP?=
- =?utf-8?B?cU9hdzJFZ1dGMGN1MDVwbzIzcjVYN3ZZbVRPYUFIa0tHWHhhdnZ0Z1l5aXFY?=
- =?utf-8?B?NWJMblZNS3UxcmNPUldYU1hWRjFnWVpNUEJOOExobHYzdGhUaGdCYzNxVFEr?=
- =?utf-8?B?bDk1OUx1YUNsemtaRGdVWGtEeHQvYVUvaEdidTdVcFBsalIreHhYQ2hFREQw?=
- =?utf-8?B?OFVpQmxIWjhTYWxnZzV2c2lOOGY3LzlBMFNkZHZDNlJFdlZlb3djWkJZMGZZ?=
- =?utf-8?B?OUszVk0vMVZvdndaYlJ0eUVqWkc5ZXpqU2ZqcW9WSnVMTmJiYzR4YW1oRlN2?=
- =?utf-8?B?d05jQUZxZ0lNeGJ4b2lvY0xpbDZQQlUyVlQ3Q2FUTENLMVpkaWtqV2xqRm9O?=
- =?utf-8?B?Q0pOc2dXYkJDWnRNRURBc0dQcFFvZElUeHVsNFZuNytwWUo0YWZhdTM0SWU3?=
- =?utf-8?B?RmZaRWszUTAyNW04V3lBaVh0Q0doWGk5UlJTSy9VazVVWlZDemhBTHVmYUNO?=
- =?utf-8?B?ZnlNNW80cTBHYk9NT3d2YkowWUpvWGVGTjV0QmdqQzByN2RUY3FYblBMNzd0?=
- =?utf-8?B?MDdrRDdRVnhHM21IdTBKenJnbndKeDE3NUkwU2VSZmdYNjBTT3E2RGZrT0FI?=
- =?utf-8?B?V2ZaUmZNQkxrdHFTTlNiSGFZR3FmOUx0ZkE3UklFWEVrRkJKa1VWT3lQRWcz?=
- =?utf-8?B?QmxVU09NN3hub0N2VEVnSGxaYmpMTVlvZE5JcFJSTzhCS2FuRk1qZTk3aURh?=
- =?utf-8?B?d09PdGZKaUJBRUtwdG5tN0d4L1FiVGNmeStwVGJ2elNyeTcwWmo1M0xCUXBs?=
- =?utf-8?B?QXFMcmh6elNwcnBnc05hK29Zcy9JUU9ka2ZsdzJDT3FiRERWWFAzQ2JlaStO?=
- =?utf-8?B?TENIQW5CWElVdmFiUExnNFVVU2V3SzJXWjFZa1dDdklUL1hKSXl3d09vWlNr?=
- =?utf-8?B?R3lEcTFlWURURkhQdHMzSG1QMEZWajNBN3cwN0E4UkNJNXlXYzBhVExnYmZh?=
- =?utf-8?B?SDkxc25mMGExanNCYkttRkhxemphWC9xaUpucVhNWklISzV5YTl6dzc3WS8x?=
- =?utf-8?B?RFIwQmI2QVdRdHBlZC9zbGRwS0VONitBRVd2Y1lMOVZycjRvMVlHTUJnaGZq?=
- =?utf-8?Q?Afs5bfy66XoPrZwhe5UdtxyhHiqF0AR4aw7PA=3D?=
-x-microsoft-antispam-prvs: <MWHPR11MB1869351B9298F7F08250592EE07D0@MWHPR11MB1869.namprd11.prod.outlook.com>
-x-forefront-prvs: 0954EE4910
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(346002)(396003)(376002)(136003)(199004)(189003)(31696002)(6246003)(53936002)(486006)(6916009)(99286004)(14454004)(106356001)(6512007)(2906002)(25786009)(54906003)(71200400001)(71190400001)(316002)(4326008)(86362001)(5660300002)(31686004)(256004)(386003)(105586002)(53546011)(6506007)(446003)(3846002)(8936002)(102836004)(11346002)(36756003)(8676002)(478600001)(81156014)(305945005)(6346003)(81166006)(97736004)(476003)(26005)(7736002)(2616005)(186003)(72206003)(6116002)(52116002)(68736007)(6436002)(66066001)(76176011)(6486002)(229853002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1869;
- H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: microchip.com does not designate
- permitted sender hosts)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Nicolas.Ferre@microchip.com; 
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: JJMxV6LOwqyoRT5GJsAeXdAcNhqLPIHGMy5cv+7AzCl4fTRf8OfjpkZwM9Df/Nj6y/TYkyQuWQPzm0BZ/tvkTl77gHz20AQUzD+VunsnenDNqNWa4w0pQjMU/urQF8vREnwboSs21/kei6c8vmM894cAIblZZ4dkLAVzf2T/P2n2MchvH5jycqxC12KK7sNkidHAxJgK/V16HSGFgZ0mrN02puDm0wvUpK8V7rRmtLODF+0IqLWOymSKLHAvPMx0RhabRYxs+rVizOKx8dPmuGYSqaODZId3RLoaEtuaxCMdquK2j7tjxbvyGhY0yTwOYnNBrJmJ82EFt0OmblDFBx0rtFccniExeBitumoaa69EXAaCYU+MNjOLsCwGAevPXL7spt1ex3AoO/jcpGk/RxmtGfkKzPnKWcUX4cazzGI=
-Content-ID: <9CBC6DFB9AE198438BFB9C73BA4EDD80@namprd11.prod.outlook.com>
+ id 1gwPSd-0003KM-SV
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:50:45 +0000
+Received: from bigeasy by Galois.linutronix.de with local (Exim 4.80)
+ (envelope-from <bigeasy@linutronix.de>)
+ id 1gwPSV-0005i0-6G; Wed, 20 Feb 2019 11:50:35 +0100
+Date: Wed, 20 Feb 2019 11:50:35 +0100
+From: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+To: Bernd Edlinger <bernd.edlinger@hotmail.de>
+Subject: Re: [RFC PATCH] ARM: enable irq in translation/section permission
+ fault handlers
+Message-ID: <20190220105034.7fv7u7lel4siu6zr@linutronix.de>
+References: <20190215200533.ypfrdekg7j4ucu6a@linutronix.de>
+ <VI1PR0702MB3840A772914621B2F026B349E4600@VI1PR0702MB3840.eurprd07.prod.outlook.com>
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8d518163-8a54-4b26-212a-08d69720ed5e
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 10:48:18.1307 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1869
-X-OriginatorOrg: microchip.com
+Content-Disposition: inline
+In-Reply-To: <VI1PR0702MB3840A772914621B2F026B349E4600@VI1PR0702MB3840.eurprd07.prod.outlook.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_024824_840427_F7AA786E 
-X-CRM114-Status: GOOD (  14.95  )
+X-CRM114-CacheID: sfid-20190220_025044_065981_4EBE3CC4 
+X-CRM114-Status: GOOD (  19.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -152,65 +66,95 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sboyd@kernel.org, mturquette@baylibre.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Cc: Thomas Gleixner <tglx@linutronix.de>, Arnd Bergmann <arnd@arndb.de>,
+ Russell King <linux@armlinux.org.uk>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "yadi.hu@windriver.com" <yadi.hu@windriver.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 20/02/2019 at 11:29, Alexandre Belloni wrote:
-> On 20/02/2019 10:20:28+0000, Nicolas Ferre wrote:
->> On 19/02/2019 at 17:51, Alexandre Belloni wrote:
->>> nck() looks at the last id in an array and unfortunately,
->>> at91sam9x35_periphck has a sentinel, hence the id is 0 and the calculated
->>
->> Well, the logic for all other SoC clk files is to not have such a
->> sentinel and deal differently with this type of array: why not modify
->> this file to match with others?
->>
->>
->>> number of peripheral clocks is 1 instead of a maximum of 31.
->>>
->>> Fixes: 1eabdc2f9dd8 ("clk: at91: add at91sam9x5 PMCs driver")
->>> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
->>> ---
->>>    drivers/clk/at91/at91sam9x5.c | 3 +--
->>>    1 file changed, 1 insertion(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/clk/at91/at91sam9x5.c b/drivers/clk/at91/at91sam9x5.c
->>> index 2fe225a697df..d37e7ed9eb90 100644
->>> --- a/drivers/clk/at91/at91sam9x5.c
->>> +++ b/drivers/clk/at91/at91sam9x5.c
->>> @@ -144,8 +144,7 @@ static void __init at91sam9x5_pmc_setup(struct device_node *np,
->>>    		return;
->>>    
->>>    	at91sam9x5_pmc = pmc_data_allocate(PMC_MAIN + 1,
->>> -					   nck(at91sam9x5_systemck),
->>> -					   nck(at91sam9x35_periphck), 0);
->>> +					   nck(at91sam9x5_systemck), 31, 0);
->>
->> I would prefer like it's done on other SoC clk files.
->>
+On 2019-02-15 21:57:56 [+0000], Bernd Edlinger wrote:
+> > diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> > index 58f69fa07df95..da82967865836 100644
+> > --- a/arch/arm/mm/fault.c
+> > +++ b/arch/arm/mm/fault.c
+> > @@ -161,8 +161,6 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+> >  		unsigned int fsr, unsigned int sig, int code,
+> >  		struct pt_regs *regs)
+> >  {
+> > -	if (addr > TASK_SIZE)
+> > -		harden_branch_predictor();
+> >  
+> >  #ifdef CONFIG_DEBUG_USER
+> >  	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+> > @@ -191,6 +189,11 @@ void do_bad_area(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> >  	struct task_struct *tsk = current;
+> >  	struct mm_struct *mm = tsk->active_mm;
+> >  
+> > +	if (addr > TASK_SIZE && user_mode(regs))
+> > +		harden_branch_predictor();
 > 
-> Well, that is not possible, what do you suggest?
+> This is somehow inconsisten with do_translation_fault, where
+> we have this:
+> 
+> 	if (addr < TASK_SIZE)
+> 		return do_page_fault(addr, fsr, regs);
 
-Okay: seen: let's keep it like this.
+yes but harden_branch_predictor() is only invoked for addr > TASK_SIZE.
+What do I miss?
+
+> > +
+> > +	if (interrupts_enabled(regs))
+> > +		local_irq_enable();
+> >  	/*
+> >  	 * If we are in kernel mode at this point, we
+> >  	 * have no context to handle this fault with.
+> > 
+> 
+> I have seen three different failure modes, pleas see the first 3 calls stacks
+> here: https://marc.info/?l=linux-rt-users&m=155016888714927&w=2
+
+yes, but this is only with the one patch in RT. So you should not see
+this without the RT patch.
+
+> I am concerned about this fist issue, because it removes the branch
+> predictor hardening after the do_page_fault has executed:
+> 
+> do_DataAbort->do_page_fault(addr>TASK_SIZE)->__do_user_fault
+>
+> This is reachable because do_page_fault is not only called from
+> do_translation_fault but also from here: arch/arm/mm/fsr-2level.c
+> and here: arch/arm/mm/fsr-3level.c
+> those are callable with addr > TASK_SIZE
+
+okay. So 0xbffffff0 without LPAE would be left out. I wasn't ware of
+that. And this indeed it hits the warning.
+
+> And the following code path does enable the hard irqs before do_bad_area:
+> do_DataAbort->do_sect_fault->do_bad_area->__do_user_fault
+> 
+> So this function, would need to be rewritten:
+> 
+> do_sect_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> {
+> 	if (interrupts_enabled(regs))
+> 		local_irq_enable();
+> 
+> 	do_bad_area(addr, fsr, regs);
+> 	return 0;
+> }
+
+We would need to move the branch predictor piece before enabling
+interrupts.
 
 > 
->>>    	if (!at91sam9x5_pmc)
->>>    		return;
->>>    
->>>
->>
->>
->> -- 
->> Nicolas Ferre
-> 
+> Thanks
+> Bernd.
 
+Sebastian
 
--- 
-Nicolas Ferre
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
