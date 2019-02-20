@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A38EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:47:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 57B97C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:47:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A27E2086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:47:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CB312147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:47:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MUPY3XQZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A27E2086D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GfqZFX7q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CB312147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,35 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=N9uP/KRxrxm0MIBXJpEWsoOYfQisunLZemgHFRTDae4=; b=MUPY3XQZvP43bn
-	YvW8qyhU5s49FOzmhuWaIsaJxUgMALuCASebsW0zgIJrJKaEXk1UnJdwyEGYsPfjmJy81Nb5GAhKh
-	bstQa5US5v7vgIm7k4AhUq3XpnfSjnELVaieEIKqY8t8nV4evDpUqpmTEDmpdPXDgc1YXFSEdPn0S
-	MCmym5OqvuaHF5Tp5D1JPia3HwITz1X60/nmmtD2/3AcOiFLkTw93JxTQjF7/jk7/3OqxReC36HIJ
-	drawdDDVz6ywDz5OyIiTSAdy3OFxCS/ygjxSnGpIfb9Gn+09wpgRBT/R/Zx5PSFkOlLD5umYnHIZB
-	QFDDmoLZzmTydx3SwIRw==;
+	List-Owner; bh=z9AMYAwGvc2/qW5zkSeSzBnDJuxD2H+PCheT5uFM4Wk=; b=GfqZFX7qaVtBnw
+	BKrMKdS883C8YwiXB7gx2Ls0ZYtuWYAw1jm0UbFUyGAAh0lh+3gLlHu7Ba5l3z9y/BaHnxgvgnI0U
+	v9vMMep+xz8WVBolGftbdZMTXrNGTm+SAl/CbmjYVmnhB5cb0Cg23liKZl1bM7WK4jm1qnIsaA7KD
+	TFBYEPTXAKwndyZsJsyIW2nDTQ35IOPRJ+2wfZuZeQHvJ0PLmFPfAtOyKQ3wi3klnLa+PkL4PBPxX
+	JgsKyWdO2J/Qlz+UaDIIsPXITd/QZQgU950qDNO8li2bildgvJR52PHsWyXYfHEbms68Ly8D78jOT
+	vFuHRfRIF7LnxJ0RZ3dA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwU5U-0003mg-0k; Wed, 20 Feb 2019 15:47:08 +0000
-Received: from muru.com ([72.249.23.125])
+	id 1gwU5l-00042a-6i; Wed, 20 Feb 2019 15:47:25 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwU5Q-0003mD-Nh
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:47:06 +0000
-Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id DD5FA80E1;
- Wed, 20 Feb 2019 15:47:11 +0000 (UTC)
-Date: Wed, 20 Feb 2019 07:46:58 -0800
-From: Tony Lindgren <tony@atomide.com>
-To: Christophe Aeschlimann <c.aeschlimann@acn-group.ch>
-Subject: Re: da850 dt cpufreq support
-Message-ID: <20190220154658.GP15711@atomide.com>
-References: <ccdb73e4-e4eb-2552-b62f-6cf57929dfee@acn-group.ch>
+ id 1gwU5g-0003zH-4G
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:47:23 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B7187EBD;
+ Wed, 20 Feb 2019 07:47:17 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 185843F5C1;
+ Wed, 20 Feb 2019 07:47:15 -0800 (PST)
+Date: Wed, 20 Feb 2019 15:47:13 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: kvmarm@lists.cs.columbia.edu
+Subject: Re: [PATCH v5 00/26] KVM: arm64: SVE guest support
+Message-ID: <20190220154711.GS3567@e103592.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <ccdb73e4-e4eb-2552-b62f-6cf57929dfee@acn-group.ch>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+In-Reply-To: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_074704_807707_EB607F99 
-X-CRM114-Status: GOOD (  10.18  )
+X-CRM114-CacheID: sfid-20190220_074720_187704_F4931AEE 
+X-CRM114-Status: GOOD (  12.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,36 +69,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>, linux-omap@vger.kernel.org,
- Sekhar Nori <nsekhar@ti.com>, David Lechner <david@lechnology.com>,
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Mon, Feb 18, 2019 at 07:52:13PM +0000, Dave Martin wrote:
 
-Adding Bartosz, David and Sekhar to Cc.
+[...]
 
-* Christophe Aeschlimann <c.aeschlimann@acn-group.ch> [190220 15:34]:
-> Hi,
-> 
-> I understand that today the da850-evm is supported in two ways in the
-> Kernel, using board file, aka "legacy" and device-tree.
-> 
-> Am I right to say that when using the device-tree there is no support for
-> cpufreq available ?
-> 
-> The "ti-cpufreq" driver doesn't target the da850 SoC and the
-> "davinci-cpufreq" driver doesn't make use of the device-tree bindings.
-> 
-> Could the generic "cpufreq-dt" driver be used ?
-> 
-> Best regards,
-> 
-> Christophe
-> 
+> AArch32 host testing is pending.  I will ping this series with a reply
+> to the cover letter when that testing has been completed.
+
+AArch32 host testing now done on Arm TC2: 15 guests were able to boot
+and execute "find /" concurrently without error.
+
+Due to the trivial nature of the changes in the common code, this is
+probably sufficient testing, but if anyone thinks I should run
+something else (or wants to give it a try), let me know.
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
