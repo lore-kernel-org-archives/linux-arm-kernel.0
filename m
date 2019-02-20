@@ -2,140 +2,129 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A1AD3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:35:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D186CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:38:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E39620880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:35:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A071B21902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 14:38:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ow4La3Om";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="BoZizYYa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E39620880
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YB0xThlO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="P1XzkdtZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A071B21902
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DSfddzAm3dowZrzCEjGHlN44qPHuesWP+gCbNcMRLmQ=; b=Ow4La3OmrkXkjv
-	H0Z/noJHlSKoA6+DFjcUSNaTSNkhIjOCAKwbuHcSFR+QjcIZGwRvoszVriGfYbYs33vBL7Vs8Gh2f
-	0M7Zxp8/r7HkA//9QqScF9dw3tFUf/o06CKVCQR6kXNlTZlAZoUATJiuCiu/JcjViHvZHRMaySFKl
-	ZB8yKbTQSKxLdQvBxNh8tAMyuycj4EyidiNqlOuKergWX8+NTl6Gfc9NBI/cghsDu3B/5uaHsQ07/
-	ngQyj00vQpq1HLC7liDWlOCWqKDRS+AAkySfF757zR6+QJWAAe5T8ZOlbAhKmFHExkVymulGryo8a
-	DKDcJZQnOsxHEc4ztctQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=1QHbMeY4CETKiucqOTw4Zlyd5zh6nm7IfXMmdf/JYlI=; b=YB0xThlOxC/4Gg
+	Kini+MI4XnZBeyUh7+zU9+KJpPbQOK8U9h/Qb0dtRFQZnsbRv0ZLh5jlPWmJnFAvgCq4M1Py1erz7
+	GMZamTlFC+lwMfQ1QRV1zPHYLdUSqi9EwyL2g2EVwVFBwfS2z2ywRwdR6y09ZqIOPCcQ0isKxXbju
+	AcLKVTWeRBbaH4O/lWmRyhMK7r1OvCEeFcTkLAl67H8OM+QcKgxjO1fn9DTZlYNyJqiksZMxmuHzm
+	FK/Ney1WxMLgqbidqSBPX5MW5CFeaEthK+642PuEVG4nJiSneT2NFz7ZcUNalFFpYF6rjDtJrJ1E7
+	vh8y2iQnDEE5yAxPQTtQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwSy2-0003KM-Pt; Wed, 20 Feb 2019 14:35:22 +0000
-Received: from mail-eopbgr40084.outbound.protection.outlook.com ([40.107.4.84]
+	id 1gwT14-0003s9-GQ; Wed, 20 Feb 2019 14:38:30 +0000
+Received: from mail-eopbgr40087.outbound.protection.outlook.com ([40.107.4.87]
  helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwSxp-0002wy-CV
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 14:35:10 +0000
+ id 1gwT11-0003rH-2D
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 14:38:28 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=GFGtz77c0ilaEfcoXC0nI63oSqme9Uu91ITw9KJLgCg=;
- b=BoZizYYaoeUAWmlG7k0b48SSYT2pS5oDmDEn5o7I3b7ur7lwb0WNqkvzB0ad3THJT61idLmsNDtIO7PhCtZ1yU5/x0zwGJE2kz9+7DFl+llaHIHkQhj2FFUQdiYz7Tg1IVqgATLhWeRTFozNc3yhZ8NyBruYWRDMqH1uyJAgrIE=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3705.eurprd04.prod.outlook.com (52.134.70.30) with Microsoft SMTP
+ bh=LUgEZTf3JikD95+qvKdhfBTxahgDdQAjUv6RzP23D0Q=;
+ b=P1XzkdtZFvJw1V+8aHOQQQP0hSecGXizrPHWmv69HJRqvNHWBWMTwfRCD3WeOaSl0hoai5T0M9UTGT9NG1EY6XVg69r505DHgmcPUqYrFBa+Eyxp2LOjgOfVP8VLyou/gaQtDO4gVjtGJWNQxcqpa1vhgMvUzkgUNCQE9y5YtDk=
+Received: from AM6PR04MB4215.eurprd04.prod.outlook.com (52.135.168.141) by
+ AM6PR04MB5975.eurprd04.prod.outlook.com (20.178.94.220) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Wed, 20 Feb 2019 14:35:06 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::14e8:6d2e:fe21:4fd5%3]) with mapi id 15.20.1601.023; Wed, 20 Feb 2019
- 14:35:06 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>, Aisheng Dong
- <aisheng.dong@nxp.com>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH V3 2/2] dt-bindings: imx: add new resources to scu resource
- table
-Thread-Topic: [PATCH V3 2/2] dt-bindings: imx: add new resources to scu
- resource table
-Thread-Index: AQHUySl5UzNMe9PxEEKuxDzmaE4lKg==
-Date: Wed, 20 Feb 2019 14:35:06 +0000
-Message-ID: <1550673029-15910-2-git-send-email-Anson.Huang@nxp.com>
-References: <1550673029-15910-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1550673029-15910-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
+ 15.20.1622.19; Wed, 20 Feb 2019 14:38:24 +0000
+Received: from AM6PR04MB4215.eurprd04.prod.outlook.com
+ ([fe80::e944:6749:3ee6:4e08]) by AM6PR04MB4215.eurprd04.prod.outlook.com
+ ([fe80::e944:6749:3ee6:4e08%5]) with mapi id 15.20.1622.020; Wed, 20 Feb 2019
+ 14:38:23 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH 0/3] firmware: imx: scu-pd: generalize the implementation
+Thread-Topic: [PATCH 0/3] firmware: imx: scu-pd: generalize the implementation
+Thread-Index: AQHUySnusuHh5S/UWkWe6S7ocFkvvQ==
+Date: Wed, 20 Feb 2019 14:38:23 +0000
+Message-ID: <1550673013-21462-1-git-send-email-aisheng.dong@nxp.com>
+Accept-Language: zh-CN, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
 x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0193.apcprd02.prod.outlook.com
- (2603:1096:201:21::29) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
+x-clientproxiedby: HK0PR03CA0074.apcprd03.prod.outlook.com
+ (2603:1096:203:72::14) To AM6PR04MB4215.eurprd04.prod.outlook.com
+ (2603:10a6:209:4f::13)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
+ smtp.mailfrom=aisheng.dong@nxp.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 5b05d76b-c279-46a8-a375-08d697409b7c
+x-ms-office365-filtering-correlation-id: 5a7bc80a-5846-420e-2e8a-08d697411107
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3705; 
-x-ms-traffictypediagnostic: DB3PR0402MB3705:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3705;
- 23:LdYo013oYsLQL/qZk6tyye4mxTFuDy3Oyeov+?=
- =?iso-8859-1?Q?mOQ/fjNbUkEaXUoEqHyGVG83VHTejObTpoEY+tqhF9yWFG9O5C7klt6H2f?=
- =?iso-8859-1?Q?RALn800PGaSPq78/c66BQctP4NI7tiJBoktnYnYEkUtLw+sQ9Ks441K+Mi?=
- =?iso-8859-1?Q?HWZ1GWx4qw3x1g9TfX5McnX9ZJFJrI4tewjH10BguGFogSJtyvq2du7FSR?=
- =?iso-8859-1?Q?n8XpU+lEL3YsfTpFXZOom+LsA3zSi26rlVYe9ld2milx1XKzxSDpM+n5An?=
- =?iso-8859-1?Q?CI+JYq14M0jCDVkb9lWt/pw5n1hxzdi6xETYMkcfVXce6U9lcLtFLYsgCs?=
- =?iso-8859-1?Q?LuRW6dG/NTxcQ6kQOiQc7Oh3OOwCc3U2WzpvK1LP6jfvLnzzYCzO6YxXLi?=
- =?iso-8859-1?Q?OVtpDWrUBYVm39Rdj6/sabx7mDi9dVgkhl3JJ73C2ihjc2F4ZHIMNZNHqK?=
- =?iso-8859-1?Q?PjBOI85tqzZ58rpFBXMuZQ6ImMWq21wlE62uKmYoSe9P8W1DxKFlQcgp2M?=
- =?iso-8859-1?Q?rDR/B2/BchVdNz4+auwhHf+5sGHG8hL2Ibv7rfGd80pZ9kNCHb7LGwPcHP?=
- =?iso-8859-1?Q?4spzbkz/p9FU+CScoWcYBwzmOyuSFvGY+nhHD1d9+tD55xhbJKBTQunxxC?=
- =?iso-8859-1?Q?+1Rsjo+V8fM8x/SnKOlarIQa7Viuv9AkQNE4RoJxKsfjAlQJ0o+SzvIcO0?=
- =?iso-8859-1?Q?X62oA7GInCIHoWaXJfEyJ6xoToXoo5KKVTNzug9s+nEcP7rjzJ5Kbjh+vl?=
- =?iso-8859-1?Q?cLhZQVs3ARgh194hUTzcUifmD57mx9d/fO2CMF8Bx44skwwcVXI5hU0iDz?=
- =?iso-8859-1?Q?WhD07jYvVtldf44Z/+Jyer27GRkF9DhV5UJLFxkrgHuckP9Ai58FDQbg7P?=
- =?iso-8859-1?Q?U+RzsBhfqkPOoE72joSiVxGYMEwsxDVvD5N0EzrVAlvAwSvLTwleI4UFHw?=
- =?iso-8859-1?Q?A/DTztRbRDLOMshQmU1BVp77PEv9lDBZj7rf9Ukbv6oI2xVfFy1SC2AXtz?=
- =?iso-8859-1?Q?rH2eKLXRoHGoS/qdFT8SfBGcNo/95zZImXT5mbtSWlcixiAdSVxrIjksJx?=
- =?iso-8859-1?Q?qxhDGLLd40yyYfS2i92/yasZCL4Oec8M8xsdrIN0Z2rwm4OPT+UwQsViiS?=
- =?iso-8859-1?Q?IyvKbBRnICxyMvU6QQHaR7QuCKW2+JtWcAzb+OKBT3QfkA5N/BMKfV4Kcf?=
- =?iso-8859-1?Q?bVtuTqIsJwfysngBxtRitYz5rEqAxDU1Uz5R3a2vLAjYuKGY+iGoLQVN3i?=
- =?iso-8859-1?Q?9se1biH0L5KXYMDogDfXvw6p9oo1wGqLfhOHVyk/zisCGA1ILlonVb7mqL?=
- =?iso-8859-1?Q?13iU=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3705687EAE627CA68A4947F1F57D0@DB3PR0402MB3705.eurprd04.prod.outlook.com>
+ SRVR:AM6PR04MB5975; 
+x-ms-traffictypediagnostic: AM6PR04MB5975:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM6PR04MB5975;
+ 23:CyTAhcrT+2eBAcsICIr9i7mxjtBncETBPka5Iwo?=
+ =?iso-8859-1?Q?KY4MDB5t+F3Pk4IexO/lxZ0iHYQMDZmIezV3QKyH9G6Va37UmxayNJXv9m?=
+ =?iso-8859-1?Q?F1J/+4Wbmpjv/qGiXtbEUfQl2X/ZcHoFEb/lsaui+RBzNMy5tDeDFeoE3+?=
+ =?iso-8859-1?Q?XFYbZRSLUuSlQe8aDP5TOIxakKrm03EmaPIxQEC/526jhtLmO4PlFxnBmk?=
+ =?iso-8859-1?Q?c2haxHydEB0fXAMksSl8NnvZXl50+wyhFkCmjmM+Fg053jBjoA8uRJkoE3?=
+ =?iso-8859-1?Q?FRtIarLcGqBjgMuzWbpWlA7xlP91KkUW3QSky3m989totMGhZ2KKqUEeRu?=
+ =?iso-8859-1?Q?PwG77v0CUy91n2IG5/1pG92hwrBlJ9XJUyiy8IFufIwILoxPp4pO8TjJVF?=
+ =?iso-8859-1?Q?f1NkeyiVd03xhJQnFtLOBzU/5qgELHQZvVrsTdn2z3ieDYGWZ0joSqgXcY?=
+ =?iso-8859-1?Q?ntOAg3ES2Pp+mqHpXfr9j3aPbOMkPIHOIhw4OZsTxsf6fxuNH45rUsUOvH?=
+ =?iso-8859-1?Q?qx0zjdw26WgERNZ97w52MrZbk2Nmxic70mIXPBeY0dZmwaHiiSSAITLmed?=
+ =?iso-8859-1?Q?kgyjsEhEnMoCLFexYYCwLfHuFW3p6xYS4YS1od8jJ/NaJTKHEsitYEr5fI?=
+ =?iso-8859-1?Q?RSwfVJyr2f/kNVFL/0WqNaFU0WsJyQ+mNq4JegtHXKcim/jwFSy/WMeAIW?=
+ =?iso-8859-1?Q?eUVeSqwiH2gYQ0qthEOfGtrJEtbeS7FBlZe/d7bikQotTyAZH8En+Ib0um?=
+ =?iso-8859-1?Q?60QgaHJEPXRuwlbKyAnrWDip8q1BN9F3ERnFzNqiPIsTa4cyOZrucrlVyV?=
+ =?iso-8859-1?Q?/1fleP+NKvtyojur+g8sg0MFBpCb8AYykTuoFh5WprFJT3qHX8YPqHtwrd?=
+ =?iso-8859-1?Q?tPQoY6WkDmZdq+1xBUYymjkWvNmGVwZuJUDt1P5MeNlpn1QTgGyz/94qgV?=
+ =?iso-8859-1?Q?9UXvj9x2dgcmicRVV1X1ICEAu50gLA7FmCtAEwe0EcPpW6vd0sqckVnKst?=
+ =?iso-8859-1?Q?n4lqjEGzUP5ItD0toLAxfyZPn8B0RU7pTqpp26mwfwV04BBzOlq0jykP8Y?=
+ =?iso-8859-1?Q?T34k4tEOOmW0lQHa3Wikmh9MGy8Lahr6+sZznpUDMRBIBcfqV9sq1gZga6?=
+ =?iso-8859-1?Q?ci1NOcYlEfbXeE2K3uXjnwPPBfM26hizNqXfp/6QvWg0eGt/URKA1C5Qcz?=
+ =?iso-8859-1?Q?dO6spcfZ0G34hd8GELz5If1liswYoJaWUNqJD/t2qRBQr0Js0NwhHVZaxJ?=
+ =?iso-8859-1?Q?5Pfk364Zkjkrcfl1SukZIXiaTx8QpU0br/oDpGw=3D=3D?=
+x-microsoft-antispam-prvs: <AM6PR04MB597538A7AFD86B0BDFC27F10807D0@AM6PR04MB5975.eurprd04.prod.outlook.com>
 x-forefront-prvs: 0954EE4910
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(136003)(376002)(366004)(39860400002)(396003)(189003)(199004)(106356001)(25786009)(4326008)(2501003)(6436002)(53936002)(6486002)(6512007)(105586002)(102836004)(52116002)(97736004)(2906002)(99286004)(68736007)(76176011)(386003)(2201001)(110136005)(86362001)(6506007)(50226002)(316002)(7416002)(478600001)(81166006)(14454004)(486006)(476003)(6116002)(3846002)(2616005)(8936002)(5660300002)(186003)(26005)(81156014)(8676002)(446003)(11346002)(36756003)(71200400001)(71190400001)(256004)(66066001)(305945005)(7736002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3705;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ SFS:(10009020)(376002)(346002)(366004)(39860400002)(136003)(396003)(189003)(199004)(14454004)(4326008)(81166006)(476003)(81156014)(6916009)(25786009)(186003)(2616005)(105586002)(8936002)(102836004)(66066001)(86362001)(71200400001)(3846002)(2501003)(54906003)(71190400001)(68736007)(6116002)(52116002)(6486002)(106356001)(486006)(6436002)(386003)(4744005)(316002)(305945005)(478600001)(50226002)(6506007)(7736002)(5640700003)(8676002)(256004)(6512007)(2906002)(53936002)(26005)(99286004)(44832011)(5660300002)(36756003)(97736004)(2351001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR04MB5975;
+ H:AM6PR04MB4215.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: aWMfBdhW5R+QwjcvLNu7ilt8foPovJ9SMEz8hTd2ymPRxUZc0xNY9wpkq0Z22+RLzmU50T+fELZqx5KiJbaq27FSvERqzJx8UJcoKX/QFd2izRg2iWS/KW6XK3hHqYEkgp5L6QYrRaPb5BfLvRkRWq6qr3HgZCQ/HmvUD8fvzLF8vJbPMuVioHep03SjQT8M2Iannb3E4F6HY0wJ/Dr48Ts5skZ3gxrx4BCSi+ZXkqYtjqfqiWopUtkdioSbpLcAfFG2m/O5Xo+E4pjJdLrCPwyb5hxsNqfOJN4zUKb7OJIUTpJcpKgXHunbnYF6YBhlcEix7U3pHQc5MPFaW0Yte4vlTcN4pr7Ok9q1fCWB1MmAE+M6lzWJOhN6c1qBbSvBvYV5xqhyJjGp6Vd+QwUCS6N3kaxXxnxDXnkHtziuDEQ=
+x-microsoft-antispam-message-info: HEUw1pc20wkJckWRbB3deUjEg3OMyoESEfkdsE1wkomO0lvFDv5qzqSd9HukhlUl1Ebu4LGP1uhPlToYui161/fJwmgOVJroYyPc+Fw+uX7XYV+JIKO3bHfU5ZqAdqTr7fJ0jLbAfILEQo2ZkBs6T5EzK8+Szk89TZcP/ugpMgR5XuDk1fZLPBkoJE55Kf4ipUE/JwvZ0ppmh3LTuV2TstnBBTA5ou4HmSKYkiOZ1Zgmph13WCh9uwf2kRM03IZrXFrKZssPeHQulUhGwOB708ZnFoMr4ODsdgWLd+myGsxm5zOPf1PG+fGqhifH1Ha19dVgT1MbafC3/flPkQJ0vPzGXxEIGJHUWpLeXWPYdKN2iR7CQCZq5WOTzSXDz25/bPA+H5Q7X0+WuxHTopaeZx0aZ8E0tHN5qqnF6eAj43I=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 5b05d76b-c279-46a8-a375-08d697409b7c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 14:35:02.3843 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 5a7bc80a-5846-420e-2e8a-08d697411107
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 14:38:19.9150 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3705
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR04MB5975
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_063509_428093_36D560E3 
-X-CRM114-Status: GOOD (  10.45  )
+X-CRM114-CacheID: sfid-20190220_063827_401535_AF443822 
+X-CRM114-Status: UNSURE (   7.98  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -147,66 +136,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "dongas86@gmail.com" <dongas86@gmail.com>,
+ "khilman@kernel.org" <khilman@kernel.org>,
+ "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>,
+ "rjw@rjwysocki.net" <rjw@rjwysocki.net>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add new resources as below according to latest system
-controller firmware for new features:
+This patch series used to further generalize the driver implementation for
+better adding new SCU based platforms. e.g. imx8qm which is mostly the same
+as imx8qxp except a minor SS name and resource avaliability difference.
+e.g.
+QXP has ADMA SS while QM has DMA and Audio SS separately.
+So we decouple the SS information from domain names.
 
-	IMX_SC_R_PERF
-	IMX_SC_R_OCRAM
-	IMX_SC_R_DMA_5_CH0
-	IMX_SC_R_DMA_5_CH1
-	IMX_SC_R_DMA_5_CH2
-	IMX_SC_R_DMA_5_CH3
-	IMX_SC_R_ATTESTATION
+Dong Aisheng (3):
+  firmware: imx: scu-pd: use bool to set postfix
+  firmware: imx: scu-pd: add specifying the base of domain name index
+    support
+  firmware: imx: scu-pd: decouple the SS information from domain names
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-No changes since V2, just separate the patch to 2, 1 patch to remove resources and the other is to add new
-resources.
----
- include/dt-bindings/firmware/imx/rsrc.h | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/firmware/imx/scu-pd.c | 121 ++++++++++++++++++++++--------------------
+ 1 file changed, 64 insertions(+), 57 deletions(-)
 
-diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
-index 32cce37..ba2572b 100644
---- a/include/dt-bindings/firmware/imx/rsrc.h
-+++ b/include/dt-bindings/firmware/imx/rsrc.h
-@@ -36,7 +36,7 @@
- #define IMX_SC_R_DC_0_BLIT1		20
- #define IMX_SC_R_DC_0_BLIT2		21
- #define IMX_SC_R_DC_0_BLIT_OUT		22
--#define IMX_SC_R_UNUSED19		23
-+#define IMX_SC_R_PERF			23
- #define IMX_SC_R_UNUSED5		24
- #define IMX_SC_R_DC_0_WARP		25
- #define IMX_SC_R_UNUSED7		26
-@@ -337,7 +337,7 @@
- #define IMX_SC_R_IRQSTR_SCU2		321
- #define IMX_SC_R_IRQSTR_DSP		322
- #define IMX_SC_R_ELCDIF_PLL		323
--#define IMX_SC_R_UNUSED6		324
-+#define IMX_SC_R_OCRAM			324
- #define IMX_SC_R_AUDIO_PLL_0		325
- #define IMX_SC_R_PI_0			326
- #define IMX_SC_R_PI_0_PWM_0		327
-@@ -554,6 +554,11 @@
- #define IMX_SC_R_VPU_MU_3		538
- #define IMX_SC_R_VPU_ENC_1		539
- #define IMX_SC_R_VPU			540
--#define IMX_SC_R_LAST			541
-+#define IMX_SC_R_DMA_5_CH0		541
-+#define IMX_SC_R_DMA_5_CH1		542
-+#define IMX_SC_R_DMA_5_CH2		543
-+#define IMX_SC_R_DMA_5_CH3		544
-+#define IMX_SC_R_ATTESTATION		545
-+#define IMX_SC_R_LAST			546
- 
- #endif /* __DT_BINDINGS_RSCRC_IMX_H */
 -- 
 2.7.4
 
