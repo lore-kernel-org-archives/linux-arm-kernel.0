@@ -2,63 +2,82 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,USER_AGENT_MUTT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1314C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:19:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AAE0C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9092C20880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:19:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2C8422147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:34:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GidCZ2zV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9092C20880
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SuORV6S6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=broadcom.com header.i=@broadcom.com header.b="aUZj46IR"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2C8422147C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=broadcom.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gaPNhlsW+RqXRGCqh1n54Mf3vtVe1sT++17zoY1AGfs=; b=GidCZ2zVq8uYKI
-	dzcId4uws1leHfoWSbInpQEZ+GTjytgmyqup1U3yUlqWEYUVjZtCaNlmSmaWYO0hsWshBbqkew7PG
-	XEmj856hZKOkZFphzSLv7GGuOOb3DOxGUotwN/blt4rfZYDNQy5hXMU0Y3IRxQDX74oCSnd7MLO6f
-	y9N94DYQYfoanOpe0eMiP6EIkBiPWWMnjAz3Hm4e2LrjRAbPCtvvQYeMZ8FA6Ktt4P8qjgvw7w1+o
-	+Ta7AN4VVMcLAVbLtUJdXvjycM4dZ0UngFyQAPlFCfiGzRKJVkiadeQvADRJvaFCbGkgzCYvCT9ts
-	ZDisHUx44lpQVW0cfD6Q==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=Kci+kJ8h+cp7buvLLMaK4CDKEdSN9d1HYgbHFe4iQIE=; b=SuO
+	RV6S6vXqVH/r4xUJHdky3FoTZkmVUUGxlStAagXXK78tT4b5MrC319NkaxUTGHfYr4TOK/sWf5/gT
+	SHhEDzdNnfsolboC/ye7LPN5521wJ5lELhQpikXegk4r4/GZK++wml8+o207i4nNiujd+Ig3572Pk
+	QmpQLogtpmsUxzVnMc2ZYV8B2BhvIuBa3sgykN0MS9jPxcqKMs21noxoIxWvYjTMnRyu/fVou+4EV
+	Qe+vYHBh6gFBN/630SjUWd+Epz0mYtp48eoBZLTYRzF5EhbB42fPUD6wQe5SXam5LZdGOjma4oteR
+	vcwegWwgqR6QUKk3Eu7jf+6M+pKpp1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUak-0007cD-PC; Wed, 20 Feb 2019 16:19:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUah-0007ba-Bk
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:19:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5A529EBD;
- Wed, 20 Feb 2019 08:19:22 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8CF193F5C1;
- Wed, 20 Feb 2019 08:19:20 -0800 (PST)
-Date: Wed, 20 Feb 2019 16:19:18 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Dave Martin <Dave.Martin@arm.com>
-Subject: Re: [PATCH v5 14/26] KVM: arm64/sve: Context switch the SVE registers
-Message-ID: <20190220161917.GG4763@lakrids.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
+	id 1gwUp2-0005Dg-SB; Wed, 20 Feb 2019 16:34:12 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwUoz-0005D0-2e
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:34:11 +0000
+Received: by mail-pg1-x543.google.com with SMTP id s198so12127758pgs.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 20 Feb 2019 08:34:08 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=broadcom.com; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=3BWkOhTkkswDxf0FP7V9XAIUNHK7O40ffyu257dAaTY=;
+ b=aUZj46IRGnkuSkRUWj0nYxAonh1J6EkNT/y4rr1tH8pGk5NypxqYTuQGiYsPsE3XRv
+ Xiy6pRLJSj5/nQb7W0v+t8CUqDDWUmxp4rXtpYRfEzdFihPrjgp/Vk3Lgn2SD0wr890M
+ GMKL8YWs5Rh5PN6aofXra2UQZdazKe/2M+n6I=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=3BWkOhTkkswDxf0FP7V9XAIUNHK7O40ffyu257dAaTY=;
+ b=G2hqPWW4tYJ6cuNfDKxPBYCqYZkI5ZFGrU1ca8DCmdSKn8wsZc2eLt//DNfDcSMfuu
+ 0VxZjJJkKQ2Vc/yjWKvWroYtzirevmPfeTwgKOPmTT0seLoa8laQvAjqzC0sKHZzAINU
+ lYxZHJ5V5j+Hq9RExXZWuNZsbCAiqjvZIAiaVAZ20rKa3s/WOumhX1mZC+OLNhpzlmQd
+ Gl6yCrzO0Svm/+8VmGrCue3Nj9VL/2e9fxxMYA7dJyPExlkYj/j4i0cQO6YQjzZLc/Fv
+ xQP+p9W/NwTglAOE+35H0aTauKO6fdEQ3sx5nfDRbS3ou6y3aHAdO+bDNucTqvbgVGXF
+ Th/Q==
+X-Gm-Message-State: AHQUAuYic9X3gz4K8x+rBRYneIm6mXDEuY9dT6a78XtlrXwBicKjdFP7
+ N2ri+8KvVTlqKtTT2OthQXFF7g==
+X-Google-Smtp-Source: AHgI3IYSJLYMwme1v91novIPjbuXRyKVN3exUtRlX5MVCQx7Vp2iq0J0P/Zkr5gUTDZGSw0ZY2F9Zw==
+X-Received: by 2002:a62:9917:: with SMTP id d23mr36693549pfe.88.1550680447687; 
+ Wed, 20 Feb 2019 08:34:07 -0800 (PST)
+Received: from mannams-OptiPlex-7010.dhcp.broadcom.net ([192.19.234.250])
+ by smtp.gmail.com with ESMTPSA id t10sm26556717pfa.151.2019.02.20.08.34.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Wed, 20 Feb 2019 08:34:06 -0800 (PST)
+From: Srinath Mannam <srinath.mannam@broadcom.com>
+To: Bjorn Helgaas <bhelgaas@google.com>,
+ Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, Ray Jui <rjui@broadcom.com>,
+ Scott Branden <sbranden@broadcom.com>
+Subject: [PATCH v3 0/2] Add IPROC PCIe new features
+Date: Wed, 20 Feb 2019 22:03:53 +0530
+Message-Id: <1550680435-9706-1-git-send-email-srinath.mannam@broadcom.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_081923_407174_4E4CDBCC 
-X-CRM114-Status: GOOD (  14.89  )
+X-CRM114-CacheID: sfid-20190220_083409_131076_ECCD09C2 
+X-CRM114-Status: UNSURE (   9.70  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,68 +89,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: linux-pci@vger.kernel.org, Srinath Mannam <srinath.mannam@broadcom.com>,
+ bcm-kernel-feedback-list@broadcom.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 18, 2019 at 07:52:27PM +0000, Dave Martin wrote:
-> -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
-> +/* Check for an FPSIMD/SVE trap and handle as appropriate */
-> +static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
->  {
-> -	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
-> +	bool vhe, sve_guest, sve_host;
-> +	u8 trap_class;
+This patch set extends support of new IPROC PCIe host controller features
+ - Add CRS check using controller register status flags
+ - Add outbound window mapping configuration for 32-bit I/O region
 
-Nit: elsewhere in kvm, this gets called hsr_ec. Can we use the same name
-here?
+This patch set is based on Linux-5.0-rc2.
 
->  
-> -	if (has_vhe())
-> -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
-> -			     cpacr_el1);
-> -	else
-> +	if (!system_supports_fpsimd())
-> +		return false;
-> +
-> +	if (system_supports_sve()) {
-> +		sve_guest = vcpu_has_sve(vcpu);
-> +		sve_host = vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE;
-> +		vhe = true;
-> +	} else {
-> +		sve_guest = false;
-> +		sve_host = false;
-> +		vhe = has_vhe();
-> +	}
-> +
-> +	trap_class = kvm_vcpu_trap_get_class(vcpu);
-> +	if (trap_class != ESR_ELx_EC_FP_ASIMD &&
-> +	    (!sve_guest || trap_class != ESR_ELx_EC_SVE))
-> +		return false;
+Changes from v2:
+  - Based on Lorenzo Pieralisi comments, commit logs are expanded.
 
-This is somewhat painful to decipher, but I couldn't come up with
-something that was both succint and legible.
+Changes from v1:
+  - Addressed Bjorn Helgaas comments.
+  - Removed set order mode patch from patchset.
 
-Maybe it's worth duplicating the SVE check, i.e.
+Srinath Mannam (2):
+  PCI: iproc: Add CRS check in config read
+  PCI: iproc: Add outbound configuration for 32-bit I/O region
 
-	if (hsr_ec != ESR_ELx_EC_FP_ASIMD &&
-	    hsr_ec != ESR_ELx_EC_SVE)
-		return false;
+ drivers/pci/controller/pcie-iproc.c | 44 +++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
 
-	if (!sve_guest && hsr_ec == ESR_ELx_EC_SVE)
-		return false;
+-- 
+2.7.4
 
-... ?
-
-Thanks,
-Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
