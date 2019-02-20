@@ -2,21 +2,22 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FA61C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:59:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 692E9C10F07
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 21:01:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0058C2146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 20:59:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3A6402147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 21:01:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YPiF6Zjz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0058C2146E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lxGZN1+y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3A6402147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,34 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gChwLofvj5JGhGgOO8EDnApDNP7jMpx3EK4GmwlmYes=; b=YPiF6ZjzYycOCm
-	UVq7uk6Bh1jAvYXOpX2q0s5aBHRqrHYKuWXn/h6b2Cv02Rqi9ZPrsZMvP0+9ymQC5pi/KegaRKLxr
-	4DfBjH+iFjjSPuD9F4turouy54EpuvvenSDn9pfLfx+b/i62Fx3KtoRtyVYzpXoV5EmTS6kvMIQpb
-	8JK0f6pLt2DGBnSsOgFiXiwDq78rTtcXi/4D+Yrtzj0BvpQqEcQdgG/fEPZOmfnsoydv1bNNVD2UK
-	zJgeeXIqtlyFuEp7Tn+brKuMvUCwRRqYxepFlOcSf8HojNdV/NsOXI6xSWTn/6Ue9ec0khKBCzyh7
-	ilAR8uwm1BaeHEgZmM4w==;
+	List-Owner; bh=VRnRjb9NI8P52UqDpQ99NwQLp5q2Gghgg4IiFN85lIA=; b=lxGZN1+yMEl5GI
+	+xeQ8zfEmblRN1ySY2GyYDYQNeeoNCXmkWg2OmxiooAOCES0aZLDMMnMPFHtadp4sEm5x7yI95Iif
+	4dVRdkzk7O0UXFZglcEI+Jtdhj6fvCOgr68peq9nw1NYP6IZj+RcKTm8ieiQPWAf/6pFxbKioWUBk
+	mVhFViytouBSZHz1OCohAwNnuU5Mv84c69mHyaVp7yQTP0SIevkgW9hCs0lW7TzV0ILlugmvtThle
+	QPcqRUzUigluFPmQF2YnuLodUiJN4SO6sX+bRkyBPZI+MY1jrLMoh1W0JXDAr8I96XOQd9gTxtR0m
+	sXlLBPhHoomgP8P+uRZA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwYxo-00036k-C4; Wed, 20 Feb 2019 20:59:32 +0000
-Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
- Hat Linux)) id 1gwYxm-00036R-7C; Wed, 20 Feb 2019 20:59:30 +0000
-Date: Wed, 20 Feb 2019 12:59:30 -0800
-From: Matthew Wilcox <willy@infradead.org>
-To: Yu Zhao <yuzhao@google.com>
-Subject: Re: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
-Message-ID: <20190220205930.GL12668@bombadil.infradead.org>
-References: <20190214211642.2200-1-yuzhao@google.com>
- <20190218231319.178224-1-yuzhao@google.com>
- <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
- <20190219053205.GA124985@google.com>
- <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
- <20190219222828.GA68281@google.com>
- <f7e4db43-b836-4ac2-1aea-922be585d8b1@arm.com>
- <20190220202244.GA80497@google.com>
+	id 1gwYzm-0005D4-HK; Wed, 20 Feb 2019 21:01:34 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwYzj-0005Cj-8d
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 21:01:32 +0000
+Received: from atomide.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTPS id BF71C80E1;
+ Wed, 20 Feb 2019 21:01:40 +0000 (UTC)
+Date: Wed, 20 Feb 2019 13:01:27 -0800
+From: Tony Lindgren <tony@atomide.com>
+To: David Miller <davem@davemloft.net>
+Subject: Re: [PATCH 6/6] net: ethernet: ti: cpsw: deprecate cpsw-phy-sel driver
+Message-ID: <20190220210127.GU15711@atomide.com>
+References: <1550676319-6440-7-git-send-email-grygorii.strashko@ti.com>
+ <20190220.112244.1206973642383679896.davem@davemloft.net>
+ <20190220203326.GT15711@atomide.com>
+ <20190220.124155.2226787912266109280.davem@davemloft.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190220202244.GA80497@google.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+In-Reply-To: <20190220.124155.2226787912266109280.davem@davemloft.net>
+User-Agent: Mutt/1.11.2 (2019-01-07)
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190220_130131_338709_45CE1728 
+X-CRM114-Status: GOOD (  14.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,58 +68,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, linux-arch@vger.kernel.org,
- Anshuman Khandual <anshuman.khandual@arm.com>,
- Peter Zijlstra <peterz@infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
- Jun Yao <yaojun8558363@gmail.com>, linux-mm@kvack.org,
- "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
- Chintan Pandya <cpandya@codeaurora.org>,
- Joel Fernandes <joel@joelfernandes.org>,
- "Kirill A . Shutemov" <kirill@shutemov.name>,
- Andrew Morton <akpm@linux-foundation.org>, Laura Abbott <labbott@redhat.com>,
+Cc: devicetree@vger.kernel.org, grygorii.strashko@ti.com,
+ netdev@vger.kernel.org, nsekhar@ti.com, linux-kernel@vger.kernel.org,
+ kishon@ti.com, robh+dt@kernel.org, linux-omap@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 01:22:44PM -0700, Yu Zhao wrote:
-> On Wed, Feb 20, 2019 at 03:57:59PM +0530, Anshuman Khandual wrote:
-> > Using pgtable_pmd_page_ctor() during PMD level pgtable page allocation
-> > as suggested in the patch breaks pmd_alloc_one() changes as per the
-> > previous proposal. Hence we all would need some agreement here.
+* David Miller <davem@davemloft.net> [190220 20:42]:
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Wed, 20 Feb 2019 12:33:26 -0800
+> 
+> > * David Miller <davem@davemloft.net> [190220 19:23]:
+> >> From: Grygorii Strashko <grygorii.strashko@ti.com>
+> >> Date: Wed, 20 Feb 2019 17:25:19 +0200
+> >> 
+> >> > Deprecate cpsw-phy-sel driver as it's been replaced with new
+> >> > TI phy-gmii-sel PHY driver.
+> >> > 
+> >> > Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> >> 
+> >> Acked-by: David S. Miller <davem@davemloft.net>
 > > 
-> > https://www.spinics.net/lists/arm-kernel/msg701960.html
+> > Thanks for the ack, but actually I'd prefer you to pick
+> > this patch at some future date. I suggest Grygorii just
+> > repost this one after v5.1-rc1.
 > 
-> A proposal that requires all page tables to go through a same set of
-> ctors on all archs is not only inefficient (for kernel page tables)
-> but also infeasible (for arches use kmem for page tables). I've
-> explained this clearly.
-> 
-> The generalized page table functions must recognize the differences
-> on different levels and between user and kernel page tables, and
-> provide unified api that is capable of handling the differences.
+> It's so much easier if you group this with those DT changes, they
+> logically belong together as well and it helps someone reading
+> the changes in the tree also if they are side by side.
 
-The two architectures I'm aware of (s390 and power) which use sub-page
-allocations for page tables do so by allocating entire pages and then
-implementing their own allocators.  It shouldn't be a huge problem to
-use a ctor for the pages.  We can probably even implement a dtor for them.
+I agree that a group of patches should go together in
+most cases.
 
-Oh, another corner-case I've just remembered is x86-32's PAE with four
-8-byte entries in the PGD.  That should also go away and be replaced
-with a shared implementation of sub-page allocations which can also be
-marked as PageTable.
+> Why don't you want to integrate this with them?
 
-Ideally PTEs, PMDs, etc, etc would all be accounted to the individual
-processes causing them to be allocated.  This isn't really feasible
-with the x86 PGD; by definition there's only one per process.  I'm OK
-with failing to account this 32-byte allocation to the task though.
-So maybe the pgd_cache can remain separate from the hypothetical unified
-ppc/s390 code.
+Because the arm-soc tree wants dts changes separately in
+general. The dts changes are considered firmware describing
+hardware. And it makes it possible to split the arm-soc pile
+of patches into multiple pull requests. In theory there
+should be no dependency between dts changes and driver
+changes, but in reality that's not always the case :)
 
+What I can do is set up a separate branch with just this
+patch on top of the dts changes that the arm-soc guys can
+then merge towards the end of the merge cycle. If that
+works for you, let me know and I'll do it.
+
+Regards,
+
+Tony
 
 _______________________________________________
 linux-arm-kernel mailing list
