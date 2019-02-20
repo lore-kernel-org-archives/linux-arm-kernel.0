@@ -2,62 +2,53 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40F36C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:15:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CA339C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:34:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3C4F21738
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:15:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A7D921738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 01:34:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dJzfPvFK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3C4F21738
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=magewell.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DyXJc+ma"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A7D921738
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pRV/32y8SXJVqxL8Zaqg6fVmI5j22r10dntiG6B7u2A=; b=dJzfPvFKTAarK9
-	E1lU+8FOD+G4q5N3Q7j8Rb490Lj4p47v+JSGxRgH4m+/sspC+1/w2ip5Skji25VvQ3YZ9ODoFgKVb
-	l2hgEI4dWTVZmzbkBG3tbVeFWjZI+wfggjMZJDRvAL2p9bbUxItpu7FgL3ix2DPfYmPf9vGcRvXrT
-	QDp9OgjwESVzCNayXDphOsNomZk+NEh3lV5NyUJ79PiM3bVCgYqRvM7uR0QnoldXXtmyFDrq8GT3A
-	Nv7LVCMh9nrVQd5d1uJ7qnTiHasUWOyGyCjUIEPkSasDhy0IbqMZPxiCcAVqJHnYJGUS0l1MOG9YO
-	xqKu3Elp5qRpU5e5BU1A==;
+	List-Owner; bh=Oaqb4AxBofRtsWM5/w7s9+ri9TKonSs/MCNH6dGuFdI=; b=DyXJc+maET2rNx
+	8SOC8Nj7Zs++9MgG5RYY0D3hFYVNx3x/rdTd+519ifZLJWyT+eQjKQIxfOrO803+vvqxFncWI4iHF
+	oR8tIietnROBiHE4m78n/EYIWmNA8qwgkmz90hV3lBdQu5UFLFB+DKcA3iCqO8+dXoSSURv85vy+/
+	BkqOpHM/4bb8k1bJabcF32an2mzJor1MhgIvfn43J3wVqoqxznE2BkA0tAJ7J+obEe9IW6/7UWKE4
+	GuLOSSkzaqrQa6+JnnFY/ep3WQEoDC05RLtZB7ouMOXhh6Y4aWqFHj1xos0bv94NIJUKGp+t3/okH
+	DWJiCkDGXrxjkPn3lFKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwGU2-0007mi-N6; Wed, 20 Feb 2019 01:15:34 +0000
-Received: from out20-206.mail.aliyun.com ([115.124.20.206])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwGTx-0007m8-N7; Wed, 20 Feb 2019 01:15:32 +0000
-X-Alimail-AntiSpam: AC=AD; BC=0.9189658|0.09951378; BR=01201311R181b1; CH=blue;
- DM=CONTINUE|AD|true|0.103024-0.0858154-0.811161; FP=0|0|0|0|0|-1|-1|-1;
- HT=e02c03312; MF=yong.deng@magewell.com; NM=1; PH=DS; RN=47; RT=47; SR=0;
- TI=SMTPD_---.E-jWb25_1550625314; 
-Received: from John(mailfrom:yong.deng@magewell.com
- fp:SMTPD_---.E-jWb25_1550625314)
- by smtp.aliyun-inc.com(10.147.41.143);
- Wed, 20 Feb 2019 09:15:15 +0800
-Date: Wed, 20 Feb 2019 09:15:14 +0800
-From: Yong <yong.deng@magewell.com>
-To: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-Subject: Re: [PATCH 06/14] media: platform: fix several typos
-Message-Id: <20190220091514.04cc6347ef24647f6a009d49@magewell.com>
-In-Reply-To: <362e90167292e8d0c03a8d0753cc26b89549d854.1550518128.git.mchehab+samsung@kernel.org>
-References: <f235ba60b2b7e5fba09d3c6b0d5dbbd8a86ea9b9.1550518128.git.mchehab+samsung@kernel.org>
- <362e90167292e8d0c03a8d0753cc26b89549d854.1550518128.git.mchehab+samsung@kernel.org>
-X-Mailer: Sylpheed 3.7.0 (GTK+ 2.24.30; i686-pc-mingw32)
-Mime-Version: 1.0
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_171529_935428_D9C5D0BC 
-X-CRM114-Status: UNSURE (   8.79  )
-X-CRM114-Notice: Please train this message.
+	id 1gwGm2-000492-7h; Wed, 20 Feb 2019 01:34:10 +0000
+Received: from willy by bombadil.infradead.org with local (Exim 4.90_1 #2 (Red
+ Hat Linux)) id 1gwGlz-00048r-IW; Wed, 20 Feb 2019 01:34:07 +0000
+Date: Tue, 19 Feb 2019 17:34:07 -0800
+From: Matthew Wilcox <willy@infradead.org>
+To: Anshuman Khandual <anshuman.khandual@arm.com>
+Subject: Re: [PATCH v2 1/3] arm64: mm: use appropriate ctors for page tables
+Message-ID: <20190220013407.GD12668@bombadil.infradead.org>
+References: <20190214211642.2200-1-yuzhao@google.com>
+ <20190218231319.178224-1-yuzhao@google.com>
+ <863acc9a-53fb-86ad-4521-828ee8d9c222@arm.com>
+ <20190219053205.GA124985@google.com>
+ <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <8f9b0bfb-b787-fa3e-7322-73a56a618aa8@arm.com>
+User-Agent: Mutt/1.9.2 (2017-12-15)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,110 +60,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew-CT Chen <andrew-ct.chen@mediatek.com>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Minghsiu Tsai <minghsiu.tsai@mediatek.com>, Heiko Stuebner <heiko@sntech.de>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Stanimir Varbanov <stanimir.varbanov@linaro.org>,
- Patrice Chotard <patrice.chotard@st.com>, Andrzej Hajda <a.hajda@samsung.com>,
- "Lad, Prabhakar" <prabhakar.csengg@gmail.com>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>,
- Michal Simek <michal.simek@xilinx.com>,
- Andrzej Pietrasiewicz <andrzejtp2010@gmail.com>,
- linux-samsung-soc@vger.kernel.org, Jonathan Corbet <corbet@lwn.net>,
- Chen-Yu Tsai <wens@csie.org>, Krzysztof Kozlowski <krzk@kernel.org>,
- linux-stm32@st-md-mailman.stormreply.com, linux-rockchip@lists.infradead.org,
- Ludovic Desroches <ludovic.desroches@microchip.com>,
- Kukjin Kim <kgene@kernel.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>,
- Kamil Debski <kamil@wypas.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Alexandre Torgue <alexandre.torgue@st.com>, linux-arm-msm@vger.kernel.org,
- Houlong Wei <houlong.wei@mediatek.com>,
- Mauro Carvalho Chehab <mchehab@infradead.org>, Benoit Parrot <bparrot@ti.com>,
- Jeongtae Park <jtp.park@samsung.com>, linux-mediatek@lists.infradead.org,
- Jacek Anaszewski <jacek.anaszewski@gmail.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Hugues Fruchet <hugues.fruchet@st.com>, Tiffany Lin <tiffany.lin@mediatek.com>,
- linux-arm-kernel@lists.infradead.org, Hyun Kwon <hyun.kwon@xilinx.com>,
- Jacob chen <jacob2.chen@rock-chips.com>, linux-renesas-soc@vger.kernel.org,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>,
- Jean-Christophe Trotin <jean-christophe.trotin@st.com>,
- Philipp Zabel <p.zabel@pengutronix.de>,
- Niklas =?UTF-8?B?U8O2ZGVybHVuZA==?= <niklas.soderlund@ragnatech.se>,
- Eugen Hristev <eugen.hristev@microchip.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, linux-arch@vger.kernel.org,
+ Yu Zhao <yuzhao@google.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Nick Piggin <npiggin@gmail.com>,
+ Jun Yao <yaojun8558363@gmail.com>, linux-mm@kvack.org,
+ "Aneesh Kumar K . V" <aneesh.kumar@linux.vnet.ibm.com>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Joel Fernandes <joel@joelfernandes.org>,
+ "Kirill A . Shutemov" <kirill@shutemov.name>,
+ Andrew Morton <akpm@linux-foundation.org>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mauro,
+On Tue, Feb 19, 2019 at 11:47:12AM +0530, Anshuman Khandual wrote:
+> + Matthew Wilcox
+> On 02/19/2019 11:02 AM, Yu Zhao wrote:
+> > On Tue, Feb 19, 2019 at 09:51:01AM +0530, Anshuman Khandual wrote:
+> >>
+> >>
+> >> On 02/19/2019 04:43 AM, Yu Zhao wrote:
+> >>> For pte page, use pgtable_page_ctor(); for pmd page, use
+> >>> pgtable_pmd_page_ctor() if not folded; and for the rest (pud,
+> >>> p4d and pgd), don't use any.
+> >> pgtable_page_ctor()/dtor() is not optional for any level page table page
+> >> as it determines the struct page state and zone statistics.
+> > 
+> > This is not true. pgtable_page_ctor() is only meant for user pte
+> > page. The name isn't perfect (we named it this way before we had
+> > split pmd page table lock, and never bothered to change it).
+> > 
+> > The commit cccd843f54be ("mm: mark pages in use for page tables")
 
-On Mon, 18 Feb 2019 14:29:00 -0500
-Mauro Carvalho Chehab <mchehab+samsung@kernel.org> wrote:
+Where did you get that commit ID from?  In Linus' tree, it's
+1d40a5ea01d53251c23c7be541d3f4a656cfc537
 
-> Use codespell to fix lots of typos over frontends.
+> > clearly states so:
+> >   Note that only pages currently accounted as NR_PAGETABLES are
+> >   tracked as PageTable; this does not include pgd/p4d/pud/pmd pages.
 > 
-> Manually verified to avoid false-positives.
+> I think the commit is the following one and it does say so. But what is
+> the rationale of tagging only PTE page as PageTable and updating the zone
+> stat but not doing so for higher level page table pages ? Are not they
+> used as page table pages ? Should not they count towards NR_PAGETABLE ?
 > 
-> Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
-> ---
->  drivers/media/platform/Kconfig                     |  2 +-
->  drivers/media/platform/atmel/atmel-isi.c           |  4 ++--
->  drivers/media/platform/coda/coda-jpeg.c            |  2 +-
->  drivers/media/platform/davinci/isif.c              |  4 ++--
->  drivers/media/platform/davinci/vpbe.c              |  2 +-
->  drivers/media/platform/davinci/vpif.c              |  2 +-
->  drivers/media/platform/davinci/vpif_display.c      |  4 ++--
->  .../media/platform/exynos4-is/fimc-is-command.h    |  2 +-
->  drivers/media/platform/exynos4-is/fimc-is-param.h  |  2 +-
->  drivers/media/platform/exynos4-is/media-dev.h      |  2 +-
->  drivers/media/platform/exynos4-is/mipi-csis.c      |  4 ++--
->  drivers/media/platform/marvell-ccic/mmp-driver.c   |  4 ++--
->  drivers/media/platform/mtk-mdp/mtk_mdp_core.h      |  6 +++---
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  2 +-
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_drv.h |  4 ++--
->  drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c |  2 +-
->  .../media/platform/mtk-vcodec/vdec/vdec_h264_if.c  |  4 ++--
->  .../media/platform/mtk-vcodec/vdec/vdec_vp8_if.c   |  2 +-
->  drivers/media/platform/mtk-vcodec/vdec_drv_if.h    |  2 +-
->  drivers/media/platform/mtk-vcodec/vdec_vpu_if.h    |  2 +-
->  drivers/media/platform/omap/omap_vout.c            |  4 ++--
->  drivers/media/platform/omap/omap_voutdef.h         |  4 ++--
->  drivers/media/platform/omap3isp/isp.c              |  2 +-
->  drivers/media/platform/omap3isp/ispccdc.c          |  4 ++--
->  drivers/media/platform/omap3isp/ispcsi2.c          |  2 +-
->  drivers/media/platform/pxa_camera.c                |  2 +-
->  drivers/media/platform/qcom/venus/core.h           |  2 +-
->  drivers/media/platform/rcar-vin/rcar-dma.c         |  2 +-
->  drivers/media/platform/rcar-vin/rcar-v4l2.c        |  4 ++--
->  drivers/media/platform/rockchip/rga/rga-hw.c       |  6 +++---
->  drivers/media/platform/s3c-camif/camif-core.h      |  2 +-
->  drivers/media/platform/s5p-jpeg/jpeg-core.h        |  4 ++--
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |  2 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |  2 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |  2 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v5.c    |  2 +-
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |  4 ++--
->  .../media/platform/sti/c8sectpfe/c8sectpfe-core.h  |  2 +-
->  drivers/media/platform/sti/delta/delta.h           |  2 +-
->  drivers/media/platform/sti/hva/hva-h264.c          |  2 +-
->  drivers/media/platform/stm32/stm32-dcmi.c          |  2 +-
->  drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h |  2 +-
->  drivers/media/platform/ti-vpe/vpdma.c              | 14 +++++++-------
->  drivers/media/platform/ti-vpe/vpe.c                |  2 +-
->  drivers/media/platform/vsp1/vsp1_brx.c             |  4 ++--
->  drivers/media/platform/xilinx/xilinx-vip.c         |  2 +-
->  46 files changed, 70 insertions(+), 70 deletions(-)
+> 1d40a5ea01d53251c ("mm: mark pages in use for page tables")
 
-For drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.h
+I think they should all be accounted towards NR_PAGETABLE and marked
+as being PageTable.  Somebody needs to make the case for that and
+send the patches.  That patch even says that there should be follow-up
+patches to do that.  I've been a little busy and haven't got back to it.
+I thought you said you were going to do it.
 
-Reviewed-by: Yong Deng <yong.deng@magewell.com>
+> pgtable_page_ctor/dtor() use across arch is not consistent and there is a need
+> for generalization which has been already acknowledged earlier. But for now we
+> can atleast fix this on arm64.
+> 
+> https://lore.kernel.org/lkml/1547619692-7946-1-git-send-email-anshuman.khandual@arm.com/
 
+... were you not listening when you were told that was completely
+inadequate?
 
-Thanks,
-Yong
 
 _______________________________________________
 linux-arm-kernel mailing list
