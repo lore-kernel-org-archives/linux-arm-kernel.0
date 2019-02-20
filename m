@@ -2,87 +2,90 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 00AC1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:11:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07CC3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:20:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD70E20C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:11:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C9A392147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:20:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eBOPs0re";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="fiYH4mem"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD70E20C01
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q7jTacBt";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=norrbonn-se.20150623.gappssmtp.com header.i=@norrbonn-se.20150623.gappssmtp.com header.b="AQvIUM2U"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C9A392147A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=norrbonn.se
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W7LT4gRPeE4VqHzjNY580hEcotu1as3zWACIol75trw=; b=eBOPs0reNUWleM
-	Sn9Y0zgolYuLiYeFre+4Qn3PrLKGnF9YzAq1e0WxuawhNhSExfApEjjCfw+w+5y8/5ek7dWXZkSF4
-	XB9VoTlkiIVRzSuCE8+cQFUHLankc4b9hWmbUkq/xydpSvc4qz5gP06ofKfdscn1Ty+NnbU9yK58y
-	DGCp2XUQEpBSKlDrnzptxbmAWVAueKByIXCh5G72iv23x1myiwflfo/Siwawt3ccYNyexZ543WyK1
-	pM48Y0Wfvcy2XV2jOHKbwmQgGHaG5Y1BQCgp1ZSn42+2I3PdILs6KHY4HGLTsWMvFNgMsQadyJkfB
-	JVgrZ+6E53UyCtsNKjMw==;
+	List-Owner; bh=vGYAX87VJImPOmI+dIbbRoDpWyiYujA9eIgDV3NhCXg=; b=q7jTacBtW1wugz
+	fkbAai8WAGe1cIMXb1PZTg3WQJa762IXRavnLgUMQ1tBg8tOKx1M4AqkQnDIt3Z7DIIzeEYshVg4T
+	nRVQPBJ4DNUGGlQduwLqSLlvil+aqYZbjw7uihnCpFsSdBeUQhMC4sQrMRM2onIpUQGSh22A7L1n4
+	Q/oK+pQtxIOkm7IJN8zb38I3OE1priMMHW1vbf41KNsIxSopK1iIW+2W7KTcj0B5wJgddPXa6Q3lw
+	bbduUct8GavfuYXeZQTg79rb0smS325xRtYeSQGtxtv3504gGpLeeXRRQaiMKmhTjKmUlTMG6JZq/
+	LzjjuKfYoFX9pFlYBPWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwQjB-00012S-Fu; Wed, 20 Feb 2019 12:11:53 +0000
-Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+	id 1gwQrO-00040p-Qs; Wed, 20 Feb 2019 12:20:22 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwQj8-000116-A4
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 12:11:51 +0000
-Received: by mail-it1-x141.google.com with SMTP id f10so14617314ita.4
+ id 1gwQrL-0003zR-62
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 12:20:21 +0000
+Received: by mail-lf1-x143.google.com with SMTP id e27so17407550lfj.8
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 04:11:49 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=dLw4WUelbqeA5gxnBRVLXKdQXBLEm4+dKDfbIGRV0i4=;
- b=fiYH4mem/AEvxzlKK7yL8uEPw0VSQCU5mhgnIzGRDrCIY9DH+My3sXq3ldDGCwJfXB
- 3RPFlDBitLlcy99lbnf45HsMTd+TnSKabP0sXuhUL3pFlOQBJ4v5ywjtc+KO8ZGNy/pu
- SsMzm7wInSWVN9LLe23T6Xx6jytEUw5NOdZfv52mBaBLXZdr+ryp2mrZGLWNMQMoJmkv
- MzziBObLFPOLnM3+XCbQdLtxXEe+RJkRRqLPAEj67juuZS43caaVLSt3t+l7BSui2xXS
- fPo+bxrDFFJ/RdCV7D+2aWz5WRxLTONjz7riRHf0wRJ3ofAJlT4MeIsgYTkkjhmsCYSw
- AdvQ==
+ Wed, 20 Feb 2019 04:20:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=norrbonn-se.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=awZcUE8KjPx4JjfHwl+NUlW0cvkJAjQR4gtYqX8pG1Q=;
+ b=AQvIUM2UJSjZFBFNmBiEQyPIT1k955/9GNyBhp3qYScYk6k6NvpWpYWldYKRTJDvV+
+ lOGQ8VMYSvv1R7eEwv0NepBy/gAbuKobStR8qIKjUPmPTnmrvqFYhj3uouzZxSHY1Qv0
+ NxlPd+9ztrnBIk/95fhFx6HM5YJ71+rZcIc5Vo43ltYFHeKIykl571qefDsCrrZg1Sxi
+ yAxS+F9OQ19Rt3BUjnmb88JiJgpR/aEfIhPr5+QIXmbYfnFEJbxAE3uN3F2ZlGmcPLIm
+ q9ax/LqlnUDJSsrdrRSPXcyooDXau5di4GqdN1VO/FlHJUVm5qWRlowXyqgNhD7sHz9n
+ 8jRQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=dLw4WUelbqeA5gxnBRVLXKdQXBLEm4+dKDfbIGRV0i4=;
- b=qweSQxPVJz8Iu+WO2yMvUPMYhOcPAHik4nMfB8yvVY+aZs7j/qu5JegIaHmhyl/ASp
- QDJ85/2D0ayEln9lcf6qbCHoMo5fyyxpkyxYk2Jh3ynCJtMHn9GHpCffOwd7JGHZ05Q7
- rWVQad7C40NCEzHLVPZA/jHp0WKfoMO09wRR6LxkidV8pfaO1ATd90if/WRryUi9qOLX
- 9VdQHhU4NDIEI7mA9JhF7hVdv0M2tkKyV2DbDJLmRxtDr1xV5S6/2L7hVKW3cGiW1+5v
- g6n6h0dPZ4wvCZJz4yVXibOn8NO7N9pTXCnHsExINqQMZYmOtBxFWFd408bwTPgFGPWq
- LGPA==
-X-Gm-Message-State: AHQUAuaQ1JtBK2QZmCmnobTpGqWJUFd+B1D7C/KgAyi+UQgU9a3yaunC
- JdaRMjRCyio7HOtWP7MpZ/z8TGazD+b2GpnRzB4=
-X-Google-Smtp-Source: AHgI3IbDS69mZr7hDXSjll5mCC6Ybp6rHPO8ckL+Q6fJNhWjwzYqshJ6sp76AQbkwGdk4tdMq5m6eX8x54L1nc5MnjM=
-X-Received: by 2002:a02:187:: with SMTP id 7mr18891910jak.115.1550664709137;
- Wed, 20 Feb 2019 04:11:49 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=awZcUE8KjPx4JjfHwl+NUlW0cvkJAjQR4gtYqX8pG1Q=;
+ b=DUf3bzDK5Tjqo4H0qHnE+X19ep5niZe9X9l6pjqSg5QVA78c+Vify3df38buw0l2dh
+ BzUFx5Tl+GkqvrnQp9lvPVWYFJyPWlT8bwnA6+DGW9RoZZToYXcCYr6NcbwQTcMj8xSA
+ DpeqAcGIvx7IaZGX9zU5D4QAIXs37q4LVMViadbeALYj2s+jKYxiNHn69WDL0qRclPtR
+ i5+gAz0mmucw/snTPkMzHZnd68urUry8x3TYDy2hGcT3nc3NV/DxHWEbtISCefhWmGUa
+ waJTRTODH3uFrhcs1UGjjWuP5WEH4lPkO/FTpByQK19dL5XMVNPGIossOk9kAxHoomVH
+ y4Gw==
+X-Gm-Message-State: AHQUAuaF4Rm+mebZzchqzF7QPPQP6bR6xghZRxOSYDEJ4vgn+vWf7/8m
+ 1sgWvZLhuuwfy/DYjBnIgAP+0g==
+X-Google-Smtp-Source: AHgI3IZd0JognXw7W6uxoYeqpFE1xYGVtSv2MfMqLodRViW0Es2mKTbWuSzTbaQg+sJAXh9Ehfgsvg==
+X-Received: by 2002:a19:f00c:: with SMTP id p12mr13898523lfc.12.1550665217158; 
+ Wed, 20 Feb 2019 04:20:17 -0800 (PST)
+Received: from mimer.lan (h-29-16.A159.priv.bahnhof.se. [79.136.29.16])
+ by smtp.gmail.com with ESMTPSA id r2-v6sm5270270lja.78.2019.02.20.04.20.15
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Wed, 20 Feb 2019 04:20:16 -0800 (PST)
+From: Jonas Bonn <jonas@norrbonn.se>
+To: linux-kernel@vger.kernel.org,
+	linux-usb@vger.kernel.org
+Subject: [PATCH 2/3] usb: gadget: atmel: support USB suspend
+Date: Wed, 20 Feb 2019 13:20:00 +0100
+Message-Id: <20190220122001.5713-3-jonas@norrbonn.se>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20190220122001.5713-1-jonas@norrbonn.se>
+References: <20190220122001.5713-1-jonas@norrbonn.se>
 MIME-Version: 1.0
-References: <20190208160944.13281-1-gregory.clement@bootlin.com>
- <20190208160944.13281-3-gregory.clement@bootlin.com>
- <8bc7bfcf-ad04-0615-1735-c2bbf20b7861@mleia.com>
- <87o97d2fyg.fsf@FE-laptop>
-In-Reply-To: <87o97d2fyg.fsf@FE-laptop>
-From: Sylvain Lemieux <slemieux.tyco@gmail.com>
-Date: Wed, 20 Feb 2019 07:11:39 -0500
-Message-ID: <CA+rxa6qbk49J8X3Ph81naXEKWWDUH_0h7uJfC0KOFOoTvEW=9w@mail.gmail.com>
-Subject: Re: [PATCH 2/5] dt-bindings: iio: adc: lpc32xx-adc: Document
- vref-supply
-To: Gregory CLEMENT <gregory.clement@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_041150_369136_763E5A22 
-X-CRM114-Status: GOOD (  15.76  )
+X-CRM114-CacheID: sfid-20190220_042019_225108_13E3AECD 
+X-CRM114-Status: GOOD (  20.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,43 +97,240 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Lars-Peter Clausen <lars@metafoo.de>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Vladimir Zapolskiy <vz@mleia.com>, Rob Herring <robh+dt@kernel.org>,
- "moderated list:ARM PORT" <linux-arm-kernel@lists.infradead.org>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- Jonathan Cameron <jic23@kernel.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Felipe Balbi <balbi@kernel.org>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Jonas Bonn <jonas@norrbonn.se>,
+ Ludovic Desroches <ludovic.desroches@microchip.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Cristian Birsan <cristian.birsan@microchip.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgR3JlZ29yeSwKCk9uIEZyaSwgRmViIDE1LCAyMDE5IGF0IDExOjA3IEFNIEdyZWdvcnkgQ0xF
-TUVOVAo8Z3JlZ29yeS5jbGVtZW50QGJvb3RsaW4uY29tPiB3cm90ZToKPgo+IEhpIFZsYWRpbWly
-LAo+Cj4gIE9uIHNhbS4sIGbDqXZyLiAwOSAyMDE5LCBWbGFkaW1pciBaYXBvbHNraXkgPHZ6QG1s
-ZWlhLmNvbT4gd3JvdGU6Cj4KPiA+IEhpIEdyZWdvcnksCj4gPgo+ID4gT24gMDIvMDgvMjAxOSAw
-NjowOSBQTSwgR3JlZ29yeSBDTEVNRU5UIHdyb3RlOgo+ID4+IEFzIG1vc3Qgb2YgdGhlIG90aGVy
-IEFEQyB0aGUgbHBjMzJ4eCBvbmUgdXNlIGEgdnJlZi1zdXBwbHkgcHJvcGVydHk6Cj4gPj4gZG9j
-dW1lbnQgaXQuCj4gPj4KPiA+PiBTaWduZWQtb2ZmLWJ5OiBHcmVnb3J5IENMRU1FTlQgPGdyZWdv
-cnkuY2xlbWVudEBib290bGluLmNvbT4KPiA+PiAtLS0KPiA+PiAgRG9jdW1lbnRhdGlvbi9kZXZp
-Y2V0cmVlL2JpbmRpbmdzL2lpby9hZGMvbHBjMzJ4eC1hZGMudHh0IHwgNSArKysrKwo+ID4+ICAx
-IGZpbGUgY2hhbmdlZCwgNSBpbnNlcnRpb25zKCspCj4gPj4KWy4uLl0KPiA+Pgo+ID4KPiA+IEkg
-a2luZGx5IGFzayB5b3UgdG8gaW5jbHVkZSBtZSB0byBUbzogbGlzdCwgaWYgeW91IHNlbmQgYW5v
-dGhlciBjaGFuZ2VzIGZvcgo+ID4gTlhQIExQQzMyeHggcGxhdGZvcm0uCj4KPiBZZXMgc3VyZSEg
-SSB3cm9uZ2x5IG9ubHkgdXNlIHRoZSBmaXJzdCBsaW5lcyBwcm92aWRlZCBieQo+IC4vc2NyaXB0
-cy9nZXRfbWFpbnRhaW5lci5wbCwgSSB3aWxsIGluY2x1ZGUgeW91IGluIHRoZSBuZXh0IHZlcnNp
-b24uCj4KClBsZWFzZSBhbHNvIGluY2x1ZGUgbXlzZWxmIGluIHRoZSBuZXh0IExQQzMyeHggcmVs
-YXRlZCBwYXRjaGVzLgoKUmVnYXJkcywKU3lsdmFpbgo+Cj4gVGhhbmtzLAo+Cj4gR3JlZ29yeQo+
-Cj4KPgo+ID4KPiA+IFRoYW5rIHlvdS4KPiA+Cj4gPiAtLQo+ID4gQmVzdCB3aXNoZXMsCj4gPiBW
-bGFkaW1pcgo+ID4KPiA+IF9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fCj4gPiBsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+ID4gbGludXgtYXJtLWtl
-cm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCj4gPiBodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
-YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwKPgo+IC0tCj4gR3JlZ29yeSBDbGVtZW50
-LCBCb290bGluCj4gRW1iZWRkZWQgTGludXggYW5kIEtlcm5lbCBlbmdpbmVlcmluZwo+IGh0dHA6
-Ly9ib290bGluLmNvbQo+Cj4gX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX18KPiBsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdAo+IGxpbnV4LWFybS1rZXJu
-ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwo+IGh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxt
-YW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAoKX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgt
-YXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3Jn
-L21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+This patch adds support for USB suspend to the Atmel UDC.
+
+When suspended, the UDC clock can be stopped, resulting in some power
+savings.  The "wake up" interrupt will fire irregardless of whether the
+clock is running or not, allowing the UDC clock to be restarted when the
+USB master wants to wake the device again.
+
+The IRQ state of this device is somewhat fiddly.  The "wake up" IRQ
+seems to actually be a "bus activity" indicator; the IRQ is almost
+continuously asserted so enabling this IRQ should only be done after a
+suspend when the wake IRQ becomes relevant.  Similarly, the "suspend"
+IRQ detects "bus inactivity" and may therefore fire together with a
+"wake" if the two types of activity coincide during the period between
+two IRQ handler invocations; therefore, it's important to ignore the
+"suspend" IRQ while waiting for a wake-up.
+
+This has been tested on a SAMA5D2 board.
+
+Signed-off-by: Jonas Bonn <jonas@norrbonn.se>
+CC: Cristian Birsan <cristian.birsan@microchip.com>
+CC: Felipe Balbi <balbi@kernel.org>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC: Nicolas Ferre <nicolas.ferre@microchip.com>
+CC: Alexandre Belloni <alexandre.belloni@bootlin.com>
+CC: Ludovic Desroches <ludovic.desroches@microchip.com>
+CC: linux-arm-kernel@lists.infradead.org
+CC: linux-usb@vger.kernel.org
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 55 ++++++++++++++++++++++---
+ drivers/usb/gadget/udc/atmel_usba_udc.h |  1 +
+ 2 files changed, 50 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 9d18fdddd9b2..740cb9308a86 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1703,6 +1703,9 @@ static void usba_dma_irq(struct usba_udc *udc, struct usba_ep *ep)
+ 	}
+ }
+ 
++static int start_clock(struct usba_udc *udc);
++static void stop_clock(struct usba_udc *udc);
++
+ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ {
+ 	struct usba_udc *udc = devid;
+@@ -1720,10 +1723,13 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	DBG(DBG_INT, "irq, status=%#08x\n", status);
+ 
+ 	if (status & USBA_DET_SUSPEND) {
+-		toggle_bias(udc, 0);
+-		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND);
++		usba_writel(udc, INT_CLR, USBA_DET_SUSPEND|USBA_WAKE_UP);
+ 		usba_int_enb_set(udc, USBA_WAKE_UP);
++		usba_int_enb_clear(udc, USBA_DET_SUSPEND);
++		udc->suspended = true;
++		toggle_bias(udc, 0);
+ 		udc->bias_pulse_needed = true;
++		stop_clock(udc);
+ 		DBG(DBG_BUS, "Suspend detected\n");
+ 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
+ 				&& udc->driver && udc->driver->suspend) {
+@@ -1734,14 +1740,17 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	}
+ 
+ 	if (status & USBA_WAKE_UP) {
++		start_clock(udc);
+ 		toggle_bias(udc, 1);
+ 		usba_writel(udc, INT_CLR, USBA_WAKE_UP);
+-		usba_int_enb_clear(udc, USBA_WAKE_UP);
+ 		DBG(DBG_BUS, "Wake Up CPU detected\n");
+ 	}
+ 
+ 	if (status & USBA_END_OF_RESUME) {
++		udc->suspended = false;
+ 		usba_writel(udc, INT_CLR, USBA_END_OF_RESUME);
++		usba_int_enb_clear(udc, USBA_WAKE_UP);
++		usba_int_enb_set(udc, USBA_DET_SUSPEND);
+ 		generate_bias_pulse(udc);
+ 		DBG(DBG_BUS, "Resume detected\n");
+ 		if (udc->gadget.speed != USB_SPEED_UNKNOWN
+@@ -1756,6 +1765,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	if (dma_status) {
+ 		int i;
+ 
++		usba_int_enb_set(udc, USBA_DET_SUSPEND);
++
+ 		for (i = 1; i <= USBA_NR_DMAS; i++)
+ 			if (dma_status & (1 << i))
+ 				usba_dma_irq(udc, &udc->usba_ep[i]);
+@@ -1765,6 +1776,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	if (ep_status) {
+ 		int i;
+ 
++		usba_int_enb_set(udc, USBA_DET_SUSPEND);
++
+ 		for (i = 0; i < udc->num_ep; i++)
+ 			if (ep_status & (1 << i)) {
+ 				if (ep_is_control(&udc->usba_ep[i]))
+@@ -1778,7 +1791,9 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 		struct usba_ep *ep0, *ep;
+ 		int i, n;
+ 
+-		usba_writel(udc, INT_CLR, USBA_END_OF_RESET);
++		usba_writel(udc, INT_CLR,
++			USBA_END_OF_RESET|USBA_END_OF_RESUME
++			|USBA_DET_SUSPEND|USBA_WAKE_UP);
+ 		generate_bias_pulse(udc);
+ 		reset_all_endpoints(udc);
+ 
+@@ -1805,6 +1820,11 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 				| USBA_BF(BK_NUMBER, USBA_BK_NUMBER_ONE)));
+ 		usba_ep_writel(ep0, CTL_ENB,
+ 				USBA_EPT_ENABLE | USBA_RX_SETUP);
++
++		/* If we get reset while suspended... */
++		udc->suspended = false;
++		usba_int_enb_clear(udc, USBA_WAKE_UP);
++
+ 		usba_int_enb_set(udc, USBA_BF(EPT_INT, 1) |
+ 				      USBA_DET_SUSPEND | USBA_END_OF_RESUME);
+ 
+@@ -1872,9 +1892,19 @@ static int usba_start(struct usba_udc *udc)
+ 	if (ret)
+ 		return ret;
+ 
++	if (udc->suspended)
++		return 0;
++
+ 	spin_lock_irqsave(&udc->lock, flags);
+ 	toggle_bias(udc, 1);
+ 	usba_writel(udc, CTRL, USBA_ENABLE_MASK);
++	/* Clear all requested and pending interrupts... */
++	usba_writel(udc, INT_ENB, 0);
++	udc->int_enb_cache = 0;
++	usba_writel(udc, INT_CLR,
++		USBA_END_OF_RESET|USBA_END_OF_RESUME
++		|USBA_DET_SUSPEND|USBA_WAKE_UP);
++	/* ...and enable just 'reset' IRQ to get us started */
+ 	usba_int_enb_set(udc, USBA_END_OF_RESET);
+ 	spin_unlock_irqrestore(&udc->lock, flags);
+ 
+@@ -1885,6 +1915,9 @@ static void usba_stop(struct usba_udc *udc)
+ {
+ 	unsigned long flags;
+ 
++	if (udc->suspended)
++		return;
++
+ 	spin_lock_irqsave(&udc->lock, flags);
+ 	udc->gadget.speed = USB_SPEED_UNKNOWN;
+ 	reset_all_endpoints(udc);
+@@ -1912,6 +1945,7 @@ static irqreturn_t usba_vbus_irq_thread(int irq, void *devid)
+ 		if (vbus) {
+ 			usba_start(udc);
+ 		} else {
++			udc->suspended = false;
+ 			usba_stop(udc);
+ 
+ 			if (udc->driver->disconnect)
+@@ -1975,6 +2009,7 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
+ 	if (fifo_mode == 0)
+ 		udc->configured_ep = 1;
+ 
++	udc->suspended = false;
+ 	usba_stop(udc);
+ 
+ 	udc->driver = NULL;
+@@ -2288,6 +2323,7 @@ static int usba_udc_suspend(struct device *dev)
+ 	mutex_lock(&udc->vbus_mutex);
+ 
+ 	if (!device_may_wakeup(dev)) {
++		udc->suspended = false;
+ 		usba_stop(udc);
+ 		goto out;
+ 	}
+@@ -2297,10 +2333,13 @@ static int usba_udc_suspend(struct device *dev)
+ 	 * to request vbus irq, assuming always on.
+ 	 */
+ 	if (udc->vbus_pin) {
++		/* FIXME: right to stop here...??? */
+ 		usba_stop(udc);
+ 		enable_irq_wake(gpiod_to_irq(udc->vbus_pin));
+ 	}
+ 
++	enable_irq_wake(udc->irq);
++
+ out:
+ 	mutex_unlock(&udc->vbus_mutex);
+ 	return 0;
+@@ -2314,8 +2353,12 @@ static int usba_udc_resume(struct device *dev)
+ 	if (!udc->driver)
+ 		return 0;
+ 
+-	if (device_may_wakeup(dev) && udc->vbus_pin)
+-		disable_irq_wake(gpiod_to_irq(udc->vbus_pin));
++	if (device_may_wakeup(dev)) {
++		if (udc->vbus_pin)
++			disable_irq_wake(gpiod_to_irq(udc->vbus_pin));
++
++		disable_irq_wake(udc->irq);
++	}
+ 
+ 	/* If Vbus is present, enable the controller and wait for reset */
+ 	mutex_lock(&udc->vbus_mutex);
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+index 58c96730e32e..24e6fbd3bb99 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.h
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+@@ -331,6 +331,7 @@ struct usba_udc {
+ 	struct usba_ep *usba_ep;
+ 	bool bias_pulse_needed;
+ 	bool clocked;
++	bool suspended;
+ 
+ 	u16 devstatus;
+ 
+-- 
+2.19.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
