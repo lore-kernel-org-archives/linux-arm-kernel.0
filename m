@@ -2,63 +2,69 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CA20EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:53:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8607CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:54:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 95F2C2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:53:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5515B2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:54:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MZ4zy+ds"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 95F2C2084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ixxKU2i6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="S+FOaVGS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5515B2084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zaCvVls0kE/G9mATHH9m6XpZnpL2U4UAPTULRuUgN8U=; b=MZ4zy+dsQPdQz9
-	shDmfloV3k6/5UDwMHKzru+i5M3XNVHOFrR9hgJw+ThEztknoVKlXLL40tYYaO0hcK+YXSo+8KE63
-	3ST2zP1l42r8sBVy4pFMAt7Qrp2wh6eWfBrQ04OnFFyQv70YQMtGKeqRoPUB6gzzpJNKQAIOpsDiE
-	CI6AQ3I4fvRhmFcH1tSCSTMpiit1gV78rsJEMdloy6qA1q5vwYb9tYnzSldUfo15Nt6XEedFZkXKu
-	tbFltWbEIY2NVHWxl0ogKIMAvWbciynvGBpZ77HOWL/uBaO0sh/u16aaauuIsOazb7RC8TSgbF2B5
-	4M1WE7YOM4+oQaZ9dHhQ==;
+	List-Owner; bh=5BxGQ234oTFCJSlwshB6QNYEqxYzDWLbsQCx68dImQw=; b=ixxKU2i6cdqd6B
+	JceaWmZZCBYZ18iXEjPSKRWpGwHGcUta64cPOjbBnuKd8m9A6pXP3iTdGCX7Cd02D6K1Hre8+b4mN
+	MXDEXmThp0+MhgYNt4d6YW/fiIOdHfvicNf5JZcFnI6dKhosIWxEVXbIx7XVp5g/7cxNyhIauDVaQ
+	+SvgQE9eXmZ1iNJBLU7HQpKK1UXZ7YSXmBpxES03mBKWZpsmKOzI3V9nF+qH0xA1L/KahRMdwNNw+
+	dMv1NZ8oqGPtHP1mGZIZ7bRYjqk+aPz+SDMC7y1UzxUrt8bnhPlwmSckynrvFhtq2X1L+WGw63Wi9
+	buVOkvI+t1+ZL58Q4fpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwV7l-0005hD-42; Wed, 20 Feb 2019 16:53:33 +0000
-Received: from relay8-d.mail.gandi.net ([217.70.183.201])
+	id 1gwV8u-00060N-IR; Wed, 20 Feb 2019 16:54:44 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwV7g-0005gm-Mw
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:53:30 +0000
-X-Originating-IP: 185.94.189.187
-Received: from localhost (unknown [185.94.189.187])
- (Authenticated sender: maxime.ripard@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 107421BF207;
- Wed, 20 Feb 2019 16:53:21 +0000 (UTC)
-Date: Wed, 20 Feb 2019 17:53:21 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: "Jonathan A. Kollasch" <jakllsch@kollasch.net>
-Subject: Re: [PATCH v2] arm64: dts: allwinner: fix status LED on
- nanopi-neo-plus2
-Message-ID: <20190220165321.24eer575gjxi3pdx@flea>
-References: <20180703132636.21587-1-jakllsch@kollasch.net>
- <20190220153303.32081-1-jakllsch@kollasch.net>
+ id 1gwV8r-0005zz-C4
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:54:43 +0000
+Received: from archlinux (cpc91196-cmbg18-2-0-cust659.5-4.cable.virginm.net
+ [81.96.234.148])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0F6C121841;
+ Wed, 20 Feb 2019 16:54:36 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550681681;
+ bh=XJLxIoLyKdGaSW3pIVrH0HtLNpF/mN2UfFqH+cyMEHE=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=S+FOaVGSB3cdQuss4KT1kYtWT/cZFEOJNEaYl5BawmdMU+V8tLzOEMcLnuw6z54OA
+ 3A4hcTkLrIQj+fMZyPY9CadJH78n9SWdRGSgxujPMOKupsWQl4PSyG86lyoBSs1zpW
+ b7MoZZjkppOImywIdriYVuf35I/akfDXgiZNysZ4=
+Date: Wed, 20 Feb 2019 16:54:33 +0000
+From: Jonathan Cameron <jic23@kernel.org>
+To: Patrick Havelange <patrick.havelange@essensium.com>
+Subject: Re: [PATCH 8/8] iio/counter/ftm-quaddec: add handling of
+ under/overflow of the counter.
+Message-ID: <20190220165433.22f5d58c@archlinux>
+In-Reply-To: <20190218140321.19166-8-patrick.havelange@essensium.com>
+References: <20190218140321.19166-1-patrick.havelange@essensium.com>
+ <20190218140321.19166-8-patrick.havelange@essensium.com>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190220153303.32081-1-jakllsch@kollasch.net>
-User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_085328_926406_A017208D 
-X-CRM114-Status: UNSURE (   9.57  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190220_085441_446180_355F3CBE 
+X-CRM114-Status: GOOD (  34.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,44 +76,362 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Lars-Peter Clausen <lars@metafoo.de>, linux-pwm@vger.kernel.org,
+ linux-iio@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ William Breathitt Gray <vilhelm.gray@gmail.com>, Li Yang <leoyang.li@nxp.com>,
+ linuxppc-dev@lists.ozlabs.org, Rob Herring <robh+dt@kernel.org>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
+ Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
+ Esben Haabendal <esben@haabendal.dk>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi!
+On Mon, 18 Feb 2019 15:03:21 +0100
+Patrick Havelange <patrick.havelange@essensium.com> wrote:
 
-A few generic comments before, you should send the patches to all the
-recipients in get_maintainers.pl, which means that in that case in
-particular, you forgot to send it to Chen-Yu Tsai.
-
-Also, when you're sending a new iteration, please provide the changes
-you made since the previous iteration after the ---.
-
-On Wed, Feb 20, 2019 at 09:33:03AM -0600, Jonathan A. Kollasch wrote:
-> The schematics[1][2] for both versions of the NanoPi NEO Plus2 place the
-> STAT status LED on GPIOA10, and describe it as being a blue LED.
+> This is implemented by polling the counter value. A new parameter
+> "poll-interval" can be set in the device tree, or can be changed
+> at runtime. The reason for the polling is to avoid interrupts flooding.
+> If the quadrature input is going up and down around the overflow value
+> (or around 0), the interrupt will be triggering all the time. Thus,
+> polling is an easy way to handle overflow in a consistent way.
+> Polling can still be disabled by setting poll-interval to 0.
 > 
-> This change makes the blue status LED on my v1.0 board functional.
+> Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
+> Reviewed-by: Esben Haabendal <esben@haabendal.dk>
+Comments inline.
+
+Jonathan
+
+> ---
+>  drivers/iio/counter/ftm-quaddec.c | 199 +++++++++++++++++++++++++++++-
+>  1 file changed, 193 insertions(+), 6 deletions(-)
 > 
-> Signed-off-by: Jonathan A. Kollasch <jakllsch@kollasch.net>
-> 
-> [1]: http://wiki.friendlyarm.com/wiki/images/8/86/Schematic_NanoPi_NEO_Plus2-v1.0-1704.pdf
-> [2]: http://wiki.friendlyarm.com/wiki/images/b/bf/Schematic_NanoPi_NEO_Plus2-v1.1-1805.pdf
+> diff --git a/drivers/iio/counter/ftm-quaddec.c b/drivers/iio/counter/ftm-quaddec.c
+> index ca7e55a9ab3f..3a0395c3ef33 100644
+> --- a/drivers/iio/counter/ftm-quaddec.c
+> +++ b/drivers/iio/counter/ftm-quaddec.c
+> @@ -25,11 +25,33 @@
+>  
+>  struct ftm_quaddec {
+>  	struct platform_device *pdev;
+> +	struct delayed_work delayedcounterwork;
+>  	void __iomem *ftm_base;
+>  	bool big_endian;
+> +
+> +	/* Offset added to the counter to adjust for overflows of the
+> +	 * 16 bit HW counter. Only the 16 MSB are set.
+Comment syntax.
+> +	 */
+> +	uint32_t counteroffset;
+> +
+> +	/* Store the counter on each read, this is used to detect
+> +	 * if the counter readout if we over or underflow
+> +	 */
+> +	uint8_t lastregion;
+> +
+> +	/* Poll-interval, in ms before delayed work must poll counter */
+> +	uint16_t poll_interval;
+> +
+>  	struct mutex ftm_quaddec_mutex;
+>  };
+>  
+> +struct counter_result {
+> +	/* 16 MSB are from the counteroffset
+> +	 * 16 LSB are from the hardware counter
+> +	 */
+> +	uint32_t value;
+Why the structure?
 
-URLs also have the tendency to become dead quite fast, while the git
-history is here for ever, so it'd be better to avoid having them in
-the commit message itself, but feel free to add them as reference
-after the ---
+> +};
+> +
+>  #define HASFLAGS(flag, bits) ((flag & bits) ? 1 : 0)
+>  
+>  #define DEFAULT_POLL_INTERVAL    100 /* in msec */
+> @@ -74,8 +96,75 @@ static void ftm_set_write_protection(struct ftm_quaddec *ftm)
+>  	ftm_write(ftm, FTM_FMS, FTM_FMS_WPEN);
+>  }
+>  
+> +/* must be called with mutex locked */
+> +static void ftm_work_reschedule(struct ftm_quaddec *ftm)
+> +{
+> +	cancel_delayed_work(&ftm->delayedcounterwork);
+> +	if (ftm->poll_interval > 0)
+> +		schedule_delayed_work(&ftm->delayedcounterwork,
+> +				   msecs_to_jiffies(ftm->poll_interval));
+> +}
+> +
+> +/* Reports the hardware counter added the offset counter.
+> + *
+> + * The quadrature decodes does not use interrupts, because it cannot be
+> + * guaranteed that the counter won't flip between 0xFFFF and 0x0000 at a high
+> + * rate, causing Real Time performance degration. Instead the counter must be
+> + * read frequently enough - the assumption is 150 KHz input can be handled with
+> + * 100 ms read cycles.
+> + */
+> +static void ftm_work_counter(struct ftm_quaddec *ftm,
+> +			     struct counter_result *returndata)
+> +{
+> +	/* only 16bits filled in*/
+> +	uint32_t hwcounter;
+> +	uint8_t currentregion;
+> +
+> +	mutex_lock(&ftm->ftm_quaddec_mutex);
+> +
+> +	ftm_read(ftm, FTM_CNT, &hwcounter);
+> +
+> +	/* Divide the counter in four regions:
+> +	 *   0x0000-0x4000-0x8000-0xC000-0xFFFF
+> +	 * When the hwcounter changes between region 0 and 3 there is an
+> +	 * over/underflow
+> +	 */
+> +	currentregion = hwcounter / 0x4000;
+> +
+> +	if (ftm->lastregion == 3 && currentregion == 0)
+> +		ftm->counteroffset += 0x10000;
+> +
+> +	if (ftm->lastregion == 0 && currentregion == 3)
+> +		ftm->counteroffset -= 0x10000;
+> +
+> +	ftm->lastregion = currentregion;
+> +
+> +	if (returndata)
+> +		returndata->value = ftm->counteroffset + hwcounter;
+> +
+> +	ftm_work_reschedule(ftm);
+> +
+> +	mutex_unlock(&ftm->ftm_quaddec_mutex);
+> +}
+> +
+> +/* wrapper around the real function */
+> +static void ftm_work_counter_delay(struct work_struct *workptr)
+> +{
+> +	struct delayed_work *work;
+> +	struct ftm_quaddec *ftm;
+> +
+> +	work = container_of(workptr, struct delayed_work, work);
+> +	ftm = container_of(work, struct ftm_quaddec, delayedcounterwork);
+> +
+> +	ftm_work_counter(ftm, NULL);
+> +}
+> +
+> +/* must be called with mutex locked */
+>  static void ftm_reset_counter(struct ftm_quaddec *ftm)
+>  {
+> +	ftm->counteroffset = 0;
+> +	ftm->lastregion = 0;
+> +
+>  	/* Reset hardware counter to CNTIN */
+>  	ftm_write(ftm, FTM_CNT, 0x0);
+>  }
+> @@ -110,18 +199,91 @@ static int ftm_quaddec_read_raw(struct iio_dev *indio_dev,
+>  				int *val, int *val2, long mask)
+>  {
+>  	struct ftm_quaddec *ftm = iio_priv(indio_dev);
+> -	uint32_t counter;
+> +	struct counter_result counter;
+>  
+>  	switch (mask) {
+>  	case IIO_CHAN_INFO_RAW:
+> -		ftm_read(ftm, FTM_CNT, &counter);
+> -		*val = counter;
+> +	case IIO_CHAN_INFO_PROCESSED:
 
-Thanks!
-Maxime
+> +		ftm_work_counter(ftm, &counter);
+> +		if (mask == IIO_CHAN_INFO_RAW)
+> +			counter.value &= 0xffff;
+> +
+> +		*val = counter.value;
+> +
+>  		return IIO_VAL_INT;
+>  	default:
+>  		return -EINVAL;
+>  	}
+>  }
+>  
+> +static uint32_t ftm_get_default_poll_interval(const struct ftm_quaddec *ftm)
+> +{
+> +	/* Read values from device tree */
+> +	uint32_t val;
+> +	const struct device_node *node = ftm->pdev->dev.of_node;
+> +
+> +	if (of_property_read_u32(node, "poll-interval", &val))
+> +		val = DEFAULT_POLL_INTERVAL;
+> +
+> +	return val;
+> +}
+> +
+> +static ssize_t ftm_read_default_poll_interval(struct iio_dev *indio_dev,
+> +					uintptr_t private,
+> +					struct iio_chan_spec const *chan,
+> +					char *buf)
+> +{
+> +	const struct ftm_quaddec *ftm = iio_priv(indio_dev);
+> +	uint32_t val = ftm_get_default_poll_interval(ftm);
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%u\n", val);
+> +}
+> +
+> +static ssize_t ftm_read_poll_interval(struct iio_dev *indio_dev,
+> +				uintptr_t private,
+> +				struct iio_chan_spec const *chan,
+> +				char *buf)
+> +{
+> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
+> +
+> +	uint32_t poll_interval = READ_ONCE(ftm->poll_interval);
+Why bother with the local variable? I'm not awake enough to see
+why the READ_ONCE is necessary here.
+If worried about it, just take the lock, we are far from high
+performance in this path.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+> +
+> +	return snprintf(buf, PAGE_SIZE, "%u\n", poll_interval);
+> +}
+> +
+> +static ssize_t ftm_write_poll_interval(struct iio_dev *indio_dev,
+> +				uintptr_t private,
+> +				struct iio_chan_spec const *chan,
+> +				const char *buf, size_t len)
+> +{
+> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
+> +	uint32_t newpoll_interval;
+> +	uint32_t default_interval;
+> +
+> +	if (kstrtouint(buf, 10, &newpoll_interval) != 0) {
+> +		dev_err(&ftm->pdev->dev, "poll_interval not a number: '%s'\n",
+> +			buf);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* Don't accept polling times below the default value to protect the
+> +	 * system.
+> +	 */
+> +	default_interval = ftm_get_default_poll_interval(ftm);
+> +
+> +	if (newpoll_interval < default_interval && newpoll_interval != 0)
+> +		newpoll_interval = default_interval;
+> +
+> +	mutex_lock(&ftm->ftm_quaddec_mutex);
+> +
+> +	WRITE_ONCE(ftm->poll_interval, newpoll_interval);
+> +	ftm_work_reschedule(ftm);
+> +
+> +	mutex_unlock(&ftm->ftm_quaddec_mutex);
+> +
+> +	return len;
+> +}
+> +
+>  static ssize_t ftm_write_reset(struct iio_dev *indio_dev,
+>  				uintptr_t private,
+>  				struct iio_chan_spec const *chan,
+> @@ -135,8 +297,11 @@ static ssize_t ftm_write_reset(struct iio_dev *indio_dev,
+>  		return -EINVAL;
+>  	}
+>  
+> +	mutex_lock(&ftm->ftm_quaddec_mutex);
+> +
+>  	ftm_reset_counter(ftm);
+>  
+> +	mutex_unlock(&ftm->ftm_quaddec_mutex);
+>  	return len;
+>  }
+>  
+> @@ -192,6 +357,17 @@ static const struct iio_enum ftm_quaddec_prescaler_en = {
+>  };
+>  
+>  static const struct iio_chan_spec_ext_info ftm_quaddec_ext_info[] = {
+> +	{
+> +		.name = "default_poll_interval",
+> +		.shared = IIO_SHARED_BY_TYPE,
+> +		.read = ftm_read_default_poll_interval,
+Why is this relevant if the value is set to something else?
+> +	},
+> +	{
+> +		.name = "poll_interval",
+> +		.shared = IIO_SHARED_BY_TYPE,
+> +		.read = ftm_read_poll_interval,
+> +		.write = ftm_write_poll_interval,
+Hmm.  New ABI that needs documenting. I'm not sure how we should
+handle this.  Perhaps William has a good suggestion for how to do it.
+> +	},
+>  	{
+>  		.name = "reset",
+>  		.shared = IIO_SEPARATE,
+> @@ -205,7 +381,8 @@ static const struct iio_chan_spec_ext_info ftm_quaddec_ext_info[] = {
+>  static const struct iio_chan_spec ftm_quaddec_channels = {
+>  	.type = IIO_COUNT,
+>  	.channel = 0,
+> -	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
+> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |
+> +			      BIT(IIO_CHAN_INFO_PROCESSED),
+Why?  As a general rule, we don't allow bother RAW and processed for
+a particular channel.  Note the raw value doesn't actually 'have'
+to be the value off a sensor - it is just expected to not have
+linear scaling and offset applied (which are encode dependent
+here so can't be applied).  So just use raw for your non overflowing
+version.
+
+>  	.ext_info = ftm_quaddec_ext_info,
+>  	.indexed = 1,
+>  };
+> @@ -232,10 +409,14 @@ static int ftm_quaddec_probe(struct platform_device *pdev)
+>  
+>  	ftm->pdev = pdev;
+>  	ftm->big_endian = of_property_read_bool(node, "big-endian");
+> +	ftm->counteroffset = 0;
+> +	ftm->lastregion = 0;
+>  	ftm->ftm_base = of_iomap(node, 0);
+>  	if (!ftm->ftm_base)
+>  		return -EINVAL;
+>  
+> +	ftm->poll_interval = ftm_get_default_poll_interval(ftm);
+> +
+>  	indio_dev->name = dev_name(&pdev->dev);
+>  	indio_dev->dev.parent = &pdev->dev;
+>  	indio_dev->info = &ftm_quaddec_iio_info;
+> @@ -245,9 +426,13 @@ static int ftm_quaddec_probe(struct platform_device *pdev)
+>  	ftm_quaddec_init(ftm);
+>  
+>  	mutex_init(&ftm->ftm_quaddec_mutex);
+> +	INIT_DELAYED_WORK(&ftm->delayedcounterwork, ftm_work_counter_delay);
+> +
+> +	ftm_work_reschedule(ftm);
+>  
+>  	ret = devm_iio_device_register(&pdev->dev, indio_dev);
+>  	if (ret) {
+> +		cancel_delayed_work_sync(&ftm->delayedcounterwork);
+>  		mutex_destroy(&ftm->ftm_quaddec_mutex);
+>  		iounmap(ftm->ftm_base);
+>  	}
+> @@ -261,13 +446,15 @@ static int ftm_quaddec_remove(struct platform_device *pdev)
+>  
+>  	ftm = (struct ftm_quaddec *)platform_get_drvdata(pdev);
+>  	indio_dev = iio_priv_to_dev(ftm);
+> -	/* This is needed to remove sysfs entries */
+> +	/* Make sure no concurrent attribute reads happen*/
+>  	devm_iio_device_unregister(&pdev->dev, indio_dev);
+>  
+> +	cancel_delayed_work_sync(&ftm->delayedcounterwork);
+> +
+>  	ftm_write(ftm, FTM_MODE, 0);
+>  
+> -	iounmap(ftm->ftm_base);
+>  	mutex_destroy(&ftm->ftm_quaddec_mutex);
+> +	iounmap(ftm->ftm_base);
+Why the reorder?  If it was wrong in the first place, fix the
+earlier patch not this one.
+>  
+>  	return 0;
+>  }
+
 
 _______________________________________________
 linux-arm-kernel mailing list
