@@ -4,20 +4,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D5DBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:04:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD8DDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:04:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C09C2146E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:04:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC2E42146E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:04:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qs1pyOnI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="EH1M+tuL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="pvGB9geh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C09C2146E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xwl5Wxd3";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="cQhxERgC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="sgQTpMXm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC2E42146E
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +27,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZrBnBzYWleVs5Q288q4XG8eby8pErO+rnoO1MMHngmE=; b=Qs1pyOnIxZKAhm
-	xpH83zmLkUb7WbQiwVIpo/rOYDAaknef5F6r5Mgu432pfF2XMY/bL2UEZptAHFRSpb7vRzDnHZQNH
-	P6R9RS7hhEiZNfD+DtNmKuyBVDXJVTgLvHPhxEJ+pqkO7HOBNk0zkY/oBjdJ1wO2jxF6A8iHRg5Y3
-	WMe7BkhBWYRy2mqttN//Wr6cSwC6+SNJM01IT6g6k06HJ5xd4rZ8JOV9jB4wLtNaYcOWaWUSUyzWT
-	aeuPsyNGVE4Op3PoZNGNau1aXGWBJx1lMXKrplY3MKrNGrCryWs5zfoAX1J5xNTFf8grvzfTuRokt
-	yhhrP/BkFUeaZp60ykwg==;
+	List-Owner; bh=kQpbRm1L9HwRaiomvtuiXfMffsbfQ+kD4ui33AneRJE=; b=Xwl5Wxd3sU9pHa
+	eOtw2wKHMq/QZQZ/0ejwE72mi+YospmVraKFi+X9z9MfAcptbXdRLlrSxJtcWiLh0qb5eTnocNDIE
+	/c5enrvRxOjoaHvvtFesLwruDE/jk6itgE3TPMdv5Om3VXkTpJnsYvaPTs56Dq1nh67UF9UZtyPx2
+	iymsoj022AgWGjX62skVLkLMYuoj3bCH7fq/9pZdWnFpjd0RJVcf48oMdADKrwBAIkczD2MVkyz+U
+	Aw5yfJXOIMERLB4V9JVFHn+UMWdLQxusAMqD8/VC1Eb185THKy5mdVQH1Fho45/tDgMO4eC7tKU9Q
+	nRsCs7oFVBKk2SwGwF1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPfu-0001d8-6O; Wed, 20 Feb 2019 11:04:26 +0000
+	id 1gwPg5-0001sQ-9E; Wed, 20 Feb 2019 11:04:37 +0000
 Received: from mx0b-0016f401.pphosted.com ([67.231.156.173])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPeR-0008OQ-0n
+ id 1gwPeT-0008QH-HS
  for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:03:02 +0000
 Received: from pps.filterd (m0045851.ppops.net [127.0.0.1])
  by mx0b-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1KB04HS012100; Wed, 20 Feb 2019 03:02:50 -0800
+ x1KB08VE012140; Wed, 20 Feb 2019 03:02:54 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
  h=from : to : cc :
  subject : date : message-id : references : in-reply-to : content-type :
  content-transfer-encoding : mime-version; s=pfpt0818;
- bh=2EzC6rX36BewKhRwnhCbiJLmyghA4rQx8aJY3zkElXA=;
- b=EH1M+tuLziZ6KQLYnkbSUvfidNUYufIufJRJJpIA93DFPE0S8gBDwyVChNWg/MfpV54h
- 6dIxSKy+QQNdSMcMRjAt0cCwksyNL5tYWKlLkpzAuY9GYA4/68ad+PQkSFqHhlHAkTad
- umGgu4AeYtU0WJD0PhP8oK9+AJFKZCDU0s4V/JLWGuEKhIXwDONyQMgPa93R83JnC5iS
- 5XDtcCmwBbjpqkmv3mjIs6aWZG8ItW6H2Y0yk53uRpaHizQow3DMYzt70eiiPhyqa4Vy
- hb5mvLaPvtGoVRWgdHz4oER2oO3FrSymGcYMV3/zJUBUgyT4L6MCofS1cmKWmvpSwYL5 hg== 
-Received: from sc-exch02.marvell.com ([199.233.58.182])
- by mx0b-0016f401.pphosted.com with ESMTP id 2qrh8xbr2j-1
+ bh=+ccWsz+uliVVMXyMUuYIdBeRenifW0T4mGikL9fw7/0=;
+ b=cQhxERgCFzCx0JfL4Oi1k6ZUH0CCGIviq0o687rxun1YcBWZesbjgUObv1GlYp4NrFbY
+ d6PjbgQfIFGIW7gb4mWS11pz9DXtBGGJvrLbmPrbkAEkGRyPS+Mm4iruhP7yGNTKS4CU
+ LDW/MMm36N1g8cWmTx+anPGzPQ+FmS3y37a6mp4RmK+Js4Y0Jf50sGsGMC/3rm85G/rS
+ EY61ue58jwbAs11fyOYM+sRkcoRaIqbvXEcRIEOstZh+tNcxk9znBlyVQszWM0MfZA/N
+ IsdmH+5jd0xXWpl7ouQYlD+/j6E4cfuSPdB8MaxDoXsv1eToZ1VdShN8YFumuOhrepif hw== 
+Received: from sc-exch03.marvell.com ([199.233.58.183])
+ by mx0b-0016f401.pphosted.com with ESMTP id 2qrh8xbr2r-3
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
- Wed, 20 Feb 2019 03:02:49 -0800
-Received: from SC-EXCH03.marvell.com (10.93.176.83) by SC-EXCH02.marvell.com
- (10.93.176.82) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Wed, 20 Feb
- 2019 03:02:48 -0800
+ Wed, 20 Feb 2019 03:02:53 -0800
+Received: from SC-EXCH03.marvell.com (10.93.176.83) by SC-EXCH03.marvell.com
+ (10.93.176.83) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Wed, 20 Feb
+ 2019 03:02:51 -0800
 Received: from NAM03-CO1-obe.outbound.protection.outlook.com (104.47.40.58) by
  SC-EXCH03.marvell.com (10.93.176.83) with Microsoft SMTP Server
  (TLS) id
- 15.0.1367.3 via Frontend Transport; Wed, 20 Feb 2019 03:02:48 -0800
+ 15.0.1367.3 via Frontend Transport; Wed, 20 Feb 2019 03:02:51 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=marvell.onmicrosoft.com; s=selector1-marvell-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=2EzC6rX36BewKhRwnhCbiJLmyghA4rQx8aJY3zkElXA=;
- b=pvGB9gehC5XVq905KM6YRsR8t66QpL1ZC0A7Ka9RGm4FJ4KjWT1Y37eXuGs4lfgC0rl6tXTfwmFEvkHYza5TgoKu2OIqLXWg1qkF1XpYTlXhyYYJiE6XKoyH5nt4D6CsaEd11WbfD4RrjmcFgzc6B6oEQjqxfLfU3W1urYCJlss=
+ bh=+ccWsz+uliVVMXyMUuYIdBeRenifW0T4mGikL9fw7/0=;
+ b=sgQTpMXmBzdpKViOnrmti7dfxicddoPyDE1ED8sFY9KTowlS+46gdQunzLJCppQGIXzfsTGgGpFxOuNuYCP5Q4GqGK0h2PZ8MdJdC5gk/vWWUB4lsQNAHKi4NYCkidfddF5xC28kHK1s7JVi7No5hDTUf8WtQFd9jwIZYWDRcN8=
 Received: from CY4PR18MB1112.namprd18.prod.outlook.com (10.173.183.147) by
  CY4PR18MB1350.namprd18.prod.outlook.com (10.173.247.15) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Wed, 20 Feb 2019 11:02:44 +0000
+ 15.20.1643.14; Wed, 20 Feb 2019 11:02:47 +0000
 Received: from CY4PR18MB1112.namprd18.prod.outlook.com
  ([fe80::7561:d13b:e106:12b4]) by CY4PR18MB1112.namprd18.prod.outlook.com
  ([fe80::7561:d13b:e106:12b4%4]) with mapi id 15.20.1643.014; Wed, 20 Feb 2019
- 11:02:44 +0000
+ 11:02:47 +0000
 From: Vadim Lomovtsev <vlomovtsev@marvell.com>
 To: "sgoutham@cavium.com" <sgoutham@cavium.com>, "sunil.kovvuri@gmail.com"
  <sunil.kovvuri@gmail.com>, "rric@kernel.org" <rric@kernel.org>,
@@ -83,13 +84,13 @@ To: "sgoutham@cavium.com" <sgoutham@cavium.com>, "sunil.kovvuri@gmail.com"
  <linux-arm-kernel@lists.infradead.org>, "netdev@vger.kernel.org"
  <netdev@vger.kernel.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>, "davem@davemloft.net" <davem@davemloft.net>
-Subject: [PATCH v3 2/8] net: thunderx: replace global nicvf_rx_mode_wq work
- queue for all VFs to private for each of them.
-Thread-Topic: [PATCH v3 2/8] net: thunderx: replace global nicvf_rx_mode_wq
- work queue for all VFs to private for each of them.
-Thread-Index: AQHUyQvNZLVeS2CeokqR5V98TddeIw==
-Date: Wed, 20 Feb 2019 11:02:43 +0000
-Message-ID: <20190220110225.9497-3-vlomovtsev@marvell.com>
+Subject: [PATCH v3 8/8] net: thunderx: remove link change polling code and
+ info from nicpf
+Thread-Topic: [PATCH v3 8/8] net: thunderx: remove link change polling code
+ and info from nicpf
+Thread-Index: AQHUyQvPNNMRL8PahkS5zmDrgenu/w==
+Date: Wed, 20 Feb 2019 11:02:45 +0000
+Message-ID: <20190220110225.9497-9-vlomovtsev@marvell.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20190220110225.9497-1-vlomovtsev@marvell.com>
 In-Reply-To: <20190220110225.9497-1-vlomovtsev@marvell.com>
@@ -99,14 +100,14 @@ X-MS-Has-Attach:
 X-MS-TNEF-Correlator: 
 x-originating-ip: [4.28.12.78]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: d782085f-1466-466d-1abd-08d69722f0ce
+x-ms-office365-filtering-correlation-id: c0e67e2e-369d-4a4a-cf8f-08d69722f26b
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
  SRVR:CY4PR18MB1350; 
 x-ms-traffictypediagnostic: CY4PR18MB1350:
 x-microsoft-exchange-diagnostics: 1; CY4PR18MB1350;
- 20:Dn9DcXT+LYlINLOBxY2E5f75eTomRSjQQ/AGWXtM4Mz8B2PRei4ouXqKvAG86ASDn/Iz0Y4RAfYvxpvXxbceCYc2ds+VEVQypPvHOnZUthRGlCitPNpbyaBOO1pcwSHG0R0VCe0SsF1gAwSKScTxGcmG8/HYZMLId9nBt1VU6Q0=
-x-microsoft-antispam-prvs: <CY4PR18MB1350C994516C6B354DEFA7AFCD7D0@CY4PR18MB1350.namprd18.prod.outlook.com>
+ 20:mR6vFwK3JSIoknPmPh5QNwx/vp56KjYrKoaYRlpp+IvDvl5BRLl8KEdFYCepV9ytdQw6BSW9yn8sjSkIvu14ATuyM9dESy/oSmE5IfM7yJgm53ZRywKWxjYmPsBlyrZkN2cpHzwthlSGKgBkXK7W4rlfqEo2G8IAbNl5AcG0+f8=
+x-microsoft-antispam-prvs: <CY4PR18MB13504759522EAF63CC289D0CCD7D0@CY4PR18MB1350.namprd18.prod.outlook.com>
 x-forefront-prvs: 0954EE4910
 x-forefront-antispam-report: SFV:NSPM;
  SFS:(10009020)(346002)(376002)(39860400002)(396003)(136003)(366004)(199004)(189003)(86362001)(97736004)(478600001)(476003)(11346002)(2616005)(14444005)(68736007)(446003)(6512007)(5660300002)(256004)(186003)(99286004)(14454004)(76176011)(2906002)(36756003)(6486002)(2201001)(102836004)(6506007)(2501003)(6436002)(26005)(316002)(8936002)(305945005)(7736002)(25786009)(1076003)(53936002)(71200400001)(54906003)(81156014)(4326008)(110136005)(106356001)(107886003)(66066001)(81166006)(6116002)(8676002)(71190400001)(105586002)(3846002)(486006);
@@ -116,10 +117,10 @@ x-forefront-antispam-report: SFV:NSPM;
 received-spf: None (protection.outlook.com: marvell.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: A7/3sYvbSDj1Hk8L3Mz9UeE6WmAx9T/ccCciUQsnZWshJnM6XjUPKMtzTOWAvqBqBJ1l1gJyh9Eg6YSA1Gh6OflO9eUUL/M60cgQxYZR4ZTPEAB2KsgRyQ6aB6B01BWJQKLaeq43FxCyboMTN2MKenzoN91Xw/eJsnlKGy6OB2ojuApyRabFoZu153SarsM4nndn8iH2k7T90igaN/hn6iwaIGKCXQ2bFAMOQGX01b7eG4O+xHjMr5dGuydEoQtuVCyDrL0ytsRXLq23K+Q/b0rOuWIubt1By+hImaauBOTd5MCXMZXQibdcMGwWjEjpyjF70EOzTtuql6UkfsQom9pn4uSwgZn6K1sGqzLV8jrwwhI1IRraO1UVUxa2nh1XBeV1VcdY+ml4LRZepgEkSXFUMXGdAEHMzvUdplt/txI=
+x-microsoft-antispam-message-info: VVL3aQjgkHdyAn+TAq1u7+tMQel4hvD0AYrhN/KnDf0fVomoiItkORXNq+G20E1frUHz7y3GUWwUJXeZCPu6DGL4kEttsXSca/i3qjApk7XtlMbotNLMGeMLnhfcYi52mYYkmNVk6Pg9xtlNmvjXMIN4LjiWk9B5d+6KuU3myCKBeltVt6/AUkBP+/ryj1+y6gl6zX23xnqhO7a6qmhRgmwA/Z6dFjhlI9CMSlJa/9e3kLhcJM8nGgbmwMn3XgWU63P78GcOIJ0SdLVvxWMMHYXfGuVhAG66basYtQtaZIpluHSSehcYu+aVtGoQIZ3zkALcXchdadY0DQan8chskoqSSPtAyqizgIUkdFbi5yTJr/hgidOsVAjjB8muvBPSc0qsWxIpU0cClN5fSbbwj3kjJEEmuVZwFNvGff1OOq4=
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: d782085f-1466-466d-1abd-08d69722f0ce
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:02:43.5357 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: c0e67e2e-369d-4a4a-cf8f-08d69722f26b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:02:45.7316 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
@@ -131,11 +132,11 @@ X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=856 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1902200080
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_030255_227409_C1262F92 
-X-CRM114-Status: GOOD (  16.61  )
+X-CRM114-CacheID: sfid-20190220_030257_729377_D52DF2DE 
+X-CRM114-Status: GOOD (  18.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -154,148 +155,247 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Having one work queue for receive mode configuration ndo_set_rx_mode()
-call for all VFs results in making each of them wait till the
-set_rx_mode() call completes for another VF if any of close, set
-receive mode and change flags calls being already invoked. Potentially
-this could cause device state change before appropriate call of receive
-mode configuration completes, so the call itself became meaningless,
-corrupt data or break configuration sequence.
+Since link change polling routine was moved to nicvf side,
+we don't need anymore polling function at nicpf side along
+with link status info for all enabled Vfs as at VF side
+this info is already tracked.
 
-We don't need any delays in NIC VF configuration sequence so having delayed
-work call with 0 delay has no sense.
-
-This commit is to implement one work queue for each NIC VF for set_rx_mode
-task and to let them work independently and replacing delayed_work
-with work_struct.
+This commit is to remove unnecessary code & fields from
+nicpf structure.
 
 Signed-off-by: Vadim Lomovtsev <vlomovtsev@marvell.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic.h     |  4 ++-
- .../net/ethernet/cavium/thunder/nicvf_main.c  | 30 ++++++++++---------
- 2 files changed, 19 insertions(+), 15 deletions(-)
+ .../net/ethernet/cavium/thunder/nic_main.c    | 114 ++----------------
+ 1 file changed, 12 insertions(+), 102 deletions(-)
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
-index f4d81765221e..376a96bce33f 100644
---- a/drivers/net/ethernet/cavium/thunder/nic.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic.h
-@@ -271,7 +271,7 @@ struct xcast_addr_list {
- };
+diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
+index 8ab71dae3988..c90252829ed3 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic_main.c
++++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
+@@ -57,14 +57,8 @@ struct nicpf {
+ #define	NIC_GET_BGX_FROM_VF_LMAC_MAP(map)	((map >> 4) & 0xF)
+ #define	NIC_GET_LMAC_FROM_VF_LMAC_MAP(map)	(map & 0xF)
+ 	u8			*vf_lmac_map;
+-	struct delayed_work     dwork;
+-	struct workqueue_struct *check_link;
+-	u8			*link;
+-	u8			*duplex;
+-	u32			*speed;
+ 	u16			cpi_base[MAX_NUM_VFS_SUPPORTED];
+ 	u16			rssi_base[MAX_NUM_VFS_SUPPORTED];
+-	bool			mbx_lock[MAX_NUM_VFS_SUPPORTED];
  
- struct nicvf_work {
--	struct delayed_work    work;
-+	struct work_struct     work;
- 	u8                     mode;
- 	struct xcast_addr_list *mc;
- };
-@@ -327,6 +327,8 @@ struct nicvf {
- 	struct nicvf_work       rx_mode_work;
- 	/* spinlock to protect workqueue arguments from concurrent access */
- 	spinlock_t              rx_mode_wq_lock;
-+	/* workqueue for handling kernel ndo_set_rx_mode() calls */
-+	struct workqueue_struct *nicvf_rx_mode_wq;
- 
- 	/* PTP timestamp */
- 	struct cavium_ptp	*ptp_clock;
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index 88f8a8fa93cd..abf24e7dff2d 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -68,9 +68,6 @@ module_param(cpi_alg, int, 0444);
- MODULE_PARM_DESC(cpi_alg,
- 		 "PFC algorithm (0=none, 1=VLAN, 2=VLAN16, 3=IP Diffserv)");
- 
--/* workqueue for handling kernel ndo_set_rx_mode() calls */
--static struct workqueue_struct *nicvf_rx_mode_wq;
--
- static inline u8 nicvf_netdev_qidx(struct nicvf *nic, u8 qidx)
- {
- 	if (nic->sqs_mode)
-@@ -1311,6 +1308,9 @@ int nicvf_stop(struct net_device *netdev)
- 	struct nicvf_cq_poll *cq_poll = NULL;
- 	union nic_mbx mbx = {};
- 
-+	/* wait till all queued set_rx_mode tasks completes */
-+	drain_workqueue(nic->nicvf_rx_mode_wq);
-+
- 	mbx.msg.msg = NIC_MBOX_MSG_SHUTDOWN;
- 	nicvf_send_msg_to_pf(nic, &mbx);
- 
-@@ -1418,6 +1418,9 @@ int nicvf_open(struct net_device *netdev)
- 	struct nicvf_cq_poll *cq_poll = NULL;
- 	union nic_mbx mbx = {};
- 
-+	/* wait till all queued set_rx_mode tasks completes if any */
-+	drain_workqueue(nic->nicvf_rx_mode_wq);
-+
- 	netif_carrier_off(netdev);
- 
- 	err = nicvf_register_misc_interrupt(nic);
-@@ -1973,7 +1976,7 @@ static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
- static void nicvf_set_rx_mode_task(struct work_struct *work_arg)
- {
- 	struct nicvf_work *vf_work = container_of(work_arg, struct nicvf_work,
--						  work.work);
-+						  work);
- 	struct nicvf *nic = container_of(vf_work, struct nicvf, rx_mode_work);
- 	u8 mode;
- 	struct xcast_addr_list *mc;
-@@ -2030,7 +2033,7 @@ static void nicvf_set_rx_mode(struct net_device *netdev)
- 	kfree(nic->rx_mode_work.mc);
- 	nic->rx_mode_work.mc = mc_list;
- 	nic->rx_mode_work.mode = mode;
--	queue_delayed_work(nicvf_rx_mode_wq, &nic->rx_mode_work.work, 0);
-+	queue_work(nic->nicvf_rx_mode_wq, &nic->rx_mode_work.work);
- 	spin_unlock(&nic->rx_mode_wq_lock);
+ 	/* MSI-X */
+ 	u8			num_vec;
+@@ -929,6 +923,10 @@ static void nic_config_timestamp(struct nicpf *nic, int vf, struct set_ptp *ptp)
+ 	nic_reg_write(nic, NIC_PF_PKIND_0_15_CFG | (pkind_idx << 3), pkind_val);
  }
  
-@@ -2187,7 +2190,10 @@ static int nicvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 
- 	INIT_WORK(&nic->reset_task, nicvf_reset_task);
- 
--	INIT_DELAYED_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
-+	nic->nicvf_rx_mode_wq = alloc_ordered_workqueue("nicvf_rx_mode_wq_VF%d",
-+							WQ_MEM_RECLAIM,
-+							nic->vf_id);
-+	INIT_WORK(&nic->rx_mode_work.work, nicvf_set_rx_mode_task);
- 	spin_lock_init(&nic->rx_mode_wq_lock);
- 
- 	err = register_netdev(netdev);
-@@ -2228,13 +2234,15 @@ static void nicvf_remove(struct pci_dev *pdev)
- 	nic = netdev_priv(netdev);
- 	pnetdev = nic->pnicvf->netdev;
- 
--	cancel_delayed_work_sync(&nic->rx_mode_work.work);
--
- 	/* Check if this Qset is assigned to different VF.
- 	 * If yes, clean primary and all secondary Qsets.
- 	 */
- 	if (pnetdev && (pnetdev->reg_state == NETREG_REGISTERED))
- 		unregister_netdev(pnetdev);
-+	if (nic->nicvf_rx_mode_wq) {
-+		destroy_workqueue(nic->nicvf_rx_mode_wq);
-+		nic->nicvf_rx_mode_wq = NULL;
-+	}
- 	nicvf_unregister_interrupts(nic);
- 	pci_set_drvdata(pdev, NULL);
- 	if (nic->drv_stats)
-@@ -2261,17 +2269,11 @@ static struct pci_driver nicvf_driver = {
- static int __init nicvf_init_module(void)
++/* Get BGX LMAC link status and update corresponding VF
++ * if there is a change, valid only if internal L2 switch
++ * is not present otherwise VF link is always treated as up
++ */
+ static void nic_link_status_get(struct nicpf *nic, u8 vf)
  {
- 	pr_info("%s, ver %s\n", DRV_NAME, DRV_VERSION);
--	nicvf_rx_mode_wq = alloc_ordered_workqueue("nicvf_generic",
--						   WQ_MEM_RECLAIM);
- 	return pci_register_driver(&nicvf_driver);
+ 	union nic_mbx mbx = {};
+@@ -944,10 +942,6 @@ static void nic_link_status_get(struct nicpf *nic, u8 vf)
+ 	/* Get interface link status */
+ 	bgx_get_lmac_link_state(nic->node, bgx, lmac, &link);
+ 
+-	nic->link[vf] = link.link_up;
+-	nic->duplex[vf] = link.duplex;
+-	nic->speed[vf] = link.speed;
+-
+ 	/* Send a mbox message to VF with current link status */
+ 	mbx.link_status.link_up = link.link_up;
+ 	mbx.link_status.duplex = link.duplex;
+@@ -970,8 +964,6 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	int i;
+ 	int ret = 0;
+ 
+-	nic->mbx_lock[vf] = true;
+-
+ 	mbx_addr = nic_get_mbx_addr(vf);
+ 	mbx_data = (u64 *)&mbx;
+ 
+@@ -986,12 +978,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 	switch (mbx.msg.msg) {
+ 	case NIC_MBOX_MSG_READY:
+ 		nic_mbx_send_ready(nic, vf);
+-		if (vf < nic->num_vf_en) {
+-			nic->link[vf] = 0;
+-			nic->duplex[vf] = 0;
+-			nic->speed[vf] = 0;
+-		}
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_QS_CFG:
+ 		reg_addr = NIC_PF_QSET_0_127_CFG |
+ 			   (mbx.qs.num << NIC_QS_ID_SHIFT);
+@@ -1060,7 +1047,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		break;
+ 	case NIC_MBOX_MSG_RSS_SIZE:
+ 		nic_send_rss_size(nic, vf);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_RSS_CFG:
+ 	case NIC_MBOX_MSG_RSS_CFG_CONT:
+ 		nic_config_rss(nic, &mbx.rss_cfg);
+@@ -1078,19 +1065,19 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		break;
+ 	case NIC_MBOX_MSG_ALLOC_SQS:
+ 		nic_alloc_sqs(nic, &mbx.sqs_alloc);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_NICVF_PTR:
+ 		nic->nicvf[vf] = mbx.nicvf.nicvf;
+ 		break;
+ 	case NIC_MBOX_MSG_PNICVF_PTR:
+ 		nic_send_pnicvf(nic, vf);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_SNICVF_PTR:
+ 		nic_send_snicvf(nic, &mbx.nicvf);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_BGX_STATS:
+ 		nic_get_bgx_stats(nic, &mbx.bgx_stats);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_LOOPBACK:
+ 		ret = nic_config_loopback(nic, &mbx.lbk);
+ 		break;
+@@ -1099,7 +1086,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		break;
+ 	case NIC_MBOX_MSG_PFC:
+ 		nic_pause_frame(nic, vf, &mbx.pfc);
+-		goto unlock;
++		return;
+ 	case NIC_MBOX_MSG_PTP_CFG:
+ 		nic_config_timestamp(nic, vf, &mbx.ptp);
+ 		break;
+@@ -1143,7 +1130,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 			break;
+ 		}
+ 		nic_link_status_get(nic, vf);
+-		goto unlock;
++		return;
+ 	default:
+ 		dev_err(&nic->pdev->dev,
+ 			"Invalid msg from VF%d, msg 0x%x\n", vf, mbx.msg.msg);
+@@ -1157,8 +1144,6 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 			mbx.msg.msg, vf);
+ 		nic_mbx_send_nack(nic, vf);
+ 	}
+-unlock:
+-	nic->mbx_lock[vf] = false;
  }
  
- static void __exit nicvf_cleanup_module(void)
- {
--	if (nicvf_rx_mode_wq) {
--		destroy_workqueue(nicvf_rx_mode_wq);
--		nicvf_rx_mode_wq = NULL;
+ static irqreturn_t nic_mbx_intr_handler(int irq, void *nic_irq)
+@@ -1306,52 +1291,6 @@ static int nic_sriov_init(struct pci_dev *pdev, struct nicpf *nic)
+ 	return 0;
+ }
+ 
+-/* Poll for BGX LMAC link status and update corresponding VF
+- * if there is a change, valid only if internal L2 switch
+- * is not present otherwise VF link is always treated as up
+- */
+-static void nic_poll_for_link(struct work_struct *work)
+-{
+-	union nic_mbx mbx = {};
+-	struct nicpf *nic;
+-	struct bgx_link_status link;
+-	u8 vf, bgx, lmac;
+-
+-	nic = container_of(work, struct nicpf, dwork.work);
+-
+-	mbx.link_status.msg = NIC_MBOX_MSG_BGX_LINK_CHANGE;
+-
+-	for (vf = 0; vf < nic->num_vf_en; vf++) {
+-		/* Poll only if VF is UP */
+-		if (!nic->vf_enabled[vf])
+-			continue;
+-
+-		/* Get BGX, LMAC indices for the VF */
+-		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+-		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+-		/* Get interface link status */
+-		bgx_get_lmac_link_state(nic->node, bgx, lmac, &link);
+-
+-		/* Inform VF only if link status changed */
+-		if (nic->link[vf] == link.link_up)
+-			continue;
+-
+-		if (!nic->mbx_lock[vf]) {
+-			nic->link[vf] = link.link_up;
+-			nic->duplex[vf] = link.duplex;
+-			nic->speed[vf] = link.speed;
+-
+-			/* Send a mbox message to VF with current link status */
+-			mbx.link_status.link_up = link.link_up;
+-			mbx.link_status.duplex = link.duplex;
+-			mbx.link_status.speed = link.speed;
+-			mbx.link_status.mac_type = link.mac_type;
+-			nic_send_msg_to_vf(nic, vf, &mbx);
+-		}
 -	}
- 	pci_unregister_driver(&nicvf_driver);
- }
+-	queue_delayed_work(nic->check_link, &nic->dwork, HZ * 2);
+-}
+-
+ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1420,18 +1359,6 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (!nic->vf_lmac_map)
+ 		goto err_release_regions;
+ 
+-	nic->link = devm_kmalloc_array(dev, max_lmac, sizeof(u8), GFP_KERNEL);
+-	if (!nic->link)
+-		goto err_release_regions;
+-
+-	nic->duplex = devm_kmalloc_array(dev, max_lmac, sizeof(u8), GFP_KERNEL);
+-	if (!nic->duplex)
+-		goto err_release_regions;
+-
+-	nic->speed = devm_kmalloc_array(dev, max_lmac, sizeof(u32), GFP_KERNEL);
+-	if (!nic->speed)
+-		goto err_release_regions;
+-
+ 	/* Initialize hardware */
+ 	nic_init_hw(nic);
+ 
+@@ -1447,19 +1374,8 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	if (err)
+ 		goto err_unregister_interrupts;
+ 
+-	/* Register a physical link status poll fn() */
+-	nic->check_link = alloc_workqueue("check_link_status",
+-					  WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
+-	if (!nic->check_link) {
+-		err = -ENOMEM;
+-		goto err_disable_sriov;
+-	}
+-
+ 	return 0;
+ 
+-err_disable_sriov:
+-	if (nic->flags & NIC_SRIOV_ENABLED)
+-		pci_disable_sriov(pdev);
+ err_unregister_interrupts:
+ 	nic_unregister_interrupts(nic);
+ err_release_regions:
+@@ -1480,12 +1396,6 @@ static void nic_remove(struct pci_dev *pdev)
+ 	if (nic->flags & NIC_SRIOV_ENABLED)
+ 		pci_disable_sriov(pdev);
+ 
+-	if (nic->check_link) {
+-		/* Destroy work Queue */
+-		cancel_delayed_work_sync(&nic->dwork);
+-		destroy_workqueue(nic->check_link);
+-	}
+-
+ 	nic_unregister_interrupts(nic);
+ 	pci_release_regions(pdev);
  
 -- 
 2.17.2
