@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6421DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:32:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E9C59C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:32:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34F4521848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:32:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BA2722147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:32:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T0ExUXTC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34F4521848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HrvYSudb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BA2722147A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ginzinger.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,30 +25,30 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:To:From:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=2jhkMHkIcIdZ/JClm9uF6bSXvt83yr2CLhtwTur//hk=; b=T0ExUXTC+F+9rKzWN7QsYekoy
-	X+Yz8MHJG9MWY+mNSK7Ca2hViOMFm4cvuTjTuzsuXf2nu+OndmCAEHSEQJ1kRqxExzWi13Q0CQXvM
-	WCW8Czpt5d/SYeeY0Y4seM3Osau5b3hYKD6+rrls/YFYBZ35mAkjhml41m/ItZlxUqWB6X9kQpq4J
-	L6QQ+yRKozZ/+Smnv4I4r1y07soSCrYb1+b+9lL8GqJX7SYgdBchdi+PTpe7jqaAP4/ts300av45S
-	OPrHSlLMgkXCc6ZtYMPwtGaHmtfGN0rmb5f/cO+VnE8C+ASnVZKHVbah4P9A4/IjmIWifYxJisjd3
-	SWIMy4QeA==;
+	 bh=FimV74s0MqOgYzLFpJiYE9/5JRCkM07egXUrYAxHPmE=; b=HrvYSudbZ7lazIaUSWqjurNgm
+	pzF8i4UBhzbvqTyngYRJOYt6hQu+rtmF+9+DhDWDo0jph5qMeImm3lL3gj9OdnWeuEqqsMjYh+K+p
+	6NtrVO5XC9jWWx3spMEhkLexIGbyWLWpCpmaj9Mzhq3Pnf6dwIL4is114RxAW79pM0IDCFSKwXOQ7
+	FDzZ6Q3WgcHDPElyrYg6GcxYXWWvnpMaLnYmLFszWDHudp4LHGAvDYGfho/5qHw8f20pHcVGtR/0B
+	xfsa7l/YlKHrLJGaiAj5bT4zcVIJrGvtYchuc2Dq4NjejHtzkULSW5StuNINI1lmtr83qFgw1sZeN
+	Qm+GFucOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwTr5-0005Je-Gg; Wed, 20 Feb 2019 15:32:15 +0000
+	id 1gwTrW-0005ay-3R; Wed, 20 Feb 2019 15:32:42 +0000
 Received: from mx-ginzinger.sigmacloud.services ([185.154.235.147])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwTr1-0005Hq-90
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:32:13 +0000
-Received: from [31.193.165.228] (port=36730
+ id 1gwTrS-0005aM-So
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:32:40 +0000
+Received: from [31.193.165.228] (port=33014
  helo=mx-ginzinger.sigmacloud.services)
  by mx-ginzinger.sigmacloud.services with esmtps
  (TLSv1.2:AES256-GCM-SHA384:256) (Exim 4.82_1-5b7a7c0-XX)
  (envelope-from <Martin.Kepplinger@ginzinger.com>)
- id 1gwTqL-0003nT-1R; Wed, 20 Feb 2019 16:31:29 +0100
+ id 1gwTqK-0003nR-1X; Wed, 20 Feb 2019 16:31:28 +0100
 Received: from martin-laptop.buero.ginzinger.com (10.10.1.120) by
  exc1.buero.ginzinger.com (10.1.1.204) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
- 15.1.1466.3; Wed, 20 Feb 2019 16:31:28 +0100
-X-CTCH-RefID: str=0001.0A0B0211.5C6D72D1.003E, ss=1, re=0.000, recu=0.000,
+ 15.1.1466.3; Wed, 20 Feb 2019 16:31:27 +0100
+X-CTCH-RefID: str=0001.0A0B0211.5C6D72D0.004F, ss=1, re=0.000, recu=0.000,
  reip=0.000, cl=1, cld=1, fgs=0
 From: Martin Kepplinger <martin.kepplinger@ginzinger.com>
 To: <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>,
@@ -59,23 +59,23 @@ To: <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>,
  <linux-serial@vger.kernel.org>, <devicetree@vger.kernel.org>,
  <linux-arm-kernel@lists.infradead.org>,
  <linux-stm32@st-md-mailman.stormreply.com>
-Subject: [PATCH 9/9] serial: st32-usart: set SER_RS485_DELAY_IN_USEC
+Subject: [PATCH 7/9] serial: atmel_serial: set SER_RS485_DELAY_IN_USEC
  accordingly
-Date: Wed, 20 Feb 2019 16:31:19 +0100
-Message-ID: <20190220153119.4423-4-martin.kepplinger@ginzinger.com>
+Date: Wed, 20 Feb 2019 16:31:17 +0100
+Message-ID: <20190220153119.4423-2-martin.kepplinger@ginzinger.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190220153119.4423-1-martin.kepplinger@ginzinger.com>
 References: <20190220153119.4423-1-martin.kepplinger@ginzinger.com>
 X-Originating-IP: [10.10.1.120]
 X-ClientProxiedBy: exc1.buero.ginzinger.com (10.1.1.204) To
  exc1.buero.ginzinger.com (10.1.1.204)
-X-EXCLAIMER-MD-ORIGINAL-SUBJECT: [NOSIG][NODISC][PATCH 9/9] serial:
- st32-usart: set SER_RS485_DELAY_IN_USEC accordingly
+X-EXCLAIMER-MD-ORIGINAL-SUBJECT: [NOSIG][NODISC][PATCH 7/9] serial:
+ atmel_serial: set SER_RS485_DELAY_IN_USEC accordingly
 X-EXCLAIMER-MD-CONFIG: 9dd172f7-de2e-4231-b886-ec11f46e03b3
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_073211_639031_CB4A7A69 
-X-CRM114-Status: GOOD (  13.04  )
+X-CRM114-CacheID: sfid-20190220_073239_083754_FFCC0BE4 
+X-CRM114-Status: GOOD (  12.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,46 +88,49 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: linux-kernel@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============2422475594658145940=="
+Content-Type: multipart/mixed; boundary="===============9014216740190649564=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 This is an S/MIME signed message
 
---===============2422475594658145940==
-Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----B3C97966A43AB33EF81F5451F7D8AF75"
+--===============9014216740190649564==
+Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----B389D1780546AC7AE00AA24BF81A4EE8"
 
 This is an S/MIME signed message
 
-------B3C97966A43AB33EF81F5451F7D8AF75
+------B389D1780546AC7AE00AA24BF81A4EE8
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain
 
-Unset SER_RS485_DELAY_IN_USEC for userspace to get correct settings.
+Unset the SER_RS485_DELAY_IN_USEC flag during rs485 config for
+userspace to get the correct setting.
 
 Signed-off-by: Martin Kepplinger <martin.kepplinger@ginzinger.com>
 ---
- drivers/tty/serial/stm32-usart.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/atmel_serial.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/tty/serial/stm32-usart.c b/drivers/tty/serial/stm32-usart.c
-index e8d7a7bb4339..4daf5fc71644 100644
---- a/drivers/tty/serial/stm32-usart.c
-+++ b/drivers/tty/serial/stm32-usart.c
-@@ -112,6 +112,7 @@ static int stm32_config_rs485(struct uart_port *port,
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 05147fe24343..36ab1c131d36 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -346,6 +346,9 @@ static int atmel_config_rs485(struct uart_port *port,
  
  	port->rs485 = *rs485conf;
  
++	/* delays are in milliseconds */
 +	rs485conf->flags &= ~SER_RS485_DELAY_IN_USEC;
- 	rs485conf->flags |= SER_RS485_RX_DURING_TX;
- 
++
  	if (rs485conf->flags & SER_RS485_ENABLED) {
+ 		dev_dbg(port->dev, "Setting UART to RS485\n");
+ 		atmel_port->tx_done_mask = ATMEL_US_TXEMPTY;
 -- 
 2.20.1
 
 
-------B3C97966A43AB33EF81F5451F7D8AF75
+------B389D1780546AC7AE00AA24BF81A4EE8
 Content-Type: application/x-pkcs7-signature; name="smime.p7s"
 Content-Transfer-Encoding: base64
 Content-Disposition: attachment; filename="smime.p7s"
@@ -197,23 +200,23 @@ MAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UE
 BxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxPTA7BgNVBAMT
 NENPTU9ETyBSU0EgQ2xpZW50IEF1dGhlbnRpY2F0aW9uIGFuZCBTZWN1cmUgRW1h
 aWwgQ0ECEE1CsTMbOtnoVViHUQRgfj4wDQYJYIZIAWUDBAIBBQCggeQwGAYJKoZI
-hvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMTkwMjIwMTUzMTQ3
-WjAvBgkqhkiG9w0BCQQxIgQgggA5I3grN5NFmfc0thFV1EijyCH+lRivMIuzsEI0
-s6wweQYJKoZIhvcNAQkPMWwwajALBglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsG
+hvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMTkwMjIwMTUzMTM4
+WjAvBgkqhkiG9w0BCQQxIgQgafwTjV6qN7n2CtHfhs0ArLx6WSNjn7Gz/u4VgaP6
+35cweQYJKoZIhvcNAQkPMWwwajALBglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsG
 CWCGSAFlAwQBAjAKBggqhkiG9w0DBzAOBggqhkiG9w0DAgICAIAwDQYIKoZIhvcN
 AwICAUAwBwYFKw4DAgcwDQYIKoZIhvcNAwICASgwDQYJKoZIhvcNAQEBBQAEggEA
-fATN9PnbsLMX4aaV8xMDGWQ1WPYe1swOmY6E772OioXTONbdpFAJvcGVj7Gpyrsz
-jUsZxRsrnuDCOqNZZZXYV4YSoAfFx/9ipQiShV9BPHK5iVWW7/ayJAef4AHo+Lv4
-YMAnsFwpe3Zc0ACCahqwk8bZ4aC00CNUqPEgT4k7k1k8SUhHDru9JwzrXY+LLdFB
-qnmLs+sYMvgs/+manFBCNa+86mmEHNVKlSNItRVHjXZKlMluVK9QSkBtKZuIdv3+
-ooFBMesmUyVrmFlpTVjmnC+LESWHCI7Kv1N7yWpPcUHEo/d7Yt/T8RYXPvL9+qTM
-0UscYomEFExLZd+08mh2nA==
+6h6YYlNFGClQtHEhS5nmzPCqvSGDkHwlI5/7ouujlu2bDsI3uU9sci51nvKk1wHG
+IttxqpURlQWlczKyUWyHUl4OKJtcaCF0mjSL4VuoSLxtCYXWvTWZupqhDrW3L9fR
+lsnq4oq4vpt7u34ELiuEaYhL2ctBlHloRqLQl6R/tfU0DD9DWqGK/+CQ+GOJGvwz
+fnQL91hFjwc+hxa18wKY93jYLqFrZkmYV4Akx4nVQJ+dDaFZFO16kx3m6aWQd9KB
+zjAUNIdoSy8VDsHn+WGC6IucmFGDfNVVpOFajk9fvCHwvddBoRfvRlSV8Rw6NTD0
+OdUziT/fYjTS/6ndKI0NSw==
 
-------B3C97966A43AB33EF81F5451F7D8AF75--
+------B389D1780546AC7AE00AA24BF81A4EE8--
 
 
 
---===============2422475594658145940==
+--===============9014216740190649564==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -224,6 +227,6 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============2422475594658145940==--
+--===============9014216740190649564==--
 
 
