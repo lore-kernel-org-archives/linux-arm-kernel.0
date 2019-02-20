@@ -3,68 +3,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1293EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:42:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 58E6EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:47:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CAEE02084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:42:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 251992083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:47:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qt7xmWc1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="1PVIg3cO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAEE02084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eB4HXoXp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 251992083B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AJ2eK3hWwrbAw6wG8DCCsXn2u+SwZgo/X+1cJz6JeeY=; b=qt7xmWc1GN/71l
-	BOpwCWEAtWRQiEkGDmomjvoWH0dKvd/EjmIm9+HxmkHbd1h+71sOcNFxBD0+p5h/YeIwPRQSZ5SWq
-	oo4qRWkZdg016sBxxUn9g5yQ+XC8T7xob4Io05eiWHmiVcjhtQZrYilGdN4lw8dqSolJ9Eie+sNc3
-	Z/V2uHHuCNh4EouLo2910TIE27WoqJCWx9wUNcolLJyikkuEs9yttkbUlK5dcx0K6/bSZoEVwW09Z
-	/rOit0N1z1cjF/KGovQ8kEdM64hYd8d+PjUhnxNj9DFb9eokWPKzuVoCi+KBZHC/3M2hTZkFvrizH
-	px2eVkMwwviWx0dYkvRA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=J0uo5yLg+SdYb8UNAPzLn2LqFPDnOdx4ajA1rMv+7y0=; b=eB4HXoXpCFofBz
+	VCFpuz/cJ0AmXXxVBhEX3wqflci1ckdUa1ZRwFLdeWQKOibgkGh/3ia+cHVQKBn2P2S1dvcxKWfRu
+	eB63Rp7/jhs+QNw+lgntDV/EWOb60wfHdXTwon/x0qT8saOFcS1Wb2NJC7iYC1FSCjAdTD1bdXhwg
+	5jCfStYrG+uH/GR/2HlV4S18PND0WYPyoDb9AbHAE225uHB1c3T5vBwMv92RykQlpj83MIo/5ttSV
+	CGmy2wXrQjC8lP3znFcT3sxtEmmRiAekrQBWPvJ0EjcJvCOLbDYOCRZMyFl/ZtT5oyV2VVA8L45Rs
+	2LiR/p3RoVQN9XMXdtOA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUwg-0001ry-8E; Wed, 20 Feb 2019 16:42:06 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUwc-0001rP-Ts
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:42:04 +0000
-Received: from archlinux (cpc91196-cmbg18-2-0-cust659.5-4.cable.virginm.net
- [81.96.234.148])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2BAC82147C;
- Wed, 20 Feb 2019 16:41:57 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550680922;
- bh=LjrCiXhIRDdj3buwI7JxKjklU+7gD4+5KLfsnc4pbRc=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=1PVIg3cO+TY5Uv6XGFT6WIdpBZWssMZGJc2qLiZNhfKFPLtJj7T2s5911TV/k/vTK
- fyiQHRNQ/5wSeK9O/+s8MRUfD4cT4wJikdO8/L9q2dk6YASEmALRJ9+aMJEu+F8Z/O
- O0b/QGygjvV2Ua3FDSlMF7YedBem+9mGBIUAnKjQ=
-Date: Wed, 20 Feb 2019 16:41:54 +0000
-From: Jonathan Cameron <jic23@kernel.org>
-To: Patrick Havelange <patrick.havelange@essensium.com>
-Subject: Re: [PATCH 5/8] iio/counter: add FlexTimer Module Quadrature
- decoder counter driver
-Message-ID: <20190220164154.00547a77@archlinux>
-In-Reply-To: <20190218140321.19166-5-patrick.havelange@essensium.com>
-References: <20190218140321.19166-1-patrick.havelange@essensium.com>
- <20190218140321.19166-5-patrick.havelange@essensium.com>
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gwV1Z-0003XM-Fi; Wed, 20 Feb 2019 16:47:09 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwV1W-0003X1-T2
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:47:08 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0A092A78;
+ Wed, 20 Feb 2019 08:47:04 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 206E83F5C1;
+ Wed, 20 Feb 2019 08:46:59 -0800 (PST)
+Subject: Re: [PATCH v5 14/26] KVM: arm64/sve: Context switch the SVE registers
+To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <83fa5587-24a0-5bbb-c113-cddc74571ea2@arm.com>
+Date: Wed, 20 Feb 2019 16:46:57 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_084203_004184_1EB101C2 
-X-CRM114-Status: GOOD (  37.26  )
+X-CRM114-CacheID: sfid-20190220_084706_952727_35353D3F 
+X-CRM114-Status: GOOD (  29.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,448 +69,228 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Lars-Peter Clausen <lars@metafoo.de>, linux-pwm@vger.kernel.org,
- linux-iio@vger.kernel.org, linux-kernel@vger.kernel.org,
- Linus Walleij <linus.walleij@linaro.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- William Breathitt Gray <vilhelm.gray@gmail.com>, Li Yang <leoyang.li@nxp.com>,
- linuxppc-dev@lists.ozlabs.org, Rob Herring <robh+dt@kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>,
- linux-arm-kernel@lists.infradead.org,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
- Esben Haabendal <esben@haabendal.dk>
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 18 Feb 2019 15:03:18 +0100
-Patrick Havelange <patrick.havelange@essensium.com> wrote:
 
-> This driver exposes the counter for the quadrature decoder of the
-> FlexTimer Module, present in the LS1021A soc.
+
+On 18/02/2019 19:52, Dave Martin wrote:
+> In order to give each vcpu its own view of the SVE registers, this
+> patch adds context storage via a new sve_state pointer in struct
+> vcpu_arch.  An additional member sve_max_vl is also added for each
+> vcpu, to determine the maximum vector length visible to the guest
+> and thus the value to be configured in ZCR_EL2.LEN while the is
+
+"While the <guest> is active"?
+
+> active.  This also determines the layout and size of the storage in
+> sve_state, which is read and written by the same backend functions
+> that are used for context-switching the SVE state for host tasks.
 > 
-> Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
-> Reviewed-by: Esben Haabendal <esben@haabendal.dk>
-Given you cc'd William, I'm guessing you know about the counter
-subsystem effort.  I would really rather not take any drivers
-into IIO if we have any hope of getting that upstreamed soon
-(which I personally think we do and should!).  The reason is
-we end up having to maintain old ABI just because someone might be using
-it and it makes the drivers very messy.
+> On SVE-enabled vcpus, SVE access traps are now handled by switching
+> in the vcpu's SVE context and disabling the trap before returning
+> to the guest.  On other vcpus, the trap is not handled and an exit
+> back to the host occurs, where the handle_sve() fallback path
+> reflects an undefined instruction exception back to the guest,
+> consistently with the behaviour of non-SVE-capable hardware (as was
+> done unconditionally prior to this patch).
+> 
+> No SVE handling is added on non-VHE-only paths, since VHE is an
+> architectural and Kconfig prerequisite of SVE.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> 
 
-I'll review as is though as may be there are some elements that will
-cross over.
+Otherwise:
 
-Comments inline.  William: Looks like a straight forward conversion if
-it makes sense to get this lined up as part of your initial submission?
-You have quite a few drivers so I wouldn't have said it needs to be there
-at the start, but good to have it soon after.
-
-Jonathan
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
 > ---
->  drivers/iio/counter/Kconfig       |  10 +
->  drivers/iio/counter/Makefile      |   1 +
->  drivers/iio/counter/ftm-quaddec.c | 294 ++++++++++++++++++++++++++++++
->  3 files changed, 305 insertions(+)
->  create mode 100644 drivers/iio/counter/ftm-quaddec.c
 > 
-> diff --git a/drivers/iio/counter/Kconfig b/drivers/iio/counter/Kconfig
-> index bf1e559ad7cd..4641cb2e752a 100644
-> --- a/drivers/iio/counter/Kconfig
-> +++ b/drivers/iio/counter/Kconfig
-> @@ -31,4 +31,14 @@ config STM32_LPTIMER_CNT
+> Changes since v4:
+> 
+>  * Remove if_sve() helper in favour of open-coded static key checks.
+> 
+>  * Explicitly merge static key checks and other condition checks to
+>    reduce overhead and maximise const-folding and specialisation
+>    opportunities in the compiler.
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  6 ++++
+>  arch/arm64/kvm/fpsimd.c           |  5 +--
+>  arch/arm64/kvm/hyp/switch.c       | 70 +++++++++++++++++++++++++++++----------
+>  3 files changed, 61 insertions(+), 20 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index c32f195..77b6f3e 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -212,6 +212,8 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
 >  
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called stm32-lptimer-cnt.
-> +
-> +config FTM_QUADDEC
-> +	tristate "Flex Timer Module Quadrature decoder driver"
-> +	help
-> +	  Select this option to enable the Flex Timer Quadrature decoder
-> +	  driver.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called ftm-quaddec.
-> +
->  endmenu
-> diff --git a/drivers/iio/counter/Makefile b/drivers/iio/counter/Makefile
-> index 1b9a896eb488..757c1f4196af 100644
-> --- a/drivers/iio/counter/Makefile
-> +++ b/drivers/iio/counter/Makefile
-> @@ -6,3 +6,4 @@
+>  struct kvm_vcpu_arch {
+>  	struct kvm_cpu_context ctxt;
+> +	void *sve_state;
+> +	unsigned int sve_max_vl;
 >  
->  obj-$(CONFIG_104_QUAD_8)	+= 104-quad-8.o
->  obj-$(CONFIG_STM32_LPTIMER_CNT)	+= stm32-lptimer-cnt.o
-> +obj-$(CONFIG_FTM_QUADDEC)	+= ftm-quaddec.o
-> diff --git a/drivers/iio/counter/ftm-quaddec.c b/drivers/iio/counter/ftm-quaddec.c
-> new file mode 100644
-> index 000000000000..ca7e55a9ab3f
-> --- /dev/null
-> +++ b/drivers/iio/counter/ftm-quaddec.c
-> @@ -0,0 +1,294 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Flex Timer Module Quadrature decoder
-> + *
-> + * This module implements a driver for decoding the FTM quadrature
-> + * of ex. a LS1021A
-> + */
+>  	/* HYP configuration */
+>  	u64 hcr_el2;
+> @@ -304,6 +306,10 @@ struct kvm_vcpu_arch {
+>  	bool sysregs_loaded_on_cpu;
+>  };
+>  
+> +/* Pointer to the vcpu's SVE FFR for sve_{save,load}_state() */
+> +#define vcpu_sve_pffr(vcpu) ((void *)((char *)((vcpu)->arch.sve_state) + \
+> +				      sve_ffr_offset((vcpu)->arch.sve_max_vl)))
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/err.h>
-> +#include <linux/device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/workqueue.h>
-Tidy these up. Not all are used.
-> +#include <linux/swait.h>
-> +#include <linux/sched.h>
-> +#include <linux/delay.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/mutex.h>
-> +#include <linux/fsl/ftm.h>
+>  /* vcpu_arch flags field values: */
+>  #define KVM_ARM64_DEBUG_DIRTY		(1 << 0)
+>  #define KVM_ARM64_FP_ENABLED		(1 << 1) /* guest FP regs loaded */
+> diff --git a/arch/arm64/kvm/fpsimd.c b/arch/arm64/kvm/fpsimd.c
+> index 7053bf4..6e3c9c8 100644
+> --- a/arch/arm64/kvm/fpsimd.c
+> +++ b/arch/arm64/kvm/fpsimd.c
+> @@ -87,10 +87,11 @@ void kvm_arch_vcpu_ctxsync_fp(struct kvm_vcpu *vcpu)
+>  
+>  	if (vcpu->arch.flags & KVM_ARM64_FP_ENABLED) {
+>  		fpsimd_bind_state_to_cpu(&vcpu->arch.ctxt.gp_regs.fp_regs,
+> -					 NULL, SVE_VL_MIN);
+> +					 vcpu->arch.sve_state,
+> +					 vcpu->arch.sve_max_vl);
+>  
+>  		clear_thread_flag(TIF_FOREIGN_FPSTATE);
+> -		clear_thread_flag(TIF_SVE);
+> +		update_thread_flag(TIF_SVE, vcpu_has_sve(vcpu));
+>  	}
+>  }
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 9f07403..cdc9063 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -98,7 +98,10 @@ static void activate_traps_vhe(struct kvm_vcpu *vcpu)
+>  	val = read_sysreg(cpacr_el1);
+>  	val |= CPACR_EL1_TTA;
+>  	val &= ~CPACR_EL1_ZEN;
+> -	if (!update_fp_enabled(vcpu)) {
+> +	if (update_fp_enabled(vcpu)) {
+> +		if (vcpu_has_sve(vcpu))
+> +			val |= CPACR_EL1_ZEN;
+> +	} else {
+>  		val &= ~CPACR_EL1_FPEN;
+>  		__activate_traps_fpsimd32(vcpu);
+>  	}
+> @@ -313,16 +316,43 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>  	return true;
+>  }
+>  
+> -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> +/* Check for an FPSIMD/SVE trap and handle as appropriate */
+> +static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
+>  {
+> -	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> +	bool vhe, sve_guest, sve_host;
+> +	u8 trap_class;
+>  
+> -	if (has_vhe())
+> -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> -			     cpacr_el1);
+> -	else
+> +	if (!system_supports_fpsimd())
+> +		return false;
 > +
-> +struct ftm_quaddec {
-> +	struct platform_device *pdev;
-> +	void __iomem *ftm_base;
-> +	bool big_endian;
-
-I'm curious. What is the benefit of running in big endian mode?
-
-> +	struct mutex ftm_quaddec_mutex;
-> +};
-> +
-> +#define HASFLAGS(flag, bits) ((flag & bits) ? 1 : 0)
-Not used.
-
-
-> +
-> +#define DEFAULT_POLL_INTERVAL    100 /* in msec */
-> +
-> +static void ftm_read(struct ftm_quaddec *ftm, uint32_t offset, uint32_t *data)
-> +{
-> +	if (ftm->big_endian)
-> +		*data = ioread32be(ftm->ftm_base + offset);
-> +	else
-> +		*data = ioread32(ftm->ftm_base + offset);
-> +}
-> +
-> +static void ftm_write(struct ftm_quaddec *ftm, uint32_t offset, uint32_t data)
-> +{
-> +	if (ftm->big_endian)
-> +		iowrite32be(data, ftm->ftm_base + offset);
-> +	else
-> +		iowrite32(data, ftm->ftm_base + offset);
-> +}
-> +
-> +/* take mutex
-
-Tidy this comment up.  I  would have said the flow as fairly
-obvious and the only thing needed here is to document that
-the mutex must be held?
-
-> + * call ftm_clear_write_protection
-> + * update settings
-> + * call ftm_set_write_protection
-> + * release mutex
-> + */
-> +static void ftm_clear_write_protection(struct ftm_quaddec *ftm)
-> +{
-> +	uint32_t flag;
-> +
-> +	/* First see if it is enabled */
-> +	ftm_read(ftm, FTM_FMS, &flag);
-> +
-> +	if (flag & FTM_FMS_WPEN) {
-> +		ftm_read(ftm, FTM_MODE, &flag);
-> +		ftm_write(ftm, FTM_MODE, flag | FTM_MODE_WPDIS);
-> +	}
-> +}
-> +
-> +static void ftm_set_write_protection(struct ftm_quaddec *ftm)
-> +{
-> +	ftm_write(ftm, FTM_FMS, FTM_FMS_WPEN);
-> +}
-> +
-> +static void ftm_reset_counter(struct ftm_quaddec *ftm)
-> +{
-> +	/* Reset hardware counter to CNTIN */
-> +	ftm_write(ftm, FTM_CNT, 0x0);
-> +}
-> +
-> +static void ftm_quaddec_init(struct ftm_quaddec *ftm)
-> +{
-> +	ftm_clear_write_protection(ftm);
-> +
-> +	/* Do not write in the region from the CNTIN register through the
-IIO multiline syntax is
-/*
- * Do not write
- * PWM..
- */
-> +	 * PWMLOAD register when FTMEN = 0.
-> +	 */
-> +	ftm_write(ftm, FTM_MODE, FTM_MODE_FTMEN); /* enable FTM */
-
-Drop any comments that are self explanatory.
-
-> +	ftm_write(ftm, FTM_CNTIN, 0x0000);         /* zero init value */
-> +	ftm_write(ftm, FTM_MOD, 0xffff);        /* max overflow value */
-> +	ftm_write(ftm, FTM_CNT, 0x0);           /* reset counter value */
-> +	ftm_write(ftm, FTM_SC, FTM_SC_PS_1);    /* prescale with x1 */
-> +	/* Select quad mode */
-> +	ftm_write(ftm, FTM_QDCTRL, FTM_QDCTRL_QUADEN);
-> +
-> +	/* Unused features and reset to default section */
-> +	ftm_write(ftm, FTM_POL, 0x0);     /* polarity is active high */
-> +	ftm_write(ftm, FTM_FLTCTRL, 0x0); /* all faults disabled */
-> +	ftm_write(ftm, FTM_SYNCONF, 0x0); /* disable all sync */
-> +	ftm_write(ftm, FTM_SYNC, 0xffff);
-> +
-> +	/* Lock the FTM */
-> +	ftm_set_write_protection(ftm);
-> +}
-> +
-> +static int ftm_quaddec_read_raw(struct iio_dev *indio_dev,
-> +				struct iio_chan_spec const *chan,
-> +				int *val, int *val2, long mask)
-> +{
-> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
-> +	uint32_t counter;
-> +
-> +	switch (mask) {
-> +	case IIO_CHAN_INFO_RAW:
-> +		ftm_read(ftm, FTM_CNT, &counter);
-> +		*val = counter;
-> +		return IIO_VAL_INT;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static ssize_t ftm_write_reset(struct iio_dev *indio_dev,
-> +				uintptr_t private,
-> +				struct iio_chan_spec const *chan,
-> +				const char *buf, size_t len)
-> +{
-> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
-> +
-> +	/* Only "counter reset" is supported for now */
-> +	if (!sysfs_streq(buf, "0")) {
-> +		dev_warn(&ftm->pdev->dev, "Reset only accepts '0'\n");
-> +		return -EINVAL;
-
-Why not just make the channel attribute itself writeable given we are
-setting it to 0?
-
+> +	if (system_supports_sve()) {
+> +		sve_guest = vcpu_has_sve(vcpu);
+> +		sve_host = vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE;
+> +		vhe = true;
+> +	} else {
+> +		sve_guest = false;
+> +		sve_host = false;
+> +		vhe = has_vhe();
 > +	}
 > +
-> +	ftm_reset_counter(ftm);
+> +	trap_class = kvm_vcpu_trap_get_class(vcpu);
+> +	if (trap_class != ESR_ELx_EC_FP_ASIMD &&
+> +	    (!sve_guest || trap_class != ESR_ELx_EC_SVE))
+> +		return false;
 > +
-> +	return len;
-> +}
+> +	/* The trap is an FPSIMD/SVE trap: switch the context */
 > +
-> +static int ftm_quaddec_get_prescaler(struct iio_dev *indio_dev,
-> +					const struct iio_chan_spec *chan)
-> +{
-> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
-> +	uint32_t scflags;
+> +	if (vhe) {
+> +		u64 reg = read_sysreg(cpacr_el1) | CPACR_EL1_FPEN;
 > +
-> +	ftm_read(ftm, FTM_SC, &scflags);
+> +		if (sve_guest)
+> +			reg |= CPACR_EL1_ZEN;
 > +
-> +	return scflags & FTM_SC_PS_MASK;
-> +}
-> +
-> +static int ftm_quaddec_set_prescaler(struct iio_dev *indio_dev,
-> +					const struct iio_chan_spec *chan,
-> +					unsigned int type)
-> +{
-> +	struct ftm_quaddec *ftm = iio_priv(indio_dev);
-> +
-> +	uint32_t scflags;
-> +
-> +	mutex_lock(&ftm->ftm_quaddec_mutex);
-> +
-> +	ftm_read(ftm, FTM_SC, &scflags);
-> +
-> +	scflags &= ~FTM_SC_PS_MASK;
-> +	type &= FTM_SC_PS_MASK; /*just to be 100% sure*/
-> +
-> +	scflags |= type;
-> +
-> +	/* Write */
-> +	ftm_clear_write_protection(ftm);
-> +	ftm_write(ftm, FTM_SC, scflags);
-> +	ftm_set_write_protection(ftm);
-> +
-> +	/* Also resets the counter as it is undefined anyway now */
-> +	ftm_reset_counter(ftm);
-> +
-> +	mutex_unlock(&ftm->ftm_quaddec_mutex);
-> +	return 0;
-> +}
-> +
-> +static const char * const ftm_quaddec_prescaler[] = {
-> +	"1", "2", "4", "8", "16", "32", "64", "128"
-> +};
-> +
-> +static const struct iio_enum ftm_quaddec_prescaler_en = {
-> +	.items = ftm_quaddec_prescaler,
-> +	.num_items = ARRAY_SIZE(ftm_quaddec_prescaler),
-> +	.get = ftm_quaddec_get_prescaler,
-> +	.set = ftm_quaddec_set_prescaler,
-> +};
-> +
-> +static const struct iio_chan_spec_ext_info ftm_quaddec_ext_info[] = {
-> +	{
-> +		.name = "reset",
-> +		.shared = IIO_SEPARATE,
-> +		.write = ftm_write_reset,
-> +	},
-> +	IIO_ENUM("prescaler", IIO_SEPARATE, &ftm_quaddec_prescaler_en),
-
-This looks like non standard ABI.  Needs documentation in
-Documentation/ABI/testing/sysfs-bus-iio-*
-
-> +	IIO_ENUM_AVAILABLE("prescaler", &ftm_quaddec_prescaler_en),
-> +	{}
-> +};
-> +
-> +static const struct iio_chan_spec ftm_quaddec_channels = {
-> +	.type = IIO_COUNT,
-> +	.channel = 0,
-> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW),
-> +	.ext_info = ftm_quaddec_ext_info,
-> +	.indexed = 1,
-> +};
-> +
-> +static const struct iio_info ftm_quaddec_iio_info = {
-> +	.read_raw = ftm_quaddec_read_raw,
-> +};
-> +
-> +static int ftm_quaddec_probe(struct platform_device *pdev)
-> +{
-> +	struct iio_dev *indio_dev;
-> +	struct ftm_quaddec *ftm;
-> +	int ret;
-> +
-> +	struct device_node *node = pdev->dev.of_node;
-> +
-> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*ftm));
-> +	if (!indio_dev)
-> +		return -ENOMEM;
-> +
-> +	ftm = iio_priv(indio_dev);
-> +
-> +	platform_set_drvdata(pdev, ftm);
-> +
-> +	ftm->pdev = pdev;
-> +	ftm->big_endian = of_property_read_bool(node, "big-endian");
-> +	ftm->ftm_base = of_iomap(node, 0);
-> +	if (!ftm->ftm_base)
-> +		return -EINVAL;
-> +
-> +	indio_dev->name = dev_name(&pdev->dev);
-
-This should be a nice part number like string.  What does
-it evaluate to here?
-
-> +	indio_dev->dev.parent = &pdev->dev;
-> +	indio_dev->info = &ftm_quaddec_iio_info;
-> +	indio_dev->num_channels = 1;
-> +	indio_dev->channels = &ftm_quaddec_channels;
-> +
-> +	ftm_quaddec_init(ftm);
-> +
-> +	mutex_init(&ftm->ftm_quaddec_mutex);
-> +
-> +	ret = devm_iio_device_register(&pdev->dev, indio_dev);
-> +	if (ret) {
-> +		mutex_destroy(&ftm->ftm_quaddec_mutex);
-
-Don't have managed devm_ calls after anything unmanaged.
-I opens you up to races and is hard to review.
-
-> +		iounmap(ftm->ftm_base);
-I would suggest not using of_iomap, then you can
-use the devm_ioremap form handle this for you.
-
+> +		write_sysreg(reg, cpacr_el1);
+> +	} else {
+>  		write_sysreg(read_sysreg(cptr_el2) & ~(u64)CPTR_EL2_TFP,
+>  			     cptr_el2);
 > +	}
-> +	return ret;
-> +}
-> +
-> +static int ftm_quaddec_remove(struct platform_device *pdev)
-> +{
-> +	struct ftm_quaddec *ftm;
-> +	struct iio_dev *indio_dev;
-> +
-> +	ftm = (struct ftm_quaddec *)platform_get_drvdata(pdev);
+>  
+>  	isb();
+>  
+> @@ -331,24 +361,28 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+>  		 * In the SVE case, VHE is assumed: it is enforced by
+>  		 * Kconfig and kvm_arch_init().
+>  		 */
+> -		if (system_supports_sve() &&
+> -		    (vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE)) {
+> +		if (sve_host) {
+>  			struct thread_struct *thread = container_of(
+> -				host_fpsimd,
+> +				vcpu->arch.host_fpsimd_state,
+>  				struct thread_struct, uw.fpsimd_state);
+>  
+> -			sve_save_state(sve_pffr(thread), &host_fpsimd->fpsr);
+> +			sve_save_state(sve_pffr(thread),
+> +				       &vcpu->arch.host_fpsimd_state->fpsr);
+>  		} else {
+> -			__fpsimd_save_state(host_fpsimd);
+> +			__fpsimd_save_state(vcpu->arch.host_fpsimd_state);
+>  		}
+>  
+>  		vcpu->arch.flags &= ~KVM_ARM64_FP_HOST;
+>  	}
+>  
+> -	__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> -
+> -	if (vcpu_has_sve(vcpu))
+> +	if (sve_guest) {
+> +		sve_load_state(vcpu_sve_pffr(vcpu),
+> +			       &vcpu->arch.ctxt.gp_regs.fp_regs.fpsr,
+> +			       sve_vq_from_vl(vcpu->arch.sve_max_vl) - 1);
+>  		write_sysreg_s(vcpu->arch.ctxt.sys_regs[ZCR_EL1], SYS_ZCR_EL12);
+> +	} else {
+> +		__fpsimd_restore_state(&vcpu->arch.ctxt.gp_regs.fp_regs);
+> +	}
+>  
+>  	/* Skip restoring fpexc32 for AArch64 guests */
+>  	if (!(read_sysreg(hcr_el2) & HCR_RW))
+> @@ -384,10 +418,10 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  	 * and restore the guest context lazily.
+>  	 * If FP/SIMD is not implemented, handle the trap and inject an
+>  	 * undefined instruction exception to the guest.
+> +	 * Similarly for trapped SVE accesses.
+>  	 */
+> -	if (system_supports_fpsimd() &&
+> -	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
+> -		return __hyp_switch_fpsimd(vcpu);
+> +	if (__hyp_handle_fpsimd(vcpu))
+> +		return true;
+>  
+>  	if (!__populate_fault_info(vcpu))
+>  		return true;
+> 
 
-platform_get_drvdata returns a void *.
-
-C spec says you can always cast implicitly from a void * to any
-other point type.  Hence you don't need the cast.
-(I'm too lazy to find the reference now as it's been a long
-day of reviewing but google will find it for you if interested)
-
-> +	indio_dev = iio_priv_to_dev(ftm);
-> +	/* This is needed to remove sysfs entries */
-
-It does a lot more than that, so please remove the comment.
-Actually this worries me.  You should not need to manually
-call devm_iio_device_register, but you do because of the ordering
-and the fact you want to remove the interfaces before turning the
-device off.  In that case, do not use the devm_ form but
-instead iio_device_register and do the error handling paths
-manually.  An alternative is to use
-devm_add_action_or_reset to call unwind functions automatically
-for the few device specific calls you have.
-
-
-> +	devm_iio_device_unregister(&pdev->dev, indio_dev);
-> +
-> +	ftm_write(ftm, FTM_MODE, 0);
-> +
-> +	iounmap(ftm->ftm_base);
-> +	mutex_destroy(&ftm->ftm_quaddec_mutex);
-
-mutex destroy is only really used in debug paths and is often
-skipped in remove functions to simplify things.
-(particularly when managed cleanup is going on).
-
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ftm_quaddec_match[] = {
-> +	{ .compatible = "fsl,ftm-quaddec" },
-> +	{},
-> +};
-> +
-> +static struct platform_driver ftm_quaddec_driver = {
-> +	.driver = {
-> +		.name = "ftm-quaddec",
-> +		.owner = THIS_MODULE,
-> +		.of_match_table = ftm_quaddec_match,
-> +	},
-> +	.probe = ftm_quaddec_probe,
-> +	.remove = ftm_quaddec_remove,
-> +};
-> +
-> +module_platform_driver(ftm_quaddec_driver);
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Kjeld Flarup <kfa@deif.com");
-> +MODULE_AUTHOR("Patrick Havelange <patrick.havelange@essensium.com");
-
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
