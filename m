@@ -2,72 +2,71 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 55582C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:17:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D19BDC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:29:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2469C2086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:17:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9FD8B2070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 09:29:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u6xcByia"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2469C2086A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FFq7YQOa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FD8B2070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KnS5kgjKQuECpYD758agkdGxjK8988lXin//SqWBhI4=; b=u6xcByiaFaHNBK
-	63fLlQQgSo6dtAqKaix1gRwoxvO+r3RX7ld6a9GO5N1rd7U9Yy5PM3wNtPTr+1EsIzKJct+UuG/CK
-	Dq/b5DsCrsa8qppoxMrzXbxqIJmnnjHDl4MS9FE2lbDXSAHFecXocCxWbHAm+7nHcY0FkAI2hs7+a
-	TIFB2gkv3r3L1goy5JTBnJeA2vdrzzDxYqcuUYtRV1qWiJTRCG6CvCfDX0tQYCAJq64Z10uGALDnU
-	GiEzKMnmuVgX+SuQJ3gB+OZSocS2SLxToNXx65ytyn2N21YIeB5Am6e2PkN07LW4J5jbeiUHkkNKL
-	AH3PoZSII73fzLIXtrVg==;
+	List-Owner; bh=7iWNQgVKaF1EeuR5qJBIe5ttfcDD+YaFs2GX1atWxxU=; b=FFq7YQOauZkE+/
+	fjGpN7Rf83xGb1fZGpGNplLolNbfawQeDF+GVXazNWJLNZVme8wtibtbe2Nwnm5Dgm8ai9AUM+ktC
+	Y/+WgEq/B12eh2/J1DIiq/VFQxtxafCucBKGkqLX2NkKff/KUbxAzkK6hAwsmF0eY28TIVJjNQjAI
+	q1MA4Q9u7fybXceiHnbSPnKQsoMHWUrOxEJqVUEWb5v/F+Or0guruKCgvxcglifX03FRNwz9W1Ucd
+	uUIhlAcOwfj0yaVerrXpqTcSBRMDnU2jxD4Bs42Nu/uRmMZHIxidX4lKw5jFflCT9ixsEU6R3u8ov
+	odpEzFrBODZriiANNuyw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwO0U-0001D6-W3; Wed, 20 Feb 2019 09:17:35 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gwOBX-00062Z-3F; Wed, 20 Feb 2019 09:28:59 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwO0Q-0001Bd-Fo; Wed, 20 Feb 2019 09:17:32 +0000
-X-UUID: 4b0e6ac92ee9429294c885f44de1eec0-20190220
-X-UUID: 4b0e6ac92ee9429294c885f44de1eec0-20190220
-Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
- (envelope-from <yong.wu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1194367230; Wed, 20 Feb 2019 01:17:20 -0800
-Received: from MTKMBS31N2.mediatek.inc (172.27.4.87) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 20 Feb 2019 01:17:18 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31N2.mediatek.inc
- (172.27.4.87) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Wed, 20 Feb 2019 17:17:16 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 20 Feb 2019 17:17:15 +0800
-Message-ID: <1550654235.26244.10.camel@mhfsdcap03>
-Subject: Re: [PATCH v6 21/22] iommu/mediatek: Fix iova_to_phys PA start for
- 4GB mode
-From: Yong Wu <yong.wu@mediatek.com>
-To: Evan Green <evgreen@chromium.org>
-Date: Wed, 20 Feb 2019 17:17:15 +0800
-In-Reply-To: <CAE=gft783rOUubODiFHxa9NKeUJxGk4FCeguDsyoqrUxsGDEsQ@mail.gmail.com>
-References: <1550394300-17420-1-git-send-email-yong.wu@mediatek.com>
- <1550394300-17420-22-git-send-email-yong.wu@mediatek.com>
- <CAE=gft783rOUubODiFHxa9NKeUJxGk4FCeguDsyoqrUxsGDEsQ@mail.gmail.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+ id 1gwOBU-000627-Bg
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 09:28:57 +0000
+Received: by mail-qt1-f196.google.com with SMTP id z25so4659285qti.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 20 Feb 2019 01:28:55 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=BEECWmoaxLKcflnT7o8isAvCgchnA7bQDZHOVtYr+LA=;
+ b=VZ+S6IHdoXHPl0SQXBMsbXI6KvGf8mM3uuJJZwtH+PCg6t8KUYP+qY5m9ZSzL8Fpod
+ L/Ht4rBdA6YloETJnMjGuo8OQrkIm68N9FmbVgas/jboIyHn0QYhi6r6CNTmkyN1qoYS
+ JStp2WjQgd6CaIfb0y7jozjHZKcibuTFJ8LrDihoRipLmwCirJmHi65U2lRk6FR4Ygwx
+ rCgo9FyzaI+Gnn3cP/DpQAEc7DvDEONKnzmO5XeQdXBYGSEBOQlw21tCFzrkuinflzKm
+ 9tAMwo2AI1yiWQGfpG8fqRTOwouhmGOtbQDKgENag9krhZ4T7piQeRRJu6zDT8c91FE+
+ mGhw==
+X-Gm-Message-State: AHQUAub/D0socwKCbI6gIOMFF0TXszOwBntCmSlv+ylSkE7PWwp23QDp
+ UH+tENDhtCmjY7vHWo7tebW/hxxIeEA4brm/xkw=
+X-Google-Smtp-Source: AHgI3IbCQZWZ+c/E7yLc81SyNeQLOF7qVFLtnoL6YpCkRNA39syiVHMEvaM4yGBe7kmZwJMviefGSO65l/xmftxb0rA=
+X-Received: by 2002:ac8:33f1:: with SMTP id d46mr25804180qtb.319.1550654934224; 
+ Wed, 20 Feb 2019 01:28:54 -0800 (PST)
 MIME-Version: 1.0
-X-MTK: N
+References: <1550648704-11545-1-git-send-email-sugaya.taichi@socionext.com>
+In-Reply-To: <1550648704-11545-1-git-send-email-sugaya.taichi@socionext.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 20 Feb 2019 10:28:38 +0100
+Message-ID: <CAK8P3a0rwi=uDFYiF50e5HkYoDQUA6_VSWDMiAVeTMaRzeE6oQ@mail.gmail.com>
+Subject: Re: [PATCH v3 9/9] ARM: configs: Add Milbeaut M10V defconfig
+To: Sugaya Taichi <sugaya.taichi@socionext.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_011730_532380_1C716DA8 
-X-CRM114-Status: GOOD (  24.10  )
+X-CRM114-CacheID: sfid-20190220_012856_395499_9F3618EF 
+X-CRM114-Status: GOOD (  14.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,107 +78,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, "open list:OPEN FIRMWARE AND FLATTENED DEVICE
- TREE BINDINGS" <devicetree@vger.kernel.org>,
- Nicolas Boichat <drinkcat@chromium.org>, srv_heupstream@mediatek.com,
- Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
- iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- yingjoe.chen@mediatek.com, anan.sun@mediatek.com,
- Robin Murphy <robin.murphy@arm.com>, Matthias
- Kaehlcke <mka@chromium.org>, linux-arm-kernel@lists.infradead.org
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Jassi Brar <jaswinder.singh@linaro.org>, soc@kernel.org,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 2019-02-19 at 15:33 -0800, Evan Green wrote:
-> On Sun, Feb 17, 2019 at 1:09 AM Yong Wu <yong.wu@mediatek.com> wrote:
-> >
-> > In the 4GB mode, the physical address is remapped,
-> >
-> > Here is the detailed remap relationship.
-> > CPU PA         ->    HW PA
-> > 0x4000_0000          0x1_4000_0000 (Add bit32)
-> > 0x8000_0000          0x1_8000_0000 ...
-> > 0xc000_0000          0x1_c000_0000 ...
-> > 0x1_0000_0000        0x1_0000_0000 (No change)
-> >
-> > Thus, we always add bit32 for PA when entering mtk_iommu_map.
-> > But in the iova_to_phys, the CPU don't need this bit32 if the
-> > PA is from 0x1_4000_0000 to 0x1_ffff_ffff.
-> > This patch discards the bit32 in this iova_to_phys in the 4GB mode.
-> >
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  drivers/iommu/mtk_iommu.c | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> >
-> > diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> > index 0277396..076d333 100644
-> > --- a/drivers/iommu/mtk_iommu.c
-> > +++ b/drivers/iommu/mtk_iommu.c
-> > @@ -119,6 +119,19 @@ struct mtk_iommu_domain {
-> >
-> >  static const struct iommu_ops mtk_iommu_ops;
-> >
-> > +/*
-> > + * In M4U 4GB mode, the physical address is remapped as below:
-> > + *  CPU PA         ->   M4U HW PA
-> > + *  0x4000_0000         0x1_4000_0000 (Add bit32)
-> > + *  0x8000_0000         0x1_8000_0000 ...
-> > + *  0xc000_0000         0x1_c000_0000 ...
-> > + *  0x1_0000_0000       0x1_0000_0000 (No change)
-> > + *
-> > + * Thus, We always add BIT32 in the iommu_map and disable BIT32 if PA is >=
-> > + * 0x1_4000_0000 in the iova_to_phys.
-> > + */
-> > +#define MTK_IOMMU_4GB_MODE_PA_140000000     0x140000000UL
-> > +
-> >  static LIST_HEAD(m4ulist);     /* List all the M4U HWs */
-> >
-> >  #define for_each_m4u(data)     list_for_each_entry(data, &m4ulist, list)
-> > @@ -415,6 +428,7 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
-> >                                           dma_addr_t iova)
-> >  {
-> >         struct mtk_iommu_domain *dom = to_mtk_domain(domain);
-> > +       struct mtk_iommu_data *data = mtk_iommu_get_m4u_data();
-> >         unsigned long flags;
-> >         phys_addr_t pa;
-> >
-> > @@ -422,6 +436,10 @@ static phys_addr_t mtk_iommu_iova_to_phys(struct iommu_domain *domain,
-> >         pa = dom->iop->iova_to_phys(dom->iop, iova);
-> >         spin_unlock_irqrestore(&dom->pgtlock, flags);
-> >
-> > +       if (data->plat_data->has_4gb_mode && data->dram_is_4gb &&
-> > +           pa >= MTK_IOMMU_4GB_MODE_PA_140000000)
-> > +               pa &= ~BIT_ULL(32);
-> > +
-> 
-> The define doesn't really make it much better, but I guess it doesn't
-> make it worse either. As I was reviewing this I was thinking that this
-> should be rolled into patch 6 "iommu/io-pgtable-arm-v7s: Extend
-> MediaTek 4GB Mode". But I guess this was returning bad PAs since
-> before this series, right? So does this need a Fixes tag?
+On Wed, Feb 20, 2019 at 8:44 AM Sugaya Taichi
+<sugaya.taichi@socionext.com> wrote:
 
-Thanks very much for your reviewing so many patches.
+> diff --git a/arch/arm/configs/milbeaut_m10v_defconfig b/arch/arm/configs/milbeaut_m10v_defconfig
+> new file mode 100644
+> index 0000000..a263211
+> --- /dev/null
+> +++ b/arch/arm/configs/milbeaut_m10v_defconfig
+> @@ -0,0 +1,175 @@
 
-Yes. The issue exist before this series, It was introduced by this
-commit:
-30e2fccf9512 ("iommu/mediatek: Enlarge the validate PA range for 4GB
-mode")
+I no longer see anything here that should be turned off, but you
+might want to run 'make savedefconfig' and use the output of that,
+to make it easier to keep it up to date.
 
-I will send a new version to add this tag.
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 5bee34a..6753805 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -54,6 +54,8 @@ CONFIG_SOC_VF610=y
+>  CONFIG_ARCH_KEYSTONE=y
+>  CONFIG_ARCH_MEDIATEK=y
+>  CONFIG_ARCH_MESON=y
+> +CONFIG_ARCH_MILBEAUT=y
+> +CONFIG_ARCH_MILBEAUT_M10V=y
+>  CONFIG_ARCH_MVEBU=y
+>  CONFIG_MACH_ARMADA_370=y
+>  CONFIG_MACH_ARMADA_375=y
 
-> -Evan
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+I'm surprised that you don't need to enable any drivers. Does this actually
+boot on your hardware?
 
-
+      Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
