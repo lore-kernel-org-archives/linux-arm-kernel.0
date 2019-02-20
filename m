@@ -4,69 +4,77 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 568B5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:55:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2A915C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 08:17:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1EB102083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 07:55:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EC3212070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 08:17:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EGKvwb2h"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1EB102083B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YjXnumCE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC3212070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1iRMsfZ1W5ZIeH6WDlgn3AXjBS+Fh7gFqySIHgoMXWQ=; b=EGKvwb2hquetJI
-	Gm9c9UWfBbd1Gzb41mj8tPbMZnZU7uTVvLvHiGL+OjNzTh2tRf19hTsjX6uJZpN3g6XS6YvNjzt4g
-	vMz/7/eNSVq1lf31lG3gBRU0ojrdlDrdaQQofTG0IHmX/wh2Z4PlH5ahjC4cciiV9GWxXtg55rd8v
-	ouBfFTrZXsmW0jfiGlLUCywf5MUhpycsNUM/PfBiuKUaZa2FcVE1VXmdfbgEaFzcnu1dqziS+unXd
-	se4RSss7DEHzl6c8Yi2eKBjnxd2ICd/SxSUheeXVnHA1rOSeUGhO7V0Ysvv8Y559M3QDw8d4okIpM
-	39fKDKm/3x3k/xPrjMFg==;
+	List-Owner; bh=fo5xHOvGcu3Q+i/C74eMEuZJxABdX2QqoOXo0MGdcmc=; b=YjXnumCEFCd6/z
+	s/omheA54MIGP0YHNPmdYZgyGdRYlg4xRDL8WastbO7YYmH1Dshp1gR7mkE5HSWYidHxfz+WNkF1X
+	0kMKvcMb86F8oojifjkZSKCgU2n9MEoV1N3A4t7993nOmZ9oVu8vvgcXFSVNGhJbvqnpD5vbJ1wmH
+	UdKY1gMd//tDr+w6ZjEq4aOQkXXFdETJPb3/qf/i9OI2HYxcFqTn/hP6WMeOFgHgTIsSX8VakPmuF
+	PLsaqohj0ER+moWXSxVt/y7EL7PFtGtFnn23S71SL6C52djtWuNAjM2rpQ3QrTWMCxF2AG/EjRuF+
+	YM975RqZF8aVt5VeYwQw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwMig-0000rp-Qf; Wed, 20 Feb 2019 07:55:06 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gwN3u-0001ia-26; Wed, 20 Feb 2019 08:17:02 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwMi0-0008Ul-W8; Wed, 20 Feb 2019 07:54:26 +0000
-X-UUID: 5680262d2d054d1b8a620681aba505cf-20190219
-X-UUID: 5680262d2d054d1b8a620681aba505cf-20190219
-Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
- (envelope-from <jerry-ch.chen@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1917060234; Tue, 19 Feb 2019 23:53:10 -0800
-Received: from MTKMBS06N2.mediatek.inc (172.21.101.130) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 19 Feb 2019 23:53:09 -0800
-Received: from mtkcas09.mediatek.inc (172.21.101.178) by
- mtkmbs06n2.mediatek.inc (172.21.101.130) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 20 Feb 2019 15:53:07 +0800
-Received: from mtkslt306.mediatek.inc (10.21.14.136) by mtkcas09.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
- Frontend Transport; Wed, 20 Feb 2019 15:53:07 +0800
-From: Jerry-ch Chen <Jerry-Ch.chen@mediatek.com>
-To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
- <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
-Subject: [RFC PATCH V0 4/7] [media] dt-bindings: mt8183: Added FD dt-bindings
-Date: Wed, 20 Feb 2019 15:48:10 +0800
-Message-ID: <1550648893-42050-5-git-send-email-Jerry-Ch.chen@mediatek.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
-References: <1550648893-42050-1-git-send-email-Jerry-Ch.chen@mediatek.com>
+ id 1gwN3p-0001i6-KS
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 08:16:59 +0000
+Received: from pty.hi.pengutronix.de ([2001:67c:670:100:1d::c5])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <mfe@pengutronix.de>)
+ id 1gwN3k-0005VC-85; Wed, 20 Feb 2019 09:16:52 +0100
+Received: from mfe by pty.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <mfe@pengutronix.de>)
+ id 1gwN3i-0008ML-Tz; Wed, 20 Feb 2019 09:16:50 +0100
+Date: Wed, 20 Feb 2019 09:16:50 +0100
+From: Marco Felsch <m.felsch@pengutronix.de>
+To: Aisheng Dong <aisheng.dong@nxp.com>
+Subject: Re: [PATCH] dt-bindings: imx: update scu resource id headfile
+Message-ID: <20190220081650.cu3yzausx55jefb6@pengutronix.de>
+References: <1550566601-11497-1-git-send-email-Anson.Huang@nxp.com>
+ <20190219125211.2pg2bqxner4klcb5@pengutronix.de>
+ <DB3PR0402MB3916AF3AA0283DB22DF61E2FF57C0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <20190219144808.qqpaubjcsb4huoml@pengutronix.de>
+ <DB3PR0402MB39160A56E168ED20410674D7F57C0@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <AM6PR04MB42152D05E62753E760741160807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: D00B037DE5B09A9535FA6E07DB648BC8A9B799E9CB79082D304071DCDCD14E0D2000:8
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <AM6PR04MB42152D05E62753E760741160807D0@AM6PR04MB4215.eurprd04.prod.outlook.com>
+X-Sent-From: Pengutronix Hildesheim
+X-URL: http://www.pengutronix.de/
+X-IRC: #ptxdist @freenode
+X-Accept-Language: de,en
+X-Accept-Content-Type: text/plain
+X-Uptime: 08:40:43 up 32 days, 12:22, 38 users,  load average: 0.12, 0.04, 0.01
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c5
+X-SA-Exim-Mail-From: mfe@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190219_235425_188674_52AA6CB3 
-X-CRM114-Status: GOOD (  10.02  )
+X-CRM114-CacheID: sfid-20190220_001657_834091_F0B7F289 
+X-CRM114-Status: GOOD (  23.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,65 +86,238 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Sean.Cheng@mediatek.com, Rynn.Wu@mediatek.com,
- srv_heupstream@mediatek.com, holmes.chiou@mediatek.com,
- Jerry-ch Chen <jerry-ch.chen@mediatek.com>, jungo.lin@mediatek.com,
- sj.huang@mediatek.com, yuzhao@chromium.org, linux-mediatek@lists.infradead.org,
- zwisler@chromium.org, christie.yu@mediatek.com, frederic.chen@mediatek.com,
- linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ Anson Huang <anson.huang@nxp.com>, "festevam@gmail.com" <festevam@gmail.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds DT binding documentation for the Face Detection (FD)
-unit of the camera system on Mediatek's SoCs.
+On 19-02-20 03:38, Aisheng Dong wrote:
+> [...]
+> 
+> > > I don't like droping some ID's (e.g. IMX_SC_R_DC_0_CAPTURE0) by mark
+> > > them as unused or even worse give them a other meaning. IMHO the
+> > > scu-api should be stable since day 1 and the ID's should only be extended.
+> > > Marking ID's as deprecated is much better than moving them around.
+> > 
+> > I agree the SCU APIs should be stable since day 1 and the ID should ONLY be
+> > extended, but that is the best cases, the reality is, there are different
+> > SoCs/Revision, some revisions may remove the resources ID defined in
+> > pre-coded SCU firmware, like the IMX_SC_R_DC_0_CAPTURE0 etc., so SCU APIs
+> > removes them after real silicon arrived, now latest SCU firmware marks them
+> > as UNUSED, they could be replaced by some other new resources in later new
+> > SoC, I am NOT sure, but if it happens, this resource ID table should be updated
+> > anyway, leaving the out-of-date resource ID table there will have issues, since it
+> > is NOT sync with SCU firmware.
+> > 
+> > So how to resolve such issue? We hope the SCU firmware should be stable
+> > since day 1, but the truth is NOT, could be still some updates but NOT very
+> > often. And I believe the updates will NOT break old kernel version.
 
-Signed-off-by: Jerry-ch Chen <jerry-ch.chen@mediatek.com>
----
- .../bindings/media/mediatek,mt8183-fd.txt          | 30 ++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/mediatek,mt8183-fd.txt
+Hi Anson,
 
-diff --git a/Documentation/devicetree/bindings/media/mediatek,mt8183-fd.txt b/Documentation/devicetree/bindings/media/mediatek,mt8183-fd.txt
-new file mode 100644
-index 0000000..d8dbb89
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/mediatek,mt8183-fd.txt
-@@ -0,0 +1,30 @@
-+* Mediatek Face Detection Unit (FD)
-+
-+Face Detection (FD) unit is a typical memory-to-memory HW device.
-+It provides hardware accelerated face detection function, and it
-+is able to detect different poses of faces. FD will writre result
-+of detected face into memory as output.
-+
-+Required properties:
-+- compatible: "mediatek,fd"
-+- reg: Must contain an entry for each entry in reg-names.
-+- reg-names: Must include the following entries:
-+- interrupts: interrupt number to the cpu.
-+- clocks : clock name from clock manager
-+- clock-names: must be main. It is the main clock of FD
-+
-+Example:
-+	fd:fd@1502b000 {
-+		compatible = "mediatek,fd";
-+		mediatek,larb = <&larb5>;
-+		mediatek,vpu = <&vpu>;
-+		iommus = <&iommu M4U_PORT_CAM_FDVT_RP>,
-+			 <&iommu M4U_PORT_CAM_FDVT_WR>,
-+			 <&iommu M4U_PORT_CAM_FDVT_RB>;
-+		reg = <0 0x1502b000 0 0x1000>;
-+		interrupts = <GIC_SPI 269 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&imgsys CLK_IMG_FDVT>;
-+		clock-names = "FD_CLK_IMG_FDVT";
-+		smem_device = <&fd_smem>;
-+	};
-+
+Please don't mix the dt-bindings and the kernel related stuff.
+Unfortunately the bindings are within the kernel repo which in fact is
+great for us kernel developer but the bindings are also used in other
+projects such as barebox or other kernels (don't know the BSD guys). So
+you can't ensure that your change will break something. Please keep that
+in mind.
+
+IMHO solving that issue should be done by the scu firmware. I tought the
+scu is a cortex-m4 with a bunch of embedded flash and ram (I don't know
+that much about the scu since it is closed/black-boxed). Why do you
+don't use a translation table within the scu? As I said earlier I don't
+like the redefinition of ID's since they are now part of the dt-bindings.
+The bindings can store up to 32bit values which is a large number ;)
+IMHO wasting some ID's in favour of stability is a better solution.
+
+Regards,
+Marco
+
+> > 
+> 
+> Please double check with SCU firmware owner what the removed ID are used before?
+> Any side effect if removing them.
+> 
+> And please also check if the combability can be maintained via IMX_SC_RPC_VERSION?
+> 
+> Regards
+> Dong Aisheng
+> 
+> > Anson.
+> > 
+> > >
+> > > Regards,
+> > > Marco
+> > >
+> > > >
+> > > > Anson.
+> > > >
+> > > > >
+> > > > > Regards,
+> > > > > Marco
+> > > > >
+> > > > > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > > > > > ---
+> > > > > >  include/dt-bindings/firmware/imx/rsrc.h | 39
+> > > > > > +++++++++++++++++++--------------
+> > > > > >  1 file changed, 22 insertions(+), 17 deletions(-)
+> > > > > >
+> > > > > > diff --git a/include/dt-bindings/firmware/imx/rsrc.h
+> > > > > > b/include/dt-bindings/firmware/imx/rsrc.h
+> > > > > > index 4481f2d..ad747a8 100644
+> > > > > > --- a/include/dt-bindings/firmware/imx/rsrc.h
+> > > > > > +++ b/include/dt-bindings/firmware/imx/rsrc.h
+> > > > > > @@ -36,15 +36,15 @@
+> > > > > >  #define IMX_SC_R_DC_0_BLIT1		20
+> > > > > >  #define IMX_SC_R_DC_0_BLIT2		21
+> > > > > >  #define IMX_SC_R_DC_0_BLIT_OUT		22
+> > > > > > -#define IMX_SC_R_DC_0_CAPTURE0		23
+> > > > > > -#define IMX_SC_R_DC_0_CAPTURE1		24
+> > > > > > +#define IMX_SC_R_PERF			23
+> > > > > > +#define IMX_SC_R_UNUSED5		24
+> > > > > >  #define IMX_SC_R_DC_0_WARP		25
+> > > > > > -#define IMX_SC_R_DC_0_INTEGRAL0		26
+> > > > > > -#define IMX_SC_R_DC_0_INTEGRAL1		27
+> > > > > > +#define IMX_SC_R_UNUSED7		26
+> > > > > > +#define IMX_SC_R_UNUSED8		27
+> > > > > >  #define IMX_SC_R_DC_0_VIDEO0		28
+> > > > > >  #define IMX_SC_R_DC_0_VIDEO1		29
+> > > > > >  #define IMX_SC_R_DC_0_FRAC0		30
+> > > > > > -#define IMX_SC_R_DC_0_FRAC1		31
+> > > > > > +#define IMX_SC_R_UNUSED6		31
+> > > > > >  #define IMX_SC_R_DC_0			32
+> > > > > >  #define IMX_SC_R_GPU_2_PID0		33
+> > > > > >  #define IMX_SC_R_DC_0_PLL_0		34
+> > > > > > @@ -53,17 +53,17 @@
+> > > > > >  #define IMX_SC_R_DC_1_BLIT1		37
+> > > > > >  #define IMX_SC_R_DC_1_BLIT2		38
+> > > > > >  #define IMX_SC_R_DC_1_BLIT_OUT		39
+> > > > > > -#define IMX_SC_R_DC_1_CAPTURE0		40
+> > > > > > -#define IMX_SC_R_DC_1_CAPTURE1		41
+> > > > > > +#define IMX_SC_R_UNUSED9		40
+> > > > > > +#define IMX_SC_R_UNUSED10		41
+> > > > > >  #define IMX_SC_R_DC_1_WARP		42
+> > > > > > -#define IMX_SC_R_DC_1_INTEGRAL0		43
+> > > > > > -#define IMX_SC_R_DC_1_INTEGRAL1		44
+> > > > > > +#define IMX_SC_R_UNUSED11		43
+> > > > > > +#define IMX_SC_R_UNUSED12		44
+> > > > > >  #define IMX_SC_R_DC_1_VIDEO0		45
+> > > > > >  #define IMX_SC_R_DC_1_VIDEO1		46
+> > > > > >  #define IMX_SC_R_DC_1_FRAC0		47
+> > > > > > -#define IMX_SC_R_DC_1_FRAC1		48
+> > > > > > +#define IMX_SC_R_UNUSED13		48
+> > > > > >  #define IMX_SC_R_DC_1			49
+> > > > > > -#define IMX_SC_R_GPU_3_PID0		50
+> > > > > > +#define IMX_SC_R_UNUSED14		50
+> > > > > >  #define IMX_SC_R_DC_1_PLL_0		51
+> > > > > >  #define IMX_SC_R_DC_1_PLL_1		52
+> > > > > >  #define IMX_SC_R_SPI_0			53
+> > > > > > @@ -303,8 +303,8 @@
+> > > > > >  #define IMX_SC_R_M4_0_UART		287
+> > > > > >  #define IMX_SC_R_M4_0_I2C		288
+> > > > > >  #define IMX_SC_R_M4_0_INTMUX		289
+> > > > > > -#define IMX_SC_R_M4_0_SIM		290
+> > > > > > -#define IMX_SC_R_M4_0_WDOG		291
+> > > > > > +#define IMX_SC_R_UNUSED15		290
+> > > > > > +#define IMX_SC_R_UNUSED16		291
+> > > > > >  #define IMX_SC_R_M4_0_MU_0B		292
+> > > > > >  #define IMX_SC_R_M4_0_MU_0A0		293
+> > > > > >  #define IMX_SC_R_M4_0_MU_0A1		294
+> > > > > > @@ -323,8 +323,8 @@
+> > > > > >  #define IMX_SC_R_M4_1_UART		307
+> > > > > >  #define IMX_SC_R_M4_1_I2C		308
+> > > > > >  #define IMX_SC_R_M4_1_INTMUX		309
+> > > > > > -#define IMX_SC_R_M4_1_SIM		310
+> > > > > > -#define IMX_SC_R_M4_1_WDOG		311
+> > > > > > +#define IMX_SC_R_UNUSED17		310
+> > > > > > +#define IMX_SC_R_UNUSED18		311
+> > > > > >  #define IMX_SC_R_M4_1_MU_0B		312
+> > > > > >  #define IMX_SC_R_M4_1_MU_0A0		313
+> > > > > >  #define IMX_SC_R_M4_1_MU_0A1		314
+> > > > > > @@ -337,7 +337,7 @@
+> > > > > >  #define IMX_SC_R_IRQSTR_SCU2		321
+> > > > > >  #define IMX_SC_R_IRQSTR_DSP		322
+> > > > > >  #define IMX_SC_R_ELCDIF_PLL		323
+> > > > > > -#define IMX_SC_R_UNUSED6		324
+> > > > > > +#define IMX_SC_R_OCRAM			324
+> > > > > >  #define IMX_SC_R_AUDIO_PLL_0		325
+> > > > > >  #define IMX_SC_R_PI_0			326
+> > > > > >  #define IMX_SC_R_PI_0_PWM_0		327
+> > > > > > @@ -554,6 +554,11 @@
+> > > > > >  #define IMX_SC_R_VPU_MU_3		538
+> > > > > >  #define IMX_SC_R_VPU_ENC_1		539
+> > > > > >  #define IMX_SC_R_VPU			540
+> > > > > > -#define IMX_SC_R_LAST			541
+> > > > > > +#define IMX_SC_R_DMA_5_CH0		541
+> > > > > > +#define IMX_SC_R_DMA_5_CH1		542
+> > > > > > +#define IMX_SC_R_DMA_5_CH2		543
+> > > > > > +#define IMX_SC_R_DMA_5_CH3		544
+> > > > > > +#define IMX_SC_R_ATTESTATION		545
+> > > > > > +#define IMX_SC_R_LAST			546
+> > > > > >
+> > > > > >  #endif /* __DT_BINDINGS_RSCRC_IMX_H */
+> > > > > > --
+> > > > > > 2.7.4
+> > > > > >
+> > > > > >
+> > > > > >
+> > > > >
+> > > > > --
+> > > > > Pengutronix e.K.                           |
+> > |
+> > > > > Industrial Linux Solutions                 |
+> > > > >
+> > > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> > > > >
+> > > w.pengutronix.de%2F&amp;data=02%7C01%7Canson.huang%40nxp.com%7
+> > > > >
+> > >
+> > Cfe709ac17a164d82c7d508d6966915fb%7C686ea1d3bc2b4c6fa92cd99c5c30
+> > 1
+> > > > >
+> > >
+> > 635%7C0%7C0%7C636861775412076730&amp;sdata=05ZzPf2%2BQF10JXLLs
+> > > > > OPqDdqTi00BWXNHxmMOsQ1z0yI%3D&amp;reserved=0  | Peiner Str.
+> > 6-8,
+> > > > > 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> > > |
+> > > > > Amtsgericht Hildesheim, HRA 2686           | Fax:
+> > +49-5121-206917-5555 |
+> > >
+> > > --
+> > > Pengutronix e.K.                           |
+> > |
+> > > Industrial Linux Solutions                 |
+> > > https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fww
+> > > w.pengutronix.de%2F&amp;data=02%7C01%7Canson.huang%40nxp.com%7
+> > >
+> > Cd5d39730435e4b06549c08d696794904%7C686ea1d3bc2b4c6fa92cd99c5c
+> > 30
+> > >
+> > 1635%7C0%7C0%7C636861845015130502&amp;sdata=tQYrNl5lzIRRNVBCji6
+> > A
+> > > sPREOnIfDgdPWgAnsWyCErg%3D&amp;reserved=0  |
+> > > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0
+> > |
+> > > Amtsgericht Hildesheim, HRA 2686           | Fax:
+> > +49-5121-206917-5555 |
+> 
+
 -- 
-1.9.1
-
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 
 _______________________________________________
 linux-arm-kernel mailing list
