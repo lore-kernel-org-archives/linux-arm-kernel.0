@@ -2,85 +2,93 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 931D9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:15:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B2C6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:26:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5EB2620859
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:15:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6762F20859
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 22:26:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HiQQfYKV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="IT4QAHOq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EB2620859
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="axERuWis";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="gsOTKs4h"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6762F20859
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=mN1y2gUH01XiItrMhDYiL+GFbIKhGwoauf0vY40HEqY=; b=HiQ
-	QfYKV7EOcDMdcboMK/aWgn5/lmlFu/cUwPumLXlHLgEKw3+371o7lboSo7sjH8UpFDH+DRAseFHdK
-	5gJVWJDeRbXh9+8RvCKIUeiG+Flwdv9ieQG5sRIwNsrgXh9s8OiuMN3gHv/Ecxr4ow+qdcIqwI9GG
-	lAtBZhpjcb87+XdLMXPcK677zoyOsTfvOkNaeDkEkqVcjisjWmuuyOwNdswimqsILTMT8Jl8xUV0n
-	GsJ9LCkeyvkfwFoecOGLTMXu4ds2t7ovTeVLhHSa8QvK+gYTE2vpeiKvvSoyOjXe43SpgwoHYz1of
-	udM9KDLqOQMUqptmS4eRyAZa0BiYz2g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=D5rH4lhU7u+QsSH/2IgGyVCd5v7vVVgLFeNjGN6f8fo=; b=axERuWis/EClQV
+	CqB3JCJM6w/ziQ+59oaQb2MVwscIp8tdvMFg8AJQDFhZmmYUImSzmBCIWGJVxsHO572z8lW3ZwI2t
+	eAsIcOf+s2v2KPleyylU0LA4Po6CGyI9U3ykwS/cewcoFGMRx2aHRFd7YkKyZVM6VKqmEyVRTWiy6
+	r1QJxX0LIpK5+9ZHN1HapGng+gA0CL0mhnTny9FpPaCSOaeNPHuHAQt14V4nBJuKUiZt12jk1S41P
+	Z0XTb7dt0/Z6d2WxqlVRzwYIjZDetm7OTkHzGh3fw2ZL4FjgebFfyy/JgGcbqVRb2bKcsT3Bl2OJT
+	Pmza7DiWkzUvc7D9BgpA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwa9V-0003qG-Jt; Wed, 20 Feb 2019 22:15:41 +0000
-Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
+	id 1gwaKA-00070l-JD; Wed, 20 Feb 2019 22:26:42 +0000
+Received: from mail-ua1-x944.google.com ([2607:f8b0:4864:20::944])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwa9S-0003pp-Np
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 22:15:40 +0000
-Received: by mail-pf1-x441.google.com with SMTP id a3so2811752pff.11
+ id 1gwaK6-0006ze-NO
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 22:26:40 +0000
+Received: by mail-ua1-x944.google.com with SMTP id q17so8834040uam.0
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 14:15:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=JIPebUwrfUQp4/lobhfycIns3KRkR56rOagABg4mSCM=;
- b=IT4QAHOqN9B5lNm3IJ1Q6dA+tYZgPGLa/s+njUzyaU20PCFZn5eHCwdmN8MpKlbGjs
- yUgziNaEEC7w2vNEWz1KCX2SJCJeQGgC4BPo68nzNqqVMRIJyM2rNbFEk4VRrqRkLhWl
- Vo5pIOaO1yYdODf6FGKJ1pW+RBzn5GjNIKzU3lLc7+dFHjIgytYyWjfGF+1CRsA2gQfj
- bl/R16dGORJ9HL7now3zRUWwOpL/PWkf0SheJAsar5MguqYnYnbtWp3WxN2sMvHp+z4z
- 6QWIV62O7f1KaaC8aagGGMNblXn6qfGxaq4F+oA3JvN05HFY4WKEKMnpIsmSOpKPOtbv
- SudQ==
+ Wed, 20 Feb 2019 14:26:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=sDpL3gmbczax8ALdj7IVEn/cdMFCR2mdLaVqooKyfDU=;
+ b=gsOTKs4hDJpCcYxXFAhd3Mw19bPjFasvElf6Yd9ikqATCYiclmkqOMIuNsxSoWBTPs
+ cvv7KgIQk6dYFFcC6p6vp/e6zA3KSvygM6ZzD1xDWenkLj9Umc2pmNvwwnaR2e9iG5Eh
+ /zlPXUrpCbDsPF9sQP3jSKppTz0LqL6aRU0M0=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=JIPebUwrfUQp4/lobhfycIns3KRkR56rOagABg4mSCM=;
- b=alHSRMQo2ca9FUAJ57KyKo0n1Eq41eOkXFJUHCR+czKeTj/HRRa8uqjt6GFBvLWpzQ
- Jqltl2cSINoa72gGlip1e3WggQt5MbKN61vUd0LPTqC8SKlCrfAeOc9zJXaz6ohqPP69
- BoJdnowlzBTebFaprSRBUSMTBbOfskAAdZ9VqLlJH7zatxt6QRMYLeQtqNP5ydeOqAL1
- g4MN3YViaWcIq8keIhLK1zy/XX4ZA0OswtWUKhd653ujvgBgVC8BEs+//+qMFM8rL/zT
- CKt1X2BR8lCIcwxX91/Q8P4qnhb2HcB/LWMOxAJR5tRkfMHF21kvi3njwWZEobpJuYXl
- UjwQ==
-X-Gm-Message-State: AHQUAuahR9fpHPyMQxG2V+H8CgVUFqxdc6ptf8os4wmbFngdnDdwmjKd
- TWjUZ6G8pge1LoDSU0MNW5o=
-X-Google-Smtp-Source: AHgI3IaFNdYHO6F4cdbiItPo5PAZjXMdkk+Tn/fKRXp92LyuZ5qC0fNOwqF82i/6aFfRRctB26ZXaA==
-X-Received: by 2002:a65:4608:: with SMTP id v8mr31686795pgq.9.1550700937254;
- Wed, 20 Feb 2019 14:15:37 -0800 (PST)
-Received: from fainelli-desktop.igp.broadcom.net ([192.19.223.250])
- by smtp.gmail.com with ESMTPSA id z9sm56779603pfd.99.2019.02.20.14.15.35
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=sDpL3gmbczax8ALdj7IVEn/cdMFCR2mdLaVqooKyfDU=;
+ b=Z/mQ4nCijOhPYy7EKPW3JsO43phUC8WxBGa3W8U6ChZhlAxZLobYCqg9MlbQ81RTtY
+ cALC9B28Ytm0j76u40cMjNQdPsW9CLtA0hSGk0CViYMCHAz01Ugu0l+YvZJD+0se0SHv
+ Jk3svaEMTs+AWO+NeZzdNqyeuqQpHK5KjSxG64WMXyycpNZRKyL61hqefwcvBoO7U43q
+ +K9mxc5YuQOrMdxxJcdbjBFxEy8c5Edu4FX5MCodvLqHI2dnHgHWnsmZKL8UPpt9eNjX
+ WlQvjBZ36Jvn+t5uJRdEtwzn1tyWbeSD/RnugON0DptxlckH6myXst2DbDsHteR84rUh
+ dxJA==
+X-Gm-Message-State: AHQUAuadV0xmtSxx1fR694vjape7z25tUcwFxygTXTIWa+6TV+5zHMtc
+ 8KrYd2IHhl6Rj1g3FFWRX6spBMQ+iCA=
+X-Google-Smtp-Source: AHgI3IY7fX88WnCtbXrhAM+MDrpU0yiXs5zrE/C7Fv6j9J40ohJ896llb2WUUBBJDDtmQQOaGK2frA==
+X-Received: by 2002:ab0:6888:: with SMTP id t8mr18731916uar.87.1550701593989; 
+ Wed, 20 Feb 2019 14:26:33 -0800 (PST)
+Received: from mail-vs1-f44.google.com (mail-vs1-f44.google.com.
+ [209.85.217.44])
+ by smtp.gmail.com with ESMTPSA id l193sm7010762vka.19.2019.02.20.14.26.30
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 20 Feb 2019 14:15:36 -0800 (PST)
-From: Florian Fainelli <f.fainelli@gmail.com>
-To: linux-kernel@vger.kernel.org,
-	marc.zyngier@arm.com
-Subject: [PATCH] irqchip: brcmstb-l2: use _irqsave variants in non-interrupt
- code
-Date: Wed, 20 Feb 2019 14:15:28 -0800
-Message-Id: <20190220221528.20811-1-f.fainelli@gmail.com>
-X-Mailer: git-send-email 2.17.1
+ Wed, 20 Feb 2019 14:26:30 -0800 (PST)
+Received: by mail-vs1-f44.google.com with SMTP id u13so14062496vsk.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 20 Feb 2019 14:26:30 -0800 (PST)
+X-Received: by 2002:a67:ec81:: with SMTP id h1mr19076075vsp.188.1550701589790; 
+ Wed, 20 Feb 2019 14:26:29 -0800 (PST)
+MIME-Version: 1.0
+References: <20190211181531.GA3238@embeddedor>
+ <CAJKOXPeHp7sKkZ+jXmTXk5GEF_7G5ujfm3Lw==G3T4thfD+F7Q@mail.gmail.com>
+ <CAGXu5jLMWrb4Dszv5YSyoGt5Lb3S1oE8EnKsTou7=7Nq1rEEVQ@mail.gmail.com>
+ <155027728836.115909.11546859472583324712@swboyd.mtv.corp.google.com>
+In-Reply-To: <155027728836.115909.11546859472583324712@swboyd.mtv.corp.google.com>
+From: Kees Cook <keescook@chromium.org>
+Date: Wed, 20 Feb 2019 14:26:06 -0800
+X-Gmail-Original-Message-ID: <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
+Message-ID: <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
+Subject: Re: [PATCH] clk: samsung: s3c2443: Mark expected switch fall-through
+To: Stephen Boyd <sboyd@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_141538_801256_5EA6179F 
-X-CRM114-Status: GOOD (  12.23  )
+X-CRM114-CacheID: sfid-20190220_142638_763856_19B6CB66 
+X-CRM114-Status: GOOD (  21.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,82 +100,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Florian Fainelli <f.fainelli@gmail.com>,
- Jason Cooper <jason@lakedaemon.net>, Kevin Cernekee <cernekee@gmail.com>,
- "open list:BROADCOM BMIPS MIPS ARCHITECTURE" <linux-mips@vger.kernel.org>,
- Doug Berger <opendmb@gmail.com>,
- "maintainer:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <bcm-kernel-feedback-list@broadcom.com>, Gregory Fong <gregory.0xf0@gmail.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- Brian Norris <computersforpeace@gmail.com>,
- "moderated list:BROADCOM BCM7XXX ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
-MIME-Version: 1.0
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Tomasz Figa <tomasz.figa@gmail.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ LKML <linux-kernel@vger.kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
+ Kukjin Kim <kgene@kernel.org>, Sylwester Nawrocki <s.nawrocki@samsung.com>,
+ linux-clk@vger.kernel.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Doug Berger <opendmb@gmail.com>
+On Fri, Feb 15, 2019 at 4:34 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Kees Cook (2019-02-12 10:57:05)
+> > On Mon, Feb 11, 2019 at 11:41 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > >
+> > > It is just the GCC which has to be fixed not the code. You want to
+> > > adjust the code for specific version of GCC and what if GCC changes
+> > > its warning? For example GCC might require "fall through: "... or any
+> > > other syntax. Another point - what about clang's syntax?
+> >
+> > -Wimplicit-fallthrough=3 is stricter and maps to -Wextra, hence its
+> > choice. GCC's levels were chosen based on the existing linters, static
+> > analyzers, etc. The patterns are unlikely to change (see the gcc
+> > man-page).
+> >
+> > Clang doesn't recognize anything in C mode (hopefully this will be
+> > fixed in the future[1]).
+> >
+> > As long as one of the compilers is able to check this, we'll avoid the
+> > bugs associated with this mis-pattern. Gustavo's efforts here have
+> > found kind of a lot of bugs, so I think it's worth a little churn to
+> > add these (and make minor adjustments to existing comments).
+>
+> Just curious, what compilation phase does this check run in? Could we
+> gain a macro like FALLTHRU or even lowercase 'fallthru' that expanded to
+> whatever the compiler wants to see and then there would only be "one
+> way" to do this?  It would alleviate the above concerns, but maybe I'm
+> rehashing something that's already been proposed and rejected.
 
-Using the irq_gc_lock/irq_gc_unlock functions in the suspend and
-resume functions creates the opportunity for a deadlock during
-suspend, resume, and shutdown. Using the irq_gc_lock_irqsave/
-irq_gc_unlock_irqrestore variants prevents this possible deadlock.
+When this got discussed a while back, the thinking was that since
+we're also dealing with static analyzers (e.g. Coverity) and IDEs that
+literally parse comments in the code, it was most sensible (at least
+for now, prior to there being a formal C "fall through" statement --
+there is for C++ but not yet for C), we'd stick to explicit comments.
+In theory, we will be able to do a tree-wide change to add the C
+statement once it exists.
 
-Signed-off-by: Doug Berger <opendmb@gmail.com>
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/irqchip/irq-brcmstb-l2.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+> Of course, I'm happy to merge any of these patches that tweak things so
+> no worries either way.
 
-diff --git a/drivers/irqchip/irq-brcmstb-l2.c b/drivers/irqchip/irq-brcmstb-l2.c
-index 0e65f609352e..83364fedbf0a 100644
---- a/drivers/irqchip/irq-brcmstb-l2.c
-+++ b/drivers/irqchip/irq-brcmstb-l2.c
-@@ -129,8 +129,9 @@ static void brcmstb_l2_intc_suspend(struct irq_data *d)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct irq_chip_type *ct = irq_data_get_chip_type(d);
- 	struct brcmstb_l2_intc_data *b = gc->private;
-+	unsigned long flags;
- 
--	irq_gc_lock(gc);
-+	irq_gc_lock_irqsave(gc, flags);
- 	/* Save the current mask */
- 	b->saved_mask = irq_reg_readl(gc, ct->regs.mask);
- 
-@@ -139,7 +140,7 @@ static void brcmstb_l2_intc_suspend(struct irq_data *d)
- 		irq_reg_writel(gc, ~gc->wake_active, ct->regs.disable);
- 		irq_reg_writel(gc, gc->wake_active, ct->regs.enable);
- 	}
--	irq_gc_unlock(gc);
-+	irq_gc_unlock_irqrestore(gc, flags);
- }
- 
- static void brcmstb_l2_intc_resume(struct irq_data *d)
-@@ -147,8 +148,9 @@ static void brcmstb_l2_intc_resume(struct irq_data *d)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	struct irq_chip_type *ct = irq_data_get_chip_type(d);
- 	struct brcmstb_l2_intc_data *b = gc->private;
-+	unsigned long flags;
- 
--	irq_gc_lock(gc);
-+	irq_gc_lock_irqsave(gc, flags);
- 	if (ct->chip.irq_ack) {
- 		/* Clear unmasked non-wakeup interrupts */
- 		irq_reg_writel(gc, ~b->saved_mask & ~gc->wake_active,
-@@ -158,7 +160,7 @@ static void brcmstb_l2_intc_resume(struct irq_data *d)
- 	/* Restore the saved mask */
- 	irq_reg_writel(gc, b->saved_mask, ct->regs.disable);
- 	irq_reg_writel(gc, ~b->saved_mask, ct->regs.enable);
--	irq_gc_unlock(gc);
-+	irq_gc_unlock_irqrestore(gc, flags);
- }
- 
- static int __init brcmstb_l2_intc_of_init(struct device_node *np,
+Thanks! :)
+
 -- 
-2.17.1
-
+Kees Cook
 
 _______________________________________________
 linux-arm-kernel mailing list
