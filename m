@@ -2,62 +2,65 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 760D5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:29:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C9F9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:34:09 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 48F8A2086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:29:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D4D520700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 10:34:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HTCU+AMD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 48F8A2086A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uLBexp1V"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D4D520700
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SH0WIpqsQ2D5m5DrP1bqy3xy2irW2dJ24p1uEIjC/ds=; b=HTCU+AMDj+dr0j
-	bgtkdpn1VQV6E5emvlJOIMFC3t0l47x7fQc2lFO5N6uPyrwajT3m8Jtw8S/h56LiQfRmYFr54FfQB
-	ySzdvZmoPa/qTcb+CxxVEzm0ZdyO0qmy3RVOjiX4fo/7V+iveWLFuanFR+zSvBG+igDkJZAgZZ2dm
-	8E56MKfhGjlKtJ8yKDH3NPDgsbF7eotE9ZaHy2K9xJU+uMsOK5trzHxan8DTUpgxH3tMir4qlBSKn
-	yETOdJnyBJuvPba0rh9+FLdpqWd7XND5rpMXGcwphgS2iqgq8VEgP2EQfk7Hxu7J/+D0m3H+TDDKX
-	J/WBgk/+TsVnTMqHaU9A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/IW37H42pyQb/C7iVY3fUdxV0iQTyhyNrnJknjINP7c=; b=uLBexp1VlS87FD79nr4jPpycR
+	7PIdAkWIfg+hdEKBY0ZSGsAoWla8ywlP7uiBDO16EO+9AZ3LToIxx/QqyXdZxhZt/Mq0h9bVa9zdz
+	qYUk+RSQxPss8WffYx/l5KQ0INBAeemo12h8ARU50rMp5jMQbriYoz8sUyobVsdJdj4jV+Zx8DkIU
+	c1K+q5nrlTCbYm1NrGpuZa6o+upmERszClzI1rEW4e3spMHaOs2VdXhmbVGyWLDOyXsNW+e3WFm6q
+	xulGFW52fJ5n5aD6i71M/MyLFON1QedGGUP5yXvd3LpcRQRyKo0wG4pSF7rxvs1p0R3BIcw9qQTi/
+	ZxugN5QJA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwP7n-0003xG-AK; Wed, 20 Feb 2019 10:29:11 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
+	id 1gwPCV-0005h0-Bf; Wed, 20 Feb 2019 10:34:03 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwP7j-0003wK-Ja
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:29:09 +0000
-X-Originating-IP: 109.212.12.126
-Received: from localhost (alyon-652-1-153-126.w109-212.abo.wanadoo.fr
- [109.212.12.126])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id 31740C0016;
- Wed, 20 Feb 2019 10:29:01 +0000 (UTC)
-Date: Wed, 20 Feb 2019 11:29:01 +0100
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Nicolas.Ferre@microchip.com
-Subject: Re: [PATCH] clk: at91: fix at91sam9x5 peripheral clock number
-Message-ID: <20190220102901.GH11432@piout.net>
-References: <20190219165114.2366-1-alexandre.belloni@bootlin.com>
- <c0688a84-bd8e-1874-6fab-727bb6bd657e@microchip.com>
+ id 1gwPCQ-0005gO-HB
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 10:34:00 +0000
+X-Originating-IP: 90.88.23.190
+Received: from localhost (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr
+ [90.88.23.190]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 451441BF21F;
+ Wed, 20 Feb 2019 10:33:48 +0000 (UTC)
+Date: Wed, 20 Feb 2019 11:33:47 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Vasily Khoruzhick <anarsoul@gmail.com>
+Subject: Re: [PATCH v3 06/11] drm/sun4i: rgb: Add DT property to disable
+ strict clock rate check
+Message-ID: <20190220103347.74wqu2btdti2myi7@flea>
+References: <20190215050957.20755-1-anarsoul@gmail.com>
+ <20190215050957.20755-7-anarsoul@gmail.com>
+ <20190218182629.GA14714@bogus>
+ <CA+E=qVfDfDvVmKQDeh2e0SA=tm6VpBMpu9MPKUqxFPObxYFXDg@mail.gmail.com>
+ <20190219085626.7poutwvm3lrilnon@flea>
+ <CA+E=qVfV8ds-zb0oG1-g8c-ReCSnZjfUjvAHbZf1zBf8H-xUcw@mail.gmail.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <c0688a84-bd8e-1874-6fab-727bb6bd657e@microchip.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <CA+E=qVfV8ds-zb0oG1-g8c-ReCSnZjfUjvAHbZf1zBf8H-xUcw@mail.gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_022907_788681_040A4607 
-X-CRM114-Status: GOOD (  20.19  )
+X-CRM114-CacheID: sfid-20190220_023358_865218_2DCAF5B9 
+X-CRM114-Status: GOOD (  38.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,63 +72,173 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sboyd@kernel.org, mturquette@baylibre.com, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Archit Taneja <architt@codeaurora.org>,
+ devicetree <devicetree@vger.kernel.org>, David Airlie <airlied@linux.ie>,
+ linux-sunxi <linux-sunxi@googlegroups.com>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Andrzej Hajda <a.hajda@samsung.com>, Chen-Yu Tsai <wens@csie.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Sean Paul <seanpaul@chromium.org>,
+ Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
+ Daniel Vetter <daniel@ffwll.ch>,
+ arm-linux <linux-arm-kernel@lists.infradead.org>,
+ Icenowy Zheng <icenowy@aosc.io>
+Content-Type: multipart/mixed; boundary="===============7522271037609828726=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 20/02/2019 10:20:28+0000, Nicolas Ferre wrote:
-> On 19/02/2019 at 17:51, Alexandre Belloni wrote:
-> > nck() looks at the last id in an array and unfortunately,
-> > at91sam9x35_periphck has a sentinel, hence the id is 0 and the calculated
-> 
-> Well, the logic for all other SoC clk files is to not have such a 
-> sentinel and deal differently with this type of array: why not modify 
-> this file to match with others?
-> 
-> 
-> > number of peripheral clocks is 1 instead of a maximum of 31.
-> > 
-> > Fixes: 1eabdc2f9dd8 ("clk: at91: add at91sam9x5 PMCs driver")
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-> > ---
-> >   drivers/clk/at91/at91sam9x5.c | 3 +--
-> >   1 file changed, 1 insertion(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/clk/at91/at91sam9x5.c b/drivers/clk/at91/at91sam9x5.c
-> > index 2fe225a697df..d37e7ed9eb90 100644
-> > --- a/drivers/clk/at91/at91sam9x5.c
-> > +++ b/drivers/clk/at91/at91sam9x5.c
-> > @@ -144,8 +144,7 @@ static void __init at91sam9x5_pmc_setup(struct device_node *np,
-> >   		return;
-> >   
-> >   	at91sam9x5_pmc = pmc_data_allocate(PMC_MAIN + 1,
-> > -					   nck(at91sam9x5_systemck),
-> > -					   nck(at91sam9x35_periphck), 0);
-> > +					   nck(at91sam9x5_systemck), 31, 0);
-> 
-> I would prefer like it's done on other SoC clk files.
-> 
 
-Well, that is not possible, what do you suggest?
+--===============7522271037609828726==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="5pzj3icjzfrpvm6r"
+Content-Disposition: inline
 
-> >   	if (!at91sam9x5_pmc)
-> >   		return;
-> >   
-> > 
-> 
-> 
-> -- 
-> Nicolas Ferre
 
--- 
-Alexandre Belloni, Bootlin
+--5pzj3icjzfrpvm6r
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Feb 19, 2019 at 07:44:56AM -0800, Vasily Khoruzhick wrote:
+> On Tue, Feb 19, 2019 at 12:56 AM Maxime Ripard
+> <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Mon, Feb 18, 2019 at 11:33:05AM -0800, Vasily Khoruzhick wrote:
+> > > On Mon, Feb 18, 2019 at 10:26 AM Rob Herring <robh@kernel.org> wrote:
+> > > >
+> > > > On Thu, Feb 14, 2019 at 09:09:52PM -0800, Vasily Khoruzhick wrote:
+> > > > > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4=
+i: rgb:
+> > > > > Validate the clock rate") prevents some panel and bridges from wo=
+rking with
+> > > > > sun4i driver.
+> > > >
+> > > > Sounds lile a regression that should be reverted. The fix is not a
+> > > > backwards compatible change either.
+> > >
+> > > anx6345 driver isn't mainlined yet and I'm not sure if this change
+> > > breaks any mainlined boards. So likely there's not enough
+> > > justification to revert it.
+> > >
+> > > > > Unfortunately, dotclock frequency for some modes are not achievab=
+le on
+> > > > > sunxi hardware, and there's a slight deviation in rate returned by
+> > > > > clk_round_rate(), so they fail this check.
+> > > > >
+> > > > > Experiments show that panels and bridges work fine with this slig=
+ht
+> > > > > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP p=
+anel
+> > > > > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and wo=
+rks just
+> > > > > fine.
+> > > > >
+> > > > > This patch adds DT property to disable strict clock rate check
+> > > > >
+> > > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > > ---
+> > > > >  .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 2=
+ ++
+> > > > >  drivers/gpu/drm/sun4i/sun4i_rgb.c                            | 5=
+ +++++
+> > > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                           | 3=
+ +++
+> > > > >  drivers/gpu/drm/sun4i/sun4i_tcon.h                           | 1=
+ +
+> > > > >  4 files changed, 11 insertions(+)
+> > > > >
+> > > > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4=
+i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > > index f426bdb42f18..18c8b053a28d 100644
+> > > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.t=
+xt
+> > > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.t=
+xt
+> > > > > @@ -63,6 +63,8 @@ Required properties:
+> > > > >      Documentation/devicetree/bindings/media/video-interfaces.txt=
+=2E The
+> > > > >      first port should be the input endpoint. The second should b=
+e the
+> > > > >      output, usually to an HDMI connector.
+> > > > > +  - no-strict-clock-check: don't reject timings if exact dot clo=
+ck can't be
+> > > > > +    reached.
+> > > >
+> > > > This should be the default IMO. Most panels are a single timing, so=
+ if
+> > > > we reject it the fallback no display?
+> > >
+> > > As far as I remember the change was introduced to reject some modes
+> > > for which dotclock can't be reached when driver is used with VGA
+> > > bridge. So if we make it default it'll break boards with VGA bridge
+> > > and old DT.
+> > >
+> > > > I thought we had some mechanism already to allow some range of
+> > > > frequencies. I think the chromeos guys needed something IIRC.
+> > >
+> > > You can specify frequency range for panels, but there's nothing for
+> > > bridges. In my case EDID doesn't specify clock tolerance.
+> >
+> > I gave it some more though, and came up with the following patch. The
+> > basic idea is to leave the boundary check for the bridges that will
+> > have EDID and we need to filter out the modes that have no chance of
+> > being supported. The tolerancy used is the one defined in VESA specs,
+> > but I added a module parameter if you wanted to tune that.
+> >
+> > And finally, since most of our panels are single timings without any
+> > tolerancy, we just try our best in this case and that's it, while
+> > leaving the door open to support display_timings and being able to do
+> > more once we have an idea of what the tolerancies are.
+> >
+> > If that works for you, I'll submit it.
+>=20
+> Maxime, thanks for your patch but  it doesn't work for me. Pinebook
+> needs 1% tolerance. Having it as a module parameter means that no
+> distro will be able to boot on Pinebook out of the box.
+
+I don't really know what to tell you, the VESA spec defines everywhere
+that tolerance, and if we're not able to provide that, then we're not
+compliant and I don't want us to not be compliant just because one
+panel needed to be a bit more flexible, and especially since what
+could work on one panel might fail on another one.
+
+If you want alternate solutions, then please answer to:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/630441.=
+html
+
+or provide the EDID blob.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
+
+--5pzj3icjzfrpvm6r
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXG0tCwAKCRDj7w1vZxhR
+xcPdAQD3QK+JgtMVF7zAZamVJQ5eyWerSJoI2PTgf92lJjyBQgD/YpdqqtVy4t7b
+jb22/lSRTvnPq1MoiYrbLL64GdDOJQs=
+=XNrV
+-----END PGP SIGNATURE-----
+
+--5pzj3icjzfrpvm6r--
+
+
+--===============7522271037609828726==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============7522271037609828726==--
+
