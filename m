@@ -2,83 +2,65 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 71D06C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:59:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E877C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:15:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3AD1E2086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 15:59:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7018E20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:15:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MZWU81hf";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZR5MTue2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AD1E2086A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FBlQYyRS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7018E20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=E5TUui6U+U5QEUzaGnav38kBkuZsvmSzovM1Xvcji1Q=; b=MZWU81hfQePnjy
-	qBrqlt57rCROxo3LjuZyQirPEQUvqgANEjSFziamYt8TbeVgB1qwmyEl5peG8jhHRPQC6Q4D86Cck
-	7nSCvuG4z+8/TzwXPVYvYQrPqHnvG2OMIdGROBXeft8gJFELBlZwgJumvP5DAXglO19Il1jMYyxgO
-	r4Vr5j2eH202xc50gXHa7IhF4Y9Yv3hxow3jECZbAXF2PVT94tA74effhpDt6WfX6tYePYrygc6jq
-	f4QMDQMiHT1FLNeBIL1fTh/12KxnRfkYPXRzJMgQXjB0jEyLd2H3DAjBBfDdBczGpIpFLdXj7Uy/T
-	74/Vma4IuN7tSnmRn7ag==;
+	List-Owner; bh=/xhcTYYL+YbGPAwMwWk9F7vlbujerP7mDggj+I4X1AQ=; b=FBlQYyRS2nLu2C
+	mDk++g2nA9tk8oWbhs6BiQig6oMWdGQ7E9hUj85fIZzq08QgZfGHbv68xwlj6MEaYniUmELlpcp1q
+	FIwHipPw+8OHjl5NeKVukTHMb8g1xyORcuQvuC/Hxl8YXmCMg8JLdzKeQorJTjbM7fEo6tRkXi/BW
+	lUGwtGED8qjnk5AkRogKuYsf86/OWvoyQxzdlilzHFjcahJ1t8gJhHNJ1ElvSgmNfj+HNwKuuhSI5
+	NsOL21PQVVGnQSlFSWnEaotPaTKxPyf3l0fxfkF6jfekh42MHZpQPn0QcpY+OGk2IiaIpiQx87SMi
+	lT66rhojhytIEHWgUUyQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUH5-0007pW-EY; Wed, 20 Feb 2019 15:59:07 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUH2-0007og-Ml
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 15:59:06 +0000
-Received: by mail-it1-x142.google.com with SMTP id e24so2679075itl.1
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 07:59:01 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=eRy3uxH0iZwIyYb3x/PVcOXd1aXhSn6gDIBvGBVJD3U=;
- b=ZR5MTue29eRVcVQa5EpI0nASuUtoyfXdyRsO8HKguw8lN+yjbxjbuXfjWjBdT2CgOu
- J+GMkktV5/LOoPiXITntaRKSN3kowPm3KmU3tv5HF4cEN6wuDDn1gaWpPVdB8VeIyNqH
- ZZWykwCvrjnx/m+9VZUaRo4flzuAMCiW/DY9m8ZkcyWHDVAt9gUBG1CRJw50Rt7opSZE
- hfYvmWF9BIfDa8acdOOut5PmnFCFGOsLywcy3HbOdNUZAFHCzvYt42KUFPrcxgBP98g+
- stcGJhqkVjIdTcW3Yz1cCVRCbT1Hdw6FgJcWv7YAoL2tstdDIDfQUWfAoZexBwfu1nkm
- EEig==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=eRy3uxH0iZwIyYb3x/PVcOXd1aXhSn6gDIBvGBVJD3U=;
- b=FSwg9uErXO8pBK16I1oS7WLv5egCTE44P5kIonycQNpveQ9RIDOTwV6Si/vWL0XMZO
- 4HajZsgn91gJcAuFJPpqHg6HEN6yF8U+Z+6BeGc5aMN+qqpTPyo8BetjMa53cIw1pXuT
- eIIsYj1ng14NGhBEO4IDqUUUUn7uuvo7d3h3WXkwCKf1UfDKdxuFMuX16k0TA535/0qN
- HUF6diRprlOGfQmnC/06ugQWQ58YKEDKNuTSUxEQOZk1his8F0ZrcX6yJvAP/geW3VB4
- 7OPJMvzKqIJMxr4KfGpSDAuPkEzUmI3VMzRfZ/KIOwQxmq90gFnjPjNPaANqqSxAghgw
- mGaw==
-X-Gm-Message-State: AHQUAuZAhSQZQVl5l2SmgzGpwqmk9436t2sjG7nq/FQP0kuOuw4CzxV3
- BJd6HPbm//EXDZR3FW5zDQubJf3A5ru2/X/4geI=
-X-Google-Smtp-Source: AHgI3IZ5RaAkoo/zINmBQafHGkYFtuUV8E9oZeeMuarImXlHUQD2a7XtASO/0lY1uu9fHPSOGlNSzCsRvG0g8EOIP7Q=
-X-Received: by 2002:a5d:8701:: with SMTP id u1mr21819978iom.69.1550678340417; 
- Wed, 20 Feb 2019 07:59:00 -0800 (PST)
+	id 1gwUXF-0006v6-1M; Wed, 20 Feb 2019 16:15:49 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwUXA-0006ud-30
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:15:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 80CB9EBD;
+ Wed, 20 Feb 2019 08:15:42 -0800 (PST)
+Received: from localhost (unknown [10.37.6.16])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 149CE3F5C1;
+ Wed, 20 Feb 2019 08:15:41 -0800 (PST)
+Date: Wed, 20 Feb 2019 16:15:40 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Christoffer Dall <christoffer.dall@arm.com>
+Subject: Re: [PATCH v10 4/5] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20190220161539.GA2055@e119886-lin.cambridge.arm.com>
+References: <1547482308-29839-1-git-send-email-andrew.murray@arm.com>
+ <1547482308-29839-5-git-send-email-andrew.murray@arm.com>
+ <20190218215307.GA28113@e113682-lin.lund.arm.com>
 MIME-Version: 1.0
-References: <ccdb73e4-e4eb-2552-b62f-6cf57929dfee@acn-group.ch>
- <20190220154658.GP15711@atomide.com>
-In-Reply-To: <20190220154658.GP15711@atomide.com>
-From: Adam Ford <aford173@gmail.com>
-Date: Wed, 20 Feb 2019 09:58:49 -0600
-Message-ID: <CAHCN7xK4PjCfNgJeQ97kQGOJfjJ927igFELWniu6kuzgJ-Hgiw@mail.gmail.com>
-Subject: Re: da850 dt cpufreq support
-To: Tony Lindgren <tony@atomide.com>
+Content-Disposition: inline
+In-Reply-To: <20190218215307.GA28113@e113682-lin.lund.arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_075904_770160_2812C78A 
-X-CRM114-Status: GOOD (  16.06  )
+X-CRM114-CacheID: sfid-20190220_081544_147717_B8F8CF2D 
+X-CRM114-Status: GOOD (  45.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,55 +72,398 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Lechner <david@lechnology.com>, Sekhar Nori <nsekhar@ti.com>,
- Christophe Aeschlimann <c.aeschlimann@acn-group.ch>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Linux-OMAP <linux-omap@vger.kernel.org>,
- arm-soc <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>, Will Deacon <will.deacon@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 9:47 AM Tony Lindgren <tony@atomide.com> wrote:
->
-> Hi,
->
-> Adding Bartosz, David and Sekhar to Cc.
->
-> * Christophe Aeschlimann <c.aeschlimann@acn-group.ch> [190220 15:34]:
-> > Hi,
-> >
-> > I understand that today the da850-evm is supported in two ways in the
-> > Kernel, using board file, aka "legacy" and device-tree.
-> >
-> > Am I right to say that when using the device-tree there is no support for
-> > cpufreq available ?
-> >
-> > The "ti-cpufreq" driver doesn't target the da850 SoC and the
-> > "davinci-cpufreq" driver doesn't make use of the device-tree bindings.
-> >
-> > Could the generic "cpufreq-dt" driver be used ?
+On Mon, Feb 18, 2019 at 10:53:07PM +0100, Christoffer Dall wrote:
+> On Mon, Jan 14, 2019 at 04:11:47PM +0000, Andrew Murray wrote:
+> > Add support for the :G and :H attributes in perf by handling the
+> > exclude_host/exclude_guest event attributes.
+> > 
+> > We notify KVM of counters that we wish to be enabled or disabled on
+> > guest entry/exit and thus defer from starting or stopping :G events
+> > as per the events exclude_host attribute.
+> > 
+> > With both VHE and non-VHE we switch the counters between host/guest
+> > at EL2. We are able to eliminate counters counting host events on
+> > the boundaries of guest entry/exit when using :G by filtering out
+> > EL2 for exclude_host. However when using :H unless exclude_hv is set
+> > on non-VHE then there is a small blackout window at the guest
+> > entry/exit where host events are not captured.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 53 ++++++++++++++++++++++++++++++++++++------
+> >  1 file changed, 46 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index 1c71796..21c6831 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -26,6 +26,7 @@
+> >  
+> >  #include <linux/acpi.h>
+> >  #include <linux/clocksource.h>
+> > +#include <linux/kvm_host.h>
+> >  #include <linux/of.h>
+> >  #include <linux/perf/arm_pmu.h>
+> >  #include <linux/platform_device.h>
+> > @@ -528,11 +529,27 @@ static inline int armv8pmu_enable_counter(int idx)
+> >  
+> >  static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> >  {
+> > +	struct perf_event_attr *attr = &event->attr;
+> >  	int idx = event->hw.idx;
+> > +	int flags = 0;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> >  
+> > -	armv8pmu_enable_counter(idx);
+> >  	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_enable_counter(idx - 1);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	if (!attr->exclude_host)
+> > +		flags |= KVM_PMU_EVENTS_HOST;
+> > +	if (!attr->exclude_guest)
+> > +		flags |= KVM_PMU_EVENTS_GUEST;
+> > +
+> > +	kvm_set_pmu_events(counter_bits, flags);
+> > +
+> > +	/* We rely on the hypervisor switch code to enable guest counters */
+> > +	if (!attr->exclude_host) {
+> > +		armv8pmu_enable_counter(idx);
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_enable_counter(idx - 1);
+> > +	}
+> >  }
+> >  
+> >  static inline int armv8pmu_disable_counter(int idx)
+> > @@ -545,11 +562,21 @@ static inline int armv8pmu_disable_counter(int idx)
+> >  static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> >  {
+> >  	struct hw_perf_event *hwc = &event->hw;
+> > +	struct perf_event_attr *attr = &event->attr;
+> >  	int idx = hwc->idx;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> >  
+> >  	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_disable_counter(idx - 1);
+> > -	armv8pmu_disable_counter(idx);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	kvm_clr_pmu_events(counter_bits);
+> > +
+> > +	/* We rely on the hypervisor switch code to disable guest counters */
+> > +	if (!attr->exclude_host) {
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_disable_counter(idx - 1);
+> > +		armv8pmu_disable_counter(idx);
+> > +	}
+> >  }
+> >  
+> >  static inline int armv8pmu_enable_intens(int idx)
+> > @@ -824,16 +851,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+> >  	 * Therefore we ignore exclude_hv in this configuration, since
+> >  	 * there's no hypervisor to sample anyway. This is consistent
+> >  	 * with other architectures (x86 and Power).
+> > +	 *
+> > +	 * To eliminate counting host events on the boundaries of
+> 					   ^comma
+> 
+> > +	 * guest entry/exit we ensure EL2 is not included in hyp mode
+> 			   ^comma (or rework sentence)
+> 
+> What do you mean by "EL2 is not included in hyp mode" ??
 
-A while ago, David L posted a message on the mailing list pointing to
-a git repo that hat some patches that weren't mainlined.
+This attempts to explain the addition of '!attr->exclude_host' when
+is_kernel_in_hyp_mode is true below.
 
-https://github.com/dlech/linux/tree/da850-dt-cpufreq
+We have no need to count EL2 when counting any guest events - by adding
+this hunk we can eliminate counting host events in the small period of
+time in the switch code between enabling the counter and entering the
+guest.
 
-I was going to try and test them, but I never got around to it due to
-other work projects.
+Perhaps I should rephrase it to "To eliminate counting host events on
+the boundaries of guest entry/exit, we ensure EL2 is not included when
+counting guest events in hyp mode." ?
 
-adam
-> >
-> > Best regards,
-> >
-> > Christophe
-> >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> > +	 * with !exclude_host.
+> >  	 */
+> >  	if (is_kernel_in_hyp_mode()) {
+> > -		if (!attr->exclude_kernel)
+> > +		if (!attr->exclude_kernel && !attr->exclude_host)
+> >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> >  	} else {
+> > -		if (attr->exclude_kernel)
+> > -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> >  		if (!attr->exclude_hv)
+> >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> >  	}
+> > +
+> > +	/*
+> > +	 * Filter out !VHE kernels and guest kernels
+> > +	 */
+> > +	if (attr->exclude_kernel)
+> > +		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> > +
+> 
+> Let me see if I get this right:
+> 
+> 	exclude_user:	VHE: Don't count EL0
+> 			Non-VHE: Don't count EL0
+> 
+> 	exclude_kernel: VHE: Don't count EL2 and don't count EL1
+> 			Non-VHE: Don't count EL1
+> 
+> 	exclude_hv:	VHE: No effect
+> 			Non-VHE: Don't count EL2
+> 
+> 	exclude_host:	VHE: Don't count EL2 + enable/disable on guest entry/exit
+> 			Non-VHE: disable on guest entry/disable on guest entry/exit
+> 
+> And the logic I extract is that _user applies across both guest and
+> host, as does _kernel (regardless of the mode the kernel on the current
+> system runs in, might be only EL1, might be EL1 and EL2), and _hv is
+> specific to non-VHE systems to measure events in a specific piece of KVM
+> code that runs at EL2.
+> 
+> As I expressed before, that doesn't seem to be the intent behind the
+> exclude_hv flag, but I'm not sure how other architectures actually
+> implement things today, and even if it's a curiosity of the Arm
+> architecture and has value to non-VHE hypervisor hackers, and we don't
+> really have to care about uniformity with the other architectures, then
+> fine.
+> 
+> It has taken me a while to make sense of this code change, so I really
+> wish we can find a suitable place to document the semantics clearly for
+> perf users on arm64.
+> 
+> Now, another thing comes to mind:  Do we really need to enable and
+> disable anything on a VHE system on entry/exit to/from a guest?  Can we
+> instead do the following:
+> 
+> 	exclude_host:	Disable EL2 counting
+> 		     	Disable EL0 counting
+> 		     	Enable EL0 counting on vcpu_load
+> 		     	  (unless exclude_user is also set)
+> 		     	Disable EL0 counting on vcpu_put
+> 
+> 	exclude_guest:	Disable EL1 counting
+> 		      	Disable EL0 counting on vcpu_load
+> 		      	Enable EL0 counting on vcpu_put
+> 			  (unless exclude_user is also set)
+> 
+> If that works, we can avoid the overhead in the critical path on VHE
+> systems and actually have slightly more accurate counting, leaving the
+> entry/exit operations to be specific to non-VHE.
+
+This all makes sense.
+
+At present on VHE, for host only events, there is a small blackout window
+at the guest entry/exit - this is where we turn off/on host counting before
+entering/exiting the guest. (This blackout window also exists on !VHE unless
+exclude_hv is set).
+
+To mitigate against this the PMU switching code was brought as close to the
+guest entry/exit as possible - but as you point out at this point in
+kvm_arch_vcpu_ioctl_run we're running without interrupts/preemption and so
+on the critical path. I believe we add about 11 instructions when there are
+no PMU counters enabled and about 23 when they are enabled. I suppose it
+would be possible to use static keys to reduce the overhead when counters
+are not enabled...
+
+Your suggestion provides an optimal solution, however it adds some
+complexity - here is a rough attempt at implementing it...
+
+
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index cbfe3d1..bc548e6 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -482,10 +482,23 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ {
+        return kvm_arch_vcpu_run_map_fp(vcpu);
+ }
+-static inline void kvm_set_pmu_events(u32 set, int flags)
++static inline bool kvm_pmu_switch_events(struct perf_event_attr *attr)
++{
++       if (!has_vhe())
++               return true;
++
++       if (attr->exclude_user)
++               return false;
++
++       return (attr->exclude_host ^ attr->exclude_guest);
++}
++static inline void kvm_set_pmu_events(u32 set, int flags, struct perf_event_attr *attr)
+ {
+        struct kvm_host_data *ctx = this_cpu_ptr(&kvm_host_data);
+ 
++       if (!kvm_pmu_switch_events(attr))
++               return;
++
+        if (flags & KVM_PMU_EVENTS_HOST)
+                ctx->pmu_events.events_host |= set;
+        if (flags & KVM_PMU_EVENTS_GUEST)
+@@ -499,6 +512,7 @@ static inline void kvm_clr_pmu_events(u32 clr)
+        ctx->pmu_events.events_guest &= ~clr;
+ }
+ #else
++static inline bool kvm_pmu_switch_events() { return false; }
+ static inline void kvm_set_pmu_events(u32 set, int flags) {}
+ static inline void kvm_clr_pmu_events(u32 clr) {}
+ #endif
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 21c6831..dae6691 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -542,10 +542,10 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+        if (!attr->exclude_guest)
+                flags |= KVM_PMU_EVENTS_GUEST;
+ 
+-       kvm_set_pmu_events(counter_bits, flags);
++       kvm_set_pmu_events(counter_bits, flags, attr);
+ 
+        /* We rely on the hypervisor switch code to enable guest counters */
+-       if (!attr->exclude_host) {
++       if (has_vhe() || !attr->exclude_host) {
+                armv8pmu_enable_counter(idx);
+                if (armv8pmu_event_is_chained(event))
+                        armv8pmu_enable_counter(idx - 1);
+@@ -572,7 +572,7 @@ static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+        kvm_clr_pmu_events(counter_bits);
+ 
+        /* We rely on the hypervisor switch code to disable guest counters */
+-       if (!attr->exclude_host) {
++       if (has_vhe() || !attr->exclude_host) {
+                if (armv8pmu_event_is_chained(event))
+                        armv8pmu_disable_counter(idx - 1);
+                armv8pmu_disable_counter(idx);
+@@ -859,6 +859,10 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+        if (is_kernel_in_hyp_mode()) {
+                if (!attr->exclude_kernel && !attr->exclude_host)
+                        config_base |= ARMV8_PMU_INCLUDE_EL2;
++               if (attr->exclude_guest)
++                       config_base |= ARMV8_PMU_EXCLUDE_EL1;
++               if (attr->exclude_host)
++                       config_base |= ARMV8_PMU_EXCLUDE_EL0;
+        } else {
+                if (!attr->exclude_hv)
+                        config_base |= ARMV8_PMU_INCLUDE_EL2;
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 9018fb3..722cd7a 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -512,15 +512,12 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ {
+        struct kvm_cpu_context *host_ctxt;
+        struct kvm_cpu_context *guest_ctxt;
+-       bool pmu_switch_needed;
+        u64 exit_code;
+ 
+        host_ctxt = vcpu->arch.host_cpu_context;
+        host_ctxt->__hyp_running_vcpu = vcpu;
+        guest_ctxt = &vcpu->arch.ctxt;
+ 
+-       pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
+-
+        sysreg_save_host_state_vhe(host_ctxt);
+ 
+        /*
+@@ -562,9 +559,6 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 
+        __debug_switch_to_host(vcpu);
+ 
+-       if (pmu_switch_needed)
+-               __pmu_switch_to_host(host_ctxt);
+-
+        return exit_code;
+ }
+ 
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 89acb7f..34d94ba 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -360,6 +360,42 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+        return kvm_vgic_vcpu_init(vcpu);
+ }
+ 
++static void kvm_vcpu_pmu_switch(struct kvm_vcpu *vcpu, bool guest)
++{
++       u32 typer, counter;
++       struct kvm_cpu_context *host_ctxt;
++       struct kvm_host_data *host;
++       unsigned long events_guest, events_host;
++
++       host_ctxt = vcpu->arch.host_cpu_context;
++       host = container_of(host_ctxt, struct kvm_host_data, host_ctxt);
++       events_guest = host->pmu_events.events_guest;
++       events_host = host->pmu_events.events_host;
++
++       if (!has_vhe())
++               return;
++
++       for_each_set_bit(counter, &events_guest, 32) {
++               write_sysreg(counter, pmselr_el0);
++               isb();
++               if (guest)
++                       typer = read_sysreg(pmxevtyper_el0) & ~BIT(30);
++               else
++                       typer = read_sysreg(pmxevtyper_el0) | BIT(30);
++               write_sysreg(typer, pmxevtyper_el0);
++       }
++
++       for_each_set_bit(counter, &events_host, 32) {
++               write_sysreg(counter, pmselr_el0);
++               isb();
++               if (guest)
++                       typer = read_sysreg(pmxevtyper_el0) | BIT(30);
++               else
++                       typer = read_sysreg(pmxevtyper_el0) & ~BIT(30);
++               write_sysreg(typer, pmxevtyper_el0);
++       }
++}
++
+ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+ {
+        int *last_ran;
+@@ -385,6 +421,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+        kvm_timer_vcpu_load(vcpu);
+        kvm_vcpu_load_sysregs(vcpu);
+        kvm_arch_vcpu_load_fp(vcpu);
++       kvm_vcpu_pmu_switch(vcpu, true);
+ 
+        if (single_task_running())
+                vcpu_clear_wfe_traps(vcpu);
+@@ -398,6 +435,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+        kvm_vcpu_put_sysregs(vcpu);
+        kvm_timer_vcpu_put(vcpu);
+        kvm_vgic_put(vcpu);
++       kvm_vcpu_pmu_switch(vcpu, false);
+ 
+        vcpu->cpu = -1;
+ 
+
+Do you think this is worth developing further?
+
+Thanks,
+
+Andrew Murray
+
+> 
+> 
+> Thanks,
+> 
+>     Christoffer
 
 _______________________________________________
 linux-arm-kernel mailing list
