@@ -7,18 +7,18 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 906E7C10F01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:03:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 80C85C10F01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:03:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 614A320685
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:03:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DBCA21902
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 11:03:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xl4v4kof";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="XpuBepAn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="nqgPTjzo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 614A320685
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PpUhagve";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marvell.com header.i=@marvell.com header.b="xOFnFv39";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=marvell.onmicrosoft.com header.i=@marvell.onmicrosoft.com header.b="axa2fRew"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DBCA21902
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=marvell.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,56 +27,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/Io2QeTM29F3E7ufYhBKVNk9Ujdpc2nDhUuDzquXDs8=; b=Xl4v4kofy22+fk
-	u8d7rB8rFV6c9yCvRqj2zyUt/J7POvjTwhswV6uBT1j/3SGT4vz0yvoSfMfi+Q7tJOTw3Bua7ArjQ
-	My84wFmDtHIidQWqIEjv5H+YreTbc4WHicvQAgfi5Thov2WaFxGmc1Q2905Vl8kepnysqaX5Zj0CD
-	YJ4c8I29NnyytjlLiKdiBE+o0WZw+7J++x9oN7NDvK+rniR0bkJUr4mc0IcCz2tVo2JQaWAYMX+Vo
-	n5pxUsorXebfiFDBg1AO77iBFoX2hcyK3M6MpIsZhsPMkjc8d+2I3fEoF6HA6Sa8lCCZlhRjiaHl2
-	DJeUa7knnR9e6OtPSOSA==;
+	List-Owner; bh=5FPEFXkfSJVDJNDEGmRfjNZ6bqYnym5hg9Ld5Hmv6uE=; b=PpUhagveeU3R+J
+	g5kqle7IKcUjXnhkSsGsPImMmoui6BTU5rZMw0VQO2gZeadrxLRRWFAsimkiDSwJh3sQV0dyv4JSt
+	t2jeX8VOFYWni0wZveuMVohEii/b5Yu1KRrOuDY/c0xoxXcFghQFpnN18c2vwwN8q0inKgNXT++9r
+	5VC7RfWDr5cm6YL027Leg7TGtEpnM5pNopgXyS6nIdJIV3nbccJ1RfxxCHZjTR8QQCQWoXHEuqRdA
+	gV5S/qjobNHxYy331I8d0qaBnU3x4w8hvghK8mQ0djKQlriNTzPOJAQo198D2zzcoE5NzJPANj8+i
+	GmTGLYSM0oxGHc40xzZQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwPeV-0008Qg-DP; Wed, 20 Feb 2019 11:02:59 +0000
-Received: from mx0b-0016f401.pphosted.com ([67.231.156.173])
+	id 1gwPei-0000Df-AZ; Wed, 20 Feb 2019 11:03:12 +0000
+Received: from mx0a-0016f401.pphosted.com ([67.231.148.174]
+ helo=mx0b-0016f401.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwPeR-0008OT-0u
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:02:57 +0000
-Received: from pps.filterd (m0045851.ppops.net [127.0.0.1])
- by mx0b-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1KB04HT012100; Wed, 20 Feb 2019 03:02:50 -0800
+ id 1gwPeR-0008OX-39
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 11:02:58 +0000
+Received: from pps.filterd (m0045849.ppops.net [127.0.0.1])
+ by mx0a-0016f401.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1KAxWYA017731; Wed, 20 Feb 2019 03:02:51 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=marvell.com;
  h=from : to : cc :
  subject : date : message-id : references : in-reply-to : content-type :
  content-transfer-encoding : mime-version; s=pfpt0818;
- bh=mE3l+LVoPLVNTervA4wn26Y5RpOuvSEnq/riY7qK5sw=;
- b=XpuBepAn0f5ZSo3+6yxK71DLjiQL8S2lbPtY+yxPts2bEJZAEsY1UUQ0TiSorjVtEW0i
- a8tvZ1KJPo/6Cx3cc9RYqbiIDQzo4KhteMiYW6X8SV/cR/eiC9XTlTIBJa6vCus42tfl
- VgJdxHHe4kQM3BzYfr8/7N++lyOUvpir/gaBp10L0es9gIPip4dObXo5Lo1PzOC/2wW8
- NxdqNz699MQzB8IvnMzcxnNGKCJ2hNcf/xtJ7O1tJsY3Ci92r7uPWHfLhg94iNInQaNt
- sisWDile9Wc8QlTxvWICHZ956XGCIXHOcvWflceZgcrOpsZn6j7b+R5tQrEUjFwrX4ZK kw== 
-Received: from sc-exch04.marvell.com ([199.233.58.184])
- by mx0b-0016f401.pphosted.com with ESMTP id 2qrh8xbr2k-1
+ bh=I7MHGovnPMTZkAD/w9P/e+ROzRiIkQC8nHEvFMKyCCY=;
+ b=xOFnFv39BZ4Vfmpu+iiLLHWvWKCyeEreDii6h4GruKNRFoNkVSk9EVkJUE4XJ2aomUCQ
+ kPOvlbXVSYItD4qxRKUXfkHJyk4e1GTILnjktx/LdscS23LRFz5C55RCKSlrs8RyVVZs
+ wxrsxo3XrA53RP0zwML7kq5YR7oUapVNnDs8YUTXLGgLnToqIKmRS4I7ElpmuCELl5bV
+ d3QoLZxAmK5c6k7vAKj9lQnerPBSHXtT8vhZjPGQHtsJneFMFsJcPMBKlYDAA7N19pqh
+ P9mztxsqxRe6WEDG9ETqHmFRqUTfTLB/Xdfeei1YkGsWMczMhb+WogRLu/sdm0uXkLym fg== 
+Received: from sc-exch01.marvell.com ([199.233.58.181])
+ by mx0a-0016f401.pphosted.com with ESMTP id 2qrtta9gjf-1
  (version=TLSv1.2 cipher=ECDHE-RSA-AES256-SHA384 bits=256 verify=NOT);
  Wed, 20 Feb 2019 03:02:50 -0800
-Received: from SC-EXCH03.marvell.com (10.93.176.83) by SC-EXCH04.marvell.com
- (10.93.176.84) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Wed, 20 Feb
- 2019 03:02:48 -0800
+Received: from SC-EXCH03.marvell.com (10.93.176.83) by SC-EXCH01.marvell.com
+ (10.93.176.81) with Microsoft SMTP Server (TLS) id 15.0.1367.3; Wed, 20 Feb
+ 2019 03:02:49 -0800
 Received: from NAM03-CO1-obe.outbound.protection.outlook.com (104.47.40.58) by
  SC-EXCH03.marvell.com (10.93.176.83) with Microsoft SMTP Server
  (TLS) id
- 15.0.1367.3 via Frontend Transport; Wed, 20 Feb 2019 03:02:48 -0800
+ 15.0.1367.3 via Frontend Transport; Wed, 20 Feb 2019 03:02:50 -0800
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=marvell.onmicrosoft.com; s=selector1-marvell-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=mE3l+LVoPLVNTervA4wn26Y5RpOuvSEnq/riY7qK5sw=;
- b=nqgPTjzoguSGlQ/4LU+8ukNYTFuW+VhHe8MUNl+3Fpr+f4ChlPaLJmHMoZlRgz+32aVxiK0MituMb6LQ74qjkAXsPQprhc2HsByIo5Hd+AhWg/M33LSzlDRXEyPt0M5c/h+WEwaNsLQB7Vi3V/e7gSClLwoUAC3YB3G88h+7npw=
+ bh=I7MHGovnPMTZkAD/w9P/e+ROzRiIkQC8nHEvFMKyCCY=;
+ b=axa2fRewKfDnCUfatECLzBBQ9xrph6unVJZ3OkiKK+nT4HxpdpadlX32BTyVRK9z4bGeTF+oRIizn1unm/LeGkue9B3W96DOQoc1Jg04CauYR3MkdvT3DOefBkPgLthC0uze742ldmN8yDmU/K5+/aIvgvgcu1Ia49WytIOs4Ws=
 Received: from CY4PR18MB1112.namprd18.prod.outlook.com (10.173.183.147) by
  CY4PR18MB1350.namprd18.prod.outlook.com (10.173.247.15) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Wed, 20 Feb 2019 11:02:44 +0000
+ 15.20.1643.14; Wed, 20 Feb 2019 11:02:45 +0000
 Received: from CY4PR18MB1112.namprd18.prod.outlook.com
  ([fe80::7561:d13b:e106:12b4]) by CY4PR18MB1112.namprd18.prod.outlook.com
  ([fe80::7561:d13b:e106:12b4%4]) with mapi id 15.20.1643.014; Wed, 20 Feb 2019
- 11:02:44 +0000
+ 11:02:45 +0000
 From: Vadim Lomovtsev <vlomovtsev@marvell.com>
 To: "sgoutham@cavium.com" <sgoutham@cavium.com>, "sunil.kovvuri@gmail.com"
  <sunil.kovvuri@gmail.com>, "rric@kernel.org" <rric@kernel.org>,
@@ -84,13 +85,13 @@ To: "sgoutham@cavium.com" <sgoutham@cavium.com>, "sunil.kovvuri@gmail.com"
  <linux-arm-kernel@lists.infradead.org>, "netdev@vger.kernel.org"
  <netdev@vger.kernel.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>, "davem@davemloft.net" <davem@davemloft.net>
-Subject: [PATCH v3 3/8] net: thunderx: make CFG_DONE message to run through
- generic send-ack sequence
-Thread-Topic: [PATCH v3 3/8] net: thunderx: make CFG_DONE message to run
- through generic send-ack sequence
-Thread-Index: AQHUyQvNlb6mQ52TF0mUmIj359Ic1A==
-Date: Wed, 20 Feb 2019 11:02:43 +0000
-Message-ID: <20190220110225.9497-4-vlomovtsev@marvell.com>
+Subject: [PATCH v3 5/8] net: thunderx: rework xcast message structure to make
+ it fit into 64 bit
+Thread-Topic: [PATCH v3 5/8] net: thunderx: rework xcast message structure to
+ make it fit into 64 bit
+Thread-Index: AQHUyQvO394FVGRin0iNnndECswptg==
+Date: Wed, 20 Feb 2019 11:02:44 +0000
+Message-ID: <20190220110225.9497-6-vlomovtsev@marvell.com>
 References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
  <20190220110225.9497-1-vlomovtsev@marvell.com>
 In-Reply-To: <20190220110225.9497-1-vlomovtsev@marvell.com>
@@ -100,27 +101,27 @@ X-MS-Has-Attach:
 X-MS-TNEF-Correlator: 
 x-originating-ip: [4.28.12.78]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 16483b27-7724-4f33-c5aa-08d69722f10f
+x-ms-office365-filtering-correlation-id: 84bb55a4-23f0-42b9-ed31-08d69722f1b5
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
  SRVR:CY4PR18MB1350; 
 x-ms-traffictypediagnostic: CY4PR18MB1350:
 x-microsoft-exchange-diagnostics: 1; CY4PR18MB1350;
- 20:Omi+lUTunUZCC07Lxmo/+ehELBYJa5dJ6mnwRg4N/e2Bejxq8D9PlIkZhnhMLYPLe4SC84lDWJFOmjsLEkQWrg+TPL5tygaGhmfmhzl45gNhsyOUhnbEdi9YNCpsu5xd9wtNDvpEqxdMYRNQYmjil4W7OgQI2Zh49VQPqStC1IY=
-x-microsoft-antispam-prvs: <CY4PR18MB13501CD4AD5E84F48830AC0CCD7D0@CY4PR18MB1350.namprd18.prod.outlook.com>
+ 20:L5IvFPoQhzo/y6CVqkWVL+xbhnjZQirG4WxpaVekYdc6YbhnN3JXv+ec0iNvtKtWRWSoU1zY22lF3WNf0Z+pdizc18MQZh8kNucgLDCHNd/ZFBzq78cmOqbZA252twwBYQYCglYpE9JEh768Lwn1pO/r2poiSYDjcjYVIKHCw4Y=
+x-microsoft-antispam-prvs: <CY4PR18MB1350938E6D7A8C67C47AC30FCD7D0@CY4PR18MB1350.namprd18.prod.outlook.com>
 x-forefront-prvs: 0954EE4910
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(39860400002)(396003)(136003)(366004)(199004)(189003)(86362001)(97736004)(478600001)(476003)(11346002)(2616005)(68736007)(446003)(6512007)(5660300002)(256004)(186003)(99286004)(14454004)(76176011)(2906002)(36756003)(6486002)(2201001)(102836004)(6506007)(2501003)(6436002)(26005)(316002)(8936002)(305945005)(15650500001)(7736002)(25786009)(1076003)(53936002)(71200400001)(54906003)(81156014)(4326008)(110136005)(106356001)(107886003)(66066001)(81166006)(6116002)(8676002)(71190400001)(105586002)(3846002)(486006)(41533002);
+ SFS:(10009020)(346002)(376002)(39860400002)(396003)(136003)(366004)(199004)(189003)(86362001)(97736004)(478600001)(476003)(11346002)(2616005)(14444005)(68736007)(446003)(6512007)(5660300002)(256004)(186003)(99286004)(14454004)(76176011)(2906002)(36756003)(6486002)(2201001)(102836004)(6506007)(2501003)(6436002)(26005)(316002)(8936002)(305945005)(15650500001)(7736002)(25786009)(1076003)(53936002)(71200400001)(54906003)(81156014)(4326008)(110136005)(106356001)(107886003)(66066001)(81166006)(6116002)(8676002)(71190400001)(105586002)(3846002)(486006);
  DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR18MB1350;
  H:CY4PR18MB1112.namprd18.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: marvell.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: 3jnw5grPWzC6u/NAsbasrXnFFNH8YqLZ17QwUEAwtVBIE0Soh2oMXCxW6Bne0v/SLLVzt/Qb6Q+4X7LbwXL9X4MaKSrYj0+J8Fsk8mkJkHiOTS2P5pmNjSfwARsyIMGlAbS6LEur1ULDsSGGaVW/5OHhZpSAC9mepT+AD+tFmrhlJLsLIhwLD2SBiyJ04flVRUqxJTvMKozZAX3yU8ntSgoIs1sru8xzF1q66ObrpFRAxm0l3M/JgnHFdvvBMtciAbn6qnvKMDpyn3fP+oCWgLTZvDJPABIT9twR2ITO8Thb5oBVenkH3jU71YsY1aEHN1/htmTCFiAw31yCOxHPJty/uXsac75VTuFFxuItB8tLKZGM0mZC6GQhJ9IHAuVFVyQ75Jrbz9uf5TPUB+oxMXKxmLnTf7Gj8lxm9K8/uWs=
+x-microsoft-antispam-message-info: 2l9MmCT8mRO0zJxCgWGqVPrAcq3nHG7LGE7+oDlU6LBidaqnqu6kdAb6KnCJzCaapTmNQnBVzPIPODA8m5kl0BYcFEyRmSI7pZEz+df7Moeqwaqi70XRHPLTHGundIeLSCJN2KHoZgffEKYRinGQY/YtMpbt8DCJ8CqLkX/trjJxJ1ee3dXet6f1/V9iQE/YzUok7THAeaVrLnmgZQT5kkgV+hxwuIRS7j14yh4V0Uq9d+AyYKmxpY/4G4ps2lwq4OyjXNLpOo3VSwAbaWo/mK0mKLmaog+gp/hSGj/qaw/zysi+A/RHpYs4V6xyURhnuQ2F+yGtcP4aB+lFpmP13L2vsYOtRbdwgJlhCBa8p7PNRnjwlYd77qv1zOHfxfofujiUNck+koNmr9AeAThMQplKy5bJ3Rl/rJ+6WwvRk6o=
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 16483b27-7724-4f33-c5aa-08d69722f10f
-X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:02:43.8590 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 84bb55a4-23f0-42b9-ed31-08d69722f1b5
+X-MS-Exchange-CrossTenant-originalarrivaltime: 20 Feb 2019 11:02:44.6106 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-id: 70e1fb47-1155-421d-87fc-2e58f638b6e0
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
@@ -131,12 +132,12 @@ X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
 X-Proofpoint-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
  malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=697 adultscore=0 classifier=spam adjust=0 reason=mlx
+ clxscore=1011 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=351 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1902200080
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_030255_229637_193627D6 
-X-CRM114-Status: GOOD (  15.75  )
+X-CRM114-CacheID: sfid-20190220_030255_348158_A219266F 
+X-CRM114-Status: GOOD (  15.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -155,71 +156,89 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-At the end of NIC VF initialization VF sends CFG_DONE message to PF without
-using nicvf_msg_send_to_pf routine. This potentially could re-write data in
-mailbox. This commit is to implement common way of sending CFG_DONE message
-by the same way with other configuration messages by using
-nicvf_send_msg_to_pf() routine.
+To communicate to PF each of ThunderX NIC VF uses mailbox which is
+pair of 64 bit registers available to both VFn and PF.
+
+This commit is to change the xcast message structure in order to
+fit it into 64 bit.
 
 Signed-off-by: Vadim Lomovtsev <vlomovtsev@marvell.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c   |  2 +-
- drivers/net/ethernet/cavium/thunder/nicvf_main.c | 15 ++++++++++++---
- 2 files changed, 13 insertions(+), 4 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic.h        | 6 ++----
+ drivers/net/ethernet/cavium/thunder/nic_main.c   | 4 ++--
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c | 6 +++---
+ 3 files changed, 7 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/net/ethernet/cavium/thunder/nic.h b/drivers/net/ethernet/cavium/thunder/nic.h
+index 376a96bce33f..227343625e83 100644
+--- a/drivers/net/ethernet/cavium/thunder/nic.h
++++ b/drivers/net/ethernet/cavium/thunder/nic.h
+@@ -577,10 +577,8 @@ struct set_ptp {
+ 
+ struct xcast {
+ 	u8    msg;
+-	union {
+-		u8    mode;
+-		u64   mac;
+-	} data;
++	u8    mode;
++	u64   mac:48;
+ };
+ 
+ /* 128 bit shared memory between PF and each VF */
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 6c8dcb65ff03..90497a27df18 100644
+index 90497a27df18..620dbe082ca0 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -1039,7 +1039,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
- 	case NIC_MBOX_MSG_CFG_DONE:
- 		/* Last message of VF config msg sequence */
- 		nic_enable_vf(nic, vf, true);
--		goto unlock;
-+		break;
- 	case NIC_MBOX_MSG_SHUTDOWN:
- 		/* First msg in VF teardown sequence */
- 		if (vf >= nic->num_vf_en)
+@@ -1094,7 +1094,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+ 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+ 		bgx_set_dmac_cam_filter(nic->node, bgx, lmac,
+-					mbx.xcast.data.mac,
++					mbx.xcast.mac,
+ 					vf < NIC_VF_PER_MBX_REG ? vf :
+ 					vf - NIC_VF_PER_MBX_REG);
+ 		break;
+@@ -1106,7 +1106,7 @@ static void nic_handle_mbx_intr(struct nicpf *nic, int vf)
+ 		}
+ 		bgx = NIC_GET_BGX_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+ 		lmac = NIC_GET_LMAC_FROM_VF_LMAC_MAP(nic->vf_lmac_map[vf]);
+-		bgx_set_xcast_mode(nic->node, bgx, lmac, mbx.xcast.data.mode);
++		bgx_set_xcast_mode(nic->node, bgx, lmac, mbx.xcast.mode);
+ 		break;
+ 	default:
+ 		dev_err(&nic->pdev->dev,
 diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_main.c b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-index abf24e7dff2d..19b58fc3ca41 100644
+index 45f06504a61b..da5986ca7bee 100644
 --- a/drivers/net/ethernet/cavium/thunder/nicvf_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nicvf_main.c
-@@ -169,6 +169,17 @@ static int nicvf_check_pf_ready(struct nicvf *nic)
- 	return 1;
- }
+@@ -1961,7 +1961,7 @@ static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
+ 		 * its' own LMAC to the filter to accept packets for it.
+ 		 */
+ 		mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-		mbx.xcast.data.mac = 0;
++		mbx.xcast.mac = 0;
+ 		if (nicvf_send_msg_to_pf(nic, &mbx) < 0)
+ 			goto free_mc;
+ 	}
+@@ -1971,7 +1971,7 @@ static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
+ 		/* now go through kernel list of MACs and add them one by one */
+ 		for (idx = 0; idx < mc_addrs->count; idx++) {
+ 			mbx.xcast.msg = NIC_MBOX_MSG_ADD_MCAST;
+-			mbx.xcast.data.mac = mc_addrs->mc[idx];
++			mbx.xcast.mac = mc_addrs->mc[idx];
+ 			if (nicvf_send_msg_to_pf(nic, &mbx) < 0)
+ 				goto free_mc;
+ 		}
+@@ -1979,7 +1979,7 @@ static void __nicvf_set_rx_mode_task(u8 mode, struct xcast_addr_list *mc_addrs,
  
-+static void nicvf_send_cfg_done(struct nicvf *nic)
-+{
-+	union nic_mbx mbx = {};
-+
-+	mbx.msg.msg = NIC_MBOX_MSG_CFG_DONE;
-+	if (nicvf_send_msg_to_pf(nic, &mbx)) {
-+		netdev_err(nic->netdev,
-+			   "PF didn't respond to CFG DONE msg\n");
-+	}
-+}
-+
- static void nicvf_read_bgx_stats(struct nicvf *nic, struct bgx_stats_msg *bgx)
- {
- 	if (bgx->rx)
-@@ -1416,7 +1427,6 @@ int nicvf_open(struct net_device *netdev)
- 	struct nicvf *nic = netdev_priv(netdev);
- 	struct queue_set *qs = nic->qs;
- 	struct nicvf_cq_poll *cq_poll = NULL;
--	union nic_mbx mbx = {};
+ 	/* and finally set rx mode for PF accordingly */
+ 	mbx.xcast.msg = NIC_MBOX_MSG_SET_XCAST;
+-	mbx.xcast.data.mode = mode;
++	mbx.xcast.mode = mode;
  
- 	/* wait till all queued set_rx_mode tasks completes if any */
- 	drain_workqueue(nic->nicvf_rx_mode_wq);
-@@ -1515,8 +1525,7 @@ int nicvf_open(struct net_device *netdev)
- 		nicvf_enable_intr(nic, NICVF_INTR_RBDR, qidx);
- 
- 	/* Send VF config done msg to PF */
--	mbx.msg.msg = NIC_MBOX_MSG_CFG_DONE;
--	nicvf_write_to_mbx(nic, &mbx);
-+	nicvf_send_cfg_done(nic);
- 
- 	return 0;
- cleanup:
+ 	nicvf_send_msg_to_pf(nic, &mbx);
+ free_mc:
 -- 
 2.17.2
 
