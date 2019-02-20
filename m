@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 936B0C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:33:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21281C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:33:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 637782183F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:33:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E64882147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 12:33:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="om/D7/QK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 637782183F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="miyamghI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E64882147C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kWZejoy7Ig3cBoZFFI2KHkdlaLjqN56oozQ3Mz0SOJs=; b=om/D7/QK2UTq2r
-	KEiF6kczl9EUuHjjkVHq83AqVu9PLDhSUV8VYV7BCGOLBrT2bzLPy0p3YVA9UDc3sTwVwhc0NV9Qh
-	61inS8oB7FzcoSl5scnNyd02CC+3drqdtR9NOvO/nKd8K+pXvpUbrJEpwmmkImdMHBIroogmV5ZCL
-	FMFSoMAyBzK4SPFUmC0tSz369y7+RfilK7Bpuv8zQCVrhAGVKwQSiJaXFaZLTGIsRVpaWUl4xg4+x
-	Lvq1IQf2aFOOXZ+RK53hpuBBuXzW19BqH11OSqtyPsUr74iuChufT8IAYH+FD5W15Khcc66MSDYrd
-	lgRlwzP3ka1O+JOfWjQg==;
+	List-Owner; bh=rB4/rVN5bGbvljbNov8/JOH/1VntIDKUjxXMGAGRAHU=; b=miyamghIkI+6LK
+	8xluLtEo8kdhojJboMLXMK2dCxfzUEs68z36HaYEXfDJYB6Yjv91FhWLLFrLmb53sKvQT+VB3Kw8D
+	IF7A3FFjQ4/V9OhIXbcIRMQsPbO9OUBlAbkyyRuLV4xziZUvnMrwM5OY2NI0+/B/7e3Jwl3TTvH/A
+	k2Zq6v/Ljp27DFGyqqeKCXqjXnKJx2eJT3lT7k6l5RabwfX7ZzBkDL/5qsSn8RcDD0V8y/PQ9Sf/0
+	x6a4oeDRdQks2VlIr69ooxKDdXEeMNQSBbNBVLiUETMrFCQIPC+XGl0O6VzKNnty0IFM19SaRcI0I
+	skTdlt55rl6+h10P/dEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwR3z-0001Nq-98; Wed, 20 Feb 2019 12:33:23 +0000
+	id 1gwR4H-0001g5-8r; Wed, 20 Feb 2019 12:33:41 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwR3T-0000tA-Di; Wed, 20 Feb 2019 12:33:03 +0000
-X-UUID: b9825bf65dff4f309880699cc7a8ad76-20190220
-X-UUID: b9825bf65dff4f309880699cc7a8ad76-20190220
+ id 1gwR3d-0000rr-G6; Wed, 20 Feb 2019 12:33:12 +0000
+X-UUID: f52d3f0a09694213aa18a7637b0859b6-20190220
+X-UUID: f52d3f0a09694213aa18a7637b0859b6-20190220
 Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
  (envelope-from <michael.kao@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 160293698; Wed, 20 Feb 2019 04:31:45 -0800
+ with ESMTP id 1969218810; Wed, 20 Feb 2019 04:31:45 -0800
 Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
  MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Wed, 20 Feb 2019 04:31:44 -0800
@@ -57,18 +57,18 @@ To: Zhang Rui <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, Rob Herring <robh+dt@kernel.org>, 
  Mark Rutland <mark.rutland@arm.com>, Matthias Brugger
  <matthias.bgg@gmail.com>
-Subject: [PATCH v2,5/7] thermal: mediatek: add flag for bank selection
-Date: Wed, 20 Feb 2019 20:31:31 +0800
-Message-ID: <1550665893-22561-6-git-send-email-michael.kao@mediatek.com>
+Subject: [PATCH v2,3/7] thermal: mediatek: add calibration item
+Date: Wed, 20 Feb 2019 20:31:29 +0800
+Message-ID: <1550665893-22561-4-git-send-email-michael.kao@mediatek.com>
 X-Mailer: git-send-email 1.9.1
 In-Reply-To: <1550665893-22561-1-git-send-email-michael.kao@mediatek.com>
 References: <1550665893-22561-1-git-send-email-michael.kao@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 9802375734CC28087793DB99608572D72B6D43699BA5EC9FD9353FE3F7AC2BF32000:8
+X-TM-SNTS-SMTP: A680BDA5DBE42D0DF397EB212030EB7EF88D2FAEE9FBF70178385BBFADECA3752000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_043252_101591_EFD6FC11 
-X-CRM114-Status: GOOD (  11.54  )
+X-CRM114-CacheID: sfid-20190220_043302_295657_00345B22 
+X-CRM114-Status: GOOD (  11.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,89 +90,106 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Michael Kao <michael.kao@mediatek.com>
 
-For past ic designs, the thermal controller should select banks before
-reading the thermal sensor.
-And the new ic design architecture removes this mechanism.
+Add calibration item in thermal_data to support
+the project with different calibration coefficient.
 
 Signed-off-by: Michael Kao <michael.kao@mediatek.com>
 ---
- drivers/thermal/mtk_thermal.c | 20 ++++++++++++++------
- 1 file changed, 14 insertions(+), 6 deletions(-)
+ drivers/thermal/mtk_thermal.c | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/thermal/mtk_thermal.c b/drivers/thermal/mtk_thermal.c
-index c96a746..0a3944e 100644
+index 07f8ad7..45c6587 100644
 --- a/drivers/thermal/mtk_thermal.c
 +++ b/drivers/thermal/mtk_thermal.c
-@@ -213,6 +213,7 @@ struct mtk_thermal_data {
- 	const int cali_val;
- 	const int num_controller;
- 	const int *controller_offset;
-+	bool need_switch_bank;
+@@ -105,6 +105,9 @@
+ /* The number of sensing points per bank */
+ #define MT8173_NUM_SENSORS_PER_ZONE	4
+ 
++/* The calibration coefficient of sensor  */
++#define MT8173_CALIBRATION	165
++
+ /*
+  * Layout of the fuses providing the calibration data
+  * These macros could be used for MT8173, MT2701, and MT2712.
+@@ -147,6 +150,9 @@ enum {
+ /* The number of sensing points per bank */
+ #define MT2701_NUM_SENSORS_PER_ZONE	3
+ 
++/* The calibration coefficient of sensor  */
++#define MT2701_CALIBRATION	165
++
+ /* MT2712 thermal sensors */
+ #define MT2712_TS1	0
+ #define MT2712_TS2	1
+@@ -162,12 +168,18 @@ enum {
+ /* The number of sensing points per bank */
+ #define MT2712_NUM_SENSORS_PER_ZONE	4
+ 
++/* The calibration coefficient of sensor  */
++#define MT2712_CALIBRATION	165
++
+ #define MT7622_TEMP_AUXADC_CHANNEL	11
+ #define MT7622_NUM_SENSORS		1
+ #define MT7622_NUM_ZONES		1
+ #define MT7622_NUM_SENSORS_PER_ZONE	1
+ #define MT7622_TS1	0
+ 
++/* The calibration coefficient of sensor  */
++#define MT7622_CALIBRATION	165
++
+ struct mtk_thermal;
+ 
+ struct thermal_bank_cfg {
+@@ -188,6 +200,7 @@ struct mtk_thermal_data {
+ 	const int *sensor_mux_values;
+ 	const int *msr;
+ 	const int *adcpnp;
++	const int cali_val;
  	struct thermal_bank_cfg bank_data[];
  };
  
-@@ -327,6 +328,7 @@ struct mtk_thermal {
- 	.cali_val = MT8173_CALIBRATION,
- 	.num_controller = MT8173_NUM_CONTROLLER,
- 	.controller_offset = mt8173_tc_offset,
-+	.need_switch_bank = true,
+@@ -295,6 +308,7 @@ struct mtk_thermal {
+ 	.num_banks = MT8173_NUM_ZONES,
+ 	.num_sensors = MT8173_NUM_SENSORS,
+ 	.vts_index = mt8173_vts_index,
++	.cali_val = MT8173_CALIBRATION,
  	.bank_data = {
  		{
  			.num_sensors = 2,
-@@ -365,6 +367,7 @@ struct mtk_thermal {
- 	.cali_val = MT2701_CALIBRATION,
- 	.num_controller = MT2701_NUM_CONTROLLER,
- 	.controller_offset = mt2701_tc_offset,
-+	.need_switch_bank = true,
+@@ -330,6 +344,7 @@ struct mtk_thermal {
+ 	.num_banks = 1,
+ 	.num_sensors = MT2701_NUM_SENSORS,
+ 	.vts_index = mt2701_vts_index,
++	.cali_val = MT2701_CALIBRATION,
  	.bank_data = {
  		{
  			.num_sensors = 3,
-@@ -394,6 +397,7 @@ struct mtk_thermal {
- 	.cali_val = MT2712_CALIBRATION,
- 	.num_controller = MT2712_NUM_CONTROLLER,
- 	.controller_offset = mt2712_tc_offset,
-+	.need_switch_bank = true,
+@@ -356,6 +371,7 @@ struct mtk_thermal {
+ 	.num_banks = 1,
+ 	.num_sensors = MT2712_NUM_SENSORS,
+ 	.vts_index = mt2712_vts_index,
++	.cali_val = MT2712_CALIBRATION,
  	.bank_data = {
  		{
  			.num_sensors = 4,
-@@ -417,6 +421,7 @@ struct mtk_thermal {
- 	.cali_val = MT7622_CALIBRATION,
- 	.num_controller = MT7622_NUM_CONTROLLER,
- 	.controller_offset = mt7622_tc_offset,
-+	.need_switch_bank = true,
+@@ -376,6 +392,7 @@ struct mtk_thermal {
+ 	.num_banks = MT7622_NUM_ZONES,
+ 	.num_sensors = MT7622_NUM_SENSORS,
+ 	.vts_index = mt7622_vts_index,
++	.cali_val = MT7622_CALIBRATION,
  	.bank_data = {
  		{
  			.num_sensors = 1,
-@@ -463,12 +468,14 @@ static void mtk_thermal_get_bank(struct mtk_thermal_bank *bank)
- 	struct mtk_thermal *mt = bank->mt;
- 	u32 val;
+@@ -402,7 +419,7 @@ static int raw_to_mcelsius(struct mtk_thermal *mt, int sensno, s32 raw)
+ 	raw &= 0xfff;
  
--	mutex_lock(&mt->lock);
-+	if (mt->conf->need_switch_bank) {
-+		mutex_lock(&mt->lock);
- 
--	val = readl(mt->thermal_base + PTPCORESEL);
--	val &= ~0xf;
--	val |= bank->id;
--	writel(val, mt->thermal_base + PTPCORESEL);
-+		val = readl(mt->thermal_base + PTPCORESEL);
-+		val &= ~0xf;
-+		val |= bank->id;
-+		writel(val, mt->thermal_base + PTPCORESEL);
-+	}
- }
- 
- /**
-@@ -481,7 +488,8 @@ static void mtk_thermal_put_bank(struct mtk_thermal_bank *bank)
- {
- 	struct mtk_thermal *mt = bank->mt;
- 
--	mutex_unlock(&mt->lock);
-+	if (mt->conf->need_switch_bank)
-+		mutex_unlock(&mt->lock);
- }
- 
- /**
+ 	tmp = 203450520 << 3;
+-	tmp /= 165 + mt->o_slope;
++	tmp /= mt->conf->cali_val + mt->o_slope;
+ 	tmp /= 10000 + mt->adc_ge;
+ 	tmp *= raw - mt->vts[sensno] - 3350;
+ 	tmp >>= 3;
 -- 
 1.9.1
 
