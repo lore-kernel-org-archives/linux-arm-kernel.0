@@ -2,22 +2,22 @@ Return-Path: <SRS0=0Bxu=Q3=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_ADSP_ALL,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E17DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:35:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E4E71C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:36:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 52FA42147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:35:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B88D72147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 20 Feb 2019 16:36:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nt+xcg3y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52FA42147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UOiWLzGN";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=rere.qmqm.pl header.i=@rere.qmqm.pl header.b="k8b/b1t0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B88D72147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=rere.qmqm.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,42 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f/H/FwSRl5elP+2ebB5KsOIbS7v8+4vg/lKwVTOhUIU=; b=Nt+xcg3yDJc632
-	qFlou2cl5gg/hF3VpqhfpDXl67bF0bEarBF3VMKNyH8A9Rz25msB4FMwEKN+PRN2BlLgRjTMWzjnm
-	iu9pFLOEZdx6DnRVyVbrSCUQjhClGTrHV9RiKDJ64OG69tFHuwvYteqyAncpLUpXvYIe8Dn367bYd
-	wOIga/4GW6EELCSGBqK8dIKhFP1QT0xiWV4BpwnJuciLtc0ZGJL/M7goFwdMaG4ASdEjtsvTTUqGi
-	iXm9jDA6CDZnYoCuvpQy2GWI5Af074GkJJjWNilQbPJ65Vw+s6QesbjqL+g9KukGJ2vFWrWADGTs5
-	16033IYMNyFIfRqjTrjw==;
+	List-Owner; bh=ufOalnpbb0jYWqeVc6JYIWrKeDWUrNm6zJP2My5BBFw=; b=UOiWLzGNkkwKF/
+	JQL8D3GETFHWj9JjK801kErCHsl+ySnSVvFEZE0d9nI13oQBjYS4/D2qeJRcjgYxfMKAa/me/3qm8
+	l3iMuKbrbd/AwSTjSzgyFWvToublir6HEuNH0CHvGogJJRiB/KXE4fF+V3UG6y3p8WIbdHh77hSb5
+	axAsrrOlyjdnhyN991eeIjilauAB3oN0cx2XKWqfy4lDeEWZw2Ag7wmV0XdbytinQcPO84E2BryBH
+	ZFnxHk9tkLrWzMgKbHv+rSFOqbOriRFdWejW/Y/6SOtCe6KhxfoNE7727QOA54kiPVLzPkJK8WZQH
+	CIQfVmjgMsNPllKC2OfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwUqc-0007M4-OV; Wed, 20 Feb 2019 16:35:50 +0000
-Received: from relay1-d.mail.gandi.net ([217.70.183.193])
+	id 1gwUrF-0007eH-IA; Wed, 20 Feb 2019 16:36:29 +0000
+Received: from rere.qmqm.pl ([91.227.64.183])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwUqY-0007LS-EQ
- for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:35:48 +0000
-X-Originating-IP: 185.94.189.187
-Received: from localhost (unknown [185.94.189.187])
- (Authenticated sender: maxime.ripard@bootlin.com)
- by relay1-d.mail.gandi.net (Postfix) with ESMTPSA id A4480240003;
- Wed, 20 Feb 2019 16:35:34 +0000 (UTC)
-Date: Wed, 20 Feb 2019 17:35:33 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jagan Teki <jagan@amarulasolutions.com>
-Subject: Re: [PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
-Message-ID: <20190220163533.cehatadivjolo7sk@flea>
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <20190215141244.5jrrqkykna6enbtp@flea>
- <CAMty3ZAA90-fHPADJSE3ht9CiYWA3yBoyEy7wVv9=6C5JiaTVw@mail.gmail.com>
- <c46cd50a-3695-ebc8-0cd4-4ddc27fc353b@openedev.com>
- <8d64d043333e3d43c36d60788d6c5b0997bc4e69.camel@bootlin.com>
- <CAMty3ZDK4Zw4XnSQFmT9C68Kf1LTshnVfMJOEM3ZbXa0AvJT4A@mail.gmail.com>
+ id 1gwUrB-0007d2-OY
+ for linux-arm-kernel@lists.infradead.org; Wed, 20 Feb 2019 16:36:27 +0000
+Received: from remote.user (localhost [127.0.0.1])
+ by rere.qmqm.pl (Postfix) with ESMTPSA id 444NVy31Pgz7y;
+ Wed, 20 Feb 2019 17:35:06 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=rere.qmqm.pl; s=1;
+ t=1550680508; bh=mArx3lQNxcAMVi6yx7LwatL78DeNE70aWYwFI/YEqmQ=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=k8b/b1t05Ri+PAk+ytVgKwgSoxtqzWLxd3xZ9dJoTMURUXEbSbCo0/hzzfruj2ck8
+ YvtpHUAQnOkMxFIB8iSBnWPZ8PUCJzUj7XfYgiWUd7BdjBAkI+Z5KAyU4I6Zzb4Mmr
+ 4hBUnl+YeWvLKQ9a44mjO5YfwR5q6DEGi1RZLUJTyASYSfXuHsof/C337MGRh8i4PX
+ ZUpTlxl1rIwgjjfVBBtQK78Sis1n2vvYg2Vay/zxrZd/3DjY1XhEOl5//j6TQ+T99l
+ o5qbBhXqVkb0wqQvRvHf/ukuRb3oZRzKjKebGm2FwEr4lFJcaQgU3Rbsl3/RCf606T
+ 6W6OAqQIialWg==
+X-Virus-Status: Clean
+X-Virus-Scanned: clamav-milter 0.100.2 at mail
+Date: Wed, 20 Feb 2019 17:36:14 +0100
+From: =?iso-8859-2?Q?Micha=B3_Miros=B3aw?= <mirq-linux@rere.qmqm.pl>
+To: Dmitry Osipenko <digetx@gmail.com>
+Subject: Re: [PATCH v4 0/8] Support Trusted Foundations firmware on Tegra30
+Message-ID: <20190220163614.GA11116@qmqm.qmqm.pl>
+References: <20190218001726.16785-1-digetx@gmail.com>
+ <c6d761cf-370c-c4f7-931b-d2333e02f2dc@gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAMty3ZDK4Zw4XnSQFmT9C68Kf1LTshnVfMJOEM3ZbXa0AvJT4A@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <c6d761cf-370c-c4f7-931b-d2333e02f2dc@gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_083546_777850_FC407A8A 
-X-CRM114-Status: GOOD (  29.96  )
+X-CRM114-CacheID: sfid-20190220_083625_961997_2FED9E83 
+X-CRM114-Status: UNSURE (   8.92  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,183 +78,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel <dri-devel@lists.freedesktop.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
+ Jonathan Hunter <jonathanh@nvidia.com>,
+ Thierry Reding <thierry.reding@gmail.com>, Robert Yang <decatf@gmail.com>,
+ linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
-
-On Mon, Feb 18, 2019 at 04:01:09PM +0530, Jagan Teki wrote:
-> On Mon, Feb 18, 2019 at 1:56 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > On Fri, 2019-02-15 at 22:37 +0530, Jagan Teki wrote:
-> > > On 15/02/19 8:10 PM, Jagan Teki wrote:
-> > > >
-> > > > On Fri, 15 Feb, 2019, 7:43 PM Maxime Ripard, <maxime.ripard@bootlin.com
-> > > > <mailto:maxime.ripard@bootlin.com>> wrote:
-> > > >
-> > > >     On Mon, Feb 11, 2019 at 03:41:21PM +0100, Maxime Ripard wrote:
-> > > >      > Hi,
-> > > >      >
-> > > >      > Here is a series implementing the burst mode support for DSI.
-> > > >      >
-> > > >      > It's been tested on an A33 board with the panel supported on the last
-> > > >      > patch, which should remove all quirks due to a different SoC from the
-> > > >      > equation.
-> > > >
-> > > >     I should have sent that mail yesterday, but patches 1-4 and 6-7 were
-> > > >     merged. Patch 5 was discarded since it was not consistent with the
-> > > >     rest of the driver, and 8 had some comments.
-> > > >
-> > > >
-> > > > Are the applied patches from this series or from my v7 series?
-> > > >
-> > > >   Would you please point me the branch.
-> > > >
-> > >
-> > > Unfortunately my last mail didn't reach arm mailing list.
-> > >
-> > > Just wanted to know are the applied patches from this series or from my
-> > > v7 series? Would you please point me the repo, I couldn't find it on
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
-> >
-> > This series is the one that was applied upstream. You can find the
-> > commits merged at: https://cgit.freedesktop.org/drm/drm-misc/log/
-> 
-> Thanks for sharing the link Paul.
-> 
-> This is really really discouraging.
-> 
-> Don't know whom to ask directly about this, but I am really upset
-> about this move.
-
-I appreciate and understand that, and I feel sorry it ended up like
-this.
-
-> Most of the changes from applied series have similar patches that are
-> been part of my series of patches. I've been sending this since last
-> September (which was sent way prior than this series).
-
-Note that only the burst part has been merged, and the first time you
-sent it was in November.
-
-> How come the same series is recreated and applied with minor changes
-> while the original series was still in discussion. At least Maxime
-> should have informed me or he should have rejected my work from
-> patchwork or atleast NAK in ML?
-
-I did, both in private and public. And I've told you on numerous
-occasions what was wrong with your series and the way you were pushing
-things. But let's break it down:
-
-v8:
-  - Chen-Yu and I spent a lot of time (almost two full work days in my
-    case, Chen-Yu at least a full evening from what I know) trying to
-    make sense of the Allwinner BSP code, and report what was being
-    done. This was made public on the mailing lists, and you were in
-    cc [1][2]. It happened the week before your submission, yet you
-    ignored most of those changes, and I told you so [3], mentionning
-    a bunch of other recurring comments I had that were not really
-    addressed.
-  - This series and the other also had some obvious flaw that had 0
-    chance to work properly (which you eventually noticed[4])
-
-v7:
-  - Chen-Yu and I were already discussing and pointing out some
-    issues, that were not addressed[5]
-
-v6:
-  - Reviewing a PLL issue, already mentionned in the v5 and v2 [6]
-
-v5:
-  - I mention that the display I have is broken, just like in your v4 [6].
-    Just like in the v4, I'm asking for a panel datasheet so
-    that I can help you debug this further. This is ignored.
-  - I asked for clarifications on that PLL min_rate, just like in the
-    previous versions [7]
-
-v4 
- - I mention that the only other DSI display there is is broken
-   [8]. I'm again asking for datasheet and better commit logs.
-
-v3
-  - Some more ignored comments [9]
-
-A64 DSI v2
-  - Asking details on the PLL min_rate, comments ignored [10]
-  - Untested code [11]
-
-Burst v2
-  - More details asked, obvious flaws [12]
-
-v1
-  - Me asking for better commit logs and some justifications [13][14][15]
-
-
-TL; DR: there's not been any single iteration of those patches where
-you wouldn't have ignored some comments made on a previous iteration,
-despite for some patches numerous questions around the same points,
-and with very significant time invested in this by numerous people
-(Chen-Yu, myself and Paul to a lesser extent).
-
-This is what was completely stalling your series, and I'm sure
-frustrating both sides. You even acknowledged that in that mail:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/632060.html
-
-Yet, you submitted your v8 versions without taking our comments into
-account.
-
-> All these burst changes and random fixes are reviewed in couple of
-> versions, now the versioning moved to v8[1] [2]. For each and every
-> versioning I'm trying to fix the previous version comments, code
-> improvements, commit messages. In fact for each rotation I'm trying to
-> validate 4 different panels which eventually consume all my 16 hours
-> in day.
-> 
-> Please let me know to how could we better collaborate?
-
-By listening and addressing the reviews we are making. If you feel
-like you're missing something and / or not understanding everything in
-a review (which honestly would be pretty understandable with that
-sub-par DSI block documentation), then please ask, but ignoring those
-comments will just be a waste of time for everyone involved, and will
-frustrate everybody (especially when the time spent is this important).
-
-Like I was saying before, I haven't merged any A64 or panel patches,
-so this will be a pretty good occasion to test this.
-
-Maxime
-
-1: http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/630522.html
-2: http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/630772.html
-3: http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/632076.html
-4: https://patchwork.freedesktop.org/patch/286191/
-5: https://patchwork.freedesktop.org/patch/280045/
-6: https://patchwork.freedesktop.org/patch/253495/
-7: https://patchwork.freedesktop.org/patch/267373/
-8: https://patchwork.freedesktop.org/patch/267362/
-9: https://patchwork.freedesktop.org/patch/261779/
-10: https://patchwork.freedesktop.org/patch/258921/
-11: https://patchwork.kernel.org/patch/10653309/
-12: https://patchwork.kernel.org/patch/10653355/
-13: https://patchwork.freedesktop.org/patch/262554/
-14: https://patchwork.freedesktop.org/patch/253495/
-15: https://patchwork.freedesktop.org/patch/253503/
-16: https://patchwork.freedesktop.org/patch/253491/
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gV2VkLCBGZWIgMjAsIDIwMTkgYXQgMDQ6MzA6MjBQTSArMDMwMCwgRG1pdHJ5IE9zaXBlbmtv
+IHdyb3RlOgo+IDE4LjAyLjIwMTkgMzoxNywgRG1pdHJ5IE9zaXBlbmtvINC/0LjRiNC10YI6Cj4g
+PiBIZWxsbywKPiA+IAo+ID4gVGhpcyBwYXRjaHNldCBhZGRzIHN1cHBvcnQgZm9yIHRoZSBUcnVz
+dGVkIEZvdW5kYXRpb25zIGZpcm13YXJlIG9uCj4gPiBOVklESUEgVGVncmEzMC4gUHJldHR5IG11
+Y2ggYWxsIG9mIFRlZ3JhMzAgY29uc3VtZXIgZGV2aWNlcyBoYXZlIHRoYXQKPiA+IGZpcm13YXJl
+IGFuZCB1cHN0cmVhbSBrZXJuZWwgY2FuJ3QgYm9vdCBvbiB0aG9zZSBkZXZpY2VzIHdpdGhvdXQg
+dGhlCj4gPiBmaXJtd2FyZSBzdXBwb3J0Lgo+IAo+IEhlbGxvIE1pY2hhxYIsCj4gCj4gV2lsbCBi
+ZSBhd2Vzb21lIGlmIHlvdSBjb3VsZCB0ZXN0IHRoZSBzZXJpZXMgb24geW91cnMgVEYzMDBUIGFu
+ZCByZXBvcnQgYmFjaywgdGhhbmtzIGluIGFkdmFuY2UhCgpJIHRoaW5rIEkgd2lsbCBiZSBhYmxl
+IHRvIGxvb2sgaW50byB0aGlzIGR1cmluZyB0aGUgd2Vla2VuZC4gV2hpY2gKa2VybmVsIHRyZWUg
+ZG8geW91IHN1Z2dlc3QgYXMgYmFzZT8KCkJlc3QgUmVnYXJkcywKTWljaGHFgsKgTWlyb3PFgmF3
+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1h
+cm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5v
+cmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0t
+a2VybmVsCg==
