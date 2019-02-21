@@ -2,21 +2,21 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3247C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:19:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53F91C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:25:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 783052147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:19:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 193D62147A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:25:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U4S+CQdq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="sYyPw0aG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 783052147A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q2Kbd/wi";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="bDhjk7i3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 193D62147A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tYWkBDGelvEKK6xeBZS6JE8IGKXdRIwOPXN7Fo3pQg4=; b=U4S+CQdqzksVk4
-	PR01fNUgZ7ADGK/t9PZH3uoQsamPTiqSEuVYpVz8ST/VMvWsLz0LZ6V0pfX/F7XTZaXRlYpfuJ7Hw
-	0GstRM1Vxe1ehVFQ1vRRhxEIP9p5P/diHkv4r7JOL4v6zE9xcnyZhYcFlQCy1H8c9SfyAJefr9X7g
-	kfuOqXWWOeiHF85iZ4W1bt+oLTG7hUsEcFqjLqtWhCV5GXbMRmBVDQBlfTEfMeryl73+OZ+/H/tor
-	KHG8TKEJkj9O+ntAQCvUuj7uqL9SiryTTcjEr7Vxzp6xFk7pJk6kdeSRSzcYWw+vePkT7udDydhVt
-	fgU6Bmzy0kmKfhgfASww==;
+	List-Owner; bh=AYqiBgtjManPpAaXjVG1DfwiLc7TxiNi7OjgSR6Hgu0=; b=q2Kbd/wickgXTF
+	K0s52c6vITutW7tofSAByJ0ntPSob8QxeT/kTNkF9SafNCK3s7UUlFXOroHIYgsarSMAFrjl9nXPH
+	8YD7MkDWF5XxD1e0J55jPb+Bm1CKXbCWmatCiM+bAP3pG+ZyRTmxL2t/F2sAiFbmKPfoYDpSUJwC5
+	mJHjh31oj0d2AsPf6n3xPgAAOybLdksLFTK6ey4LTcx1LsKGFhDiVYh5VXx50zUaZ4/suDfrfiGlb
+	4dcQ+/Xs/g/yrWghCWq/e8ATgLSOVd3bAiIcBsuhtn1j7TgacAhjNNLD+bTRr0mNLE+CB80C31ZCF
+	aTNlxyzae8h6ShQj0MOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwmNi-0005Kg-ES; Thu, 21 Feb 2019 11:19:10 +0000
+	id 1gwmU7-0000NB-Ck; Thu, 21 Feb 2019 11:25:47 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwmNf-0005KG-9N; Thu, 21 Feb 2019 11:19:08 +0000
+ id 1gwmU4-0000MQ-KE; Thu, 21 Feb 2019 11:25:46 +0000
 Received: from localhost (unknown [91.160.177.164])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id B7DA32084F;
- Thu, 21 Feb 2019 11:19:04 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id EF2942084F;
+ Thu, 21 Feb 2019 11:25:41 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550747947;
- bh=OFWRmPdHR9MMBor0LEiYPxs3cWI8jGhrxy11w5VI+4M=;
+ s=default; t=1550748344;
+ bh=kds1rV8j7IXcOqn/OYulUikOuVxCR6va1Q/Ev0NHbe0=;
  h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=sYyPw0aGHSr5e4wIEFbPHuD3OsbdxtrBqd7kH8zyGrTeEAI4wuX97gRU794pC+cvk
- KjSPsKkb2NlGSKVHlDJKs4bnZ6sD2SKFDzmKvle0LIytCADcGML3iaj0UatLBDSEoH
- 0jCpmPMpC/E3owbQ35ftRzBpmmtYB/4icXTbJJnE=
-Date: Thu, 21 Feb 2019 12:19:00 +0100
+ b=bDhjk7i3uzdLhw6nx9kb7WrLJU8IkxRwBNy8UPDCkaNj7INAghtefpacDHqt1J89b
+ Qv9yF0vE7gwXAR4dbEwm1u4ZZEU5Xi8ZQGB3Ic11iRXHJIwAiyMzzQL89kZHN5sBM/
+ Ybwv7TP/za38E4tCB8QItrAiCsTuLOlr/whCRyio=
+Date: Thu, 21 Feb 2019 12:25:38 +0100
 From: Boris Brezillon <bbrezillon@kernel.org>
 To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [RFC PATCH 05/27] mtd: nand: Move standard OOB layouts to the
- NAND core
-Message-ID: <20190221121900.19d28477@kernel.org>
-In-Reply-To: <20190221100216.25255-6-miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 08/27] mtd: nand: ecc: Use SPDX license identifier
+ for the software BCH code
+Message-ID: <20190221122538.414750f7@kernel.org>
+In-Reply-To: <20190221100216.25255-9-miquel.raynal@bootlin.com>
 References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
- <20190221100216.25255-6-miquel.raynal@bootlin.com>
+ <20190221100216.25255-9-miquel.raynal@bootlin.com>
 X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_031907_344457_4CBB3D72 
-X-CRM114-Status: GOOD (  11.65  )
+X-CRM114-CacheID: sfid-20190221_032544_682241_F1B8A0E7 
+X-CRM114-Status: GOOD (  19.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,31 +82,47 @@ Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Brian Norris <computersforpeace@gmail.com>,
  David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 11:01:54 +0100
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-
-> These OOB layouts are generic to all NAND chips, the should not be
-> restricted to be used only by raw NAND controller drivers. They might
-> later be used by generic ECC engines and SPI-NAND devices as well.
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  drivers/mtd/nand/core.c             | 161 ++++++++++++++++++++++++++++
-
-Can we place those definitions in ecc.c instead of core.c
-
->  drivers/mtd/nand/raw/nand_base.c    | 161 +---------------------------
->  drivers/mtd/nand/raw/nand_toshiba.c |   2 +
->  include/linux/mtd/nand.h            |   4 +
->  include/linux/mtd/rawnand.h         |   3 -
->  5 files changed, 168 insertions(+), 163 deletions(-)
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gVGh1LCAyMSBGZWIgMjAxOSAxMTowMTo1NyArMDEwMApNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwu
+cmF5bmFsQGJvb3RsaW4uY29tPiB3cm90ZToKCj4gUmVtb3ZlIHRoZSBsZWdhY3kgbGljZW5zZSB0
+ZXh0LCBhbHNvIHVwZGF0ZSB0aGUgTU9EVUxFX0xJQ0VOU0UgbWFjcm8KPiBpbiBhY2NvcmRhbmNl
+IHdpdGggdGhlIHRleHQgYXQgdGhlIHRvcCBvZiB0aGUgZmlsZSAoR1BMIHYyIG9yCj4gaGlnaGVy
+KS4KPiAKPiBTaWduZWQtb2ZmLWJ5OiBNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3Rs
+aW4uY29tPgo+IC0tLQo+ICBkcml2ZXJzL210ZC9uYW5kL2VjYy9zdy1iY2gtZW5naW5lLmMgICB8
+IDE3ICsrLS0tLS0tLS0tLS0tLS0tCj4gIGluY2x1ZGUvbGludXgvbXRkL25hbmQtc3ctYmNoLWVu
+Z2luZS5oIHwgIDUgKy0tLS0KPiAgMiBmaWxlcyBjaGFuZ2VkLCAzIGluc2VydGlvbnMoKyksIDE5
+IGRlbGV0aW9ucygtKQo+IAo+IGRpZmYgLS1naXQgYS9kcml2ZXJzL210ZC9uYW5kL2VjYy9zdy1i
+Y2gtZW5naW5lLmMgYi9kcml2ZXJzL210ZC9uYW5kL2VjYy9zdy1iY2gtZW5naW5lLmMKPiBpbmRl
+eCAzN2RjMGYwMDYxZDMuLjg3MWM0ZGQ5ZjcxZCAxMDA2NDQKPiAtLS0gYS9kcml2ZXJzL210ZC9u
+YW5kL2VjYy9zdy1iY2gtZW5naW5lLmMKPiArKysgYi9kcml2ZXJzL210ZC9uYW5kL2VjYy9zdy1i
+Y2gtZW5naW5lLmMKPiBAQCAtMSwyMiArMSw5IEBACj4gKy8vIFNQRFgtTGljZW5zZS1JZGVudGlm
+aWVyOiBHUEwtMi4wKwo+ICAvKgo+ICAgKiBUaGlzIGZpbGUgcHJvdmlkZXMgRUNDIGNvcnJlY3Rp
+b24gZm9yIG1vcmUgdGhhbiAxIGJpdCBwZXIgYmxvY2sgb2YgZGF0YSwKPiAgICogdXNpbmcgYmlu
+YXJ5IEJDSCBjb2Rlcy4gSXQgcmVsaWVzIG9uIHRoZSBnZW5lcmljIEJDSCBsaWJyYXJ5IGxpYi9i
+Y2guYy4KPiAgICoKPiAgICogQ29weXJpZ2h0IMKpIDIwMTEgSXZhbiBEamVsaWMgPGl2YW4uZGpl
+bGljQHBhcnJvdC5jb20+Cj4gLSAqCj4gLSAqIFRoaXMgZmlsZSBpcyBmcmVlIHNvZnR3YXJlOyB5
+b3UgY2FuIHJlZGlzdHJpYnV0ZSBpdCBhbmQvb3IgbW9kaWZ5IGl0Cj4gLSAqIHVuZGVyIHRoZSB0
+ZXJtcyBvZiB0aGUgR05VIEdlbmVyYWwgUHVibGljIExpY2Vuc2UgYXMgcHVibGlzaGVkIGJ5IHRo
+ZQo+IC0gKiBGcmVlIFNvZnR3YXJlIEZvdW5kYXRpb247IGVpdGhlciB2ZXJzaW9uIDIgb3IgKGF0
+IHlvdXIgb3B0aW9uKSBhbnkKPiAtICogbGF0ZXIgdmVyc2lvbi4KPiAtICoKPiAtICogVGhpcyBm
+aWxlIGlzIGRpc3RyaWJ1dGVkIGluIHRoZSBob3BlIHRoYXQgaXQgd2lsbCBiZSB1c2VmdWwsIGJ1
+dCBXSVRIT1VUCj4gLSAqIEFOWSBXQVJSQU5UWTsgd2l0aG91dCBldmVuIHRoZSBpbXBsaWVkIHdh
+cnJhbnR5IG9mIE1FUkNIQU5UQUJJTElUWSBvcgo+IC0gKiBGSVRORVNTIEZPUiBBIFBBUlRJQ1VM
+QVIgUFVSUE9TRS4gIFNlZSB0aGUgR05VIEdlbmVyYWwgUHVibGljIExpY2Vuc2UKPiAtICogZm9y
+IG1vcmUgZGV0YWlscy4KPiAtICoKPiAtICogWW91IHNob3VsZCBoYXZlIHJlY2VpdmVkIGEgY29w
+eSBvZiB0aGUgR05VIEdlbmVyYWwgUHVibGljIExpY2Vuc2UgYWxvbmcKPiAtICogd2l0aCB0aGlz
+IGZpbGU7IGlmIG5vdCwgd3JpdGUgdG8gdGhlIEZyZWUgU29mdHdhcmUgRm91bmRhdGlvbiwgSW5j
+LiwKPiAtICogNTkgVGVtcGxlIFBsYWNlLCBTdWl0ZSAzMzAsIEJvc3RvbiwgTUEgMDIxMTEtMTMw
+NyBVU0EuCj4gICAqLwo+ICAKPiAgI2luY2x1ZGUgPGxpbnV4L3R5cGVzLmg+Cj4gQEAgLTIyNyw2
+ICsyMTQsNiBAQCB2b2lkIG5hbmRfYmNoX2ZyZWUoc3RydWN0IG5hbmRfYmNoX2NvbnRyb2wgKm5i
+YykKPiAgfQo+ICBFWFBPUlRfU1lNQk9MKG5hbmRfYmNoX2ZyZWUpOwo+ICAKPiAtTU9EVUxFX0xJ
+Q0VOU0UoIkdQTCIpOwo+ICtNT0RVTEVfTElDRU5TRSgiR1BMIHYyIik7CgpHUEwgd2FzIGNvcnJl
+Y3QgaGVyZSwgc2VlIFsxXQoKWzFdaHR0cHM6Ly9lbGl4aXIuYm9vdGxpbi5jb20vbGludXgvdjUu
+MC1yYzcvc291cmNlL2luY2x1ZGUvbGludXgvbW9kdWxlLmgjTDE3NQoKX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5n
+IGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5p
+bmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
