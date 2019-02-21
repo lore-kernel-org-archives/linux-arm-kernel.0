@@ -7,59 +7,73 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 026C8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:01:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 35B27C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:01:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B726B2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:01:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E909B2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:01:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EpGLoR6k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B726B2070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RM5HxvmA";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nT1MvMu2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E909B2084D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YUMz1/0EUP7+wiYPhFGOWmuD3sDn6G7ow84qLNb1pdE=; b=EpGLoR6kZ94fkm
-	uNiE0Bjm9MKLVKJRZiPGg1YuR013D6MuRLhFuupNKqTgkO+MX/yCyhSg72Cy/8qzfheKkYKok15nW
-	e2hLnJRtmd00pptlik6bQKQ5iU9cgByhfa+4lir/7Sss4I6BLEw6motqkiavlbKxxp+3k+KaBMVbB
-	fZ9A9/HH3kybuYGttLWmpGyAlDLoiDI/S+8FEtGC4lf/WakJrCMaSQLtu56TRPb+XriGlOOgbNhTO
-	P94VxKesJKXVhgagnf6/SykwCMBBsyCOh2RxZfPdiIKzoTlyET6xf3geQN5GgXMQWBFs845oaitDA
-	ijUm5RbbQG/wv+K8ArTA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=nLboJvu5fp7XW0X7Sfm5xyDA9Xa5tQ8uADi1DqNFyhE=; b=RM5HxvmA4EZF+Y
+	AFf95unWm2+o5RmcOoHPiS/Z5Rm/+peUp0Pkk2tEu+UFgCkkp6wv/kbUu0Kq2d61pC7GQu0Va3g/1
+	Dv5QT0n9x+Nw03PFO8oF0Pd+mpXyz0YZJZB/HDotlKSwZzVWeeC1cJk9nWwXeg1k+Gx8Jm4VVtooJ
+	+s7F0gTYgJsj82sxr12w6HTL/C6PnP0BbYtniCVUObj8yYWYrzsj4WU5BQp1HBhCwbhF9dfIqX0Tx
+	nUKdrBMk4jiR8CBQ4E0fm0P2jPW3J4BNAllOxShFyMuIIXoAclh7j9WFkJz4IEius78ZtNustEGpp
+	Lkiuv2UKR7TGR+IKcjLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwnyc-0007ex-6h; Thu, 21 Feb 2019 13:01:22 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
+	id 1gwnyy-00089t-Hv; Thu, 21 Feb 2019 13:01:44 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwnw8-0003Gv-OJ; Thu, 21 Feb 2019 12:59:11 +0000
+ id 1gwnw7-0003Ge-UD; Thu, 21 Feb 2019 12:58:47 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-Type:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=+rjIAOxhdeD52kMA3q1zOLc9t1bwlWNyqYOBY1JvhAY=; b=nT1MvMu2Tb8X1/EuJFQaMwHk/l
+ lJV9A2j1tIjaKrjoH+MAx45clc7F8PrxYOx8J7hGHoqR7qOaMHrPTW8lWDqEJSPYXQ8wqVHRoKW8Z
+ N9tBF/0P2Cvas1CnXzEa6yDrS830j707fz8bIByyB8F2fc5EbMUAU/jmib9mxakcCUBdMep4QVSCZ
+ mbnQpRPceU6rnQ+0A4c7v/aM2uMgMKqvlrKjZVaga2bxgX2hBOGrOMqfzV7MBvo36JxQ1mWTWkJZX
+ JyKRho6rk8sokF03zRyHFJ9Rl7nBI6jMLeb0SyYWNNCjthmYAKwdF9Se7j+IRbI3prCJ4nmfMz8y1
+ B6HUBuZw==;
+Received: from relay6-d.mail.gandi.net ([217.70.183.198])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwnw5-0000IR-0Z; Thu, 21 Feb 2019 12:58:46 +0000
 X-Originating-IP: 90.88.23.190
 Received: from localhost.localdomain
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: miquel.raynal@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id 8CCD0C0006;
- Thu, 21 Feb 2019 12:58:43 +0000 (UTC)
+ by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id E12F7C0002;
+ Thu, 21 Feb 2019 12:58:09 +0000 (UTC)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Boris Brezillon <bbrezillon@kernel.org>,
  Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
  Brian Norris <computersforpeace@gmail.com>,
  Marek Vasut <marek.vasut@gmail.com>,
  Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [RFC PATCH 22/27] mtd: spinand: Let the SPI-NAND core flag a SPI-NAND
- chip
-Date: Thu, 21 Feb 2019 13:58:01 +0100
-Message-Id: <20190221125806.28875-10-miquel.raynal@bootlin.com>
+Subject: [RFC PATCH 13/27] mtd: nand: ecc: Clarify the software Hamming
+ introductory line
+Date: Thu, 21 Feb 2019 13:57:52 +0100
+Message-Id: <20190221125806.28875-1-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190221125806.28875-1-miquel.raynal@bootlin.com>
-References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_045849_493888_13BD9EA4 
-X-CRM114-Status: GOOD (  14.70  )
+X-CRM114-CacheID: sfid-20190221_125845_101185_E6FA222D 
+X-CRM114-Status: GOOD (  13.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,60 +96,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As of today there is no way to make the distinction between a raw NAND
-chip and a SPI-NAND chip. The ABI is stable and we cannot add a
-"SPI-NAND" tag to the MTD type, but we can add a special SPINAND
-capability to the flags instead. A helper is also provided to retrieve
-if whether or not the chip is working over SPI or not.
+The include file pretends being the header for "ECC algorithm", while
+it is just the header for the Hamming implementation. Make this clear
+by rewording the sentence.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/core.c    | 2 +-
- include/linux/mtd/mtd.h    | 5 +++++
- include/uapi/mtd/mtd-abi.h | 1 +
- 3 files changed, 7 insertions(+), 1 deletion(-)
+ include/linux/mtd/nand-sw-hamming-engine.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mtd/nand/core.c b/drivers/mtd/nand/core.c
-index a76d206d233a..872d46b5fc0f 100644
---- a/drivers/mtd/nand/core.c
-+++ b/drivers/mtd/nand/core.c
-@@ -245,7 +245,7 @@ int nanddev_init(struct nand_device *nand, const struct nand_ops *ops,
+diff --git a/include/linux/mtd/nand-sw-hamming-engine.h b/include/linux/mtd/nand-sw-hamming-engine.h
+index 1bd7493c682b..4ce99fa574e3 100644
+--- a/include/linux/mtd/nand-sw-hamming-engine.h
++++ b/include/linux/mtd/nand-sw-hamming-engine.h
+@@ -4,7 +4,7 @@
+  *			    David Woodhouse <dwmw2@infradead.org>
+  *			    Thomas Gleixner <tglx@linutronix.de>
+  *
+- * This file is the header for the ECC algorithm.
++ * This file is the header for the NAND Hamming ECC implementation.
+  */
  
- 	mtd->type = memorg->bits_per_cell == 1 ?
- 		    MTD_NANDFLASH : MTD_MLCNANDFLASH;
--	mtd->flags = MTD_CAP_NANDFLASH;
-+	mtd->flags = MTD_SPINAND | MTD_CAP_NANDFLASH;
- 	mtd->erasesize = memorg->pagesize * memorg->pages_per_eraseblock;
- 	mtd->writesize = memorg->pagesize;
- 	mtd->writebufsize = memorg->pagesize;
-diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
-index 677768b21a1d..7c245d109524 100644
---- a/include/linux/mtd/mtd.h
-+++ b/include/linux/mtd/mtd.h
-@@ -551,6 +551,11 @@ static inline int mtd_type_is_nand(const struct mtd_info *mtd)
- 	return mtd->type == MTD_NANDFLASH || mtd->type == MTD_MLCNANDFLASH;
- }
- 
-+static inline int mtd_type_is_spinand(const struct mtd_info *mtd)
-+{
-+	return mtd_type_is_nand(mtd) && (mtd->flags & MTD_SPINAND);
-+}
-+
- static inline int mtd_can_have_bb(const struct mtd_info *mtd)
- {
- 	return !!mtd->_block_isbad;
-diff --git a/include/uapi/mtd/mtd-abi.h b/include/uapi/mtd/mtd-abi.h
-index aff5b5e59845..7c7124c88fe0 100644
---- a/include/uapi/mtd/mtd-abi.h
-+++ b/include/uapi/mtd/mtd-abi.h
-@@ -104,6 +104,7 @@ struct mtd_write_req {
- #define MTD_BIT_WRITEABLE	0x800	/* Single bits can be flipped */
- #define MTD_NO_ERASE		0x1000	/* No erase necessary */
- #define MTD_POWERUP_LOCK	0x2000	/* Always locked after reset */
-+#define MTD_SPINAND		0x4000	/* Device works over SPI */
- 
- /* Some common devices / combinations of capabilities */
- #define MTD_CAP_ROM		0
+ #ifndef __MTD_NAND_ECC_SW_HAMMING_H__
 -- 
 2.19.1
 
