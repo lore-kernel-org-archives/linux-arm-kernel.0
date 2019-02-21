@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E5ADC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37E58C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 58FA820838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F30DC20838
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hp3SyAXS";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="OceaUCzG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58FA820838
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W1MuMtT9";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="TkEwW293"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F30DC20838
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7a7O+6DS0pGslFHcKD399zL4xaOYMR1uLzIm5N3bdW4=; b=hp3SyAXSz7M5jW
-	OR/7yZNt0QrjEgTWjiA8LxS3Lz8SCkqX53RsWEZz82j1VUcwa445BORhSH4omSdwjV4QtXUSmD0OW
-	yv29xpzcopZYJyb9R2OE+g5Abu1Z5w3hkClH3QqB7KYhS1CWLFzWdOvBmFJ3F2Zy/QkoELwTT/jCj
-	celtZdKP9VuoZeWSDwI1/Z2FW2C0RGCk8rwBowto79Wpy5OQCl00mhRYT91HTY9pVdYS7AmgYLIy4
-	JY+DkWafMU4VdcY4YnQinVObl+zjzDO7drQa2ka+M34SIbOXTh8HbvpmePk/IfocLpnBFRF0WzZdJ
-	lIZw5o1Oo2G2CnTI/nCA==;
+	List-Owner; bh=xyZjjsrRmlV9tD4mdlahJ8R+wdMcGcjHp8Quy4KCbT0=; b=W1MuMtT9sh0OAW
+	2o1BhREgziKQFP/0DGVP12t0XNGTY9feJBsV+NfjMOfR6hRqJc+CXXU8abRLsJCRl1GK/VlEoZMrw
+	htuQvYY0j1jX/lh/V7c0uAueCSr8ymIr1bVsZnh4IaAsunQYGibNP3wST20jEcNGdq506Sp7hVFv6
+	p3H6srhkaMtAlJeerNZFwEwtHICDR8RnRfb0oUXBQftWQQNsPwrjDCC85X/WKptZC0hxhwDXJQzC9
+	gNP1ExHe9AqBNgmy/3VBWl2uBgN92BQ88To9gRdipg+oOsC9NdTu/LARaoBm8UG3i+i7Fy4Bi5qYE
+	CQXcWtsVESc3aqTkyb1g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwihb-0007Pt-Nc; Thu, 21 Feb 2019 07:23:27 +0000
-Received: from hqemgate15.nvidia.com ([216.228.121.64])
+	id 1gwihm-0007dg-V0; Thu, 21 Feb 2019 07:23:38 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwigN-0005v4-2f
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 07:22:12 +0000
+ id 1gwigP-0005wm-0x
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 07:22:14 +0000
 Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate15.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c6e51a10000>; Wed, 20 Feb 2019 23:22:09 -0800
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c6e51ad0002>; Wed, 20 Feb 2019 23:22:21 -0800
 Received: from hqmail.nvidia.com ([172.20.161.6])
  by hqpgpgate101.nvidia.com (PGP Universal service);
- Wed, 20 Feb 2019 23:22:10 -0800
+ Wed, 20 Feb 2019 23:22:12 -0800
 X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Wed, 20 Feb 2019 23:22:10 -0800
-Received: from HQMAIL111.nvidia.com (172.20.187.18) by HQMAIL104.nvidia.com
- (172.18.146.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 21 Feb
- 2019 07:22:10 +0000
-Received: from HQMAIL107.nvidia.com (172.20.187.13) by HQMAIL111.nvidia.com
+ by hqpgpgate101.nvidia.com on Wed, 20 Feb 2019 23:22:12 -0800
+Received: from HQMAIL111.nvidia.com (172.20.187.18) by HQMAIL103.nvidia.com
+ (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 21 Feb
+ 2019 07:22:12 +0000
+Received: from HQMAIL105.nvidia.com (172.20.187.12) by HQMAIL111.nvidia.com
  (172.20.187.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 21 Feb
- 2019 07:22:10 +0000
-Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL107.nvidia.com
- (172.20.187.13) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
- Transport; Thu, 21 Feb 2019 07:22:10 +0000
+ 2019 07:22:12 +0000
+Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL105.nvidia.com
+ (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
+ Transport; Thu, 21 Feb 2019 07:22:12 +0000
 Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
  hqnvemgw01.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c6e51a10000>; Wed, 20 Feb 2019 23:22:10 -0800
+ id <B5c6e51a30001>; Wed, 20 Feb 2019 23:22:12 -0800
 From: Joseph Lo <josephl@nvidia.com>
 To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
  <jonathanh@nvidia.com>, Daniel Lezcano <daniel.lezcano@linaro.org>, "Thomas
  Gleixner" <tglx@linutronix.de>
-Subject: [PATCH V7 7/8] arm64: tegra: Enable CPU idle support for Smaug
-Date: Thu, 21 Feb 2019 15:21:49 +0800
-Message-ID: <20190221072150.4395-8-josephl@nvidia.com>
+Subject: [PATCH V7 8/8] arm64: tegra: Enable CPU idle support for Shield
+Date: Thu, 21 Feb 2019 15:21:50 +0800
+Message-ID: <20190221072150.4395-9-josephl@nvidia.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190221072150.4395-1-josephl@nvidia.com>
 References: <20190221072150.4395-1-josephl@nvidia.com>
 MIME-Version: 1.0
 X-NVConfidentiality: public
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1550733729; bh=KRDQj9vXKb5WlKoNng8/9HfzHsIaDhd8WrkgXmcCnjI=;
+ t=1550733741; bh=44biMiFScpj3JFxN9qB/6joZqFonPW8T1GzONE394E0=;
  h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
  In-Reply-To:References:MIME-Version:X-NVConfidentiality:
  Content-Transfer-Encoding:Content-Type;
- b=OceaUCzG5OThXNia803Z+ylIPMeCc2SkVbJpCZAyGcS6PWYPCFdK9kkqZo3Zny0wH
- 1z8Q+LesWyJVf3JCYU/OhXJJBfmBtWuuKyW+QSsYrJF6CuICDWRYr3Z2AZw35fcCux
- 8fNfoZ1x1Mo9FBou3WZLOPgVrjPoUtJyTh924QSmlv2G2TWPu/0af4SO/qJosIOhWq
- pdzPx6oTF2wmuUs3NWeOrljsWX7Pei75T4XWjm0Iddd8Pxv3lHOf3LCHd6IfgdCTgZ
- dqOuCRQCR/r7PGiZTcOf3FthFK1s6n36nVtvF2dwp9+Q8zaY3gBEEAMbbcPTenGRdV
- CiqLi0T5ODJWQ==
+ b=TkEwW293nh5MBK9R6Z/cQ+z8MhuofVlmEA6gwe9Wy18BRG1aOr1k5xpIdG69/fHR8
+ a0w5jQNE/HZRgRSnIm2gRpGhIJdkdIasQW6oR3tBJdRf7Kvhf7PKcjC0mkxLbcakrY
+ YytkFMSok+8kvQjqncz6/iyq13OK52syWAkxzMdvvtRyAvh+n9Ma0tGsESVaA35vDE
+ Y+bgcNe5FyiK7lfiik/WxFScBwT10DnCo0+EUBPpyd/vqOyrTM7dn/nIZ1xD8rklPW
+ lDsdNQjfmPUUE8L3Z6iYa3/SXKSkVyCly4E19j6h3g4XT8yHrVHutJPkyyw4Js2w3u
+ ceJNOiJrdUTCA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_232211_201882_E160F8EF 
-X-CRM114-Status: UNSURE (   6.39  )
+X-CRM114-CacheID: sfid-20190220_232213_238493_3B9789D0 
+X-CRM114-Status: UNSURE (   6.60  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -104,45 +104,33 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable CPU idle support for Smaug platform.
+Enable CPU idle support for Shield platform.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
 ---
 v7:
- * s/c7/cpu-sleep/
-v6:
- * add ack tag from Jon.
-v5:
- * no change
-v4:
- * no change
-v3:
- * no change
-v2:
- * no change
+ * new added in v7
 ---
- arch/arm64/boot/dts/nvidia/tegra210-smaug.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-index a4b8f668a6d4..25fd65b5397a 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
-@@ -1751,6 +1751,13 @@
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
+index 3ddf173ccc18..88a4b9333d84 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
+@@ -1629,6 +1629,12 @@
  		cpu@3 {
  			enable-method = "psci";
  		};
 +
 +		idle-states {
 +			cpu-sleep {
-+				arm,psci-suspend-param = <0x00010007>;
 +				status = "okay";
 +			};
 +		};
  	};
  
- 	gpio-keys {
+ 	psci {
 -- 
 2.20.1
 
