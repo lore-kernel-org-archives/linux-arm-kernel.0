@@ -2,63 +2,102 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 330FAC00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:59:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9EDC2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:06:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 021BB2086A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:59:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B74F2086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:06:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZTlTrhWj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 021BB2086A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=acn-group.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BPGZMOFh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B74F2086C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hotmail.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=xzyV1fhmhpoMjgZv4xXriw/s1HptV4P/4rXo0R82TVc=; b=ZTlTrhWjTrbrZlDu7uItpVZkO
-	oVtaBdHlvFHBf2zSzt2+wCEUTeRcQKqKQkRz3HQBgbhy0piER7lky5LUPITSd/Jr8JFPPDPQifgGu
-	XGf3D4ZBuQwb5cRvcxgFxY+F8NyXvnl6oYDekvqLeNQKdjog+639QUg7qtjYm10pRBj18V88AWnJp
-	VNKYIp1iMy2muuOm4XmzIdK0yT4uKP7cIK7J32+n5pYHt5A+blCBzOeXfZqaxehflR6Ue21Dq0FA/
-	hf6WkbcswRGHNm7RBoQPvTieZStYk+kNCcDtwnA7oekGWHiTX9vjGkHB5Z4kF7zidyIIWDZm2fcr+
-	DKw4vCe6w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=V/R3uk263XBWd/oBybPIBCeZ5fEuxjhlE5JkJAgFJM4=; b=BPGZMOFhIg/dnt
+	BSwumVQ0/YhDBNn2PGZl4BD5ewXEjGNq2QAVHbGr8VT4zk0CrGoQ+/hGMzihONmGBReSANtS0uIdT
+	ZzNAzsl4kquw0IT0CQmb4Hgnh8tguEE13xjTkajHvj3nidmdcADVl7Dqx4Q9Gdmhk6/EgWG16QH/h
+	I51JU8Psc1oeZjtZi9PwPi1Ekdx09SYM4V+dia2LT8/AwfoLDh+hIQlhk8blmAeWh1GCLUyE4dkj6
+	yy+85qCHXAp33pajvxT5PFCIS76UIdyNEd6ihmuxvHFCk+FiHcLUtDQN7+i5kuoKZe+HRuj9o8CpO
+	GvTC3Ph/whqlBLhQm/LA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwjFy-00047r-Sl; Thu, 21 Feb 2019 07:58:58 +0000
-Received: from mail.dns-net.ch ([195.160.190.3] helo=111.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwjFs-00047U-VA
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 07:58:55 +0000
-Received: from [172.16.145.102] (unknown [213.193.93.78])
- (using TLSv1 with cipher AES128-SHA (128/128 bits))
- (No client certificate requested)
- by 111.com (Postfix) with ESMTPSA id 2F15EACE4C6;
- Thu, 21 Feb 2019 08:50:41 +0100 (CET)
-Subject: Re: da850 dt cpufreq support
-To: Adam Ford <aford173@gmail.com>, Tony Lindgren <tony@atomide.com>
-References: <ccdb73e4-e4eb-2552-b62f-6cf57929dfee@acn-group.ch>
- <20190220154658.GP15711@atomide.com>
- <CAHCN7xK4PjCfNgJeQ97kQGOJfjJ927igFELWniu6kuzgJ-Hgiw@mail.gmail.com>
-From: Christophe Aeschlimann <c.aeschlimann@acn-group.ch>
-Message-ID: <18bf329c-b5e3-2d9f-8a7a-065720d187eb@acn-group.ch>
-Date: Thu, 21 Feb 2019 08:50:57 +0100
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gwjNI-0000e1-9K; Thu, 21 Feb 2019 08:06:32 +0000
+Received: from mail-oln040092070068.outbound.protection.outlook.com
+ ([40.92.70.68] helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwjNF-0000dd-GK
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 08:06:30 +0000
+Received: from VE1EUR03FT021.eop-EUR03.prod.protection.outlook.com
+ (10.152.18.57) by VE1EUR03HT070.eop-EUR03.prod.protection.outlook.com
+ (10.152.19.212) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1643.11; Thu, 21 Feb
+ 2019 08:06:25 +0000
+Received: from VI1PR0702MB3840.eurprd07.prod.outlook.com (10.152.18.55) by
+ VE1EUR03FT021.mail.protection.outlook.com (10.152.18.117) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.11 via Frontend Transport; Thu, 21 Feb 2019 08:06:25 +0000
+Received: from VI1PR0702MB3840.eurprd07.prod.outlook.com
+ ([fe80::6139:4cf3:fb81:b105]) by VI1PR0702MB3840.eurprd07.prod.outlook.com
+ ([fe80::6139:4cf3:fb81:b105%5]) with mapi id 15.20.1643.016; Thu, 21 Feb 2019
+ 08:06:25 +0000
+From: Bernd Edlinger <bernd.edlinger@hotmail.de>
+To: Sebastian Andrzej Siewior <bigeasy@linutronix.de>, "Russell King - ARM
+ Linux admin" <linux@armlinux.org.uk>
+Subject: Re: [RFC PATCH] ARM: enable irq in translation/section permission
+ fault handlers
+Thread-Topic: [RFC PATCH] ARM: enable irq in translation/section permission
+ fault handlers
+Thread-Index: AQHUxWnWUPB2na06qUiuVihk2ZlxqKXiTBcAgAZAHICAATa1gA==
+Date: Thu, 21 Feb 2019 08:06:25 +0000
+Message-ID: <f05d2cae-5664-6cc7-51c8-933d6d1403ec@hotmail.de>
+References: <20190215200533.ypfrdekg7j4ucu6a@linutronix.de>
+ <20190216113338.irr5j4ukhpwngval@shell.armlinux.org.uk>
+ <20190220110039.2p2iglhqlf6xapsb@linutronix.de>
+In-Reply-To: <20190220110039.2p2iglhqlf6xapsb@linutronix.de>
+Accept-Language: en-US, en-GB, de-DE
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-exchange-imapappendstamp: AM6PR0702MB3831.eurprd07.prod.outlook.com
+ (15.20.1643.000)
+x-incomingtopheadermarker: OriginalChecksum:F2725633AE2BEA403BA8AAF847FA9B23C977A326B1699229E4BB019027BD26C4;
+ UpperCasedChecksum:2A7C2078EB85E904DB14452400520EC7BF6826725205188E4B0BC38061241B42;
+ SizeAsReceived:7317; Count:46
+x-ms-exchange-messagesentrepresentingtype: 1
+x-tmn: [CoNfN32Ps0imScO/YnD2Yof4Ni0VJ4r0]
+x-ms-publictraffictype: Email
+x-incomingheadercount: 46
+x-eopattributedmessage: 0
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(201702061078)(5061506573)(5061507331)(1603103135)(2017031320274)(2017031323274)(2017031324274)(2017031322404)(1601125500)(1603101475)(1701031045);
+ SRVR:VE1EUR03HT070; 
+x-ms-traffictypediagnostic: VE1EUR03HT070:
+x-microsoft-antispam-message-info: bTBzhgew3K0FCtQGZ5khVnMEzgd/GwNtHfa+KoyPp4VRU/fKpdggIbip50cxcKuB
+Content-ID: <C73D32B78412494D97EA4065A27708FB@sct-15-20-1580-5-msonline-outlook-518d2.templateTenant>
 MIME-Version: 1.0
-In-Reply-To: <CAHCN7xK4PjCfNgJeQ97kQGOJfjJ927igFELWniu6kuzgJ-Hgiw@mail.gmail.com>
-Content-Language: fr
+X-OriginatorOrg: outlook.com
+X-MS-Exchange-CrossTenant-RMS-PersistedConsumerOrg: 00000000-0000-0000-0000-000000000000
+X-MS-Exchange-CrossTenant-Network-Message-Id: 11cf7920-9f8a-4448-2595-08d697d37985
+X-MS-Exchange-CrossTenant-rms-persistedconsumerorg: 00000000-0000-0000-0000-000000000000
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 08:06:25.1396 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Internet
+X-MS-Exchange-CrossTenant-id: 84df9e7f-e9f6-40af-b435-aaaaaaaaaaaa
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VE1EUR03HT070
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_235853_170329_E6109E48 
-X-CRM114-Status: GOOD (  16.18  )
+X-CRM114-CacheID: sfid-20190221_000629_543032_8F639FDE 
+X-CRM114-Status: GOOD (  11.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,41 +109,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Linux-OMAP <linux-omap@vger.kernel.org>, Sekhar Nori <nsekhar@ti.com>,
- David Lechner <david@lechnology.com>,
- arm-soc <linux-arm-kernel@lists.infradead.org>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Thomas Gleixner <tglx@linutronix.de>, Arnd Bergmann <arnd@arndb.de>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "yadi.hu@windriver.com" <yadi.hu@windriver.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-TGUgMjAuMDIuMjAxOSDDoCAxNjo1OCwgQWRhbSBGb3JkIGEgw6ljcml0wqA6Cj4gT24gV2VkLCBG
-ZWIgMjAsIDIwMTkgYXQgOTo0NyBBTSBUb255IExpbmRncmVuIDx0b255QGF0b21pZGUuY29tPiB3
-cm90ZToKPj4KPj4gSGksCj4+Cj4+IEFkZGluZyBCYXJ0b3N6LCBEYXZpZCBhbmQgU2VraGFyIHRv
-IENjLgo+Pgo+PiAqIENocmlzdG9waGUgQWVzY2hsaW1hbm4gPGMuYWVzY2hsaW1hbm5AYWNuLWdy
-b3VwLmNoPiBbMTkwMjIwIDE1OjM0XToKPj4+IEhpLAo+Pj4KPj4+IEkgdW5kZXJzdGFuZCB0aGF0
-IHRvZGF5IHRoZSBkYTg1MC1ldm0gaXMgc3VwcG9ydGVkIGluIHR3byB3YXlzIGluIHRoZQo+Pj4g
-S2VybmVsLCB1c2luZyBib2FyZCBmaWxlLCBha2EgImxlZ2FjeSIgYW5kIGRldmljZS10cmVlLgo+
-Pj4KPj4+IEFtIEkgcmlnaHQgdG8gc2F5IHRoYXQgd2hlbiB1c2luZyB0aGUgZGV2aWNlLXRyZWUg
-dGhlcmUgaXMgbm8gc3VwcG9ydCBmb3IKPj4+IGNwdWZyZXEgYXZhaWxhYmxlID8KPj4+Cj4+PiBU
-aGUgInRpLWNwdWZyZXEiIGRyaXZlciBkb2Vzbid0IHRhcmdldCB0aGUgZGE4NTAgU29DIGFuZCB0
-aGUKPj4+ICJkYXZpbmNpLWNwdWZyZXEiIGRyaXZlciBkb2Vzbid0IG1ha2UgdXNlIG9mIHRoZSBk
-ZXZpY2UtdHJlZSBiaW5kaW5ncy4KPj4+Cj4+PiBDb3VsZCB0aGUgZ2VuZXJpYyAiY3B1ZnJlcS1k
-dCIgZHJpdmVyIGJlIHVzZWQgPwo+IAo+IEEgd2hpbGUgYWdvLCBEYXZpZCBMIHBvc3RlZCBhIG1l
-c3NhZ2Ugb24gdGhlIG1haWxpbmcgbGlzdCBwb2ludGluZyB0bwo+IGEgZ2l0IHJlcG8gdGhhdCBo
-YXQgc29tZSBwYXRjaGVzIHRoYXQgd2VyZW4ndCBtYWlubGluZWQuCj4gCj4gaHR0cHM6Ly9naXRo
-dWIuY29tL2RsZWNoL2xpbnV4L3RyZWUvZGE4NTAtZHQtY3B1ZnJlcQo+IAo+IEkgd2FzIGdvaW5n
-IHRvIHRyeSBhbmQgdGVzdCB0aGVtLCBidXQgSSBuZXZlciBnb3QgYXJvdW5kIHRvIGl0IGR1ZSB0
-bwo+IG90aGVyIHdvcmsgcHJvamVjdHMuCgpUaGFua3MgZm9yIHRoZSBwb2ludGVyLgoKQ2hyaXN0
-b3BoZQoKPiAKPiBhZGFtCj4+Pgo+Pj4gQmVzdCByZWdhcmRzLAo+Pj4KPj4+IENocmlzdG9waGUK
-Pj4+Cj4+Cj4+IF9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-Cj4+IGxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0Cj4+IGxpbnV4LWFybS1rZXJuZWxAbGlz
-dHMuaW5mcmFkZWFkLm9yZwo+PiBodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xp
-c3RpbmZvL2xpbnV4LWFybS1rZXJuZWwKPiAKCgotLSAKQ2hyaXN0b3BoZSBBZXNjaGxpbWFubgoK
-RW1iZWRkZWQgU29mdHdhcmUgRW5naW5lZXIgJiBJVCBNYW5hZ2VyCkFDTiBBZHZhbmNlZCBDb21t
-dW5pY2F0aW9ucyBOZXR3b3JrcyBTLkEuCjIwMDAgLSBOZXVjaMOidGVsLCBTd2l0emVybGFuZApU
-ZWwuICs0MSAzMiA3MjQgNzQgMzEKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJu
-ZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFu
-L2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On 2/20/19 12:00 PM, Sebastian Andrzej Siewior wrote:
+> 
+> Bernd Edlinger explained the missing piece to me. With
+> PAGE_OFFSET=0xC0000000 and without LPAE a R/W of 0xbffffff0 will ends up
+> with:
+> 
+
+I am unable to reproduce on my target, wheter do_page_fault is directly taken,
+or do_translation_fault is taken depends on whether the page table root directory
+permission bits deny the access or the second level page table deny the access?
+
+But if there is a way to get into the code path do_DataAbort->do_page_fault with
+addr > TASK_SIZE, then I don't see why that works without the RT patch,
+since the interrupts are enabled here:
+
+do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+{
+        struct task_struct *tsk;
+        struct mm_struct *mm;
+        int sig, code;
+        vm_fault_t fault;
+        unsigned int flags = FAULT_FLAG_ALLOW_RETRY | FAULT_FLAG_KILLABLE;
+
+        if (notify_page_fault(regs, fsr))
+                return 0;
+
+        tsk = current;
+        mm  = tsk->mm;
+
+        /* Enable interrupts if they were enabled in the parent context. */
+        if (interrupts_enabled(regs))
+                local_irq_enable();
+
+Is preemption disabled at this point, without the RT patch?
+
+I still don't quite see why is this no issue without the RT patch.
+Can someone explain that?
+
+
+Thanks
+Bernd.
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
