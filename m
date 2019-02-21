@@ -2,79 +2,76 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A72F2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:10:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40214C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:11:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 61AEA20880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:10:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1202321738
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:11:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tf4CP1Dq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=bidouilliste.com header.i=@bidouilliste.com header.b="hIgWGRzf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61AEA20880
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bidouilliste.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PVKGcfpC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1202321738
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gy5LHcnoKjjbX8x41ASE0n/+9OMZGdg2N86vplsNlpE=; b=Tf4CP1DqceSzKI
-	SMrtr3iivV8cy9F4eQcr4kxR1qIdDo4yM+jl+9vwvtAzGd4HmwM1wrbLccPjOJalNMcH7o+VlntCF
-	9qtJ1gfaxcMCPjO3ubAPSUARP11lJNzjz7asbY2pu4kUS7ilE08p2OZDI4I1eIVYMAqniI/ZQdD0+
-	+HxV6gK/7DCCuILYurUl2H7h34jRjDs5SbfDjiTAtFgERlLfdQpKz9p9yM7XNNeEFOG+UhBpRuCnx
-	XCbOrqRJPbq8ArXX0hyUMK6GIA1Dv2dYsdLWQ/sv45glolJ3tqBFM2w8y4eYsgU6EPrTOoPUFehJ1
-	oXTfp6fsYk8TnSuhB1SA==;
+	List-Owner; bh=T8BJGea/uYXyu6Be7f+yE1TT74Nwz54JDwhBmxtUp2E=; b=PVKGcfpCr6s6sx
+	ZRr0L01jKFysH5jaxWH27WBomruibbA8jbLueCgI+x1tfAr5SKSwDvBKRX8mpuRueU+ootqFzDzEU
+	IPSrlkez6MTQnCaG4rVm0qg5avfKG3biNG5WDSufSpDhIf9pbgPahVjZD6M+Hcd6m+0pV1HGgcO1g
+	7gZR118PL5nhd2E+7L9WdRozHfOyqPppJdzOB7LSFqxC6WKkmTIJwYOZdn8umowlqPkFyWU9Fa7Zy
+	tTli4otMQhY8WbmFojPwgQa5JHk+kzKeIKUa1wMpfcYFUvlwvvaLinAF1EF2HZrzSPNXplzaR96xW
+	bmPA6AseTisVSHWS6+uw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwlJE-00080n-1v; Thu, 21 Feb 2019 10:10:28 +0000
-Received: from mail.blih.net ([212.83.177.182])
+	id 1gwlK6-0008Tg-Hq; Thu, 21 Feb 2019 10:11:22 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwlJ9-00080K-Eg
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 10:10:25 +0000
-Received: from mail.blih.net (mail.blih.net [212.83.177.182])
- by mail.blih.net (OpenSMTPD) with ESMTP id 0b330c4b;
- Thu, 21 Feb 2019 11:10:18 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha1; c=relaxed; d=bidouilliste.com; h=date
- :from:to:cc:subject:message-id:in-reply-to:references
- :mime-version:content-type:content-transfer-encoding; s=mail;
- bh=8yA3uPBAxUDLtORA2o8u5XjRGpQ=; b=hIgWGRzfkrQKS+fhohCpQ2a4K150
- FIhalBWBd8DSrWgrZ3edjSTvh2hWv2OB3HKlNZh7Qc/ZJ4RI9IsZ9Vz+FXUdlI6B
- 7FpCz5d7VzOntoqXOK1sktIr7y2wuann1kUT7694COT8ArZXxP9TYp/Htb4xd3cw
- nzYcjOVneArKNdc=
-DomainKey-Signature: a=rsa-sha1; c=nofws; d=bidouilliste.com; h=date
- :from:to:cc:subject:message-id:in-reply-to:references
- :mime-version:content-type:content-transfer-encoding; q=dns; s=
- mail; b=n8biuWE4Ic7RwUXC8QdHKN+0r5bqI73iJdDcyTW/YZJMgB4oHpQe7I0a
- FpnGfhfJR3swnBv4wpQ+OeArTEufFcdPbWNf/DGRTFit6aEVXXqMIV8X8pYJC9yn
- O2COT811qeUfwr7FdwyCE/M0jUpUQGN7eOmeY2t69AxT+ebsGms=
-Received: from knuckles.blih.net (ip-9.net-89-3-105.rev.numericable.fr
- [89.3.105.9]) by mail.blih.net (OpenSMTPD) with ESMTPSA id ed322229
- TLS version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO;
- Thu, 21 Feb 2019 11:10:17 +0100 (CET)
-Date: Thu, 21 Feb 2019 11:10:17 +0100
-From: Emmanuel Vadot <manu@bidouilliste.com>
-To: Chen-Yu Tsai <wens@csie.org>
-Subject: Re: Allwinner SID THS calibration data cell representation?
-Message-Id: <20190221111017.f3be5d56b419d9b90876b4c2@bidouilliste.com>
-In-Reply-To: <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-28-embed3d@gmail.com>
- <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
- <55579dd6-625d-e71b-1482-4592dccac665@gmail.com>
- <20180906115114.inc6dhqhy47obo25@flea>
- <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
-X-Mailer: Sylpheed 3.7.0 (GTK+ 2.24.32; amd64-portbld-freebsd13.0)
-Mime-Version: 1.0
+ id 1gwlK3-0008Sk-4x
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 10:11:21 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1LA6sRO023425; Thu, 21 Feb 2019 11:11:12 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2qsbm9bt6j-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Thu, 21 Feb 2019 11:11:12 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 162A149;
+ Thu, 21 Feb 2019 10:11:11 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 8E16B2858;
+ Thu, 21 Feb 2019 10:11:10 +0000 (GMT)
+Received: from SAFEX1HUBCAS23.st.com (10.75.90.47) by Safex1hubcas22.st.com
+ (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 21 Feb
+ 2019 11:11:10 +0100
+Received: from lmecxl0923.lme.st.com (10.48.0.237) by webmail-ga.st.com
+ (10.75.90.48) with Microsoft SMTP Server (TLS) id 14.3.361.1; Thu, 21 Feb
+ 2019 11:11:09 +0100
+From: Ludovic Barre <ludovic.Barre@st.com>
+To: Ulf Hansson <ulf.hansson@linaro.org>, Rob Herring <robh+dt@kernel.org>
+Subject: [PATCH 2/2] mmc: mmci: add quirk property to add stm32 transfer mode
+Date: Thu, 21 Feb 2019 11:10:51 +0100
+Message-ID: <1550743851-13588-3-git-send-email-ludovic.Barre@st.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1550743851-13588-1-git-send-email-ludovic.Barre@st.com>
+References: <1550743851-13588-1-git-send-email-ludovic.Barre@st.com>
+MIME-Version: 1.0
+X-Originating-IP: [10.48.0.237]
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-21_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_021024_059477_60C4E44F 
-X-CRM114-Status: GOOD (  18.63  )
+X-CRM114-CacheID: sfid-20190221_021119_481002_C547334A 
+X-CRM114-Status: GOOD (  12.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,72 +83,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>, Philipp Rossak <embed3d@gmail.com>,
- Quentin Schulz <quentin.schulz@bootlin.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-iio@vger.kernel.org,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Jonathan Cameron <jic23@kernel.org>, Icenowy Zheng <icenowy@aosc.io>
+Cc: devicetree@vger.kernel.org, Alexandre Torgue <alexandre.torgue@st.com>,
+ linux-mmc@vger.kernel.org, linux-kernel@vger.kernel.org,
+ srinivas.kandagatla@linaro.org, Ludovic Barre <ludovic.barre@st.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 19 Feb 2019 15:54:00 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+From: Ludovic Barre <ludovic.barre@st.com>
 
-> Sorry for resurrecting an old discussion, but since someone posted patches
-> for H5 and H6, I thought we should resolve this. I'm working on patches to
-> fix / replace the big-endian issue.
-> 
-> On Thu, Sep 6, 2018 at 7:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Thu, Sep 06, 2018 at 01:47:47PM +0200, Philipp Rossak wrote:
-> > > On 04.09.2018 18:46, Emmanuel Vadot wrote:
-> > > > > +                 /* Data cells */
-> > > > > +                 thermal_calibration: calib@234 {
-> > > > > +                         reg = <0x234 0x8>;
-> > > > > +                 };
-> > > >   You are declaring 8 bytes of calibration data but to my knowledge it's
-> > > > only 2 bytes per sensor, so 2 bytes for H3.
-> > > >   Am I missing something ?
-> > > >
-> > > >   Thanks,
-> > >
-> > > Emmanuel you are right, it is 2 bytes per Sensor and should be 2 bytes for
-> > > H3, but the thermal calibration data field is on all chips 64 bit wide - so
-> > > 8 bytes. So I'm reading here the complete calibration data field.
-> >
-> > Having one cell per channel would make more sense I guess.
-> 
-> Would it? The 2 32-bit words directly map onto the registers 0x74 / 0x78 in
-> the THS. As far as the SID is concerned, their is just one consumer for this
-> data, the thermal sensor. How the thermal sensor uses that data is really not
-> its concern. And the thermal sensor is really just copying the data from the
-> e-fuses into its registers. Nothing more.
+This patch adds a quirk bit to define specific stm32 transfer
+modes. sdmmc data transfer mode selection could be:
+-Block data transfer ending on block count.
+-SDIO multibyte data transfer.
+-MMC Stream data transfer (not used).
+-Block data transfer ending with STOP_TRANSMISSION command.
 
- If you see this at the controller lever and not at the sensor level it
-might make sense to use the full 32bits data even some bits are ignored
-I guess.
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/mmc/host/mmci.c | 11 +++++++++++
+ drivers/mmc/host/mmci.h |  7 +++++++
+ 2 files changed, 18 insertions(+)
 
-> Furthermore, with the register access interface, the e-fuses are read/write
-> 32 bits at a time. Seems to me it would make more sense to enforce a 32-bit
-> word size, so cells should be multiples of 32 bits.
-
- Ok, honestly at this point I don't really care what choice is done as
-long as the dts is updated, I'll deal with the diff for FreeBSD and
-ping the others BSD (Net and Open who also have a driver) for this
-change.
-
-> Regards
-> ChenYu
-
- Cheers,
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 387ff14..44c721a 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -284,6 +284,7 @@ static struct variant_data variant_stm32_sdmmc = {
+ 	.datactrl_blocksz	= 14,
+ 	.stm32_idmabsize_mask	= GENMASK(12, 5),
+ 	.init			= sdmmc_variant_init,
++	.quirks			= MMCI_QUIRK_STM32_DTMODE,
+ };
+ 
+ static struct variant_data variant_qcom = {
+@@ -1028,6 +1029,16 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 	else
+ 		datactrl = variant->datactrl_dpsm_enable | blksz_bits << 4;
+ 
++	if (variant->quirks & MMCI_QUIRK_STM32_DTMODE) {
++		if (host->mmc->card && mmc_card_sdio(host->mmc->card) &&
++		    data->blocks == 1)
++			datactrl |= MCI_DPSM_STM32_MODE_SDIO;
++		else if (data->stop && !host->mrq->sbc)
++			datactrl |= MCI_DPSM_STM32_MODE_BLOCK_STOP;
++		else
++			datactrl |= MCI_DPSM_STM32_MODE_BLOCK;
++	}
++
+ 	if (data->flags & MMC_DATA_READ)
+ 		datactrl |= MCI_DPSM_DIRECTION;
+ 
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index 474f4fa..9fbd0a4 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -131,6 +131,11 @@
+ /* Control register extensions in the Qualcomm versions */
+ #define MCI_DPSM_QCOM_DATA_PEND	BIT(17)
+ #define MCI_DPSM_QCOM_RX_DATA_PEND BIT(20)
++/* Control register extensions in STM32 versions */
++#define MCI_DPSM_STM32_MODE_BLOCK	(0 << 2)
++#define MCI_DPSM_STM32_MODE_SDIO	(1 << 2)
++#define MCI_DPSM_STM32_MODE_STREAM	(2 << 2)
++#define MCI_DPSM_STM32_MODE_BLOCK_STOP	(3 << 2)
+ 
+ #define MMCIDATACNT		0x030
+ #define MMCISTATUS		0x034
+@@ -357,6 +362,8 @@ struct variant_data {
+ 	void (*init)(struct mmci_host *host);
+ };
+ 
++#define MMCI_QUIRK_STM32_DTMODE	BIT(0)
++
+ /* mmci variant callbacks */
+ struct mmci_host_ops {
+ 	int (*validate_data)(struct mmci_host *host, struct mmc_data *data);
 -- 
-Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
