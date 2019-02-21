@@ -2,21 +2,21 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82BD9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:39:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 252AEC00319
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:40:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4B00620818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:39:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E9C4E20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:40:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RC1XXcGk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="yWBJsncV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B00620818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SgsFEwdM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="i0SanTzt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9C4E20855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,54 +25,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jeXMZT3q8FFoCStZ28UgyXpt79aVyYVxLdCjlLJhEc4=; b=RC1XXcGkaxCveW
-	xz6WN2lwPvkl0vswcAPC5YIsiugDREOMRKhnKTxOle4+Vz94lH+wK/bi7/kWNwS1EAjo1Wtx+BPpn
-	IPXIsrnaYncrjKmOebl2Apiw+znd8P5JsDp5j4+czZ3+bVnwElBqN/gSwTttXPwk8p7MQR0farc/y
-	J10+YkSM4R8+0hdoK2OjY1H4DTdqYhM+8fBYt8FqgHdGf+BzmWbPJBs5/DaVIEd5n1CpEL3/qK+5/
-	fHo754bXW2auX7+QXkfve9ZR99Va3Or2tVofVtXOFlIpO/4vXrRcgDLNzAXmXEh3yzy6lqNYp9bMI
-	XuIgS482trjMoKoLMiOg==;
+	List-Owner; bh=ox/zaWcB8vGWzGU0LFvXBvcc9e+YkRunvSlWUE4cRdQ=; b=SgsFEwdMkKJCh0
+	Astu2E17Tbl+5Q3TJJnwGkLRHTLJDLCLetCVcnah4iX2Fn2dY3ki068YsegOfOVjzp3na+BSNkb14
+	WNzctp1BNjLm61fLDCJinA9u28vlsxNKOSnd93hnvht58KbwfhxPxk2syPBZqRolzm+PGuYTZgQo/
+	bqvXfwbzPmy6tVcsGlIdPHBKCGbHFSb4cbvGP6jfwLZHNU1ac3walqpkWNP3H+iBtOhOHdkyxCArh
+	Md4J5K4DlvbEaWxV8dcJfrErAiYy5Ncj8TAZFH2MRdpKOY73kJwopwvnpccQAv0kuW18g/NZE94O3
+	3H19dWkRJGNWuiIFhgDw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gww4O-00061B-KN; Thu, 21 Feb 2019 21:39:52 +0000
+	id 1gww53-0007We-Rr; Thu, 21 Feb 2019 21:40:33 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gww4L-00060h-BI
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 21:39:50 +0000
-Received: from mail-qk1-f171.google.com (mail-qk1-f171.google.com
- [209.85.222.171])
+ id 1gww50-0007WF-Iu
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 21:40:31 +0000
+Received: from mail-qk1-f176.google.com (mail-qk1-f176.google.com
+ [209.85.222.176])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2C8F62083E
+ by mail.kernel.org (Postfix) with ESMTPSA id 2A7B22084F
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 21:39:48 +0000 (UTC)
+ Thu, 21 Feb 2019 21:40:30 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550785188;
- bh=dAy7F8x9H9wk+ykvturIHWB3Iij2WmlgDdGVm3G27JI=;
+ s=default; t=1550785230;
+ bh=E4oo939D+Wd4k2cm0MMMJPASRD8zd2968+rhPegnv6M=;
  h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=yWBJsncVKmJETkkpXyq5BUGRUgzY7yEAbs3mEYkKQzjnMjL0RRe7H6+PSJTbmjdom
- LmUW9o345QL5KPakNG+E6FoiGicKGWoabZ5GzDXsHDpvYHpXuHUxNtupwLPj9bIK3k
- eXDSxI86JITxLrHqhmtSV4PpAN8bPYBgvALZ+KJc=
-Received: by mail-qk1-f171.google.com with SMTP id m9so80268qkl.4
+ b=i0SanTztlrA+RBfR/SuupafZ3fku56/vafXRVQOzbzaXz1LuSbYhsH0jw91SBHIna
+ YOEwdG/LxVRQD/NZ44rdFDjLCkAGW9b31MFCLMOfyop1bZ3KkVOJXW7cgRgPyxSGID
+ wxN1iFIKsbi4GZ1c904GxrfV2dnaEdSmjnrQod5w=
+Received: by mail-qk1-f176.google.com with SMTP id o125so85035qkf.3
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 13:39:48 -0800 (PST)
-X-Gm-Message-State: AHQUAua5GHBaLJxyqUsxf+J1bPvkt9xmKLWmZaBR5alqqeuKQPv1fEKe
- /8Foqr/27sWPAEj7E5tgS5CnvWT+DwKzGu4/QA==
-X-Google-Smtp-Source: AHgI3IbOnD86NJpUnssD5laWgNolQ0eCBDnib8AkvyVg/TgJsP+Fu72mk1lX5OoxvCRZwKTacEmijBYjI40sXL77OA4=
-X-Received: by 2002:a37:674c:: with SMTP id b73mr536074qkc.184.1550785187350; 
- Thu, 21 Feb 2019 13:39:47 -0800 (PST)
+ Thu, 21 Feb 2019 13:40:30 -0800 (PST)
+X-Gm-Message-State: AHQUAuZ+CRqYHMUbMM3bxl7BjGH4DldAT+q9qjTY3jEMt/WF1l07+7bG
+ ZoLutC9eak1spr92H2fX4u4HM04wco5n7gOG8g==
+X-Google-Smtp-Source: AHgI3IbzkLbWet0saKWkUzUIFgRM5iGCk24Pr9PVH+ZqJWA0VHVe4BfcKwN6rCxKZfcOguJQjcLLwZZZ3ZTYQucUz60=
+X-Received: by 2002:a37:a381:: with SMTP id m123mr536020qke.147.1550785229393; 
+ Thu, 21 Feb 2019 13:40:29 -0800 (PST)
 MIME-Version: 1.0
 References: <20190221154458.23763-1-linus.walleij@linaro.org>
- <20190221154458.23763-10-linus.walleij@linaro.org>
-In-Reply-To: <20190221154458.23763-10-linus.walleij@linaro.org>
+ <20190221154458.23763-12-linus.walleij@linaro.org>
+In-Reply-To: <20190221154458.23763-12-linus.walleij@linaro.org>
 From: Rob Herring <robh@kernel.org>
-Date: Thu, 21 Feb 2019 15:39:36 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqLFqxQ2NtZvsqmowMBcSaRgha=pb39_+rqg95LpAj0u0g@mail.gmail.com>
-Message-ID: <CAL_JsqLFqxQ2NtZvsqmowMBcSaRgha=pb39_+rqg95LpAj0u0g@mail.gmail.com>
-Subject: Re: [PATCH 09/30 v2] irqchip: ixp4xx: Add DT bindings
+Date: Thu, 21 Feb 2019 15:40:18 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqKp-DPkEQuWbeTsTqXF7v2=BD11-x2Os_8KfXtg28UJ8g@mail.gmail.com>
+Message-ID: <CAL_JsqKp-DPkEQuWbeTsTqXF7v2=BD11-x2Os_8KfXtg28UJ8g@mail.gmail.com>
+Subject: Re: [PATCH 11/30 v2] clocksource/drivers/ixp4xx: Add DT bindings
 To: Linus Walleij <linus.walleij@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_133949_421676_566E128C 
-X-CRM114-Status: GOOD (  18.90  )
+X-CRM114-CacheID: sfid-20190221_134030_641312_CB39A17E 
+X-CRM114-Status: GOOD (  13.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,9 +84,9 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
- Marc Zyngier <marc.zyngier@arm.com>, Krzysztof Halasa <khalasa@piap.pl>,
- Thomas Gleixner <tglx@linutronix.de>, Imre Kaloz <kaloz@openwrt.org>,
+Cc: devicetree@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Krzysztof Halasa <khalasa@piap.pl>, Thomas Gleixner <tglx@linutronix.de>,
+ Imre Kaloz <kaloz@openwrt.org>,
  "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
  <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
@@ -96,84 +96,22 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Thu, Feb 21, 2019 at 9:45 AM Linus Walleij <linus.walleij@linaro.org> wrote:
 >
-> This adds device tree bindings for the IXP4xx interrupt
-> controller. It's a standard 2-cell controller.
+> This adds device tree bindings for the Intel IXP4xx
+> timers.
 >
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 > Cc: Thomas Gleixner <tglx@linutronix.de>
 > Cc: devicetree@vger.kernel.org
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
 > ChangeLog v1->v2:
-> - Converted to use JSON yaml schema, why not.
-> - Not keeping Rob's ACK because I think he wants to take
->   a second look.
+> - Switch to JSON YAML schema, why not.
+> - Not collecting any review tags as this changed a bit.
 > ---
->  .../intel,ixp4xx-interrupt.yaml               | 57 +++++++++++++++++++
+>  .../bindings/timer/intel,ixp4xx-timer.yaml    | 42 +++++++++++++++++++
 >  MAINTAINERS                                   |  1 +
->  2 files changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/intel,ixp4xx-interrupt.yaml
->
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/intel,ixp4xx-interrupt.yaml b/Documentation/devicetree/bindings/interrupt-controller/intel,ixp4xx-interrupt.yaml
-> new file mode 100644
-> index 000000000000..f32c08f270d6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/intel,ixp4xx-interrupt.yaml
-> @@ -0,0 +1,57 @@
-> +# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
-> +# Copyright 2018 Linaro Ltd.
-> +%YAML 1.2
-> +---
-> +$id: "http://devicetree.org/schemas/interrupt/intel-ixp4xx-interrupt.yaml#"
-> +$schema: "http://devicetree.org/meta-schemas/core.yaml#"
-> +
-> +title: Intel IXP4xx XScale Networking Processors Interrupt Controller
-> +
-> +maintainers:
-> +  - Linus Walleij <linus.walleij@linaro.org>
-> +
-> +description: |
-> +  This interrupt controller is found in the Intel IXP4xx processors.
-> +  Some processors have 32 interrupts, some have up to 64 interrupts.
-> +  The exact number of interrupts is determined from the compatible
-> +  string.
-> +
-> +  The distinct IXP4xx families with different interrupt controller
-> +  variations are IXP42x, IXP43x, IXP45x and IXP46x. Those four
-> +  families were the only ones to reach the developer and consumer
-> +  market.
-> +
-> +properties:
-> +  compatible:
-> +    oneOf:
-
-You can drop oneOf since there is only 1.
-
-> +      - items:
-> +        - enum:
-> +          - intel,ixp42x-interrupt
-> +          - intel,ixp43x-interrupt
-> +          - intel,ixp45x-interrupt
-> +          - intel,ixp46x-interrupt
-> +
-> +  reg:
-> +    description: The register bank for the interrupt controller.
-
-No need to define what reg is here. Just 'maxItems: 1' is sufficient.
-
-> +
-> +  interrupt-controller: true
-> +
-> +  '#interrupt-cells':
-> +    const: 2
-> +    description: The number of cells to define the interrupts.
-> +      with two cells specified in interrupt-controller/interrupts.txt
-
-I'd drop description here, but I prefer things terse. I guess this
-does define the format of the cells.
-
-With the other changes,
+>  2 files changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/timer/intel,ixp4xx-timer.yaml
 
 Reviewed-by: Rob Herring <robh@kernel.org>
 
