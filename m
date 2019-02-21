@@ -7,51 +7,51 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 20CFCC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:39:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B1414C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:39:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E292820675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:39:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D54F20675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:39:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uEd1ze/s";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lXy2vKnl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E292820675
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SvWnXYMe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="uWvBOH6y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D54F20675
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=wTidcEIc4aylj1XGHWv93nUwCgKdXZKCNbGPHj+BJEs=; b=uEd1ze/s9kQkML
-	FJH8RH81qYTAfuV5b85RULiXxA1VxHwCF4zUCSYhaTvrlGAiW4YYbahm5phfzWF7verHPI+74WOeh
-	q0Gwc4peFQf7jsVmpW0fCdYlhoDNMZJPW4XzB9auvm9ECvlAeA8Z0F5tTWdNJcTGsAGsE1M6lpSC4
-	K3JGvUtx0jNuafNnni+k02ut7JAtMEs6ve3eCJFj+W0gXSVokn3XAg0Ybn8Rl/SkFOzRRXk39Wwju
-	wmZQkvN2Q3dCgFeEp2YYBpY9qEBH0p/adhFAd8unjeVWoAX9dcd7z32/eULsqU4KNI5qmfxoj9bGs
-	Vw4zRa8XcTQbvPgSIXew==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=KWi1SFsy6lkaHWlqKgJ/7C2VKKR0lFQxpRCQQEqSmUU=; b=SvWnXYMeVpFKzn
+	0TxVBl8G02/duaeLLBLyMTCyd9Jh5DcQcxGmkbdclCuSYi6Rg1FxOAg5gRhzHKSsl+JdQne4nW3t4
+	I2m+ofv5oEl4agL6gQWKP25Fz+A7CZvwn5ddVjGldmqIl6C9fDSBtiM9AGBu1zUGqivUFgEqrsqn+
+	ObVmSMcaeL51nxeaDfWGIE2Oe10CAo2XhSVGh0gdRU4WwYmD9RyHXYYadE12zg0Waa78xpdTwR5PS
+	33xBaMIA/4c/66CcGZWgXMggY0+soOsvfQ6N3ZK9iYswrAxG/t3bwq80SVNzFaiFesmPivV6+8aFd
+	/t7ATB9XziUXc9/AKaVg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwi0I-0007s3-Kv; Thu, 21 Feb 2019 06:38:42 +0000
-Received: from mail-eopbgr50055.outbound.protection.outlook.com ([40.107.5.55]
+	id 1gwi0S-00082e-Pr; Thu, 21 Feb 2019 06:38:52 +0000
+Received: from mail-eopbgr50085.outbound.protection.outlook.com ([40.107.5.85]
  helo=EUR03-VE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwi0F-0007rZ-8f
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 06:38:41 +0000
+ id 1gwi0N-0007w7-OP
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 06:38:49 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=5uIf5/BCzdYmNrHTzX4wEXj81QQkIXzS9ewzSz75O6k=;
- b=lXy2vKnl1VdGBgtxULcHtz0XLVv1wCrVgvZCfWBW9OWvocHX5Gr/ofUlBdqTT2J08RNwGmKjyKiw3Pw0pquKHybVbmEl1//tEJpQb0inC6OwnEuzsd7101tXaWfMmIA6DQ1W26fofL0hfEucji8d9gR/cLgC+wIwr5EJgy+xSM0=
+ bh=Ze5IIe1T6c4EkSzmcmLV1l3QESc8WF7FBLxcdcb36UU=;
+ b=uWvBOH6yfPAirPHmVlO7qLIEonFrcitHX4KeGwM2SS0jckvgKooTr7m5pjTlbQpRDezVivFwx96783joUJUNbSRBt+BthE3QRMuYhfURlF4os4E9qNVcX1M0ITODLRDzCcZiNYGwS1OjVAQUP//QGZhpu02DwiGOSY71DweF/CA=
 Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com (52.133.30.10) by
  AM6PR0402MB3863.eurprd04.prod.outlook.com (52.133.29.150) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.18; Thu, 21 Feb 2019 06:38:30 +0000
+ 15.20.1622.18; Thu, 21 Feb 2019 06:38:39 +0000
 Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com
  ([fe80::6c94:4ad8:e9f3:cf1]) by AM6PR0402MB3911.eurprd04.prod.outlook.com
  ([fe80::6c94:4ad8:e9f3:cf1%4]) with mapi id 15.20.1622.018; Thu, 21 Feb 2019
- 06:38:30 +0000
+ 06:38:39 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -76,11 +76,15 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  "linux-arm-kernel@lists.infradead.org"
  <linux-arm-kernel@lists.infradead.org>, "linux-pm@vger.kernel.org"
  <linux-pm@vger.kernel.org>
-Subject: [PATCH V8 1/4] dt-bindings: fsl: scu: add thermal binding
-Thread-Topic: [PATCH V8 1/4] dt-bindings: fsl: scu: add thermal binding
-Thread-Index: AQHUybAPUmnoI6Ce/UqIMDTlZO/oOg==
-Date: Thu, 21 Feb 2019 06:38:30 +0000
-Message-ID: <1550730831-14995-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V8 2/4] thermal: imx_sc: add i.MX system controller thermal
+ support
+Thread-Topic: [PATCH V8 2/4] thermal: imx_sc: add i.MX system controller
+ thermal support
+Thread-Index: AQHUybAULnz4bMD1zUS0pt2wSf6zwA==
+Date: Thu, 21 Feb 2019 06:38:39 +0000
+Message-ID: <1550730831-14995-2-git-send-email-Anson.Huang@nxp.com>
+References: <1550730831-14995-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1550730831-14995-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -94,7 +98,7 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: a0567e44-a19b-49de-e90d-08d697c73148
+x-ms-office365-filtering-correlation-id: 1d3a3118-761b-4e87-41e2-08d697c7369d
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
@@ -102,50 +106,51 @@ x-microsoft-antispam: BCL:0; PCL:0;
 x-ms-traffictypediagnostic: AM6PR0402MB3863:
 x-ld-processed: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635,ExtAddr
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM6PR0402MB3863;
- 23:mMtUhZy1XLYnwGPhlj836SUdvyQtOiiYt3nxC?=
- =?iso-8859-1?Q?ZTvIU9bhg/IT1gLElBEbWbD569LcjkQNrN37rBmq1IZ2AJPRJB1FHje3j1?=
- =?iso-8859-1?Q?w7/qx6tD0g0QlimyUm9NX4MRCP0GqKUUOuxucGtRhS8RnLzCOm/x6fLCAt?=
- =?iso-8859-1?Q?r47NFbCR/tGBAkjnuqqcp6iSvkETzm55gtVfqNBy3riHnnhMu1JEmlZI8s?=
- =?iso-8859-1?Q?yQk3MwSq3xzzJunoXFkEsJp63AOWvOKoyHSk8hiJO2+jruaj4l+AL7x6zD?=
- =?iso-8859-1?Q?bQUo42JsN/Qq1i2QPgOm1ZjCzXdjlEZrhJUfDMlfETJ70eYS/fGvqIc58C?=
- =?iso-8859-1?Q?/scdgi2L9MaiZptqU86ybslnB+KMqIbK8CSIHKDgkPSNKeX/EoUdNmiJhE?=
- =?iso-8859-1?Q?d5v1iQ2QrzsiKAIhW9CY0K3TEpUKbO7Ng9YfvQGLb0vMGZB8XGmgLXBnpn?=
- =?iso-8859-1?Q?1t0SpZ021MAjY+w5//bkEn5+1nxlxnMxAMzRHKkz89ZYPo/ICMO9JgZkdH?=
- =?iso-8859-1?Q?SOGhpjlHeZiYIii4/RAzRCCe7qNQUn7nquiuNT3txzc7PKH7MMSIx+m/hc?=
- =?iso-8859-1?Q?82J2QvjqNdw4zxSW9W///VKar0jQ+TXozL+TA/gkKa8Eg0BhHkf4YB2jKr?=
- =?iso-8859-1?Q?Dgp2Ef4e7+j/Psk6J6y29tU5wJ/UBoooOy4CmdMKcLnst3dIUe0itoHq0L?=
- =?iso-8859-1?Q?BK19EbxfFSD2NPniVrBV+/xhhs7RX1cioPsWE6liLAjHAZ1Q7GmoMNSPPC?=
- =?iso-8859-1?Q?5Dm8QSj9apoQeHKizOsm12dk0iwk/yQeW0clHChcExz+d2+aOKcdM6lNaR?=
- =?iso-8859-1?Q?iVBCYS8PpEgjDRbZaQ8fGiOwDV5ld/UZk8Ffx7zlv10OryGlHJe8VO5+3F?=
- =?iso-8859-1?Q?6LaQcOqTZDRxceD+ZABN1sdhcqrFe3hmNZBLR6wHOrUlvXMwfw7pdhsBVi?=
- =?iso-8859-1?Q?hBRB9VQBVF8FhjfX5mNNuw5knU0Io+jv5OcLuvdiDnRy5tzAcnKa4OtKRL?=
- =?iso-8859-1?Q?fnfvHgRPI/hhVtDkypeUKrGid4hCCj/s/mqyFwGRMxKIyeVEBsAZUkluQM?=
- =?iso-8859-1?Q?5LX0JJxUIyMgI/Y5YMxMIo0tZHs3pg87CZRVPrmDpuoe53cLqTd1FNVRIj?=
- =?iso-8859-1?Q?7MJabccGSaaSCSxy0UL8TTY4JTP/iu5MWPDkbsKjqrtMZcR1ynGKVfDEjF?=
- =?iso-8859-1?Q?ZkiUYmKqYSDBnQzPvsrBlBjib7RWmSup3aKVxc6munRaO52BaKYx6XZueW?=
- =?iso-8859-1?Q?sskc4VYqMzytF8AGUV9eDS4d2csPdpezfCJXigh2w=3D=3D?=
-x-microsoft-antispam-prvs: <AM6PR0402MB3863ABD56A061F954F6CDD16F57E0@AM6PR0402MB3863.eurprd04.prod.outlook.com>
+ 23:i8NpIJ3e9MhIan5EXXmQ+o8CbTjyYYxWSci1K?=
+ =?iso-8859-1?Q?Cdo9ynuWfvL8w7eNOuEzrYRVGaxCQHC7aboMD+Kecu2XB1w3s1ULzryMnv?=
+ =?iso-8859-1?Q?uwcYWznqdx95BFhjfoEbzbRtP2876uNXo3QDNiprl/CR0JsgDO/FJ8bS2U?=
+ =?iso-8859-1?Q?KPmu3BizNIUKRdJpVGgxPNsedWnhn5EdYDwS9tYy9iWHir04iaidBF7HWV?=
+ =?iso-8859-1?Q?Fiync+aUKcD6ro9nDRe0UYI3+y+COc0eqmI/e1SANb6KANLfQUaFSrpHJu?=
+ =?iso-8859-1?Q?8ujz+EzklrQgzyYDnvUfzyZqIMIfhTbREjtIqf5qwBKCdbGHQD/dQ0vjfW?=
+ =?iso-8859-1?Q?711EYVi+uGJp9ZSOjyQ/bmCcTpVStLsTJMFSeiKhapWpU9NRoeRrEIHina?=
+ =?iso-8859-1?Q?43JEPUjEaFJUfyO3R0mjgUywZ5VVJvA6FiLfy8ty90Kbhn+Ns9dhjG6AZy?=
+ =?iso-8859-1?Q?m3qQ9sjOUhE2vERIKzmO+FFzd0HWSSRWyNLqs44jImZ4EeX3NrBSMAMyWT?=
+ =?iso-8859-1?Q?sVNdXpGezY3iylPLenUQFKOlnKFef1sjd2YNuY+Mi9ich1B7zKE2iOTUl9?=
+ =?iso-8859-1?Q?u98QE7Jc3kMXOY+Yx80ZCoumwfTKeTyrhu7T/VPRLI0jZ2p45ZyPi9+i/S?=
+ =?iso-8859-1?Q?PHqA5LBcj/8x9VrFRTBVp6uQUqtIEEGJfh+WHYdOYxRi3z0GpM8zbEcNwi?=
+ =?iso-8859-1?Q?pjGbTwXDNuYgT0NlPq+xmvYmDcB7UqszGipnycCu1LEeWYRNdJPOjxvekP?=
+ =?iso-8859-1?Q?hQpPUZl+GgD75mP/2RhNmFLVpWUQ2XFxs4jeK4HqTcwUgObL2vZrehX5YL?=
+ =?iso-8859-1?Q?9cHB9eOekMsp7fwcntDyKmQy8pE4gn1h9DF7TmLeiUKulOLmLjsWMhYTSo?=
+ =?iso-8859-1?Q?D6OvOnluTvRba050ve3oD6PC3UDhmkIEllQ5h/ijUQzUzmb6OfIZSB3rgZ?=
+ =?iso-8859-1?Q?AcfWujIE8g8OAG1qx9u6uK6Dsyns0n+qPw84zzg26RvjLtQl8Fxs9QZffZ?=
+ =?iso-8859-1?Q?69YU50pRm3TG8Ipwq9oUnZWiMs6JeaIc+Ahh+WsTQUz3v9zVHhDLvSutfY?=
+ =?iso-8859-1?Q?Tec5cJa9mzZv6ZCFjG9l4kbPnQb9tgAY1CwKWcNQ5/+7CidG9jwZVNLDFq?=
+ =?iso-8859-1?Q?k+AYqhJQwez031AeKbaJWhkPbWBFXmofMHxSJ1iKoszjvCS7R93nrqDAEj?=
+ =?iso-8859-1?Q?UvZU98WnCKQp2RPF/6gxZkGvj5KFzBO9e0HpqZajw+t/MetnzybQ4lbPwQ?=
+ =?iso-8859-1?Q?Iyk2wGN3lQeJJ9z7BmIhRre07VwBYAiGWQ1QBD0QZIca8odsdULCIBK1zG?=
+ =?iso-8859-1?Q?zZuw=3D?=
+x-microsoft-antispam-prvs: <AM6PR0402MB386316E86BC2C0A5EBECD30AF57E0@AM6PR0402MB3863.eurprd04.prod.outlook.com>
 x-forefront-prvs: 09555FB1AD
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(366004)(136003)(376002)(346002)(396003)(199004)(189003)(478600001)(71200400001)(5660300002)(6486002)(97736004)(6512007)(2906002)(86362001)(36756003)(66066001)(2201001)(71190400001)(53936002)(4326008)(486006)(25786009)(68736007)(305945005)(14454004)(6436002)(316002)(386003)(8676002)(6116002)(3846002)(110136005)(186003)(7736002)(2616005)(26005)(256004)(81166006)(102836004)(50226002)(7416002)(14444005)(476003)(2501003)(81156014)(8936002)(6506007)(52116002)(106356001)(99286004)(105586002)(921003)(1121003);
+ SFS:(10009020)(39860400002)(366004)(136003)(376002)(346002)(396003)(199004)(189003)(478600001)(71200400001)(5660300002)(6486002)(97736004)(6512007)(2906002)(86362001)(36756003)(66066001)(2201001)(71190400001)(53936002)(4326008)(486006)(25786009)(68736007)(305945005)(14454004)(6436002)(316002)(386003)(8676002)(6116002)(3846002)(446003)(110136005)(186003)(7736002)(2616005)(76176011)(26005)(256004)(81166006)(102836004)(50226002)(7416002)(476003)(2501003)(81156014)(8936002)(6506007)(52116002)(106356001)(99286004)(105586002)(11346002)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3863;
  H:AM6PR0402MB3911.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: wEEgAq0a6i5lalWkd4zfvsrl0Nvjkan9wEsBkxI7YFJHqOzRB1BKDXoE/NmvQptva6mzFcvey+OsPMV3HWFzZmtiTgDn0nFnrtfWPYWaIxS96Zu6HlFPANStojCC9HrS1u+GLI7jq2O2Iu6sNuD88QaWrUv1wz7S+dYksII5DtUfbtYyy7d4EZYbFpL84G53zb8LwDxafd8jxokpweKQme41jMxjYk6ABD5FJ39tTfPPrSTQi+Tj03HdqY6c9oY2i2dt68QamQKWZXuB2l12l1f5Qic5q6xEiYvJ7dVBDWUxUE1x9La5AuQJmjz9c7Vd/BMSNjubjqo8zIlV6u9oKVsASO872msEZ0VwnCYvwNtY7GcmI1AR7iqKiT/t/KfUIl2BSzxeEeEGGbBXR3hcGLfUedzOA0MFNdeWZB/VJgw=
+x-microsoft-antispam-message-info: Tve+XdrNd0ulrSKhAH2FuFQ7IhyLD2+Z1JjPuyltnvJidmH0OSN0gyQKXTPpqZrNjD1syy32v0itoHz2q4Ye/O+hqqL4NWtyGRjzoHMw5vM9XjMJh15kJu853vr3ks3VqeOf66+JhrJczlM7O0WWti5MC1J6D+fFIGmKM0NPoxw8b3LPP4hAM0SRcT09wh5oRP9irhX85yUf05TnGEI5yTOLEysZvP/3BjaCqIqokVZQUhtpU1eoTXVPyiFM+dm6/ZofF11M54MOIJxW1oxQ/srkpTQFLJoNVLopUvwccXn6nBwyY2xakQ5YKUQG/8Z9+B3wh1HFpuBEEHkYTouZ9aXSG6ya3F/PJRxRK0vvPQQ3pFPupopYsfODF8fQ9vvwC87dtRDPClO//V8ug8U2+6fE69bYsA2pfx8PGgKMGeM=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: a0567e44-a19b-49de-e90d-08d697c73148
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 06:38:21.8202 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 1d3a3118-761b-4e87-41e2-08d697c7369d
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 06:38:30.7416 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3863
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_223839_380529_1BDDF6D9 
-X-CRM114-Status: GOOD (  10.64  )
+X-CRM114-CacheID: sfid-20190220_223847_884674_E379886B 
+X-CRM114-Status: GOOD (  20.98  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -163,61 +168,214 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
-system controller, the system controller is in charge of system
-power, clock and thermal sensors etc. management, Linux kernel
-has to communicate with system controller via MU (message unit)
-IPC to get temperature from thermal sensors, this patch adds
-binding doc for i.MX system controller thermal driver.
+i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+inside, the system controller is in charge of controlling power,
+clock and thermal sensors etc..
+
+This patch adds i.MX system controller thermal driver support,
+Linux kernel has to communicate with system controller via MU
+(message unit) IPC to get each thermal sensor's temperature,
+it supports multiple sensors which are passed from device tree,
+please see the binding doc for details.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
 Changes since V7:
-        - remove unused property "tsens-num";
-        - improve the compatible description;
-        - update examples according to latest dts file.
+	- remove unused structure imx_sc_thermal_data to simply the driver;
+	- move the "imx,sensor-resource-id" property from thermal zone node to scu tsens node, and
+	  get this property using phandle;
+	- remove unused sensor number got from dts, now it is not needed.
 ---
- .../devicetree/bindings/arm/freescale/fsl,scu.txt     | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ drivers/thermal/Kconfig          |  11 +++
+ drivers/thermal/Makefile         |   1 +
+ drivers/thermal/imx_sc_thermal.c | 144 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 156 insertions(+)
+ create mode 100644 drivers/thermal/imx_sc_thermal.c
 
-diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-index 72d481c..d89147e 100644
---- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-+++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
-@@ -122,6 +122,19 @@ RTC bindings based on SCU Message Protocol
- Required properties:
- - compatible: should be "fsl,imx8qxp-sc-rtc";
+diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
+index 58bb7d7..fec0ef5 100644
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -223,6 +223,17 @@ config IMX_THERMAL
+ 	  cpufreq is used as the cooling device to throttle CPUs when the
+ 	  passive trip is crossed.
  
-+Thermal bindings based on SCU Message Protocol
-+------------------------------------------------------------
++config IMX_SC_THERMAL
++	tristate "Temperature sensor driver for NXP i.MX SoCs with System Controller"
++	depends on (ARCH_MXC && IMX_SCU) || COMPILE_TEST
++	depends on OF
++	help
++	  Support for Temperature Monitor (TEMPMON) found on NXP i.MX SoCs with
++	  system controller inside, Linux kernel has to communicate with system
++	  controller via MU (message unit) IPC to get temperature from thermal
++	  sensor. It supports one critical trip point and one
++	  passive trip point for each thermal sensor.
 +
-+Required properties:
-+- compatible:			Should be :
-+				  "fsl,imx8qxp-sc-thermal"
-+				followed by "fsl,imx-sc-thermal";
+ config MAX77620_THERMAL
+ 	tristate "Temperature sensor driver for Maxim MAX77620 PMIC"
+ 	depends on MFD_MAX77620
+diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
+index 486d682..4062627 100644
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -40,6 +40,7 @@ obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
+ obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
+ obj-$(CONFIG_TANGO_THERMAL)	+= tango_thermal.o
+ obj-$(CONFIG_IMX_THERMAL)	+= imx_thermal.o
++obj-$(CONFIG_IMX_SC_THERMAL)	+= imx_sc_thermal.o
+ obj-$(CONFIG_MAX77620_THERMAL)	+= max77620_thermal.o
+ obj-$(CONFIG_QORIQ_THERMAL)	+= qoriq_thermal.o
+ obj-$(CONFIG_DA9062_THERMAL)	+= da9062-thermal.o
+diff --git a/drivers/thermal/imx_sc_thermal.c b/drivers/thermal/imx_sc_thermal.c
+new file mode 100644
+index 0000000..145e73b
+--- /dev/null
++++ b/drivers/thermal/imx_sc_thermal.c
+@@ -0,0 +1,144 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright 2018-2019 NXP.
++ */
 +
-+- #thermal-sensor-cells:	See Documentation/devicetree/bindings/thermal/thermal.txt
-+				for a description.
++#include <linux/err.h>
++#include <linux/firmware/imx/sci.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/thermal.h>
 +
-+- imx,sensor-resource-id: 	Property array to specify each thermal zone's sensor resource ID.
++#include "thermal_core.h"
 +
- Example (imx8qxp):
- -------------
- lsio_mu1: mailbox@5d1c0000 {
-@@ -168,6 +181,12 @@ firmware {
- 		rtc: rtc {
- 			compatible = "fsl,imx8qxp-sc-rtc";
- 		};
++#define IMX_SC_MISC_FUNC_GET_TEMP	13
++#define IMX_SC_C_TEMP			0
 +
-+		tsens: thermal-sensor {
-+			compatible = "fsl,imx8qxp-sc-thermal", "fsl,imx-sc-thermal";
-+			#thermal-sensor-cells = <0>;
-+			imx,sensor-resource-id = <IMX_SC_R_SYSTEM>;
-+		};
- 	};
- };
- 
++static struct imx_sc_ipc *thermal_ipc_handle;
++
++struct imx_sc_sensor {
++	struct thermal_zone_device *tzd;
++	u32 resource_id;
++};
++
++struct req_get_temp {
++	u16 resource_id;
++	u8 type;
++} __packed;
++
++struct resp_get_temp {
++	u16 celsius;
++	u8 tenths;
++} __packed;
++
++struct imx_sc_msg_misc_get_temp {
++	struct imx_sc_rpc_msg hdr;
++	union {
++		struct req_get_temp req;
++		struct resp_get_temp resp;
++	} data;
++} __packed;
++
++static int imx_sc_thermal_get_temp(void *data, int *temp)
++{
++	struct imx_sc_msg_misc_get_temp msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	struct imx_sc_sensor *sensor = data;
++	int ret;
++
++	msg.data.req.resource_id = sensor->resource_id;
++	msg.data.req.type = IMX_SC_C_TEMP;
++
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_MISC;
++	hdr->func = IMX_SC_MISC_FUNC_GET_TEMP;
++	hdr->size = 2;
++
++	ret = imx_scu_call_rpc(thermal_ipc_handle, &msg, true);
++	if (ret) {
++		pr_err("read temp sensor %d failed, ret %d\n",
++			sensor->resource_id, ret);
++		return ret;
++	}
++
++	*temp = msg.data.resp.celsius * 1000 + msg.data.resp.tenths * 100;
++
++	return 0;
++}
++
++static const struct thermal_zone_of_device_ops imx_sc_thermal_ops = {
++	.get_temp = imx_sc_thermal_get_temp,
++};
++
++static int imx_sc_thermal_probe(struct platform_device *pdev)
++{
++	struct device_node *np, *sensor_np;
++	int ret, i = 0;
++
++	ret = imx_scu_get_handle(&thermal_ipc_handle);
++	if (ret)
++		return ret;
++
++	np = of_find_node_by_name(NULL, "thermal-zones");
++	if (!np)
++		return -ENODEV;
++
++	for_each_available_child_of_node(np, sensor_np) {
++		struct of_phandle_args tsens_args;
++		struct imx_sc_sensor *sensor =
++			devm_kzalloc(&pdev->dev, sizeof(*sensor), GFP_KERNEL);
++		if (!sensor)
++			return -ENOMEM;
++
++		ret = of_parse_phandle_with_args(sensor_np, "thermal-sensors",
++				"#thermal-sensor-cells", i, &tsens_args);
++		if (ret < 0)
++			return ret;
++
++		ret = of_property_read_u32_index(tsens_args.np,
++			"imx,sensor-resource-id", i, &sensor->resource_id);
++		if (ret) {
++			dev_err(&pdev->dev,
++				"failed to get valid sensor resource id: %d\n",
++				ret);
++			break;
++		}
++
++		sensor->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev,
++								   i++,
++								   sensor,
++								   &imx_sc_thermal_ops);
++		if (IS_ERR(sensor->tzd)) {
++			dev_err(&pdev->dev, "failed to register thermal zone\n");
++			ret = PTR_ERR(sensor->tzd);
++			break;
++		}
++	}
++
++	of_node_put(np);
++	of_node_put(sensor_np);
++
++	return ret;
++}
++
++static const struct of_device_id imx_sc_thermal_table[] = {
++	{ .compatible = "fsl,imx-sc-thermal", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, imx_sc_thermal_table);
++
++static struct platform_driver imx_sc_thermal_driver = {
++		.probe = imx_sc_thermal_probe,
++		.driver = {
++			.name = "imx-sc-thermal",
++			.of_match_table = imx_sc_thermal_table,
++		},
++};
++module_platform_driver(imx_sc_thermal_driver);
++
++MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
++MODULE_DESCRIPTION("Thermal driver for NXP i.MX SoCs with system controller");
++MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
 
