@@ -2,65 +2,94 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ECFFEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:19:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 21FC9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:21:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB2822075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:19:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E49F82070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:21:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WQUTAwXI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB2822075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BFyCxlr/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=shutemov-name.20150623.gappssmtp.com header.i=@shutemov-name.20150623.gappssmtp.com header.b="si2bkdMJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E49F82070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=shutemov.name
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=y+IFMG8qmqr/Iv6DSxbyp/0/5A0SSnHFxnY688GRnDs=; b=WQUTAwXIBbwQFD
-	pSIsNYBzSSCReozN+0WoQccFEGmvjaIACG8prmaQRu+HFfkW4gpFLWcsVMZN04Gs1jSxLCCvkLmAw
-	jzOvsVhXUL71n31hay9OVsMhqHhOm+tj1c+FVSSDH5yYhuo8eCR6J+KaiAjqChmkVl+pkfyxDZpus
-	b3b4fUSMwlzYL4EEgHoE0fjvDy7QLGlXiWCL+Ubmcm9ShLad62NMN8b32/57mkFUf5rd6AczGDB8h
-	adBH94KplDKmTuThOlWZij+RYqPn5NACK/I8Vo/HVHMxrpcqisnKO+KvepSrlFecVoYrMpVDL7dX7
-	DpZ5jcZLIu9RSeORVT5w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tWiu7LeSRDIMYUE/nnvnI7l8lDvQe3Oskt/2JnY9zdc=; b=BFyCxlr/4Wxb+T
+	a5vmTbO+pwYB7GXubIWquJnx0tN6ZHz/Jf1ifu5av0JB06mZ9eZB1weSei2KfwY/2ULxa1VBRGQHH
+	E3nbld0I93+VLgqQsZhfgTHtpL14Q6U6hmF4+nHfGnf+fAA71cFiSlFRCyiInl7dENGIYd1+6G5Fu
+	O07mK2ImDbIBl6gJD2K6+MApAbfvTokvw1eoPU0wvILk1F7rWf2ftuOpgsr5odUgT2jC+gwMN0exe
+	48rMkQm5pVHy2l2PP3qWnAl2qZF69AyR6bA/fIfAdODxi53dFx/GesDuLG9Yk6aoAc/IRAo6MV9Lr
+	NX9dR1nL7CKUQ1DyQ4bA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwpCC-0002N2-Og; Thu, 21 Feb 2019 14:19:28 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwpC9-0002LZ-8w
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:19:26 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5F9A280D;
- Thu, 21 Feb 2019 06:19:23 -0800 (PST)
-Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 63C563F575;
- Thu, 21 Feb 2019 06:19:21 -0800 (PST)
-Subject: Re: [PATCH] trace: skip hwasan
-To: Will Deacon <will.deacon@arm.com>, Dmitry Vyukov <dvyukov@google.com>
-References: <20190217043434.46233-1-cai@lca.pw>
- <CACT4Y+ZYd0LFLJTwBbPRXpS1SorgPjN6c6woUB+25Vd6GuStsw@mail.gmail.com>
- <ec947849-5743-d48b-e2fc-acb90bbe6559@lca.pw>
- <CACT4Y+a=d3G06tjLU0qEz8RWthFybeiJZ_sAAt2ybi+-JEDPZw@mail.gmail.com>
- <20190218135929.GB15050@fuggles.cambridge.arm.com>
-From: James Morse <james.morse@arm.com>
-Message-ID: <aa6ef1c4-5073-4748-0c3c-b2d10c5bcdb7@arm.com>
-Date: Thu, 21 Feb 2019 14:19:19 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gwpEH-0004KT-7F; Thu, 21 Feb 2019 14:21:37 +0000
+Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwpEC-0004Ip-UI
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:21:35 +0000
+Received: by mail-pg1-x544.google.com with SMTP id j3so104614pgm.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 21 Feb 2019 06:21:31 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=shutemov-name.20150623.gappssmtp.com; s=20150623;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=iI1RJ0SSXxDh0vlZLQrOFO/u2FUJ4ENpS3Ludw9bPw8=;
+ b=si2bkdMJebBvPM0GwIvEO3/Amyao38zKAiijR3TpjprMmoqFKum3Njget2unbrFOug
+ Ga5QS8HL9rNhN0+nYuT7Z1Uu30vuTxz/7QrYSi00fO0cXe2GxPw1/zwMWmVyWJcYa23o
+ f+J45gf8vblmxl80YXo1DP1ukP8rOkDYFLlVRZ93Vepj3O8V/WlhKysqFYJtQLEkXXvu
+ Oh7ZRasJOIPvqvl9oLSXVqrMRxLiDcJW4Jr6wY7G8ezbvntovYIWEP4ik7Idb5ominp4
+ 8zG9C/Wqm3T7mqY/Z7xn00SZ3SrtBhrBwMG6aS/sCofVD/oqCyNYjTc3pB0OZzOpXqXf
+ 7Dtg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=iI1RJ0SSXxDh0vlZLQrOFO/u2FUJ4ENpS3Ludw9bPw8=;
+ b=WiuQl+5ITM3NZ4s0r1ywINFyH1G/TJNK4UVjWQlLb7uchfNTNiBN/TM38ZesRjgMfg
+ fl0kpL2PHf2ZT3PdhHPaeeZlIBwZmwC3Ui7AJFAe4ZU1Mw3eu4nhJ2dHAyIALF+S4GQW
+ XkDeHi8oZ74PBTHiA3HSBNBxRSPyU46zDwcQb5ARjXEn6qt0YLGTsMRT+riqww5OoXXC
+ sdlbStR67eljsQ/VMBbeC0bX6ToiAAPpif+qWlMMSmO4X8GYgjYohjMs7TU1yAmH0gaa
+ sGQl/80cZ+KUxtleedGGd6wmUkUeadzTyfP0z77jdD0udoClQENpARzovKzsmOf/ElHR
+ dJVA==
+X-Gm-Message-State: AHQUAuaexPPFpx0VBDh1TYeCMGwdtxor8DGSMeCTgQyklPZkTOlK2XBn
+ rt3SPxtF6NnwcNqdnsNMI/biFWJqelBXgQ==
+X-Google-Smtp-Source: AHgI3IZIRxhWmHk+uI4fyRE/obuhbmXUG2L9nLu0JhpIBnQ04LtmbdtCF/YGn8UplGAT9XruNQ0UOA==
+X-Received: by 2002:a63:68c9:: with SMTP id
+ d192mr35656895pgc.264.1550758891142; 
+ Thu, 21 Feb 2019 06:21:31 -0800 (PST)
+Received: from kshutemo-mobl1.localdomain ([192.55.54.44])
+ by smtp.gmail.com with ESMTPSA id o2sm31440498pfa.76.2019.02.21.06.21.29
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 21 Feb 2019 06:21:30 -0800 (PST)
+Received: by kshutemo-mobl1.localdomain (Postfix, from userid 1000)
+ id 662E6301708; Thu, 21 Feb 2019 17:21:26 +0300 (+03)
+Date: Thu, 21 Feb 2019 17:21:26 +0300
+From: "Kirill A. Shutemov" <kirill@shutemov.name>
+To: Steven Price <steven.price@arm.com>
+Subject: Re: [PATCH v2 02/13] x86/mm: Add p?d_large() definitions
+Message-ID: <20190221142126.k54vqaacrc2ekeff@kshutemo-mobl1>
+References: <20190221113502.54153-1-steven.price@arm.com>
+ <20190221113502.54153-3-steven.price@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20190218135929.GB15050@fuggles.cambridge.arm.com>
-Content-Language: en-GB
+Content-Disposition: inline
+In-Reply-To: <20190221113502.54153-3-steven.price@arm.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_061925_319853_8B4AF89C 
-X-CRM114-Status: GOOD (  17.86  )
+X-CRM114-CacheID: sfid-20190221_062133_018286_B7CB3B14 
+X-CRM114-Status: GOOD (  17.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,105 +101,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, Steven Rostedt <rostedt@goodmis.org>,
- Ingo Molnar <mingo@redhat.com>, Qian Cai <cai@lca.pw>,
- kasan-dev <kasan-dev@googlegroups.com>,
- Andrey Konovalov <andreyknvl@google.com>,
- Andrey Ryabinin <aryabinin@virtuozzo.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, linux-mm@kvack.org,
+ =?utf-8?B?SsOpcsO0bWU=?= Glisse <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi!
+On Thu, Feb 21, 2019 at 11:34:51AM +0000, Steven Price wrote:
+> Exposing the pud/pgd levels of the page tables to walk_page_range() means
+> we may come across the exotic large mappings that come with large areas
+> of contiguous memory (such as the kernel's linear map).
+> 
+> Expose p?d_large() from each architecture to detect these large mappings.
+> 
+> x86 already has these defined as inline functions, add a macro of the
+> same name so we don't end up with the generic version too.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Signed-off-by: Steven Price <steven.price@arm.com>
+> ---
+>  arch/x86/include/asm/pgtable.h | 3 +++
+>  arch/x86/mm/dump_pagetables.c  | 3 +++
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/arch/x86/include/asm/pgtable.h b/arch/x86/include/asm/pgtable.h
+> index 2779ace16d23..3695f6acb6af 100644
+> --- a/arch/x86/include/asm/pgtable.h
+> +++ b/arch/x86/include/asm/pgtable.h
+> @@ -234,6 +234,7 @@ static inline int pmd_large(pmd_t pte)
+>  {
+>  	return pmd_flags(pte) & _PAGE_PSE;
+>  }
+> +#define pmd_large(x)	pmd_large(x)
+>  
+>  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
+>  static inline int pmd_trans_huge(pmd_t pmd)
+> @@ -873,6 +874,7 @@ static inline int pud_large(pud_t pud)
+>  	return 0;
+>  }
+>  #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
+> +#define pud_large(x)	pud_large(x)
 
-On 18/02/2019 13:59, Will Deacon wrote:
-> [+James, who knows how to decode these things]
+Nit: we usually do this in form of
 
-Decode is a strong term!
+#define pud_large pud_large
 
-This stuff is printed by Cavium's secure-world software. All I'm doing is spotting the
-bits that vary between the out we've seen!
+and before body of the inline function.
 
-
-> On Mon, Feb 18, 2019 at 02:56:47PM +0100, Dmitry Vyukov wrote:
->> On Mon, Feb 18, 2019 at 2:27 PM Qian Cai <cai@lca.pw> wrote:
->>> On 2/17/19 2:30 AM, Dmitry Vyukov wrote:
->>>> On Sun, Feb 17, 2019 at 5:34 AM Qian Cai <cai@lca.pw> wrote:
->>>>>
->>>>> Enabling function tracer with CONFIG_KASAN_SW_TAGS=y (hwasan) tracer
->>>>> causes the whole system frozen on ThunderX2 systems with 256 CPUs,
->>>>> because there is a burst of too much pointer access, and then KASAN will
->>>>> dereference each byte of the shadow address for the tag checking which
->>>>> will kill all the CPUs.
->>>>
->>>> Could you please elaborate what exactly happens and who/why kills
->>>> CPUs? Number of memory accesses should not make any difference.
->>>> With hardware support (MTE) it won't be possible to disable
->>>> instrumentation (loads and stores check tags themselves), so it would
->>>> be useful to keep track of exact reasons we disable instrumentation to
->>>> know how to deal with them with hardware support.
->>>> It would be useful to keep this info in the comment in the Makefile.
->>>
->>> It turns out sometimes it will trigger a hardware error.
->>
->> Please add this to the comment that there is that error, reason is
->> unknown, happens from time to time.
->> "Too much pointer access" is confusing and does not seem to be the
->> root cause (there are lots of source files that cause lots of pointer
->> accesses).
-
-> I don't think this is directly related to KASAN, as I'm sure we've seen this
-> RAS error before.
-
-Not quite like this. I've had one choke on some PCIe transaction[0].
-
-This looks like corruption detected in a cache associated with a CPU. 'Write back' and
-'Physical Address' suggests its the data cache:
-
-
->>>  Node 0 NBU 0 Error report :
->>>  NBU BAR Error
-[..]
->>>       Physical Address : 0x40011ff00
->>>
->>> NBU BAR Error : Decoded info :
->>>         Agent info : CPU
->>>             Core ID : 21
->>>             Thread ID : 1
->>>         Requ: type : 4 : Write Back
->>>  Node 0 NBU 1 Error report :
->>>  NBU BAR Error
-[..]
->>>       Physical Address : 0x40011ff40
->>>
->>> NBU BAR Error : Decoded info :
->>>         Agent info : CPU
->>>             Core ID : 21
->>>             Thread ID : 1
->>>         Requ: type : 4 : Write Back
->>>  Node 0 NBU 2 Error report :
->>>  NBU BAR Error
-[..]
->>>       Physical Address : 0x40011ff80
-
-If you can reproduce it, and it always affects Core:21,Thread:1 I'd suggest offline-ing
-all the threads/CPUs in that core. It may be one cache is close to some threshold, and you
-can offline the core that its part of.
-
-
-Thanks,
-
-James
-
-
-[0] For comparison, I've had one of these during kexec:
-# NBU BAR Error : Decoded info :
-#        Agent info : IO
-#                   : PCIE0
-#        Requ: type : 2 : Read
+-- 
+ Kirill A. Shutemov
 
 _______________________________________________
 linux-arm-kernel mailing list
