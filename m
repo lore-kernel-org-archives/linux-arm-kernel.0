@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F5FBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:16:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 151BFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:19:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E0FD214AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:16:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D66F120823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:19:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hfbW93+6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E0FD214AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jZSJQyPi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D66F120823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Jk75Ier+K2J8mEEbsKzT83RFuWNaaDBPhOv+i48FVzE=; b=hfbW93+6HmgkXl
-	wPaZFZEnH3huFpChMubBBBq5nh+rXbIO5rcfIUpzKvZkNctHGfP/YSpamhhxPOM9PXYXLFq1+jpk+
-	C9+/i7tEKSBAjaBw8XjveAL9HhX9M154jU3jMbVeiRbWpTFJPUS+rYsU+ddZZ3jzuYi7mY7wSuG54
-	K7zwIdUlRRtt7Di23UY3mWUoMOey4HB/V4an2TTxGhC06A5NX5cxJcVdBzwwNTiGz6NMPYo3dyp0Z
-	braq/yQ7+fAPfqJJxewCD/NMGPGZLP2pB0FAza2parVwQdA8IFp3F7fTL478FolwHOsC/zr52ohJo
-	b7gQhELwK8F9KLv0/1UA==;
+	List-Owner; bh=iRLNSBHchDLFmYj48x/rmiUvSFGWX0wVS7NsozFkTOQ=; b=jZSJQyPiSIR/bK
+	vs24bvgkDLo32oY86r9Yn6zJeeIXmWrEcqpH8BsoPld6Z5DI7Pj3blk4EqJZ/z3pTBGPKt0p0wIgT
+	1nwQc37lRDlJGgM6Fu5x4pZVmp4NAd3SYiuWpzTbMp0SUpQXKgdsan9oPruP2ENfrA81Kds6LFsQX
+	Z3t9fpMCTM4NPDv6bBc3WM5aFjNwTtfUE2izaxMsPn3RVThtxcjacwvsN7WHWFYLK4NN4azKDKDt7
+	qt3y4T70p3RjZt8mnw5oRrxA/nRGCLj6mbDx/uCkd18VJz1nZ80i3IomP3+a9kqyLYI1eBdKAf3gU
+	jJSmqBZrON7uoCh2G/Rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwkTG-0002h4-0e; Thu, 21 Feb 2019 09:16:46 +0000
+	id 1gwkVO-0005aQ-DX; Thu, 21 Feb 2019 09:18:58 +0000
 Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwkSF-0001T2-E8; Thu, 21 Feb 2019 09:15:47 +0000
+ id 1gwkSa-0001tS-KS; Thu, 21 Feb 2019 09:16:11 +0000
 X-Originating-IP: 90.88.23.190
 Received: from localhost.localdomain
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: miquel.raynal@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 946441BF219;
- Thu, 21 Feb 2019 09:15:33 +0000 (UTC)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 5F3231BF218;
+ Thu, 21 Feb 2019 09:16:00 +0000 (UTC)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Boris Brezillon <bbrezillon@kernel.org>,
  Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
  Brian Norris <computersforpeace@gmail.com>,
  Marek Vasut <marek.vasut@gmail.com>,
  Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [PATCH 01/15] mtd: nand: Add max_bad_eraseblocks_per_lun info to
- memorg
-Date: Thu, 21 Feb 2019 10:15:13 +0100
-Message-Id: <20190221091527.20497-2-miquel.raynal@bootlin.com>
+Subject: [PATCH 12/15] mtd: rawnand: Get rid of chip->bits_per_cell
+Date: Thu, 21 Feb 2019 10:15:24 +0100
+Message-Id: <20190221091527.20497-13-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190221091527.20497-1-miquel.raynal@bootlin.com>
 References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_011543_820371_B2BD88F8 
-X-CRM114-Status: GOOD (  17.02  )
+X-CRM114-CacheID: sfid-20190221_011605_361444_610572ED 
+X-CRM114-Status: GOOD (  14.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,214 +83,139 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Boris Brezillon <bbrezillon@kernel.org>
 
-NAND datasheets usually give the maximum number of bad blocks per LUN
-and this number can be used to help upper layers decide how much blocks
-they should reserve for bad block handling.
-
-Add a max_bad_eraseblocks_per_lun to the nand_memory_organization
-struct and update the NAND_MEMORG() macro (and its users) accordingly.
-
-We also provide a default mtd->_max_bad_blocks() implementation.
+Now that we inherit from nand_device, we can use
+nand_device->memorg.bits_per_cell instead of having our own field at
+the nand_chip level.
 
 Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/mtd/nand/core.c           | 34 +++++++++++++++++++++++++++++++
- drivers/mtd/nand/spi/gigadevice.c |  6 +++---
- drivers/mtd/nand/spi/macronix.c   |  4 ++--
- drivers/mtd/nand/spi/micron.c     |  2 +-
- drivers/mtd/nand/spi/toshiba.c    |  2 +-
- drivers/mtd/nand/spi/winbond.c    |  4 ++--
- include/linux/mtd/nand.h          |  6 +++++-
- 7 files changed, 48 insertions(+), 10 deletions(-)
+ drivers/mtd/nand/raw/nand_base.c   | 4 ----
+ drivers/mtd/nand/raw/nand_hynix.c  | 2 +-
+ drivers/mtd/nand/raw/nand_jedec.c  | 1 -
+ drivers/mtd/nand/raw/nand_micron.c | 2 +-
+ drivers/mtd/nand/raw/nand_onfi.c   | 1 -
+ include/linux/mtd/rawnand.h        | 6 ++----
+ 6 files changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/mtd/nand/core.c b/drivers/mtd/nand/core.c
-index e6554b401813..0a2be5e6d669 100644
---- a/drivers/mtd/nand/core.c
-+++ b/drivers/mtd/nand/core.c
-@@ -173,6 +173,40 @@ int nanddev_mtd_erase(struct mtd_info *mtd, struct erase_info *einfo)
+diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+index 4c9c2660df64..00fe124fcb44 100644
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -4502,7 +4502,6 @@ void nand_decode_ext_id(struct nand_chip *chip)
+ 
+ 	/* The 3rd id byte holds MLC / multichip data */
+ 	memorg->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+-	chip->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+ 	/* The 4th id byte is the important one */
+ 	extid = id_data[3];
+ 
+@@ -4546,7 +4545,6 @@ static void nand_decode_id(struct nand_chip *chip, struct nand_flash_dev *type)
+ 
+ 	/* All legacy ID NAND are small-page, SLC */
+ 	memorg->bits_per_cell = 1;
+-	chip->bits_per_cell = 1;
  }
- EXPORT_SYMBOL_GPL(nanddev_mtd_erase);
  
-+/**
-+ * nanddev_mtd_max_bad_blocks() - Get the maximum number of bad eraseblock on
-+ *				  a specific region of the NAND device
-+ * @mtd: MTD device
-+ * @offs: offset of the NAND region
-+ * @len: length of the NAND region
-+ *
-+ * Default implementation for mtd->_max_bad_blocks(). Only works if
-+ * nand->memorg.max_bad_eraseblocks_per_lun is > 0.
-+ *
-+ * Return: a positive number encoding the maximum number of eraseblocks on a
-+ * portion of memory, a negative error code otherwise.
-+ */
-+int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len)
-+{
-+	struct nand_device *nand = mtd_to_nanddev(mtd);
-+	struct nand_pos pos, end;
-+	unsigned int max_bb = 0;
-+
-+	if (!nand->memorg.max_bad_eraseblocks_per_lun)
-+		return -ENOTSUPP;
-+
-+	nanddev_offs_to_pos(nand, offs, &pos);
-+	nanddev_offs_to_pos(nand, offs + len, &end);
-+
-+	for (nanddev_offs_to_pos(nand, offs, &pos);
-+	     nanddev_pos_cmp(&pos, &end) < 0;
-+	     nanddev_pos_next_lun(nand, &pos))
-+		max_bb += nand->memorg.max_bad_eraseblocks_per_lun;
-+
-+	return max_bb;
-+}
-+EXPORT_SYMBOL_GPL(nanddev_mtd_max_bad_blocks);
-+
+ /*
+@@ -4589,7 +4587,6 @@ static bool find_full_id_nand(struct nand_chip *chip,
+ 		mtd->oobsize = memorg->oobsize;
+ 
+ 		memorg->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+-		chip->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+ 		chip->chipsize = (uint64_t)type->chipsize << 20;
+ 		chip->options |= type->options;
+ 		chip->ecc_strength_ds = NAND_ECC_STRENGTH(type);
+@@ -4625,7 +4622,6 @@ static void nand_manufacturer_detect(struct nand_chip *chip)
+ 
+ 		/* The 3rd id byte holds MLC / multichip data */
+ 		memorg->bits_per_cell = nand_get_bits_per_cell(chip->id.data[2]);
+-		chip->bits_per_cell = nand_get_bits_per_cell(chip->id.data[2]);
+ 		chip->manufacturer.desc->ops->detect(chip);
+ 	} else {
+ 		nand_decode_ext_id(chip);
+diff --git a/drivers/mtd/nand/raw/nand_hynix.c b/drivers/mtd/nand/raw/nand_hynix.c
+index 94ea8c593589..272b934dffb7 100644
+--- a/drivers/mtd/nand/raw/nand_hynix.c
++++ b/drivers/mtd/nand/raw/nand_hynix.c
+@@ -592,7 +592,7 @@ static void hynix_nand_extract_scrambling_requirements(struct nand_chip *chip,
+ 	u8 nand_tech;
+ 
+ 	/* We need scrambling on all TLC NANDs*/
+-	if (chip->bits_per_cell > 2)
++	if (nanddev_bits_per_cell(&chip->base) > 2)
+ 		chip->options |= NAND_NEED_SCRAMBLING;
+ 
+ 	/* And on MLC NANDs with sub-3xnm process */
+diff --git a/drivers/mtd/nand/raw/nand_jedec.c b/drivers/mtd/nand/raw/nand_jedec.c
+index 61e33ee7ee19..030f178c7a97 100644
+--- a/drivers/mtd/nand/raw/nand_jedec.c
++++ b/drivers/mtd/nand/raw/nand_jedec.c
+@@ -104,7 +104,6 @@ int nand_jedec_detect(struct nand_chip *chip)
+ 	chip->chipsize = memorg->eraseblocks_per_lun;
+ 	chip->chipsize *= (uint64_t)mtd->erasesize * p->lun_count;
+ 	memorg->bits_per_cell = p->bits_per_cell;
+-	chip->bits_per_cell = p->bits_per_cell;
+ 
+ 	if (le16_to_cpu(p->features) & JEDEC_FEATURE_16_BIT_BUS)
+ 		chip->options |= NAND_BUSWIDTH_16;
+diff --git a/drivers/mtd/nand/raw/nand_micron.c b/drivers/mtd/nand/raw/nand_micron.c
+index b85e1c13b79e..98ce6575aa64 100644
+--- a/drivers/mtd/nand/raw/nand_micron.c
++++ b/drivers/mtd/nand/raw/nand_micron.c
+@@ -385,7 +385,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
+ 	if (!chip->parameters.onfi)
+ 		return MICRON_ON_DIE_UNSUPPORTED;
+ 
+-	if (chip->bits_per_cell != 1)
++	if (nanddev_bits_per_cell(&chip->base) != 1)
+ 		return MICRON_ON_DIE_UNSUPPORTED;
+ 
+ 	/*
+diff --git a/drivers/mtd/nand/raw/nand_onfi.c b/drivers/mtd/nand/raw/nand_onfi.c
+index 3ca9c8923a30..a6b9fc9a335b 100644
+--- a/drivers/mtd/nand/raw/nand_onfi.c
++++ b/drivers/mtd/nand/raw/nand_onfi.c
+@@ -249,7 +249,6 @@ int nand_onfi_detect(struct nand_chip *chip)
+ 	chip->chipsize = memorg->eraseblocks_per_lun;
+ 	chip->chipsize *= (uint64_t)mtd->erasesize * p->lun_count;
+ 	memorg->bits_per_cell = p->bits_per_cell;
+-	chip->bits_per_cell = p->bits_per_cell;
+ 
+ 	if (le16_to_cpu(p->features) & ONFI_FEATURE_16_BIT_BUS)
+ 		chip->options |= NAND_BUSWIDTH_16;
+diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+index d748e09de480..24ecd9a4f952 100644
+--- a/include/linux/mtd/rawnand.h
++++ b/include/linux/mtd/rawnand.h
+@@ -1004,7 +1004,6 @@ struct nand_legacy {
+  * @badblockbits:	[INTERN] minimum number of set bits in a good block's
+  *			bad block marker position; i.e., BBM == 11110111b is
+  *			not bad when badblockbits == 7
+- * @bits_per_cell:	[INTERN] number of bits per cell. i.e., 1 means SLC.
+  * @ecc_strength_ds:	[INTERN] ECC correctability from the datasheet.
+  *			Minimum amount of bit errors per @ecc_step_ds guaranteed
+  *			to be correctable. If unknown, set to zero.
+@@ -1073,7 +1072,6 @@ struct nand_chip {
+ 	} pagecache;
+ 
+ 	int subpagesize;
+-	uint8_t bits_per_cell;
+ 	uint16_t ecc_strength_ds;
+ 	uint16_t ecc_step_ds;
+ 	int onfi_timing_mode_default;
+@@ -1244,9 +1242,9 @@ int nand_create_bbt(struct nand_chip *chip);
+  */
+ static inline bool nand_is_slc(struct nand_chip *chip)
+ {
+-	WARN(chip->bits_per_cell == 0,
++	WARN(nanddev_bits_per_cell(&chip->base) == 0,
+ 	     "chip->bits_per_cell is used uninitialized\n");
+-	return chip->bits_per_cell == 1;
++	return nanddev_bits_per_cell(&chip->base) == 1;
+ }
+ 
  /**
-  * nanddev_init() - Initialize a NAND device
-  * @nand: NAND device
-diff --git a/drivers/mtd/nand/spi/gigadevice.c b/drivers/mtd/nand/spi/gigadevice.c
-index e4141c20947a..c434fbed3ce5 100644
---- a/drivers/mtd/nand/spi/gigadevice.c
-+++ b/drivers/mtd/nand/spi/gigadevice.c
-@@ -88,7 +88,7 @@ static const struct mtd_ooblayout_ops gd5fxgq4xa_ooblayout = {
- 
- static const struct spinand_info gigadevice_spinand_table[] = {
- 	SPINAND_INFO("GD5F1GQ4xA", 0xF1,
--		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 1024, 20, 1, 1, 1),
- 		     NAND_ECCREQ(8, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-@@ -97,7 +97,7 @@ static const struct spinand_info gigadevice_spinand_table[] = {
- 		     SPINAND_ECCINFO(&gd5fxgq4xa_ooblayout,
- 				     gd5fxgq4xa_ecc_get_status)),
- 	SPINAND_INFO("GD5F2GQ4xA", 0xF2,
--		     NAND_MEMORG(1, 2048, 64, 64, 2048, 1, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 2048, 40, 1, 1, 1),
- 		     NAND_ECCREQ(8, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-@@ -106,7 +106,7 @@ static const struct spinand_info gigadevice_spinand_table[] = {
- 		     SPINAND_ECCINFO(&gd5fxgq4xa_ooblayout,
- 				     gd5fxgq4xa_ecc_get_status)),
- 	SPINAND_INFO("GD5F4GQ4xA", 0xF4,
--		     NAND_MEMORG(1, 2048, 64, 64, 4096, 1, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 4096, 40, 1, 1, 1),
- 		     NAND_ECCREQ(8, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-diff --git a/drivers/mtd/nand/spi/macronix.c b/drivers/mtd/nand/spi/macronix.c
-index 98f6b9c4b684..c6300d9d63f9 100644
---- a/drivers/mtd/nand/spi/macronix.c
-+++ b/drivers/mtd/nand/spi/macronix.c
-@@ -94,7 +94,7 @@ static int mx35lf1ge4ab_ecc_get_status(struct spinand_device *spinand,
- 
- static const struct spinand_info macronix_spinand_table[] = {
- 	SPINAND_INFO("MX35LF1GE4AB", 0x12,
--		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 1024, 40, 1, 1, 1),
- 		     NAND_ECCREQ(4, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-@@ -103,7 +103,7 @@ static const struct spinand_info macronix_spinand_table[] = {
- 		     SPINAND_ECCINFO(&mx35lfxge4ab_ooblayout,
- 				     mx35lf1ge4ab_ecc_get_status)),
- 	SPINAND_INFO("MX35LF2GE4AB", 0x22,
--		     NAND_MEMORG(1, 2048, 64, 64, 2048, 2, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 2048, 20, 2, 1, 1),
- 		     NAND_ECCREQ(4, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-diff --git a/drivers/mtd/nand/spi/micron.c b/drivers/mtd/nand/spi/micron.c
-index 9c4381d6847b..7d7b1f7fcf71 100644
---- a/drivers/mtd/nand/spi/micron.c
-+++ b/drivers/mtd/nand/spi/micron.c
-@@ -92,7 +92,7 @@ static int mt29f2g01abagd_ecc_get_status(struct spinand_device *spinand,
- 
- static const struct spinand_info micron_spinand_table[] = {
- 	SPINAND_INFO("MT29F2G01ABAGD", 0x24,
--		     NAND_MEMORG(1, 2048, 128, 64, 2048, 2, 1, 1),
-+		     NAND_MEMORG(1, 2048, 128, 64, 2048, 40, 2, 1, 1),
- 		     NAND_ECCREQ(8, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-diff --git a/drivers/mtd/nand/spi/toshiba.c b/drivers/mtd/nand/spi/toshiba.c
-index 081265557e70..00ddab08e6c6 100644
---- a/drivers/mtd/nand/spi/toshiba.c
-+++ b/drivers/mtd/nand/spi/toshiba.c
-@@ -95,7 +95,7 @@ static int tc58cvg2s0h_ecc_get_status(struct spinand_device *spinand,
- 
- static const struct spinand_info toshiba_spinand_table[] = {
- 	SPINAND_INFO("TC58CVG2S0H", 0xCD,
--		     NAND_MEMORG(1, 4096, 256, 64, 2048, 1, 1, 1),
-+		     NAND_MEMORG(1, 4096, 256, 64, 2048, 40, 1, 1, 1),
- 		     NAND_ECCREQ(8, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-diff --git a/drivers/mtd/nand/spi/winbond.c b/drivers/mtd/nand/spi/winbond.c
-index 5d944580b898..a6c17e0cace8 100644
---- a/drivers/mtd/nand/spi/winbond.c
-+++ b/drivers/mtd/nand/spi/winbond.c
-@@ -76,7 +76,7 @@ static int w25m02gv_select_target(struct spinand_device *spinand,
- 
- static const struct spinand_info winbond_spinand_table[] = {
- 	SPINAND_INFO("W25M02GV", 0xAB,
--		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 2),
-+		     NAND_MEMORG(1, 2048, 64, 64, 1024, 20, 1, 1, 2),
- 		     NAND_ECCREQ(1, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-@@ -85,7 +85,7 @@ static const struct spinand_info winbond_spinand_table[] = {
- 		     SPINAND_ECCINFO(&w25m02gv_ooblayout, NULL),
- 		     SPINAND_SELECT_TARGET(w25m02gv_select_target)),
- 	SPINAND_INFO("W25N01GV", 0xAA,
--		     NAND_MEMORG(1, 2048, 64, 64, 1024, 1, 1, 1),
-+		     NAND_MEMORG(1, 2048, 64, 64, 1024, 20, 1, 1, 1),
- 		     NAND_ECCREQ(1, 512),
- 		     SPINAND_INFO_OP_VARIANTS(&read_cache_variants,
- 					      &write_cache_variants,
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 7f53ece2c039..d32bb623d532 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -19,6 +19,7 @@
-  * @oobsize: OOB area size
-  * @pages_per_eraseblock: number of pages per eraseblock
-  * @eraseblocks_per_lun: number of eraseblocks per LUN (Logical Unit Number)
-+ * @max_bad_eraseblocks_per_lun: maximum number of eraseblocks per LUN
-  * @planes_per_lun: number of planes per LUN
-  * @luns_per_target: number of LUN per target (target is a synonym for die)
-  * @ntargets: total number of targets exposed by the NAND device
-@@ -29,18 +30,20 @@ struct nand_memory_organization {
- 	unsigned int oobsize;
- 	unsigned int pages_per_eraseblock;
- 	unsigned int eraseblocks_per_lun;
-+	unsigned int max_bad_eraseblocks_per_lun;
- 	unsigned int planes_per_lun;
- 	unsigned int luns_per_target;
- 	unsigned int ntargets;
- };
- 
--#define NAND_MEMORG(bpc, ps, os, ppe, epl, ppl, lpt, nt)	\
-+#define NAND_MEMORG(bpc, ps, os, ppe, epl, mbb, ppl, lpt, nt)	\
- 	{							\
- 		.bits_per_cell = (bpc),				\
- 		.pagesize = (ps),				\
- 		.oobsize = (os),				\
- 		.pages_per_eraseblock = (ppe),			\
- 		.eraseblocks_per_lun = (epl),			\
-+		.max_bad_eraseblocks_per_lun = (mbb),		\
- 		.planes_per_lun = (ppl),			\
- 		.luns_per_target = (lpt),			\
- 		.ntargets = (nt),				\
-@@ -729,5 +732,6 @@ static inline bool nanddev_bbt_is_initialized(struct nand_device *nand)
- 
- /* MTD -> NAND helper functions. */
- int nanddev_mtd_erase(struct mtd_info *mtd, struct erase_info *einfo);
-+int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len);
- 
- #endif /* __LINUX_MTD_NAND_H */
 -- 
 2.19.1
 
