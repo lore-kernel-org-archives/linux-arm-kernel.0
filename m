@@ -2,93 +2,71 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A651C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:28:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36F77C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:43:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3AE5B2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:28:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B5782080D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:43:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dn98e714";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=shutemov-name.20150623.gappssmtp.com header.i=@shutemov-name.20150623.gappssmtp.com header.b="1W/lKVgG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3AE5B2075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=shutemov.name
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="czAR/pHP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LOonzcU5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B5782080D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=A2hY3uR3hGrcmCJtvbVnOTPmCaeoeO8c9YPQMMoVBBw=; b=Dn98e714WhF4dw
-	OdsYXXyLzEQ15tzjGqJP/5xhdbeub0zV2ZqR3jh2qpbL750RfabtMxK8ZX+KAgo8lAR4ELLUWlpdW
-	h+zWkOqOnGF/dinT7kZ9w+oSQFSypAr3WcjA8OHuM0mWH/xGX3eNm7bH4EHaLrcR58QiJuXUIe6NU
-	McM9gFw1ZxgS1IjdZHBGBICTj7PfE1P4QUhJVkK6MxAaD/0jKLPkh+dsURveQ/FzUXIl23OTTgpJC
-	9qwIEN/AZJHaJmlOLp94x3TwVJmneRT92Xn6ugshqdWd1Psa+AuNGCVqmSHnMp0aMOXH3G2/sOKn4
-	Vznc5rdsbJYkY5B4SWdg==;
+	List-Owner; bh=T7Dy/U7dIpa92zOgCTrEWkqbHoQd/hLrNgDBHk+fnJg=; b=czAR/pHPLxWMSX
+	e1CT14YyKU7GpNzl8nz+BsPjldJsAvY32E1zFTZh2tGFgc2olfBOHr1LX66ppVJVRyr82PJigLl7h
+	6Y7wv198DDozMx8VOUE0Byv9SkVIkqwvuhSGXW2+5yj09gMM4uWqj+iyi44pQ9vkqKgsyLlH4xTfw
+	1X0mF8Ax6W/eIr5bjXhZxNKBXXuePHqUQyzdHlur+inqrG6UEC0caO847nbK1taJ9PNd8VXLDKUqL
+	SC8VKC/NOST0a7Q7IwIP7lW5C8kENyDXyA0MMTET3a8DAiIE7XNibMHxWoIZT68/TGp2s6OEzTrFg
+	agcS0feswoDlsVj+w3vQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwpKo-0006hf-3S; Thu, 21 Feb 2019 14:28:22 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gwpZ6-0003m2-Lw; Thu, 21 Feb 2019 14:43:08 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwpKk-0006h0-Mj
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:28:20 +0000
-Received: by mail-pg1-x543.google.com with SMTP id r124so13780615pgr.3
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 06:28:18 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=shutemov-name.20150623.gappssmtp.com; s=20150623;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=pA9wgCQyEUyTHkAq+rVlPzlBQCV50nMzrf+ehGsqY3Q=;
- b=1W/lKVgGsUokYt6qJwL+oFd6wI/8KbnaSxB0ry6zobjbzzt8lwy3rDM0GPrPbtSzWc
- XG5+mzm8TvRZAvS9RAH1TXfpQzPMGUQl6oFNDC4cI7CFGbnXzzQkKLtKcRg+9PQgPMg0
- pXOIaFUcQmh98dypu8uNF3Y2c/xfQLSZaDJV0dnCRB+kT6gfZqY/nbPnUJ9KfNdArqh7
- gaOhtVDM5gTEAmClFOieev9ao8Ctx/Fy8y8/MqglYraqRqt5rGZzTWciBFhzAHeoA13O
- FAi/fYvXvQljBV62TkgyfrGmaviIfnN2K+pcsmzHfWyWorMknnuXuMfFrqSEyT2WFs7R
- kzTw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=pA9wgCQyEUyTHkAq+rVlPzlBQCV50nMzrf+ehGsqY3Q=;
- b=h5CIxVke2YvNBqGI4AURuscIK5nA0+IzY3wzyXueg4Hjm4XcLI6GiJbkPGTRs3gq5w
- mUzfSyw08AiIu+RJgFmBzB50KWCg5nmG2KkCgiYRzWa1XLMwlx5Ehz/N/EyLoHbcMs2K
- f/zBif/2q7Y/NJuIef5h2TjtaNrbwkDfANR2nKyjeRF1oWYYN3y5CrtRAsmODz11josc
- yWf7/51c0mzkg4wAPmgJ8U3dG0bkwDhHXaNf12IomFhSEFgD8NRhkh7801wPJdTEre1n
- ZBa0Op4L2sNPV+6HqCtUzwUJTk0jdud0juTsDM1jxrPB/3FXTKLbsdp9lGrpN7caOVjk
- kIeQ==
-X-Gm-Message-State: AHQUAuaZhyJfwXFygr7CZzcHD5LIznpLcJeFKQMnaGV00bMfYXiuJgCD
- +fQ0HFhjFeUzyurWWR2l51OmkA==
-X-Google-Smtp-Source: AHgI3IbfbbYkruivN5aBVqRxR1ViZUHLVAQoi1hsZAsMbsY8Xl1Xpgutyz7rtk/D8d3+HA9SOuSXiw==
-X-Received: by 2002:a62:3a01:: with SMTP id h1mr39568542pfa.169.1550759297907; 
- Thu, 21 Feb 2019 06:28:17 -0800 (PST)
-Received: from kshutemo-mobl1.localdomain ([134.134.139.83])
- by smtp.gmail.com with ESMTPSA id y5sm41244867pge.49.2019.02.21.06.28.16
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 06:28:16 -0800 (PST)
-Received: by kshutemo-mobl1.localdomain (Postfix, from userid 1000)
- id 0B424301708; Thu, 21 Feb 2019 17:28:13 +0300 (+03)
-Date: Thu, 21 Feb 2019 17:28:12 +0300
-From: "Kirill A. Shutemov" <kirill@shutemov.name>
-To: Steven Price <steven.price@arm.com>
-Subject: Re: [PATCH v2 03/13] mm: Add generic p?d_large() macros
-Message-ID: <20190221142812.oa53lfnnfmsuh6ys@kshutemo-mobl1>
-References: <20190221113502.54153-1-steven.price@arm.com>
- <20190221113502.54153-4-steven.price@arm.com>
+ id 1gwpZ2-0003ks-6C
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:43:06 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id A36462075A;
+ Thu, 21 Feb 2019 14:43:02 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550760183;
+ bh=bVdnAZuC9zpBJqGFcs2av9P/pemb+R9HXCnfEHXFCvo=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=LOonzcU5g8cjdQc6S+dNWuIT4vCdRj1SN77tTtwPgRn0lxQm3lwKST32RI0Fht9+8
+ TibQ7h6JpQWhU3jJCrjRlzuKgNNTg38uylnVpkZlIS+CmTE9DiGx4Q1lhHz9LVWotc
+ +zqGeLlYE4PJOSNH7b/gyiAadcpZ3/lHgr+cTCAc=
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH 4.20 22/32] arm64, mm,
+ efi: Account for GICv3 LPI tables in static memblock reserve table
+Date: Thu, 21 Feb 2019 15:36:10 +0100
+Message-Id: <20190221125252.203198615@linuxfoundation.org>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190221125250.855065214@linuxfoundation.org>
+References: <20190221125250.855065214@linuxfoundation.org>
+User-Agent: quilt/0.65
+X-stable: review
+X-Patchwork-Hint: ignore
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190221113502.54153-4-steven.price@arm.com>
-User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_062818_737301_4DBF743F 
-X-CRM114-Status: GOOD (  12.02  )
+X-CRM114-CacheID: sfid-20190221_064304_263644_2FF9C737 
+X-CRM114-Status: GOOD (  16.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,43 +78,151 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
- Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, linux-mm@kvack.org,
- =?utf-8?B?SsOpcsO0bWU=?= Glisse <jglisse@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
+Cc: Ingo Molnar <mingo@kernel.org>, Sasha Levin <sashal@kernel.org>,
+ linux-efi@vger.kernel.org, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Will Deacon <will.deacon@arm.com>, stable@vger.kernel.org,
+ Mike Rapoport <rppt@linux.ibm.com>, Peter Zijlstra <peterz@infradead.org>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ Linus Torvalds <torvalds@linux-foundation.org>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 11:34:52AM +0000, Steven Price wrote:
-> From: James Morse <james.morse@arm.com>
-> 
-> Exposing the pud/pgd levels of the page tables to walk_page_range() means
-> we may come across the exotic large mappings that come with large areas
-> of contiguous memory (such as the kernel's linear map).
-> 
-> For architectures that don't provide p?d_large() macros, provided a
-> does nothing default.
+4.20-stable review patch.  If anyone has any objections, please let me know.
 
-Nak, sorry.
+------------------
 
-Power will get broken by the patch. It has pmd_large() inline function,
-that will be overwritten by the define from this patch.
+Commit 8a5b403d71affa098009cc3dff1b2c45113021ad upstream.
 
-I believe it requires more ground work on arch side in general.
-All architectures that has huge page support has to provide these helpers
-(and matching defines) before you can use it in a generic code.
+In the irqchip and EFI code, we have what basically amounts to a quirk
+to work around a peculiarity in the GICv3 architecture, which permits
+the system memory address of LPI tables to be programmable only once
+after a CPU reset. This means kexec kernels must use the same memory
+as the first kernel, and thus ensure that this memory has not been
+given out for other purposes by the time the ITS init code runs, which
+is not very early for secondary CPUs.
 
+On systems with many CPUs, these reservations could overflow the
+memblock reservation table, and this was addressed in commit:
+
+  eff896288872 ("efi/arm: Defer persistent reservations until after paging_init()")
+
+However, this turns out to have made things worse, since the allocation
+of page tables and heap space for the resized memblock reservation table
+itself may overwrite the regions we are attempting to reserve, which may
+cause all kinds of corruption, also considering that the ITS will still
+be poking bits into that memory in response to incoming MSIs.
+
+So instead, let's grow the static memblock reservation table on such
+systems so it can accommodate these reservations at an earlier time.
+This will permit us to revert the above commit in a subsequent patch.
+
+[ mingo: Minor cleanups. ]
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Mike Rapoport <rppt@linux.ibm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-efi@vger.kernel.org
+Link: http://lkml.kernel.org/r/20190215123333.21209-2-ard.biesheuvel@linaro.org
+Signed-off-by: Ingo Molnar <mingo@kernel.org>
+[ ardb: Double the size of the slack to account for the lack of an
+        optimization that was introduced in mainline after the release
+        of v4.20. ]
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Sasha Levin <sashal@kernel.org>
+---
+ arch/arm64/include/asm/memory.h | 11 +++++++++++
+ include/linux/memblock.h        |  3 ---
+ mm/memblock.c                   | 11 +++++++++--
+ 3 files changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 778af0b7f7fd5..c67081301035f 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -303,6 +303,17 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define virt_addr_valid(kaddr)		(_virt_addr_is_linear(kaddr) && \
+ 					 _virt_addr_valid(kaddr))
+ 
++/*
++ * Given that the GIC architecture permits ITS implementations that can only be
++ * configured with a LPI table address once, GICv3 systems with many CPUs may
++ * end up reserving a lot of different regions after a kexec for their LPI
++ * tables (one per CPU), as we are forced to reuse the same memory after kexec
++ * (and thus reserve it persistently with EFI beforehand)
++ */
++#if defined(CONFIG_EFI) && defined(CONFIG_ARM_GIC_V3_ITS)
++# define INIT_MEMBLOCK_RESERVED_REGIONS	(INIT_MEMBLOCK_REGIONS + 2*(NR_CPUS + 1))
++#endif
++
+ #include <asm-generic/memory_model.h>
+ 
+ #endif
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index 3ef3086ed52f9..ecff64ff365d4 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -29,9 +29,6 @@ extern unsigned long max_pfn;
+  */
+ extern unsigned long long max_possible_pfn;
+ 
+-#define INIT_MEMBLOCK_REGIONS	128
+-#define INIT_PHYSMEM_REGIONS	4
+-
+ /**
+  * enum memblock_flags - definition of memory region attributes
+  * @MEMBLOCK_NONE: no special request
+diff --git a/mm/memblock.c b/mm/memblock.c
+index f45a049532fea..74ac4f89018ab 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -26,6 +26,13 @@
+ 
+ #include "internal.h"
+ 
++#define INIT_MEMBLOCK_REGIONS			128
++#define INIT_PHYSMEM_REGIONS			4
++
++#ifndef INIT_MEMBLOCK_RESERVED_REGIONS
++# define INIT_MEMBLOCK_RESERVED_REGIONS		INIT_MEMBLOCK_REGIONS
++#endif
++
+ /**
+  * DOC: memblock overview
+  *
+@@ -92,7 +99,7 @@ unsigned long max_pfn;
+ unsigned long long max_possible_pfn;
+ 
+ static struct memblock_region memblock_memory_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
+-static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_REGIONS] __initdata_memblock;
++static struct memblock_region memblock_reserved_init_regions[INIT_MEMBLOCK_RESERVED_REGIONS] __initdata_memblock;
+ #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
+ static struct memblock_region memblock_physmem_init_regions[INIT_PHYSMEM_REGIONS] __initdata_memblock;
+ #endif
+@@ -105,7 +112,7 @@ struct memblock memblock __initdata_memblock = {
+ 
+ 	.reserved.regions	= memblock_reserved_init_regions,
+ 	.reserved.cnt		= 1,	/* empty dummy entry */
+-	.reserved.max		= INIT_MEMBLOCK_REGIONS,
++	.reserved.max		= INIT_MEMBLOCK_RESERVED_REGIONS,
+ 	.reserved.name		= "reserved",
+ 
+ #ifdef CONFIG_HAVE_MEMBLOCK_PHYS_MAP
 -- 
- Kirill A. Shutemov
+2.19.1
+
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
