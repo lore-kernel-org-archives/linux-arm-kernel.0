@@ -2,188 +2,83 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11BA7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:36:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 40E20C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:48:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D55EB20842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:36:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0D08520880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:48:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ryAYNuSu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VNzt0tn1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D55EB20842
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hwfACbfy";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="OGkxXLAm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D08520880
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lIAxfTIbOCjzEuJvsFr4FIQp2rZKfAQqKMn0vBfhMZc=; b=ryAYNuSuHcJHz4
-	HTTPLdFIDCBth3YzYpF5QmXDN35GlGaTbW8zvTBxhbMts82LgjT7GBS1AUDnRe3X3IFCkUna4dJ0T
-	1c1vH6A6skTp2SToXa/7T2SmJB3dZO65ZGJbm1ULc+KwTLCnizj+SBpb6V28I5pZ3zwwwu833IIlN
-	SF7Uk7mc4wyfdctc0+uyCnmOJBH+sjVgxHiMwekHoDKaH1i3TIPkjc6PNSCx3rTTGqex+dySbooTA
-	sGlM0C3rTbFnbcYGZ4R+0DU3nf0o08mEJsv78I1XopPLcW426emS73/l1Z3+EbA7JZTTRcyuPOPsR
-	p35qqf7hFP8/3exZySvQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=vLA2HF08Pw5Sar10F2c4/twGZKtwEAgkwbMKIyFOJIo=; b=hwfACbfyHm/Tre
+	aFhM7+h0xYCd82bAwxYTE8zE7xgkvrUEsIfbKZhxKa1VHVhSFfBbqt/Tp55BGuUlNSr7RdLAFiO+0
+	Lz0k1Jqvpgq60e2cW/Wk/ogqKvf5QYUvMkbkvKS0qJIGUUcnz/AN0iVEFQbyRXuCaL3NA04gG4TEz
+	Uh7lJ/dAC8rzsACCWObAE6dLdmvdjw4wmvm1b0RNWcQNdlEQo4DNgyhzgzKcoKkMs25LcM/iSx+2/
+	FKSAxuXSxyJItpH180JM7eQ4r0H/SfK/voFQG7vBZDDpuyPfMZ/TihuY2KkN4amXEL6qA53DEFgMY
+	MWEr7lWskof5GEiEFtRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwjqM-0002bS-JD; Thu, 21 Feb 2019 08:36:34 +0000
-Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
+	id 1gwk1z-0006RB-9q; Thu, 21 Feb 2019 08:48:35 +0000
+Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwjqG-0002Zi-O8; Thu, 21 Feb 2019 08:36:30 +0000
-Received: by mail-ed1-x543.google.com with SMTP id m12so22331009edv.4;
- Thu, 21 Feb 2019 00:36:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
+ id 1gwk1u-0006QN-HK
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 08:48:32 +0000
+Received: by mail-pg1-x543.google.com with SMTP id u9so9918860pgo.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 21 Feb 2019 00:48:29 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=9lbUimjtwre8R/NsVQ9Izb5SBgkSg5qu0O3hF49wMwg=;
- b=VNzt0tn1LCZLa7t7NXyXSYFnx13q982HMjGjZw4/iCX3ffJdbr1+SvCVPES3MLRRmX
- rC2uIucorjIeMULrGosfbMd0D+iXNUhc5Kv/9DuAhw6iDKCFARPEdHyZx6XKDefAeNvH
- jXixUxq3Bun95reecjgfLiBrI3cPmnhsN0opxP81u/9cSkc8tvBl7QdxNpcZ/WLdKWLD
- bZ5c2vB4ihbQ7IyZpbVHL+PxCylpEAVu+MU47HAkOP8Tmhc48An5e+Lue9wEhzwhVs8t
- 8wWdW8DMEM5gau4RBSnQ5TabkNILHXwNsKtI2+i1F4+0YI714EHYlTDNShNaVVjqkPcr
- 7dmw==
+ bh=vROhy5Plmd50xPCC/Q/QS2fuBqQNtJbtmF30XL2rY0I=;
+ b=OGkxXLAmXTDDTQhksDfNZ3HIwUESqZRKIiXe1lTFBIsfOhKk4vM2yPtQggUEcdTLkX
+ haIPRtLM0cwfZif0RFUPilAP4Tl2WMeSseeLLr1wKr3ghgl7JbN+ujN/4etP7xq4erLK
+ 0qx+huuYpwCCy/itxxpB3zdZ9V8vn/MpZbru4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=9lbUimjtwre8R/NsVQ9Izb5SBgkSg5qu0O3hF49wMwg=;
- b=gBxiBOIM5d1htCYXytktalwl8oUqZuAXGtJLD77PuLlHFp1X4szK15ruqx0FjJ+yZd
- Ig9J2U/KdymAO+S6c8nc8c/tXRlZTbVrnADqEOwRC4yjWwP4MQQC9Qn8976hSu6ZWgXA
- 2h7cW6J2jpCBrB0bnOh5hYTZCQH1b6NlLf3G9ej/MTwWX9Fad+spwaxDI50TGblTB7EP
- 7mK7pk2fj7uT+cy4z0VFdwIG7bkZPyr+wGKcZ7/4EkdMdk3citOlCKbqfLw4bIR6ICWA
- NUWG+IO6jfVHgwDz3HcaITplWGK4mfRWKsuLXqfLDlFIWR+qya3dwxJB/P33xyl/J8MA
- qf3w==
-X-Gm-Message-State: AHQUAuYn3dyBF7xugvqqBKSBfVS11NXZsqSaxHlf7d98DZNXEgad0px8
- Jlj2JEr4Ls/yFkOcSk/hDgQ=
-X-Google-Smtp-Source: AHgI3Ia3SsLubOQAvmazpI1OskOq+OYcNBtXXQhXLYlyYC5xS9wwAsT6WObkKw6jO7sVXyFJRJ+G/g==
-X-Received: by 2002:a50:b4f1:: with SMTP id x46mr30957400edd.289.1550738186604; 
- Thu, 21 Feb 2019 00:36:26 -0800 (PST)
-Received: from ziggy.stardust ([37.223.146.9])
- by smtp.gmail.com with ESMTPSA id w24-v6sm4711175eja.71.2019.02.21.00.36.24
- (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 00:36:25 -0800 (PST)
-Subject: Re: [PATCH v4 00/12] Mediatek MT8183 clock and scpsys support
-To: Stephen Boyd <sboyd@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>, 
- Rob Herring <robh@kernel.org>, Stephen Boyd <sboyd@codeaurora.org>,
- Weiyi Lu <weiyi.lu@mediatek.com>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-2-weiyi.lu@mediatek.com>
- <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
- 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
- jrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <b7abe484-71c1-5ec0-796c-544f1ac5d6f5@gmail.com>
-Date: Thu, 21 Feb 2019 09:36:24 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=vROhy5Plmd50xPCC/Q/QS2fuBqQNtJbtmF30XL2rY0I=;
+ b=exdBaQ5ng5vGhc/ognDzhTeDEEqnwvOtcL8NbTS/Tvi2H9sAldEY6jmMui5sfM8yfR
+ DzgpQiHurlzp5A7KX5whGhxoQjphfgEEPhbJ/7zkt2559lRAGRjZIPqVB3ho50lGgtnz
+ /2HrryrlD9OmB/KmYyi18J1oRTRmTvrp4Gh8Eu8XeEW4/YTBHGXJfXulpFFJCVNaP8Kz
+ 5N4u6f2rRlJYHu7gFfaUDbUSRpoBdGieik6afbDXlZAa+LOD8f2jT0knZH+Qf0oBXjtc
+ MOQ9eMfxMAHt6jl2Jza9gfL0iDIDiagLtrF9EhW8yGxSH2XyGe91akIpRSEm1QQnfFRo
+ 7VEg==
+X-Gm-Message-State: AHQUAuZkvURh66dL0hCXIB10UyQlXsY+uOhQtjvD/4/EEwgkCd6xMMxh
+ iNUlJ6AZhVVpxNPQedmooaYS7g==
+X-Google-Smtp-Source: AHgI3IaIXSJgaHD3TpFvI1ZV1oCwiy9yvB+mWo08WPJvnounP2mYhOStOn/R8hmpARgiwYyfGsKrWg==
+X-Received: by 2002:a63:541:: with SMTP id 62mr4487159pgf.172.1550738908655;
+ Thu, 21 Feb 2019 00:48:28 -0800 (PST)
+Received: from pihsun-z840.tpe.corp.google.com
+ ([2401:fa00:1:10:7889:7a43:f899:134c])
+ by smtp.googlemail.com with ESMTPSA id b4sm23154027pgq.57.2019.02.21.00.48.27
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 21 Feb 2019 00:48:27 -0800 (PST)
+From: Pi-Hsun Shih <pihsun@chromium.org>
+To: 
+Subject: [PATCH v5 0/6] Add support for mt8183 SCP.
+Date: Thu, 21 Feb 2019 16:47:23 +0800
+Message-Id: <20190221084729.101784-1-pihsun@chromium.org>
+X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
 MIME-Version: 1.0
-In-Reply-To: <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_003628_815916_187BEB2F 
-X-CRM114-Status: GOOD (  14.66  )
+X-CRM114-CacheID: sfid-20190221_004830_600427_460C1083 
+X-CRM114-Status: GOOD (  16.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -195,47 +90,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: James Liao <jamesjj.liao@mediatek.com>, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, stable@vger.kernel.org,
- Fan Chen <fan.chen@mediatek.com>, linux-mediatek@lists.infradead.org,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Matthias Brugger <matthias.bgg@gmail.com>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-mediatek@lists.infradead.org>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>, Pi-Hsun Shih <pihsun@chromium.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Add support for controlling and communicating with mt8183's system
+control processor (SCP), using the remoteproc & rpmsg framework.
+And also add a cros_ec driver for CrOS EC host command over rpmsg.
 
+The overall structure of the series is:
+* remoteproc/mtk_scp.c: Control the start / stop of SCP (Patch 2, 3).
+* remoteproc/mtk_scp_ipi.c: Communicates to SCP using inter-processor
+  interrupt (IPI) and shared memory (Patch 2, 3).
+* rpmsg/mtk_rpmsg.c: Wrapper to wrap the IPI communication into a rpmsg
+  device. Supports name service for SCP firmware to
+  announce channels (Patch 4).
+* platform/chrome/cros_ec_rpmsg.c: Communicates with the SCP over the
+  rpmsg framework (like what platform/chrome/cros_ec_{i2c,spi}.c does)
+  (Patch 5, 6).
 
-On 20/02/2019 20:18, Stephen Boyd wrote:
-> Quoting Weiyi Lu (2019-02-01 00:30:04)
->> This series is based on v5.0-rc1 and most of changes are extracted from series below
->> (clock/scpsys common changes for both MT8183 & MT6765)
->> https://patchwork.kernel.org/patch/10528495/
->> (clock support of MT8183)
->> https://patchwork.kernel.org/patch/10549891/
->>
->> The whole series is composed of
->> clock common changes for both MT8183 & MT6765 (PATCH 1-3),
->> scpsys common changes for both MT8183 & MT6765 (PATCH 4),
->> clock support of MT8183 (PATCH 5-8),
->> scpsys support of MT8183 (PATCH 9-11) and
->> resend a clock patch long time ago(PTACH 12).
-> 
-> What's the merge plan here? Do you want me to apply these patches to clk
-> tree? Will someone be sending me a pull request for mediatek clk changes
-> this cycle? It's getting pretty late for much of anything making this
-> upcoming merge window.
-> 
+Since I'm not familiar with the remoteproc / rpmsg framework, and there
+are not much other custom rpmsg driver for reference, would like some
+review / comments on the overall structure of the driver.
 
-As far as I can see, the clock patches are independent, so I think it is OK to
-take them. SCPSYS patches will go through my tree once they are in shape.
+Changes from v4:
+ - Merge patch 6 (Load ELF firmware) into patch 2, so the driver loads
+   ELF firmware by default, and no longer accept plain binary.
+ - rpmsg_device listed in device tree (as a child of the SCP node) would
+   have it's device tree node mapped to the rpmsg_device, so the rpmsg
+   driver can use the properties on device tree.
 
-Do you prefer to get pull requests for clock patches? I wasn't aware of that.
-But if you prefer that, we can find someone who prepares every merge window a
-pull request.
+Changes from v3:
+ - Make writing to SCP SRAM aligned.
+ - Add a new patch (Patch 6) to load ELF instead of bin firmware.
+ - Add host event support for EC driver.
+ - Fix some bugs found in testing (missing spin_lock_init,
+   rproc_subdev_unprepare to rproc_subdev_stop).
+ - Fix some coding style issue found by checkpatch.pl.
 
-Regards,
-Matthias
+Changes from v2:
+ - Fold patch 3 into patch 2 in v2.
+ - Move IPI id around to support cross-testing for old and new firmware.
+ - Finish more TODO items.
+
+Changes from v1:
+ - Extract functions and rename variables in mtk_scp.c.
+ - Do cleanup properly in mtk_rpmsg.c, which also removes the problem of
+   short-lived work items.
+ - Code format fix based on feedback for cros_ec_rpmsg.c.
+ - Extract feature detection for SCP into separate patch (Patch 6).
+
+Erin Lo (3):
+  dt-bindings: Add a binding for Mediatek SCP
+  remoteproc/mediatek: add SCP support for mt8183
+  remoteproc: mt8183: add reserved memory manager API
+
+Pi-Hsun Shih (3):
+  rpmsg: add rpmsg support for mt8183 SCP.
+  mfd: add EC host command support using rpmsg.
+  cros_ec: differentiate SCP from EC by feature bit.
+
+ .../bindings/remoteproc/mtk,scp.txt           |  37 ++
+ drivers/mfd/cros_ec_dev.c                     |   9 +
+ drivers/platform/chrome/Kconfig               |   9 +
+ drivers/platform/chrome/Makefile              |   1 +
+ drivers/platform/chrome/cros_ec_rpmsg.c       | 248 +++++++
+ drivers/remoteproc/Kconfig                    |   9 +
+ drivers/remoteproc/Makefile                   |   1 +
+ drivers/remoteproc/mtk_common.h               |  77 +++
+ drivers/remoteproc/mtk_scp.c                  | 628 ++++++++++++++++++
+ drivers/remoteproc/mtk_scp_ipi.c              | 163 +++++
+ drivers/rpmsg/Kconfig                         |   9 +
+ drivers/rpmsg/Makefile                        |   1 +
+ drivers/rpmsg/mtk_rpmsg.c                     | 385 +++++++++++
+ include/linux/mfd/cros_ec.h                   |   1 +
+ include/linux/mfd/cros_ec_commands.h          |   2 +
+ include/linux/platform_data/mtk_scp.h         | 157 +++++
+ include/linux/rpmsg/mtk_rpmsg.h               |  35 +
+ 17 files changed, 1772 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/remoteproc/mtk,scp.txt
+ create mode 100644 drivers/platform/chrome/cros_ec_rpmsg.c
+ create mode 100644 drivers/remoteproc/mtk_common.h
+ create mode 100644 drivers/remoteproc/mtk_scp.c
+ create mode 100644 drivers/remoteproc/mtk_scp_ipi.c
+ create mode 100644 drivers/rpmsg/mtk_rpmsg.c
+ create mode 100644 include/linux/platform_data/mtk_scp.h
+ create mode 100644 include/linux/rpmsg/mtk_rpmsg.h
+
+-- 
+2.21.0.rc0.258.g878e2cd30e-goog
+
 
 _______________________________________________
 linux-arm-kernel mailing list
