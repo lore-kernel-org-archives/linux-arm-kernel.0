@@ -2,63 +2,79 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B4708C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:07:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A72F2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:10:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 818D42147A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:07:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 61AEA20880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:10:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ue5+zyGq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 818D42147A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Tf4CP1Dq";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=bidouilliste.com header.i=@bidouilliste.com header.b="hIgWGRzf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 61AEA20880
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bidouilliste.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Message-Id:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OXzqF9dcqeLxseVqZ6SyZYqvjjUPj8xMRik3YqKr+w0=; b=ue5+zyGq1+6IJj
-	Z4plQDLzUIXdgEtQTQsy9NWiB7cDNK2n2728Sl1fH2zp4GTQZ9W9OcXbDp5XFX3Lc4MjGcslKWDo1
-	NMciv9ME/AjWaphId4yWveacpPFNxmSsTVS4b0IWJwD3iORh/lHhvrqYuK32on3po7Ze7IZ2yXlbF
-	mX+Ak9sb8/jjxr5RohsIsf5n6H0qmYKBKv6cR0Snvcgdv8QAcm+UAlHZbhVoyDs4eRUJTsnzDJSQU
-	R+vpfb7EOazSWU/1qTaLkWGI/hFv/5QYOookRMe3rjBhvD7Ea3VAMTFUVNOSkVooR8DDMraQX1S4m
-	L7CDunBE8FJhj4iekF7A==;
+	List-Owner; bh=gy5LHcnoKjjbX8x41ASE0n/+9OMZGdg2N86vplsNlpE=; b=Tf4CP1DqceSzKI
+	SMrtr3iivV8cy9F4eQcr4kxR1qIdDo4yM+jl+9vwvtAzGd4HmwM1wrbLccPjOJalNMcH7o+VlntCF
+	9qtJ1gfaxcMCPjO3ubAPSUARP11lJNzjz7asbY2pu4kUS7ilE08p2OZDI4I1eIVYMAqniI/ZQdD0+
+	+HxV6gK/7DCCuILYurUl2H7h34jRjDs5SbfDjiTAtFgERlLfdQpKz9p9yM7XNNeEFOG+UhBpRuCnx
+	XCbOrqRJPbq8ArXX0hyUMK6GIA1Dv2dYsdLWQ/sv45glolJ3tqBFM2w8y4eYsgU6EPrTOoPUFehJ1
+	oXTfp6fsYk8TnSuhB1SA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwlFx-0005fg-VM; Thu, 21 Feb 2019 10:07:05 +0000
-Received: from relay11.mail.gandi.net ([217.70.178.231])
+	id 1gwlJE-00080n-1v; Thu, 21 Feb 2019 10:10:28 +0000
+Received: from mail.blih.net ([212.83.177.182])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwlBz-0007nn-Ha; Thu, 21 Feb 2019 10:03:31 +0000
-Received: from localhost.localdomain
- (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
- (Authenticated sender: miquel.raynal@bootlin.com)
- by relay11.mail.gandi.net (Postfix) with ESMTPSA id 1F5B1100016;
- Thu, 21 Feb 2019 10:02:54 +0000 (UTC)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Boris Brezillon <bbrezillon@kernel.org>,
- Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
- Brian Norris <computersforpeace@gmail.com>,
- Marek Vasut <marek.vasut@gmail.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [RFC PATCH 12/27] mtd: nand: ecc: Use SPDX license identifier for the
- software Hamming code
-Date: Thu, 21 Feb 2019 11:02:01 +0100
-Message-Id: <20190221100216.25255-13-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190221100216.25255-1-miquel.raynal@bootlin.com>
-References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
-MIME-Version: 1.0
+ id 1gwlJ9-00080K-Eg
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 10:10:25 +0000
+Received: from mail.blih.net (mail.blih.net [212.83.177.182])
+ by mail.blih.net (OpenSMTPD) with ESMTP id 0b330c4b;
+ Thu, 21 Feb 2019 11:10:18 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha1; c=relaxed; d=bidouilliste.com; h=date
+ :from:to:cc:subject:message-id:in-reply-to:references
+ :mime-version:content-type:content-transfer-encoding; s=mail;
+ bh=8yA3uPBAxUDLtORA2o8u5XjRGpQ=; b=hIgWGRzfkrQKS+fhohCpQ2a4K150
+ FIhalBWBd8DSrWgrZ3edjSTvh2hWv2OB3HKlNZh7Qc/ZJ4RI9IsZ9Vz+FXUdlI6B
+ 7FpCz5d7VzOntoqXOK1sktIr7y2wuann1kUT7694COT8ArZXxP9TYp/Htb4xd3cw
+ nzYcjOVneArKNdc=
+DomainKey-Signature: a=rsa-sha1; c=nofws; d=bidouilliste.com; h=date
+ :from:to:cc:subject:message-id:in-reply-to:references
+ :mime-version:content-type:content-transfer-encoding; q=dns; s=
+ mail; b=n8biuWE4Ic7RwUXC8QdHKN+0r5bqI73iJdDcyTW/YZJMgB4oHpQe7I0a
+ FpnGfhfJR3swnBv4wpQ+OeArTEufFcdPbWNf/DGRTFit6aEVXXqMIV8X8pYJC9yn
+ O2COT811qeUfwr7FdwyCE/M0jUpUQGN7eOmeY2t69AxT+ebsGms=
+Received: from knuckles.blih.net (ip-9.net-89-3-105.rev.numericable.fr
+ [89.3.105.9]) by mail.blih.net (OpenSMTPD) with ESMTPSA id ed322229
+ TLS version=TLSv1.2 cipher=ECDHE-RSA-AES256-GCM-SHA384 bits=256 verify=NO;
+ Thu, 21 Feb 2019 11:10:17 +0100 (CET)
+Date: Thu, 21 Feb 2019 11:10:17 +0100
+From: Emmanuel Vadot <manu@bidouilliste.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: Allwinner SID THS calibration data cell representation?
+Message-Id: <20190221111017.f3be5d56b419d9b90876b4c2@bidouilliste.com>
+In-Reply-To: <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-28-embed3d@gmail.com>
+ <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
+ <55579dd6-625d-e71b-1482-4592dccac665@gmail.com>
+ <20180906115114.inc6dhqhy47obo25@flea>
+ <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
+X-Mailer: Sylpheed 3.7.0 (GTK+ 2.24.32; amd64-portbld-freebsd13.0)
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_020300_466545_199F23C7 
-X-CRM114-Status: GOOD (  15.21  )
+X-CRM114-CacheID: sfid-20190221_021024_059477_60C4E44F 
+X-CRM114-Status: GOOD (  18.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,87 +86,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vignesh R <vigneshr@ti.com>, Tudor Ambarus <tudor.ambarus@microchip.com>,
- Julien Su <juliensu@mxic.com.tw>,
- Schrempf Frieder <frieder.schrempf@kontron.de>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- Mason Yang <masonccyang@mxic.com.tw>, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Philipp Rossak <embed3d@gmail.com>,
+ Quentin Schulz <quentin.schulz@bootlin.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, linux-iio@vger.kernel.org,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jonathan Cameron <jic23@kernel.org>, Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Remove the legacy license text, also update the MODULE_LICENSE macro
-in accordance with the text at the top of the file (GPL v2 or
-higher).
+On Tue, 19 Feb 2019 15:54:00 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/mtd/nand/ecc/sw-hamming-engine.c   | 18 ++----------------
- include/linux/mtd/nand-sw-hamming-engine.h |  5 +----
- 2 files changed, 3 insertions(+), 20 deletions(-)
+> Sorry for resurrecting an old discussion, but since someone posted patches
+> for H5 and H6, I thought we should resolve this. I'm working on patches to
+> fix / replace the big-endian issue.
+> 
+> On Thu, Sep 6, 2018 at 7:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Thu, Sep 06, 2018 at 01:47:47PM +0200, Philipp Rossak wrote:
+> > > On 04.09.2018 18:46, Emmanuel Vadot wrote:
+> > > > > +                 /* Data cells */
+> > > > > +                 thermal_calibration: calib@234 {
+> > > > > +                         reg = <0x234 0x8>;
+> > > > > +                 };
+> > > >   You are declaring 8 bytes of calibration data but to my knowledge it's
+> > > > only 2 bytes per sensor, so 2 bytes for H3.
+> > > >   Am I missing something ?
+> > > >
+> > > >   Thanks,
+> > >
+> > > Emmanuel you are right, it is 2 bytes per Sensor and should be 2 bytes for
+> > > H3, but the thermal calibration data field is on all chips 64 bit wide - so
+> > > 8 bytes. So I'm reading here the complete calibration data field.
+> >
+> > Having one cell per channel would make more sense I guess.
+> 
+> Would it? The 2 32-bit words directly map onto the registers 0x74 / 0x78 in
+> the THS. As far as the SID is concerned, their is just one consumer for this
+> data, the thermal sensor. How the thermal sensor uses that data is really not
+> its concern. And the thermal sensor is really just copying the data from the
+> e-fuses into its registers. Nothing more.
 
-diff --git a/drivers/mtd/nand/ecc/sw-hamming-engine.c b/drivers/mtd/nand/ecc/sw-hamming-engine.c
-index 9abef611456f..6ba0205f1b4f 100644
---- a/drivers/mtd/nand/ecc/sw-hamming-engine.c
-+++ b/drivers/mtd/nand/ecc/sw-hamming-engine.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0+
- /*
-  * This file contains an ECC algorithm that detects and corrects 1 bit
-  * errors in a 256 byte block of data.
-@@ -11,21 +12,6 @@
-  *
-  * Information on how this algorithm works and how it was developed
-  * can be found in Documentation/mtd/nand_ecc.txt
-- *
-- * This file is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License as published by the
-- * Free Software Foundation; either version 2 or (at your option) any
-- * later version.
-- *
-- * This file is distributed in the hope that it will be useful, but WITHOUT
-- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-- * for more details.
-- *
-- * You should have received a copy of the GNU General Public License along
-- * with this file; if not, write to the Free Software Foundation, Inc.,
-- * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA.
-- *
-  */
- 
- #include <linux/types.h>
-@@ -493,6 +479,6 @@ int nand_correct_data(struct nand_chip *chip, unsigned char *buf,
- }
- EXPORT_SYMBOL(nand_correct_data);
- 
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
- MODULE_AUTHOR("Frans Meulenbroeks <fransmeulenbroeks@gmail.com>");
- MODULE_DESCRIPTION("Generic NAND ECC support");
-diff --git a/include/linux/mtd/nand-sw-hamming-engine.h b/include/linux/mtd/nand-sw-hamming-engine.h
-index c0f015b1a077..1bd7493c682b 100644
---- a/include/linux/mtd/nand-sw-hamming-engine.h
-+++ b/include/linux/mtd/nand-sw-hamming-engine.h
-@@ -1,12 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  *  Copyright (C) 2000-2010 Steven J. Hill <sjhill@realitydiluted.com>
-  *			    David Woodhouse <dwmw2@infradead.org>
-  *			    Thomas Gleixner <tglx@linutronix.de>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-  * This file is the header for the ECC algorithm.
-  */
- 
+ If you see this at the controller lever and not at the sensor level it
+might make sense to use the full 32bits data even some bits are ignored
+I guess.
+
+> Furthermore, with the register access interface, the e-fuses are read/write
+> 32 bits at a time. Seems to me it would make more sense to enforce a 32-bit
+> word size, so cells should be multiples of 32 bits.
+
+ Ok, honestly at this point I don't really care what choice is done as
+long as the dts is updated, I'll deal with the diff for FreeBSD and
+ping the others BSD (Net and Open who also have a driver) for this
+change.
+
+> Regards
+> ChenYu
+
+ Cheers,
+
 -- 
-2.19.1
-
+Emmanuel Vadot <manu@bidouilliste.com> <manu@freebsd.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
