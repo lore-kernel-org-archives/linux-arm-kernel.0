@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0B2FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:15:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 149DBC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:16:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9D78B214AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:15:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BF79E2086A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:16:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lIibI88E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D78B214AF
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sWzx1Z8O"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BF79E2086A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jTLf84S/SjZlO5LX8IXkji6PBdBnAP6chJ14sVeJwds=; b=lIibI88ECtLv0w
-	ecfsF6/UKmqqgPo8ZO1Usd+ZmomsqkMBvDIdxNZellwF+7bF3IceXl/16NvjccSed4v0Nh80pEtoS
-	I1culXChZ7sH6hOG170Wa2pQ9XRk9ML0XDjw+WkJfBXZVbU/hSpITC0CXM/60YCLU955WRu5fp6zg
-	yQmRG4weSmcYhgrzw9NC+QHPlezCXPqdI5ECN+MAg5dbnzgWpbV7mlnmhMU+SrxWSSiF/ZRTxrshv
-	ccSvNyZkAeoS21foN9hyIk8g6226vDcKWQsLYCBfLkSwqxEyMv4RLD9ouvXnoHKUP6qQw9Q+Vay/V
-	d5lxRKSi1Qvn1N+j7SRg==;
+	List-Owner; bh=6rDGGHJ+bBoVjtnxlqJWLqX3ufufpJ4rEF50Rv0yW6w=; b=sWzx1Z8OKL18xK
+	POvz6YJwNBeQqqrWCEEJ0JM6RA0yKXhR1duMf9jLOb6BYcLFNVo+ifRuTGXNM6N9Py6L4YkVKsQEl
+	Jic48l/j6EvtqhrV/2rkxqEwUNyJI25DRqXTIBdjP0gcFYVqTT4qORUrDTkxl9LjFHb2lE7HLo//s
+	h1gjqucUGtOoTp1E6/S+fC9rpZTWx7jds5TWtP153fEGURCiupPvpWHU27xNgQpU7O7L3vFf7xniq
+	ACsg8JZi8a9Mh+k5Jt8hMJLcgzlUk3tG8MEENaxmOI0VcaN9w/Z1JGt9wXOqB6kbcpmv/kw4hqKJM
+	voUKBivDaeiD8uTgeHog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwkSJ-0001VL-0k; Thu, 21 Feb 2019 09:15:47 +0000
+	id 1gwkSi-00020Y-A5; Thu, 21 Feb 2019 09:16:12 +0000
 Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwkSF-0001T6-ED; Thu, 21 Feb 2019 09:15:45 +0000
+ id 1gwkSG-0001TI-MW; Thu, 21 Feb 2019 09:15:47 +0000
 X-Originating-IP: 90.88.23.190
 Received: from localhost.localdomain
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: miquel.raynal@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 379531BF207;
- Thu, 21 Feb 2019 09:15:36 +0000 (UTC)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 022FA1BF212;
+ Thu, 21 Feb 2019 09:15:40 +0000 (UTC)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Boris Brezillon <bbrezillon@kernel.org>,
  Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
  Brian Norris <computersforpeace@gmail.com>,
  Marek Vasut <marek.vasut@gmail.com>,
  Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [PATCH 02/15] mtd: nand: Add an helper returning the number of
- eraseblocks per target
-Date: Thu, 21 Feb 2019 10:15:14 +0100
-Message-Id: <20190221091527.20497-3-miquel.raynal@bootlin.com>
+Subject: [PATCH 04/15] mtd: spinand: Implement mtd->_max_bad_blocks
+Date: Thu, 21 Feb 2019 10:15:16 +0100
+Message-Id: <20190221091527.20497-5-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190221091527.20497-1-miquel.raynal@bootlin.com>
 References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_011543_627951_85698AA0 
-X-CRM114-Status: UNSURE (   9.66  )
+X-CRM114-CacheID: sfid-20190221_011544_886773_73CD6163 
+X-CRM114-Status: UNSURE (   9.97  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -85,38 +84,26 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Boris Brezillon <bbrezillon@kernel.org>
 
-Some drivers in the raw NAND framework seems to need this helper, so
-let's just add it instead of open-coding the logic.
+We just have to use nanddev_mtd_max_bad_blocks().
 
 Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- include/linux/mtd/nand.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/mtd/nand/spi/core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index d32bb623d532..12d75402472a 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -294,6 +294,18 @@ nanddev_eraseblocks_per_lun(const struct nand_device *nand)
- 	return nand->memorg.eraseblocks_per_lun;
- }
+diff --git a/drivers/mtd/nand/spi/core.c b/drivers/mtd/nand/spi/core.c
+index 2ae4237a586e..ed5e340dff51 100644
+--- a/drivers/mtd/nand/spi/core.c
++++ b/drivers/mtd/nand/spi/core.c
+@@ -1040,6 +1040,7 @@ static int spinand_init(struct spinand_device *spinand)
+ 	mtd->_block_markbad = spinand_mtd_block_markbad;
+ 	mtd->_block_isreserved = spinand_mtd_block_isreserved;
+ 	mtd->_erase = spinand_mtd_erase;
++	mtd->_max_bad_blocks = nanddev_mtd_max_bad_blocks;
  
-+/**
-+ * nanddev_eraseblocks_per_target() - Get the number of eraseblocks per target
-+ * @nand: NAND device
-+ *
-+ * Return: the number of eraseblocks per target.
-+ */
-+static inline unsigned int
-+nanddev_eraseblocks_per_target(const struct nand_device *nand)
-+{
-+	return nand->memorg.eraseblocks_per_lun * nand->memorg.luns_per_target;
-+}
-+
- /**
-  * nanddev_target_size() - Get the total size provided by a single target/die
-  * @nand: NAND device
+ 	if (spinand->eccinfo.ooblayout)
+ 		mtd_set_ooblayout(mtd, spinand->eccinfo.ooblayout);
 -- 
 2.19.1
 
