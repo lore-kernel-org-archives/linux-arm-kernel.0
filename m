@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 827C2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:46:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3FD79C00319
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:47:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3C6C720823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:46:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0EB1A20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:47:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YnHJUeLw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="cntTMUXe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3C6C720823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XMbMSfpf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="klZIZBQ9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0EB1A20823
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3pALDxl3HENLISeftgkdK7Hj3oILeD4SkoS0/J/nq7Y=; b=YnHJUeLwj5TM+9
-	YnVbU51LF8B0ZMxBAWVnzAVsb4CcuE2DfhX4qsmWxPqD/AWlboxtmyHR0lG7tDJsP/6uXuh1yb3Ib
-	HZvyonz0MT34JiQFGjc9MdPC4PKXZVTh268rXpuZXid/h950ylI6oJY3bvAFN6S00E1W4GQe7IRTC
-	sqS+5CANw04H9Vtka4zSjZ3aRnyxmf6oL77SDsr5CunkFBtMIXYenS2e9UPkVsVgSHptXIjXVJKhA
-	Ju+CGOUySOS7cdP9NGGNjH4G6WlMHGQblUqkUDl2HJ200huV1IIMKd+YtDPeH4ju4DhRmwT1ks8dr
-	M6iVjylqF1LGC2p2XPUw==;
+	List-Owner; bh=WowUJrmgf7wJ7b2f4eH8eJY69izIihS+ejlYvUIDVOg=; b=XMbMSfpfArrcoN
+	gM68Qd2xGlcNI05NYLlvJrzjsfhL6KXr61wXpbI22plDLMoh9fw4aPePHKZtJKEoJMYHUKivdAr2A
+	O6tnvjRKYtwP3AIPtsFaK3oULoWY4yWjx5gzobLzOgPEz8tGqsVP1hij/KGQ7P4tntKQ6fBchipoe
+	kgKtlB6pMSuPSCAW6vmORMHQuUhfEtVtEHyK2rfw37kSihsRp29bL/8bUX/rOlE/4eY9I76MNVXzv
+	dWcfbqGY2goMB89bxJsfM+Pim5gvNoOvIRzyPZpCN56s1xyE/6mBGB0rbYe32F6Jb/K+BCb8Q3ZDn
+	+Sm6NT7KEeEpnOkaRmZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwqYB-00062v-PP; Thu, 21 Feb 2019 15:46:15 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gwqYr-0006S9-19; Thu, 21 Feb 2019 15:46:57 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwqXL-0004wL-LJ
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:45:28 +0000
-Received: by mail-lf1-x142.google.com with SMTP id q12so20737155lfm.0
+ id 1gwqXO-0004yw-4Z
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:45:30 +0000
+Received: by mail-lf1-x144.google.com with SMTP id u21so20750233lfu.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 07:45:23 -0800 (PST)
+ Thu, 21 Feb 2019 07:45:25 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=ydtr9kS0jBdprA0griqlZhz/r8SHgp5tMSx95q9fwc8=;
- b=cntTMUXetJ4dZVI4MED/bINKmsdMB77bNMmsivrRYXxvjjU9hi7d2UMVMi3Z/Q07UH
- fFIgSk1JC49KWn+1rsEiTLb245fSPVCHDXQJjwq0afbLZt6NaflqBPE+3u0DiDqY79sU
- NbSFWjlHpPIdsKLU7dOniM++MMp5qgQsWbJ/Bw6aVeGPUHyP+zJ2dLVTlduXjVbvhXcm
- uVJO/f+xbTuUxkgI/yQKBjalqwyst/7weEoYoh6UHSxsRZsTao1JyI6aH6PsXX8Twfa1
- cQRSu9RhpI4A+T0LJNaK4IUs9vmSDAdIpu0I9ZRS/CteSKq4QIxe8ay9zAOBiLRgVJFx
- TFxg==
+ bh=U1cxO7VVwqmxQbAIOAoy5XNG/YE4OZ3otvMxFXrUJPE=;
+ b=klZIZBQ9AtQkWuhuoITtBTqWgBbRG848BhhnzJRiw8KwhcN/003cwmYFxVT5Li6Jcw
+ xEhh4T3yl9dUo5G/CiO/ps3KxY8W6zPZeg9LdQ9zKs2k5dVPdEbVG14BG0IInfxW1Rzm
+ eUb6M/K8L6x6klc1VD+3iyyq+wF1uV7lsrhhm2E7+qlhS6kaspss5l1/JVAHgwVfYf+1
+ /LdnI2SaODzaPrBy6pkHPRwAUOrMAhWf5OurmD1ANpD9ZrVRxeOOEVIE6MNtCPOs/AEP
+ aHs75PMij+hosSKOBKnWIkeRUpFvphtkDXn4t9kOiWUZegPYbQXMFrnwtvW0sHOcbuKa
+ 767Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=ydtr9kS0jBdprA0griqlZhz/r8SHgp5tMSx95q9fwc8=;
- b=tLlSrcTQrnsDH093dOPAodCXLJo9ag/4UFBnoovkOu8AjtUFevlxBF20fKdD8oik6f
- NLWZxeIjd6GdNXUq3/89rwMjDLX/HftXNHfjSwx0neFIKrUMscaWdRFldxSwiNH72vtl
- tzEfESAuKjnPGksIwFy12RsUEVYIEYhZc5NucIF5ju/exht3Cztz9lQtsopKCiveXlqM
- 2IXuSh0e3OFMsx+7cD8uEoJf6d4LrrFW8upkXhxrtDCrzmYd05AkmNObsDwqqSmj1Kl0
- PFXWsfLanYqu45kstlbJYANki3s/SrnaizSZG+lXYJEqdJJb5KMQqgbxYkX98Izk38/2
- z8bQ==
-X-Gm-Message-State: AHQUAubzJzuRZDpsTKKTLy7o/DtSbiJWdt2uA5V/hO9SxXlZk1SfKGHo
- 86f2BRQz4OSMXXoOxwAwaZkF8MV91rM=
-X-Google-Smtp-Source: AHgI3IbD4VoulOessIXVshFSBiSsosQrbFcAZCvIt/3OYJr2d4sk/OrWiaTBOssJkWNbGp8c3hcc7g==
-X-Received: by 2002:a19:d83:: with SMTP id 125mr23426782lfn.159.1550763921118; 
- Thu, 21 Feb 2019 07:45:21 -0800 (PST)
+ bh=U1cxO7VVwqmxQbAIOAoy5XNG/YE4OZ3otvMxFXrUJPE=;
+ b=TOrVIKltNYsvPtMdl/R+e36pzv408CtBd3E4x5zVUOg8eB0AuGGvfIJ1UuEMjXMJlJ
+ h4w/Z8HsLxSNxd0h04Fxlx9lh0s1lB6gcpvKAD9/fjfiQqkwp9zoVw6vBkXcCFkYnHrl
+ tepGJrMkawdSl3sfvkuMQiXlnETpcsrEN32i+jZOje+7N/MSroEJUikGHSWwwFgFKzH3
+ ic8NbJM9lGVQQBpLCcIvM6QGk15L7mQptRUbpxrMcSpoe2lt2sjVgEPHIjRLZZAXUB0u
+ iXrDwEwJS7kgOTRY/jaJp4TYS5EfDnr9jxjpW0Ttgoo8n1wyNQyvdUC5VbcDR24xwSte
+ 3I8w==
+X-Gm-Message-State: AHQUAuZebziDzFTXMMYkBc5PdVwT+rO6IHAMTzntO3mYksuk7vPl84sX
+ 8940p6L0Kvin/kuW0Eb+4hQ+S6T5HiI=
+X-Google-Smtp-Source: AHgI3IayufXMo2FLSaezwErWB1akiqYtz2lCrkr2W+luTmMLDzE8VFG432L0t9q9BOytLoj2DHf0SQ==
+X-Received: by 2002:a19:f517:: with SMTP id j23mr23569346lfb.118.1550763923595; 
+ Thu, 21 Feb 2019 07:45:23 -0800 (PST)
 Received: from linux-2.local (c-ae7b71d5.014-348-6c756e10.bbcust.telenor.se.
  [213.113.123.174])
- by smtp.gmail.com with ESMTPSA id m73sm1316965lfa.65.2019.02.21.07.45.19
+ by smtp.gmail.com with ESMTPSA id m73sm1316965lfa.65.2019.02.21.07.45.21
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 21 Feb 2019 07:45:20 -0800 (PST)
+ Thu, 21 Feb 2019 07:45:22 -0800 (PST)
 From: Linus Walleij <linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org, Imre Kaloz <kaloz@openwrt.org>,
  Krzysztof Halasa <khalasa@piap.pl>
-Subject: [PATCH 05/30 v2] gpio: ixp4xx: Add driver for the IXP4xx GPIO
-Date: Thu, 21 Feb 2019 16:44:33 +0100
-Message-Id: <20190221154458.23763-6-linus.walleij@linaro.org>
+Subject: [PATCH 06/30 v2] ARM: ixp4xx: Switch to use new IRQ+GPIO drivers
+Date: Thu, 21 Feb 2019 16:44:34 +0100
+Message-Id: <20190221154458.23763-7-linus.walleij@linaro.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190221154458.23763-1-linus.walleij@linaro.org>
 References: <20190221154458.23763-1-linus.walleij@linaro.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_074524_446333_0A449877 
-X-CRM114-Status: GOOD (  29.45  )
+X-CRM114-CacheID: sfid-20190221_074527_008145_FB7B2B72 
+X-CRM114-Status: GOOD (  24.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,544 +97,564 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Linus Walleij <linus.walleij@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Linus Walleij <linus.walleij@linaro.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Jason Cooper <jason@lakedaemon.net>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This adds a driver for the IXP4xx GPIO block found in
-the Intel XScale IXP4xx systems.
+This deletes the old irq+gpiochip combo from the IXP4xx
+machine and switches it over to use the new drivers merged
+in respective subsystem.
 
-The GPIO part of this block is pretty straight-forward and
-just uses the generic MMIO GPIO library.
-
-The irqchip side of this driver is hierarchical where
-the main irqchip will receive a processed level trigger
-in response to the edge detector of the GPIO block,
-so for this reason the v2 version of the irqdomain API
-is used (as well as in the parent IXP4xx irqchip) and
-masking, unmasking and setting up the type on IRQ
-happens on several levels.
-
-Currently this GPIO controller will grab the parent
-irqdomain using a special function, but as the platform
-move toward device tree probing, this will not be needed:
-we can just look up the parent irqdomain from the device
-tree.
-
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ChangeLog v1->v2:
-- Fix comment style in header
-- Fix register naming to be more intuitive
+IRQ+GPIO folks: here you see how I activate those new
+drivers. Intended to be merged through ARM SoC.
 ---
- MAINTAINERS                |   1 +
- drivers/gpio/Kconfig       |  12 +
- drivers/gpio/Makefile      |   1 +
- drivers/gpio/gpio-ixp4xx.c | 444 +++++++++++++++++++++++++++++++++++++
- 4 files changed, 458 insertions(+)
- create mode 100644 drivers/gpio/gpio-ixp4xx.c
+ arch/arm/Kconfig                              |   3 +-
+ arch/arm/mach-ixp4xx/common.c                 | 318 ++----------------
+ arch/arm/mach-ixp4xx/dsmg600-setup.c          |   3 -
+ .../mach-ixp4xx/include/mach/ixp4xx-regs.h    |  89 -----
+ arch/arm/mach-ixp4xx/nas100d-setup.c          |   3 -
+ 5 files changed, 24 insertions(+), 392 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0d48faa3e635..6c161bd82238 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1651,6 +1651,7 @@ M:	Krzysztof Halasa <khalasa@piap.pl>
- L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/mach-ixp4xx/
-+F:	drivers/gpio/gpio-ixp4xx.c
- F:	drivers/irqchip/irq-ixp4xx.c
- F:	include/linux/irqchip/irq-ixp4xx.h
- 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 699a8118c433..fe4a47e49a24 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -286,6 +286,18 @@ config GPIO_IOP
- 
- 	  If unsure, say N.
- 
-+config GPIO_IXP4XX
-+	bool "Intel IXP4xx GPIO"
-+	depends on ARCH_IXP4XX || COMPILE_TEST
-+	select GPIO_GENERIC
-+	select IRQ_DOMAIN
-+	select IRQ_DOMAIN_HIERARCHY
-+	help
-+	  Say yes here to support the GPIO functionality of a number of Intel
-+	  IXP4xx series of chips.
-+
-+	  If unsure, say N.
-+
- config GPIO_LOONGSON
- 	bool "Loongson-2/3 GPIO support"
- 	depends on CPU_LOONGSON2 || CPU_LOONGSON3
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index 0568bbe6fe68..cf66523b5eec 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -60,6 +60,7 @@ obj-$(CONFIG_GPIO_HLWD)		+= gpio-hlwd.o
- obj-$(CONFIG_HTC_EGPIO)		+= gpio-htc-egpio.o
- obj-$(CONFIG_GPIO_ICH)		+= gpio-ich.o
- obj-$(CONFIG_GPIO_IOP)		+= gpio-iop.o
-+obj-$(CONFIG_GPIO_IXP4XX)	+= gpio-ixp4xx.o
- obj-$(CONFIG_GPIO_IT87)		+= gpio-it87.o
- obj-$(CONFIG_GPIO_JANZ_TTL)	+= gpio-janz-ttl.o
- obj-$(CONFIG_GPIO_KEMPLD)	+= gpio-kempld.o
-diff --git a/drivers/gpio/gpio-ixp4xx.c b/drivers/gpio/gpio-ixp4xx.c
-new file mode 100644
-index 000000000000..eaf317f73f75
---- /dev/null
-+++ b/drivers/gpio/gpio-ixp4xx.c
-@@ -0,0 +1,444 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// IXP4 GPIO driver
-+// Copyright (C) 2019 Linus Walleij <linus.walleij@linaro.org>
-+//
-+// based on previous work and know-how from:
-+// Deepak Saxena <dsaxena@plexity.net>
-+
-+#include <linux/gpio/driver.h>
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/irqdomain.h>
-+#include <linux/irqchip.h>
-+#include <linux/platform_device.h>
-+#include <linux/bitops.h>
-+/* Include that go away with DT transition */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index de2a5647e85d..f6345594cef0 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -432,10 +432,11 @@ config ARCH_IXP4XX
+ 	select DMABOUNCE if PCI
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_MULTI_HANDLER
++	select GPIO_IXP4XX
+ 	select GPIOLIB
+ 	select HAVE_PCI
++	select IXP4XX_IRQ
+ 	select NEED_MACH_IO_H
+-	select SPARSE_IRQ
+ 	select USB_EHCI_BIG_ENDIAN_DESC
+ 	select USB_EHCI_BIG_ENDIAN_MMIO
+ 	help
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index aa8fd248c125..71683dfc48f9 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -27,11 +27,11 @@
+ #include <linux/clockchips.h>
+ #include <linux/io.h>
+ #include <linux/export.h>
+-#include <linux/gpio/driver.h>
+ #include <linux/cpu.h>
+ #include <linux/pci.h>
+ #include <linux/sched_clock.h>
+ #include <linux/bitops.h>
 +#include <linux/irqchip/irq-ixp4xx.h>
-+
-+#include <asm/mach-types.h>
-+
-+#define IXP4XX_REG_GPOUT	0x00
-+#define IXP4XX_REG_GPOE		0x04
-+#define IXP4XX_REG_GPIN		0x08
-+#define IXP4XX_REG_GPIS		0x0C
-+#define IXP4XX_REG_GPIT1	0x10
-+#define IXP4XX_REG_GPIT2	0x14
-+#define IXP4XX_REG_GPCLK	0x18
-+#define IXP4XX_REG_GPDBSEL	0x1C
-+
-+/*
-+ * The hardware uses 3 bits to indicate interrupt "style".
-+ * we clear and set these three bits accordingly. The lower 24
-+ * bits in two registers (GPIT1 and GPIT2) are used to set up
-+ * the style for 8 lines each for a total of 16 GPIO lines.
-+ */
-+#define IXP4XX_GPIO_STYLE_ACTIVE_HIGH	0x0
-+#define IXP4XX_GPIO_STYLE_ACTIVE_LOW	0x1
-+#define IXP4XX_GPIO_STYLE_RISING_EDGE	0x2
-+#define IXP4XX_GPIO_STYLE_FALLING_EDGE	0x3
-+#define IXP4XX_GPIO_STYLE_TRANSITIONAL	0x4
-+#define IXP4XX_GPIO_STYLE_MASK		GENMASK(2, 0)
-+#define IXP4XX_GPIO_STYLE_SIZE		3
-+
-+/**
-+ * struct ixp4xx_gpio - IXP4 GPIO state container
-+ * @dev: containing device for this instance
-+ * @fwnode: the fwnode for this GPIO chip
-+ * @gc: gpiochip for this instance
-+ * @domain: irqdomain for this chip instance
-+ * @base: remapped I/O-memory base
-+ * @irq_edge: Each bit represents an IRQ: 1: edge-triggered,
-+ * 0: level triggered
-+ */
-+struct ixp4xx_gpio {
-+	struct device *dev;
-+	struct fwnode_handle *fwnode;
-+	struct gpio_chip gc;
-+	struct irq_domain *domain;
-+	void __iomem *base;
-+	unsigned long long irq_edge;
-+};
-+
-+/**
-+ * struct ixp4xx_gpio_map - IXP4 GPIO to parent IRQ map
-+ * @gpio_offset: offset of the IXP4 GPIO line
-+ * @parent_hwirq: hwirq on the parent IRQ controller
-+ */
-+struct ixp4xx_gpio_map {
-+	int gpio_offset;
-+	int parent_hwirq;
-+};
-+
-+/* GPIO lines 0..12 have corresponding IRQs, GPIOs 13..15 have no IRQs */
-+const struct ixp4xx_gpio_map ixp4xx_gpiomap[] = {
-+	{ .gpio_offset = 0, .parent_hwirq = 6 },
-+	{ .gpio_offset = 1, .parent_hwirq = 7 },
-+	{ .gpio_offset = 2, .parent_hwirq = 19 },
-+	{ .gpio_offset = 3, .parent_hwirq = 20 },
-+	{ .gpio_offset = 4, .parent_hwirq = 21 },
-+	{ .gpio_offset = 5, .parent_hwirq = 22 },
-+	{ .gpio_offset = 6, .parent_hwirq = 23 },
-+	{ .gpio_offset = 7, .parent_hwirq = 24 },
-+	{ .gpio_offset = 8, .parent_hwirq = 25 },
-+	{ .gpio_offset = 9, .parent_hwirq = 26 },
-+	{ .gpio_offset = 10, .parent_hwirq = 27 },
-+	{ .gpio_offset = 11, .parent_hwirq = 28 },
-+	{ .gpio_offset = 12, .parent_hwirq = 29 },
-+};
-+
-+static void ixp4xx_gpio_irq_ack(struct irq_data *d)
-+{
-+	struct ixp4xx_gpio *g = irq_data_get_irq_chip_data(d);
-+
-+	__raw_writel(BIT(d->hwirq), g->base + IXP4XX_REG_GPIS);
-+}
-+
-+static void ixp4xx_gpio_irq_unmask(struct irq_data *d)
-+{
-+	struct ixp4xx_gpio *g = irq_data_get_irq_chip_data(d);
-+
-+	/* ACK when unmasking if not edge-triggered */
-+	if (!(g->irq_edge & BIT(d->hwirq)))
-+		ixp4xx_gpio_irq_ack(d);
-+
-+	irq_chip_unmask_parent(d);
-+}
-+
-+static int ixp4xx_gpio_irq_set_type(struct irq_data *d, unsigned int type)
-+{
-+	struct ixp4xx_gpio *g = irq_data_get_irq_chip_data(d);
-+	int line = d->hwirq;
-+	unsigned long flags;
-+	u32 int_style;
-+	u32 int_reg;
-+	u32 val;
-+
-+	switch (type) {
-+	case IRQ_TYPE_EDGE_BOTH:
-+		irq_set_handler_locked(d, handle_edge_irq);
-+		int_style = IXP4XX_GPIO_STYLE_TRANSITIONAL;
-+		g->irq_edge |= BIT(d->hwirq);
-+		break;
-+	case IRQ_TYPE_EDGE_RISING:
-+		irq_set_handler_locked(d, handle_edge_irq);
-+		int_style = IXP4XX_GPIO_STYLE_RISING_EDGE;
-+		g->irq_edge |= BIT(d->hwirq);
-+		break;
-+	case IRQ_TYPE_EDGE_FALLING:
-+		irq_set_handler_locked(d, handle_edge_irq);
-+		int_style = IXP4XX_GPIO_STYLE_FALLING_EDGE;
-+		g->irq_edge |= BIT(d->hwirq);
-+		break;
-+	case IRQ_TYPE_LEVEL_HIGH:
-+		irq_set_handler_locked(d, handle_level_irq);
-+		int_style = IXP4XX_GPIO_STYLE_ACTIVE_HIGH;
-+		g->irq_edge &= ~BIT(d->hwirq);
-+		break;
-+	case IRQ_TYPE_LEVEL_LOW:
-+		irq_set_handler_locked(d, handle_level_irq);
-+		int_style = IXP4XX_GPIO_STYLE_ACTIVE_LOW;
-+		g->irq_edge &= ~BIT(d->hwirq);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	if (line >= 8) {
-+		/* pins 8-15 */
-+		line -= 8;
-+		int_reg = IXP4XX_REG_GPIT2;
-+	} else {
-+		/* pins 0-7 */
-+		int_reg = IXP4XX_REG_GPIT1;
-+	}
-+
-+	spin_lock_irqsave(&g->gc.bgpio_lock, flags);
-+
-+	/* Clear the style for the appropriate pin */
-+	val = __raw_readl(g->base + int_reg);
-+	val &= ~(IXP4XX_GPIO_STYLE_MASK << (line * IXP4XX_GPIO_STYLE_SIZE));
-+	__raw_writel(val, g->base + int_reg);
-+
-+	__raw_writel(BIT(line), g->base + IXP4XX_REG_GPIS);
-+
-+	/* Set the new style */
-+	val = __raw_readl(g->base + int_reg);
-+	val |= (int_style << (line * IXP4XX_GPIO_STYLE_SIZE));
-+	__raw_writel(val, g->base + int_reg);
-+
-+	/* Force-configure this line as an input */
-+	val = __raw_readl(g->base + IXP4XX_REG_GPOE);
-+	val |= BIT(d->hwirq);
-+	__raw_writel(val, g->base + IXP4XX_REG_GPOE);
-+
-+	spin_unlock_irqrestore(&g->gc.bgpio_lock, flags);
-+
-+	/* This parent only accept level high (asserted) */
-+	return irq_chip_set_type_parent(d, IRQ_TYPE_LEVEL_HIGH);
-+}
-+
-+static struct irq_chip ixp4xx_gpio_irqchip = {
-+	.name = "IXP4GPIO",
-+	.irq_ack = ixp4xx_gpio_irq_ack,
-+	.irq_mask = irq_chip_mask_parent,
-+	.irq_unmask = ixp4xx_gpio_irq_unmask,
-+	.irq_set_type = ixp4xx_gpio_irq_set_type,
-+};
-+
-+static int ixp4xx_gpio_to_irq(struct gpio_chip *gc, unsigned int offset)
-+{
-+	struct ixp4xx_gpio *g = gpiochip_get_data(gc);
-+	struct irq_fwspec fwspec;
-+
-+	fwspec.fwnode = g->fwnode;
-+	fwspec.param_count = 2;
-+	fwspec.param[0] = offset;
-+	fwspec.param[1] = IRQ_TYPE_NONE;
-+
-+	return irq_create_fwspec_mapping(&fwspec);
-+}
-+
-+static int ixp4xx_gpio_irq_domain_translate(struct irq_domain *domain,
-+					    struct irq_fwspec *fwspec,
-+					    unsigned long *hwirq,
-+					    unsigned int *type)
-+{
-+
-+	/* We support standard DT translation */
-+	if (is_of_node(fwspec->fwnode) && fwspec->param_count == 2) {
-+		*hwirq = fwspec->param[0];
-+		*type = fwspec->param[1];
-+		return 0;
-+	}
-+
-+	/* This goes away when we transition to DT */
-+	if (is_fwnode_irqchip(fwspec->fwnode)) {
-+		if (fwspec->param_count != 2)
-+			return -EINVAL;
-+		*hwirq = fwspec->param[0];
-+		*type = fwspec->param[1];
-+		WARN_ON(*type == IRQ_TYPE_NONE);
-+		return 0;
-+	}
-+	return -EINVAL;
-+}
-+
-+static int ixp4xx_gpio_irq_domain_alloc(struct irq_domain *d,
-+					unsigned int irq, unsigned int nr_irqs,
-+					void *data)
-+{
-+	struct ixp4xx_gpio *g = d->host_data;
-+	irq_hw_number_t hwirq;
-+	unsigned int type = IRQ_TYPE_NONE;
-+	struct irq_fwspec *fwspec = data;
-+	int ret;
-+	int i;
-+
-+	ret = ixp4xx_gpio_irq_domain_translate(d, fwspec, &hwirq, &type);
-+	if (ret)
-+		return ret;
-+
-+	dev_dbg(g->dev, "allocate IRQ %d..%d, hwirq %lu..%lu\n",
-+		irq, irq + nr_irqs - 1,
-+		hwirq, hwirq + nr_irqs - 1);
-+
-+	for (i = 0; i < nr_irqs; i++) {
-+		struct irq_fwspec parent_fwspec;
-+		const struct ixp4xx_gpio_map *map;
-+		int j;
-+
-+		/* Not all lines support IRQs */
-+		for (j = 0; j < ARRAY_SIZE(ixp4xx_gpiomap); j++) {
-+			map = &ixp4xx_gpiomap[j];
-+			if (map->gpio_offset == hwirq)
-+				break;
-+		}
-+		if (j == ARRAY_SIZE(ixp4xx_gpiomap)) {
-+			dev_err(g->dev, "can't look up hwirq %lu\n", hwirq);
-+			return -EINVAL;
-+		}
-+		dev_dbg(g->dev, "found parent hwirq %u\n", map->parent_hwirq);
-+
-+		/*
-+		 * We set handle_bad_irq because the .set_type() should
-+		 * always be invoked and set the right type of handler.
-+		 */
-+		irq_domain_set_info(d,
-+				    irq + i,
-+				    hwirq + i,
-+				    &ixp4xx_gpio_irqchip,
-+				    g,
-+				    handle_bad_irq,
-+				    NULL, NULL);
-+		irq_set_probe(irq + i);
-+
-+		/*
-+		 * Create a IRQ fwspec to send up to the parent irqdomain:
-+		 * specify the hwirq we address on the parent and tie it
-+		 * all together up the chain.
-+		 */
-+		parent_fwspec.fwnode = d->parent->fwnode;
-+		parent_fwspec.param_count = 2;
-+		parent_fwspec.param[0] = map->parent_hwirq;
-+		/* This parent only handles asserted level IRQs */
-+		parent_fwspec.param[1] = IRQ_TYPE_LEVEL_HIGH;
-+		dev_dbg(g->dev, "alloc_irqs_parent for %d parent hwirq %d\n",
-+			irq + i, map->parent_hwirq);
-+		ret = irq_domain_alloc_irqs_parent(d, irq + i, 1,
-+						   &parent_fwspec);
-+		if (ret)
-+			dev_err(g->dev,
-+				"failed to allocate parent hwirq %d for hwirq %lu\n",
-+				map->parent_hwirq, hwirq);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct irq_domain_ops ixp4xx_gpio_irqdomain_ops = {
-+	.translate = ixp4xx_gpio_irq_domain_translate,
-+	.alloc = ixp4xx_gpio_irq_domain_alloc,
-+	.free = irq_domain_free_irqs_common,
-+};
-+
-+static int ixp4xx_gpio_probe(struct platform_device *pdev)
-+{
-+	unsigned long flags;
-+	struct device *dev = &pdev->dev;
-+	struct irq_domain *parent;
-+	struct resource *res;
-+	struct ixp4xx_gpio *g;
-+	int ret;
-+	int i;
-+
-+	g = devm_kzalloc(dev, sizeof(*g), GFP_KERNEL);
-+	if (!g)
-+		return -ENOMEM;
-+	g->dev = dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	g->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(g->base)) {
-+		dev_err(dev, "ioremap error\n");
-+		return PTR_ERR(g->base);
-+	}
-+
-+	/*
-+	 * Make sure GPIO 14 and 15 are NOT used as clocks but GPIO on
-+	 * specific machines.
-+	 */
-+	if (machine_is_dsmg600() || machine_is_nas100d())
-+		__raw_writel(0x0, g->base + IXP4XX_REG_GPCLK);
-+
-+	/*
-+	 * This is a very special big-endian ARM issue: when the IXP4xx is
-+	 * run in big endian mode, all registers in the machine are switched
-+	 * around to the CPU-native endianness. As you see mostly in the
-+	 * driver we use __raw_readl()/__raw_writel() to access the registers
-+	 * in the appropriate order. With the GPIO library we need to specify
-+	 * byte order explicitly, so this flag needs to be set when compiling
-+	 * for big endian.
-+	 */
-+#if defined(CONFIG_CPU_BIG_ENDIAN)
-+	flags = BGPIOF_BIG_ENDIAN_BYTE_ORDER;
-+#else
-+	flags = 0;
-+#endif
-+
-+	/* Populate and register gpio chip */
-+	ret = bgpio_init(&g->gc, dev, 4,
-+			 g->base + IXP4XX_REG_GPIN,
-+			 g->base + IXP4XX_REG_GPOUT,
-+			 NULL,
-+			 NULL,
-+			 g->base + IXP4XX_REG_GPOE,
-+			 flags);
-+	if (ret) {
-+		dev_err(dev, "unable to init generic GPIO\n");
-+		return ret;
-+	}
-+	g->gc.to_irq = ixp4xx_gpio_to_irq;
-+	g->gc.ngpio = 16;
-+	g->gc.label = "IXP4XX_GPIO_CHIP";
-+	/*
-+	 * TODO: when we have migrated to device tree and all GPIOs
-+	 * are fetched using phandles, set this to -1 to get rid of
-+	 * the fixed gpiochip base.
-+	 */
-+	g->gc.base = 0;
-+	g->gc.parent = &pdev->dev;
-+	g->gc.owner = THIS_MODULE;
-+
-+	ret = devm_gpiochip_add_data(dev, &g->gc, g);
-+	if (ret) {
-+		dev_err(dev, "failed to add SoC gpiochip\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * When we convert to device tree we will simply look up the
-+	 * parent irqdomain using irq_find_host(parent) as parent comes
-+	 * from IRQCHIP_DECLARE(), then use of_node_to_fwnode() to get
-+	 * the fwnode. For now we need this boardfile style code.
-+	 */
-+	parent = ixp4xx_get_irq_domain();
-+	g->fwnode = irq_domain_alloc_fwnode(g->base);
-+	if (!g->fwnode) {
-+		dev_err(dev, "no domain base\n");
-+		return -ENODEV;
-+	}
-+	g->domain = irq_domain_create_hierarchy(parent,
-+						IRQ_DOMAIN_FLAG_HIERARCHY,
-+						ARRAY_SIZE(ixp4xx_gpiomap),
-+						g->fwnode,
-+						&ixp4xx_gpio_irqdomain_ops,
-+						g);
-+	if (!g->domain) {
-+		irq_domain_free_fwnode(g->fwnode);
-+		dev_err(dev, "no hierarchical irq domain\n");
-+		return ret;
-+	}
-+
-+	/*
-+	 * After adding OF support, this is no longer needed: irqs
-+	 * will be allocated for the respective fwnodes.
-+	 */
-+	for (i = 0; i < ARRAY_SIZE(ixp4xx_gpiomap); i++) {
-+		const struct ixp4xx_gpio_map *map = &ixp4xx_gpiomap[i];
-+		struct irq_fwspec fwspec;
-+
-+		fwspec.fwnode = g->fwnode;
-+		/* This is the hwirq for the GPIO line side of things */
-+		fwspec.param[0] = map->gpio_offset;
-+		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
-+		fwspec.param_count = 2;
-+		ret = __irq_domain_alloc_irqs(g->domain,
-+					      -1, /* just pick something */
-+					      1,
-+					      NUMA_NO_NODE,
-+					      &fwspec,
-+					      false,
-+					      NULL);
-+		if (ret < 0) {
-+			irq_domain_free_fwnode(g->fwnode);
-+			dev_err(dev,
-+				"can not allocate irq for GPIO line %d parent hwirq %d in hierarchy domain: %d\n",
-+				map->gpio_offset, map->parent_hwirq, ret);
-+			return ret;
-+		}
-+	}
-+
-+	platform_set_drvdata(pdev, g);
-+	dev_info(dev, "IXP4 GPIO @%p registered\n", g->base);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver ixp4xx_gpio_driver = {
-+	.driver = {
-+		.name		= "ixp4xx-gpio",
+ #include <mach/udc.h>
+ #include <mach/hardware.h>
+ #include <mach/io.h>
+@@ -58,7 +58,6 @@
+ 				       (IXP4XX_OST_RELOAD_MASK + 1) * HZ) * \
+ 			(IXP4XX_OST_RELOAD_MASK + 1)
+ 
+-static struct irq_domain *ixp4xx_irqdomain;
+ static void __init ixp4xx_clocksource_init(void);
+ static void __init ixp4xx_clockevent_init(void);
+ static struct clock_event_device clockevent_ixp4xx;
+@@ -95,266 +94,18 @@ void __init ixp4xx_map_io(void)
+   	iotable_init(ixp4xx_io_desc, ARRAY_SIZE(ixp4xx_io_desc));
+ }
+ 
+-/*
+- * GPIO-functions
+- */
+-/*
+- * The following converted to the real HW bits the gpio_line_config
+- */
+-/* GPIO pin types */
+-#define IXP4XX_GPIO_OUT 		0x1
+-#define IXP4XX_GPIO_IN  		0x2
+-
+-/* GPIO signal types */
+-#define IXP4XX_GPIO_LOW			0
+-#define IXP4XX_GPIO_HIGH		1
+-
+-/* GPIO Clocks */
+-#define IXP4XX_GPIO_CLK_0		14
+-#define IXP4XX_GPIO_CLK_1		15
+-
+-static void gpio_line_config(u8 line, u32 direction)
+-{
+-	if (direction == IXP4XX_GPIO_IN)
+-		*IXP4XX_GPIO_GPOER |= (1 << line);
+-	else
+-		*IXP4XX_GPIO_GPOER &= ~(1 << line);
+-}
+-
+-static void gpio_line_get(u8 line, int *value)
+-{
+-	*value = (*IXP4XX_GPIO_GPINR >> line) & 0x1;
+-}
+-
+-static void gpio_line_set(u8 line, int value)
+-{
+-	if (value == IXP4XX_GPIO_HIGH)
+-	    *IXP4XX_GPIO_GPOUTR |= (1 << line);
+-	else if (value == IXP4XX_GPIO_LOW)
+-	    *IXP4XX_GPIO_GPOUTR &= ~(1 << line);
+-}
+-
+-/*************************************************************************
+- * IXP4xx chipset IRQ handling
+- *
+- * TODO: GPIO IRQs should be marked invalid until the user of the IRQ
+- *       (be it PCI or something else) configures that GPIO line
+- *       as an IRQ.
+- **************************************************************************/
+-enum ixp4xx_irq_type {
+-	IXP4XX_IRQ_LEVEL, IXP4XX_IRQ_EDGE
+-};
+-
+-/* Each bit represents an IRQ: 1: edge-triggered, 0: level triggered */
+-static unsigned long long ixp4xx_irq_edge = 0;
+-
+-/*
+- * IRQ -> GPIO mapping table
+- */
+-static signed char irq2gpio[32] = {
+-	-1, -1, -1, -1, -1, -1,  0,  1,
+-	-1, -1, -1, -1, -1, -1, -1, -1,
+-	-1, -1, -1,  2,  3,  4,  5,  6,
+-	 7,  8,  9, 10, 11, 12, -1, -1,
+-};
+-
+-static int ixp4xx_gpio_to_irq(struct gpio_chip *chip, unsigned gpio)
+-{
+-	int irq;
+-
+-	for (irq = 0; irq < 32; irq++) {
+-		if (irq2gpio[irq] == gpio)
+-			return irq;
+-	}
+-	return -EINVAL;
+-}
+-
+-static int ixp4xx_set_irq_type(struct irq_data *d, unsigned int type)
+-{
+-	int line = irq2gpio[d->hwirq];
+-	u32 int_style;
+-	enum ixp4xx_irq_type irq_type;
+-	volatile u32 *int_reg;
+-
+-	/*
+-	 * Only for GPIO IRQs
+-	 * all other IRQs are simply active low
+-	 */
+-	if (line < 0)
+-		return 0;
+-
+-	switch (type){
+-	case IRQ_TYPE_EDGE_BOTH:
+-		int_style = IXP4XX_GPIO_STYLE_TRANSITIONAL;
+-		irq_type = IXP4XX_IRQ_EDGE;
+-		break;
+-	case IRQ_TYPE_EDGE_RISING:
+-		int_style = IXP4XX_GPIO_STYLE_RISING_EDGE;
+-		irq_type = IXP4XX_IRQ_EDGE;
+-		break;
+-	case IRQ_TYPE_EDGE_FALLING:
+-		int_style = IXP4XX_GPIO_STYLE_FALLING_EDGE;
+-		irq_type = IXP4XX_IRQ_EDGE;
+-		break;
+-	case IRQ_TYPE_LEVEL_HIGH:
+-		int_style = IXP4XX_GPIO_STYLE_ACTIVE_HIGH;
+-		irq_type = IXP4XX_IRQ_LEVEL;
+-		break;
+-	case IRQ_TYPE_LEVEL_LOW:
+-		int_style = IXP4XX_GPIO_STYLE_ACTIVE_LOW;
+-		irq_type = IXP4XX_IRQ_LEVEL;
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	if (irq_type == IXP4XX_IRQ_EDGE)
+-		ixp4xx_irq_edge |= (1 << d->hwirq);
+-	else
+-		ixp4xx_irq_edge &= ~(1 << d->hwirq);
+-
+-	if (line >= 8) {	/* pins 8-15 */
+-		line -= 8;
+-		int_reg = IXP4XX_GPIO_GPIT2R;
+-	} else {		/* pins 0-7 */
+-		int_reg = IXP4XX_GPIO_GPIT1R;
+-	}
+-
+-	/* Clear the style for the appropriate pin */
+-	*int_reg &= ~(IXP4XX_GPIO_STYLE_CLEAR <<
+-	    		(line * IXP4XX_GPIO_STYLE_SIZE));
+-
+-	*IXP4XX_GPIO_GPISR = (1 << line);
+-
+-	/* Set the new style */
+-	*int_reg |= (int_style << (line * IXP4XX_GPIO_STYLE_SIZE));
+-
+-	/* Configure the line as an input */
+-	gpio_line_config(irq2gpio[d->hwirq], IXP4XX_GPIO_IN);
+-
+-	return 0;
+-}
+-
+-static void ixp4xx_irq_mask(struct irq_data *d)
+-{
+-	if ((cpu_is_ixp46x() || cpu_is_ixp43x()) && d->hwirq >= 32)
+-		*IXP4XX_ICMR2 &= ~(1 << (d->hwirq - 32));
+-	else
+-		*IXP4XX_ICMR &= ~(1 << d->hwirq);
+-}
+-
+-static void ixp4xx_irq_ack(struct irq_data *d)
+-{
+-	int line = (d->hwirq < 32) ? irq2gpio[d->hwirq] : -1;
+-
+-	if (line >= 0)
+-		*IXP4XX_GPIO_GPISR = (1 << line);
+-}
+-
+-/*
+- * Level triggered interrupts on GPIO lines can only be cleared when the
+- * interrupt condition disappears.
+- */
+-static void ixp4xx_irq_unmask(struct irq_data *d)
+-{
+-	if (!(ixp4xx_irq_edge & (1 << d->hwirq)))
+-		ixp4xx_irq_ack(d);
+-
+-	if ((cpu_is_ixp46x() || cpu_is_ixp43x()) && d->hwirq >= 32)
+-		*IXP4XX_ICMR2 |= (1 << (d->hwirq - 32));
+-	else
+-		*IXP4XX_ICMR |= (1 << d->hwirq);
+-}
+-
+-static struct irq_chip ixp4xx_irq_chip = {
+-	.name		= "IXP4xx",
+-	.irq_ack	= ixp4xx_irq_ack,
+-	.irq_mask	= ixp4xx_irq_mask,
+-	.irq_unmask	= ixp4xx_irq_unmask,
+-	.irq_set_type	= ixp4xx_set_irq_type,
+-};
+-
+-asmlinkage void __exception_irq_entry ixp4xx_handle_irq(struct pt_regs *regs)
+-{
+-	unsigned long status;
+-	int i;
+-
+-	status = *IXP4XX_ICIP;
+-
+-	for_each_set_bit(i, &status, 32)
+-		handle_domain_irq(ixp4xx_irqdomain, i, regs);
+-
+-	/*
+-	 * IXP465/IXP435 has an upper IRQ status register
+-	 */
+-	if ((cpu_is_ixp46x() || cpu_is_ixp43x())) {
+-		status = *IXP4XX_ICIP2;
+-		for_each_set_bit(i, &status, 32)
+-			handle_domain_irq(ixp4xx_irqdomain, i + 32, regs);
+-	}
+-}
+-
+-static int ixp4xx_irqdomain_map(struct irq_domain *d, unsigned int irq,
+-				irq_hw_number_t hwirq)
+-{
+-	irq_set_chip_data(irq, &ixp4xx_irq_chip);
+-	irq_set_chip_and_handler(irq, &ixp4xx_irq_chip, handle_level_irq);
+-	irq_set_probe(irq);
+-
+-	return 0;
+-}
+-
+-static void ixp4xx_irqdomain_unmap(struct irq_domain *d, unsigned int irq)
+-{
+-	irq_set_chip_and_handler(irq, NULL, NULL);
+-	irq_set_chip_data(irq, NULL);
+-}
+-
+-static const struct irq_domain_ops ixp4xx_irqdomain_ops = {
+-	.map = ixp4xx_irqdomain_map,
+-	.unmap = ixp4xx_irqdomain_unmap,
+-};
+-
+ void __init ixp4xx_init_irq(void)
+ {
+-	int nr_irqs;
+-
+ 	/*
+ 	 * ixp4xx does not implement the XScale PWRMODE register
+ 	 * so it must not call cpu_do_idle().
+ 	 */
+ 	cpu_idle_poll_ctrl(true);
+ 
+-	/* Route all sources to IRQ instead of FIQ */
+-	*IXP4XX_ICLR = 0x0;
+-
+-	/* Disable all interrupt */
+-	*IXP4XX_ICMR = 0x0; 
+-
+-	if (cpu_is_ixp46x() || cpu_is_ixp43x()) {
+-		/* Route upper 32 sources to IRQ instead of FIQ */
+-		*IXP4XX_ICLR2 = 0x00;
+-
+-		/* Disable upper 32 interrupts */
+-		*IXP4XX_ICMR2 = 0x00;
+-
+-		nr_irqs = 64;
+-	} else {
+-		nr_irqs = 32;
+-	}
+-
+-	ixp4xx_irqdomain = irq_domain_add_simple(NULL, nr_irqs, IRQ_IXP4XX_BASE,
+-						 &ixp4xx_irqdomain_ops,
+-						 NULL);
+-	if (!ixp4xx_irqdomain) {
+-		pr_crit("can not add primary irqdomain\n");
+-		return;
+-	}
+-
+-	set_handle_irq(ixp4xx_handle_irq);
++	ixp4xx_irq_init(IXP4XX_INTC_BASE_PHYS,
++			(cpu_is_ixp46x() || cpu_is_ixp43x()));
+ }
+ 
+-
+ /*************************************************************************
+  * IXP4xx timer tick
+  * We use OS timer1 on the CPU for the timer tick and the timestamp 
+@@ -408,6 +159,24 @@ static struct resource ixp4xx_udc_resources[] = {
+ 	},
+ };
+ 
++static struct resource ixp4xx_gpio_resource[] = {
++	{
++		.start = IXP4XX_GPIO_BASE_PHYS,
++		.end = IXP4XX_GPIO_BASE_PHYS + 0xfff,
++		.flags = IORESOURCE_MEM,
 +	},
-+	.probe = ixp4xx_gpio_probe,
 +};
-+builtin_platform_driver(ixp4xx_gpio_driver);
++
++static struct platform_device ixp4xx_gpio_device = {
++	.name           = "ixp4xx-gpio",
++	.id             = -1,
++	.dev = {
++		.coherent_dma_mask      = DMA_BIT_MASK(32),
++	},
++	.resource = ixp4xx_gpio_resource,
++	.num_resources  = ARRAY_SIZE(ixp4xx_gpio_resource),
++};
++
+ /*
+  * USB device controller. The IXP4xx uses the same controller as PXA25X,
+  * so we just use the same device.
+@@ -423,6 +192,7 @@ static struct platform_device ixp4xx_udc_device = {
+ };
+ 
+ static struct platform_device *ixp4xx_devices[] __initdata = {
++	&ixp4xx_gpio_device,
+ 	&ixp4xx_udc_device,
+ };
+ 
+@@ -457,56 +227,12 @@ static struct platform_device *ixp46x_devices[] __initdata = {
+ unsigned long ixp4xx_exp_bus_size;
+ EXPORT_SYMBOL(ixp4xx_exp_bus_size);
+ 
+-static int ixp4xx_gpio_direction_input(struct gpio_chip *chip, unsigned gpio)
+-{
+-	gpio_line_config(gpio, IXP4XX_GPIO_IN);
+-
+-	return 0;
+-}
+-
+-static int ixp4xx_gpio_direction_output(struct gpio_chip *chip, unsigned gpio,
+-					int level)
+-{
+-	gpio_line_set(gpio, level);
+-	gpio_line_config(gpio, IXP4XX_GPIO_OUT);
+-
+-	return 0;
+-}
+-
+-static int ixp4xx_gpio_get_value(struct gpio_chip *chip, unsigned gpio)
+-{
+-	int value;
+-
+-	gpio_line_get(gpio, &value);
+-
+-	return value;
+-}
+-
+-static void ixp4xx_gpio_set_value(struct gpio_chip *chip, unsigned gpio,
+-				  int value)
+-{
+-	gpio_line_set(gpio, value);
+-}
+-
+-static struct gpio_chip ixp4xx_gpio_chip = {
+-	.label			= "IXP4XX_GPIO_CHIP",
+-	.direction_input	= ixp4xx_gpio_direction_input,
+-	.direction_output	= ixp4xx_gpio_direction_output,
+-	.get			= ixp4xx_gpio_get_value,
+-	.set			= ixp4xx_gpio_set_value,
+-	.to_irq			= ixp4xx_gpio_to_irq,
+-	.base			= 0,
+-	.ngpio			= 16,
+-};
+-
+ void __init ixp4xx_sys_init(void)
+ {
+ 	ixp4xx_exp_bus_size = SZ_16M;
+ 
+ 	platform_add_devices(ixp4xx_devices, ARRAY_SIZE(ixp4xx_devices));
+ 
+-	gpiochip_add_data(&ixp4xx_gpio_chip, NULL);
+-
+ 	if (cpu_is_ixp46x()) {
+ 		int region;
+ 
+diff --git a/arch/arm/mach-ixp4xx/dsmg600-setup.c b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+index 0daaede8fb6d..4d4c62fced71 100644
+--- a/arch/arm/mach-ixp4xx/dsmg600-setup.c
++++ b/arch/arm/mach-ixp4xx/dsmg600-setup.c
+@@ -270,9 +270,6 @@ static void __init dsmg600_init(void)
+ {
+ 	ixp4xx_sys_init();
+ 
+-	/* Make sure that GPIO14 and GPIO15 are not used as clocks */
+-	*IXP4XX_GPIO_GPCLKR = 0;
+-
+ 	dsmg600_flash_resource.start = IXP4XX_EXP_BUS_BASE(0);
+ 	dsmg600_flash_resource.end =
+ 		IXP4XX_EXP_BUS_BASE(0) + ixp4xx_exp_bus_size - 1;
+diff --git a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+index b7ddd27419c2..459abe2eb4b5 100644
+--- a/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
++++ b/arch/arm/mach-ixp4xx/include/mach/ixp4xx-regs.h
+@@ -147,95 +147,6 @@
+ #define IXP4XX_I2C_BASE_VIRT		(IXP4XX_PERIPHERAL_BASE_VIRT + 0x11000)
+ #define IXP4XX_SSP_BASE_VIRT		(IXP4XX_PERIPHERAL_BASE_VIRT + 0x12000)
+ 
+-/*
+- * Constants to make it easy to access  Interrupt Controller registers
+- */
+-#define IXP4XX_ICPR_OFFSET	0x00 /* Interrupt Status */
+-#define IXP4XX_ICMR_OFFSET	0x04 /* Interrupt Enable */
+-#define IXP4XX_ICLR_OFFSET	0x08 /* Interrupt IRQ/FIQ Select */
+-#define IXP4XX_ICIP_OFFSET      0x0C /* IRQ Status */
+-#define IXP4XX_ICFP_OFFSET	0x10 /* FIQ Status */
+-#define IXP4XX_ICHR_OFFSET	0x14 /* Interrupt Priority */
+-#define IXP4XX_ICIH_OFFSET	0x18 /* IRQ Highest Pri Int */
+-#define IXP4XX_ICFH_OFFSET	0x1C /* FIQ Highest Pri Int */
+-
+-/*
+- * IXP465-only
+- */
+-#define	IXP4XX_ICPR2_OFFSET	0x20 /* Interrupt Status 2 */
+-#define	IXP4XX_ICMR2_OFFSET	0x24 /* Interrupt Enable 2 */
+-#define	IXP4XX_ICLR2_OFFSET	0x28 /* Interrupt IRQ/FIQ Select 2 */
+-#define IXP4XX_ICIP2_OFFSET     0x2C /* IRQ Status */
+-#define IXP4XX_ICFP2_OFFSET	0x30 /* FIQ Status */
+-#define IXP4XX_ICEEN_OFFSET	0x34 /* Error High Pri Enable */
+-
+-
+-/*
+- * Interrupt Controller Register Definitions.
+- */
+-
+-#define IXP4XX_INTC_REG(x) ((volatile u32 *)(IXP4XX_INTC_BASE_VIRT+(x)))
+-
+-#define IXP4XX_ICPR	IXP4XX_INTC_REG(IXP4XX_ICPR_OFFSET)
+-#define IXP4XX_ICMR     IXP4XX_INTC_REG(IXP4XX_ICMR_OFFSET)
+-#define IXP4XX_ICLR     IXP4XX_INTC_REG(IXP4XX_ICLR_OFFSET)
+-#define IXP4XX_ICIP     IXP4XX_INTC_REG(IXP4XX_ICIP_OFFSET)
+-#define IXP4XX_ICFP     IXP4XX_INTC_REG(IXP4XX_ICFP_OFFSET)
+-#define IXP4XX_ICHR     IXP4XX_INTC_REG(IXP4XX_ICHR_OFFSET)
+-#define IXP4XX_ICIH     IXP4XX_INTC_REG(IXP4XX_ICIH_OFFSET) 
+-#define IXP4XX_ICFH     IXP4XX_INTC_REG(IXP4XX_ICFH_OFFSET)
+-#define IXP4XX_ICPR2	IXP4XX_INTC_REG(IXP4XX_ICPR2_OFFSET)
+-#define IXP4XX_ICMR2    IXP4XX_INTC_REG(IXP4XX_ICMR2_OFFSET)
+-#define IXP4XX_ICLR2    IXP4XX_INTC_REG(IXP4XX_ICLR2_OFFSET)
+-#define IXP4XX_ICIP2    IXP4XX_INTC_REG(IXP4XX_ICIP2_OFFSET)
+-#define IXP4XX_ICFP2    IXP4XX_INTC_REG(IXP4XX_ICFP2_OFFSET)
+-#define IXP4XX_ICEEN    IXP4XX_INTC_REG(IXP4XX_ICEEN_OFFSET)
+-                                                                                
+-/*
+- * Constants to make it easy to access GPIO registers
+- */
+-#define IXP4XX_GPIO_GPOUTR_OFFSET       0x00
+-#define IXP4XX_GPIO_GPOER_OFFSET        0x04
+-#define IXP4XX_GPIO_GPINR_OFFSET        0x08
+-#define IXP4XX_GPIO_GPISR_OFFSET        0x0C
+-#define IXP4XX_GPIO_GPIT1R_OFFSET	0x10
+-#define IXP4XX_GPIO_GPIT2R_OFFSET	0x14
+-#define IXP4XX_GPIO_GPCLKR_OFFSET	0x18
+-#define IXP4XX_GPIO_GPDBSELR_OFFSET	0x1C
+-
+-/* 
+- * GPIO Register Definitions.
+- * [Only perform 32bit reads/writes]
+- */
+-#define IXP4XX_GPIO_REG(x) ((volatile u32 *)(IXP4XX_GPIO_BASE_VIRT+(x)))
+-
+-#define IXP4XX_GPIO_GPOUTR	IXP4XX_GPIO_REG(IXP4XX_GPIO_GPOUTR_OFFSET)
+-#define IXP4XX_GPIO_GPOER       IXP4XX_GPIO_REG(IXP4XX_GPIO_GPOER_OFFSET)
+-#define IXP4XX_GPIO_GPINR       IXP4XX_GPIO_REG(IXP4XX_GPIO_GPINR_OFFSET)
+-#define IXP4XX_GPIO_GPISR       IXP4XX_GPIO_REG(IXP4XX_GPIO_GPISR_OFFSET)
+-#define IXP4XX_GPIO_GPIT1R      IXP4XX_GPIO_REG(IXP4XX_GPIO_GPIT1R_OFFSET)
+-#define IXP4XX_GPIO_GPIT2R      IXP4XX_GPIO_REG(IXP4XX_GPIO_GPIT2R_OFFSET)
+-#define IXP4XX_GPIO_GPCLKR      IXP4XX_GPIO_REG(IXP4XX_GPIO_GPCLKR_OFFSET)
+-#define IXP4XX_GPIO_GPDBSELR    IXP4XX_GPIO_REG(IXP4XX_GPIO_GPDBSELR_OFFSET)
+-
+-/*
+- * GPIO register bit definitions
+- */
+-
+-/* Interrupt styles
+- */
+-#define IXP4XX_GPIO_STYLE_ACTIVE_HIGH	0x0
+-#define IXP4XX_GPIO_STYLE_ACTIVE_LOW	0x1
+-#define IXP4XX_GPIO_STYLE_RISING_EDGE	0x2
+-#define IXP4XX_GPIO_STYLE_FALLING_EDGE	0x3
+-#define IXP4XX_GPIO_STYLE_TRANSITIONAL	0x4
+-
+-/* 
+- * Mask used to clear interrupt styles 
+- */
+-#define IXP4XX_GPIO_STYLE_CLEAR		0x7
+-#define IXP4XX_GPIO_STYLE_SIZE		3
+-
+ /*
+  * Constants to make it easy to access Timer Control/Status registers
+  */
+diff --git a/arch/arm/mach-ixp4xx/nas100d-setup.c b/arch/arm/mach-ixp4xx/nas100d-setup.c
+index 9d67f8de0772..c142cfa8c5d6 100644
+--- a/arch/arm/mach-ixp4xx/nas100d-setup.c
++++ b/arch/arm/mach-ixp4xx/nas100d-setup.c
+@@ -281,9 +281,6 @@ static void __init nas100d_init(void)
+ 
+ 	ixp4xx_sys_init();
+ 
+-	/* gpio 14 and 15 are _not_ clocks */
+-	*IXP4XX_GPIO_GPCLKR = 0;
+-
+ 	nas100d_flash_resource.start = IXP4XX_EXP_BUS_BASE(0);
+ 	nas100d_flash_resource.end =
+ 		IXP4XX_EXP_BUS_BASE(0) + ixp4xx_exp_bus_size - 1;
 -- 
 2.20.1
 
