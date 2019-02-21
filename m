@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37E58C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 28816C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:24:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F30DC20838
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:23:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E85C62086A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 07:24:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W1MuMtT9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="TkEwW293"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F30DC20838
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AIw3Fsaw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E85C62086A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,65 +25,48 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xyZjjsrRmlV9tD4mdlahJ8R+wdMcGcjHp8Quy4KCbT0=; b=W1MuMtT9sh0OAW
-	2o1BhREgziKQFP/0DGVP12t0XNGTY9feJBsV+NfjMOfR6hRqJc+CXXU8abRLsJCRl1GK/VlEoZMrw
-	htuQvYY0j1jX/lh/V7c0uAueCSr8ymIr1bVsZnh4IaAsunQYGibNP3wST20jEcNGdq506Sp7hVFv6
-	p3H6srhkaMtAlJeerNZFwEwtHICDR8RnRfb0oUXBQftWQQNsPwrjDCC85X/WKptZC0hxhwDXJQzC9
-	gNP1ExHe9AqBNgmy/3VBWl2uBgN92BQ88To9gRdipg+oOsC9NdTu/LARaoBm8UG3i+i7Fy4Bi5qYE
-	CQXcWtsVESc3aqTkyb1g==;
+	List-Owner; bh=yu7FlnYjHS1BtKlVp/rXgjDcC7DCwckX9BmeBshIlxE=; b=AIw3FsawpNuK1k
+	ufK1DjTirhEhVjYL8DidYcVVuRgeRgaNZWg491E+tI26EI/9W9XHapsGGOLFIzp7vzB/RDrmrRtSr
+	CclPAX7p3SUJVrhoc5Ap23D5wILmHayLXhb+tLzCv8gh0JWgXfseTyli8MOi1rySYUi4Mk0ptpX4x
+	dyHcdmfqw1VEh4dDJrfv6m64PYoRdiQ7YW0AeyqOYZVfVhd6woejVwwceMlOsNfXmacgyF4hNB4gy
+	tJg8KjqeA7Zz1C65pwToGLeRvHQQUcqK7Ja5mlljrwGAbqGJ3es/wpVeOCrSKQKpIFkOs0hcINQ96
+	rQ2laGinClWap36srx4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwihm-0007dg-V0; Thu, 21 Feb 2019 07:23:38 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gwiid-0008Aj-IE; Thu, 21 Feb 2019 07:24:31 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwigP-0005wm-0x
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 07:22:14 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c6e51ad0002>; Wed, 20 Feb 2019 23:22:21 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Wed, 20 Feb 2019 23:22:12 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Wed, 20 Feb 2019 23:22:12 -0800
-Received: from HQMAIL111.nvidia.com (172.20.187.18) by HQMAIL103.nvidia.com
- (172.20.187.11) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 21 Feb
- 2019 07:22:12 +0000
-Received: from HQMAIL105.nvidia.com (172.20.187.12) by HQMAIL111.nvidia.com
- (172.20.187.18) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Thu, 21 Feb
- 2019 07:22:12 +0000
-Received: from hqnvemgw01.nvidia.com (172.20.150.20) by HQMAIL105.nvidia.com
- (172.20.187.12) with Microsoft SMTP Server (TLS) id 15.0.1395.4 via Frontend
- Transport; Thu, 21 Feb 2019 07:22:12 +0000
-Received: from josephl-linux.nvidia.com (Not Verified[10.19.108.132]) by
- hqnvemgw01.nvidia.com with Trustwave SEG (v7, 5, 8, 10121)
- id <B5c6e51a30001>; Wed, 20 Feb 2019 23:22:12 -0800
-From: Joseph Lo <josephl@nvidia.com>
-To: Thierry Reding <thierry.reding@gmail.com>, Jonathan Hunter
- <jonathanh@nvidia.com>, Daniel Lezcano <daniel.lezcano@linaro.org>, "Thomas
- Gleixner" <tglx@linutronix.de>
-Subject: [PATCH V7 8/8] arm64: tegra: Enable CPU idle support for Shield
-Date: Thu, 21 Feb 2019 15:21:50 +0800
-Message-ID: <20190221072150.4395-9-josephl@nvidia.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190221072150.4395-1-josephl@nvidia.com>
-References: <20190221072150.4395-1-josephl@nvidia.com>
+ id 1gwigV-00060y-Ur; Thu, 21 Feb 2019 07:22:23 +0000
+X-UUID: 0a8b52fe1c7e4a37be26cae0f595c127-20190220
+X-UUID: 0a8b52fe1c7e4a37be26cae0f595c127-20190220
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ (envelope-from <louis.kuo@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 306436309; Wed, 20 Feb 2019 23:22:08 -0800
+Received: from MTKMBS01N2.mediatek.inc (172.21.101.79) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 20 Feb 2019 23:22:06 -0800
+Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
+ mtkmbs01n2.mediatek.inc (172.21.101.79) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Thu, 21 Feb 2019 15:22:04 +0800
+Received: from mtkslt306.mediatek.inc (10.21.14.136) by MTKCAS06.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Thu, 21 Feb 2019 15:22:04 +0800
+From: Louis Kuo <louis.kuo@mediatek.com>
+To: <hans.verkuil@cisco.com>, <laurent.pinchart+renesas@ideasonboard.com>,
+ <tfiga@chromium.org>, <matthias.bgg@gmail.com>, <mchehab@kernel.org>
+Subject: [RFC PATCH V0 4/4] dts: arm64: mt8183: Add sensor interface nodes
+Date: Thu, 21 Feb 2019 15:21:58 +0800
+Message-ID: <1550733718-31702-5-git-send-email-louis.kuo@mediatek.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1550733718-31702-1-git-send-email-louis.kuo@mediatek.com>
+References: <1550733718-31702-1-git-send-email-louis.kuo@mediatek.com>
 MIME-Version: 1.0
-X-NVConfidentiality: public
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1550733741; bh=44biMiFScpj3JFxN9qB/6joZqFonPW8T1GzONE394E0=;
- h=X-PGP-Universal:From:To:CC:Subject:Date:Message-ID:X-Mailer:
- In-Reply-To:References:MIME-Version:X-NVConfidentiality:
- Content-Transfer-Encoding:Content-Type;
- b=TkEwW293nh5MBK9R6Z/cQ+z8MhuofVlmEA6gwe9Wy18BRG1aOr1k5xpIdG69/fHR8
- a0w5jQNE/HZRgRSnIm2gRpGhIJdkdIasQW6oR3tBJdRf7Kvhf7PKcjC0mkxLbcakrY
- YytkFMSok+8kvQjqncz6/iyq13OK52syWAkxzMdvvtRyAvh+n9Ma0tGsESVaA35vDE
- Y+bgcNe5FyiK7lfiik/WxFScBwT10DnCo0+EUBPpyd/vqOyrTM7dn/nIZ1xD8rklPW
- lDsdNQjfmPUUE8L3Z6iYa3/SXKSkVyCly4E19j6h3g4XT8yHrVHutJPkyyw4Js2w3u
- ceJNOiJrdUTCA==
+X-TM-SNTS-SMTP: 2AD8D285512C25823880DA55DA547D13C7B332F23BE9B3C59E3CE9B9AF24A0072000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_232213_238493_3B9789D0 
-X-CRM114-Status: UNSURE (   6.60  )
+X-CRM114-CacheID: sfid-20190220_232220_467382_938B3FF8 
+X-CRM114-Status: UNSURE (   7.84  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -97,42 +79,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Joseph Lo <josephl@nvidia.com>
+Cc: devicetree@vger.kernel.org, Sean.Cheng@mediatek.com, Rynn.Wu@mediatek.com,
+ srv_heupstream@mediatek.com, holmes.chiou@mediatek.com,
+ Jerry-ch.Chen@mediatek.com, jungo.lin@mediatek.com, sj.huang@mediatek.com,
+ yuzhao@chromium.org, linux-mediatek@lists.infradead.org, zwisler@chromium.org,
+ Louis Kuo <louis.kuo@mediatek.com>, christie.yu@mediatek.com,
+ frederic.chen@mediatek.com, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Enable CPU idle support for Shield platform.
+Add nodes for Mediatek's sensor interface device. Sensor interface module
+embedded in Mediatek SOCs, works as a HW camera interface controller
+intended for image and data transmission between cameras and host devices.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Signed-off-by: Louis Kuo <louis.kuo@mediatek.com>
 ---
-v7:
- * new added in v7
----
- arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8183.dtsi | 34 ++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
-index 3ddf173ccc18..88a4b9333d84 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2894.dtsi
-@@ -1629,6 +1629,12 @@
- 		cpu@3 {
- 			enable-method = "psci";
+diff --git a/arch/arm64/boot/dts/mediatek/mt8183.dtsi b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+index c3a516e..2fe97e8 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8183.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8183.dtsi
+@@ -474,4 +474,38 @@
+ 			#clock-cells = <1>;
  		};
+ 	};
 +
-+		idle-states {
-+			cpu-sleep {
-+				status = "okay";
++	seninf: seninf@1a040000 {
++		compatible = "mediatek,mt8183-seninf";
++		reg = <0 0x1a040000 0 0x8000>,
++		      <0 0x11C80000 0 0x6000>;
++		reg-names = "base_reg", "rx_reg";
++		interrupts = <GIC_SPI 251 IRQ_TYPE_LEVEL_LOW>;
++		power-domains = <&scpsys MT8183_POWER_DOMAIN_CAM>;
++		clocks =
++			<&camsys CLK_CAM_SENINF>,
++			<&topckgen CLK_TOP_MUX_SENINF>;
++		clock-names =
++			"CLK_CAM_SENINF", "CLK_TOP_MUX_SENINF";
++		status = "disabled";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port@0 {
++				reg = <0>;
++				mipi_in_cam0: endpoint@0 {
++					reg = <0>;
++					data-lanes = <1 3>;
++				};
++			};
++
++			port@1 {
++				reg = <1>;
++				mipi_in_cam1: endpoint@0 {
++					reg = <1>;
++					data-lanes = <1 3>;
++				};
 +			};
 +		};
- 	};
- 
- 	psci {
++	};
+ };
 -- 
-2.20.1
+1.9.1
 
 
 _______________________________________________
