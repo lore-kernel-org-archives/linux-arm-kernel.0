@@ -2,80 +2,83 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C74ABC00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:18:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E27DAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:18:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 955C421734
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:18:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9804C20855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 10:18:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A6v006PW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="kY1oPhmc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 955C421734
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FYMPnaVr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="rGcgScG9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9804C20855
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=CThPtQD/rEWm7ElwtRDtZLbjvrBPgNYjUcTLdL6/ovs=; b=A6v006PWBYss8d
-	R1b+/v6OPWUatNQjNyCz+IvRUxzmGpf2l47zIu3CYHnhQghSrQTT/Y+I0XDCr+Z8ZZDGOWeyBesHa
-	oFup0kEnuq76f+5qZvVdnQCJf1ym2HDw7kQV33Pcz+BfOflBHRBrv2+kqPOsoYOKreqoLj57kR7dm
-	VpnT4slKFO5IihIKq2z29a8VUXUThnBG+GC6i8h9dsEsSdyiRbc/ZxCcfb67zAGmq7nnsh2wz2GTS
-	ofT05JMHs2gD7+UjMyr8zDFTRCxsBa1tQC4pI++OWKHGixlGrH/sbFI+/sH6hZTLrMe6IJnEFw0me
-	aBcKAST491bSeim4eAcw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tdbvR2XAH3AwLuK97DXJlqyHzdx4rfnztlFQ/NBZSwY=; b=FYMPnaVrBff8yB
+	+Kf6gSkq6d4+Iitob+R4g4OsCEH2KODw+x/zz+/8DaTgmt9xQpCsTBlqVGxPiTJ2z0bKtpnYiUR4p
+	OgHVG0Tq63OGZdr4HfOkDt3/wGAAmHVsVG/IxRhx0phMGJQZBehjB7//WynA7wlMjiin6WQVY+ppd
+	fQS04ZO3rNRlrsRO7QnQaVpFQsYl0ck2UYm6rJ6w/ec1Bmk1gQeer5zo8ORp+/T2PYtwCsKO5Odw2
+	oNBKWGFU7bdhDnbetZ0FIoWQ08GH7tQl7HVC0w6VyACU7Ra2glOz5lLT0KPWYnBHSzQ35L5Nej9NJ
+	GI/6kLfV354LCc3I3jqQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwlR7-0003K8-K6; Thu, 21 Feb 2019 10:18:37 +0000
-Received: from fllv0016.ext.ti.com ([198.47.19.142])
+	id 1gwlRQ-0003hD-2W; Thu, 21 Feb 2019 10:18:56 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwlR3-0003JS-7T
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 10:18:35 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by fllv0016.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1LAIR21053057;
- Thu, 21 Feb 2019 04:18:27 -0600
+ id 1gwlR5-0003Ji-1z
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 10:18:36 +0000
+Received: from fllv0034.itg.ti.com ([10.64.40.246])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1LAIUjV062496;
+ Thu, 21 Feb 2019 04:18:30 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550744307;
- bh=XY0f+fTB98q/vGndB90XrPK0wznd+QHF7jVR6uOp1Ls=;
- h=From:To:CC:Subject:Date;
- b=kY1oPhmcpsThndV6BEjaQ3rU523QrDPkvrHlgi145y0fGLbRX79tdsxp1cjGYjzSg
- Skcvdlor2g0OZuEF9pEQQMiBfQr9YI2Ncyt1QH3VLSMt/VmZvKzZh+tmOdnhMlNmhd
- MHEHha+UXiQ7pg9k1bXJIvFSYBeGTUvUVtIIAIH0=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1LAIR8C052436
+ s=ti-com-17Q1; t=1550744310;
+ bh=GmaChAagvvR3BKGTtUPZxsSHjPP8U/j4RxXcXLkz7sg=;
+ h=From:To:CC:Subject:Date:In-Reply-To:References;
+ b=rGcgScG9w2KngadT7i7DrpImMJwNvdju4GpR5bvvrfN4Hb69eYRcmS3SLhcIgcQLw
+ kyTm96MkdOTYEOxx10G7PU1aH1njXyQzF1+/94NU+VXajbb9JyLTdK+oWS2QxaeweR
+ 8nS+DIO+EIOA3AFMwsQ9ruWFz2/wp+FpIFBKt9Fo=
+Received: from DFLE102.ent.ti.com (dfle102.ent.ti.com [10.64.6.23])
+ by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1LAIUnD070311
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 21 Feb 2019 04:18:27 -0600
-Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
+ Thu, 21 Feb 2019 04:18:30 -0600
+Received: from DFLE112.ent.ti.com (10.64.6.33) by DFLE102.ent.ti.com
+ (10.64.6.23) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 21
- Feb 2019 04:18:27 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE109.ent.ti.com
- (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
+ Feb 2019 04:18:30 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE112.ent.ti.com
+ (10.64.6.33) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 21 Feb 2019 04:18:27 -0600
+ Thu, 21 Feb 2019 04:18:30 -0600
 Received: from a0393678ub.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1LAIORF022198;
- Thu, 21 Feb 2019 04:18:24 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1LAIORG022198;
+ Thu, 21 Feb 2019 04:18:27 -0600
 From: Kishon Vijay Abraham I <kishon@ti.com>
 To: Murali Karicheri <m-karicheri2@ti.com>, Lorenzo Pieralisi
  <lorenzo.pieralisi@arm.com>
-Subject: [PATCH v4 0/9] PCI: DWC/Keystone: MSI configuration cleanup
-Date: Thu, 21 Feb 2019 15:45:09 +0530
-Message-ID: <20190221101518.22604-1-kishon@ti.com>
+Subject: [PATCH v4 1/9] PCI: keystone: Cleanup interrupt related macros
+Date: Thu, 21 Feb 2019 15:45:10 +0530
+Message-ID: <20190221101518.22604-2-kishon@ti.com>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190221101518.22604-1-kishon@ti.com>
+References: <20190221101518.22604-1-kishon@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_021833_346898_CA53F11C 
-X-CRM114-Status: GOOD (  15.63  )
+X-CRM114-CacheID: sfid-20190221_021835_176245_EF709824 
+X-CRM114-Status: GOOD (  16.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,54 +99,98 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series tries to address the comments discussed in [1] w.r.t
-removing Keystone specific callbacks defined in dw_pcie_host_ops.
+No functional change. Change both MSI interrupt and legacy interrupt
+related macros to take an additional argument in order to return the
+correct register offset.
 
-This series also tries to cleanup the Keystone interrupt handling
-part.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/pci/controller/dwc/pci-keystone.c | 26 +++++++++++------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-Changes from v3:
-*) Uses hierarchy IRQ domain for legacy interrupts since there is 1:1
-   mapping between legacy interrupt and GIC IRQ.
-   (MSI still depends on the order of IRQs populated in dt).
-
-Changes from v2:
-*) Removed patch that modifies ks_pcie_legacy_irq_handler() to check the
-   IRQ_STATUS of INTA/B/C/D. Lorenzo's comment to create a matrix
-   LinuxIRQ x INTx will be added in AM654x PCIe support series
-*) ks_pcie_legacy_irq_handler() is made to use hwirq to get IRQ offset
-   instead of virq.
-*) default msi_irq_chip is assigned in dw_pcie_host_init() once keystone
-   assigns its msi_irq_chip
-*) Fixed other minor comments from Lorenzo and Bjorn
-
-Changes from v1:
-*) Removed "PCI: keystone: Use "dummy_irq_chip" instead of new irqchip
-for legacy interrupt handling" from the patch series. It should be
-handled differently.
-
-*) Added Gustavo's ACKed by and fixed a commit message.
-
-[1] -> https://patchwork.kernel.org/patch/10681587/
-
-Kishon Vijay Abraham I (9):
-  PCI: keystone: Cleanup interrupt related macros
-  PCI: keystone: Add separate functions for configuring MSI and legacy
-    interrupt
-  PCI: keystone: Convert to using hierarchy domain for legacy interrupts
-  PCI: keystone: Use hwirq to get the MSI IRQ number offset
-  PCI: keystone: Cleanup ks_pcie_msi_irq_handler
-  PCI: dwc: Add support to use non default msi_irq_chip
-  PCI: keystone: Use Keystone specific msi_irq_chip
-  PCI: dwc: Remove Keystone specific dw_pcie_host_ops
-  PCI: dwc: Do not write to MSI control registers if the platform
-    doesn't use it
-
- drivers/pci/controller/dwc/pci-keystone.c     | 520 ++++++++++--------
- .../pci/controller/dwc/pcie-designware-host.c |  78 +--
- drivers/pci/controller/dwc/pcie-designware.h  |   6 +-
- 3 files changed, 326 insertions(+), 278 deletions(-)
-
+diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+index 14f2b0b4ed5e..5286a480f76b 100644
+--- a/drivers/pci/controller/dwc/pci-keystone.c
++++ b/drivers/pci/controller/dwc/pci-keystone.c
+@@ -52,17 +52,17 @@
+ 
+ /* IRQ register defines */
+ #define IRQ_EOI				0x050
+-#define IRQ_STATUS			0x184
+-#define IRQ_ENABLE_SET			0x188
+-#define IRQ_ENABLE_CLR			0x18c
+ 
+ #define MSI_IRQ				0x054
+-#define MSI0_IRQ_STATUS			0x104
+-#define MSI0_IRQ_ENABLE_SET		0x108
+-#define MSI0_IRQ_ENABLE_CLR		0x10c
+-#define IRQ_STATUS			0x184
++#define MSI_IRQ_STATUS(n)		(0x104 + ((n) << 4))
++#define MSI_IRQ_ENABLE_SET(n)		(0x108 + ((n) << 4))
++#define MSI_IRQ_ENABLE_CLR(n)		(0x10c + ((n) << 4))
+ #define MSI_IRQ_OFFSET			4
+ 
++#define IRQ_STATUS(n)			(0x184 + ((n) << 4))
++#define IRQ_ENABLE_SET(n)		(0x188 + ((n) << 4))
++#define INTx_EN				BIT(0)
++
+ #define ERR_IRQ_STATUS			0x1c4
+ #define ERR_IRQ_ENABLE_SET		0x1c8
+ #define ERR_AER				BIT(5)	/* ECRC error */
+@@ -142,7 +142,7 @@ static void ks_pcie_handle_msi_irq(struct keystone_pcie *ks_pcie, int offset)
+ 	u32 pending, vector;
+ 	int src, virq;
+ 
+-	pending = ks_pcie_app_readl(ks_pcie, MSI0_IRQ_STATUS + (offset << 4));
++	pending = ks_pcie_app_readl(ks_pcie, MSI_IRQ_STATUS(offset));
+ 
+ 	/*
+ 	 * MSI0 status bit 0-3 shows vectors 0, 8, 16, 24, MSI1 status bit
+@@ -169,7 +169,7 @@ static void ks_pcie_msi_irq_ack(int irq, struct pcie_port *pp)
+ 	ks_pcie = to_keystone_pcie(pci);
+ 	update_reg_offset_bit_pos(irq, &reg_offset, &bit_pos);
+ 
+-	ks_pcie_app_writel(ks_pcie, MSI0_IRQ_STATUS + (reg_offset << 4),
++	ks_pcie_app_writel(ks_pcie, MSI_IRQ_STATUS(reg_offset),
+ 			   BIT(bit_pos));
+ 	ks_pcie_app_writel(ks_pcie, IRQ_EOI, reg_offset + MSI_IRQ_OFFSET);
+ }
+@@ -181,7 +181,7 @@ static void ks_pcie_msi_set_irq(struct pcie_port *pp, int irq)
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+ 
+ 	update_reg_offset_bit_pos(irq, &reg_offset, &bit_pos);
+-	ks_pcie_app_writel(ks_pcie, MSI0_IRQ_ENABLE_SET + (reg_offset << 4),
++	ks_pcie_app_writel(ks_pcie, MSI_IRQ_ENABLE_SET(reg_offset),
+ 			   BIT(bit_pos));
+ }
+ 
+@@ -192,7 +192,7 @@ static void ks_pcie_msi_clear_irq(struct pcie_port *pp, int irq)
+ 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pci);
+ 
+ 	update_reg_offset_bit_pos(irq, &reg_offset, &bit_pos);
+-	ks_pcie_app_writel(ks_pcie, MSI0_IRQ_ENABLE_CLR + (reg_offset << 4),
++	ks_pcie_app_writel(ks_pcie, MSI_IRQ_ENABLE_CLR(reg_offset),
+ 			   BIT(bit_pos));
+ }
+ 
+@@ -206,7 +206,7 @@ static void ks_pcie_enable_legacy_irqs(struct keystone_pcie *ks_pcie)
+ 	int i;
+ 
+ 	for (i = 0; i < PCI_NUM_INTX; i++)
+-		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET + (i << 4), 0x1);
++		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), 0x1);
+ }
+ 
+ static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
+@@ -217,7 +217,7 @@ static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
+ 	u32 pending;
+ 	int virq;
+ 
+-	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS + (offset << 4));
++	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
+ 
+ 	if (BIT(0) & pending) {
+ 		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
 -- 
 2.17.1
 
