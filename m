@@ -2,80 +2,62 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70B76C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:43:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DDE0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:45:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3DD6420855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:43:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0653B2148D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:45:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a3Eox7la";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="mWTLE8h/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3DD6420855
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZQojkNpQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0653B2148D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mqp+LPiCrdxWf7SEydMAekwD39WusrLqQvmG/VG/R4w=; b=a3Eox7laAxeLsw
-	djxJmmrJ6Ef1I7+IiJg+C3aA6aps+tX55Y8Nqd/M0wShTCw3BiZPCU0rhljhZE2ou1lbHcZZZMJUu
-	+o5OmWgBgzMoS+26xIOxos4pJ289Mlvueq2JMkclk86IntkvhK4CXqA72isJn2FSq8Z4PpoEeP8tt
-	FWIQDUat3yc93BIoFs7qmY4RCo2pQvq8bhMr9oAcXcN9LGhWP6oUuhAKgLX+bC27XXHO3AWuaum3N
-	vOmk4AfirCKNLxS8Tgjyukqd5M79HAM9WIN94BjXYzZ2R/DTacPQ1N4DG/XUQ8PhnQSS+6LNZdV56
-	pS4NeXVI+DZMF7900CHg==;
+	List-Owner; bh=L27Go/zwF+uP2xY4PiAeXJzKli07SpIdilU1AX2qYYs=; b=ZQojkNpQiGkWeb
+	CKbKnwFPWTFBvi1c9ePFef5jyNQxllB3Wf/PhfntdeLVOxXn/yqkDEUIMGNlS2Rb8qYL+ZDNgcyLL
+	5Kj/sEX8SmPB8v3aDs6GMiEMm8aJ2PGE/KSO2sut5nPr6caQ+uSawlgxgc4NSmZ/4xtqvgB8iuHyx
+	2KMlouIyqZEns4mxUcn6kesW7lkWQUXmsbJoFoMOtFzqOhWwVOa6WpgIKL8eFIpd5V2K9L+oi23sv
+	ML/ReZtqKz1KGsqI5EHvXvxZMPoym8u8gb676fZcgkiBmVStZLbdxfYq8V/P2L8AS+UCcgZ/zVfFo
+	tAWH0NUuYBhJZf3j92bQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwmlX-0000wy-23; Thu, 21 Feb 2019 11:43:47 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwmlU-0000wd-B3
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 11:43:45 +0000
-Received: from mail-lj1-f180.google.com (mail-lj1-f180.google.com
- [209.85.208.180])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 64CB321841
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 11:43:43 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550749423;
- bh=uxodDM8DcIH3DFJRf934Ta55iD7dtEytKxV92UjmqeI=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=mWTLE8h/Lv6/fQgKksVECU0Esfe1cnrxar+Gpek8lGgTSmKdyrY+VCf1W58l2Bm2i
- b3Oke1FdCzh9MU7Z703X0PuIpHVogTMCjhGq47J2ULY5BjqymLAvNKg8LW9Vu5KQ9s
- hTLD6PasBETPnup5ZcQwIbLFVtqbWl0oWDrKPK6E=
-Received: by mail-lj1-f180.google.com with SMTP id j13-v6so23751838ljc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 03:43:43 -0800 (PST)
-X-Gm-Message-State: AHQUAuY1VxOSSgd5JdfefzvE2EY4rkToiogr2Xp5p1w4qKD03OQJPTPq
- T1rY9/kBRqccY+zlhrabAitS0NmIYxyCIAp3Vw8=
-X-Google-Smtp-Source: AHgI3IZNZsanInxkXFUrNJne8zWhKWZSRpL4jzRErZ+/B+6LAWL7rvdLBlsvjSdwbsFS7QIgo54g0gcKMPfX700vRDQ=
-X-Received: by 2002:a2e:3c10:: with SMTP id j16mr1213830lja.113.1550749421489; 
- Thu, 21 Feb 2019 03:43:41 -0800 (PST)
+	id 1gwmmc-0001Rs-Oe; Thu, 21 Feb 2019 11:44:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwmdx-0004W4-Kd
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 11:36:03 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 88DFD15AB;
+ Thu, 21 Feb 2019 03:35:57 -0800 (PST)
+Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
+ [10.1.196.69])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 07E943F5C1;
+ Thu, 21 Feb 2019 03:35:53 -0800 (PST)
+From: Steven Price <steven.price@arm.com>
+To: linux-mm@kvack.org
+Subject: [PATCH v2 11/13] x86/mm: Convert ptdump_walk_pgd_level_debugfs() to
+ take an mm_struct
+Date: Thu, 21 Feb 2019 11:35:00 +0000
+Message-Id: <20190221113502.54153-12-steven.price@arm.com>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190221113502.54153-1-steven.price@arm.com>
+References: <20190221113502.54153-1-steven.price@arm.com>
 MIME-Version: 1.0
-References: <1550484960-2392-1-git-send-email-krzk@kernel.org>
- <CAMuHMdWXy_0zL8FZWapPj4+cXRd0wHy9buLhf0D0txpAHPkK7Q@mail.gmail.com>
- <CAJKOXPe1CW4k4ivbh4QhKEbuVc3RRNmzUwQcL0BsrAn=hCdjZg@mail.gmail.com>
- <155070010208.77512.17397936280518534534@swboyd.mtv.corp.google.com>
-In-Reply-To: <155070010208.77512.17397936280518534534@swboyd.mtv.corp.google.com>
-From: Krzysztof Kozlowski <krzk@kernel.org>
-Date: Thu, 21 Feb 2019 12:43:29 +0100
-X-Gmail-Original-Message-ID: <CAJKOXPc=mKrNuw65qf=vPtRD7b7=5FZWdNcncvwhpDN+tqp0Bw@mail.gmail.com>
-Message-ID: <CAJKOXPc=mKrNuw65qf=vPtRD7b7=5FZWdNcncvwhpDN+tqp0Bw@mail.gmail.com>
-Subject: Re: [RFC 0/4] clk/driver: platform: Fix kfree() of const memory on
- setting driver_override
-To: Stephen Boyd <sboyd@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_034344_419931_A7EA85D7 
-X-CRM114-Status: GOOD (  22.89  )
+X-CRM114-CacheID: sfid-20190221_033557_746213_EF008380 
+X-CRM114-Status: GOOD (  14.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,77 +69,136 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: David Brown <david.brown@linaro.org>,
- ALSA Development Mailing List <alsa-devel@alsa-project.org>,
- "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Russell King <linux@armlinux.org.uk>, linux-spi <linux-spi@vger.kernel.org>,
- Chanwoo Choi <cw00.choi@samsung.com>, Mark Brown <broonie@kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>, Kukjin Kim <kgene@kernel.org>,
- Sylwester Nawrocki <s.nawrocki@samsung.com>, linux-arm-msm@vger.kernel.org,
- Andy Gross <andy.gross@linaro.org>,
- Srinivas Kandagatla <srinivas.kandagatla@linaro.org>,
- Tomasz Figa <tomasz.figa@gmail.com>, linux-clk <linux-clk@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
+ Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Steven Price <steven.price@arm.com>,
+ =?UTF-8?q?J=C3=A9r=C3=B4me=20Glisse?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 20 Feb 2019 at 23:01, Stephen Boyd <sboyd@kernel.org> wrote:
->
-> Quoting Krzysztof Kozlowski (2019-02-18 03:14:29)
-> > On Mon, 18 Feb 2019 at 11:40, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
-> > >
-> > > Hi Krzysztof,
-> > >
-> > > On Mon, Feb 18, 2019 at 11:27 AM Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > > > The problem
-> > > > ===========
-> > > > Several device types (platform, amba, spi etc.) provide a driver_override
-> > > > field.  On sysfs store or during device removal, they kfree() the
-> > > > existing value.
-> > > >
-> > > > However the users are unaware of this and set the driver_override like:
-> > > >
-> > > >         pdev->driver_override = "exynos5-subcmu";
-> > > >
-> > > > which obviously leads to error.
-> > >
-> > > IMHO driver_override is not meant to be set by a driver, only from userspace,
-> > > for binding the device to vfio (is there another use case?).
-> > >
-> > > >   clk: samsung: exynos5: Fix kfree() of const memory on setting
-> > > >     driver_override
-> > > >   slimbus: ngd: Fix kfree() of const memory on setting driver_override
-> > >
-> > > I see all users set override immediately after allocating a platform device.
-> > > Can't they just allocate a platform device using the override name instead?
-> > > What am I missing?
-> >
-> > For the clk-exynos5-subcmu.c case, driver registers several
-> > sub-devices. Each sub-devices is a clock controller associated with
-> > power domain. I guess the author wanted to have meaningful names of
-> > these sub-devices (DISP, CAM etc. like names of power domains),
-> > instead of just exynos5-subcmu.1, exynos5-subcmu.2 ...
-> >
-> > If driver_override should not be used for such case, then I could
-> > replace it with what you said.
->
-> Looking at the introduction of the code into the platform bus makes it
-> sound like it was all for vfio devices. If the clk driver doesn't need
-> it for that purpose and can get by with more generic names then it seems
-> best to avoid using it entirely. So can you do that and resend the first
-> patch in this series too? Effectively splitting the clk parts from the
-> larger issue of kfree()ing of const memory.
+To enable x86 to use the generic walk_page_range() function, the
+callers of ptdump_walk_pgd_level_debugfs() need to pass in the mm_struct.
 
-Sure, let me send just the clk parts.
+This means that ptdump_walk_pgd_level_core() is now always passed a
+valid pgd, so drop the support for pgd==NULL.
 
-BR,
-Krzysztof
+Signed-off-by: Steven Price <steven.price@arm.com>
+---
+ arch/x86/include/asm/pgtable.h |  3 ++-
+ arch/x86/mm/debug_pagetables.c |  8 ++++----
+ arch/x86/mm/dump_pagetables.c  | 14 ++++++--------
+ 3 files changed, 12 insertions(+), 13 deletions(-)
+
+diff --git a/arch/x86/include/asm/pgtable.h b/arch/x86/include/asm/pgtable.h
+index 371901283d5f..ab2aa3eb05e9 100644
+--- a/arch/x86/include/asm/pgtable.h
++++ b/arch/x86/include/asm/pgtable.h
+@@ -28,7 +28,8 @@ extern pgd_t early_top_pgt[PTRS_PER_PGD];
+ int __init __early_make_pgtable(unsigned long address, pmdval_t pmd);
+ 
+ void ptdump_walk_pgd_level(struct seq_file *m, struct mm_struct *mm);
+-void ptdump_walk_pgd_level_debugfs(struct seq_file *m, pgd_t *pgd, bool user);
++void ptdump_walk_pgd_level_debugfs(struct seq_file *m, struct mm_struct *mm,
++				   bool user);
+ void ptdump_walk_pgd_level_checkwx(void);
+ void ptdump_walk_user_pgd_level_checkwx(void);
+ 
+diff --git a/arch/x86/mm/debug_pagetables.c b/arch/x86/mm/debug_pagetables.c
+index cd84f067e41d..824131052574 100644
+--- a/arch/x86/mm/debug_pagetables.c
++++ b/arch/x86/mm/debug_pagetables.c
+@@ -6,7 +6,7 @@
+ 
+ static int ptdump_show(struct seq_file *m, void *v)
+ {
+-	ptdump_walk_pgd_level_debugfs(m, NULL, false);
++	ptdump_walk_pgd_level_debugfs(m, &init_mm, false);
+ 	return 0;
+ }
+ 
+@@ -16,7 +16,7 @@ static int ptdump_curknl_show(struct seq_file *m, void *v)
+ {
+ 	if (current->mm->pgd) {
+ 		down_read(&current->mm->mmap_sem);
+-		ptdump_walk_pgd_level_debugfs(m, current->mm->pgd, false);
++		ptdump_walk_pgd_level_debugfs(m, current->mm, false);
+ 		up_read(&current->mm->mmap_sem);
+ 	}
+ 	return 0;
+@@ -31,7 +31,7 @@ static int ptdump_curusr_show(struct seq_file *m, void *v)
+ {
+ 	if (current->mm->pgd) {
+ 		down_read(&current->mm->mmap_sem);
+-		ptdump_walk_pgd_level_debugfs(m, current->mm->pgd, true);
++		ptdump_walk_pgd_level_debugfs(m, current->mm, true);
+ 		up_read(&current->mm->mmap_sem);
+ 	}
+ 	return 0;
+@@ -46,7 +46,7 @@ static struct dentry *pe_efi;
+ static int ptdump_efi_show(struct seq_file *m, void *v)
+ {
+ 	if (efi_mm.pgd)
+-		ptdump_walk_pgd_level_debugfs(m, efi_mm.pgd, false);
++		ptdump_walk_pgd_level_debugfs(m, &efi_mm, false);
+ 	return 0;
+ }
+ 
+diff --git a/arch/x86/mm/dump_pagetables.c b/arch/x86/mm/dump_pagetables.c
+index 07f62d5517da..8b457a65ad8e 100644
+--- a/arch/x86/mm/dump_pagetables.c
++++ b/arch/x86/mm/dump_pagetables.c
+@@ -526,16 +526,12 @@ static inline bool is_hypervisor_range(int idx)
+ static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
+ 				       bool checkwx, bool dmesg)
+ {
+-	pgd_t *start = INIT_PGD;
++	pgd_t *start = pgd;
+ 	pgprotval_t prot, eff;
+ 	int i;
+ 	struct pg_state st = {};
+ 
+-	if (pgd) {
+-		start = pgd;
+-		st.to_dmesg = dmesg;
+-	}
+-
++	st.to_dmesg = dmesg;
+ 	st.check_wx = checkwx;
+ 	st.seq = m;
+ 	if (checkwx)
+@@ -580,8 +576,10 @@ void ptdump_walk_pgd_level(struct seq_file *m, struct mm_struct *mm)
+ 	ptdump_walk_pgd_level_core(m, mm->pgd, false, true);
+ }
+ 
+-void ptdump_walk_pgd_level_debugfs(struct seq_file *m, pgd_t *pgd, bool user)
++void ptdump_walk_pgd_level_debugfs(struct seq_file *m, struct mm_struct *mm,
++				   bool user)
+ {
++	pgd_t *pgd = mm->pgd;
+ #ifdef CONFIG_PAGE_TABLE_ISOLATION
+ 	if (user && static_cpu_has(X86_FEATURE_PTI))
+ 		pgd = kernel_to_user_pgdp(pgd);
+@@ -607,7 +605,7 @@ void ptdump_walk_user_pgd_level_checkwx(void)
+ 
+ void ptdump_walk_pgd_level_checkwx(void)
+ {
+-	ptdump_walk_pgd_level_core(NULL, NULL, true, false);
++	ptdump_walk_pgd_level_core(NULL, INIT_PGD, true, false);
+ }
+ 
+ static int __init pt_dump_init(void)
+-- 
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
