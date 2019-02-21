@@ -2,133 +2,111 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B22CDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 18:28:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 224F6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 18:45:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 74E5020818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 18:28:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E32CB2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 18:45:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bSahvKR8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="X8jDYn7G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74E5020818
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ky28lQQ/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="QPAdwXc1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E32CB2084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FVccErTyiSFLUscu5Bix6ic0JeQAKDkUjPDOJQgxMcw=; b=bSahvKR8BZS4s/
-	78oKD5UdfKl2mqRc4MMK0SXWG9HUAyaJf+I7eosK1aZGCTpAEj74DApxFpDJFKkgaCGeaO2087f3+
-	GL+ij4VTisNbl3ibSHzqsMqVSArpN+qFzZUqrfn/ESG4yz6RyodMskAVRdzRfGRRrRC/WPJHQ89wk
-	VJ34AmCzacdfKkZsJWNUMQCDGW5gdtWJdbXN0b6UVLEGfJI9B3mdFP0LATUwmXlEc0NKyJalg8+36
-	5Mj2Zc9ig+QVxvKPTDnCRRu9Gu+FSQrLRV2ocprhmm1jU+jyc4lnwW2vHLza+dDqTYO86WV1zNiiA
-	kUvEhFwdxnyi3jqgJwzQ==;
+	List-Owner; bh=jW+SX8y68AKipFHoSF+GBs3COwB199R1PiA01rQdcz8=; b=ky28lQQ/F1b5Xo
+	GG4+MYBTD2yE7vFSDIJEWnDx645QzYFBJbJAKwOyorf5R5XwG1im1ED94NIubxJmZiPNuAUcGHUx3
+	YqxiO+FhxaD5Ra6pPF60GCvr0Zh3pkNv3AYJD2YZGOj4PAB6nDbpg4RGED5al66VbiFZ9tWnXsCw+
+	SwZNKYuplAnbzba8O+cJOCxWI0/rhoDf736vIrrtZc5pOeaAwWU+UpsklM+diIIJzqvJX4UaCu85D
+	pudeJAlmWsV5MxGj3HqZnu4NJkqYiV+DeEkd0oz31Jal4+DheRCvIVum7YcvDoYiQDzBXJ1LEChLR
+	BNuIqMWe7Zimy6AmK2OA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwt4i-0003Re-Hw; Thu, 21 Feb 2019 18:28:00 +0000
-Received: from mail-eopbgr20046.outbound.protection.outlook.com ([40.107.2.46]
- helo=EUR02-VE1-obe.outbound.protection.outlook.com)
+	id 1gwtLM-00027v-Bk; Thu, 21 Feb 2019 18:45:12 +0000
+Received: from mail-eopbgr30070.outbound.protection.outlook.com ([40.107.3.70]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwt2t-0000Km-VU
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 18:26:39 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ id 1gwtLH-0001Kp-58
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 18:45:10 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=0wW1N80OuAjkStP8HE43HCSeKLGIY6G121882rGLVZ8=;
- b=X8jDYn7G2s/jiSg+MIWO0OXbWxyHZ/YTaMuDbdOwmBRhxiZyTO+yzrk+6eQPAVyu5d9SsqomCnpR1mc5fUKULuFBneO+yd+gJ6hUT5N3R8x8wDyUL6J7JF9CBmN2ZJP3ZV48AOyNza6m/qQ8tP4aNI13uZuuLNT+iGNkfT9RG3Y=
-Received: from VI1PR04MB4222.eurprd04.prod.outlook.com (52.134.31.21) by
- VI1PR04MB5599.eurprd04.prod.outlook.com (20.178.125.80) with Microsoft SMTP
+ bh=QcqJRDCih8Kp0Ud5r920kR+JNm+SsEhW03mEfk8rAOQ=;
+ b=QPAdwXc1c0pLpT6r8/Nef8Ha3cxd0k9DlF94RJoErzJKOl70zwhV5TRtIpx4Zw98+/Gf6dZphB2dYezStBFw3B5n6W+HKuEhq/M+8CiZHqrqg5IzYh9xR11Nlwb8HdhIikjSLwVeKqtKYMeYIf7ObSWtK1WKJ0nPuE0n/bdo14M=
+Received: from VI1PR0801MB1599.eurprd08.prod.outlook.com (10.167.211.15) by
+ VI1PR0801MB1952.eurprd08.prod.outlook.com (10.173.74.9) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Thu, 21 Feb 2019 18:25:34 +0000
-Received: from VI1PR04MB4222.eurprd04.prod.outlook.com
- ([fe80::b1cb:82a5:aacb:238d]) by VI1PR04MB4222.eurprd04.prod.outlook.com
- ([fe80::b1cb:82a5:aacb:238d%6]) with mapi id 15.20.1643.014; Thu, 21 Feb 2019
- 18:25:34 +0000
-From: Aisheng Dong <aisheng.dong@nxp.com>
-To: "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 11/14] arm64: dts: imx8: split adma ss into dma and audio ss
-Thread-Topic: [PATCH 11/14] arm64: dts: imx8: split adma ss into dma and audio
- ss
-Thread-Index: AQHUyhLVa4voSQ/PHE68eEoO39rJ3g==
-Date: Thu, 21 Feb 2019 18:25:34 +0000
-Message-ID: <1550773093-13349-12-git-send-email-aisheng.dong@nxp.com>
-References: <1550773093-13349-1-git-send-email-aisheng.dong@nxp.com>
-In-Reply-To: <1550773093-13349-1-git-send-email-aisheng.dong@nxp.com>
-Accept-Language: zh-CN, en-US
+ 15.20.1601.24; Thu, 21 Feb 2019 18:45:03 +0000
+Received: from VI1PR0801MB1599.eurprd08.prod.outlook.com
+ ([fe80::e11e:abd4:7d4:d8aa]) by VI1PR0801MB1599.eurprd08.prod.outlook.com
+ ([fe80::e11e:abd4:7d4:d8aa%3]) with mapi id 15.20.1643.014; Thu, 21 Feb 2019
+ 18:45:03 +0000
+From: Dave P Martin <Dave.Martin@arm.com>
+To: Andrew Murray <Andrew.Murray@arm.com>
+Subject: Re: [PATCH v2 2/6] arm64: HWCAP: add support for AT_HWCAP2
+Thread-Topic: [PATCH v2 2/6] arm64: HWCAP: add support for AT_HWCAP2
+Thread-Index: AQHUyd/t1Srq935N/UGw8BkLn71pHqXql1kA
+Date: Thu, 21 Feb 2019 18:45:03 +0000
+Message-ID: <20190221184500.GO16031@e103592.cambridge.arm.com>
+References: <1550751657-30252-1-git-send-email-andrew.murray@arm.com>
+ <1550751657-30252-3-git-send-email-andrew.murray@arm.com>
+In-Reply-To: <1550751657-30252-3-git-send-email-andrew.murray@arm.com>
+Accept-Language: en-GB, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR03CA0051.apcprd03.prod.outlook.com
- (2603:1096:202:17::21) To VI1PR04MB4222.eurprd04.prod.outlook.com
- (2603:10a6:803:3e::21)
+user-agent: Mutt/1.5.23 (2014-03-12)
+x-originating-ip: [217.140.106.49]
+x-clientproxiedby: LO2P265CA0032.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:61::20) To VI1PR0801MB1599.eurprd08.prod.outlook.com
+ (2603:10a6:800:19::15)
 authentication-results: spf=none (sender IP is )
- smtp.mailfrom=aisheng.dong@nxp.com; 
+ smtp.mailfrom=Dave.Martin@arm.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 73520381-a397-4795-3dcd-08d69829f844
+x-ms-office365-filtering-correlation-id: 4e01e7de-8c23-4cd8-3eb7-08d6982cb084
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB5599; 
-x-ms-traffictypediagnostic: VI1PR04MB5599:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR04MB5599;
- 23:XeTi6zxv0ULH3TyYzoBorbO5AN6GCNAZ1LLIIRR?=
- =?iso-8859-1?Q?CGAnWh8roxHHlWc28Qh/+XaF5lPYx3LgdghwXK6ROHTEYdIEXzTeZi6ncs?=
- =?iso-8859-1?Q?xUSXBY34Z7YSJXgmVdNnCy1ZvwIZP+x+nPibVLtXbfshudKmFnTCim1HTd?=
- =?iso-8859-1?Q?NG1tb7x+1OMgV15XkzsOMjhya7fCj077wkCLIkiX+4UTf4h0GejObSwDAY?=
- =?iso-8859-1?Q?f3FzIRgFKECn/VWWpbrZORNz0omkGkTBtmAhEp7Dp2syamxwg4J78Wc+Ab?=
- =?iso-8859-1?Q?wFSlYSl62Rj6mTEtIpeIXxjz8WA6RZRMalGKbZQQalUmo/w5CclKiIfA/l?=
- =?iso-8859-1?Q?xgKHSUnYtClLIVqBMVmALnVadFCqjiTf8nPfICdL5rCBivT6r68dzyMSg+?=
- =?iso-8859-1?Q?MHjzUlBKXj0MgvGuLxQfts6LIvTpSXIX0flpFnqDAH6o9K0NOFp+oq0Ep5?=
- =?iso-8859-1?Q?T2AmAlS1m1x4ta+0823cOx5UEZ65vool6cbMQ7w8Cs+U6Zc5Iu1KRGOe23?=
- =?iso-8859-1?Q?3YsJLcgTD5swC7/WSvnARUoz0OD25/CL90Ya32RbYv4j6LIfz60rPYrOD0?=
- =?iso-8859-1?Q?P0UuteOds4lOdgUlkEpsPRcenTqopWF7jMI7YTK7hsBGGak2iscuY/fE3y?=
- =?iso-8859-1?Q?8QlB5BXu3z1YSy5iI8LXIlwOWsjPEviBdclzSXW6rBpn8EZSYniLUv9oa0?=
- =?iso-8859-1?Q?hJD1ejYq0Aa84ljUQ62S1ft5esoEXQPrz5DGSvYf4OATL0TkRAy3wFfiGF?=
- =?iso-8859-1?Q?aEZBn98VetVt41wGT42P6r6Tv8MH+Rhy7PhvytqLvK7Mna7Twr/vl0CP/w?=
- =?iso-8859-1?Q?iErggSCfEkp90tHkUDOAR4BmceRl9H7URR+M8EWjnJCRe2gUxO9PZD3b4L?=
- =?iso-8859-1?Q?rmwMTvdH4VRE1nMfAieI6a+fYpNUYfPkGQTv5xJHqWK14J0rqxM3kFJqKO?=
- =?iso-8859-1?Q?Lcv0RlWke5hYQoMgS8tmkszdddCJXcO9aDLpPrZuqR4l82Hty2lAjoyeyo?=
- =?iso-8859-1?Q?gpW9DUYAvVRB67xAm+yX+WYW9enK6NUvBW1vG6AfpbH21exduiE0m5nHcY?=
- =?iso-8859-1?Q?H6jO2x/7bqWrNAvlA+OvoR0HFsAOh9qxIDIJnhZDMr5fI8wAOGF18y+e0r?=
- =?iso-8859-1?Q?sGY/3b/f2Jff7U0hF5JkHziSjLcKuyxLbWPIOx2E+dDLUvxrMRtVD/+tm8?=
- =?iso-8859-1?Q?CyBkuHEE0RKctRYVQmZ6ZQ7iirv0xrbU9DHZSoB/ynMZiE27HbNxD7ug4/?=
- =?iso-8859-1?Q?v1I4anEaTg5i56JlycNrzudXbB6JQPaZPucjdrBGpx1vxj/oARkTJsAk5I?=
- =?iso-8859-1?Q?R+5hOeT4wPxSgv87yzh03CNd1G0uagDs7hDzESp3e0zPUOWCHt+g3/Rxvy?=
- =?iso-8859-1?Q?C088hqRH9U/Wi3yMlfmwkR5vUf65b?=
-x-microsoft-antispam-prvs: <VI1PR04MB5599A383986F806B4FAB0D47807E0@VI1PR04MB5599.eurprd04.prod.outlook.com>
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0801MB1952; 
+x-ms-traffictypediagnostic: VI1PR0801MB1952:
+x-microsoft-exchange-diagnostics: 1; VI1PR0801MB1952;
+ 20:hdf5YeyAJvXvoYJbEXJZILfQPhO0ofoMdJwECKvoDAzK1plUZAucbIlR8rT2W9G64TStkOLdTru7KcuT1cHCEC8rG5CM4/s8FOcpmKe9HV8xMu5DrLB0A5N9j4yWHipIRKiQza29oxaj67bQWrg5Q2Ha0AUCYoK05TOuuJrn/6w=
+x-microsoft-antispam-prvs: <VI1PR0801MB1952442D89D20CCF2759B9CEFE7E0@VI1PR0801MB1952.eurprd08.prod.outlook.com>
 x-forefront-prvs: 09555FB1AD
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(396003)(366004)(39860400002)(346002)(376002)(189003)(199004)(256004)(53936002)(106356001)(71200400001)(71190400001)(81166006)(2351001)(2906002)(6916009)(446003)(105586002)(81156014)(44832011)(53946003)(316002)(305945005)(97736004)(2616005)(8676002)(54906003)(14444005)(6512007)(7736002)(2501003)(68736007)(76176011)(386003)(6506007)(3846002)(486006)(14454004)(5640700003)(86362001)(6486002)(30864003)(52116002)(6436002)(4326008)(8936002)(102836004)(5660300002)(476003)(26005)(99286004)(478600001)(11346002)(6116002)(25786009)(50226002)(186003)(36756003)(66066001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5599;
- H:VI1PR04MB4222.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
+ SFS:(10009020)(366004)(39860400002)(396003)(346002)(376002)(136003)(199004)(40434004)(189003)(478600001)(99286004)(102836004)(52116002)(72206003)(68736007)(486006)(6636002)(8936002)(11346002)(446003)(316002)(6512007)(58126008)(54906003)(229853002)(476003)(76176011)(71190400001)(386003)(6506007)(1076003)(6486002)(5024004)(2906002)(5660300002)(6436002)(53936002)(256004)(14444005)(86362001)(71200400001)(66066001)(105586002)(6246003)(33656002)(25786009)(26005)(6862004)(81166006)(186003)(106356001)(3846002)(81156014)(305945005)(14454004)(6116002)(8676002)(4326008)(97736004)(7736002)(18370500001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0801MB1952;
+ H:VI1PR0801MB1599.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: AX0K6A+BAb99Nlx1S1CrwqeGNzayPY+kBGrRfOm0lKb899+cfY/eo7NqBFlhvacmpLV/VxE/1gFr3PEodbraRHDyKDFGgpQeHAk7dhv7gmAA0qpDJ9xgg3pUgReph16DKTouAYxQMMw3Virglm9NsnXo9XbCRaUaKZTUUfua/vSW4ViDXW4UxoXfm4p49iEtThKAvXHGlIosz/vcUBaTkLmpp1b+AZ4pHF2OSSGXUVDft3CdzOVPOOBrI2FUydOGpEGZ9rNnitGqmGFiPzH3tqSvFxHvnXZTE8DDZVmt+IOSZuph5iQkXshbmt4jLznM1D1FapROx9v2R9LtV9iiB8VMzpxRljMj0zHeeOddoLJezfOXWjeSU5VjpuN/A14nqsxKZkpFscfMBNIQyZtCM15UbzmDFYOEQvlPZZmDMZ4=
+x-microsoft-antispam-message-info: +zCS8TD81fY9HoRmIpRYB8tN/4XeTfrbe8z42CatvxOWPxzwTeVbgkpu50/EyoXiWbYJDonblJUB8IoehHnuijo4LZbmer+avXiCiRgcvObq0ZPHxnoUHjZJGm5eKaVQopYqvSAXbYqOgf+fwEfu/iiNot0PJtR5m1BmuZe3L7VOdrQGeUH3wn+X8baQwhInJZb4IOQuvYzhp1rkH+XGEUGELPArr6rK545q1615NnEulkRneBbcZwPwppObFbaaqUnmltzn4im+yjrK8a1sE7hivQUqiXdh4+M3F7jzeIIFQjVOLrp22Bw8ZUJJBfBTr7wy5xW5RBnlLL9X9axuiCvH1eDn4lj7JYH+QSTjckPP8/Nx7hKShKVvHEM1e0TNGOSFi1FIo5GdbL/3SIX/4HsVzYJ/p8lLFRZUXCQDjHY=
+Content-ID: <D4DF55E7E6A2E8408F792AEB925E383D@eurprd08.prod.outlook.com>
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 73520381-a397-4795-3dcd-08d69829f844
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 18:25:31.3494 (UTC)
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 4e01e7de-8c23-4cd8-3eb7-08d6982cb084
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 18:45:02.4911 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5599
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0801MB1952
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_102608_713743_894EF333 
-X-CRM114-Status: GOOD (  13.31  )
+X-CRM114-CacheID: sfid-20190221_104507_390125_3331EDD4 
+X-CRM114-Status: GOOD (  36.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -140,670 +118,255 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>,
- "dongas86@gmail.com" <dongas86@gmail.com>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- "will.deacon@arm.com" <will.deacon@arm.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>
+Cc: Szabolcs Nagy <Szabolcs.Nagy@arm.com>,
+ Catalin Marinas <Catalin.Marinas@arm.com>, Will Deacon <Will.Deacon@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-amda ss is consisted of dma and audio ss in qxp which are
-also used in qm.
-Let's split them into two ss for better code reuse.
+On Thu, Feb 21, 2019 at 12:20:53PM +0000, Andrew Murray wrote:
+> As we will exhaust the first 32 bits of AT_HWCAP let's start
+> exposing AT_HWCAP2 to userspace to give us up to 64 caps.
+>
+> Whilst it's possible to use the remaining 32 bits of AT_HWCAP, we
+> prefer to expand into AT_HWCAP2 in order to provide a consistent
+> view to userspace between ILP32 and LP64. However internal to the
+> kernel we prefer to continue to use the full space of elf_hwcap.
+>
+> To reduce complexity and allow for future expansion, we now
+> represent hwcaps in the kernel as ordinals and use a
+> KERNEL_HWCAP_ prefix. This allows us to support automatic feature
+> based module loading for all our hwcaps.
+>
+> We introduce cpu_set_feature to set hwcaps which compliments the
+> existing cpu_have_feature helper. These helpers allow us to clean
+> up existing direct uses of elf_hwcap and reduce any future effort
+> required to move beyond 64 caps.
+>
+> For convenience we also introduce cpu_{have,set}_feature_name which
+> makes use of the cpu_feature macro to allow providing a hwcap name
+> without a {KERNEL_}HWCAP_ prefix.
+>
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  arch/arm64/crypto/aes-ce-ccm-glue.c      |  2 +-
+>  arch/arm64/crypto/aes-neonbs-glue.c      |  2 +-
+>  arch/arm64/crypto/chacha-neon-glue.c     |  2 +-
+>  arch/arm64/crypto/crct10dif-ce-glue.c    |  2 +-
+>  arch/arm64/crypto/ghash-ce-glue.c        |  6 +--
+>  arch/arm64/crypto/nhpoly1305-neon-glue.c |  2 +-
+>  arch/arm64/crypto/sha256-glue.c          |  4 +-
+>  arch/arm64/include/asm/cpufeature.h      | 19 ++++++---
+>  arch/arm64/include/asm/hwcap.h           | 40 ++++++++++++++++++-
+>  arch/arm64/include/uapi/asm/hwcap.h      |  2 +-
+>  arch/arm64/kernel/cpufeature.c           | 66 ++++++++++++++++----------------
+>  arch/arm64/kernel/cpuinfo.c              |  2 +-
+>  arch/arm64/kernel/fpsimd.c               |  4 +-
+>  drivers/clocksource/arm_arch_timer.c     |  8 ++++
+>  14 files changed, 108 insertions(+), 53 deletions(-)
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- arch/arm64/boot/dts/freescale/imx8-ss-adma.dtsi    | 274 +-------------------
- arch/arm64/boot/dts/freescale/imx8-ss-dma.dtsi     | 279 +++++++++++++++++++++
- arch/arm64/boot/dts/freescale/imx8qxp-mek.dts      |   4 +-
- arch/arm64/boot/dts/freescale/imx8qxp-ss-adma.dtsi |  10 +-
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |   2 +-
- 5 files changed, 288 insertions(+), 281 deletions(-)
- create mode 100644 arch/arm64/boot/dts/freescale/imx8-ss-dma.dtsi
+[...]
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8-ss-adma.dtsi b/arch/arm64/boot/dts/freescale/imx8-ss-adma.dtsi
-index 835ecf7..991aaab 100644
---- a/arch/arm64/boot/dts/freescale/imx8-ss-adma.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8-ss-adma.dtsi
-@@ -4,276 +4,4 @@
-  *	Dong Aisheng <aisheng.dong@nxp.com>
-  */
- 
--#include <dt-bindings/firmware/imx/rsrc.h>
--
--adma_subsys: bus@59000000 {
--	compatible = "simple-bus";
--	#address-cells = <1>;
--	#size-cells = <1>;
--	ranges = <0x59000000 0x0 0x59000000 0x2000000>;
--
--	/* SCU clocks */
--	adma_ipg_clk: clock-adma-ipg {
--		compatible = "fixed-clock";
--		#clock-cells = <0>;
--		clock-frequency = <120000000>;
--		clock-output-names = "adma_ipg_clk";
--	};
--
--	adc0_clk: clock-adc0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_ADC_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "adc0_clk";
--	};
--
--	can0_clk: clock-can0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_CAN_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "can0_clk";
--	};
--
--	ftm0_clk: clock-ftm0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_FTM_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "ftm0_clk";
--	};
--
--	ftm1_clk: clock-ftm1 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_FTM_1>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "ftm1_clk";
--	};
--
--	i2c0_clk: clock-i2c0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_I2C_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "i2c0_clk";
--	};
--
--	i2c1_clk: clock-i2c1 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_I2C_1>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "i2c1_clk";
--	};
--
--	i2c2_clk: clock-i2c2 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_I2C_2>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "i2c2_clk";
--	};
--
--	i2c3_clk: clock-i2c3 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_I2C_3>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "i2c3_clk";
--	};
--
--	lcd0_clk: clock-lcd0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_LCD_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "lcd0_clk";
--	};
--
--	lcd0_pwm0_clk: clock-lcd0-pwm0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_LCD_0_PWM_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "lcd0_pwm0_clk";
--	};
--
--	spi0_clk: clock-spi0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_SPI_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "spi0_clk";
--	};
--
--	spi1_clk: clock-spi1 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_SPI_1>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "spi1_clk";
--	};
--
--	spi2_clk: clock-spi2 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_SPI_2>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "spi2_clk";
--	};
--
--	spi3_clk: clock-spi3 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_SPI_3>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "spi3_clk";
--	};
--
--	uart0_clk: clock-uart0 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_UART_0>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "uart0_clk";
--	};
--
--	uart1_clk: clock-uart1 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_UART_1>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "uart1_clk";
--	};
--
--	uart2_clk: clock-uart2 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_UART_2>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "uart2_clk";
--	};
--
--	uart3_clk: clock-uart3 {
--		#clock-cells = <0>;
--		rsrc-id = <IMX_SC_R_UART_3>;
--		clk-type = <IMX_SC_PM_CLK_PER>;
--		clock-output-names = "uart3_clk";
--	};
--
--	/* LPCG clocks */
--	uart0_lpcg: clock-controller@5a460000 {
--		reg = <0x5a460000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&uart0_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "uart0_lpcg_baud_clk",
--				     "uart0_lpcg_ipg_clk";
--	};
--
--	uart1_lpcg: clock-controller@5a470000 {
--		reg = <0x5a470000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&uart1_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "uart1_lpcg_baud_clk",
--				     "uart1_lpcg_ipg_clk";
--	};
--
--	uart2_lpcg: clock-controller@5a480000 {
--		reg = <0x5a480000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&uart2_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "uart2_lpcg_baud_clk",
--				     "uart2_lpcg_ipg_clk";
--	};
--
--	uart3_lpcg: clock-controller@5a490000 {
--		reg = <0x5a490000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&uart3_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "uart3_lpcg_baud_clk",
--				     "uart3_lpcg_ipg_clk";
--	};
--
--	i2c0_lpcg: clock-controller@5ac00000 {
--		reg = <0x5ac00000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&i2c0_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "i2c0_lpcg_clk",
--				     "i2c0_lpcg_ipg_clk";
--	};
--
--	i2c1_lpcg: clock-controller@5ac10000 {
--		reg = <0x5ac10000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&i2c1_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "i2c1_lpcg_clk",
--				     "i2c1_lpcg_ipg_clk";
--	};
--
--	i2c2_lpcg: clock-controller@5ac20000 {
--		reg = <0x5ac20000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&i2c2_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "i2c2_lpcg_clk",
--				     "i2c2_lpcg_ipg_clk";
--	};
--
--	i2c3_lpcg: clock-controller@5ac30000 {
--		reg = <0x5ac30000 0x10000>;
--		#clock-cells = <1>;
--		clocks = <&i2c3_clk>, <&adma_ipg_clk>;
--		bit-offset = <0 16>;
--		clock-output-names = "i2c3_lpcg_clk",
--				     "i2c3_lpcg_ipg_clk";
--	};
--
--	adma_lpuart0: serial@5a060000 {
--		reg = <0x5a060000 0x1000>;
--		interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-parent = <&gic>;
--		clocks = <&uart0_lpcg 0>;
--		clock-names = "ipg";
--		power-domains = <&pd IMX_SC_R_UART_0>;
--		status = "disabled";
--	};
--
--	adma_i2c0: i2c@5a800000 {
--		reg = <0x5a800000 0x4000>;
--		interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-parent = <&gic>;
--		clocks = <&i2c0_lpcg 0>;
--		clock-names = "per";
--		assigned-clocks = <&i2c0_clk>;
--		assigned-clock-rates = <24000000>;
--		power-domains = <&pd IMX_SC_R_I2C_0>;
--		status = "disabled";
--	};
--
--	adma_i2c1: i2c@5a810000 {
--		reg = <0x5a810000 0x4000>;
--		interrupts = <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-parent = <&gic>;
--		clocks = <&i2c1_lpcg 0>;
--		clock-names = "per";
--		assigned-clocks = <&i2c1_clk>;
--		assigned-clock-rates = <24000000>;
--		power-domains = <&pd IMX_SC_R_I2C_1>;
--		status = "disabled";
--	};
--
--	adma_i2c2: i2c@5a820000 {
--		reg = <0x5a820000 0x4000>;
--		interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-parent = <&gic>;
--		clocks = <&i2c2_lpcg 0>;
--		clock-names = "per";
--		assigned-clocks = <&i2c2_clk>;
--		assigned-clock-rates = <24000000>;
--		power-domains = <&pd IMX_SC_R_I2C_2>;
--		status = "disabled";
--	};
--
--	adma_i2c3: i2c@5a830000 {
--		reg = <0x5a830000 0x4000>;
--		interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
--		interrupt-parent = <&gic>;
--		clocks = <&i2c3_lpcg 0>;
--		clock-names = "per";
--		assigned-clocks = <&i2c3_clk>;
--		assigned-clock-rates = <24000000>;
--		power-domains = <&pd IMX_SC_R_I2C_3>;
--		status = "disabled";
--	};
--};
-+#include "imx8-ss-dma.dtsi"
-diff --git a/arch/arm64/boot/dts/freescale/imx8-ss-dma.dtsi b/arch/arm64/boot/dts/freescale/imx8-ss-dma.dtsi
-new file mode 100644
-index 0000000..fda5fa7
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/imx8-ss-dma.dtsi
-@@ -0,0 +1,279 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright 2018-2019 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
-+ */
-+
-+#include <dt-bindings/firmware/imx/rsrc.h>
-+
-+dma_subsys: bus@5a000000 {
-+	compatible = "simple-bus";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges = <0x5a000000 0x0 0x5a000000 0x1000000>;
-+
-+	/* SCU clocks */
-+	dma_ipg_clk: clock-dma-ipg {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <120000000>;
-+		clock-output-names = "dma_ipg_clk";
-+	};
-+
-+	adc0_clk: clock-adc0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_ADC_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "adc0_clk";
-+	};
-+
-+	can0_clk: clock-can0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_CAN_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "can0_clk";
-+	};
-+
-+	ftm0_clk: clock-ftm0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_FTM_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "ftm0_clk";
-+	};
-+
-+	ftm1_clk: clock-ftm1 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_FTM_1>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "ftm1_clk";
-+	};
-+
-+	i2c0_clk: clock-i2c0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_I2C_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "i2c0_clk";
-+	};
-+
-+	i2c1_clk: clock-i2c1 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_I2C_1>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "i2c1_clk";
-+	};
-+
-+	i2c2_clk: clock-i2c2 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_I2C_2>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "i2c2_clk";
-+	};
-+
-+	i2c3_clk: clock-i2c3 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_I2C_3>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "i2c3_clk";
-+	};
-+
-+	lcd0_clk: clock-lcd0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_LCD_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "lcd0_clk";
-+	};
-+
-+	lcd0_pwm0_clk: clock-lcd0-pwm0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_LCD_0_PWM_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "lcd0_pwm0_clk";
-+	};
-+
-+	spi0_clk: clock-spi0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_SPI_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "spi0_clk";
-+	};
-+
-+	spi1_clk: clock-spi1 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_SPI_1>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "spi1_clk";
-+	};
-+
-+	spi2_clk: clock-spi2 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_SPI_2>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "spi2_clk";
-+	};
-+
-+	spi3_clk: clock-spi3 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_SPI_3>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "spi3_clk";
-+	};
-+
-+	uart0_clk: clock-uart0 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_UART_0>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "uart0_clk";
-+	};
-+
-+	uart1_clk: clock-uart1 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_UART_1>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "uart1_clk";
-+	};
-+
-+	uart2_clk: clock-uart2 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_UART_2>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "uart2_clk";
-+	};
-+
-+	uart3_clk: clock-uart3 {
-+		#clock-cells = <0>;
-+		rsrc-id = <IMX_SC_R_UART_3>;
-+		clk-type = <IMX_SC_PM_CLK_PER>;
-+		clock-output-names = "uart3_clk";
-+	};
-+
-+	/* LPCG clocks */
-+	uart0_lpcg: clock-controller@5a460000 {
-+		reg = <0x5a460000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&uart0_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "uart0_lpcg_baud_clk",
-+				     "uart0_lpcg_ipg_clk";
-+	};
-+
-+	uart1_lpcg: clock-controller@5a470000 {
-+		reg = <0x5a470000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&uart1_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "uart1_lpcg_baud_clk",
-+				     "uart1_lpcg_ipg_clk";
-+	};
-+
-+	uart2_lpcg: clock-controller@5a480000 {
-+		reg = <0x5a480000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&uart2_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "uart2_lpcg_baud_clk",
-+				     "uart2_lpcg_ipg_clk";
-+	};
-+
-+	uart3_lpcg: clock-controller@5a490000 {
-+		reg = <0x5a490000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&uart3_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "uart3_lpcg_baud_clk",
-+				     "uart3_lpcg_ipg_clk";
-+	};
-+
-+	i2c0_lpcg: clock-controller@5ac00000 {
-+		reg = <0x5ac00000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&i2c0_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "i2c0_lpcg_clk",
-+				     "i2c0_lpcg_ipg_clk";
-+	};
-+
-+	i2c1_lpcg: clock-controller@5ac10000 {
-+		reg = <0x5ac10000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&i2c1_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "i2c1_lpcg_clk",
-+				     "i2c1_lpcg_ipg_clk";
-+	};
-+
-+	i2c2_lpcg: clock-controller@5ac20000 {
-+		reg = <0x5ac20000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&i2c2_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "i2c2_lpcg_clk",
-+				     "i2c2_lpcg_ipg_clk";
-+	};
-+
-+	i2c3_lpcg: clock-controller@5ac30000 {
-+		reg = <0x5ac30000 0x10000>;
-+		#clock-cells = <1>;
-+		clocks = <&i2c3_clk>, <&dma_ipg_clk>;
-+		bit-offset = <0 16>;
-+		clock-output-names = "i2c3_lpcg_clk",
-+				     "i2c3_lpcg_ipg_clk";
-+	};
-+
-+	dma_lpuart0: serial@5a060000 {
-+		reg = <0x5a060000 0x1000>;
-+		interrupts = <GIC_SPI 225 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&uart0_lpcg 0>;
-+		clock-names = "ipg";
-+		power-domains = <&pd IMX_SC_R_UART_0>;
-+		status = "disabled";
-+	};
-+
-+	dma_i2c0: i2c@5a800000 {
-+		reg = <0x5a800000 0x4000>;
-+		interrupts = <GIC_SPI 220 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&i2c0_lpcg 0>;
-+		clock-names = "per";
-+		assigned-clocks = <&i2c0_clk>;
-+		assigned-clock-rates = <24000000>;
-+		power-domains = <&pd IMX_SC_R_I2C_0>;
-+		status = "disabled";
-+	};
-+
-+	dma_i2c1: i2c@5a810000 {
-+		reg = <0x5a810000 0x4000>;
-+		interrupts = <GIC_SPI 221 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&i2c1_lpcg 0>;
-+		clock-names = "per";
-+		assigned-clocks = <&i2c1_clk>;
-+		assigned-clock-rates = <24000000>;
-+		power-domains = <&pd IMX_SC_R_I2C_1>;
-+		status = "disabled";
-+	};
-+
-+	dma_i2c2: i2c@5a820000 {
-+		reg = <0x5a820000 0x4000>;
-+		interrupts = <GIC_SPI 222 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&i2c2_lpcg 0>;
-+		clock-names = "per";
-+		assigned-clocks = <&i2c2_clk>;
-+		assigned-clock-rates = <24000000>;
-+		power-domains = <&pd IMX_SC_R_I2C_2>;
-+		status = "disabled";
-+	};
-+
-+	dma_i2c3: i2c@5a830000 {
-+		reg = <0x5a830000 0x4000>;
-+		interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		clocks = <&i2c3_lpcg 0>;
-+		clock-names = "per";
-+		assigned-clocks = <&i2c3_clk>;
-+		assigned-clock-rates = <24000000>;
-+		power-domains = <&pd IMX_SC_R_I2C_3>;
-+		status = "disabled";
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-index 03aad66..1f9c2f8 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-@@ -12,7 +12,7 @@
- 	compatible = "fsl,imx8qxp-mek", "fsl,imx8qxp";
- 
- 	chosen {
--		stdout-path = &adma_lpuart0;
-+		stdout-path = &dma_lpuart0;
- 	};
- 
- 	memory@80000000 {
-@@ -30,7 +30,7 @@
- 	};
- };
- 
--&adma_lpuart0 {
-+&dma_lpuart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_lpuart0>;
- 	status = "okay";
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp-ss-adma.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp-ss-adma.dtsi
-index 2368e52..67b8807 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp-ss-adma.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp-ss-adma.dtsi
-@@ -108,22 +108,22 @@
- 	compatible = "fsl,imx8qxp-lpcg";
- };
- 
--&adma_lpuart0 {
-+&dma_lpuart0 {
- 	compatible = "fsl,imx8qxp-lpuart", "fsl,imx7ulp-lpuart";
- };
- 
--&adma_i2c0 {
-+&dma_i2c0 {
- 	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
- };
- 
--&adma_i2c1 {
-+&dma_i2c1 {
- 	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
- };
- 
--&adma_i2c2 {
-+&dma_i2c2 {
- 	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
- };
- 
--&adma_i2c3 {
-+&dma_i2c3 {
- 	compatible = "fsl,imx8qxp-lpi2c", "fsl,imx7ulp-lpi2c";
- };
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 589483a..161f6c0 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -20,7 +20,7 @@
- 		mmc0 = &usdhc1;
- 		mmc1 = &usdhc2;
- 		mmc2 = &usdhc3;
--		serial0 = &adma_lpuart0;
-+		serial0 = &dma_lpuart0;
- 	};
- 
- 	cpus {
--- 
-2.7.4
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index dfcfba7..dd21a32 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -17,12 +17,12 @@
+>  /*
+>   * In the arm64 world (as in the ARM world), elf_hwcap is used both internally
+>   * in the kernel and for user space to keep track of which optional features
+> - * are supported by the current system. So let's map feature 'x' to HWCAP_x.
+> - * Note that HWCAP_x constants are bit fields so we need to take the log.
+> + * are supported by the current system. So let's map feature 'x' to
+> + * KERNEL_HWCAP_x.
 
+This doesn't read quite right now.
+
+The purpose of this paragraph seems to be that the kernel and user
+views have the same encoding, so we can just map x to UAPI HWCAP_x
+definition.
+
+This isn't true any more: we now consider the kernel (in elf_hwcap) and
+user encodings (in AT_HWCAP) distinct, but for backwards compatibility
+reasons HWCAP_x == BIT(KERNEL_HWCAP_x) for the first 32 hwcaps.
+
+So it would be worth rewriting this whole comment to describe the new
+situation, rather than just tweaking it.
+
+
+I'm not sure whether it is more natural to put the comment in
+<asm/hwcap.h> or here: you could put it in one place with a brief
+pointer in the other.
+
+>   */
+>
+> -#define MAX_CPU_FEATURES(8 * sizeof(elf_hwcap))
+> -#define cpu_feature(x)ilog2(HWCAP_ ## x)
+> +#define MAX_CPU_FEATURES64
+> +#define cpu_feature(x)(KERNEL_HWCAP_ ## x)
+>
+>  #ifndef __ASSEMBLY__
+>
+> @@ -396,10 +396,19 @@ extern struct static_key_false arm64_const_caps_ready;
+>
+>  bool this_cpu_has_cap(unsigned int cap);
+>
+> +static inline void cpu_set_feature(unsigned int num)
+> +{
+> +WARN_ON(num >= MAX_CPU_FEATURES);
+> +elf_hwcap |= BIT(num);
+> +}
+> +#define cpu_set_feature_name(name) cpu_set_feature(cpu_feature(name))
+> +
+>  static inline bool cpu_have_feature(unsigned int num)
+>  {
+> -return elf_hwcap & (1UL << num);
+> +WARN_ON(num >= MAX_CPU_FEATURES);
+> +return elf_hwcap & BIT(num);
+>  }
+> +#define cpu_have_feature_name(name) cpu_have_feature(cpu_feature(name))
+
+This is bikeshedding, but I'd say that CPUs don't have (feature) names;
+they have features (which have names).
+
+So I might prefer to call these something like:
+
+cpu_set_named_feature()
+cpu_have_named_feature()
+
+(May not be worth it unless you respin the series for another reason
+though.)
+
+>  /* System capability check for constant caps */
+>  static inline bool __cpus_have_const_cap(int num)
+> diff --git a/arch/arm64/include/asm/hwcap.h b/arch/arm64/include/asm/hwcap.h
+> index 400b80b..7549c72 100644
+> --- a/arch/arm64/include/asm/hwcap.h
+> +++ b/arch/arm64/include/asm/hwcap.h
+> @@ -39,12 +39,50 @@
+>  #define COMPAT_HWCAP2_SHA2(1 << 3)
+>  #define COMPAT_HWCAP2_CRC32(1 << 4)
+>
+> +/*
+> + * KERNEL_HWCAP flags - for elf_hwcap (in kernel)
+> + */
+> +#define KERNEL_HWCAP_FPilog2(HWCAP_FP)
+> +#define KERNEL_HWCAP_ASIMDilog2(HWCAP_ASIMD)
+
+[...]
+
+> +#define KERNEL_HWCAP_SBilog2(HWCAP_SB)
+> +#define KERNEL_HWCAP_PACAilog2(HWCAP_PACA)
+> +#define KERNEL_HWCAP_PACGilog2(HWCAP_PACG)
+> +#define KERNEL_HWCAP_DCPODP(ilog2(HWCAP2_DCPODP) + 32)
+
+For ABI purposes, we should take the opportunity to document the status
+of the currently unused bits.
+
+For interoperation with the glibc ifunc resolver ABI, we may want to
+reserve a bit among AT_HWCAP [63:32] or AT_HWCAP2 [31:0] that will
+never be used by the kernel and always passed to userspace as 0.
+
+I'm envisaging code such as
+
+foo resolver(unsigned long hwcaps, unsigned int num_at_hwcaps,
+unsigned long const *at_hwcaps)
+{
+if ((hwcaps & _GLIBC_EXTRA_HWCAPS) &&
+num_at_hwcaps >= 2 &&
+at_hwcaps[1] && HWCAP2_FOO)
+/* feature present */
+}
+
+We would need that _GLIBC_EXTRA_HWCAPS to distinguish the second and
+third arguments from uninitialised junk that would be passed by older
+glibc versions.
+
+Glibc might or might not choose to try and wegde AT_HWCAP2 in the top
+bits of the first argument instead of bits [63:32] of AT_HWCAP (which
+we expect to be zero for now, but could still be made reachable via the
+at_hwcaps pointer).
+
+Coordination would be needed if glibc carries on using the
+<uapi/asm/hwcap.h> HWCAP{,2}_foo defines for here while doing tricks
+of this sort.
+
+Szabolcs may have a view on whether this is needed / useful.
+
+
+If so, we should document any required guarantees now so that we don't
+accidentally violate them during future maintenance.  For the benefit
+of userspace folks, it may be a good idea to have some clear statement
+in Documentation/arm64/ also.
+
+Because of the ABI implications here, if would also be good idea to copy
+the libc-alpha mailing list, and possibly also linux-api.
+
+> +
+>  #ifndef __ASSEMBLY__
+>  /*
+>   * This yields a mask that user programs can use to figure out what
+>   * instruction set this cpu supports.
+>   */
+> -#define ELF_HWCAP(elf_hwcap)
+> +#define ELF_HWCAPlower_32_bits(elf_hwcap)
+> +#define ELF_HWCAP2upper_32_bits(elf_hwcap)
+
+Should we have #include <linux/kernel.h> here somewhere?
+
+[...]
+
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 9a7d4dc..4e8d3b4 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -778,7 +778,11 @@ static void arch_timer_evtstrm_enable(int divider)
+>  cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
+>  | ARCH_TIMER_VIRT_EVT_EN;
+>  arch_timer_set_cntkctl(cntkctl);
+> +#ifdef CONFIG_ARM64
+> +cpu_set_feature_name(EVTSTRM);
+> +#else
+>  elf_hwcap |= HWCAP_EVTSTRM;
+> +#endif
+
+This is a little nasty.
+
+You could give arch/arm its own cpu_set_feature_name() (or whatever it's
+called), depending on how keen Russell is to pick it up.
+
+Or for this particular case, stick with the old code (which we now get
+away with because elf_hwcap is still exported).  The case of an
+HWCAP_foo flag name that happens to have the same semantics on both arm
+and arm64 is a pretty esoteric one, so it's not the end of the world if
+the standard helpers don't deal with it.
+
+To avoid future accidents you could replace the #ifdef with a comment at
+each site (which will also allow people to track down this patch when
+looking at that code).
+
+>  #ifdef CONFIG_COMPAT
+>  compat_elf_hwcap |= COMPAT_HWCAP_EVTSTRM;
+>  #endif
+> @@ -1000,7 +1004,11 @@ static int arch_timer_cpu_pm_notify(struct notifier_block *self,
+>  } else if (action == CPU_PM_ENTER_FAILED || action == CPU_PM_EXIT) {
+>  arch_timer_set_cntkctl(__this_cpu_read(saved_cntkctl));
+>
+> +#ifdef CONFIG_ARM64
+> +if (cpu_have_feature_name(EVTSTRM))
+> +#else
+>  if (elf_hwcap & HWCAP_EVTSTRM)
+> +#endif
+
+Ditto.
+
+[...]
+
+Cheers
+---Dave
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
 
 _______________________________________________
 linux-arm-kernel mailing list
