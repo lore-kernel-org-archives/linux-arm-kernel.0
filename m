@@ -2,77 +2,63 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E0C67C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:29:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 753E1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:30:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AE9A320880
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:29:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35710214AF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:30:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gpoWV9s7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="SNdWluq/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE9A320880
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="orfFbRqf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35710214AF
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=VDJkQaBp/yufjnvaoWmFuG0qHjCnHWpcAMwjE7UCbdA=; b=gpoWV9s7kF2ymn
-	6TMlKNriruETDDP5S1HOjPdLBUrfYCa0lnILnH/3fpX326l8qbyfyLMY1v7Kdn6iH9vPcrKGq0NWc
-	s7UbFz5SryeHWvb/+M9hLrD9Lt6gYrLTybboBrjKoTy4z023mb5nGnidgdj3+Zbcqz5pXvny/k+S8
-	hcGGvPLldSPT9Uu5Q1bKkNINhAhBt1QoNNPtqbRCNVNKduZLGcXCYBRS3/5ZYe4zN/76T4M71zhlG
-	JilPtWQy3XoUkcYUhH+xKkpG7Kc+nqFuifPt+fjXCoA/j0p64/G3cSCiXNP/av9aAJchmN8HJgQmc
-	71dmKETbjTN5Hham76IQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=tfuJNH+fHjpP0gXD0SqJWuABLvHvVhSVWSldoGWvDm4=; b=orfFbRqfB91OEs
+	wTd36VBQseUHmyXlH0JSDRu+JAmRrRU0gSOYJH6e8dHC0EMxf/myqQN7BrvRtbJqREvuPVpZMuPQH
+	vARgwB+IJZZ9gbHpdV9zzdYIYmprxQAuImxIPIe92yH6l1LNd486VdWjgCXD/REvx31OfAjx4JY0S
+	1PC2c3YUd7u856S1R7iJH6GfkSxZ2SF3F+Rd1AkAjd39y5Ffd7jk1Gi6wP+VANowG2PrgrUy+/QXB
+	CoFyfCPf7XDJrKSH6WeD98qydd3FCp5cWm+KjewG7ZzZhWlMq4wiOtgOw2klaB9EMw/5mtb2lyVOb
+	dAHd6a0FkmgqPX+0QEdg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwkfW-00067E-6x; Thu, 21 Feb 2019 09:29:26 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gwkgP-0008Kc-56; Thu, 21 Feb 2019 09:30:21 +0000
+Received: from relay8-d.mail.gandi.net ([217.70.183.201])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwkeN-0004eG-JV; Thu, 21 Feb 2019 09:28:15 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:Content-Type:
- MIME-Version:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:Content-ID:
- Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
- :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
- List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=KP2OQ9VKXqpULJj8WAbqmQ/oL0NEEFL47wLL9XfisoM=; b=SNdWluq/EMCl16NXwgSdt2F0ik
- Qg1MY/lOJhMv7QKKLG2OctIIsH0Z+ngOlJ/5/xfuph2JZ9QMlgiQrsLwL+atcL3TmmHqpVQ2McUvH
- 9k0J64jyOoHGwF024QmIzH+OZERRwwRJMolFjKcL9MXczu6Mt73giPy00NB8sBpyC+N6DEvJahZhe
- Jj7K9Q8PF8AUPemrIQRk94ITnhjWUWiCPi/HY6Pmgrfh381lkuTEwVtqAahX7H+YrSAafdcr2oIXo
- d+jhjHeqYZ2QIWvxKx6YANnTPeFyXc/XY867QQ3VT7QMAtZ/Ho1QvwLQsilgatKGY50s9/d4Qxa1D
- 1nyh4VLQ==;
-Received: from relay2-d.mail.gandi.net ([217.70.183.194])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwkeK-00072v-JB; Thu, 21 Feb 2019 09:28:13 +0000
+ id 1gwkSd-0001wL-5x; Thu, 21 Feb 2019 09:16:20 +0000
 X-Originating-IP: 90.88.23.190
 Received: from localhost.localdomain
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: miquel.raynal@bootlin.com)
- by relay2-d.mail.gandi.net (Postfix) with ESMTPSA id 050D040013;
- Thu, 21 Feb 2019 09:27:35 +0000 (UTC)
+ by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 208711BF206;
+ Thu, 21 Feb 2019 09:16:02 +0000 (UTC)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Boris Brezillon <bbrezillon@kernel.org>,
  Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
  Brian Norris <computersforpeace@gmail.com>,
  Marek Vasut <marek.vasut@gmail.com>,
  Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [PATCH 0/6] mtd: rawnand: 6th batch of cleanups
-Date: Thu, 21 Feb 2019 10:27:27 +0100
-Message-Id: <20190221092734.21634-1-miquel.raynal@bootlin.com>
+Subject: [PATCH 13/15] mtd: rawnand: Get rid of chip->chipsize
+Date: Thu, 21 Feb 2019 10:15:25 +0100
+Message-Id: <20190221091527.20497-14-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20190221091527.20497-1-miquel.raynal@bootlin.com>
+References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_042812_865796_5D4598CA 
-X-CRM114-Status: UNSURE (   8.90  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190221_011607_610853_5D271416 
+X-CRM114-Status: GOOD (  18.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,121 +71,435 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Vignesh R <vigneshr@ti.com>, Tudor Ambarus <tudor.ambarus@microchip.com>,
- Julien Su <juliensu@mxic.com.tw>, linux-mtd@lists.infradead.org,
+ Julien Su <juliensu@mxic.com.tw>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>, linux-mtd@lists.infradead.org,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Miquel Raynal <miquel.raynal@bootlin.com>,
  Mason Yang <masonccyang@mxic.com.tw>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGVsbG8sCgpUaGlzIGlzIGEgc21hbGwgcHJlcGFyYXRpb24gc2VyaWVzIGZvY3VzZWQgb24gTWFr
-ZWZpbGUvS2NvbmZpZwpmaWxlcy4gVGhlIGdvYWwgaXMgdG8gY2xhcmlmeSB3aGF0IGlzIGNvbXBp
-bGVkIGluIHRoZSBOQU5EIHN1YnN5c3RlbSwKcmF3IE5BTkQgY29udHJvbGxlciBkcml2ZXJzLCBT
-UEktTkFORCBjb250cm9sbGVycyBhbmQgc29vbiBFQ0MKZW5naW5lcy4gUGxlYXNlIGhhdmUgYSBs
-b29rIHdpdGggYSBtZW51Y29uZmlnIGF0IHRoZSBuZXcgcHJlc2VudGF0aW9uLApJIGZlZWwgaXQg
-aXMgbXVjaCBtb3JlIHJlYWRhYmxlIGFuZCB1bmRlcnN0YW5kYWJsZS4gTW9yZSBjaGFuZ2VzIHdp
-bGwKY29tZSBpbiB0aGVzZSBLY29uZmlnIGZpbGVzIHdoZW4gYWRkaW5nIHRoZSBFQ0MgZW5naW5l
-IGdlbmVyaWMgbGF5ZXIuCgpSZWdhcmRzLApNaXF1w6hsCgoKTWlxdWVsIFJheW5hbCAoNik6CiAg
-bXRkOiBuYW5kOiBvbWFwOiBGaXggY29tbWVudCBpbiBwbGF0Zm9ybSBkYXRhIHVzaW5nIHdyb25n
-IEtjb25maWcKICAgIHN5bWJvbAogIG10ZDogbmFuZDogQ2xhcmlmeSBLY29uZmlnIGVudHJ5IGZv
-ciBzb2Z0d2FyZSBCQ0ggRUNDIGFsZ29yaXRobQogIG10ZDogbmFuZDogQ2xhcmlmeSBLY29uZmln
-IGVudHJ5IGZvciBzb2Z0d2FyZSBIYW1taW5nIEVDQyBlbnRyaWVzCiAgbXRkOiByYXduYW5kOiBD
-aGFuZ2UgS2NvbmZpZyB0aXRsZXMgYW5kIHJlLW9yZGVyIGEgYml0IHRoZSBsaXN0CiAgbXRkOiBy
-YXduYW5kOiBDbGFyaWZ5IEtjb25maWcgZW50cnkgTVREX05BTkQKICBtdGQ6IG5hbmQ6IFJlbW92
-ZSB1c2VsZXNzIGxpbmUgaW4gS2NvbmZpZwoKIGFyY2gvYXJtL2NvbmZpZ3MvYXQ5MV9kdF9kZWZj
-b25maWcgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9jbHBzNzExeF9kZWZj
-b25maWcgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL2NtX3gyeHhfZGVmY29u
-ZmlnICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvY21feDMwMF9kZWZjb25m
-aWcgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9jb2xpYnJpX3B4YTI3MF9k
-ZWZjb25maWcgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL2NvcmdpX2RlZmNvbmZpZyAg
-ICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvZGF2aW5jaV9hbGxfZGVmY29u
-ZmlnICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9lbV94MjcwX2RlZmNvbmZpZyAg
-ICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL2VwOTN4eF9kZWZjb25maWcgICAg
-ICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvZXNlcmllc19weGFfZGVmY29uZmln
-ICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9pbXhfdjRfdjVfZGVmY29uZmlnICAg
-ICAgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL2lteF92Nl92N19kZWZjb25maWcgICAg
-ICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvaXhwNHh4X2RlZmNvbmZpZyAgICAgICAg
-ICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9rZXlzdG9uZV9kZWZjb25maWcgICAgICAg
-ICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL2xwYzMyeHhfZGVmY29uZmlnICAgICAgICAg
-ICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvbWFjcm9uaXhfenlucV9kZWZjb25maWcgICAg
-ICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9taW5pMjQ0MF9kZWZjb25maWcgICAgICAgICAg
-IHwgICAyICstCiBhcmNoL2FybS9jb25maWdzL21tcDJfZGVmY29uZmlnICAgICAgICAgICAgICAg
-fCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvbXVsdGlfdjR0X2RlZmNvbmZpZyAgICAgICAgICB8
-ICAgMiArLQogYXJjaC9hcm0vY29uZmlncy9tdWx0aV92NV9kZWZjb25maWcgICAgICAgICAgIHwg
-ICAyICstCiBhcmNoL2FybS9jb25maWdzL211bHRpX3Y3X2RlZmNvbmZpZyAgICAgICAgICAgfCAg
-IDIgKy0KIGFyY2gvYXJtL2NvbmZpZ3MvbXY3OHh4MF9kZWZjb25maWcgICAgICAgICAgICB8ICAg
-MiArLQogYXJjaC9hcm0vY29uZmlncy9tdmVidV92NV9kZWZjb25maWcgICAgICAgICAgIHwgICAy
-ICstCiBhcmNoL2FybS9jb25maWdzL212ZWJ1X3Y3X2RlZmNvbmZpZyAgICAgICAgICAgfCAgIDIg
-Ky0KIGFyY2gvYXJtL2NvbmZpZ3MvbXhzX2RlZmNvbmZpZyAgICAgICAgICAgICAgICB8ICAgMiAr
-LQogYXJjaC9hcm0vY29uZmlncy9uaGs4ODE1X2RlZmNvbmZpZyAgICAgICAgICAgIHwgICA0ICst
-CiBhcmNoL2FybS9jb25maWdzL29tYXAxX2RlZmNvbmZpZyAgICAgICAgICAgICAgfCAgIDIgKy0K
-IGFyY2gvYXJtL2NvbmZpZ3Mvb21hcDJwbHVzX2RlZmNvbmZpZyAgICAgICAgICB8ICAgNCArLQog
-YXJjaC9hcm0vY29uZmlncy9vcmlvbjV4X2RlZmNvbmZpZyAgICAgICAgICAgIHwgICAyICstCiBh
-cmNoL2FybS9jb25maWdzL294bmFzX3Y2X2RlZmNvbmZpZyAgICAgICAgICAgfCAgIDIgKy0KIGFy
-Y2gvYXJtL2NvbmZpZ3MvcHhhM3h4X2RlZmNvbmZpZyAgICAgICAgICAgICB8ICAgMiArLQogYXJj
-aC9hcm0vY29uZmlncy9weGFfZGVmY29uZmlnICAgICAgICAgICAgICAgIHwgICA0ICstCiBhcmNo
-L2FybS9jb25maWdzL3Fjb21fZGVmY29uZmlnICAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gv
-YXJtL2NvbmZpZ3MvcmF1bWZlbGRfZGVmY29uZmlnICAgICAgICAgICB8ICAgMiArLQogYXJjaC9h
-cm0vY29uZmlncy9zM2MyNDEwX2RlZmNvbmZpZyAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2Fy
-bS9jb25maWdzL3MzYzY0MDBfZGVmY29uZmlnICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJt
-L2NvbmZpZ3Mvc2FtYTVfZGVmY29uZmlnICAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0v
-Y29uZmlncy9zb2NmcGdhX2RlZmNvbmZpZyAgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9j
-b25maWdzL3NwZWFyMTN4eF9kZWZjb25maWcgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2Nv
-bmZpZ3Mvc3BlYXIzeHhfZGVmY29uZmlnICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29u
-Zmlncy9zcGVhcjZ4eF9kZWZjb25maWcgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25m
-aWdzL3NwaXR6X2RlZmNvbmZpZyAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtL2NvbmZp
-Z3MvdGFuZ280X2RlZmNvbmZpZyAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9hcm0vY29uZmln
-cy90cml6ZXBzNF9kZWZjb25maWcgICAgICAgICAgIHwgICAyICstCiBhcmNoL2FybS9jb25maWdz
-L3UzMDBfZGVmY29uZmlnICAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvYXJtNjQvY29uZmln
-cy9kZWZjb25maWcgICAgICAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9taXBzL2NvbmZpZ3Mv
-YmNtNDd4eF9kZWZjb25maWcgICAgICAgICAgIHwgICAyICstCiBhcmNoL21pcHMvY29uZmlncy9j
-aTIwX2RlZmNvbmZpZyAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvbWlwcy9jb25maWdzL2Ri
-MXh4eF9kZWZjb25maWcgICAgICAgICAgICB8ICAgNCArLQogLi4uL2NvbmZpZ3MvZ2VuZXJpYy9i
-b2FyZC1uaTE2OTQ0NS5jb25maWcgICAgIHwgICA2ICstCiBhcmNoL21pcHMvY29uZmlncy9nZW5l
-cmljL2JvYXJkLW9jZWxvdC5jb25maWcgfCAgIDIgKy0KIGFyY2gvbWlwcy9jb25maWdzL2xvb25n
-c29uMWJfZGVmY29uZmlnICAgICAgICB8ICAgMiArLQogYXJjaC9taXBzL2NvbmZpZ3MvbG9vbmdz
-b24xY19kZWZjb25maWcgICAgICAgIHwgICAyICstCiBhcmNoL21pcHMvY29uZmlncy9xaV9sYjYw
-X2RlZmNvbmZpZyAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvbWlwcy9jb25maWdzL3JiNTMyX2Rl
-ZmNvbmZpZyAgICAgICAgICAgICB8ICAgMiArLQogYXJjaC9taXBzL2NvbmZpZ3MvcmJ0eDQ5eHhf
-ZGVmY29uZmlnICAgICAgICAgIHwgICAyICstCiBhcmNoL21pcHMvY29uZmlncy94d2F5X2RlZmNv
-bmZpZyAgICAgICAgICAgICAgfCAgIDIgKy0KIGFyY2gvcG93ZXJwYy9jb25maWdzLzQweC9raWxh
-dWVhX2RlZmNvbmZpZyAgICB8ICAgMiArLQogYXJjaC9wb3dlcnBjL2NvbmZpZ3MvNDB4L29iczYw
-MF9kZWZjb25maWcgICAgIHwgICAyICstCiAuLi4vcG93ZXJwYy9jb25maWdzLzQ0eC9jYW55b25s
-YW5kc19kZWZjb25maWcgfCAgIDIgKy0KIGFyY2gvcG93ZXJwYy9jb25maWdzLzQ0eC9laWdlcl9k
-ZWZjb25maWcgICAgICB8ICAgMiArLQogYXJjaC9wb3dlcnBjL2NvbmZpZ3MvNDR4L3NlcXVvaWFf
-ZGVmY29uZmlnICAgIHwgICAyICstCiBhcmNoL3Bvd2VycGMvY29uZmlncy80NHgvd2FycF9kZWZj
-b25maWcgICAgICAgfCAgIDIgKy0KIC4uLi9jb25maWdzLzgzeHgvbXBjODMxM19yZGJfZGVmY29u
-ZmlnICAgICAgICB8ICAgMiArLQogLi4uL2NvbmZpZ3MvODN4eC9tcGM4MzE1X3JkYl9kZWZjb25m
-aWcgICAgICAgIHwgICAyICstCiBhcmNoL3Bvd2VycGMvY29uZmlncy84NXh4LWh3LmNvbmZpZyAg
-ICAgICAgICAgfCAgIDIgKy0KIGFyY2gvcG93ZXJwYy9jb25maWdzLzg1eHgvZ2VfaW1wM2FfZGVm
-Y29uZmlnICB8ICAgMiArLQogYXJjaC9wb3dlcnBjL2NvbmZpZ3MvODV4eC9zb2NyYXRlc19kZWZj
-b25maWcgIHwgICAyICstCiBhcmNoL3Bvd2VycGMvY29uZmlncy84NXh4L3RxbTg1NDhfZGVmY29u
-ZmlnICAgfCAgIDQgKy0KIC4uLi9jb25maWdzLzg1eHgveGVzX21wYzg1eHhfZGVmY29uZmlnICAg
-ICAgICB8ICAgMiArLQogYXJjaC9wb3dlcnBjL2NvbmZpZ3MvODZ4eC1ody5jb25maWcgICAgICAg
-ICAgIHwgICAyICstCiBhcmNoL3Bvd2VycGMvY29uZmlncy9tcGM1MTJ4X2RlZmNvbmZpZyAgICAg
-ICAgfCAgIDIgKy0KIGFyY2gvcG93ZXJwYy9jb25maWdzL21wYzgzeHhfZGVmY29uZmlnICAgICAg
-ICB8ICAgMiArLQogYXJjaC9wb3dlcnBjL2NvbmZpZ3MvcGFzZW1pX2RlZmNvbmZpZyAgICAgICAg
-IHwgICAyICstCiBhcmNoL3Bvd2VycGMvY29uZmlncy9wcGM0NHhfZGVmY29uZmlnICAgICAgICAg
-fCAgIDIgKy0KIGFyY2gvc2gvY29uZmlncy9hcDMyNXJ4YV9kZWZjb25maWcgICAgICAgICAgICB8
-ICAgMiArLQogYXJjaC9zaC9jb25maWdzL2Vjb3ZlYzI0X2RlZmNvbmZpZyAgICAgICAgICAgIHwg
-ICAyICstCiBhcmNoL3NoL2NvbmZpZ3MvbWlnb3JfZGVmY29uZmlnICAgICAgICAgICAgICAgfCAg
-IDIgKy0KIGFyY2gvc2gvY29uZmlncy9zZGs3Nzg2X2RlZmNvbmZpZyAgICAgICAgICAgICB8ICAg
-MiArLQogYXJjaC9zaC9jb25maWdzL3RpdGFuX2RlZmNvbmZpZyAgICAgICAgICAgICAgIHwgICAy
-ICstCiBkcml2ZXJzL210ZC9LY29uZmlnICAgICAgICAgICAgICAgICAgICAgICAgICAgfCAgIDMg
-Ky0KIGRyaXZlcnMvbXRkL2RldmljZXMvS2NvbmZpZyAgICAgICAgICAgICAgICAgICB8ICAgMiAr
-LQogZHJpdmVycy9tdGQvbmFuZC9LY29uZmlnICAgICAgICAgICAgICAgICAgICAgIHwgICAxIC0K
-IGRyaXZlcnMvbXRkL25hbmQvcmF3L0tjb25maWcgICAgICAgICAgICAgICAgICB8IDM4NSArKysr
-KysrKystLS0tLS0tLS0KIGRyaXZlcnMvbXRkL25hbmQvcmF3L01ha2VmaWxlICAgICAgICAgICAg
-ICAgICB8ICAgNiArLQogZHJpdmVycy9tdGQvbmFuZC9yYXcvbmFuZF9iYXNlLmMgICAgICAgICAg
-ICAgIHwgICA0ICstCiBkcml2ZXJzL210ZC9uYW5kL3Jhdy9vbWFwMi5jICAgICAgICAgICAgICAg
-ICAgfCAgIDQgKy0KIGRyaXZlcnMvbXRkL3NtX2Z0bC5jICAgICAgICAgICAgICAgICAgICAgICAg
-ICB8ICAxMiArLQogZHJpdmVycy9tdGQvdGVzdHMvbXRkX25hbmRlY2N0ZXN0LmMgICAgICAgICAg
-IHwgIDE2ICstCiBpbmNsdWRlL2xpbnV4L210ZC9uYW5kX2JjaC5oICAgICAgICAgICAgICAgICAg
-fCAgIDYgKy0KIGluY2x1ZGUvbGludXgvcGxhdGZvcm1fZGF0YS9lbG0uaCAgICAgICAgICAgICB8
-ICAgMiArLQogOTEgZmlsZXMgY2hhbmdlZCwgMzA1IGluc2VydGlvbnMoKyksIDMxMCBkZWxldGlv
-bnMoLSkKCi0tIAoyLjE5LjEKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVs
-QGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9s
-aXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+From: Boris Brezillon <bbrezillon@kernel.org>
+
+The target size can now be returned by nanddev_get_targetsize(). Get
+rid of the chip->chipsize field and use this helper instead.
+
+Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ .../mtd/nand/raw/bcm47xxnflash/ops_bcm4706.c  |  2 +-
+ drivers/mtd/nand/raw/denali.c                 |  1 -
+ drivers/mtd/nand/raw/fsl_elbc_nand.c          |  2 +-
+ drivers/mtd/nand/raw/fsl_ifc_nand.c           |  2 +-
+ drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c    |  2 +-
+ drivers/mtd/nand/raw/jz4740_nand.c            |  2 +-
+ drivers/mtd/nand/raw/nand_base.c              | 21 +++++++++-------
+ drivers/mtd/nand/raw/nand_bbt.c               | 25 ++++++++++++-------
+ drivers/mtd/nand/raw/nand_jedec.c             |  2 --
+ drivers/mtd/nand/raw/nand_onfi.c              |  2 --
+ drivers/mtd/nand/raw/nandsim.c                |  5 ++--
+ drivers/mtd/nand/raw/sh_flctl.c               |  9 ++++---
+ include/linux/mtd/rawnand.h                   |  2 --
+ 13 files changed, 41 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/mtd/nand/raw/bcm47xxnflash/ops_bcm4706.c b/drivers/mtd/nand/raw/bcm47xxnflash/ops_bcm4706.c
+index a37cbfe56567..a53ffb3d64b0 100644
+--- a/drivers/mtd/nand/raw/bcm47xxnflash/ops_bcm4706.c
++++ b/drivers/mtd/nand/raw/bcm47xxnflash/ops_bcm4706.c
+@@ -428,7 +428,7 @@ int bcm47xxnflash_ops_bcm4706_init(struct bcm47xxnflash *b47n)
+ 	}
+ 
+ 	/* Configure FLASH */
+-	chipsize = b47n->nand_chip.chipsize >> 20;
++	chipsize = nanddev_target_size(&b47n->nand_chip.base) >> 20;
+ 	tbits = ffs(chipsize); /* find first bit set */
+ 	if (!tbits || tbits != fls(chipsize)) {
+ 		pr_err("Invalid flash size: 0x%lX\n", chipsize);
+diff --git a/drivers/mtd/nand/raw/denali.c b/drivers/mtd/nand/raw/denali.c
+index 86e5df403beb..3ec0242b0aa2 100644
+--- a/drivers/mtd/nand/raw/denali.c
++++ b/drivers/mtd/nand/raw/denali.c
+@@ -1157,7 +1157,6 @@ static int denali_multidev_fixup(struct denali_nand_info *denali)
+ 	mtd->erasesize <<= 1;
+ 	mtd->writesize <<= 1;
+ 	mtd->oobsize <<= 1;
+-	chip->chipsize <<= 1;
+ 	chip->page_shift += 1;
+ 	chip->phys_erase_shift += 1;
+ 	chip->bbt_erase_shift += 1;
+diff --git a/drivers/mtd/nand/raw/fsl_elbc_nand.c b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+index 70f0d2b450ea..1d960a6cd691 100644
+--- a/drivers/mtd/nand/raw/fsl_elbc_nand.c
++++ b/drivers/mtd/nand/raw/fsl_elbc_nand.c
+@@ -655,7 +655,7 @@ static int fsl_elbc_attach_chip(struct nand_chip *chip)
+ 	dev_dbg(priv->dev, "fsl_elbc_init: nand->numchips = %d\n",
+ 	        chip->numchips);
+ 	dev_dbg(priv->dev, "fsl_elbc_init: nand->chipsize = %lld\n",
+-	        chip->chipsize);
++	        nanddev_target_size(&chip->base));
+ 	dev_dbg(priv->dev, "fsl_elbc_init: nand->pagemask = %8x\n",
+ 	        chip->pagemask);
+ 	dev_dbg(priv->dev, "fsl_elbc_init: nand->legacy.chip_delay = %d\n",
+diff --git a/drivers/mtd/nand/raw/fsl_ifc_nand.c b/drivers/mtd/nand/raw/fsl_ifc_nand.c
+index e65d274399f9..a9e8f89aeebd 100644
+--- a/drivers/mtd/nand/raw/fsl_ifc_nand.c
++++ b/drivers/mtd/nand/raw/fsl_ifc_nand.c
+@@ -724,7 +724,7 @@ static int fsl_ifc_attach_chip(struct nand_chip *chip)
+ 	dev_dbg(priv->dev, "%s: nand->numchips = %d\n", __func__,
+ 							chip->numchips);
+ 	dev_dbg(priv->dev, "%s: nand->chipsize = %lld\n", __func__,
+-							chip->chipsize);
++	        nanddev_target_size(&chip->base));
+ 	dev_dbg(priv->dev, "%s: nand->pagemask = %8x\n", __func__,
+ 							chip->pagemask);
+ 	dev_dbg(priv->dev, "%s: nand->legacy.chip_delay = %d\n", __func__,
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
+index 05f6f68e4e0d..6151214eddec 100644
+--- a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
++++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
+@@ -1753,7 +1753,7 @@ static int mx23_boot_init(struct gpmi_nand_data  *this)
+ 	dev_dbg(dev, "Transcribing bad block marks...\n");
+ 
+ 	/* Compute the number of blocks in the entire medium. */
+-	block_count = chip->chipsize >> chip->phys_erase_shift;
++	block_count = nanddev_eraseblocks_per_target(&chip->base);
+ 
+ 	/*
+ 	 * Loop over all the blocks in the medium, transcribing block marks as
+diff --git a/drivers/mtd/nand/raw/jz4740_nand.c b/drivers/mtd/nand/raw/jz4740_nand.c
+index 76a32ad2cf83..06690b3603b1 100644
+--- a/drivers/mtd/nand/raw/jz4740_nand.c
++++ b/drivers/mtd/nand/raw/jz4740_nand.c
+@@ -356,7 +356,7 @@ static int jz_nand_detect_bank(struct platform_device *pdev,
+ 		/* Update size of the MTD. */
+ 		chip->numchips++;
+ 		memorg->ntargets++;
+-		mtd->size += chip->chipsize;
++		mtd->size += nanddev_target_size(&chip->base);
+ 	}
+ 
+ 	dev_info(&pdev->dev, "Found chip %zu on bank %i\n", chipnr, bank);
+diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+index 00fe124fcb44..674505a0021c 100644
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -4587,7 +4587,10 @@ static bool find_full_id_nand(struct nand_chip *chip,
+ 		mtd->oobsize = memorg->oobsize;
+ 
+ 		memorg->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+-		chip->chipsize = (uint64_t)type->chipsize << 20;
++		memorg->eraseblocks_per_lun =
++			DIV_ROUND_DOWN_ULL((u64)type->chipsize << 20,
++					   memorg->pagesize *
++					   memorg->pages_per_eraseblock);
+ 		chip->options |= type->options;
+ 		chip->ecc_strength_ds = NAND_ECC_STRENGTH(type);
+ 		chip->ecc_step_ds = NAND_ECC_STEP(type);
+@@ -4674,6 +4677,7 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+ 	int busw, ret;
+ 	u8 *id_data = chip->id.data;
+ 	u8 maf_id, dev_id;
++	u64 targetsize;
+ 
+ 	/*
+ 	 * Let's start by initializing memorg fields that might be left
+@@ -4778,8 +4782,6 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+ 	if (!chip->parameters.model)
+ 		return -ENOMEM;
+ 
+-	chip->chipsize = (uint64_t)type->chipsize << 20;
+-
+ 	if (!type->pagesize)
+ 		nand_manufacturer_detect(chip);
+ 	else
+@@ -4821,14 +4823,15 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+ 	/* Calculate the address shift from the page size */
+ 	chip->page_shift = ffs(mtd->writesize) - 1;
+ 	/* Convert chipsize to number of pages per chip -1 */
+-	chip->pagemask = (chip->chipsize >> chip->page_shift) - 1;
++	targetsize = nanddev_target_size(&chip->base);
++	chip->pagemask = (targetsize >> chip->page_shift) - 1;
+ 
+ 	chip->bbt_erase_shift = chip->phys_erase_shift =
+ 		ffs(mtd->erasesize) - 1;
+-	if (chip->chipsize & 0xffffffff)
+-		chip->chip_shift = ffs((unsigned)chip->chipsize) - 1;
++	if (targetsize & 0xffffffff)
++		chip->chip_shift = ffs((unsigned)targetsize) - 1;
+ 	else {
+-		chip->chip_shift = ffs((unsigned)(chip->chipsize >> 32));
++		chip->chip_shift = ffs((unsigned)(targetsize >> 32));
+ 		chip->chip_shift += 32 - 1;
+ 	}
+ 
+@@ -4844,7 +4847,7 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+ 	pr_info("%s %s\n", nand_manufacturer_name(manufacturer),
+ 		chip->parameters.model);
+ 	pr_info("%d MiB, %s, erase size: %d KiB, page size: %d, OOB size: %d\n",
+-		(int)(chip->chipsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
++		(int)(targetsize >> 20), nand_is_slc(chip) ? "SLC" : "MLC",
+ 		mtd->erasesize >> 10, mtd->writesize, mtd->oobsize);
+ 	return 0;
+ 
+@@ -5089,7 +5092,7 @@ static int nand_scan_ident(struct nand_chip *chip, unsigned int maxchips,
+ 	/* Store the number of chips and calc total size for mtd */
+ 	memorg->ntargets = i;
+ 	chip->numchips = i;
+-	mtd->size = i * chip->chipsize;
++	mtd->size = i * nanddev_target_size(&chip->base);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/mtd/nand/raw/nand_bbt.c b/drivers/mtd/nand/raw/nand_bbt.c
+index 0b96c4cab967..e3308857b2ee 100644
+--- a/drivers/mtd/nand/raw/nand_bbt.c
++++ b/drivers/mtd/nand/raw/nand_bbt.c
+@@ -264,6 +264,7 @@ static int read_abs_bbt(struct nand_chip *this, uint8_t *buf,
+ 			struct nand_bbt_descr *td, int chip)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(this);
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	int res = 0, i;
+ 
+ 	if (td->options & NAND_BBT_PERCHIP) {
+@@ -271,11 +272,11 @@ static int read_abs_bbt(struct nand_chip *this, uint8_t *buf,
+ 		for (i = 0; i < this->numchips; i++) {
+ 			if (chip == -1 || chip == i)
+ 				res = read_bbt(this, buf, td->pages[i],
+-					this->chipsize >> this->bbt_erase_shift,
++					targetsize >> this->bbt_erase_shift,
+ 					td, offs);
+ 			if (res)
+ 				return res;
+-			offs += this->chipsize >> this->bbt_erase_shift;
++			offs += targetsize >> this->bbt_erase_shift;
+ 		}
+ 	} else {
+ 		res = read_bbt(this, buf, td->pages[0],
+@@ -459,6 +460,7 @@ static int scan_block_fast(struct nand_chip *this, struct nand_bbt_descr *bd,
+ static int create_bbt(struct nand_chip *this, uint8_t *buf,
+ 		      struct nand_bbt_descr *bd, int chip)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	struct mtd_info *mtd = nand_to_mtd(this);
+ 	int i, numblocks, numpages;
+ 	int startblock;
+@@ -481,7 +483,7 @@ static int create_bbt(struct nand_chip *this, uint8_t *buf,
+ 			       chip + 1, this->numchips);
+ 			return -EINVAL;
+ 		}
+-		numblocks = this->chipsize >> this->bbt_erase_shift;
++		numblocks = targetsize >> this->bbt_erase_shift;
+ 		startblock = chip * numblocks;
+ 		numblocks += startblock;
+ 		from = (loff_t)startblock << this->bbt_erase_shift;
+@@ -529,6 +531,7 @@ static int create_bbt(struct nand_chip *this, uint8_t *buf,
+ static int search_bbt(struct nand_chip *this, uint8_t *buf,
+ 		      struct nand_bbt_descr *td)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	struct mtd_info *mtd = nand_to_mtd(this);
+ 	int i, chips;
+ 	int startblock, block, dir;
+@@ -548,7 +551,7 @@ static int search_bbt(struct nand_chip *this, uint8_t *buf,
+ 	/* Do we have a bbt per chip? */
+ 	if (td->options & NAND_BBT_PERCHIP) {
+ 		chips = this->numchips;
+-		bbtblocks = this->chipsize >> this->bbt_erase_shift;
++		bbtblocks = targetsize >> this->bbt_erase_shift;
+ 		startblock &= bbtblocks - 1;
+ 	} else {
+ 		chips = 1;
+@@ -576,7 +579,7 @@ static int search_bbt(struct nand_chip *this, uint8_t *buf,
+ 				break;
+ 			}
+ 		}
+-		startblock += this->chipsize >> this->bbt_erase_shift;
++		startblock += targetsize >> this->bbt_erase_shift;
+ 	}
+ 	/* Check, if we found a bbt for each requested chip */
+ 	for (i = 0; i < chips; i++) {
+@@ -626,6 +629,7 @@ static void search_read_bbts(struct nand_chip *this, uint8_t *buf,
+ static int get_bbt_block(struct nand_chip *this, struct nand_bbt_descr *td,
+ 			 struct nand_bbt_descr *md, int chip)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	int startblock, dir, page, numblocks, i;
+ 
+ 	/*
+@@ -637,7 +641,7 @@ static int get_bbt_block(struct nand_chip *this, struct nand_bbt_descr *td,
+ 		return td->pages[chip] >>
+ 				(this->bbt_erase_shift - this->page_shift);
+ 
+-	numblocks = (int)(this->chipsize >> this->bbt_erase_shift);
++	numblocks = (int)(targetsize >> this->bbt_erase_shift);
+ 	if (!(td->options & NAND_BBT_PERCHIP))
+ 		numblocks *= this->numchips;
+ 
+@@ -717,6 +721,7 @@ static int write_bbt(struct nand_chip *this, uint8_t *buf,
+ 		     struct nand_bbt_descr *td, struct nand_bbt_descr *md,
+ 		     int chipsel)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	struct mtd_info *mtd = nand_to_mtd(this);
+ 	struct erase_info einfo;
+ 	int i, res, chip = 0;
+@@ -737,7 +742,7 @@ static int write_bbt(struct nand_chip *this, uint8_t *buf,
+ 		rcode = 0xff;
+ 	/* Write bad block table per chip rather than per device? */
+ 	if (td->options & NAND_BBT_PERCHIP) {
+-		numblocks = (int)(this->chipsize >> this->bbt_erase_shift);
++		numblocks = (int)(targetsize >> this->bbt_erase_shift);
+ 		/* Full device write or specific chip? */
+ 		if (chipsel == -1) {
+ 			nrchips = this->numchips;
+@@ -1099,6 +1104,7 @@ static int nand_update_bbt(struct nand_chip *this, loff_t offs)
+  */
+ static void mark_bbt_region(struct nand_chip *this, struct nand_bbt_descr *td)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	struct mtd_info *mtd = nand_to_mtd(this);
+ 	int i, j, chips, block, nrblocks, update;
+ 	uint8_t oldval;
+@@ -1106,7 +1112,7 @@ static void mark_bbt_region(struct nand_chip *this, struct nand_bbt_descr *td)
+ 	/* Do we have a bbt per chip? */
+ 	if (td->options & NAND_BBT_PERCHIP) {
+ 		chips = this->numchips;
+-		nrblocks = (int)(this->chipsize >> this->bbt_erase_shift);
++		nrblocks = (int)(targetsize >> this->bbt_erase_shift);
+ 	} else {
+ 		chips = 1;
+ 		nrblocks = (int)(mtd->size >> this->bbt_erase_shift);
+@@ -1159,6 +1165,7 @@ static void mark_bbt_region(struct nand_chip *this, struct nand_bbt_descr *td)
+  */
+ static void verify_bbt_descr(struct nand_chip *this, struct nand_bbt_descr *bd)
+ {
++	u64 targetsize = nanddev_target_size(&this->base);
+ 	struct mtd_info *mtd = nand_to_mtd(this);
+ 	u32 pattern_len;
+ 	u32 bits;
+@@ -1187,7 +1194,7 @@ static void verify_bbt_descr(struct nand_chip *this, struct nand_bbt_descr *bd)
+ 	}
+ 
+ 	if (bd->options & NAND_BBT_PERCHIP)
+-		table_size = this->chipsize >> this->bbt_erase_shift;
++		table_size = targetsize >> this->bbt_erase_shift;
+ 	else
+ 		table_size = mtd->size >> this->bbt_erase_shift;
+ 	table_size >>= 3;
+diff --git a/drivers/mtd/nand/raw/nand_jedec.c b/drivers/mtd/nand/raw/nand_jedec.c
+index 030f178c7a97..99e2f017c79b 100644
+--- a/drivers/mtd/nand/raw/nand_jedec.c
++++ b/drivers/mtd/nand/raw/nand_jedec.c
+@@ -101,8 +101,6 @@ int nand_jedec_detect(struct nand_chip *chip)
+ 	/* Please reference to the comment for nand_flash_detect_onfi. */
+ 	memorg->eraseblocks_per_lun =
+ 		1 << (fls(le32_to_cpu(p->blocks_per_lun)) - 1);
+-	chip->chipsize = memorg->eraseblocks_per_lun;
+-	chip->chipsize *= (uint64_t)mtd->erasesize * p->lun_count;
+ 	memorg->bits_per_cell = p->bits_per_cell;
+ 
+ 	if (le16_to_cpu(p->features) & JEDEC_FEATURE_16_BIT_BUS)
+diff --git a/drivers/mtd/nand/raw/nand_onfi.c b/drivers/mtd/nand/raw/nand_onfi.c
+index a6b9fc9a335b..7b468e7214c7 100644
+--- a/drivers/mtd/nand/raw/nand_onfi.c
++++ b/drivers/mtd/nand/raw/nand_onfi.c
+@@ -246,8 +246,6 @@ int nand_onfi_detect(struct nand_chip *chip)
+ 	memorg->eraseblocks_per_lun =
+ 		1 << (fls(le32_to_cpu(p->blocks_per_lun)) - 1);
+ 	memorg->max_bad_eraseblocks_per_lun = le32_to_cpu(p->blocks_per_lun);
+-	chip->chipsize = memorg->eraseblocks_per_lun;
+-	chip->chipsize *= (uint64_t)mtd->erasesize * p->lun_count;
+ 	memorg->bits_per_cell = p->bits_per_cell;
+ 
+ 	if (le16_to_cpu(p->features) & ONFI_FEATURE_16_BIT_BUS)
+diff --git a/drivers/mtd/nand/raw/nandsim.c b/drivers/mtd/nand/raw/nandsim.c
+index 7da15620f12e..670abe8d59ca 100644
+--- a/drivers/mtd/nand/raw/nandsim.c
++++ b/drivers/mtd/nand/raw/nandsim.c
+@@ -2312,12 +2312,13 @@ static int __init ns_init_module(void)
+ 			retval = -EINVAL;
+ 			goto err_exit;
+ 		}
++
+ 		/* N.B. This relies on nand_scan not doing anything with the size before we change it */
+ 		nsmtd->size = new_size;
+ 		memorg->eraseblocks_per_lun = 1 << overridesize;
+-		chip->chipsize = new_size;
++		targetsize = nanddev_target_size(&chip->base);
+ 		chip->chip_shift = ffs(nsmtd->erasesize) + overridesize - 1;
+-		chip->pagemask = (chip->chipsize >> chip->page_shift) - 1;
++		chip->pagemask = (targetsize >> chip->page_shift) - 1;
+ 	}
+ 
+ 	if ((retval = setup_wear_reporting(nsmtd)) != 0)
+diff --git a/drivers/mtd/nand/raw/sh_flctl.c b/drivers/mtd/nand/raw/sh_flctl.c
+index cf6b1be1cf9c..3f610040f0c3 100644
+--- a/drivers/mtd/nand/raw/sh_flctl.c
++++ b/drivers/mtd/nand/raw/sh_flctl.c
+@@ -986,6 +986,7 @@ static void flctl_read_buf(struct nand_chip *chip, uint8_t *buf, int len)
+ 
+ static int flctl_chip_attach_chip(struct nand_chip *chip)
+ {
++	u64 targetsize = nanddev_target_size(&chip->base);
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct sh_flctl *flctl = mtd_to_flctl(mtd);
+ 
+@@ -998,11 +999,11 @@ static int flctl_chip_attach_chip(struct nand_chip *chip)
+ 
+ 	if (mtd->writesize == 512) {
+ 		flctl->page_size = 0;
+-		if (chip->chipsize > (32 << 20)) {
++		if (targetsize > (32 << 20)) {
+ 			/* big than 32MB */
+ 			flctl->rw_ADRCNT = ADRCNT_4;
+ 			flctl->erase_ADRCNT = ADRCNT_3;
+-		} else if (chip->chipsize > (2 << 16)) {
++		} else if (targetsize > (2 << 16)) {
+ 			/* big than 128KB */
+ 			flctl->rw_ADRCNT = ADRCNT_3;
+ 			flctl->erase_ADRCNT = ADRCNT_2;
+@@ -1012,11 +1013,11 @@ static int flctl_chip_attach_chip(struct nand_chip *chip)
+ 		}
+ 	} else {
+ 		flctl->page_size = 1;
+-		if (chip->chipsize > (128 << 20)) {
++		if (targetsize > (128 << 20)) {
+ 			/* big than 128MB */
+ 			flctl->rw_ADRCNT = ADRCNT2_E;
+ 			flctl->erase_ADRCNT = ADRCNT_3;
+-		} else if (chip->chipsize > (8 << 16)) {
++		} else if (targetsize > (8 << 16)) {
+ 			/* big than 512KB */
+ 			flctl->rw_ADRCNT = ADRCNT_4;
+ 			flctl->erase_ADRCNT = ADRCNT_2;
+diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+index 24ecd9a4f952..a127eb773b1a 100644
+--- a/include/linux/mtd/rawnand.h
++++ b/include/linux/mtd/rawnand.h
+@@ -1015,7 +1015,6 @@ struct nand_legacy {
+  *			      ONFI compliant or deduced from the datasheet if
+  *			      the NAND chip is not ONFI compliant.
+  * @numchips:		[INTERN] number of physical chips
+- * @chipsize:		[INTERN] the size of one chip for multichip arrays
+  * @pagemask:		[INTERN] page number mask = number of (pages / chip) - 1
+  * @data_buf:		[INTERN] buffer for data, size is (page size + oobsize).
+  * @pagecache:		Structure containing page cache related fields
+@@ -1062,7 +1061,6 @@ struct nand_chip {
+ 	int bbt_erase_shift;
+ 	int chip_shift;
+ 	int numchips;
+-	uint64_t chipsize;
+ 	int pagemask;
+ 	u8 *data_buf;
+ 
+-- 
+2.19.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
