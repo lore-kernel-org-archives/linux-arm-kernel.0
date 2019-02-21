@@ -2,63 +2,142 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19146C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:44:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D532C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:45:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DB2D7208E4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:44:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1AE4208E4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 09:45:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T9ZRRr8t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB2D7208E4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LvhKNUGx";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ffcLtZ1k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1AE4208E4
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BHS01pQHxCNtO/Teihm5KI3H9et0iTl6NWgTv657Dkc=; b=T9ZRRr8tQr5UPy
-	wnDnhcbiksp+JroQdnrosljtkbbn4sr2Sxfapy6E1D9fchXy6XA+3xiM6MOtP/qDLayguosIKfGrZ
-	ueBTiiPRPjZmEk+m0mAErorfp2kLgyBhqQtS0gdtQWusXul2gnRYpUKJ4bzPKLlgcRTEibYQ1ahSB
-	+hpuN6h/tcCfaRnl2G8vEwPxNN9uBvPUGYwakgiCAluY4esvXoBXTuVZEG899jE8gmy+ELut3O6PZ
-	qpr0MNVWl/YpZtMKzGs1GYixzIUKcNj3gj2xHRQ1RFp48OncLOXGDKAxILjCMAzidcJcUgSzWGVcX
-	HyUWpOGh9PAfoi3S+XSg==;
+	List-Owner; bh=Tt28bSTdSMIUpTF9IepB6SmzWvEKtJicJGC70qlvkUU=; b=LvhKNUGxMY6qND
+	8VvoE0SCMP4gD5EjQFgOih2YNdjFPvjMD0PNphGlqjza3xPspA2V4EB5vpAAuql+o8Ae2mPlXierU
+	InHh6rbgJVQVc07dCSsHFbiKc4ALsQ8ZzSsWe/kYlxbAfATNzP3uxnRJB5nfE9oIW1i8Agu2e2C+o
+	quI2oVLQpeIRU3p6MXQORjQG3nExRKrJzKrohmQ2yh2YvvSCp++j7A9aR3U7zQg1onGGzuQ/3mp60
+	ZB6ny6KUsxwcdib8rAhRJdy8l436Z725bgctm3JzbsDOoDwBwKQv2iRQyvG7upMlgNOG6YRxykjBx
+	XKDDJtqRiq8RKBMu6ZPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwkuQ-0005fh-8F; Thu, 21 Feb 2019 09:44:50 +0000
-Received: from relay8-d.mail.gandi.net ([217.70.183.201])
+	id 1gwkuW-0005nl-Le; Thu, 21 Feb 2019 09:44:56 +0000
+Received: from mail-vi1eur04on060c.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0e::60c]
+ helo=EUR04-VI1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwkSh-000209-QU; Thu, 21 Feb 2019 09:16:29 +0000
-X-Originating-IP: 90.88.23.190
-Received: from localhost.localdomain
- (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
- (Authenticated sender: miquel.raynal@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id A19011BF216;
- Thu, 21 Feb 2019 09:16:07 +0000 (UTC)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Boris Brezillon <bbrezillon@kernel.org>,
- Richard Weinberger <richard@nod.at>, David Woodhouse <dwmw2@infradead.org>,
- Brian Norris <computersforpeace@gmail.com>,
- Marek Vasut <marek.vasut@gmail.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: [PATCH 15/15] mtd: rawnand: Get rid of chip->ecc_{strength,step}_ds
-Date: Thu, 21 Feb 2019 10:15:27 +0100
-Message-Id: <20190221091527.20497-16-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20190221091527.20497-1-miquel.raynal@bootlin.com>
-References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
+ id 1gwkWH-00068L-Tg
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 09:20:09 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=tu4PNXxo2gJ4Ree8EspoH9hSKGaHGCP967+bedKiMlM=;
+ b=ffcLtZ1kMxqpZ8jLdg/gyHPwMdNxUrhYifTXJwxZPRdhax5h/uj40IIUJCA8ZwGli7YlPWsDDWpChM36KWgnATgLSic1kx5bocvgFjZQPeFtap0zAbHBRXBYhyvzQcwccCbx0UpBolwPzMf3AZqEEMt24wsrD0W+Oe/vYurdoac=
+Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com (52.133.30.10) by
+ AM6PR0402MB3784.eurprd04.prod.outlook.com (52.133.9.157) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1622.19; Thu, 21 Feb 2019 09:19:28 +0000
+Received: from AM6PR0402MB3911.eurprd04.prod.outlook.com
+ ([fe80::6c94:4ad8:e9f3:cf1]) by AM6PR0402MB3911.eurprd04.prod.outlook.com
+ ([fe80::6c94:4ad8:e9f3:cf1%4]) with mapi id 15.20.1622.018; Thu, 21 Feb 2019
+ 09:19:28 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "a.zummo@towertech.it" <a.zummo@towertech.it>,
+ "alexandre.belloni@bootlin.com" <alexandre.belloni@bootlin.com>, Aisheng Dong
+ <aisheng.dong@nxp.com>, "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ Daniel Baluta <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-rtc@vger.kernel.org"
+ <linux-rtc@vger.kernel.org>
+Subject: [PATCH V4 2/4] firmware: imx: enable imx scu general irq function
+Thread-Topic: [PATCH V4 2/4] firmware: imx: enable imx scu general irq function
+Thread-Index: AQHUycaLw3da++dFN02n8A3i94XTEg==
+Date: Thu, 21 Feb 2019 09:19:28 +0000
+Message-ID: <1550740354-2701-2-git-send-email-Anson.Huang@nxp.com>
+References: <1550740354-2701-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1550740354-2701-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK0PR03CA0025.apcprd03.prod.outlook.com
+ (2603:1096:203:2f::13) To AM6PR0402MB3911.eurprd04.prod.outlook.com
+ (2603:10a6:209:1c::10)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 02913f12-f9fa-45cb-bcbb-08d697ddadf8
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM6PR0402MB3784; 
+x-ms-traffictypediagnostic: AM6PR0402MB3784:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM6PR0402MB3784;
+ 23:Oc4nKSXNSo8llC7VHI85wPizIq/Q8g62rRFNt?=
+ =?iso-8859-1?Q?2Z9ujhGeDBU+8sKgFif7Z0AL5N6uZURXk9JZW18Urz2htvxPSPWqa+ym07?=
+ =?iso-8859-1?Q?K3EUQaG4bEEZaY0RznLkdvEyc7aFs6q0DjcqJgGC7eG7S8Q6RvNjxIpQcO?=
+ =?iso-8859-1?Q?10wr/IjNnTr5ej4MxfG09U59HM1OTCh/g3oC9AEXeF5LfgyXf/Yvfe8qMM?=
+ =?iso-8859-1?Q?LgihT0VjbWN8/uI11/jd/Da8vM/4mOUZd+R4T9EAixBi1LksqQ9sh6Dux2?=
+ =?iso-8859-1?Q?lN+xgH2FbYi20kRUdBmnzQBAL1YFHW6FVPpG++tYa6dKmdtFXbp1YpRMLf?=
+ =?iso-8859-1?Q?mDh/BtzGd4SQkJMjjZRbq9zfQ/Bdg+lUlxpgZbztpobu7MjA2GkdVk4j7Z?=
+ =?iso-8859-1?Q?KJUVOLXFnJSRh0tz3Ib0hC6JRkloJra/ue0sCnJrnbKYwr5MUOIvbMrpba?=
+ =?iso-8859-1?Q?xXDqTHdHOLjnpQVVZ6UYO7ziDHFYWXKRyD51TnNGy0RAq1aK3sCHGDYClj?=
+ =?iso-8859-1?Q?w0FcA5a2nEXH9jzfL3xrBqxXo2yqHvYm6KKSMVyRy/Sfa6Ilpj4l4UpgM5?=
+ =?iso-8859-1?Q?BvvkH8/v25i0Ju2DB7tegNVRPiGB+ohV5JPjarZVXEd0SdpoDkkjEsBm2t?=
+ =?iso-8859-1?Q?Izzyt19y7GNlmfETRgtGl0Z240X6c2+/rzS6Zgla+TYS98TmL0u4Ux3BGN?=
+ =?iso-8859-1?Q?tXboaQuZ/Js3JyfRkSGegcwr9pSDWMcgzrFNJDA0faHAk/PZ/iEAL/m0EP?=
+ =?iso-8859-1?Q?wRFu4sQjlioW6JevKvkbwGAOEYM8yM0hett3Ii5we59H6seB6kv01bK3lz?=
+ =?iso-8859-1?Q?Z/qiL7TCJh8vGSKhKYgBOLPO9r+SukmrVJXeXzfszmv/Ep0JCmfZ6LCUx2?=
+ =?iso-8859-1?Q?llP+Rw1A2+NeKRsOyqJUejrgOY2y0fdc1jfLiv7gVXxDzjVXfKCfUW76wX?=
+ =?iso-8859-1?Q?dZv22V5LowF1C87cCA3FlO9jDp4S9FJCOv4iW2SofQY5Eu0LtktxgPRMr2?=
+ =?iso-8859-1?Q?eE6rXUWbZMrD7OERi+dWWqVXsGFIJlk7JIOzG5Ig+GWbn2laS0X13Okn/k?=
+ =?iso-8859-1?Q?a7Y8SRcn8Bzrn1CLx3Pu2yb7eENAbmbBTNdRrLkbhx8efIRGSjVavf/ENe?=
+ =?iso-8859-1?Q?VtZUSi5+0vQ8IJ2DQlLBHAm3wTL6Vr+GSXBW9F8wNf9Hjcpm+CX509prV9?=
+ =?iso-8859-1?Q?VG16hpEe1K0arTXWPaI9mIlO+xYcF05tDxLdMpUc+AgVaOEk+RXcSGAuQ2?=
+ =?iso-8859-1?Q?G4q39qV+1QgwHbTAc2cCg6umlHd19fJk0IvJJLs5BeooTG4cpJrG/glM4A?=
+ =?iso-8859-1?Q?YFxZ/5Pz49MVbmoq99ShG+Yq1?=
+x-microsoft-antispam-prvs: <AM6PR0402MB3784D4594D8A03CC42DFE826F57E0@AM6PR0402MB3784.eurprd04.prod.outlook.com>
+x-forefront-prvs: 09555FB1AD
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(376002)(396003)(346002)(39860400002)(366004)(189003)(199004)(71190400001)(68736007)(71200400001)(14454004)(66066001)(26005)(386003)(102836004)(6506007)(186003)(86362001)(2201001)(316002)(6512007)(14444005)(36756003)(256004)(76176011)(99286004)(305945005)(2501003)(478600001)(52116002)(97736004)(7416002)(106356001)(50226002)(8936002)(3846002)(53936002)(6116002)(7736002)(105586002)(11346002)(5660300002)(2906002)(4326008)(8676002)(81166006)(6486002)(6436002)(476003)(486006)(81156014)(2616005)(110136005)(446003)(25786009)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3784;
+ H:AM6PR0402MB3911.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: SxnSO+OfMDOgsua1ZOZO5W8gwKoDsBymFDii7zQqrzocvhOwf/M/rWF410ivKmD0atoiRlxqZL8t06c8OKN70nC4G3eGDw4psmXTvveCTomENj1cmla6QaQZKpzNeVr7bB+PglJL02K241LDxjI2c2WbCJhw8t8HjdS2dCh1Iw1Fv+Vv50yptzlIuG52OODdTKep/x36gcboE6MPYNmNUqbYszaqNWr2TdtMvSw+JucLh/h1/eEKznTPOCTDo5LQ1ZXqfz4cqvZxYQaTSePAV0Lo3vAeaeEKmMepWZ06g6AZyGY1ot/JDYek/br3PRJnBHO6I/Gb52VPT2WXWRkctyydRVdPB5BfbtxQo/0U+vKKxr86BOJQE/HEHiMCQ/+4fTGSwGG7rHEFCBasX65Lqv9v/WC2w7QBj/2/9fqGjHA=
 MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 02913f12-f9fa-45cb-bcbb-08d697ddadf8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 09:19:23.3637 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3784
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_011612_405424_C4B89353 
-X-CRM114-Status: GOOD (  21.20  )
+X-CRM114-CacheID: sfid-20190221_011954_100460_10A6E2EA 
+X-CRM114-Status: GOOD (  17.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,540 +149,214 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Vignesh R <vigneshr@ti.com>, Tudor Ambarus <tudor.ambarus@microchip.com>,
- Julien Su <juliensu@mxic.com.tw>,
- Masahiro Yamada <yamada.masahiro@socionext.com>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- Mason Yang <masonccyang@mxic.com.tw>, linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Boris Brezillon <bbrezillon@kernel.org>
+The System Controller Firmware (SCFW) controls RTC, thermal
+and WDOG etc., these resources' interrupt function are managed
+by SCU. When any IRQ pending, SCU will notify Linux via MU general
+interrupt channel #3, and Linux kernel needs to call SCU APIs
+to get IRQ status and notify each module to handle the interrupt.
 
-nand_device embeds a nand_ecc_req object which contains the minimum
-strength and step-size required by the NAND device.
+Since there is no data transmission for SCU IRQ notification, so
+doorbell mode is used for this MU channel, and SCU driver will
+use notifier mechanism to broadcast to every module which registers
+the SCU block notifier.
 
-Drop the chip->ecc_{strength,step}_ds fields and use
-chip->base.eccreq.{strength,step_size} instead.
-
-Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/mtd/nand/raw/atmel/nand-controller.c |  8 ++--
- drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c   | 11 ++++--
- drivers/mtd/nand/raw/marvell_nand.c          |  6 +--
- drivers/mtd/nand/raw/mtk_nand.c              |  4 +-
- drivers/mtd/nand/raw/nand_base.c             | 15 ++++----
- drivers/mtd/nand/raw/nand_esmt.c             | 10 ++---
- drivers/mtd/nand/raw/nand_hynix.c            | 40 ++++++++++----------
- drivers/mtd/nand/raw/nand_jedec.c            |  4 +-
- drivers/mtd/nand/raw/nand_micron.c           | 12 +++---
- drivers/mtd/nand/raw/nand_onfi.c             |  8 ++--
- drivers/mtd/nand/raw/nand_samsung.c          | 18 ++++-----
- drivers/mtd/nand/raw/nand_toshiba.c          | 10 ++---
- drivers/mtd/nand/raw/sunxi_nand.c            |  4 +-
- drivers/mtd/nand/raw/tegra_nand.c            |  8 ++--
- include/linux/mtd/rawnand.h                  |  8 ----
- 15 files changed, 81 insertions(+), 85 deletions(-)
+Changes since V3:
+	- use alias to get general MU interrupt channel id and then get resource ID,
+	  this is to support different MU instance;
+	- add return value check for imx_scu_enable_general_irq_channel().
+---
+ drivers/firmware/imx/imx-scu.c   | 116 +++++++++++++++++++++++++++++++++++++++
+ include/linux/firmware/imx/sci.h |   3 +
+ 2 files changed, 119 insertions(+)
 
-diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-index 5781fcf6b76c..9867e9115399 100644
---- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-+++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-@@ -1068,15 +1068,15 @@ static int atmel_nand_pmecc_init(struct nand_chip *chip)
- 		req.ecc.strength = ATMEL_PMECC_MAXIMIZE_ECC_STRENGTH;
- 	else if (chip->ecc.strength)
- 		req.ecc.strength = chip->ecc.strength;
--	else if (chip->ecc_strength_ds)
--		req.ecc.strength = chip->ecc_strength_ds;
-+	else if (chip->base.eccreq.strength)
-+		req.ecc.strength = chip->base.eccreq.strength;
- 	else
- 		req.ecc.strength = ATMEL_PMECC_MAXIMIZE_ECC_STRENGTH;
+diff --git a/drivers/firmware/imx/imx-scu.c b/drivers/firmware/imx/imx-scu.c
+index 2bb1a19..1dcd7b3 100644
+--- a/drivers/firmware/imx/imx-scu.c
++++ b/drivers/firmware/imx/imx-scu.c
+@@ -7,6 +7,7 @@
+  *
+  */
  
- 	if (chip->ecc.size)
- 		req.ecc.sectorsize = chip->ecc.size;
--	else if (chip->ecc_step_ds)
--		req.ecc.sectorsize = chip->ecc_step_ds;
-+	else if (chip->base.eccreq.step_size)
-+		req.ecc.sectorsize = chip->base.eccreq.step_size;
- 	else
- 		req.ecc.sectorsize = ATMEL_PMECC_SECTOR_SIZE_AUTO;
++#include <dt-bindings/firmware/imx/rsrc.h>
+ #include <linux/err.h>
+ #include <linux/firmware/imx/types.h>
+ #include <linux/firmware/imx/ipc.h>
+@@ -21,6 +22,8 @@
  
-diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-index 6151214eddec..dbefb6bac5c9 100644
---- a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-@@ -204,7 +204,8 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this,
- 	default:
- 		dev_err(this->dev,
- 			"unsupported nand chip. ecc bits : %d, ecc size : %d\n",
--			chip->ecc_strength_ds, chip->ecc_step_ds);
-+			chip->base.eccreq.strength,
-+			chip->base.eccreq.step_size);
- 		return -EINVAL;
- 	}
- 	geo->ecc_chunk_size = ecc_step;
-@@ -417,11 +418,13 @@ int common_nfc_set_geometry(struct gpmi_nand_data *this)
+ #define SCU_MU_CHAN_NUM		8
+ #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
++#define IMX_SC_IRQ_FUNC_STATUS	2
++#define IMX_SC_IRQ_NUM_GROUP	6
  
- 	if ((of_property_read_bool(this->dev->of_node, "fsl,use-minimum-ecc"))
- 				|| legacy_set_geometry(this)) {
--		if (!(chip->ecc_strength_ds > 0 && chip->ecc_step_ds > 0))
-+		if (!(chip->base.eccreq.strength > 0 &&
-+		      chip->base.eccreq.step_size > 0))
- 			return -EINVAL;
+ struct imx_sc_chan {
+ 	struct imx_sc_ipc *sc_ipc;
+@@ -41,6 +44,7 @@ struct imx_sc_ipc {
+ 	u32 *msg;
+ 	u8 rx_size;
+ 	u8 count;
++	u32 mu_resource_id;
+ };
  
--		return set_geometry_by_ecc_info(this, chip->ecc_strength_ds,
--						chip->ecc_step_ds);
-+		return set_geometry_by_ecc_info(this,
-+						chip->base.eccreq.strength,
-+						chip->base.eccreq.step_size);
- 	}
+ /*
+@@ -77,7 +81,23 @@ static int imx_sc_linux_errmap[IMX_SC_ERR_LAST] = {
+ 	-EIO,	 /* IMX_SC_ERR_FAIL */
+ };
  
- 	return 0;
-diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
-index e8023b32be93..d21e808bb075 100644
---- a/drivers/mtd/nand/raw/marvell_nand.c
-+++ b/drivers/mtd/nand/raw/marvell_nand.c
-@@ -2248,9 +2248,9 @@ static int marvell_nand_ecc_init(struct mtd_info *mtd,
- 	int ret;
++struct imx_sc_msg_irq_get_status {
++	struct imx_sc_rpc_msg hdr;
++	union {
++		struct {
++			u16 resource;
++			u8 group;
++			u8 reserved;
++		} __packed req;
++		struct {
++			u32 status;
++		} __packed resp;
++	} data;
++};
++
+ static struct imx_sc_ipc *imx_sc_ipc_handle;
++static struct work_struct imx_sc_general_irq_work;
++static BLOCKING_NOTIFIER_HEAD(imx_scu_notifier_chain);
  
- 	if (ecc->mode != NAND_ECC_NONE && (!ecc->size || !ecc->strength)) {
--		if (chip->ecc_step_ds && chip->ecc_strength_ds) {
--			ecc->size = chip->ecc_step_ds;
--			ecc->strength = chip->ecc_strength_ds;
-+		if (chip->base.eccreq.step_size && chip->base.eccreq.strength) {
-+			ecc->size = chip->base.eccreq.step_size;
-+			ecc->strength = chip->base.eccreq.strength;
- 		} else {
- 			dev_info(nfc->dev,
- 				 "No minimum ECC strength, using 1b/512B\n");
-diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
-index b6b4602f5132..bfb89aca4155 100644
---- a/drivers/mtd/nand/raw/mtk_nand.c
-+++ b/drivers/mtd/nand/raw/mtk_nand.c
-@@ -1197,8 +1197,8 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
- 	/* if optional dt settings not present */
- 	if (!nand->ecc.size || !nand->ecc.strength) {
- 		/* use datasheet requirements */
--		nand->ecc.strength = nand->ecc_strength_ds;
--		nand->ecc.size = nand->ecc_step_ds;
-+		nand->ecc.strength = nand->base.eccreq.strength;
-+		nand->ecc.size = nand->base.eccreq.step_size;
- 
- 		/*
- 		 * align eccstrength and eccsize
-diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-index e4bc851b099a..3bd077ca58bb 100644
---- a/drivers/mtd/nand/raw/nand_base.c
-+++ b/drivers/mtd/nand/raw/nand_base.c
-@@ -4592,8 +4592,8 @@ static bool find_full_id_nand(struct nand_chip *chip,
- 					   memorg->pagesize *
- 					   memorg->pages_per_eraseblock);
- 		chip->options |= type->options;
--		chip->ecc_strength_ds = NAND_ECC_STRENGTH(type);
--		chip->ecc_step_ds = NAND_ECC_STEP(type);
-+		chip->base.eccreq.strength = NAND_ECC_STRENGTH(type);
-+		chip->base.eccreq.step_size = NAND_ECC_STEP(type);
- 		chip->onfi_timing_mode_default =
- 					type->onfi_timing_mode_default;
- 
-@@ -5266,8 +5266,8 @@ nand_match_ecc_req(struct nand_chip *chip,
+ static inline int imx_sc_to_linux_errno(int errno)
  {
- 	struct mtd_info *mtd = nand_to_mtd(chip);
- 	const struct nand_ecc_step_info *stepinfo;
--	int req_step = chip->ecc_step_ds;
--	int req_strength = chip->ecc_strength_ds;
-+	int req_step = chip->base.eccreq.step_size;
-+	int req_strength = chip->base.eccreq.strength;
- 	int req_corr, step_size, strength, nsteps, ecc_bytes, ecc_bytes_total;
- 	int best_step, best_strength, best_ecc_bytes;
- 	int best_ecc_bytes_total = INT_MAX;
-@@ -5460,7 +5460,7 @@ static bool nand_ecc_strength_good(struct nand_chip *chip)
- 	struct nand_ecc_ctrl *ecc = &chip->ecc;
- 	int corr, ds_corr;
- 
--	if (ecc->size == 0 || chip->ecc_step_ds == 0)
-+	if (ecc->size == 0 || chip->base.eccreq.step_size == 0)
- 		/* Not enough information */
- 		return true;
- 
-@@ -5469,9 +5469,10 @@ static bool nand_ecc_strength_good(struct nand_chip *chip)
- 	 * the correction density.
- 	 */
- 	corr = (mtd->writesize * ecc->strength) / ecc->size;
--	ds_corr = (mtd->writesize * chip->ecc_strength_ds) / chip->ecc_step_ds;
-+	ds_corr = (mtd->writesize * chip->base.eccreq.strength) /
-+		  chip->base.eccreq.step_size;
- 
--	return corr >= ds_corr && ecc->strength >= chip->ecc_strength_ds;
-+	return corr >= ds_corr && ecc->strength >= chip->base.eccreq.strength;
+@@ -194,9 +214,90 @@ int imx_scu_call_rpc(struct imx_sc_ipc *sc_ipc, void *msg, bool have_resp)
  }
+ EXPORT_SYMBOL(imx_scu_call_rpc);
  
- static int rawnand_erase(struct nand_device *nand, const struct nand_pos *pos)
-diff --git a/drivers/mtd/nand/raw/nand_esmt.c b/drivers/mtd/nand/raw/nand_esmt.c
-index 96f039a83bc8..3de5e89482f5 100644
---- a/drivers/mtd/nand/raw/nand_esmt.c
-+++ b/drivers/mtd/nand/raw/nand_esmt.c
-@@ -14,20 +14,20 @@ static void esmt_nand_decode_id(struct nand_chip *chip)
++int imx_scu_register_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_register(&imx_scu_notifier_chain, nb);
++}
++EXPORT_SYMBOL(imx_scu_register_notifier);
++
++int imx_scu_unregister_notifier(struct notifier_block *nb)
++{
++	return blocking_notifier_chain_unregister(&imx_scu_notifier_chain, nb);
++}
++EXPORT_SYMBOL(imx_scu_unregister_notifier);
++
++static int imx_scu_notifier_call_chain(unsigned long status, u8 *group)
++{
++	return blocking_notifier_call_chain(&imx_scu_notifier_chain,
++					    status, (void *)group);
++}
++
++static void imx_scu_general_irq_work_handler(struct work_struct *work)
++{
++	struct imx_sc_msg_irq_get_status msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	u32 irq_status;
++	int ret;
++	u8 i;
++
++	for (i = 0; i < IMX_SC_IRQ_NUM_GROUP; i++) {
++		hdr->ver = IMX_SC_RPC_VERSION;
++		hdr->svc = IMX_SC_RPC_SVC_IRQ;
++		hdr->func = IMX_SC_IRQ_FUNC_STATUS;
++		hdr->size = 2;
++
++		msg.data.req.resource = imx_sc_ipc_handle->mu_resource_id;
++		msg.data.req.group = i;
++
++		ret = imx_scu_call_rpc(imx_sc_ipc_handle, &msg, true);
++		if (ret) {
++			pr_err("get irq status failed, ret %d\n", ret);
++			return;
++		}
++
++		irq_status = msg.data.resp.status;
++		if (!irq_status)
++			continue;
++
++		imx_scu_notifier_call_chain(irq_status, &i);
++	}
++}
++
++static void imx_scu_rxdb_callback(struct mbox_client *c, void *msg)
++{
++	schedule_work(&imx_sc_general_irq_work);
++}
++
++static int imx_scu_enable_general_irq_channel(struct device *dev)
++{
++	struct mbox_client *cl;
++	struct mbox_chan *ch;
++	int ret = 0;
++
++	cl = devm_kzalloc(dev, sizeof(*cl), GFP_KERNEL);
++	if (!cl)
++		return -ENOMEM;
++
++	cl->dev = dev;
++	cl->rx_callback = imx_scu_rxdb_callback;
++
++	/* SCU general IRQ uses general interrupt channel 3 */
++	ch = mbox_request_channel_byname(cl, "gip3");
++	if (IS_ERR(ch)) {
++		ret = PTR_ERR(ch);
++		dev_err(dev, "failed to request mbox chan gip3, ret %d\n", ret);
++		return ret;
++	}
++
++	INIT_WORK(&imx_sc_general_irq_work, imx_scu_general_irq_work_handler);
++
++	return ret;
++}
++
+ static int imx_scu_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct of_phandle_args spec;
+ 	struct imx_sc_ipc *sc_ipc;
+ 	struct imx_sc_chan *sc_chan;
+ 	struct mbox_client *cl;
+@@ -246,6 +347,21 @@ static int imx_scu_probe(struct platform_device *pdev)
  
- 	/* Extract ECC requirements from 5th id byte. */
- 	if (chip->id.len >= 5 && nand_is_slc(chip)) {
--		chip->ecc_step_ds = 512;
-+		chip->base.eccreq.step_size = 512;
- 		switch (chip->id.data[4] & 0x3) {
- 		case 0x0:
--			chip->ecc_strength_ds = 4;
-+			chip->base.eccreq.strength = 4;
- 			break;
- 		case 0x1:
--			chip->ecc_strength_ds = 2;
-+			chip->base.eccreq.strength = 2;
- 			break;
- 		case 0x2:
--			chip->ecc_strength_ds = 1;
-+			chip->base.eccreq.strength = 1;
- 			break;
- 		default:
- 			WARN(1, "Could not get ECC info");
--			chip->ecc_step_ds = 0;
-+			chip->base.eccreq.step_size = 0;
- 			break;
- 		}
- 	}
-diff --git a/drivers/mtd/nand/raw/nand_hynix.c b/drivers/mtd/nand/raw/nand_hynix.c
-index 272b934dffb7..821d221b83eb 100644
---- a/drivers/mtd/nand/raw/nand_hynix.c
-+++ b/drivers/mtd/nand/raw/nand_hynix.c
-@@ -508,30 +508,30 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
+ 	imx_sc_ipc_handle = sc_ipc;
  
- 	if (valid_jedecid) {
- 		/* Reference: H27UCG8T2E datasheet */
--		chip->ecc_step_ds = 1024;
-+		chip->base.eccreq.step_size = 1024;
++	ret = imx_scu_enable_general_irq_channel(dev);
++	if (ret)
++		dev_warn(dev,
++			"failed to enable general irq channel: %d\n", ret);
++
++	if (!of_parse_phandle_with_args(dev->of_node, "mboxes",
++				       "#mbox-cells", 0, &spec))
++		i = of_alias_get_id(spec.np, "mu");
++
++	/* use mu1 as general mu irq channel if failed */
++	if (i < 0)
++		i = 1;
++
++	imx_sc_ipc_handle->mu_resource_id = IMX_SC_R_MU_0A + i;
++
+ 	dev_info(dev, "NXP i.MX SCU Initialized\n");
  
- 		switch (ecc_level) {
- 		case 0:
--			chip->ecc_step_ds = 0;
--			chip->ecc_strength_ds = 0;
-+			chip->base.eccreq.step_size = 0;
-+			chip->base.eccreq.strength = 0;
- 			break;
- 		case 1:
--			chip->ecc_strength_ds = 4;
-+			chip->base.eccreq.strength = 4;
- 			break;
- 		case 2:
--			chip->ecc_strength_ds = 24;
-+			chip->base.eccreq.strength = 24;
- 			break;
- 		case 3:
--			chip->ecc_strength_ds = 32;
-+			chip->base.eccreq.strength = 32;
- 			break;
- 		case 4:
--			chip->ecc_strength_ds = 40;
-+			chip->base.eccreq.strength = 40;
- 			break;
- 		case 5:
--			chip->ecc_strength_ds = 50;
-+			chip->base.eccreq.strength = 50;
- 			break;
- 		case 6:
--			chip->ecc_strength_ds = 60;
-+			chip->base.eccreq.strength = 60;
- 			break;
- 		default:
- 			/*
-@@ -552,14 +552,14 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
- 		if (nand_tech < 3) {
- 			/* > 26nm, reference: H27UBG8T2A datasheet */
- 			if (ecc_level < 5) {
--				chip->ecc_step_ds = 512;
--				chip->ecc_strength_ds = 1 << ecc_level;
-+				chip->base.eccreq.step_size = 512;
-+				chip->base.eccreq.strength = 1 << ecc_level;
- 			} else if (ecc_level < 7) {
- 				if (ecc_level == 5)
--					chip->ecc_step_ds = 2048;
-+					chip->base.eccreq.step_size = 2048;
- 				else
--					chip->ecc_step_ds = 1024;
--				chip->ecc_strength_ds = 24;
-+					chip->base.eccreq.step_size = 1024;
-+				chip->base.eccreq.strength = 24;
- 			} else {
- 				/*
- 				 * We should never reach this case, but if that
-@@ -572,14 +572,14 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
- 		} else {
- 			/* <= 26nm, reference: H27UBG8T2B datasheet */
- 			if (!ecc_level) {
--				chip->ecc_step_ds = 0;
--				chip->ecc_strength_ds = 0;
-+				chip->base.eccreq.step_size = 0;
-+				chip->base.eccreq.strength = 0;
- 			} else if (ecc_level < 5) {
--				chip->ecc_step_ds = 512;
--				chip->ecc_strength_ds = 1 << (ecc_level - 1);
-+				chip->base.eccreq.step_size = 512;
-+				chip->base.eccreq.strength = 1 << (ecc_level - 1);
- 			} else {
--				chip->ecc_step_ds = 1024;
--				chip->ecc_strength_ds = 24 +
-+				chip->base.eccreq.step_size = 1024;
-+				chip->base.eccreq.strength = 24 +
- 							(8 * (ecc_level - 5));
- 			}
- 		}
-diff --git a/drivers/mtd/nand/raw/nand_jedec.c b/drivers/mtd/nand/raw/nand_jedec.c
-index 99e2f017c79b..9b540e76f84f 100644
---- a/drivers/mtd/nand/raw/nand_jedec.c
-+++ b/drivers/mtd/nand/raw/nand_jedec.c
-@@ -110,8 +110,8 @@ int nand_jedec_detect(struct nand_chip *chip)
- 	ecc = &p->ecc_info[0];
+ 	return devm_of_platform_populate(dev);
+diff --git a/include/linux/firmware/imx/sci.h b/include/linux/firmware/imx/sci.h
+index ebc5509..9d608db 100644
+--- a/include/linux/firmware/imx/sci.h
++++ b/include/linux/firmware/imx/sci.h
+@@ -15,4 +15,7 @@
  
- 	if (ecc->codeword_size >= 9) {
--		chip->ecc_strength_ds = ecc->ecc_bits;
--		chip->ecc_step_ds = 1 << ecc->codeword_size;
-+		chip->base.eccreq.strength = ecc->ecc_bits;
-+		chip->base.eccreq.step_size = 1 << ecc->codeword_size;
- 	} else {
- 		pr_warn("Invalid codeword size\n");
- 	}
-diff --git a/drivers/mtd/nand/raw/nand_micron.c b/drivers/mtd/nand/raw/nand_micron.c
-index 98ce6575aa64..7a2cef02eacd 100644
---- a/drivers/mtd/nand/raw/nand_micron.c
-+++ b/drivers/mtd/nand/raw/nand_micron.c
-@@ -391,7 +391,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
- 	/*
- 	 * We only support on-die ECC of 4/512 or 8/512
- 	 */
--	if  (chip->ecc_strength_ds != 4 && chip->ecc_strength_ds != 8)
-+	if  (chip->base.eccreq.strength != 4 && chip->base.eccreq.strength != 8)
- 		return MICRON_ON_DIE_UNSUPPORTED;
- 
- 	/* 0x2 means on-die ECC is available. */
-@@ -424,7 +424,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
- 	/*
- 	 * We only support on-die ECC of 4/512 or 8/512
- 	 */
--	if  (chip->ecc_strength_ds != 4 && chip->ecc_strength_ds != 8)
-+	if  (chip->base.eccreq.strength != 4 && chip->base.eccreq.strength != 8)
- 		return MICRON_ON_DIE_UNSUPPORTED;
- 
- 	return MICRON_ON_DIE_SUPPORTED;
-@@ -479,7 +479,7 @@ static int micron_nand_init(struct nand_chip *chip)
- 		 * That's not needed for 8-bit ECC, because the status expose
- 		 * a better approximation of the number of bitflips in a page.
- 		 */
--		if (chip->ecc_strength_ds == 4) {
-+		if (chip->base.eccreq.strength == 4) {
- 			micron->ecc.rawbuf = kmalloc(mtd->writesize +
- 						     mtd->oobsize,
- 						     GFP_KERNEL);
-@@ -489,16 +489,16 @@ static int micron_nand_init(struct nand_chip *chip)
- 			}
- 		}
- 
--		if (chip->ecc_strength_ds == 4)
-+		if (chip->base.eccreq.strength == 4)
- 			mtd_set_ooblayout(mtd,
- 					  &micron_nand_on_die_4_ooblayout_ops);
- 		else
- 			mtd_set_ooblayout(mtd,
- 					  &micron_nand_on_die_8_ooblayout_ops);
- 
--		chip->ecc.bytes = chip->ecc_strength_ds * 2;
-+		chip->ecc.bytes = chip->base.eccreq.strength * 2;
- 		chip->ecc.size = 512;
--		chip->ecc.strength = chip->ecc_strength_ds;
-+		chip->ecc.strength = chip->base.eccreq.strength;
- 		chip->ecc.algo = NAND_ECC_BCH;
- 		chip->ecc.read_page = micron_nand_read_page_on_die_ecc;
- 		chip->ecc.write_page = micron_nand_write_page_on_die_ecc;
-diff --git a/drivers/mtd/nand/raw/nand_onfi.c b/drivers/mtd/nand/raw/nand_onfi.c
-index 7b468e7214c7..0b879bd0a68c 100644
---- a/drivers/mtd/nand/raw/nand_onfi.c
-+++ b/drivers/mtd/nand/raw/nand_onfi.c
-@@ -94,8 +94,8 @@ static int nand_flash_detect_ext_param_page(struct nand_chip *chip,
- 		goto ext_out;
- 	}
- 
--	chip->ecc_strength_ds = ecc->ecc_bits;
--	chip->ecc_step_ds = 1 << ecc->codeword_size;
-+	chip->base.eccreq.strength = ecc->ecc_bits;
-+	chip->base.eccreq.step_size = 1 << ecc->codeword_size;
- 	ret = 0;
- 
- ext_out:
-@@ -252,8 +252,8 @@ int nand_onfi_detect(struct nand_chip *chip)
- 		chip->options |= NAND_BUSWIDTH_16;
- 
- 	if (p->ecc_bits != 0xff) {
--		chip->ecc_strength_ds = p->ecc_bits;
--		chip->ecc_step_ds = 512;
-+		chip->base.eccreq.strength = p->ecc_bits;
-+		chip->base.eccreq.step_size = 512;
- 	} else if (onfi_version >= 21 &&
- 		(le16_to_cpu(p->features) & ONFI_FEATURE_EXT_PARAM_PAGE)) {
- 
-diff --git a/drivers/mtd/nand/raw/nand_samsung.c b/drivers/mtd/nand/raw/nand_samsung.c
-index 9a9ad43cc97d..f7d7041b6213 100644
---- a/drivers/mtd/nand/raw/nand_samsung.c
-+++ b/drivers/mtd/nand/raw/nand_samsung.c
-@@ -80,23 +80,23 @@ static void samsung_nand_decode_id(struct nand_chip *chip)
- 		/* Extract ECC requirements from 5th id byte*/
- 		extid = (chip->id.data[4] >> 4) & 0x07;
- 		if (extid < 5) {
--			chip->ecc_step_ds = 512;
--			chip->ecc_strength_ds = 1 << extid;
-+			chip->base.eccreq.step_size = 512;
-+			chip->base.eccreq.strength = 1 << extid;
- 		} else {
--			chip->ecc_step_ds = 1024;
-+			chip->base.eccreq.step_size = 1024;
- 			switch (extid) {
- 			case 5:
--				chip->ecc_strength_ds = 24;
-+				chip->base.eccreq.strength = 24;
- 				break;
- 			case 6:
--				chip->ecc_strength_ds = 40;
-+				chip->base.eccreq.strength = 40;
- 				break;
- 			case 7:
--				chip->ecc_strength_ds = 60;
-+				chip->base.eccreq.strength = 60;
- 				break;
- 			default:
- 				WARN(1, "Could not decode ECC info");
--				chip->ecc_step_ds = 0;
-+				chip->base.eccreq.step_size = 0;
- 			}
- 		}
- 	} else {
-@@ -106,8 +106,8 @@ static void samsung_nand_decode_id(struct nand_chip *chip)
- 			switch (chip->id.data[1]) {
- 			/* K9F4G08U0D-S[I|C]B0(T00) */
- 			case 0xDC:
--				chip->ecc_step_ds = 512;
--				chip->ecc_strength_ds = 1;
-+				chip->base.eccreq.step_size = 512;
-+				chip->base.eccreq.strength = 1;
- 				break;
- 
- 			/* K9F1G08U0E 21nm chips do not support subpage write */
-diff --git a/drivers/mtd/nand/raw/nand_toshiba.c b/drivers/mtd/nand/raw/nand_toshiba.c
-index d8465049dfd6..13f9632f1cb4 100644
---- a/drivers/mtd/nand/raw/nand_toshiba.c
-+++ b/drivers/mtd/nand/raw/nand_toshiba.c
-@@ -130,20 +130,20 @@ static void toshiba_nand_decode_id(struct nand_chip *chip)
- 	 *  - 24nm: 8 bit ECC for each 512Byte is required.
- 	 */
- 	if (chip->id.len >= 6 && nand_is_slc(chip)) {
--		chip->ecc_step_ds = 512;
-+		chip->base.eccreq.step_size = 512;
- 		switch (chip->id.data[5] & 0x7) {
- 		case 0x4:
--			chip->ecc_strength_ds = 1;
-+			chip->base.eccreq.strength = 1;
- 			break;
- 		case 0x5:
--			chip->ecc_strength_ds = 4;
-+			chip->base.eccreq.strength = 4;
- 			break;
- 		case 0x6:
--			chip->ecc_strength_ds = 8;
-+			chip->base.eccreq.strength = 8;
- 			break;
- 		default:
- 			WARN(1, "Could not get ECC info");
--			chip->ecc_step_ds = 0;
-+			chip->base.eccreq.step_size = 0;
- 			break;
- 		}
- 	}
-diff --git a/drivers/mtd/nand/raw/sunxi_nand.c b/drivers/mtd/nand/raw/sunxi_nand.c
-index d5de0a7114bc..69599854fdd6 100644
---- a/drivers/mtd/nand/raw/sunxi_nand.c
-+++ b/drivers/mtd/nand/raw/sunxi_nand.c
-@@ -1821,8 +1821,8 @@ static int sunxi_nand_attach_chip(struct nand_chip *nand)
- 	nand->options |= NAND_SUBPAGE_READ;
- 
- 	if (!ecc->size) {
--		ecc->size = nand->ecc_step_ds;
--		ecc->strength = nand->ecc_strength_ds;
-+		ecc->size = nand->base.eccreq.step_size;
-+		ecc->strength = nand->base.eccreq.strength;
- 	}
- 
- 	if (!ecc->size || !ecc->strength)
-diff --git a/drivers/mtd/nand/raw/tegra_nand.c b/drivers/mtd/nand/raw/tegra_nand.c
-index 13be32c38194..3cc9a4c41443 100644
---- a/drivers/mtd/nand/raw/tegra_nand.c
-+++ b/drivers/mtd/nand/raw/tegra_nand.c
-@@ -853,7 +853,7 @@ static int tegra_nand_get_strength(struct nand_chip *chip, const int *strength,
- 		} else {
- 			strength_sel = strength[i];
- 
--			if (strength_sel < chip->ecc_strength_ds)
-+			if (strength_sel < chip->base.eccreq.strength)
- 				continue;
- 		}
- 
-@@ -917,9 +917,9 @@ static int tegra_nand_attach_chip(struct nand_chip *chip)
- 	chip->ecc.mode = NAND_ECC_HW;
- 	chip->ecc.size = 512;
- 	chip->ecc.steps = mtd->writesize / chip->ecc.size;
--	if (chip->ecc_step_ds != 512) {
-+	if (chip->base.eccreq.step_size != 512) {
- 		dev_err(ctrl->dev, "Unsupported step size %d\n",
--			chip->ecc_step_ds);
-+			chip->base.eccreq.step_size);
- 		return -EINVAL;
- 	}
- 
-@@ -950,7 +950,7 @@ static int tegra_nand_attach_chip(struct nand_chip *chip)
- 		if (ret < 0) {
- 			dev_err(ctrl->dev,
- 				"No valid strength found, minimum %d\n",
--				chip->ecc_strength_ds);
-+				chip->base.eccreq.strength);
- 			return ret;
- 		}
- 
-diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-index e5a25ba75211..14748183508b 100644
---- a/include/linux/mtd/rawnand.h
-+++ b/include/linux/mtd/rawnand.h
-@@ -1004,12 +1004,6 @@ struct nand_legacy {
-  * @badblockbits:	[INTERN] minimum number of set bits in a good block's
-  *			bad block marker position; i.e., BBM == 11110111b is
-  *			not bad when badblockbits == 7
-- * @ecc_strength_ds:	[INTERN] ECC correctability from the datasheet.
-- *			Minimum amount of bit errors per @ecc_step_ds guaranteed
-- *			to be correctable. If unknown, set to zero.
-- * @ecc_step_ds:	[INTERN] ECC step required by the @ecc_strength_ds,
-- *			also from the datasheet. It is the recommended ECC step
-- *			size, if known; if unknown, set to zero.
-  * @onfi_timing_mode_default: [INTERN] default ONFI timing mode. This field is
-  *			      set to the actually used ONFI mode if the chip is
-  *			      ONFI compliant or deduced from the datasheet if
-@@ -1069,8 +1063,6 @@ struct nand_chip {
- 	} pagecache;
- 
- 	int subpagesize;
--	uint16_t ecc_strength_ds;
--	uint16_t ecc_step_ds;
- 	int onfi_timing_mode_default;
- 	int badblockpos;
- 	int badblockbits;
+ #include <linux/firmware/imx/svc/misc.h>
+ #include <linux/firmware/imx/svc/pm.h>
++
++int imx_scu_register_notifier(struct notifier_block *nb);
++int imx_scu_unregister_notifier(struct notifier_block *nb);
+ #endif /* _SC_SCI_H */
 -- 
-2.19.1
+2.7.4
 
 
 _______________________________________________
