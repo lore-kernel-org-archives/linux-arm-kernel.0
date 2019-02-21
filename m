@@ -2,77 +2,70 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 252AEC00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:40:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5225CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:43:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E9C4E20855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:40:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F9FA20836
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 21:43:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SgsFEwdM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="i0SanTzt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9C4E20855
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VhvtK1YT";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0V8xyxYI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F9FA20836
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
+	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ox/zaWcB8vGWzGU0LFvXBvcc9e+YkRunvSlWUE4cRdQ=; b=SgsFEwdMkKJCh0
-	Astu2E17Tbl+5Q3TJJnwGkLRHTLJDLCLetCVcnah4iX2Fn2dY3ki068YsegOfOVjzp3na+BSNkb14
-	WNzctp1BNjLm61fLDCJinA9u28vlsxNKOSnd93hnvht58KbwfhxPxk2syPBZqRolzm+PGuYTZgQo/
-	bqvXfwbzPmy6tVcsGlIdPHBKCGbHFSb4cbvGP6jfwLZHNU1ac3walqpkWNP3H+iBtOhOHdkyxCArh
-	Md4J5K4DlvbEaWxV8dcJfrErAiYy5Ncj8TAZFH2MRdpKOY73kJwopwvnpccQAv0kuW18g/NZE94O3
-	3H19dWkRJGNWuiIFhgDw==;
+	List-Owner; bh=+M8+NKZcDHwQLrkOPKvVAdq9czUvTnj9DHMSvm2wOhk=; b=VhvtK1YT0nFQ2j
+	cwjcVaohcPAAAR+BpBl+k20LumN9oWLEpZD0j+hbgmBVogX+QbkdubZjAD4qaAgYisNjZAEpCzrHU
+	mP3mP4RyY3/SWHWwO3eIiKZKEUO4n/VoP9UfSA/ip8gmNqZAa/He6MwZt3vR6S1ZfzJGyV3bIais0
+	HbWcJavkCidIifym4V8JgHDaiu0o/RYhJ5/rN6v3158RXeLjAyY18K/pAioqdqfDC8KBxbDJegedB
+	FNZXsZRZjhScZMtYFTemiGNRHQrU14D1FLuM2K8rBsgCW1borygSkeJTUdOR4rLD+/R8MPqyRNuAO
+	3w4kdTPprL3EAKPoiwUQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gww53-0007We-Rr; Thu, 21 Feb 2019 21:40:33 +0000
+	id 1gww81-0008Dj-7E; Thu, 21 Feb 2019 21:43:37 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gww50-0007WF-Iu
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 21:40:31 +0000
-Received: from mail-qk1-f176.google.com (mail-qk1-f176.google.com
- [209.85.222.176])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gww7y-0008DP-8K
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 21:43:35 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2A7B22084F
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 21:40:30 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id BE1372080F;
+ Thu, 21 Feb 2019 21:43:33 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550785230;
- bh=E4oo939D+Wd4k2cm0MMMJPASRD8zd2968+rhPegnv6M=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=i0SanTztlrA+RBfR/SuupafZ3fku56/vafXRVQOzbzaXz1LuSbYhsH0jw91SBHIna
- YOEwdG/LxVRQD/NZ44rdFDjLCkAGW9b31MFCLMOfyop1bZ3KkVOJXW7cgRgPyxSGID
- wxN1iFIKsbi4GZ1c904GxrfV2dnaEdSmjnrQod5w=
-Received: by mail-qk1-f176.google.com with SMTP id o125so85035qkf.3
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 13:40:30 -0800 (PST)
-X-Gm-Message-State: AHQUAuZ+CRqYHMUbMM3bxl7BjGH4DldAT+q9qjTY3jEMt/WF1l07+7bG
- ZoLutC9eak1spr92H2fX4u4HM04wco5n7gOG8g==
-X-Google-Smtp-Source: AHgI3IbzkLbWet0saKWkUzUIFgRM5iGCk24Pr9PVH+ZqJWA0VHVe4BfcKwN6rCxKZfcOguJQjcLLwZZZ3ZTYQucUz60=
-X-Received: by 2002:a37:a381:: with SMTP id m123mr536020qke.147.1550785229393; 
- Thu, 21 Feb 2019 13:40:29 -0800 (PST)
+ s=default; t=1550785413;
+ bh=1V1fa89HRlAZLgQ1xiUDViIqteCgMYcMAxRF6LJf0Sc=;
+ h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
+ b=0V8xyxYIpdrwrT/l137iDJ7ZvYdrbofQpFPP104vwYKJvlcyEMtcABdWGq8EAauIW
+ mXXvmlsk3XMj/7921WXXe3hR7wlreFpLhIwK5zpRCMVgE7EcZSMEyp/x0eb79aI8Tj
+ e3zmK+LW8ZztW8nQGRsKIdXXKIWwgXYuQYaV3dxA=
 MIME-Version: 1.0
-References: <20190221154458.23763-1-linus.walleij@linaro.org>
- <20190221154458.23763-12-linus.walleij@linaro.org>
-In-Reply-To: <20190221154458.23763-12-linus.walleij@linaro.org>
-From: Rob Herring <robh@kernel.org>
-Date: Thu, 21 Feb 2019 15:40:18 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqKp-DPkEQuWbeTsTqXF7v2=BD11-x2Os_8KfXtg28UJ8g@mail.gmail.com>
-Message-ID: <CAL_JsqKp-DPkEQuWbeTsTqXF7v2=BD11-x2Os_8KfXtg28UJ8g@mail.gmail.com>
-Subject: Re: [PATCH 11/30 v2] clocksource/drivers/ixp4xx: Add DT bindings
-To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [PATCH] clk: samsung: s3c2443: Mark expected switch fall-through
+Message-ID: <155078541292.77512.12594007340364187685@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.8
+References: <20190211181531.GA3238@embeddedor>
+ <CAJKOXPeHp7sKkZ+jXmTXk5GEF_7G5ujfm3Lw==G3T4thfD+F7Q@mail.gmail.com>
+ <CAGXu5jLMWrb4Dszv5YSyoGt5Lb3S1oE8EnKsTou7=7Nq1rEEVQ@mail.gmail.com>
+ <155027728836.115909.11546859472583324712@swboyd.mtv.corp.google.com>
+ <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <CAGXu5jJPfoYy20WrR5ghaSo88bsA75s-OyA4qt_3Vz0cJST_MQ@mail.gmail.com>
+To: Kees Cook <keescook@chromium.org>
+Date: Thu, 21 Feb 2019 13:43:32 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_134030_641312_CB39A17E 
-X-CRM114-Status: GOOD (  13.01  )
+X-CRM114-CacheID: sfid-20190221_134334_340936_7CAC1186 
+X-CRM114-Status: GOOD (  22.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,36 +77,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
- Krzysztof Halasa <khalasa@piap.pl>, Thomas Gleixner <tglx@linutronix.de>,
- Imre Kaloz <kaloz@openwrt.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Tomasz Figa <tomasz.figa@gmail.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ LKML <linux-kernel@vger.kernel.org>, Chanwoo Choi <cw00.choi@samsung.com>,
+ Kukjin Kim <kgene@kernel.org>, Sylwester Nawrocki <s.nawrocki@samsung.com>,
+ linux-clk@vger.kernel.org,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 9:45 AM Linus Walleij <linus.walleij@linaro.org> wrote:
->
-> This adds device tree bindings for the Intel IXP4xx
-> timers.
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: devicetree@vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v1->v2:
-> - Switch to JSON YAML schema, why not.
-> - Not collecting any review tags as this changed a bit.
-> ---
->  .../bindings/timer/intel,ixp4xx-timer.yaml    | 42 +++++++++++++++++++
->  MAINTAINERS                                   |  1 +
->  2 files changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/timer/intel,ixp4xx-timer.yaml
+Quoting Kees Cook (2019-02-20 14:26:06)
+> On Fri, Feb 15, 2019 at 4:34 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> > Quoting Kees Cook (2019-02-12 10:57:05)
+> > > On Mon, Feb 11, 2019 at 11:41 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > > >
+> > > > It is just the GCC which has to be fixed not the code. You want to
+> > > > adjust the code for specific version of GCC and what if GCC changes
+> > > > its warning? For example GCC might require "fall through: "... or any
+> > > > other syntax. Another point - what about clang's syntax?
+> > >
+> > > -Wimplicit-fallthrough=3 is stricter and maps to -Wextra, hence its
+> > > choice. GCC's levels were chosen based on the existing linters, static
+> > > analyzers, etc. The patterns are unlikely to change (see the gcc
+> > > man-page).
+> > >
+> > > Clang doesn't recognize anything in C mode (hopefully this will be
+> > > fixed in the future[1]).
+> > >
+> > > As long as one of the compilers is able to check this, we'll avoid the
+> > > bugs associated with this mis-pattern. Gustavo's efforts here have
+> > > found kind of a lot of bugs, so I think it's worth a little churn to
+> > > add these (and make minor adjustments to existing comments).
+> >
+> > Just curious, what compilation phase does this check run in? Could we
+> > gain a macro like FALLTHRU or even lowercase 'fallthru' that expanded to
+> > whatever the compiler wants to see and then there would only be "one
+> > way" to do this?  It would alleviate the above concerns, but maybe I'm
+> > rehashing something that's already been proposed and rejected.
+> 
+> When this got discussed a while back, the thinking was that since
+> we're also dealing with static analyzers (e.g. Coverity) and IDEs that
+> literally parse comments in the code, it was most sensible (at least
+> for now, prior to there being a formal C "fall through" statement --
+> there is for C++ but not yet for C), we'd stick to explicit comments.
+> In theory, we will be able to do a tree-wide change to add the C
+> statement once it exists.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Ok, thanks for the background. Looks like the perf tool already
+introduced the #define __fallthrough that they use for this purpose.
+Maybe they're hoping that it will be formalized.
+
 
 _______________________________________________
 linux-arm-kernel mailing list
