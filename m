@@ -4,18 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BCF8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:44:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 264ECC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:44:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0C69020823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:44:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E8E5220823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:44:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ktb4kIwF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C69020823
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z2QE5g6o"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E8E5220823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-m68k.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,51 +24,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H345W1zbeWwauZHBFe06cwK888bLMJfT1EzwSjt2wLA=; b=Ktb4kIwFW3l8YD
-	WAjuu7og0q1T2pZoxyvKKJ4dqxrp8xXflEJfdQsgU2IRgeETUPT8CJjKrYtcUnCjgr5z9e/PNbC7u
-	XjUp7M/a8OsuwVLdp7eMyhatr4QWUy5oGatXpo722N8aWHNo2t96hhuy08IRbFfP2rADHsNbOBOeM
-	zNlHj3Go7fQALnrlY006IW2D5zYcQ7MTOs5QqZGjpsL35xvz9feN3Xlaw9FuHTgaJsXyW33sLeq24
-	mtjhYDKooVX1V4cEYuJmQMqSebMVvDOri0ft6mkdkVjXQaatO6bQypGK6iAdGObUiqTC5irSSdNPZ
-	8qGaFOQ1mmUAdw+bSpug==;
+	List-Owner; bh=QUgybpVylWA8jWGdLYnD8Ua+8KnID8SZotEdOijnPio=; b=Z2QE5g6owAjGEo
+	68mdVCW2MYUM8568m1YYfxa16xrlOBOxpcL7HB4yc8hQ9cx05FifRxBM1OUvzfPL+dDJG40pIlrfw
+	cS5G5uP7YsoSljTKrrK5jPMNsLhgPu7+k6hw7Lz6wkFuKuZom7NqBJqzcnXirAGHi+XWTUc5Ve8XS
+	R6AAlEGwcYYyi1Zd9uty/VilP4+9VtGq0SvOYfLWOpDuCMH5lL/dj84dR1w//GfQ5tpqHY44n2zQ/
+	UWTYJHPEHMj92uCouIv4CVgpNBEQaNCBOPvTh/buPDhYvO9//wVuLuAuHSSpdQWet/wsuyeVOYisK
+	3qhRHrLjY06RXNs3xMig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwqWB-0002rR-72; Thu, 21 Feb 2019 15:44:11 +0000
-Received: from mail-ua1-f65.google.com ([209.85.222.65])
+	id 1gwqWc-00038f-KU; Thu, 21 Feb 2019 15:44:38 +0000
+Received: from mail-ua1-f66.google.com ([209.85.222.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwqW7-0002qp-PF
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:44:09 +0000
-Received: by mail-ua1-f65.google.com with SMTP id v9so9627492uar.11
+ id 1gwqWZ-000388-65
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:44:37 +0000
+Received: by mail-ua1-f66.google.com with SMTP id j8so9622766uae.13
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 07:44:07 -0800 (PST)
+ Thu, 21 Feb 2019 07:44:34 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=/Ujnw5Uiwkv5qTiAYI4IO+ayFYK6PgidtMZeh00Ee/Y=;
- b=fvifBO4mEQqqsZCORsXCsayX/N++comIp1RP0IzrX1yt4MprUEsoKHBv+WOyZoQ4ck
- SLRDNmR/es5HsPnjzNuXyq6YOYaJedRbwwuLwO/+dYh5vFBfgbHm4q2OCBEyAoyTtLOn
- vOfI5J7UziU+eejiXIPzyoWtD7ktD5FYH2pC7Gl9lRPReAx4jX81/ODhllCBy5eAyNcH
- xdThj3g02cbkaqRrMBdj4mqbc8KjkWNSU5jezfeUu7QvFZPM5e1Id1wGwPitTb2Ejd2n
- Kd2PsG2xBhx554x4j61EL+jFbr6TJ5e99n20P0BY3RLCtvStIcwUYVpb/oW1NgNIMGVL
- hrrg==
-X-Gm-Message-State: AHQUAuZxKFRXC9ekxUGYbE/2i0WkBYnYHe+p1rWuF0mJiJjO8ld5jWrc
- fMI84E0OWqNoIn+0x1Js3LrnoWw5ERxG+4VtSho=
-X-Google-Smtp-Source: AHgI3IZkIsmyOUVreh1QOkHEAPFxqcxd77snLAmAV+9Sy/chSvR4jotEu/irvqDdLX1f9A4IiENyMkkEowuXViAeJaU=
-X-Received: by 2002:a67:fc9a:: with SMTP id x26mr3949088vsp.166.1550763846010; 
- Thu, 21 Feb 2019 07:44:06 -0800 (PST)
+ bh=6eMh2+4Dzu8fH8dTG8IuUcw3i7yHGPBUrizuhfdjbzM=;
+ b=ToeC0JBL/MG8yMVvwRBt8m0Dqd1K9rC4U/4RmYgGY428KQ0aKi6sup6QGYKRSCpicW
+ TunojHoq+4/HixVyOZrZPJmGU9HpjxcxEhxcH5LGZdIuemh60tKWfeFMMEH8lhS9WzTL
+ xIMgdGdCJCEbgBS7nBndghV4lI2qjw5ZhUjuAwoaIFE3kKEjJSfFltiFK2AiOZe6ps6R
+ nCxsUS6aNihzDUiTe5VckAm4rjBafz4JFnwujlYd6EekyXeBkmCmx2RL9PMfhzwaXbkE
+ NlU9tYC3grpXfuS4c3Ffdu6ZDW5B6RB/lKElRAoxq9sCJn8CqpI+JvGaJxCb5pWpaqJM
+ CiUQ==
+X-Gm-Message-State: AHQUAuYFlDsUtcJE7Kmryf9v1Ba1GGNoDHMzFn/lV+/TKpITpDG5UWBV
+ DpZ55ZX/bjRoDEABNkG6K8IarJJCTbawYrT6zbqdsjpk
+X-Google-Smtp-Source: AHgI3IYHR/rvso6r8oBc1YsmiKIWozJLbR7EZ4EqqZKb7c/uuOjbi1ImhsdIK1jqouVkO8hMKu9y1o7UYKxdNt8694g=
+X-Received: by 2002:a67:ead0:: with SMTP id s16mr17405341vso.63.1550763874055; 
+ Thu, 21 Feb 2019 07:44:34 -0800 (PST)
 MIME-Version: 1.0
 References: <1550749552-8133-1-git-send-email-krzk@kernel.org>
- <1550749552-8133-2-git-send-email-krzk@kernel.org>
-In-Reply-To: <1550749552-8133-2-git-send-email-krzk@kernel.org>
+ <1550749552-8133-3-git-send-email-krzk@kernel.org>
+In-Reply-To: <1550749552-8133-3-git-send-email-krzk@kernel.org>
 From: Geert Uytterhoeven <geert@linux-m68k.org>
-Date: Thu, 21 Feb 2019 16:43:53 +0100
-Message-ID: <CAMuHMdUcn4LtMnE75XzF+p2G8ivTxKPMp_gT6ozx0iwtQFS+Hw@mail.gmail.com>
-Subject: Re: [PATCH v2 1/2] clk: samsung: exynos5: Fix possible NULL pointer
- exception on platform_device_alloc() failure
+Date: Thu, 21 Feb 2019 16:44:22 +0100
+Message-ID: <CAMuHMdUFvrW5RuhJxCoZdjzbYobJydcdTttkZTaRtL3=7Ao_Fg@mail.gmail.com>
+Subject: Re: [PATCH v2 2/2] clk: samsung: exynos5: Fix kfree() of const memory
+ on setting driver_override
 To: Krzysztof Kozlowski <krzk@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_074407_820547_D15B0CFB 
-X-CRM114-Status: GOOD (  11.34  )
+X-CRM114-CacheID: sfid-20190221_074435_229101_4E3E5679 
+X-CRM114-Status: GOOD (  13.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,12 +93,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 12:47 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> During initialization of subdevices if platform_device_alloc() failed,
-> returned NULL pointer will be later dereferenced.  Add proper error
-> paths to exynos5_clk_register_subcmu().  The return value of this
-> function is still ignored because at this stage of init there is nothing
-> we can do.
+On Thu, Feb 21, 2019 at 12:46 PM Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Platform driver driver_override field should not be initialized from
+> const memory because the core later kfree() it.  If driver_override is
+> manually set later through sysfs, kfree() of old value leads to:
+>
+>     $ echo "new_value" > /sys/bus/platform/drivers/.../driver_override
+>
+>     kernel BUG at ../mm/slub.c:3960!
+>     Internal error: Oops - BUG: 0 [#1] PREEMPT SMP ARM
+>     ...
+>     (kfree) from [<c058e8c0>] (platform_set_driver_override+0x84/0xac)
+>     (platform_set_driver_override) from [<c058e908>] (driver_override_store+0x20/0x34)
+>     (driver_override_store) from [<c031f778>] (kernfs_fop_write+0x100/0x1dc)
+>     (kernfs_fop_write) from [<c0296de8>] (__vfs_write+0x2c/0x17c)
+>     (__vfs_write) from [<c02970c4>] (vfs_write+0xa4/0x188)
+>     (vfs_write) from [<c02972e8>] (ksys_write+0x4c/0xac)
+>     (ksys_write) from [<c0101000>] (ret_fast_syscall+0x0/0x28)
+>
+> The clk-exynos5-subcmu driver uses override only for the purpose of
+> creating meaningful names for children devices (matching names of power
+> domains, e.g. DISP, MFC).  The driver_override was not developed for
+> this purpose so just switch to default names of devices to fix the
+> issue.
 >
 > Fixes: b06a532bf1fa ("clk: samsung: Add Exynos5 sub-CMU clock driver")
 > Cc: <stable@vger.kernel.org>
