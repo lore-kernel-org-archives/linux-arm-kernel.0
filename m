@@ -2,22 +2,22 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C95DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:40:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9AD42C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:42:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1909A20675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:40:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63EF52086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 06:42:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ka7kpzWZ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="e79UzZ4t"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1909A20675
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Mo9P66iV";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HCBmaNgq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63EF52086C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,65 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=01WNADcaimF/3K94icmasuqK6cSTXhALx1hWv4edz1Y=; b=Ka7kpzWZH4gZzU
-	DR5TYacd52R3EUP/aLuvg1RvFhJzHLGT4iXi6eoEkNCElGzNPZo9QHifMBDO0vtHaN4iV91G+b0Ca
-	TgwXB1p8RYJFoOvv491+p5Ldq66aNzq1zjKQ1v66F9Ux04FCrwgLgVIeRwEgUFVoem2xa7meN7gKD
-	oUh/TUw2qYr21JTKxeGJVtpjpwBswc+jbrCqdBYKbFTq7g9EJQTmAS240mrh8LJqS53vVyeZqBT1j
-	rF/MNNZVWB65EXnAuSUEknwFZqEc9ThHO3j5kqVSbz6f2Y6luDZaBLBpy+CDO5dyjOL/fiTSxo5KS
-	rH7IMcjzWraXRvAnjPgg==;
+	List-Owner; bh=m85zw7izLUQAftJGObmQ7ZDKiHSBQ23J0e9p4aJCYOU=; b=Mo9P66iV4wyR6Q
+	sYUpRmjaQ9MgeBLaDJdi7Ap4mo0bkXFb/b3vgOCINeq+RDAQeasm9FbosY0i8IsjJjtkuRtzg5VoW
+	1XYDKAekBygbO+uhTIGXoiIQYwr4Xn0iqqryjf769xp99Mo0CGAEBH9QrTDhOOzy2JXwGzHXcBrcG
+	GkpXPKeXVKt6xKIxa5wDtCdrgepOmJ9aJzcdIwwB+WNHe/+xZTqqJZhp+T0tGaYOJ1iTGwgzjgFBq
+	4GEAEXBXnRscpCA4GLUjsdi+E2wL8IoYitRNpBwjIwB8CxYsNqNWtHu2U2ztCvF9mlkaQdTRVT6/x
+	Kg4Ly/27pEpYEfJtJZTQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwi1u-0001pn-9w; Thu, 21 Feb 2019 06:40:22 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gwi3Z-00027o-Qb; Thu, 21 Feb 2019 06:42:05 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwi1r-0001pL-7G
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 06:40:20 +0000
-Received: by mail-oi1-x242.google.com with SMTP id q81so563463oic.5
+ id 1gwi3V-000274-Nb
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 06:42:03 +0000
+Received: by mail-ot1-x343.google.com with SMTP id n71so43988676ota.10
  for <linux-arm-kernel@lists.infradead.org>;
- Wed, 20 Feb 2019 22:40:18 -0800 (PST)
+ Wed, 20 Feb 2019 22:42:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=DId3EczNJmPuSYVXChV6P1cuILrHJcLT/vynhKnZcqg=;
- b=e79UzZ4tF3mCmhUE3wc0HUMo1MEBfzeKnnX84wsYAwfFiinQxxDMAoK7aulNUPti6T
- D8Tmz043MiTv/2YqsF27Oogt+dNCjP5AgFHcov4NCpgB9dilKWWuqptSZre6KocL6sa6
- lJH4GY8jYw8/EusMzYSvuPk/b/HushGP/c2jMWmaNrKKASrNh+HmHIcLWpI5U6yXWfb8
- c3rFyRgSNkYAkHUA29RZdI/Q3/apfQcImymoshtvxS8aD5AXE3zwtfy3JCEgyyJq/Fq7
- +7sM3ZRhygQ6b1ayuHFhbMvJKPeoFiQE0OK8bHSsrY5JPlpDtO78j9JNAze+HvPlHzqE
- PL/g==
+ :cc; bh=oZLuHvi6dxMdxF6+YdcLqfkavwbkzPlDzObkV+DFtqk=;
+ b=HCBmaNgq04mU+cXcHOxnBU0HIx16w6GXalyywTtRl3iVPk64Gk5J9urZBt0k/7oJwT
+ G9vgqChwkMNY8cH4hQTpARACUTDZParNwjos8kRfkRcToJeeBOb97gkKMA45Akz6TUJV
+ 0aKCcYv3WfiCdqqBx9N62ta6QBluq0aYGhPOI3g/sWJbzRd3jwIdXSspY8EXTU7jVAf2
+ vREkxbnZUj0ZEa7B+lMrtUJiRYd9sdGma/S/1/iNP2jovv9JAXoFp3tJXsBVpuIhuMFU
+ 4Cm4oaCS9qmjiQHIEDLhh146eyScfyBPTzJZtEn9GetDdu+4LcQ6jnhzhp50bUU7Y2Ch
+ ut8Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=DId3EczNJmPuSYVXChV6P1cuILrHJcLT/vynhKnZcqg=;
- b=PReFRVbeA4Av0lLJ6xfJkBGlVZSWDwUnLTddRxOy0IDcq2Es+MrebPCIEzuYp4tJO8
- /C4tz0tvDd+M2oJ8EH2ZAnwePdmSBtddxfTD+Dh4bpp55x/FAHq1RsRNyjKj8i4MpOWd
- yHlTBgPfIbRkPzmK0rJ0KiLI6zlu9QVgdBm0vJ/UQZCWdgmd5Ha8oddiKWpd3Ba/Yj7v
- +dUUnmyaQ/rGyr54zjeWU+7uD5Bts3TEcJcFl7BWglLWoMr25XWPn006YpMcNBgRuBDE
- mrf6F4s44bTmo32nwxHkFJV2SxLrix7toUlMg27icF4Sex/txDBgbLAznFejSMmZ5tPC
- 3Xvw==
-X-Gm-Message-State: AHQUAuacmi6rSguhDA4a6os2+l37PTAMtFEb8tVX3RRNGeGVoiwjPQS/
- zgDm1MvwnK2IbPoMabPfagXzINakjippe6+iXys=
-X-Google-Smtp-Source: AHgI3IahjipocvG92w+SIbwbz8+8Pbq0YwiEXQTIp75iklfZwdpj7GP4mkciGJMabQbHUYNg8UrcuIgRoh/kseO9jqA=
-X-Received: by 2002:aca:c142:: with SMTP id r63mr8680208oif.98.1550731217599; 
- Wed, 20 Feb 2019 22:40:17 -0800 (PST)
+ bh=oZLuHvi6dxMdxF6+YdcLqfkavwbkzPlDzObkV+DFtqk=;
+ b=dooNiKvBtKoZUJ6k06/C44igAb5LzctWC/YjAVolRooFCtlcLiu7tSlPIfMg4dILpz
+ bRXqasxUV5hDJEeijpjFbAeG6erypxOuLqjq6hovB3sV3kUJq2UDGibdL4Sxe6Z49vsE
+ J0m+KTEIAOzNKG0qaKrHXfmIOlx0FPism25vDPnBSeV/1YUNmMA7+Wt6yT54+1gnlETb
+ tTtaRRu04rfT3kRd2P5Eyof/9GFgCoSXcfyxZrqddcHCvXvSaUkQwWw7oJ46nr1JD4MH
+ aheLGrP9tvDaqGq7hToU7O0popwo9KzhqXWfs/7Dj+rtNL0CbO+CWAQIpZHhN7factNX
+ oggg==
+X-Gm-Message-State: AHQUAuZXOuxv0VjBBNo7VFT8BoRE639lQ6XBYcxQTOwh1JcSaw4w19Tf
+ LosBjlG2Ce7WUwFsWgPEOKMPw2EZaSAZhuVR96U=
+X-Google-Smtp-Source: AHgI3Ib1Qf8bXKwIzxbEKejrrUcTTDKLDYIvsE9L7re2iDVc5x9gl1WM2ZRG0QyNIN6s7FQWih2fNarbGRe+AJujrCY=
+X-Received: by 2002:a9d:7c92:: with SMTP id q18mr22460681otn.111.1550731317759; 
+ Wed, 20 Feb 2019 22:41:57 -0800 (PST)
 MIME-Version: 1.0
 References: <20190215050957.20755-1-anarsoul@gmail.com>
  <20190215050957.20755-7-anarsoul@gmail.com>
  <20190218182629.GA14714@bogus>
  <CA+E=qVfDfDvVmKQDeh2e0SA=tm6VpBMpu9MPKUqxFPObxYFXDg@mail.gmail.com>
  <20190219085626.7poutwvm3lrilnon@flea>
- <CA+E=qVfV8ds-zb0oG1-g8c-ReCSnZjfUjvAHbZf1zBf8H-xUcw@mail.gmail.com>
- <20190220103347.74wqu2btdti2myi7@flea>
-In-Reply-To: <20190220103347.74wqu2btdti2myi7@flea>
+In-Reply-To: <20190219085626.7poutwvm3lrilnon@flea>
 From: Vasily Khoruzhick <anarsoul@gmail.com>
-Date: Wed, 20 Feb 2019 22:39:51 -0800
-Message-ID: <CA+E=qVdP8Ocds2Ojv5PzvwowGKb-od21bRgAtC==Z8CNfYszQw@mail.gmail.com>
+Date: Wed, 20 Feb 2019 22:41:31 -0800
+Message-ID: <CA+E=qVdnP5iN2u98VEgEYoSnfUQwHMaGmSYkNjhuwvsc+jK8Rw@mail.gmail.com>
 Subject: Re: [PATCH v3 06/11] drm/sun4i: rgb: Add DT property to disable
  strict clock rate check
 To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190220_224019_285228_406A504D 
-X-CRM114-Status: GOOD (  17.46  )
+X-CRM114-CacheID: sfid-20190220_224201_821280_1D5545C4 
+X-CRM114-Status: GOOD (  44.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,35 +110,174 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 2:33 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Tue, Feb 19, 2019 at 12:56 AM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
 >
-> On Tue, Feb 19, 2019 at 07:44:56AM -0800, Vasily Khoruzhick wrote:
-> > On Tue, Feb 19, 2019 at 12:56 AM Maxime Ripard
-
-> > Maxime, thanks for your patch but  it doesn't work for me. Pinebook
-> > needs 1% tolerance. Having it as a module parameter means that no
-> > distro will be able to boot on Pinebook out of the box.
+> On Mon, Feb 18, 2019 at 11:33:05AM -0800, Vasily Khoruzhick wrote:
+> > On Mon, Feb 18, 2019 at 10:26 AM Rob Herring <robh@kernel.org> wrote:
+> > >
+> > > On Thu, Feb 14, 2019 at 09:09:52PM -0800, Vasily Khoruzhick wrote:
+> > > > Clock rate check that was added in commit bb43d40d7c83 ("drm/sun4i: rgb:
+> > > > Validate the clock rate") prevents some panel and bridges from working with
+> > > > sun4i driver.
+> > >
+> > > Sounds lile a regression that should be reverted. The fix is not a
+> > > backwards compatible change either.
+> >
+> > anx6345 driver isn't mainlined yet and I'm not sure if this change
+> > breaks any mainlined boards. So likely there's not enough
+> > justification to revert it.
+> >
+> > > > Unfortunately, dotclock frequency for some modes are not achievable on
+> > > > sunxi hardware, and there's a slight deviation in rate returned by
+> > > > clk_round_rate(), so they fail this check.
+> > > >
+> > > > Experiments show that panels and bridges work fine with this slight
+> > > > deviation, e.g. Pinebook that uses ANX6345 bridge with 768p eDP panel
+> > > > requests 73 MHz, gets 72.296MHz instead (0.96% difference) and works just
+> > > > fine.
+> > > >
+> > > > This patch adds DT property to disable strict clock rate check
+> > > >
+> > > > Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> > > > ---
+> > > >  .../devicetree/bindings/display/sunxi/sun4i-drm.txt          | 2 ++
+> > > >  drivers/gpu/drm/sun4i/sun4i_rgb.c                            | 5 +++++
+> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                           | 3 +++
+> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.h                           | 1 +
+> > > >  4 files changed, 11 insertions(+)
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > index f426bdb42f18..18c8b053a28d 100644
+> > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > @@ -63,6 +63,8 @@ Required properties:
+> > > >      Documentation/devicetree/bindings/media/video-interfaces.txt. The
+> > > >      first port should be the input endpoint. The second should be the
+> > > >      output, usually to an HDMI connector.
+> > > > +  - no-strict-clock-check: don't reject timings if exact dot clock can't be
+> > > > +    reached.
+> > >
+> > > This should be the default IMO. Most panels are a single timing, so if
+> > > we reject it the fallback no display?
+> >
+> > As far as I remember the change was introduced to reject some modes
+> > for which dotclock can't be reached when driver is used with VGA
+> > bridge. So if we make it default it'll break boards with VGA bridge
+> > and old DT.
+> >
+> > > I thought we had some mechanism already to allow some range of
+> > > frequencies. I think the chromeos guys needed something IIRC.
+> >
+> > You can specify frequency range for panels, but there's nothing for
+> > bridges. In my case EDID doesn't specify clock tolerance.
 >
-> I don't really know what to tell you, the VESA spec defines everywhere
-> that tolerance, and if we're not able to provide that, then we're not
-> compliant and I don't want us to not be compliant just because one
-> panel needed to be a bit more flexible, and especially since what
-> could work on one panel might fail on another one.
+> I gave it some more though, and came up with the following patch. The
+> basic idea is to leave the boundary check for the bridges that will
+> have EDID and we need to filter out the modes that have no chance of
+> being supported. The tolerancy used is the one defined in VESA specs,
+> but I added a module parameter if you wanted to tune that.
 >
-> If you want alternate solutions, then please answer to:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/630441.html
+> And finally, since most of our panels are single timings without any
+> tolerancy, we just try our best in this case and that's it, while
+> leaving the door open to support display_timings and being able to do
+> more once we have an idea of what the tolerancies are.
 >
-> or provide the EDID blob.
-
-Uh, I spoke to early, my bad. I made a mistake when I calculated rate
-deviation for 768p last time - I took 73MHz as dotclock, but actual
-requested rate 72.3 MHz and it gets 72.296296 MHz, so it's within 0.5%
-tolerance. 1080p pinebook needs 138.5 MHz and gets 138.461538 MHz -
-also within 0.5%.
-
-However your patch has an issue, I'll respond to your previous email.
-
+> If that works for you, I'll submit it.
+>
 > Maxime
+>
+> --- >8 ---
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> index f4a22689eb54..0460146aab75 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+> @@ -43,6 +43,25 @@ drm_encoder_to_sun4i_rgb(struct drm_encoder *encoder)
+>                             encoder);
+>  }
+>
+> +static inline struct drm_connector *
+> +sun4i_rgb_get_connector_from_encoder(const struct drm_encoder *encoder)
+> +{
+> +       struct drm_connector *connector = NULL, *tmp;
+> +       struct drm_connector_list_iter iter;
+> +
+> +       drm_connector_list_iter_begin(encoder->dev, &iter);
+> +       drm_for_each_connector_iter(tmp, &iter)
+> +               if (tmp->encoder == encoder) {
+> +                       connector = tmp;
+> +                       goto out;
+> +               }
+> +
+> +out:
+> +       drm_connector_list_iter_end(&iter);
+> +
+> +       return connector;
+> +}
+> +
+>  static int sun4i_rgb_get_modes(struct drm_connector *connector)
+>  {
+>         struct sun4i_rgb *rgb =
+> @@ -52,11 +71,22 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
+>         return drm_panel_get_modes(tcon->panel);
+>  }
+>
+> +/*
+> + * VESA DMT defines a tolerancy of 0.5% on the pixel clock, while the
+> + * CVT spec reuses that tolerancy in its examples, so it looks to be a
+> + * good default tolerancy for the EDID-based modes.
+> + */
+> +static unsigned int clock_tolerancy = 5;
+> +module_param(clock_tolerancy, uint, 0644);
+> +MODULE_PARM_DESC(clock_tolerancy,
+> +                "Tolerancy of the pixel clock in per mille");
+> +
+>  static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
+>                                                  const struct drm_display_mode *mode)
+>  {
+>         struct sun4i_rgb *rgb = drm_encoder_to_sun4i_rgb(crtc);
+>         struct sun4i_tcon *tcon = rgb->tcon;
+> +       struct drm_connector *connector = sun4i_rgb_get_connector_from_encoder(crtc);
+>         u32 hsync = mode->hsync_end - mode->hsync_start;
+>         u32 vsync = mode->vsync_end - mode->vsync_start;
+>         unsigned long rate = mode->clock * 1000;
+> @@ -92,15 +122,27 @@ static enum drm_mode_status sun4i_rgb_mode_valid(struct drm_encoder *crtc,
+>
+>         DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+>
+> +       /*
+> +        * TODO: We should use the struct display_timing if available
+> +        * and / or trying to stretch the timings within that
+> +        * tolerancy to take care of panels that we wouldn't be able
+> +        * to have a exact match for.
+> +        */
+> +       if (connector->connector_type == DRM_MODE_CONNECTOR_Unknown) {
+
+I applied your patch onto 5.0-rc6 and connector is NULL for me on
+Pinebook. I guess you need to check whether it's NULL before
+dereferencing it.
+
+> +               DRM_DEBUG_DRIVER("RGB panel used, skipping clock rate checks");
+> +               goto out;
+> +       }
+> +
+>         tcon->dclk_min_div = 6;
+>         tcon->dclk_max_div = 127;
+>         rounded_rate = clk_round_rate(tcon->dclk, rate);
+> -       if (rounded_rate < rate)
+> +       if (rounded_rate < (rate * (1000 - clock_tolerancy) / 1000))
+>                 return MODE_CLOCK_LOW;
+>
+> -       if (rounded_rate > rate)
+> +       if (rounded_rate > (rate * (1000 + clock_tolerancy) / 1000))
+>                 return MODE_CLOCK_HIGH;
+>
+> +out:
+>         DRM_DEBUG_DRIVER("Clock rate OK\n");
+>
+>         return MODE_OK;
+> --- >8 ---
+>
 >
 > --
 > Maxime Ripard, Bootlin
