@@ -2,65 +2,77 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5490BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:24:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B2AA9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:25:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25D272083E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:24:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 784AC2083E
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 15:25:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NY7A8aqT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25D272083E
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dYk/8TXL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="By1OrJXA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 784AC2083E
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zVI5oJILbzeqxgqdFMyjufHuIUih5DDnZFRyOhL0Y9o=; b=NY7A8aqTfURV8Q
-	jW29N3TM20M6w20KpmCjnoX0BdHZqmoQAChpII1YF9M3xjOFmlAXrG71FQ36Okh+hkopz9svmbOsx
-	/MPHG0x+P87G7bs6usamnARkseHKJlQiM0Ikbu+VGiCCWNzM8RmZTeEVpWgTHasqT/oESM1vx071o
-	7uvOJssZTbxnrx2bv7ph02pKNTCx1SUBITxLdvs87rmsXnbIP0cljMytZwiIz1kxFxAXhJ1L90xdo
-	/u4Dj9YS1VQczQ3CeLqEXJmxNOA+mAej1huIJDVSSeWb/BSqrugPfgOvWmdgEjhNdz7x7fHVMvnO2
-	NdazWd1Il6EifkvxsGNg==;
+	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=MfiIjyogdAfSe/HN2AIkRXZU8irYyvxM4r+j84OJTns=; b=dYk/8TXLH/zf6e
+	FqXcD2b1xvNlYx0xR7JHUrPtiHCbfxtBkUOTdgqcQeoRHR+yzFZL6pvxzuEfe53fBLgAjqYf73+zH
+	h/nCbDdTT4NlejZ3Cj66o3kWzn+7N7fZnejOWzzO8nMUfbzldBSpd6iZR4YG969+WJ+LM3fsQD/xf
+	6+N2Tfbd+ffrHTm7bBWJCGOgv6+9kEvcUkLmgTjOHSGmQYkPiQos4GiuJb9U2DCwuVBSi1+rD7UZl
+	M8w2j0zbvXNdsBfoV+6uYdfIYly+q9A3hY3BHkdQ4EN66bXBjqw+TOzsGV9FqRFPO6SQsI4xN0ZZm
+	asdU+JqTTXpaihjE2JiA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwqCW-0003lF-8m; Thu, 21 Feb 2019 15:23:52 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwqCS-0003kq-Lx
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:23:50 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id F1F1815AB;
- Thu, 21 Feb 2019 07:23:45 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 47DDA3F5C1;
- Thu, 21 Feb 2019 07:23:43 -0800 (PST)
-Subject: Re: [PATCH v5 18/26] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-19-git-send-email-Dave.Martin@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <f6d9f731-e9f8-a54d-1165-2b188e22b4df@arm.com>
-Date: Thu, 21 Feb 2019 15:23:37 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gwqDo-0005RW-D0; Thu, 21 Feb 2019 15:25:12 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwqDk-0004Yx-9M
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 15:25:10 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2019; h=Sender:Content-Type:MIME-Version:
+ Message-ID:Subject:To:From:Date:Reply-To:Cc:Content-Transfer-Encoding:
+ Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
+ Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=jVJv1+dguLI4tKg6gHtO7nLWMeTo9l6YXa8ZnZJcLKI=; b=By1OrJXAWObK/P6SU4eAh6l4b
+ t5u06wDkMxz6hHnLtGNwYECISlBCR6Ms9epoJ+iANn8iD29PL8s32tAf2XVr2GCgiC+2X8wdXgFaa
+ uUBtXF/Yjwf4Etngu+6yI8n01seu3zfqL8d/z2LnWxtzm5nulapMovNX038lslXmMrUxdmsaHbgjO
+ hKVuEHvdDaamcHKya3Em5Dkx3si20g61LRMajH8L28ARvvz4PEx7jKUnBIjZrTPV5ODqjq6jjsk8e
+ IxwobK5IMSkfUfHVfZXtcCk6kKdvbf7E2ml79phQZZ6c9eGWD78t+0jkdxPGJNo6Ct+l+O7G/Dn0A
+ DUVtxbNkw==;
+Received: from shell.armlinux.org.uk
+ ([fd8f:7570:feb6:1:5054:ff:fe00:4ec]:51324)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gwqDd-0003Tl-1O; Thu, 21 Feb 2019 15:25:01 +0000
+Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
+ (envelope-from <linux@shell.armlinux.org.uk>)
+ id 1gwqDb-0001RJ-FO; Thu, 21 Feb 2019 15:24:59 +0000
+Date: Thu, 21 Feb 2019 15:24:59 +0000
+From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
+To: linux-arm-kernel@lists.infradead.org, Mark Brown <broonie@kernel.org>,
+ linux-spi@vger.kernel.org, Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
+Subject: [BUG] vf610-zii-dev-rev-b SPI fails at boot
+Message-ID: <20190221152459.axrjce7yqkjmedgl@shell.armlinux.org.uk>
 MIME-Version: 1.0
-In-Reply-To: <1550519559-15915-19-git-send-email-Dave.Martin@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_072348_732439_CBC6A586 
-X-CRM114-Status: GOOD (  36.62  )
+X-CRM114-CacheID: sfid-20190221_072508_334859_AADA2289 
+X-CRM114-Status: UNSURE (   7.48  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,274 +84,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Dave,
+While booting 4.20 on the ZII development revision B board, I notice 
+this in the kernel logs:
 
-On 18/02/2019 19:52, Dave Martin wrote:
-> This patch adds the following registers for access via the
-> KVM_{GET,SET}_ONE_REG interface:
-> 
->  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
->  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
->  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
-> 
-> In order to adapt gracefully to future architectural extensions,
-> the registers are logically divided up into slices as noted above:
-> the i parameter denotes the slice index.
-> 
-> This allows us to reserve space in the ABI for future expansion of
-> these registers.  However, as of today the architecture does not
-> permit registers to be larger than a single slice, so no code is
-> needed in the kernel to expose additional slices, for now.  The
-> code can be extended later as needed to expose them up to a maximum
-> of 32 slices (as carved out in the architecture itself) if they
-> really exist someday.
-> 
-> The registers are only visible for vcpus that have SVE enabled.
-> They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
-> have SVE.
-> 
-> Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
-> allowed for SVE-enabled vcpus: SVE-aware userspace can use the
-> KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
-> register state.  This avoids some complex and pointless emulation
-> in the kernel to convert between the two views of these aliased
-> registers.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> ---
-> 
-> Changes since v4:
-> 
->  * Add "BASE" #defines for the Z-reg and P-reg ranges in the KVM
->    register ID space, to make the 0x400 magic number a little less
->    cryptic.
-> 
->  * Pull KVM_SVE_{Z,P}REG_SIZE defines from "KVM: arm64: Enumerate SVE
->    register indices for KVM_GET_REG_LIST", since we now use them here.
-> 
->  * Simplify sve_reg_region(), and give up on the attempt to make
->    kreg_region a general thing: nothing else will use it for now,
->    anyway, so let's keep it as simple as possible.
-> 
->  * Drop support for multiple slices per register.  This functionality
->    can be added back in later if needed, without ABI breaks.
-> 
->  * Pull vcpu_sve_state_size() into kvm_host.h, from "KVM: arm64/sve:
->    Allow userspace to enable SVE for vcpus".  This is needed for use
->    with array_index_nospec() to determine the applicable buffer bounds.
->    To avoid circular header deependency issues, the function is also
->    converted into a macro, but is otherwise equivalent to the original
->    version.
-> 
->  * Guard sve_state base offset in kernel memory with
->    array_index_nospec(), since it is generated from user data that can
->    put it out of range.
-> 
->    (sve_state will get allocated with the corresponding size later in
->    the series.  For now, this code is dormant since no means is
->    provided for userspace to create SVE-enabled vcpus yet.)
-> ---
->  arch/arm64/include/asm/kvm_host.h |  14 ++++
->  arch/arm64/include/uapi/asm/kvm.h |  17 +++++
->  arch/arm64/kvm/guest.c            | 138 ++++++++++++++++++++++++++++++++++----
->  3 files changed, 157 insertions(+), 12 deletions(-)
-> 
+spi spi0.1: setup: unsupported mode bits 4
+spi_gpio spi0: can't setup spi0.1, status -22
+spi_master spi0: spi_device register error /spi0/at93c46d@1
+spi_master spi0: Failed to create SPI device for /spi0/at93c46d@1
 
-[...]
+This is for the at93c46d@1 device attached to spi-gpio (see
+arch/arm/boot/dts/vf610-zii-dev-rev-b.dts around line 330).  This
+is declared with "spi-cs-high;" in DT.  It appears to be complaining
+about the SPI_CS_HIGH flag.
 
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index f491456..8cfa889 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
+It appears this warning comes from drivers/spi/spi.c around lines
+2828-2847 due to:
 
-[...]
+	bad_bits = spi->mode & ~(spi->controller->mode_bits | SPI_CS_WORD);
 
-> @@ -211,6 +217,114 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	return err;
->  }
->  
-> +#define SVE_REG_SLICE_SHIFT	0
-> +#define SVE_REG_SLICE_BITS	5
-> +#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
-> +#define SVE_REG_ID_BITS		5
-> +
-> +#define SVE_REG_SLICE_MASK					\
-> +	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
-> +		SVE_REG_SLICE_SHIFT)
-> +#define SVE_REG_ID_MASK							\
-> +	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
-> +
-> +#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
-> +
-> +#define KVM_SVE_ZREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0))
-> +#define KVM_SVE_PREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0))
-> +
-> +struct sve_state_region {
+and it looks like spi-gpio sets:
 
-This sve_state_region feels a bit too generic too me.
+	master->mode_bits = SPI_3WIRE | SPI_CPHA | SPI_CPOL;
 
-So far it is only used to access a single (slice of a) register at a
-time. Is there a plan to use it for more?
+but then goes on to set:
 
-Otherwise I'd suggest at least naming it something like sve_reg_region,
-sve_reg_mem_region or sve_reg_mem_desc.
+	spi_gpio->bitbang.flags = SPI_CS_HIGH;
 
+However, this is ignored by bitbang if master->mode_bits has already
+been set:
 
-> +	unsigned int koffset;	/* offset into sve_state in kernel memory */
-> +	unsigned int klen;	/* length in kernel memory */
-> +	unsigned int upad;	/* extra trailing padding in user memory */
-> +};
-> +
-> +/* Get sanitised bounds for user/kernel SVE register copy */
-> +static int sve_reg_region(struct sve_state_region *region,
+	if (!master->mode_bits)
+		master->mode_bits = SPI_CPOL | SPI_CPHA | bitbang->flags;
 
-I feel that sve_reg_to_region or sve_reg_get_region would be a clearer name.
+It looks like this commit introduced for v4.19 broke the driver:
 
-Cheers,
+commit 4b859db2c60692560afbfef1b030d0ddef57b7ee
+Author: Lorenzo Bianconi <lorenzo.bianconi@redhat.com>
+Date:   Sat Jul 28 10:19:14 2018 +0200
 
-Julien
-
-> +			  struct kvm_vcpu *vcpu,
-> +			  const struct kvm_one_reg *reg)
-> +{
-> +	/* reg ID ranges for Z- registers */
-> +	const u64 zreg_id_min = KVM_REG_ARM64_SVE_ZREG(0, 0);
-> +	const u64 zreg_id_max = KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
-> +						       SVE_NUM_SLICES - 1);
-> +
-> +	/* reg ID ranges for P- registers and FFR (which are contiguous) */
-> +	const u64 preg_id_min = KVM_REG_ARM64_SVE_PREG(0, 0);
-> +	const u64 preg_id_max = KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1);
-> +
-> +	unsigned int vq;
-> +	unsigned int reg_num;
-> +
-> +	unsigned int reqoffset, reqlen; /* User-requested offset and length */
-> +	unsigned int maxlen; /* Maxmimum permitted length */
-> +
-> +	size_t sve_state_size;
-> +
-> +	/* Only the first slice ever exists, for now: */
-> +	if ((reg->id & SVE_REG_SLICE_MASK) != 0)
-> +		return -ENOENT;
-> +
-> +	vq = sve_vq_from_vl(vcpu->arch.sve_max_vl);
-> +
-> +	reg_num = (reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
-> +
-> +	if (reg->id >= zreg_id_min && reg->id <= zreg_id_max) {
-> +		reqoffset = SVE_SIG_ZREG_OFFSET(vq, reg_num) -
-> +				SVE_SIG_REGS_OFFSET;
-> +		reqlen = KVM_SVE_ZREG_SIZE;
-> +		maxlen = SVE_SIG_ZREG_SIZE(vq);
-> +	} else if (reg->id >= preg_id_min && reg->id <= preg_id_max) {
-> +		reqoffset = SVE_SIG_PREG_OFFSET(vq, reg_num) -
-> +				SVE_SIG_REGS_OFFSET;
-> +		reqlen = KVM_SVE_PREG_SIZE;
-> +		maxlen = SVE_SIG_PREG_SIZE(vq);
-> +	} else {
-> +		return -ENOENT;
-> +	}
-> +
-> +	sve_state_size = vcpu_sve_state_size(vcpu);
-> +	if (!sve_state_size)
-> +		return -EINVAL;
-> +
-> +	region->koffset = array_index_nospec(reqoffset, sve_state_size);
-> +	region->klen = min(maxlen, reqlen);
-> +	region->upad = reqlen - region->klen;
-> +
-> +	return 0;
-> +}
-> +
-> +static int get_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	struct sve_state_region region;
-> +	char __user *uptr = (char __user *)reg->addr;
-> +
-> +	if (!vcpu_has_sve(vcpu) || sve_reg_region(&region, vcpu, reg))
-> +		return -ENOENT;
-> +
-> +	if (copy_to_user(uptr, vcpu->arch.sve_state + region.koffset,
-> +			 region.klen) ||
-> +	    clear_user(uptr + region.klen, region.upad))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
-> +static int set_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	struct sve_state_region region;
-> +	const char __user *uptr = (const char __user *)reg->addr;
-> +
-> +	if (!vcpu_has_sve(vcpu) || sve_reg_region(&region, vcpu, reg))
-> +		return -ENOENT;
-> +
-> +	if (copy_from_user(vcpu->arch.sve_state + region.koffset, uptr,
-> +			   region.klen))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
->  int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->  {
->  	return -EINVAL;
-> @@ -371,12 +485,12 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
->  		return -EINVAL;
->  
-> -	/* Register group 16 means we want a core register. */
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> -		return get_core_reg(vcpu, reg);
-> -
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-> -		return kvm_arm_get_fw_reg(vcpu, reg);
-> +	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-> +	case KVM_REG_ARM_CORE:	return get_core_reg(vcpu, reg);
-> +	case KVM_REG_ARM_FW:	return kvm_arm_get_fw_reg(vcpu, reg);
-> +	case KVM_REG_ARM64_SVE:	return get_sve_reg(vcpu, reg);
-> +	default: break; /* fall through */
-> +	}
->  
->  	if (is_timer_reg(reg->id))
->  		return get_timer_reg(vcpu, reg);
-> @@ -390,12 +504,12 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
->  		return -EINVAL;
->  
-> -	/* Register group 16 means we set a core register. */
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> -		return set_core_reg(vcpu, reg);
-> -
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-> -		return kvm_arm_set_fw_reg(vcpu, reg);
-> +	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-> +	case KVM_REG_ARM_CORE:	return set_core_reg(vcpu, reg);
-> +	case KVM_REG_ARM_FW:	return kvm_arm_set_fw_reg(vcpu, reg);
-> +	case KVM_REG_ARM64_SVE:	return set_sve_reg(vcpu, reg);
-> +	default: break; /* fall through */
-> +	}
->  
->  	if (is_timer_reg(reg->id))
->  		return set_timer_reg(vcpu, reg);
-> 
+by setting master->mode_bits - prior to this, bitbang would have set
+the mode bits itself.
 
 -- 
-Julien Thierry
+RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
