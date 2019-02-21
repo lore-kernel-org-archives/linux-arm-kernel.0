@@ -2,21 +2,21 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AC679C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 17:19:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 543A6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 17:19:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7D34F2083B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 17:19:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0C6ED2083B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 17:19:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ErPLB2fY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D34F2083B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kFRtGw9z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0C6ED2083B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ginzinger.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,30 +25,30 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	MIME-Version:References:In-Reply-To:Message-ID:Date:Subject:To:From:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=MsrxCVNXl9+bwBaLMCBIAM5FSld8tXEZR7SZDzVZBxM=; b=ErPLB2fY9W4t8ncBAGG1GvajX
-	aweoik6GGvIv1mQesTndNgnFCTh9YOMWSb65b5xHl3RI4LANi9Fcql39QXrdR4vPvHlGVSsN9afhn
-	/P1huttwt6vyEWXDn2acMJNYylaGIARCU/PvDQUnr2YGCdnxK6umXepiSOasWZTkz9+z96gSczBbv
-	jhtk4xNEHH8QJ9VURM5YT2TFL8CS03Xsbcjv7caAN3fnan/qfNcUW9wOT07zdran7mHa7NFTVyLmE
-	aLw4US3mOTx8e5xG8LZnkKQkFGAlhD5TcjA2iU/XGYBUKXnj+kXhYoS+xSd29IycjqW43zBK44UWA
-	Iq5uw85lw==;
+	 bh=YeYeaXVRDIb2WINYuQuc+vR/G9zzVHsetUCvlVs8P4c=; b=kFRtGw9zWm65QfLYSE165AAga
+	jBEr6LtWaZztkCjPRZUbZ3wBXNigUiLfIn81KEo4X8KsDvBmAVusKinOm7VLyD/0eu06609O+JcUm
+	w3b3IFxVhVvucoyL1T7n+7p7d8WH2cxGd2Tl7xjqROjb0tOIIik23HKVy89OlEuMLJM87dSvZOXZu
+	5GQluoDjTPWn+cGQ+9c4QRdaytUmB88IaC2gVgaWxylBwKUifggPUFhGI2pIfkph1IsNBvDUTjqC7
+	o8QW8rmBW8CxXqotNpXMKu5dX8xmvANYu67zhtOjUbfxxy/naJIDx01XM9UkokTv1+RvvAHTtWZRc
+	7JbWRBoHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gws06-0006nU-7Z; Thu, 21 Feb 2019 17:19:10 +0000
+	id 1gws0a-0007Bc-81; Thu, 21 Feb 2019 17:19:40 +0000
 Received: from mx-ginzinger.sigmacloud.services ([185.154.235.147])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwrze-0006CJ-OK
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 17:18:45 +0000
-Received: from [31.193.165.228] (port=9990
+ id 1gwrzk-0006Ji-Pd
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 17:18:58 +0000
+Received: from [31.193.165.228] (port=49952
  helo=mx-ginzinger.sigmacloud.services)
  by mx-ginzinger.sigmacloud.services with esmtps
  (TLSv1.2:AES256-GCM-SHA384:256) (Exim 4.82_1-5b7a7c0-XX)
  (envelope-from <Martin.Kepplinger@ginzinger.com>)
- id 1gwrzJ-00028z-2k; Thu, 21 Feb 2019 18:18:21 +0100
+ id 1gwrzL-00029F-19; Thu, 21 Feb 2019 18:18:23 +0100
 Received: from martin-laptop.buero.ginzinger.com (10.10.1.120) by
  exc1.buero.ginzinger.com (10.1.1.204) with Microsoft SMTP Server
  (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id
- 15.1.1466.3; Thu, 21 Feb 2019 18:18:21 +0100
-X-CTCH-RefID: str=0001.0A0B020F.5C6EDD5D.0076, ss=1, re=0.000, recu=0.000,
+ 15.1.1466.3; Thu, 21 Feb 2019 18:18:22 +0100
+X-CTCH-RefID: str=0001.0A0B020F.5C6EDD5F.003B, ss=1, re=0.000, recu=0.000,
  reip=0.000, cl=1, cld=1, fgs=0
 From: Martin Kepplinger <martin.kepplinger@ginzinger.com>
 To: <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>,
@@ -59,23 +59,23 @@ To: <gregkh@linuxfoundation.org>, <robh+dt@kernel.org>,
  <linux-serial@vger.kernel.org>, <devicetree@vger.kernel.org>,
  <linux-arm-kernel@lists.infradead.org>,
  <linux-stm32@st-md-mailman.stormreply.com>
-Subject: [PATCH v2 5/9] serial: omap-serial: add support for rs485 RTS delays
- in microseconds
-Date: Thu, 21 Feb 2019 18:17:54 +0100
-Message-ID: <20190221171758.10322-5-martin.kepplinger@ginzinger.com>
+Subject: [PATCH v2 8/9] serial: fsl_lpuart: set SER_RS485_DELAY_IN_USEC
+ accordingly
+Date: Thu, 21 Feb 2019 18:17:57 +0100
+Message-ID: <20190221171758.10322-8-martin.kepplinger@ginzinger.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190221171758.10322-1-martin.kepplinger@ginzinger.com>
 References: <20190221171758.10322-1-martin.kepplinger@ginzinger.com>
 X-Originating-IP: [10.10.1.120]
 X-ClientProxiedBy: exc1.buero.ginzinger.com (10.1.1.204) To
  exc1.buero.ginzinger.com (10.1.1.204)
-X-EXCLAIMER-MD-ORIGINAL-SUBJECT: [NOSIG][NODISC][PATCH v2 5/9] serial:
- omap-serial: add support for rs485 RTS delays in microseconds
+X-EXCLAIMER-MD-ORIGINAL-SUBJECT: [NOSIG][NODISC][PATCH v2 8/9] serial:
+ fsl_lpuart: set SER_RS485_DELAY_IN_USEC accordingly
 X-EXCLAIMER-MD-CONFIG: 9dd172f7-de2e-4231-b886-ec11f46e03b3
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_091843_191124_2E5384D2 
-X-CRM114-Status: GOOD (  18.51  )
+X-CRM114-CacheID: sfid-20190221_091849_405309_65ABCC80 
+X-CRM114-Status: GOOD (  12.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,85 +89,46 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Martin Kepplinger <martin.kepplinger@ginzinger.com>,
  linux-kernel@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============7659171068999530855=="
+Content-Type: multipart/mixed; boundary="===============8670509728820902643=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 This is an S/MIME signed message
 
---===============7659171068999530855==
-Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----09BFD6A71C150161EE278215821D26F9"
+--===============8670509728820902643==
+Content-Type: multipart/signed; protocol="application/x-pkcs7-signature"; micalg="sha-256"; boundary="----771A652DCDC067E7CC3AA4A730987364"
 
 This is an S/MIME signed message
 
-------09BFD6A71C150161EE278215821D26F9
+------771A652DCDC067E7CC3AA4A730987364
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
 Content-Type: text/plain
 
-Read struct serial_rs485's flag SER_RS485_DELAY_IN_USEC and apply the delay
-accordingly.
+Clear SER_RS485_DELAY_IN_USEC for userspace to get correct settings.
 
 Signed-off-by: Martin Kepplinger <martin.kepplinger@ginzinger.com>
 ---
- drivers/tty/serial/omap-serial.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ drivers/tty/serial/fsl_lpuart.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 6420ae581a80..adcd75ce5112 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -310,7 +310,11 @@ static void serial_omap_stop_tx(struct uart_port *port)
- 			res = (port->rs485.flags & SER_RS485_RTS_AFTER_SEND) ?
- 				1 : 0;
- 			if (gpio_get_value(up->rts_gpio) != res) {
--				if (port->rs485.delay_rts_after_send > 0)
-+				if (port->rs485.delay_rts_after_send > 0 &&
-+				    port->rs485.flags & SER_RS485_DELAY_IN_USEC)
-+					udelay(
-+					port->rs485.delay_rts_after_send);
-+				else if (port->rs485.delay_rts_after_send > 0)
- 					mdelay(
- 					port->rs485.delay_rts_after_send);
- 				gpio_set_value(up->rts_gpio, res);
-@@ -420,7 +424,11 @@ static void serial_omap_start_tx(struct uart_port *port)
- 		res = (port->rs485.flags & SER_RS485_RTS_ON_SEND) ? 1 : 0;
- 		if (gpio_get_value(up->rts_gpio) != res) {
- 			gpio_set_value(up->rts_gpio, res);
--			if (port->rs485.delay_rts_before_send > 0)
-+			if (port->rs485.delay_rts_before_send > 0 &&
-+			    port->rs485.flags & SER_RS485_DELAY_IN_USEC)
-+				udelay(port->rs485.delay_rts_before_send);
-+			else if (port->rs485.delay_rts_before_send > 0 &&
-+				 !(port->rs485.flags & SER_RS485_DELAY_IN_USEC)
- 				mdelay(port->rs485.delay_rts_before_send);
- 		}
- 	}
-@@ -1407,8 +1415,17 @@ serial_omap_config_rs485(struct uart_port *port, struct serial_rs485 *rs485)
- 	serial_out(up, UART_IER, 0);
+diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
+index ea1c85e3b432..a63aa22e3a25 100644
+--- a/drivers/tty/serial/fsl_lpuart.c
++++ b/drivers/tty/serial/fsl_lpuart.c
+@@ -1124,6 +1124,7 @@ static int lpuart_config_rs485(struct uart_port *port,
+ 	rs485->delay_rts_before_send = 0;
+ 	rs485->delay_rts_after_send = 0;
+ 	rs485->flags &= ~SER_RS485_RX_DURING_TX;
++	rs485->flags &= ~SER_RS485_DELAY_IN_USEC;
  
- 	/* Clamp the delays to [0, 100ms] */
--	rs485->delay_rts_before_send = min(rs485->delay_rts_before_send, 100U);
--	rs485->delay_rts_after_send  = min(rs485->delay_rts_after_send, 100U);
-+	if (port->rs485.flags & SER_RS485_DELAY_IN_USEC) {
-+		rs485->delay_rts_before_send = min(rs485->delay_rts_before_send,
-+						   100000U);
-+		rs485->delay_rts_after_send  = min(rs485->delay_rts_after_send,
-+						   100000U);
-+	} else {
-+		rs485->delay_rts_before_send = min(rs485->delay_rts_before_send,
-+						   100);
-+		rs485->delay_rts_after_send  = min(rs485->delay_rts_after_send,
-+						   100U);
-+	}
- 
- 	/* store new config */
- 	port->rs485 = *rs485;
+ 	if (rs485->flags & SER_RS485_ENABLED) {
+ 		/* Enable auto RS-485 RTS mode */
 -- 
 2.20.1
 
 
-------09BFD6A71C150161EE278215821D26F9
+------771A652DCDC067E7CC3AA4A730987364
 Content-Type: application/x-pkcs7-signature; name="smime.p7s"
 Content-Transfer-Encoding: base64
 Content-Disposition: attachment; filename="smime.p7s"
@@ -237,23 +198,23 @@ MAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4GA1UE
 BxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxPTA7BgNVBAMT
 NENPTU9ETyBSU0EgQ2xpZW50IEF1dGhlbnRpY2F0aW9uIGFuZCBTZWN1cmUgRW1h
 aWwgQ0ECEE1CsTMbOtnoVViHUQRgfj4wDQYJYIZIAWUDBAIBBQCggeQwGAYJKoZI
-hvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMTkwMjIxMTcxODM2
-WjAvBgkqhkiG9w0BCQQxIgQg570FavXu3hMCYzYb4yIQ9IrAWVYZ0NU24SrhpZ2H
-GLoweQYJKoZIhvcNAQkPMWwwajALBglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsG
+hvcNAQkDMQsGCSqGSIb3DQEHATAcBgkqhkiG9w0BCQUxDxcNMTkwMjIxMTcxODQ0
+WjAvBgkqhkiG9w0BCQQxIgQgVnYMnAmI+qYffTZiuOPxMRHee8z+x5xBcTdAFzR7
+umAweQYJKoZIhvcNAQkPMWwwajALBglghkgBZQMEASowCwYJYIZIAWUDBAEWMAsG
 CWCGSAFlAwQBAjAKBggqhkiG9w0DBzAOBggqhkiG9w0DAgICAIAwDQYIKoZIhvcN
 AwICAUAwBwYFKw4DAgcwDQYIKoZIhvcNAwICASgwDQYJKoZIhvcNAQEBBQAEggEA
-PT6GXyFCCtUomVnbb3Rgyp7OypQg4WDzioMCItyLrBC9WTAR7vYHYgmptGE+celQ
-UUJi5Eh9DX1kJ3g+tPuvWOFmfsgwBQhytxIBr0rF894CeiAiqHmiEpHcQor1hJYU
-PP3GYcq4oT3HDskY/NTF86gWW4+U0v5uzJsvEA7edi+eR1fqsA9JjFG7gtEhLILr
-zl027+eDc7ZwjdH8Qm1BI8EsKtN2sD1FmuvzdMJUYzANjOe4qgqVgMz6j4bS5sF6
-jGYNAc2QRPSbMHXN9w/uEZLVjtUq5T4IW4HFOwXvRfx9ayX9rs92ZDPx7r1oIwPe
-nINWkW5/bLMVbQh0Rmv2lw==
+AcsbmM5+gpVetfIwTNoBjdZlTP1OugqeOWeUYg49pNSSysrbxmzHXyFeRE96Dhye
+v/Ga9yZTJvRPCYciDWNYR7Yy1mUZtkrGXgdue+m98Ajh+/kAweqqUHPm5++HMS/E
+lrKtFP+ilo/KJyFN4zx/lbDpv72306XvU8OljNg9EPbWagCPWoAlXYPm1KG7klpu
+WLa/mjLViaOpeLtiNrRO/tEsgDEeogJaqCf7KIofeNWllcNlzQtZSltdCJRCi8EN
+SOtzO4q/PRh/oFMslZEIT4TcEQsGjs/fqv460QSA7YVS2HnpxYR7MUooBhqQC6MW
+eSvcviro1wSntQCUXRQ9sw==
 
-------09BFD6A71C150161EE278215821D26F9--
+------771A652DCDC067E7CC3AA4A730987364--
 
 
 
---===============7659171068999530855==
+--===============8670509728820902643==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -264,6 +225,6 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============7659171068999530855==--
+--===============8670509728820902643==--
 
 
