@@ -2,93 +2,188 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.3 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F0ECC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:28:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 11BA7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:36:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B7DF2148D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:28:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D55EB20842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:36:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jWnDFKpZ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZPC4HrPd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B7DF2148D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ryAYNuSu";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VNzt0tn1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D55EB20842
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7pOz6uoFndz7XIKo9WCAtUErYIorX6SHcYNNWRYy+6A=; b=jWnDFKpZVac5W+
-	9L3jMm2fHWfb4DoIWNn+CDEna16v7W8QPkeXQB2hk4reaTd7ZTtG4ESp3b/DkDvsaYJzzgP7Qib3I
-	dEb5KCTboZMMU8QMoEdXGFm+bbj48pmhGA4lzOVuJh1uzyYS9OwneeFsnu5k4DbM1akf6EVTY+sgh
-	Qv/1jXhx6mAVdNFJHTzx0bB9ZwLJyaUt6UB0E6Ba5qbsnu0AamZntjs6KIMSVEfFnXcPgLD8cPwZf
-	d1+k1C7cd5pTVzhZCsSD1728EibTWVHoflvbC/Tf80Q00vM3jsLPI+/qlMCkCP/ZfBn/4WZ25aLJY
-	XJ/X4e8UI4T0PxuHUpyQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lIAxfTIbOCjzEuJvsFr4FIQp2rZKfAQqKMn0vBfhMZc=; b=ryAYNuSuHcJHz4
+	HTTPLdFIDCBth3YzYpF5QmXDN35GlGaTbW8zvTBxhbMts82LgjT7GBS1AUDnRe3X3IFCkUna4dJ0T
+	1c1vH6A6skTp2SToXa/7T2SmJB3dZO65ZGJbm1ULc+KwTLCnizj+SBpb6V28I5pZ3zwwwu833IIlN
+	SF7Uk7mc4wyfdctc0+uyCnmOJBH+sjVgxHiMwekHoDKaH1i3TIPkjc6PNSCx3rTTGqex+dySbooTA
+	sGlM0C3rTbFnbcYGZ4R+0DU3nf0o08mEJsv78I1XopPLcW426emS73/l1Z3+EbA7JZTTRcyuPOPsR
+	p35qqf7hFP8/3exZySvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwjhy-00071S-Ik; Thu, 21 Feb 2019 08:27:54 +0000
-Received: from mail-pf1-x442.google.com ([2607:f8b0:4864:20::442])
+	id 1gwjqM-0002bS-JD; Thu, 21 Feb 2019 08:36:34 +0000
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwjhv-000715-9E
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 08:27:53 +0000
-Received: by mail-pf1-x442.google.com with SMTP id j5so8889315pfa.2
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 00:27:50 -0800 (PST)
+ id 1gwjqG-0002Zi-O8; Thu, 21 Feb 2019 08:36:30 +0000
+Received: by mail-ed1-x543.google.com with SMTP id m12so22331009edv.4;
+ Thu, 21 Feb 2019 00:36:28 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=g5gN4Ti0gN+mczLgHhdKVrENWOTE09jCVWnpN/478RY=;
- b=ZPC4HrPdz+WY6AK9hfFZDhcbS7CxkySmfmXhtYXcQUQkKmLIAX2EVxo+MN8tnhNrYs
- H8pwsE6LR931tqfoTltTDeciYj8gMZmnFqHzpapNqLYGZtsqxLEsJG49B4dDFRzAXZAI
- wxfFc6d+QlYwVFgCJY5jvgbyWQTOwPVzSA/3Mb4QWd6TrCafEYiFPbnL6vzD2cxJ+LDi
- n6pTfn2IQTzSakuXkbroS7vy3VeVtWj0C8jFqGj8OMMn0t+BuQQGORqy7lmBXo6ae1wV
- pTPOR2prRD++s9vCn/842lnW2bGWhrohsW6tTp2vtR18jlTInv5qUO1oBuF8mTooMCM9
- W6ng==
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=9lbUimjtwre8R/NsVQ9Izb5SBgkSg5qu0O3hF49wMwg=;
+ b=VNzt0tn1LCZLa7t7NXyXSYFnx13q982HMjGjZw4/iCX3ffJdbr1+SvCVPES3MLRRmX
+ rC2uIucorjIeMULrGosfbMd0D+iXNUhc5Kv/9DuAhw6iDKCFARPEdHyZx6XKDefAeNvH
+ jXixUxq3Bun95reecjgfLiBrI3cPmnhsN0opxP81u/9cSkc8tvBl7QdxNpcZ/WLdKWLD
+ bZ5c2vB4ihbQ7IyZpbVHL+PxCylpEAVu+MU47HAkOP8Tmhc48An5e+Lue9wEhzwhVs8t
+ 8wWdW8DMEM5gau4RBSnQ5TabkNILHXwNsKtI2+i1F4+0YI714EHYlTDNShNaVVjqkPcr
+ 7dmw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=g5gN4Ti0gN+mczLgHhdKVrENWOTE09jCVWnpN/478RY=;
- b=Y4xOyN6TFyb5rHRE4ZRglBH0PA4FnyEKTao+B2tGjWh+rmFcW98Z7sgOP0hQeXHGUX
- oE1CYQnmoNj+fIJ+A61hUNLUA+jy7pcObExNYi2X04lGc6Gy9pbBeOErAkZi9a38LTMU
- gDWzoU4FGRKT39byo655Obbl4wDZtc+bQzwbgcx6JZe7Vp7xcgb2YXtgafAsTWANW7NC
- iPNikjSuTA/uRWvIJf+1ydjOoWSPbCAAu63/6Of+QgU3A3hRiu6AXbzYAbQ9NiTI3Zyp
- CsNwYSe9QHVUXcA/vUfRiAMYC7WJ5gMX9fnZ9G8siov4s/epGGFqjTepHmBl88NS2fws
- 2lYw==
-X-Gm-Message-State: AHQUAuZG0A4itq2iOuU1oo5MyCoioIsUprhcgZE6naXWtA+Rnz80fHKA
- P3ZvwC1I+Vzaug1LMRUiWOU=
-X-Google-Smtp-Source: AHgI3IZHNJbq9wAWv/DgJ7abDmOyMDM9OF93XsPXA58Q+3Eb1CGKbsQCgm4TJ1+6HhEgw1vRQJEhcA==
-X-Received: by 2002:a63:1766:: with SMTP id 38mr33480045pgx.204.1550737670185; 
- Thu, 21 Feb 2019 00:27:50 -0800 (PST)
-Received: from icarus ([2001:268:c0a4:888c:c70:4af9:86e2:2])
- by smtp.gmail.com with ESMTPSA id f67sm29158116pff.29.2019.02.21.00.27.38
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 21 Feb 2019 00:27:48 -0800 (PST)
-Date: Thu, 21 Feb 2019 17:28:21 +0900
-From: William Breathitt Gray <vilhelm.gray@gmail.com>
-To: Patrick Havelange <patrick.havelange@essensium.com>
-Subject: Re: [PATCH 5/8] iio/counter: add FlexTimer Module Quadrature decoder
- counter driver
-Message-ID: <20190221082758.GA3380@icarus>
-References: <20190218140321.19166-1-patrick.havelange@essensium.com>
- <20190218140321.19166-5-patrick.havelange@essensium.com>
- <20190220164154.00547a77@archlinux> <20190221010931.GA3471@icarus>
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=9lbUimjtwre8R/NsVQ9Izb5SBgkSg5qu0O3hF49wMwg=;
+ b=gBxiBOIM5d1htCYXytktalwl8oUqZuAXGtJLD77PuLlHFp1X4szK15ruqx0FjJ+yZd
+ Ig9J2U/KdymAO+S6c8nc8c/tXRlZTbVrnADqEOwRC4yjWwP4MQQC9Qn8976hSu6ZWgXA
+ 2h7cW6J2jpCBrB0bnOh5hYTZCQH1b6NlLf3G9ej/MTwWX9Fad+spwaxDI50TGblTB7EP
+ 7mK7pk2fj7uT+cy4z0VFdwIG7bkZPyr+wGKcZ7/4EkdMdk3citOlCKbqfLw4bIR6ICWA
+ NUWG+IO6jfVHgwDz3HcaITplWGK4mfRWKsuLXqfLDlFIWR+qya3dwxJB/P33xyl/J8MA
+ qf3w==
+X-Gm-Message-State: AHQUAuYn3dyBF7xugvqqBKSBfVS11NXZsqSaxHlf7d98DZNXEgad0px8
+ Jlj2JEr4Ls/yFkOcSk/hDgQ=
+X-Google-Smtp-Source: AHgI3Ia3SsLubOQAvmazpI1OskOq+OYcNBtXXQhXLYlyYC5xS9wwAsT6WObkKw6jO7sVXyFJRJ+G/g==
+X-Received: by 2002:a50:b4f1:: with SMTP id x46mr30957400edd.289.1550738186604; 
+ Thu, 21 Feb 2019 00:36:26 -0800 (PST)
+Received: from ziggy.stardust ([37.223.146.9])
+ by smtp.gmail.com with ESMTPSA id w24-v6sm4711175eja.71.2019.02.21.00.36.24
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Thu, 21 Feb 2019 00:36:25 -0800 (PST)
+Subject: Re: [PATCH v4 00/12] Mediatek MT8183 clock and scpsys support
+To: Stephen Boyd <sboyd@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>, 
+ Rob Herring <robh@kernel.org>, Stephen Boyd <sboyd@codeaurora.org>,
+ Weiyi Lu <weiyi.lu@mediatek.com>
+References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
+ <20190201083016.25856-2-weiyi.lu@mediatek.com>
+ <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <b7abe484-71c1-5ec0-796c-544f1ac5d6f5@gmail.com>
+Date: Thu, 21 Feb 2019 09:36:24 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190221010931.GA3471@icarus>
-User-Agent: Mutt/1.11.3 (2019-02-01)
+In-Reply-To: <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_002751_327666_89DDC204 
-X-CRM114-Status: GOOD (  28.54  )
+X-CRM114-CacheID: sfid-20190221_003628_815916_187BEB2F 
+X-CRM114-Status: GOOD (  14.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,84 +195,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Lars-Peter Clausen <lars@metafoo.de>, linux-pwm@vger.kernel.org,
- linux-iio@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- Linus Walleij <linus.walleij@linaro.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Li Yang <leoyang.li@nxp.com>, Rob Herring <robh+dt@kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>,
- Esben Haabendal <esben@haabendal.dk>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
- Jonathan Cameron <jic23@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: James Liao <jamesjj.liao@mediatek.com>, srv_heupstream@mediatek.com,
+ linux-kernel@vger.kernel.org, stable@vger.kernel.org,
+ Fan Chen <fan.chen@mediatek.com>, linux-mediatek@lists.infradead.org,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 10:09:54AM +0900, William Breathitt Gray wrote:
-> On Wed, Feb 20, 2019 at 04:41:54PM +0000, Jonathan Cameron wrote:
-> > On Mon, 18 Feb 2019 15:03:18 +0100
-> > Patrick Havelange <patrick.havelange@essensium.com> wrote:
-> > 
-> > > This driver exposes the counter for the quadrature decoder of the
-> > > FlexTimer Module, present in the LS1021A soc.
-> > > 
-> > > Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
-> > > Reviewed-by: Esben Haabendal <esben@haabendal.dk>
-> > Given you cc'd William, I'm guessing you know about the counter
-> > subsystem effort.  I would really rather not take any drivers
-> > into IIO if we have any hope of getting that upstreamed soon
-> > (which I personally think we do and should!).  The reason is
-> > we end up having to maintain old ABI just because someone might be using
-> > it and it makes the drivers very messy.
-> > 
-> > I'll review as is though as may be there are some elements that will
-> > cross over.
-> > 
-> > Comments inline.  William: Looks like a straight forward conversion if
-> > it makes sense to get this lined up as part of your initial submission?
-> > You have quite a few drivers so I wouldn't have said it needs to be there
-> > at the start, but good to have it soon after.
-> > 
-> > Jonathan
-> 
-> I agree, we should try to merge this as part of Counter subsystem
-> introduction rather than as another IIO Counter driver. As we determined
-> when adding support for the STM32 timers, the existing IIO Counter API
-> is fundamentally unsuitable for representing counter devices. So
-> regardless of how a new Counter API is merged, the existing IIO Counter
-> API must be deprecated.
-> 
-> Patrick, I apologize for the confusion this has caused. Would you be
-> able to convert this driver to use the proposed Counter subsystem API
-> from this patchset that I believe you encountered before:
-> https://marc.info/?l=linux-arm-kernel&m=153229982404051
-> 
-> Although it was last updated in October, I believe you should be able to
-> rebase that Counter subsystem introduction patchset cleanly on top of
-> the IIO tree (if there are any merge conflicts send me an email). Take a
-> look at the generic-counter.rst file under the Documentation/driver-api/
-> directory for an overview of the API; the counter drivers under the
-> drivers/counter/ directory also make good references.
-> 
-> If you have any difficulties understanding the API, or any other
-> troubles, don't hesitate to ask. Hopefully, I've made the documentation
-> clear enough to make the conversion of this driver quick and easy -- and
-> if not, then it's something I need to fix, so let me know. :-)
-> 
-> William Breathitt Gray
 
-Patrick,
 
-It looks like there were some minor conflicts with the v9 patchset, so
-I've rebased it on top of the latest iio tree testing branch and
-resolved the conflicts in my personal repository. Please pull from my
-personal repository at https://gitlab.com/vilhelmgray/iio.git and base
-your patches on top of the generic_counter_v10 branch.
+On 20/02/2019 20:18, Stephen Boyd wrote:
+> Quoting Weiyi Lu (2019-02-01 00:30:04)
+>> This series is based on v5.0-rc1 and most of changes are extracted from series below
+>> (clock/scpsys common changes for both MT8183 & MT6765)
+>> https://patchwork.kernel.org/patch/10528495/
+>> (clock support of MT8183)
+>> https://patchwork.kernel.org/patch/10549891/
+>>
+>> The whole series is composed of
+>> clock common changes for both MT8183 & MT6765 (PATCH 1-3),
+>> scpsys common changes for both MT8183 & MT6765 (PATCH 4),
+>> clock support of MT8183 (PATCH 5-8),
+>> scpsys support of MT8183 (PATCH 9-11) and
+>> resend a clock patch long time ago(PTACH 12).
+> 
+> What's the merge plan here? Do you want me to apply these patches to clk
+> tree? Will someone be sending me a pull request for mediatek clk changes
+> this cycle? It's getting pretty late for much of anything making this
+> upcoming merge window.
+> 
 
-William Breathitt Gray
+As far as I can see, the clock patches are independent, so I think it is OK to
+take them. SCPSYS patches will go through my tree once they are in shape.
+
+Do you prefer to get pull requests for clock patches? I wasn't aware of that.
+But if you prefer that, we can find someone who prepares every merge window a
+pull request.
+
+Regards,
+Matthias
 
 _______________________________________________
 linux-arm-kernel mailing list
