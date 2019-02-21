@@ -2,65 +2,64 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B847EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:24:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DC24C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:28:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88BC92084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:24:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2BF6A20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:28:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eRpkD2EG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88BC92084D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oluuqCFq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2BF6A20818
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2Mii4zrRUoAGAppYyVJd1vox+PPVyHIefUMdAl2e5H0=; b=eRpkD2EGwYIGZO
-	FTUcCgsxLFN7Q4PA3WyyIF2RlMY4mmfAEBiMM9Uc1hPjnFGFsYnhCo6XcXf97kjRr5PZ+h/zGsgUV
-	umZir4Ag62W8LEX3eXNKjxfhysWkClwwN4sev1JH6sRQoB46gnzQKMnLqb0e4xKj+Hn651E9qJ+74
-	4S85YrFO5dXvUDIj7ta0lyvNmg2PAyH0XUyH99K/bDzrMtbipLfwOMcb7DKxSW2Z09DzJzBWs3TBf
-	Ft3E2V0Y/oHt1jAckpilo6+SLhOMPuqFi8NgZT31yJt6Q/y2+eUBpDsOmmCaHeUArOuy0yqCJ5y8v
-	04EVHc9TP4M4+5S9rU7A==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ju2kWulI8iwk6P4zZxYRChDcwR1E+Styn9ezULkuPbk=; b=oluuqCFq6j/+i4
+	Xm3Z0o0SxLCwuRa6R1qP5R9Hb5AbsiRUMz0gO4BVoNFap3P7jshShHt0VBGqp8kRA4w+UM7MFgS3v
+	ef7JRI6BgYHAgFLnOLKP6E4ZmVGlOmdmswUOwkM07QJvuxSbwphP3QQnMFTTcZSmxNoCQXX5zL6Re
+	ag/zQMASIBM75SwHp9fhk1FeOwvyaK0tb4fZhERl8GCeNDyDSw4yOQGo0AiRevi6pQAUYi1vmJdf/
+	LOFeQSdOTXvgV1bBW7Vo9sc+ZK2mbWzrbFSEQUoE+CM6FGakRtRA/fknxi8GHLpN8CJJJQVFWguXV
+	pp4tYbICU3B0mpOwTp0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwr99-0002nb-3P; Thu, 21 Feb 2019 16:24:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gwrCw-0004n0-Rg; Thu, 21 Feb 2019 16:28:22 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwr95-0002n2-DV
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 16:24:25 +0000
+ id 1gwrCs-0004k6-If
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 16:28:20 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 48E7BA78;
- Thu, 21 Feb 2019 08:24:21 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5A8BB3F690;
- Thu, 21 Feb 2019 08:24:19 -0800 (PST)
-Date: Thu, 21 Feb 2019 16:24:14 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Kishon Vijay Abraham I <kishon@ti.com>, marc.zyngier@arm.com
-Subject: Re: [PATCH v4 3/9] PCI: keystone: Convert to using hierarchy domain
- for legacy interrupts
-Message-ID: <20190221162413.GA5815@e107981-ln.cambridge.arm.com>
-References: <20190221101518.22604-1-kishon@ti.com>
- <20190221101518.22604-4-kishon@ti.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3CB3DA78;
+ Thu, 21 Feb 2019 08:28:18 -0800 (PST)
+Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 250C23F690;
+ Thu, 21 Feb 2019 08:28:12 -0800 (PST)
+Subject: Re: [PATCH v5 19/26] KVM: arm64: Enumerate SVE register indices for
+ KVM_GET_REG_LIST
+To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-20-git-send-email-Dave.Martin@arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <2b50c4cd-d729-4109-9e90-66a2a7b94cf9@arm.com>
+Date: Thu, 21 Feb 2019 16:28:11 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190221101518.22604-4-kishon@ti.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <1550519559-15915-20-git-send-email-Dave.Martin@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_082423_470633_52EED9CB 
-X-CRM114-Status: GOOD (  26.93  )
+X-CRM114-CacheID: sfid-20190221_082818_768382_A89F072B 
+X-CRM114-Status: GOOD (  23.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,337 +71,135 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
- Bjorn Helgaas <bhelgaas@google.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 03:45:12PM +0530, Kishon Vijay Abraham I wrote:
-> K2G provides separate IRQ lines for each of the four legacy interrupts.
-> Model this using hierarchy domain instead of linear domain with chained
-> IRQ handler.
+
+
+On 18/02/2019 19:52, Dave Martin wrote:
+> This patch includes the SVE register IDs in the list returned by
+> KVM_GET_REG_LIST, as appropriate.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> On a non-SVE-enabled vcpu, no new IDs are added.
+> 
+> On an SVE-enabled vcpu, IDs for the FPSIMD V-registers are removed
+> from the list, since userspace is required to access the Z-
+> registers instead to access their context.  For the variably-sized
+> SVE registers, the appropriate set of slice IDs are enumerated,
+> depending on the maximum vector length for the vcpu.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+
+Reviewed-by: Julien Thierry <julien.thiery@arm.com>
+
+> 
 > ---
->  drivers/pci/controller/dwc/pci-keystone.c | 205 +++++++++++++---------
->  1 file changed, 118 insertions(+), 87 deletions(-)
-
-Hi Kishon,
-
-I CC'ed Marc because you are actually re-writing an interrupt controller
-driver so I would be happier to merge this refactoring if Marc can have
-a look and he is satisfied with it - more so because most of the code can
-be reused by other host bridge drivers with similar behaviour.
-
-I will have a look too, unfortunately it is becoming a bit tight for
-v5.1 but let's see how it goes.
-
-Thanks,
-Lorenzo
-
-> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-> index 47f0dcf638f2..7f1648453f54 100644
-> --- a/drivers/pci/controller/dwc/pci-keystone.c
-> +++ b/drivers/pci/controller/dwc/pci-keystone.c
-> @@ -61,6 +61,7 @@
+> 
+> Changes since v4:
+> 
+>  * Drop KVM_SVE_SLICES(), which is no longer used due to the dropping of
+>    register multi-slice support from the series.
+> 
+>  * Drop register multi-slice support.
+> ---
+>  arch/arm64/kvm/guest.c | 51 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 8cfa889..4a2ad60 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -366,6 +366,14 @@ static int copy_core_reg_indices(const struct kvm_vcpu *vcpu,
+>  			continue;
+>  		}
 >  
->  #define IRQ_STATUS(n)			(0x184 + ((n) << 4))
->  #define IRQ_ENABLE_SET(n)		(0x188 + ((n) << 4))
-> +#define IRQ_ENABLE_CLR(n)		(0x18C + ((n) << 4))
->  #define INTx_EN				BIT(0)
->  
->  #define ERR_IRQ_STATUS			0x1c4
-> @@ -87,7 +88,6 @@ struct keystone_pcie {
->  	struct dw_pcie		*pci;
->  	/* PCI Device ID */
->  	u32			device_id;
-> -	int			legacy_host_irqs[PCI_NUM_INTX];
->  	struct			device_node *legacy_intc_np;
->  
->  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
-> @@ -96,7 +96,6 @@ struct keystone_pcie {
->  	struct phy		**phy;
->  	struct device_link	**link;
->  	struct			device_node *msi_intc_np;
-> -	struct irq_domain	*legacy_irq_domain;
->  	struct device_node	*np;
->  
->  	int error_irq;
-> @@ -199,26 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
->  	return dw_pcie_allocate_domains(pp);
+> +		/*
+> +		 * The KVM_REG_ARM64_SVE regs must be used instead of
+> +		 * KVM_REG_ARM_CORE for accessing the FPSIMD V-registers on
+> +		 * SVE-enabled vcpus:
+> +		 */
+> +		if (vcpu_has_sve(vcpu) && core_reg_offset_is_vreg(i))
+> +			continue;
+> +
+>  		if (uind) {
+>  			if (put_user(reg, *uind))
+>  				return -EFAULT;
+> @@ -436,6 +444,44 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
 >  }
 >  
-> -static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
-> -				      int offset)
-> -{
-> -	struct dw_pcie *pci = ks_pcie->pci;
-> -	struct device *dev = pci->dev;
-> -	u32 pending;
-> -	int virq;
-> -
-> -	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
-> -
-> -	if (BIT(0) & pending) {
-> -		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
-> -		dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
-> -		generic_handle_irq(virq);
-> -	}
-> -
-> -	/* EOI the INTx interrupt */
-> -	ks_pcie_app_writel(ks_pcie, IRQ_EOI, offset);
-> -}
-> -
->  static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
->  {
->  	ks_pcie_app_writel(ks_pcie, ERR_IRQ_ENABLE_SET, ERR_IRQ_ALL);
-> @@ -256,39 +235,117 @@ static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
->  	return IRQ_HANDLED;
->  }
->  
-> -static void ks_pcie_ack_legacy_irq(struct irq_data *d)
-> +void ks_pcie_irq_eoi(struct irq_data *data)
->  {
-> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> +	irq_hw_number_t hwirq = data->hwirq;
+> +static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
+> +{
+> +	/* Only the first slice ever exists, for now */
+> +	const unsigned int slices = 1;
 > +
-> +	ks_pcie_app_writel(ks_pcie, IRQ_EOI, hwirq);
-> +	irq_chip_eoi_parent(data);
->  }
->  
-> -static void ks_pcie_mask_legacy_irq(struct irq_data *d)
-> +void ks_pcie_irq_enable(struct irq_data *data)
->  {
-> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> +	irq_hw_number_t hwirq = data->hwirq;
+> +	if (!vcpu_has_sve(vcpu))
+> +		return 0;
 > +
-> +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(hwirq), INTx_EN);
-> +	irq_chip_enable_parent(data);
->  }
->  
-> -static void ks_pcie_unmask_legacy_irq(struct irq_data *d)
-> +void ks_pcie_irq_disable(struct irq_data *data)
->  {
-> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> +	irq_hw_number_t hwirq = data->hwirq;
-> +
-> +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_CLR(hwirq), INTx_EN);
-> +	irq_chip_disable_parent(data);
->  }
->  
->  static struct irq_chip ks_pcie_legacy_irq_chip = {
-> -	.name = "Keystone-PCI-Legacy-IRQ",
-> -	.irq_ack = ks_pcie_ack_legacy_irq,
-> -	.irq_mask = ks_pcie_mask_legacy_irq,
-> -	.irq_unmask = ks_pcie_unmask_legacy_irq,
-> +	.name			= "Keystone-PCI-Legacy-IRQ",
-> +	.irq_enable		= ks_pcie_irq_enable,
-> +	.irq_disable		= ks_pcie_irq_disable,
-> +	.irq_eoi		= ks_pcie_irq_eoi,
-> +	.irq_mask		= irq_chip_mask_parent,
-> +	.irq_unmask		= irq_chip_unmask_parent,
-> +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-> +	.irq_set_type		= irq_chip_set_type_parent,
-> +	.irq_set_affinity	= irq_chip_set_affinity_parent,
->  };
->  
-> -static int ks_pcie_init_legacy_irq_map(struct irq_domain *d,
-> -				       unsigned int irq,
-> -				       irq_hw_number_t hw_irq)
-> +static int ks_pcie_legacy_irq_domain_alloc(struct irq_domain *domain,
-> +					   unsigned int virq,
-> +					   unsigned int nr_irqs, void *data)
->  {
-> -	irq_set_chip_and_handler(irq, &ks_pcie_legacy_irq_chip,
-> -				 handle_level_irq);
-> -	irq_set_chip_data(irq, d->host_data);
-> +	struct keystone_pcie *ks_pcie = domain->host_data;
-> +	struct device_node *np = ks_pcie->legacy_intc_np;
-> +	struct irq_fwspec parent_fwspec, *fwspec = data;
-> +	struct of_phandle_args out_irq;
-> +	int ret, i;
-> +
-> +	if (nr_irqs != 1)
-> +		return -EINVAL;
-> +
-> +	ret = of_irq_parse_one(np, fwspec->param[0], &out_irq);
-> +	if (ret < 0) {
-> +		pr_err("Failed to parse interrupt node\n");
-> +		return ret;
-> +	}
-> +
-> +	parent_fwspec.fwnode = &out_irq.np->fwnode;
-> +	parent_fwspec.param_count = out_irq.args_count;
-> +
-> +	for (i = 0; i < out_irq.args_count; i++)
-> +		parent_fwspec.param[i] = out_irq.args[i];
-> +
-> +	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &parent_fwspec);
-> +	if (ret < 0) {
-> +		pr_err("Failed to allocate parent irq %u: %d\n",
-> +		       parent_fwspec.param[0], ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
-> +					    &ks_pcie_legacy_irq_chip, ks_pcie);
-> +	if (ret < 0) {
-> +		pr_err("Failed to set hwirq and chip\n");
-> +		goto err_set_hwirq_and_chip;
-> +	}
->  
->  	return 0;
-> +
-> +err_set_hwirq_and_chip:
-> +	irq_domain_free_irqs_parent(domain, virq, 1);
-> +
-> +	return ret;
+> +	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
 > +}
 > +
-> +static int ks_pcie_irq_domain_translate(struct irq_domain *domain,
-> +					struct irq_fwspec *fwspec,
-> +					unsigned long *hwirq,
-> +					unsigned int *type)
+> +static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
 > +{
-> +	if (is_of_node(fwspec->fwnode)) {
-> +		if (fwspec->param_count != 2)
-> +			return -EINVAL;
+> +	/* Only the first slice ever exists, for now */
+> +	const unsigned int slices = 1;
+> +	unsigned int i, n;
 > +
-> +		if (fwspec->param[0] >= PCI_NUM_INTX)
-> +			return -EINVAL;
-> +
-> +		*hwirq = fwspec->param[0];
-> +		*type = fwspec->param[1];
-> +
+> +	if (!vcpu_has_sve(vcpu))
 > +		return 0;
+> +
+> +	for (i = 0; i < slices; i++) {
+> +		for (n = 0; n < SVE_NUM_ZREGS; n++) {
+> +			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
+> +				return -EFAULT;
+> +		}
+> +
+> +		for (n = 0; n < SVE_NUM_PREGS; n++) {
+> +			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
+> +				return -EFAULT;
+> +		}
+> +
+> +		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
+> +			return -EFAULT;
 > +	}
 > +
-> +	return -EINVAL;
->  }
->  
->  static const struct irq_domain_ops ks_pcie_legacy_irq_domain_ops = {
-> -	.map = ks_pcie_init_legacy_irq_map,
-> -	.xlate = irq_domain_xlate_onetwocell,
-> +	.alloc		= ks_pcie_legacy_irq_domain_alloc,
-> +	.free		= irq_domain_free_irqs_common,
-> +	.translate	= ks_pcie_irq_domain_translate,
->  };
->  
+> +	return 0;
+> +}
+> +
 >  /**
-> @@ -572,35 +629,6 @@ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
->  	chained_irq_exit(chip, desc);
->  }
+>   * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+>   *
+> @@ -446,6 +492,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+>  	unsigned long res = 0;
 >  
-> -/**
-> - * ks_pcie_legacy_irq_handler() - Handle legacy interrupt
-> - * @irq: IRQ line for legacy interrupts
-> - * @desc: Pointer to irq descriptor
-> - *
-> - * Traverse through pending legacy interrupts and invoke handler for each. Also
-> - * takes care of interrupt controller level mask/ack operation.
-> - */
-> -static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
-> -{
-> -	unsigned int irq = irq_desc_get_irq(desc);
-> -	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
-> -	struct dw_pcie *pci = ks_pcie->pci;
-> -	struct device *dev = pci->dev;
-> -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
-> -	struct irq_chip *chip = irq_desc_get_chip(desc);
-> -
-> -	dev_dbg(dev, ": Handling legacy irq %d\n", irq);
-> -
-> -	/*
-> -	 * The chained irq handler installation would have replaced normal
-> -	 * interrupt driver handler so we need to take care of mask/unmask and
-> -	 * ack operation.
-> -	 */
-> -	chained_irq_enter(chip, desc);
-> -	ks_pcie_handle_legacy_irq(ks_pcie, irq_offset);
-> -	chained_irq_exit(chip, desc);
-> -}
-> -
->  static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
->  {
->  	struct device *dev = ks_pcie->pci->dev;
-> @@ -655,14 +683,33 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
->  	struct device *dev = ks_pcie->pci->dev;
->  	struct irq_domain *legacy_irq_domain;
->  	struct device_node *np = ks_pcie->np;
-> +	struct irq_domain *parent_domain;
-> +	struct device_node *parent_node;
->  	struct device_node *intc_np;
-> -	int irq_count, irq, ret = 0, i;
-> +	int irq_count, ret = 0;
+>  	res += num_core_regs(vcpu);
+> +	res += num_sve_regs(vcpu);
+>  	res += kvm_arm_num_sys_reg_descs(vcpu);
+>  	res += kvm_arm_get_fw_num_regs(vcpu);
+>  	res += NUM_TIMER_REGS;
+> @@ -466,6 +513,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>  	if (ret < 0)
+>  		return ret;
 >  
->  	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
->  	if (!intc_np) {
->  		dev_warn(dev, "legacy-interrupt-controller node is absent\n");
->  		return -EINVAL;
->  	}
-> +	ks_pcie->legacy_intc_np = intc_np;
+> +	ret = copy_sve_reg_indices(vcpu, &uindices);
+> +	if (ret)
+> +		return ret;
 > +
-> +	parent_node = of_irq_find_parent(intc_np);
-> +	if (!parent_node) {
-> +		dev_err(dev, "unable to obtain parent node\n");
-> +		ret = -ENXIO;
-> +		goto err;
-> +	}
-> +
-> +	parent_domain = irq_find_host(parent_node);
-> +	if (!parent_domain) {
-> +		dev_err(dev, "unable to obtain parent domain\n");
-> +		ret = -ENXIO;
-> +		goto err;
-> +	}
-> +
-> +	of_node_put(parent_node);
->  
->  	irq_count = of_irq_count(intc_np);
->  	if (!irq_count) {
-> @@ -671,31 +718,15 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
->  		goto err;
->  	}
->  
-> -	for (i = 0; i < irq_count; i++) {
-> -		irq = irq_of_parse_and_map(intc_np, i);
-> -		if (!irq) {
-> -			ret = -EINVAL;
-> -			goto err;
-> -		}
-> -		ks_pcie->legacy_host_irqs[i] = irq;
-> -
-> -		irq_set_chained_handler_and_data(irq,
-> -						 ks_pcie_legacy_irq_handler,
-> -						 ks_pcie);
-> -	}
-> -
->  	legacy_irq_domain =
-> -		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
-> -				      &ks_pcie_legacy_irq_domain_ops, NULL);
-> +		irq_domain_add_hierarchy(parent_domain, 0, PCI_NUM_INTX,
-> +					 intc_np,
-> +					 &ks_pcie_legacy_irq_domain_ops,
-> +					 ks_pcie);
->  	if (!legacy_irq_domain) {
->  		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
->  		ret = -EINVAL;
-> -		goto err;
->  	}
-> -	ks_pcie->legacy_irq_domain = legacy_irq_domain;
-> -
-> -	for (i = 0; i < PCI_NUM_INTX; i++)
-> -		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
->  
->  err:
->  	of_node_put(intc_np);
-> -- 
-> 2.17.1
+>  	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
+>  	if (ret)
+>  		return ret;
 > 
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
