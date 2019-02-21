@@ -2,92 +2,65 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BC98C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:20:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B847EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:24:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2AF3020836
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:20:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88BC92084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 16:24:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HaW/p2Jc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2AF3020836
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eRpkD2EG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88BC92084D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=/kart/DTNBR31nYIEbm9wUFDRq9JThX827FGTcaQBsY=; b=HaW/p2Jc8LIYs0JzrP3SgQznH
-	u6TMdFULjqtyaRDDORTf3jQmgzyJoP5jLZR3rZQdIGwNzsbCTKbh5i5w1U7tI9tmfOs1G6kiBP/B3
-	GIbzQQ6g5bWMq7goq0QBQizh0jVb4Oe6+f74thy7qk2W2TzESSkPQjiyPqsa7JGDbO1G4nMrGhiIo
-	Ia5GOwoBfNYr5qQB01QOpN33Ka4aJlXPQvm4OJpStP8FbbcHCaxsLQvWi9qVtoO5GkNGihrCIr7Cb
-	eu4cmKajIBFxPhEWGEQUcgJGXhqTgHHAJFCSf2Z5R9WtA9v39qJ6tdpcKQQNwWSLv38KV/zaQ4/kz
-	kaRdvi5SQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=2Mii4zrRUoAGAppYyVJd1vox+PPVyHIefUMdAl2e5H0=; b=eRpkD2EGwYIGZO
+	FTUcCgsxLFN7Q4PA3WyyIF2RlMY4mmfAEBiMM9Uc1hPjnFGFsYnhCo6XcXf97kjRr5PZ+h/zGsgUV
+	umZir4Ag62W8LEX3eXNKjxfhysWkClwwN4sev1JH6sRQoB46gnzQKMnLqb0e4xKj+Hn651E9qJ+74
+	4S85YrFO5dXvUDIj7ta0lyvNmg2PAyH0XUyH99K/bDzrMtbipLfwOMcb7DKxSW2Z09DzJzBWs3TBf
+	Ft3E2V0Y/oHt1jAckpilo6+SLhOMPuqFi8NgZT31yJt6Q/y2+eUBpDsOmmCaHeUArOuy0yqCJ5y8v
+	04EVHc9TP4M4+5S9rU7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwr5Y-0001ka-Jf; Thu, 21 Feb 2019 16:20:44 +0000
-Received: from mail-pf1-f193.google.com ([209.85.210.193])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwr5U-0001j3-5U
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 16:20:42 +0000
-Received: by mail-pf1-f193.google.com with SMTP id n74so14050967pfi.9
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 08:20:40 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=/++Cz1Zs6WAJeIapQqDg6Se45Vcqo3gD6KlzknmAVHk=;
- b=Iw45P2b2Djg4U9MC+SJB51GertngCQJv6y26Aasv8i6bxIe9xZAe+XinvDzBlTu3lN
- H7KmWFhma9EIFXMzoRY/Zw9c/f5UoUScaD2AG9B4idP77fIxIwD0qhuUEWy2Uk4h75fM
- zs8JYf1x3YBm1XzfEYeUU+ThJWC4Rc5ZcdxK2S0djs3PZeeeAYZ7qd75fbRt8mhXhxWw
- CSTFXbM4QNx+JeRgK/6NVqSXmhOCR+Dw6qY6Rczs4YtJZHcLquY8FiGqVQ64DH4yIwcY
- k+AgtiqwiXKXtutMPTOBWdkd7k98T7Ss/1vugqMbkp9ugvxh7liFw62NlrekSo6VsnUQ
- kKsA==
-X-Gm-Message-State: AHQUAuYjeTfqrSSGYfgl5/0+ZFGU5DGyg/D4eqUu7trejURbmqgeSI4G
- TchzS/LFtJa5x+KXDPF147GCCB9jxNs=
-X-Google-Smtp-Source: AHgI3IYeDKO1imYjOgpaha+0B5KYU1ZizsqzlOd4q5jYzqb1HBi1uP6YZoIIz3xZQHEJHi5HVUMcig==
-X-Received: by 2002:a63:54c:: with SMTP id 73mr7289676pgf.295.1550766039007;
- Thu, 21 Feb 2019 08:20:39 -0800 (PST)
-Received: from localhost.localdomain ([182.69.202.151])
- by smtp.gmail.com with ESMTPSA id 63sm16192391pfs.65.2019.02.21.08.20.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 08:20:38 -0800 (PST)
-Subject: Re: [PATCH] arm64, vmcoreinfo : Append 'MAX_USER_VA_BITS' and
- 'MAX_PHYSMEM_BITS' to vmcoreinfo
-To: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
-References: <1548850991-11879-1-git-send-email-bhsharma@redhat.com>
- <20190131014800.GB15785@dhcp-128-65.nay.redhat.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03567AA3@BPXM09GP.gisp.nec.co.jp>
- <d7d50b5a-3577-448e-d928-7898016a38fb@redhat.com>
- <20190212104407.GA17022@dhcp-128-65.nay.redhat.com>
- <CACi5LpOAADU8s+3e6=fO7FT+VtAmWYNeZN9COF+4Gt6twLWYaA@mail.gmail.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC035683DB@BPXM09GP.gisp.nec.co.jp>
- <20190213111552.GA8265@dhcp-128-65.nay.redhat.com>
- <bed51e6e-3dcb-8e07-1d31-9d81bfca20e5@arm.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03568504@BPXM09GP.gisp.nec.co.jp>
- <37ed4c14-e4b9-49c0-4816-c289ce65fd76@arm.com>
- <CACi5LpN6gVy4gCTYLGRiWW1VNGrVc-+Ykn919LKsO2bP-v1NHw@mail.gmail.com>
- <4AE2DC15AC0B8543882A74EA0D43DBEC03568A9F@BPXM09GP.gisp.nec.co.jp>
-From: Bhupesh Sharma <bhsharma@redhat.com>
-Message-ID: <891eaf5a-aede-364d-6465-832e377c3e29@redhat.com>
-Date: Thu, 21 Feb 2019 21:50:30 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+	id 1gwr99-0002nb-3P; Thu, 21 Feb 2019 16:24:27 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwr95-0002n2-DV
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 16:24:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 48E7BA78;
+ Thu, 21 Feb 2019 08:24:21 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5A8BB3F690;
+ Thu, 21 Feb 2019 08:24:19 -0800 (PST)
+Date: Thu, 21 Feb 2019 16:24:14 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>, marc.zyngier@arm.com
+Subject: Re: [PATCH v4 3/9] PCI: keystone: Convert to using hierarchy domain
+ for legacy interrupts
+Message-ID: <20190221162413.GA5815@e107981-ln.cambridge.arm.com>
+References: <20190221101518.22604-1-kishon@ti.com>
+ <20190221101518.22604-4-kishon@ti.com>
 MIME-Version: 1.0
-In-Reply-To: <4AE2DC15AC0B8543882A74EA0D43DBEC03568A9F@BPXM09GP.gisp.nec.co.jp>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190221101518.22604-4-kishon@ti.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_082040_201182_9E61168E 
-X-CRM114-Status: GOOD (  20.25  )
+X-CRM114-CacheID: sfid-20190221_082423_470633_52EED9CB 
+X-CRM114-Status: GOOD (  26.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,138 +72,337 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "lijiang@redhat.com" <lijiang@redhat.com>, "bhe@redhat.com" <bhe@redhat.com>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- "catalin.marinas@arm.com" <catalin.marinas@arm.com>,
- Steve Capper <Steve.Capper@arm.com>,
- "kexec@lists.infradead.org" <kexec@lists.infradead.org>,
- Will Deacon <will.deacon@arm.com>,
- AKASHI Takahiro <takahiro.akashi@linaro.org>,
- James Morse <james.morse@arm.com>,
- Kristina Martsenko <kristina.martsenko@arm.com>,
- Borislav Petkov <bp@alien8.de>, "anderson@redhat.com" <anderson@redhat.com>,
- Dave Young <dyoung@redhat.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
+ Murali Karicheri <m-karicheri2@ti.com>, linux-pci@vger.kernel.org,
+ Bjorn Helgaas <bhelgaas@google.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Kazu,
-
-On 02/20/2019 02:17 AM, Kazuhito Hagio wrote:
-> Hi Bhupesh,
+On Thu, Feb 21, 2019 at 03:45:12PM +0530, Kishon Vijay Abraham I wrote:
+> K2G provides separate IRQ lines for each of the four legacy interrupts.
+> Model this using hierarchy domain instead of linear domain with chained
+> IRQ handler.
 > 
-> -----Original Message-----
->> I am not sure you got a chance to look at the two regression cases I
->> reported here:
->> <http://lists.infradead.org/pipermail/kexec/2019-February/022449.html>
->>
->> Unfortunately the above suggestion doesn't provide any fix for
->> ARMv8.2-LPA regression (see text under heading '
->> (1). Regression Case 1 (ARMv8.2-LPA enabled kernel)')
-> 
-> As for MAX_PHYSMEM_BITS, I realized that ppc64 makedumpfile can detect
-> it because there is only one SECTION_SIZE_BITS for ppc64. I think we
-> can use the same way as set_ppc64_max_physmem_bits() does also for
-> arm64 for now. I'm going to write it for kernels not having
-> NUMBER(MAX_PHYSMEM_BITS) in vmcoreinfo.
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+>  drivers/pci/controller/dwc/pci-keystone.c | 205 +++++++++++++---------
+>  1 file changed, 118 insertions(+), 87 deletions(-)
 
-I see two drawbacks with the above approach:
+Hi Kishon,
 
-a). This means that other user-space tools like crash-utility would 
-still be broken and would probably need to find MAX_PHYSMEM_BITS for 
-arm64 via a similar (hack'ish ?) approach.
+I CC'ed Marc because you are actually re-writing an interrupt controller
+driver so I would be happier to merge this refactoring if Marc can have
+a look and he is satisfied with it - more so because most of the code can
+be reused by other host bridge drivers with similar behaviour.
 
-b). I am looking at the makedumpfile code for 'MAX_PHYSMEM_BITS' 
-determination for two archs as an example:
-
-ppc
----
-
-int
-set_ppc64_max_physmem_bits(void)
-{
-         long array_len = ARRAY_LENGTH(mem_section);
-         /*
-          * The older ppc64 kernels uses _MAX_PHYSMEM_BITS as 42 and the
-          * newer kernels 3.7 onwards uses 46 bits.
-          */
-
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG ;
-         if ((array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT_EXTREME()))
-                 || (array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT())))
-                 return TRUE;
-
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_3_7;
-         if ((array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT_EXTREME()))
-                 || (array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT())))
-                 return TRUE;
-
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_4_19;
-         if ((array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT_EXTREME()))
-                 || (array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT())))
-                 return TRUE;
-
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_4_20;
-         if ((array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT_EXTREME()))
-                 || (array_len == (NR_MEM_SECTIONS() / 
-_SECTIONS_PER_ROOT())))
-                 return TRUE;
-
-         return FALSE;
-}
-
-x86_64:
-------
-
-int
-get_versiondep_info_x86_64(void)
-{
-     /*
-      * On linux-2.6.26, MAX_PHYSMEM_BITS is changed to 44 from 40.
-      */
-     if (info->kernel_version < KERNEL_VERSION(2, 6, 26))
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_ORIG;
-     else if (info->kernel_version < KERNEL_VERSION(2, 6, 31))
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_26;
-     else if(check_5level_paging())
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_5LEVEL;
-     else
-         info->max_physmem_bits  = _MAX_PHYSMEM_BITS_2_6_31;
-
-     ...
-}
-
-Looking at the above, two questions come to my mind:
-
-- Do we really need all the above complexity in user-space code, to hoop 
-across various kernel versions and perform allocations for something 
-that can be so easily exported via vmcoreinfo? Also we need to see how 
-portable is the above code for a new kernel version - IMO, it will need 
-another fix patch when we update to a new kernel version in near future.
-
-- Also do we need to replicate the above implementations across 
-user-space tools when they can also utilize the vmcoreinfo information 
-to determine the PA_BITS range without any additional arch/kernel 
-version specific details as the single point of obtaining this 
-information from the kernel?
-
-So, in view of the above, I would still advocate that we use a 
-vmcoreinfo export for 'MAX_PHYSMEM_BITS' as well to have a uniform 
-interface for the same across all user-land applications.
+I will have a look too, unfortunately it is becoming a bit tight for
+v5.1 but let's see how it goes.
 
 Thanks,
-Bhupesh
+Lorenzo
 
+> diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
+> index 47f0dcf638f2..7f1648453f54 100644
+> --- a/drivers/pci/controller/dwc/pci-keystone.c
+> +++ b/drivers/pci/controller/dwc/pci-keystone.c
+> @@ -61,6 +61,7 @@
+>  
+>  #define IRQ_STATUS(n)			(0x184 + ((n) << 4))
+>  #define IRQ_ENABLE_SET(n)		(0x188 + ((n) << 4))
+> +#define IRQ_ENABLE_CLR(n)		(0x18C + ((n) << 4))
+>  #define INTx_EN				BIT(0)
+>  
+>  #define ERR_IRQ_STATUS			0x1c4
+> @@ -87,7 +88,6 @@ struct keystone_pcie {
+>  	struct dw_pcie		*pci;
+>  	/* PCI Device ID */
+>  	u32			device_id;
+> -	int			legacy_host_irqs[PCI_NUM_INTX];
+>  	struct			device_node *legacy_intc_np;
+>  
+>  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
+> @@ -96,7 +96,6 @@ struct keystone_pcie {
+>  	struct phy		**phy;
+>  	struct device_link	**link;
+>  	struct			device_node *msi_intc_np;
+> -	struct irq_domain	*legacy_irq_domain;
+>  	struct device_node	*np;
+>  
+>  	int error_irq;
+> @@ -199,26 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
+>  	return dw_pcie_allocate_domains(pp);
+>  }
+>  
+> -static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
+> -				      int offset)
+> -{
+> -	struct dw_pcie *pci = ks_pcie->pci;
+> -	struct device *dev = pci->dev;
+> -	u32 pending;
+> -	int virq;
+> -
+> -	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
+> -
+> -	if (BIT(0) & pending) {
+> -		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
+> -		dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
+> -		generic_handle_irq(virq);
+> -	}
+> -
+> -	/* EOI the INTx interrupt */
+> -	ks_pcie_app_writel(ks_pcie, IRQ_EOI, offset);
+> -}
+> -
+>  static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
+>  {
+>  	ks_pcie_app_writel(ks_pcie, ERR_IRQ_ENABLE_SET, ERR_IRQ_ALL);
+> @@ -256,39 +235,117 @@ static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static void ks_pcie_ack_legacy_irq(struct irq_data *d)
+> +void ks_pcie_irq_eoi(struct irq_data *data)
+>  {
+> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
+> +	irq_hw_number_t hwirq = data->hwirq;
+> +
+> +	ks_pcie_app_writel(ks_pcie, IRQ_EOI, hwirq);
+> +	irq_chip_eoi_parent(data);
+>  }
+>  
+> -static void ks_pcie_mask_legacy_irq(struct irq_data *d)
+> +void ks_pcie_irq_enable(struct irq_data *data)
+>  {
+> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
+> +	irq_hw_number_t hwirq = data->hwirq;
+> +
+> +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(hwirq), INTx_EN);
+> +	irq_chip_enable_parent(data);
+>  }
+>  
+> -static void ks_pcie_unmask_legacy_irq(struct irq_data *d)
+> +void ks_pcie_irq_disable(struct irq_data *data)
+>  {
+> +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
+> +	irq_hw_number_t hwirq = data->hwirq;
+> +
+> +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_CLR(hwirq), INTx_EN);
+> +	irq_chip_disable_parent(data);
+>  }
+>  
+>  static struct irq_chip ks_pcie_legacy_irq_chip = {
+> -	.name = "Keystone-PCI-Legacy-IRQ",
+> -	.irq_ack = ks_pcie_ack_legacy_irq,
+> -	.irq_mask = ks_pcie_mask_legacy_irq,
+> -	.irq_unmask = ks_pcie_unmask_legacy_irq,
+> +	.name			= "Keystone-PCI-Legacy-IRQ",
+> +	.irq_enable		= ks_pcie_irq_enable,
+> +	.irq_disable		= ks_pcie_irq_disable,
+> +	.irq_eoi		= ks_pcie_irq_eoi,
+> +	.irq_mask		= irq_chip_mask_parent,
+> +	.irq_unmask		= irq_chip_unmask_parent,
+> +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
+> +	.irq_set_type		= irq_chip_set_type_parent,
+> +	.irq_set_affinity	= irq_chip_set_affinity_parent,
+>  };
+>  
+> -static int ks_pcie_init_legacy_irq_map(struct irq_domain *d,
+> -				       unsigned int irq,
+> -				       irq_hw_number_t hw_irq)
+> +static int ks_pcie_legacy_irq_domain_alloc(struct irq_domain *domain,
+> +					   unsigned int virq,
+> +					   unsigned int nr_irqs, void *data)
+>  {
+> -	irq_set_chip_and_handler(irq, &ks_pcie_legacy_irq_chip,
+> -				 handle_level_irq);
+> -	irq_set_chip_data(irq, d->host_data);
+> +	struct keystone_pcie *ks_pcie = domain->host_data;
+> +	struct device_node *np = ks_pcie->legacy_intc_np;
+> +	struct irq_fwspec parent_fwspec, *fwspec = data;
+> +	struct of_phandle_args out_irq;
+> +	int ret, i;
+> +
+> +	if (nr_irqs != 1)
+> +		return -EINVAL;
+> +
+> +	ret = of_irq_parse_one(np, fwspec->param[0], &out_irq);
+> +	if (ret < 0) {
+> +		pr_err("Failed to parse interrupt node\n");
+> +		return ret;
+> +	}
+> +
+> +	parent_fwspec.fwnode = &out_irq.np->fwnode;
+> +	parent_fwspec.param_count = out_irq.args_count;
+> +
+> +	for (i = 0; i < out_irq.args_count; i++)
+> +		parent_fwspec.param[i] = out_irq.args[i];
+> +
+> +	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &parent_fwspec);
+> +	if (ret < 0) {
+> +		pr_err("Failed to allocate parent irq %u: %d\n",
+> +		       parent_fwspec.param[0], ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
+> +					    &ks_pcie_legacy_irq_chip, ks_pcie);
+> +	if (ret < 0) {
+> +		pr_err("Failed to set hwirq and chip\n");
+> +		goto err_set_hwirq_and_chip;
+> +	}
+>  
+>  	return 0;
+> +
+> +err_set_hwirq_and_chip:
+> +	irq_domain_free_irqs_parent(domain, virq, 1);
+> +
+> +	return ret;
+> +}
+> +
+> +static int ks_pcie_irq_domain_translate(struct irq_domain *domain,
+> +					struct irq_fwspec *fwspec,
+> +					unsigned long *hwirq,
+> +					unsigned int *type)
+> +{
+> +	if (is_of_node(fwspec->fwnode)) {
+> +		if (fwspec->param_count != 2)
+> +			return -EINVAL;
+> +
+> +		if (fwspec->param[0] >= PCI_NUM_INTX)
+> +			return -EINVAL;
+> +
+> +		*hwirq = fwspec->param[0];
+> +		*type = fwspec->param[1];
+> +
+> +		return 0;
+> +	}
+> +
+> +	return -EINVAL;
+>  }
+>  
+>  static const struct irq_domain_ops ks_pcie_legacy_irq_domain_ops = {
+> -	.map = ks_pcie_init_legacy_irq_map,
+> -	.xlate = irq_domain_xlate_onetwocell,
+> +	.alloc		= ks_pcie_legacy_irq_domain_alloc,
+> +	.free		= irq_domain_free_irqs_common,
+> +	.translate	= ks_pcie_irq_domain_translate,
+>  };
+>  
+>  /**
+> @@ -572,35 +629,6 @@ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> -/**
+> - * ks_pcie_legacy_irq_handler() - Handle legacy interrupt
+> - * @irq: IRQ line for legacy interrupts
+> - * @desc: Pointer to irq descriptor
+> - *
+> - * Traverse through pending legacy interrupts and invoke handler for each. Also
+> - * takes care of interrupt controller level mask/ack operation.
+> - */
+> -static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
+> -{
+> -	unsigned int irq = irq_desc_get_irq(desc);
+> -	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
+> -	struct dw_pcie *pci = ks_pcie->pci;
+> -	struct device *dev = pci->dev;
+> -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
+> -	struct irq_chip *chip = irq_desc_get_chip(desc);
+> -
+> -	dev_dbg(dev, ": Handling legacy irq %d\n", irq);
+> -
+> -	/*
+> -	 * The chained irq handler installation would have replaced normal
+> -	 * interrupt driver handler so we need to take care of mask/unmask and
+> -	 * ack operation.
+> -	 */
+> -	chained_irq_enter(chip, desc);
+> -	ks_pcie_handle_legacy_irq(ks_pcie, irq_offset);
+> -	chained_irq_exit(chip, desc);
+> -}
+> -
+>  static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
+>  {
+>  	struct device *dev = ks_pcie->pci->dev;
+> @@ -655,14 +683,33 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
+>  	struct device *dev = ks_pcie->pci->dev;
+>  	struct irq_domain *legacy_irq_domain;
+>  	struct device_node *np = ks_pcie->np;
+> +	struct irq_domain *parent_domain;
+> +	struct device_node *parent_node;
+>  	struct device_node *intc_np;
+> -	int irq_count, irq, ret = 0, i;
+> +	int irq_count, ret = 0;
+>  
+>  	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
+>  	if (!intc_np) {
+>  		dev_warn(dev, "legacy-interrupt-controller node is absent\n");
+>  		return -EINVAL;
+>  	}
+> +	ks_pcie->legacy_intc_np = intc_np;
+> +
+> +	parent_node = of_irq_find_parent(intc_np);
+> +	if (!parent_node) {
+> +		dev_err(dev, "unable to obtain parent node\n");
+> +		ret = -ENXIO;
+> +		goto err;
+> +	}
+> +
+> +	parent_domain = irq_find_host(parent_node);
+> +	if (!parent_domain) {
+> +		dev_err(dev, "unable to obtain parent domain\n");
+> +		ret = -ENXIO;
+> +		goto err;
+> +	}
+> +
+> +	of_node_put(parent_node);
+>  
+>  	irq_count = of_irq_count(intc_np);
+>  	if (!irq_count) {
+> @@ -671,31 +718,15 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
+>  		goto err;
+>  	}
+>  
+> -	for (i = 0; i < irq_count; i++) {
+> -		irq = irq_of_parse_and_map(intc_np, i);
+> -		if (!irq) {
+> -			ret = -EINVAL;
+> -			goto err;
+> -		}
+> -		ks_pcie->legacy_host_irqs[i] = irq;
+> -
+> -		irq_set_chained_handler_and_data(irq,
+> -						 ks_pcie_legacy_irq_handler,
+> -						 ks_pcie);
+> -	}
+> -
+>  	legacy_irq_domain =
+> -		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
+> -				      &ks_pcie_legacy_irq_domain_ops, NULL);
+> +		irq_domain_add_hierarchy(parent_domain, 0, PCI_NUM_INTX,
+> +					 intc_np,
+> +					 &ks_pcie_legacy_irq_domain_ops,
+> +					 ks_pcie);
+>  	if (!legacy_irq_domain) {
+>  		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
+>  		ret = -EINVAL;
+> -		goto err;
+>  	}
+> -	ks_pcie->legacy_irq_domain = legacy_irq_domain;
+> -
+> -	for (i = 0; i < PCI_NUM_INTX; i++)
+> -		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
+>  
+>  err:
+>  	of_node_put(intc_np);
+> -- 
+> 2.17.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
