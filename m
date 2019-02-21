@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94E50C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:17:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 32315C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:17:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 55D9420818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:17:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 01D4C20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:17:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oJ0gv1dH";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vHq/LMn9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55D9420818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kl/hUeOP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZsO6VX+R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01D4C20818
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
 	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HCwAruR+tmAKU2dVqV7SUG4wj4OxLevdaTCPoFag8Wc=; b=oJ0gv1dHZpMReS
-	KraulksmyqPD8D0Lcn83CUwhOgwHcC64D9jpcEEl3MsCBf2l0dQ6HNtBqvtyIktYAwRWKN1cDf9dg
-	8XeYnsHlU5qDJ3NEywR5M7QYMoyprMbbzCYAULk+GiVofUUb59+Cf4o+kqcLDYEHMXLmCsqz+W4b6
-	mVXqd8q+cd7t9egprRagne43CLdcv1N9dTwPfLV7kwRqLVixjc7fRBSHN6BqmEiT9GuLf4W6rGnWQ
-	5Bi4U4mgoPb/SajEPStz97iazlcfERqHQqoSqjqZqJMby/UdKKL5SOoVO6ZoFJJPlzRbU2Iu1Y+x/
-	zmy/Q5RD43czNZN3dMuA==;
+	List-Owner; bh=4S/E/yYuAGX4u98i6kcxfigRUbE9exX5+GtafU9cpLo=; b=kl/hUeOPfjiyHW
+	b4x1b+mHSD3NhcZrJjg6HiFMVEW0+OdJhzqqQDEuQiritV6oFI8HKu9Tp1G7jcG1O/4jYd1WEncOA
+	EBszRoQIEDgpiKe0wc3a9zd6tBKl+jZVTd/jrE6nzXPTr5hltpT7E/iHpxUiVrnJG25RQBl5zsf+F
+	mEVFhceisxdgjLHWCi6ry1iZJ9t8nABzUq3rwBQIh+w6J9A1q1ArrYQELjNC199wwPcHmyY6PLwVm
+	yfogP8XDYPwx4oAfES5rAUKFeJcYMb3GtNpDf5EGneXv1L9kB22IxPOnsQpy68T92g2Is9Fhsqa0v
+	i5XgAas/sTN1Tg85WhdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwweP-0005MJ-Gy; Thu, 21 Feb 2019 22:17:05 +0000
+	id 1gwweb-0005d0-0x; Thu, 21 Feb 2019 22:17:17 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwwdL-0004PL-SV
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 22:16:09 +0000
+ id 1gwwdP-0004UW-8e
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 22:16:11 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 22BB220818;
- Thu, 21 Feb 2019 22:15:59 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 9BA5D208E4;
+ Thu, 21 Feb 2019 22:16:02 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550787359;
- bh=Hi47GsDWkrIEtUc1wOpXtU7yX3Q/A8ipCZbEVPsHnR0=;
+ s=default; t=1550787362;
+ bh=6ZocVTDyu6QEKppFxuFMBJv/i8n5oL4RFkclVuHAYiw=;
  h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
- b=vHq/LMn9pS3cZp0lCFQI3a4gd0iKAVaWbpjegE3wQxIxoGzZF6/Y+70zxRJQxuSJv
- cZwY5U1Y63V4A9TSIdLHPJKIKupAWlDKwe3HtRYGp8u945vOf7kPAVscxREyRA27YP
- LMGcJCsXqkYQJSfLWKCHvfZc6RLvZk5XnUW+Rarg=
+ b=ZsO6VX+RWSctu3HUnqy6FvQ1T3CYcrU2SfaTipuS1HfpXc5zheNiGA8yQILdTmGqX
+ XkxB/N0nkt/npEGY9VrStQ+VWkgXWI0Vm0xOyuN6qMT+NcoN+brvaSfJJZkUJEMB7U
+ HAFDm37EYP1h+tT2xgKRlSYEda5QLy4wWabT+AKw=
 MIME-Version: 1.0
-Subject: Re: [PATCH v2 6/7] clk: stm32mp1: remove unnecessary
- CLK_DIVIDER_ALLOW_ZERO flag
-Message-ID: <155078735843.77512.7517600013226000262@swboyd.mtv.corp.google.com>
+Subject: Re: [PATCH v2 7/7] clk: stm32mp1: fix bit width of hse_rtc divider
+Message-ID: <155078736177.77512.5139718258939104063@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.8
 References: <20190214104047.1173-1-gabriel.fernandez@st.com>
- <20190214104047.1173-7-gabriel.fernandez@st.com>
+ <20190214104047.1173-8-gabriel.fernandez@st.com>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20190214104047.1173-7-gabriel.fernandez@st.com>
+In-Reply-To: <20190214104047.1173-8-gabriel.fernandez@st.com>
 To: Alexandre Torgue <alexandre.torgue@st.com>,
  Maxime Coquelin <mcoquelin.stm32@gmail.com>,
  Michael Turquette <mturquette@baylibre.com>, gabriel.fernandez@st.com
-Date: Thu, 21 Feb 2019 14:15:58 -0800
+Date: Thu, 21 Feb 2019 14:16:01 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_141600_195740_B6E5B0EC 
-X-CRM114-Status: UNSURE (   5.98  )
+X-CRM114-CacheID: sfid-20190221_141603_863597_BD61D6F6 
+X-CRM114-Status: UNSURE (   6.04  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,13 +85,12 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting gabriel.fernandez@st.com (2019-02-14 02:40:46)
+Quoting gabriel.fernandez@st.com (2019-02-14 02:40:47)
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> The divisor of ethptp_k and ck_hse_rtc clocks is: 'value register
-> plus one'.
-> Then CLK_DIVIDER_ALLOW_ZERO flag has no effect and is useless here.
+> Fix the bit width of the hse rtc divider because it's off by one.
 > 
+> Fixes: 2c87c9d33117 ("clk: stm32mp1: add RTC clock")
 > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
 
