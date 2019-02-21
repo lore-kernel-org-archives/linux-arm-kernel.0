@@ -2,74 +2,77 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54DCAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:45:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44BF8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:46:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2545F2080F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:45:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1338C2084F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 13:46:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zv9MUfF+";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="Oi1auStJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2545F2080F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gmxJOXMG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="Ek6p/b5B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1338C2084F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=FariDFfYNnIBclcMpB916HK6orSQeI3ptWL9udxv7Us=; b=Zv9MUfF+ZgUo33
-	ZKUHCZQeTBysyegyXpYneCwTQCxDqUJ77pRAOwmN9ObUr2NPNMw0Padw1zHSuhqMDbRKk3i55MDVr
-	H7ymXiP8Ou9+MTc9rUd/XmDr9KC6Pa3TyXdEw6fso6bTLxJfcuX1sqs8dyEGPiuZRNcRaKGLLa8JH
-	j84XHqlO1Fne2rlP3VYamqaoiROODGAH61M61/jnF4fBfSbzBPjxBDE4VBYoFXss1uDzAdzYrLD73
-	4FKPupxGoMztr7YCFEC4LFnj+/NzqZ3itc8N7hSDpBq2tXYskdM5thq8IIa2TzLsnVS6eBswuPqmo
-	QHUg3rKl3O+EeAG81kiA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EuIlJ5qdR31oJD5RvDyod7T2TShKOs1crWQS1r8wkqs=; b=gmxJOXMGM2yFo8
+	Nb0MzwydoEn5O8/90Gty0tTw0TFfmEL99sPPXHMOqalZY8rWr85t+7gXdfo64QVmWl5hq6lKp98hf
+	9X1/HDbVHLuQa27JDWruNAWLRV3ntHrAUUadSk59Ra6cjCEpo0oGHSjXkoqJSNS9nakmeYQW/aPs/
+	MQ6OvMnylBJ2p8B2ztJrrZmq85VyrvQ1/gEkulQ0Dbjac3MWx5cXrQ7QhokhatJnGwx8dtmgTyTis
+	vX7/S6sj9oJXPln4IQ/FI0HhCy2fGfOYE4NcALAiHcNOWaMngPNu9DIiktkW0D+FYDOdeCGBLDbbS
+	btw1SUq2z8PdHpexxnkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwofj-0005Jx-8E; Thu, 21 Feb 2019 13:45:55 +0000
-Received: from esa4.microchip.iphmx.com ([68.232.154.123])
+	id 1gwofu-0005YF-Sb; Thu, 21 Feb 2019 13:46:06 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwofe-0005Jb-7o
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 13:45:52 +0000
-X-IronPort-AV: E=Sophos;i="5.58,395,1544511600"; d="scan'208";a="26664942"
+ id 1gwofi-0005Jr-IA
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 13:45:57 +0000
+X-IronPort-AV: E=Sophos;i="5.58,395,1544511600"; d="scan'208";a="24225445"
 Received: from smtpout.microchip.com (HELO email.microchip.com)
  ([198.175.253.82])
- by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
- 21 Feb 2019 06:45:48 -0700
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 21 Feb 2019 06:45:50 -0700
 Received: from NAM01-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
  email.microchip.com (10.10.76.108) with Microsoft SMTP Server (TLS)
- id 14.3.352.0; Thu, 21 Feb 2019 06:45:47 -0700
+ id 14.3.352.0; Thu, 21 Feb 2019 06:45:50 -0700
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=microchiptechnology.onmicrosoft.com;
  s=selector1-microchiptechnology-onmicrosoft-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=THBY4Yi+rszutxqdRfVhErufWvIhiThaMuapsO8zFos=;
- b=Oi1auStJ3A1SECVLHg+Y65Y6yXc8vZqWqiz6jNlI/qEb1E0a9jk07/d24DTdB0m1y59bmfQlGCiVcgr9OJgoFRvpHia7UR63b2wdDaZ4+Tn0Ba9mF61t5UXcajh7Rb/eJH6/eAZ9WuwcY8P7FHZxuaFn5nXoXbC/WX1tuziDazw=
+ bh=DC9Sg3RKw34ixaN2S3M72KryUsEVfr17/Cjot5fMG3g=;
+ b=Ek6p/b5BYEV/HPde0b/RH7xdfAyVoupmLUrmGJ1FGGSs9GIqxHMt45pOHLNlJDpQDI3ICriVtVcJ57fO02glwD3PJglfVx5qsuxqN9HfjPDTa9HEb4hpZH6V9fSIIjHyvf/1XVyC1eXyHhH7DGW9vHVGeSRAxQi6Q3NHTE++lgw=
 Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
  MWHPR11MB1677.namprd11.prod.outlook.com (10.172.55.18) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.16; Thu, 21 Feb 2019 13:45:45 +0000
+ 15.20.1643.16; Thu, 21 Feb 2019 13:45:48 +0000
 Received: from MWHPR11MB1920.namprd11.prod.outlook.com
  ([fe80::dcd3:5ebd:191c:549e]) by MWHPR11MB1920.namprd11.prod.outlook.com
  ([fe80::dcd3:5ebd:191c:549e%6]) with mapi id 15.20.1643.016; Thu, 21 Feb 2019
- 13:45:45 +0000
+ 13:45:48 +0000
 From: <Claudiu.Beznea@microchip.com>
 To: <robh+dt@kernel.org>, <mark.rutland@arm.com>,
  <Nicolas.Ferre@microchip.com>, <alexandre.belloni@bootlin.com>,
  <Ludovic.Desroches@microchip.com>, <sre@kernel.org>
-Subject: [PATCH v2 0/3] add support for SAM9X60's shutdown controller
-Thread-Topic: [PATCH v2 0/3] add support for SAM9X60's shutdown controller
-Thread-Index: AQHUyeu+va/R5VdQpUeP/sCJumt1Iw==
-Date: Thu, 21 Feb 2019 13:45:44 +0000
-Message-ID: <1550756716-3032-1-git-send-email-claudiu.beznea@microchip.com>
+Subject: [PATCH v2 1/3] power: reset: at91-poweroff: add RTT wakeup capability
+Thread-Topic: [PATCH v2 1/3] power: reset: at91-poweroff: add RTT wakeup
+ capability
+Thread-Index: AQHUyevAV4hXVGKMOUuIUcZK/AzqJA==
+Date: Thu, 21 Feb 2019 13:45:48 +0000
+Message-ID: <1550756716-3032-2-git-send-email-claudiu.beznea@microchip.com>
+References: <1550756716-3032-1-git-send-email-claudiu.beznea@microchip.com>
+In-Reply-To: <1550756716-3032-1-git-send-email-claudiu.beznea@microchip.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -83,56 +86,57 @@ x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: git-send-email 2.7.4
 x-originating-ip: [94.177.32.154]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 6af1c15e-a344-4cb7-1385-08d69802e087
+x-ms-office365-filtering-correlation-id: 9bda0993-3601-4807-1699-08d69802e2aa
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
  SRVR:MWHPR11MB1677; 
 x-ms-traffictypediagnostic: MWHPR11MB1677:
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; MWHPR11MB1677;
- 23:j9dGiRzsfNQvSAgtbKdtAvHQn8xOD+oRgV69v0+?=
- =?iso-8859-1?Q?OIBCSsHi5Iy6zZJYCZjyv6sk/IgBw08PLP2vvXBGSfxuqqkzprPqMbipWW?=
- =?iso-8859-1?Q?FHMTWRVItp8S4oA1MboZP1FcFT43/n+eXeoogOe1ORQJlAEPe/BblVTxhM?=
- =?iso-8859-1?Q?WhrA7w3nQqOGRrnD9v8ukgdVu1bRupGosjmSNddYlEsp4IRaEzHE0RgqHz?=
- =?iso-8859-1?Q?FwmG6bS7Sl3mFTT1aJcxPt4ZBv6Fa1373rbvCvOqKXEKM6//ealZThuf3l?=
- =?iso-8859-1?Q?M2hlIYUwx/OSr5KaUud5NFGLhNHvNTZz9B0R6l3wqxZFtvB4AEN//MOe7J?=
- =?iso-8859-1?Q?C4O7c9fj/vp2buzyS1d0lS71RFz5jnI2+f8C8nEy7wTiWO4nIoQOWuF5vA?=
- =?iso-8859-1?Q?BBV4mcnEonbJvOonCU6D0bbwrEkPDl9PV2GBy1cIJp1SDpxTt/h7V0WLMc?=
- =?iso-8859-1?Q?MOhchmc8VnyJTSrAdTahK4+5MtuB4Sj5P7ugqAgRADFXCYBKMWaQ2/0IBG?=
- =?iso-8859-1?Q?VeyZUOLAqsTDh92g47hlEiF76oDSLtQjajQu1YzdUevVK3TMpkAGa8yeKq?=
- =?iso-8859-1?Q?7uEur8S3IIrQs8gTpZRoE/j9Hby4N8+1M1/f0s2s2qh+AhGkMggxdJCG/h?=
- =?iso-8859-1?Q?bQRkGpJQlBZt5efXg4QwXTdLvphe94TOphX3R2jt5yTYcpWbAf100930r3?=
- =?iso-8859-1?Q?N+euCUhYHzyvYtqMe8g0f/sbXPvuo5DWVrP35ALU3mb0UhVNoxfZhpSqxD?=
- =?iso-8859-1?Q?1ddODJ9mEI+VdI5cHCtoBTpe5Q89b3W5I9rSpL401emtwEeFmC6UbcsBL3?=
- =?iso-8859-1?Q?b+fr89XpVwgsz+kWdmgzCsr4CQiMgNQI6ZPbxMzUCY2+YfAeNj/Lm/jk7w?=
- =?iso-8859-1?Q?wQDigO+/adRsUKOjvqPzl5o3pe/ynEt1y2A617c4FphzHh7H17dyfuQJJh?=
- =?iso-8859-1?Q?4GyrQh4mSZWXi10+HYoE2aJ2Ne8nCrLtU0cmY1dkamio28XTN3mpfJWFG1?=
- =?iso-8859-1?Q?K5nNebgxnm7LQLqwcE7vWc/fkro4H6QSmNuBzuyLmt4JIGPiN1Mr7tpbyO?=
- =?iso-8859-1?Q?hlfZAT9oB4yCcGvFs0PbXjAmPYmEI/GZiz8hN40m7/P+NZNBRWb278Dm3G?=
- =?iso-8859-1?Q?Sp0ZdqG5Yl8slHTpr5yy8tkq07pYD8HDVz20nNggCBiInu8r1hjNaCap6l?=
- =?iso-8859-1?Q?p/te7WzsMq8G/+quO/tQYN0cGsb9s6OGHPXHQM9/yprJJjPszaNjDHxInm?=
- =?iso-8859-1?Q?Aka7mgdOWWUVdIAtWjplZl0b2EUj1Y7k7CztqIw=3D=3D?=
-x-microsoft-antispam-prvs: <MWHPR11MB16777280EAE9EBA1050EAE1E877E0@MWHPR11MB1677.namprd11.prod.outlook.com>
+ 23:Fj/riKE3LSOBGRzgFiJ1vTKInuWlrITxXoxxN06?=
+ =?iso-8859-1?Q?nDrIyMJEl7BOZsMzcdDHJmeMd4uvUk81SPdz5U3/rkCr7sGUz6xIP0es/o?=
+ =?iso-8859-1?Q?F1C5y2yBkWrHgMTAtzHT7rJsoCDkQtCywDOcad66djXP5tkXOekBolLpYN?=
+ =?iso-8859-1?Q?jFiVCibA72qHRpenwemM1prtiNjeSHfibMT3OdEx0j3hfjchHWQKLFTJl5?=
+ =?iso-8859-1?Q?SEV/2+C21/aR1HZkXnakR/AmYYA1UtkXrXqLxgG95gs+AzXeS59QzKXQxS?=
+ =?iso-8859-1?Q?FGhLq0/GntL4bgKFUxtPQ6D+apwlNheJCBiY9uaixBvcgV8ekPqS8eU3oF?=
+ =?iso-8859-1?Q?7b1DPPqkCB68KlNEhA1hqNV8T9galCodqpsmpjPbblwKCSECkuVBnqCWxS?=
+ =?iso-8859-1?Q?+Ws+0XVCsKiz0zsySn+UR2z1pRKEGraU9+EktJXob1tGwAcBZQ6BCwpoAv?=
+ =?iso-8859-1?Q?osnCRPlw/nVSAu8EDxIpz/J3L0ehQYh6CPfrSptdn6T/UQTRVvsJfb2A2B?=
+ =?iso-8859-1?Q?rOjfW40dkfj8z8kiZk7EkJQLw/7+x9vFydlGNQAnIXj8PBa/8OzQy3N/be?=
+ =?iso-8859-1?Q?vNGWtDA3NoBRF1qi25usQmlynR0tIenG1CuTQdDPPbbN1mym9hpoRng+bG?=
+ =?iso-8859-1?Q?S8SEuXhbZptU+r9/OFJZ+LXvEHEb/q1kqjH4UIqwsrg3wx53JRvpNKTnaH?=
+ =?iso-8859-1?Q?vSh2vYotLF1ch4+9Oa5eelYq8MI7IH+I5PtNfPIzgW4SeJXNkJB1MiXqpZ?=
+ =?iso-8859-1?Q?hOoMQIES8WJYCvpFQ1ywaoWJWJWGLG9JY30gfS/h6qKnc4JceTkB3T6ucp?=
+ =?iso-8859-1?Q?DT5sKIux8IPEZWaV6oRkBwRvHkhDXnF3wrujXpufI0/t++HCblKKc7YoQY?=
+ =?iso-8859-1?Q?czf4Nc9dBnAfFk4B8LIaYVtcp0QENhTwZ3xRyAHLu2v6Jv8zUXcWSICbQM?=
+ =?iso-8859-1?Q?+yZQL+zHDQ6v4dhwictKDdmPbLrHb0xiXupbB4yCOVnC0gGv0xIfuZwbvX?=
+ =?iso-8859-1?Q?yjuejj+SGX97eD4xWbmV0KGwwQNPWuPve6mcdDJOlCQdG4syQzZs0P7b+j?=
+ =?iso-8859-1?Q?ePM7nsxBPMjs48C7HtKPuOwLvCumEXQ+OmPEBFLuMV0SXpEfAnzpRDB4OE?=
+ =?iso-8859-1?Q?U8q21n4xnLC0jyrhk8nFPXr8AM2Yr3Xcrjm4TiUliOm4g6d3t8KudIZ3R0?=
+ =?iso-8859-1?Q?WL5i2mNclh9wfDGss4KMWNAGvDnef3kdMLtmmLbYIO9vGCclqX0ZPtd33M?=
+ =?iso-8859-1?Q?yCwDq3CbNs6Xj/bfLQN0jvwifPxO+6vQsLi3ZR9a5h7JLrQB80epLZetEg?=
+ =?iso-8859-1?Q?V0=3D?=
+x-microsoft-antispam-prvs: <MWHPR11MB16774D76AEC5B02AD45E8DC1877E0@MWHPR11MB1677.namprd11.prod.outlook.com>
 x-forefront-prvs: 09555FB1AD
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(346002)(136003)(366004)(376002)(396003)(189003)(199004)(6436002)(6486002)(66066001)(36756003)(107886003)(5660300002)(81166006)(97736004)(8676002)(25786009)(4744005)(2501003)(4326008)(81156014)(7736002)(305945005)(8936002)(26005)(50226002)(53936002)(186003)(6506007)(386003)(102836004)(6116002)(3846002)(14454004)(316002)(478600001)(72206003)(2906002)(106356001)(14444005)(54906003)(256004)(110136005)(6512007)(486006)(71200400001)(71190400001)(68736007)(86362001)(476003)(52116002)(99286004)(2616005)(105586002);
+ SFS:(10009020)(39860400002)(346002)(136003)(366004)(376002)(396003)(189003)(199004)(6436002)(6486002)(66066001)(36756003)(107886003)(5660300002)(81166006)(97736004)(8676002)(25786009)(2501003)(4326008)(81156014)(7736002)(305945005)(8936002)(26005)(50226002)(53936002)(186003)(6506007)(386003)(102836004)(6116002)(3846002)(14454004)(316002)(478600001)(72206003)(2906002)(106356001)(54906003)(256004)(110136005)(6512007)(486006)(71200400001)(71190400001)(68736007)(86362001)(476003)(52116002)(446003)(11346002)(99286004)(2616005)(105586002)(76176011);
  DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1677;
  H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; MX:1; A:1; 
 received-spf: None (protection.outlook.com: microchip.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: LaFXQ9adpZ1welcRXnjpoGT9NhGwL5A3GiX8T+hQJDIHTDN3eXby12UtaIqgTdLMfyLh6tgVrN5Hxh6R993fCswIG3S5IvWp27urrbjb9kCdjYZogzYAJVIho3hHoTvDuihgpLfrqnwyGdv7sHgWxbEYM7FHtqCme1jpbmztDZDm3TLSbeCASyPh2Ntk/wWi6ZgQFfiZT5RJYNfBhJmX9Ytp/+hZrDuusAJ7BLSW0lsJ0X0gliziekNymwGNg4p/971mdRxwG8uy1kW7L6DWvqdKfW2zgiYzxh4114QsouIXfBReqWV/GzppsgSFunGnNrFtpM/UpRTPbC2CrP9mixDuak0vRpQhX/VkmwFSoq8TQWjiPwz6KshGSM2CC7csimfzHdrfNxP4O8YBqK3oUyAkA6d8t9AKl8LjVkc5RVE=
+x-microsoft-antispam-message-info: s++/JLV7L9qlIFqby6fqMBQIt/5c7uqy3sWq32RWcRltDhvT3fbx8xJH/k0FhbdZCt7xWq4FdU8+WhnrNIa2Jsu0zofH2sQ5xWFmQWOEDhJGd4WrQP2JWn9/vYOEfpNycVjivHpEy1FXxi1xKRFVdE2EQDtJtt0dNfnC6vmSE1TXvTURvAnLgs99N+dztJRqmmq3mnL5vwWaze3GL24DNNLp8/K5ftOQAx2Ywctnc5R+Cnatt8QwKsPYOiRJ3pwO4YRlJuOpNgMqS3ucToYGfI2YPFkUWloh6fDwMB/B40ay2SMrkWLogFq4DckkWYeSqSHaHM3ZYJyJIU5yA8BnbDlTYKRZ8l0mE52QHkfAR5QuPAIXW8cNEDDEFd6DiCObFhPSLqTys/IwVvsEBWu61SBM7uwcJHH6W+LjsNZ+cqU=
 MIME-Version: 1.0
-X-MS-Exchange-CrossTenant-Network-Message-Id: 6af1c15e-a344-4cb7-1385-08d69802e087
-X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 13:45:41.0131 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9bda0993-3601-4807-1699-08d69802e2aa
+X-MS-Exchange-CrossTenant-originalarrivaltime: 21 Feb 2019 13:45:45.0874 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1677
 X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_054550_363992_85E2CCB3 
-X-CRM114-Status: UNSURE (   8.37  )
+X-CRM114-CacheID: sfid-20190221_054554_654521_365D56DC 
+X-CRM114-Status: UNSURE (   9.03  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -155,33 +159,70 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Claudiu Beznea <claudiu.beznea@microchip.com>
 
-Hi,
+Add RTT wakeup capability.
 
-This series adapt SAMA5D2's shutdown controller driver to work for
-SAM9X60's shutdown controller. The difference is that SAM9X60 have
-option for RTT timer wakeup.
+Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+---
+ drivers/power/reset/at91-sama5d2_shdwc.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-Thank you,
-Claudiu Beznea
-
-Changes in v2:
-- collect Acked-by tags
-- in patch 3/3 use "optional microchip,sam9x60-shdwc properties"
-  string to specify that the introduced property is only for
-  microchip,sam9x60-shdwc as specified above in case of
-  atmel,<chip>-shdwc shutdown controllers
-- in patch 3/3 keep only the optional property introduced by
-  microchip,sam9x60-shwdwc (atmel,wakeup-rtt-timer)
-
-Claudiu Beznea (3):
-  power: reset: at91-poweroff: add RTT wakeup capability
-  power: reset: at91-poweroff: add support for SAM9X60
-  dt-bindings: arm: atmel: add binding for SAM9X60 shutdown controller
-
- .../devicetree/bindings/arm/atmel-sysregs.txt      |  6 +++++-
- drivers/power/reset/at91-sama5d2_shdwc.c           | 25 ++++++++++++++++++++++
- 2 files changed, 30 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/power/reset/at91-sama5d2_shdwc.c b/drivers/power/reset/at91-sama5d2_shdwc.c
+index 2b686c55b717..0747e0cdf350 100644
+--- a/drivers/power/reset/at91-sama5d2_shdwc.c
++++ b/drivers/power/reset/at91-sama5d2_shdwc.c
+@@ -57,15 +57,21 @@
+ 
+ #define SHDW_WK_PIN(reg, cfg)	((reg) & AT91_SHDW_WKUPIS((cfg)->wkup_pin_input))
+ #define SHDW_RTCWK(reg, cfg)	(((reg) >> ((cfg)->sr_rtcwk_shift)) & 0x1)
++#define SHDW_RTTWK(reg, cfg)	(((reg) >> ((cfg)->sr_rttwk_shift)) & 0x1)
+ #define SHDW_RTCWKEN(cfg)	(1 << ((cfg)->mr_rtcwk_shift))
++#define SHDW_RTTWKEN(cfg)	(1 << ((cfg)->mr_rttwk_shift))
+ 
+ #define DBC_PERIOD_US(x)	DIV_ROUND_UP_ULL((1000000 * (x)), \
+ 							SLOW_CLOCK_FREQ)
+ 
++#define SHDW_CFG_NOT_USED	(32)
++
+ struct shdwc_config {
+ 	u8 wkup_pin_input;
+ 	u8 mr_rtcwk_shift;
++	u8 mr_rttwk_shift;
+ 	u8 sr_rtcwk_shift;
++	u8 sr_rttwk_shift;
+ };
+ 
+ struct shdwc {
+@@ -104,6 +110,8 @@ static void __init at91_wakeup_status(struct platform_device *pdev)
+ 		reason = "WKUP pin";
+ 	else if (SHDW_RTCWK(reg, shdw->cfg))
+ 		reason = "RTC";
++	else if (SHDW_RTTWK(reg, shdw->cfg))
++		reason = "RTT";
+ 
+ 	pr_info("AT91: Wake-Up source: %s\n", reason);
+ }
+@@ -221,6 +229,9 @@ static void at91_shdwc_dt_configure(struct platform_device *pdev)
+ 	if (of_property_read_bool(np, "atmel,wakeup-rtc-timer"))
+ 		mode |= SHDW_RTCWKEN(shdw->cfg);
+ 
++	if (of_property_read_bool(np, "atmel,wakeup-rtt-timer"))
++		mode |= SHDW_RTTWKEN(shdw->cfg);
++
+ 	dev_dbg(&pdev->dev, "%s: mode = %#x\n", __func__, mode);
+ 	writel(mode, shdw->shdwc_base + AT91_SHDW_MR);
+ 
+@@ -231,7 +242,10 @@ static void at91_shdwc_dt_configure(struct platform_device *pdev)
+ static const struct shdwc_config sama5d2_shdwc_config = {
+ 	.wkup_pin_input = 0,
+ 	.mr_rtcwk_shift = 17,
++	.mr_rttwk_shift	= SHDW_CFG_NOT_USED,
+ 	.sr_rtcwk_shift = 5,
++	.sr_rttwk_shift = SHDW_CFG_NOT_USED,
++};
+ };
+ 
+ static const struct of_device_id at91_shdwc_of_match[] = {
 -- 
 2.7.4
 
