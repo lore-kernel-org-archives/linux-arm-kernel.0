@@ -2,85 +2,68 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	FROM_EXCESS_BASE64,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16BD5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 23:03:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2AFD3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 23:23:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D80A32083E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 23:03:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF2C82077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 23:23:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TATJebYV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="iWZI2+83"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D80A32083E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VuRlZuu+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="2j0FplgH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF2C82077B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fNDORYWDKBgSEePBA0Z12N9/rH0WFmV60bpwL4BAJuk=; b=TATJebYVD0S4dT
-	i5we0GTxqxbHnixnDI7v3LnbAz6jffRwQaHsKbBheNAStFu2BztNkiu21MrcgTcfl56hO/+7UiYwf
-	I41y6wmHH4ykkJSJbp6jtF1f43EA8wZk7XB/5Og147TQZrS9QJcE4NrgSj/JMy747z3YurAYhLooZ
-	xrBOtQjGmJPsSJGhSFHkC468kiZDig0DfgPRH7IcUkZdRRGED0G6n40XLDvxdrU5W2G0FJpeKCqVH
-	4rKlKv7P8HyQ1MMCUdteNRGQSaEdw4e6h+N0bLxqV+pDC0873URAzSD72Bv0PgxH29cMcFWidCrrQ
-	PHADpJvU99WHp8r3vBtw==;
+	List-Owner; bh=8pKTrRPpyBdKny9ICVSXhYxrdhMJrCeOt99pyk3NWAc=; b=VuRlZuu+kSrbuT
+	jgD2NGOT1C0r/C1ild+mMlJG5hLbO1n3fYILO/A6e9yGpYAfx2O74NrbNa8meURy5AvpNaVFvaUpf
+	ANO4z2VXsS3eqDLuvrj2WmjN37mF6HjR6bE3mAB15Z8u2YmlyJFUkTZ+cYNnOyGjRoBTkxz1jB7vq
+	4wVjacnxG1v90X7qQxuBQTn3mol8aMRWaMvSGqR+HfNdHK8NuUNSzfDd9dsr1z85zgl/9UhzYqxST
+	GN21fcBher3oekmfAIjwOmQmkdmSV7m/tc/h3J7PnTc47//+uE/pt0boTK975UJLacWjwNE416H3m
+	hu6zUCy73Z/hsPe6OwNg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwxNT-0004nH-0b; Thu, 21 Feb 2019 23:03:39 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gwxge-0002vl-LB; Thu, 21 Feb 2019 23:23:28 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwxNP-0004mg-GL
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 23:03:36 +0000
-Received: by mail-ed1-x544.google.com with SMTP id c55so275999edb.0
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 15:03:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc:content-transfer-encoding;
- bh=FXlxvF4xhFiRMVY9dsmk97DoXxTAN7l0XRbieA4sju4=;
- b=iWZI2+832YMkH7XL4pcR60BH69F+1P6eq3Sx+4B6f1/nuMqvpG1jZpsD3vxuyNYv8K
- ptmt8OphBlOX90c2+sz7HKYLx8/wulSEKzOGEhYZN0kW3vbNQUGchi8XSXgl33t6iZAT
- u8myPqU/bgcQpEexg6o5s84Kc7oI2QxcPBkMiDcFaLg3kYCtLkwRWuPyhBEQX0EYCkfa
- V7/c6qnUb5m+rcKxAq52l5s6EeiMZccPF2ht+4E1hguLO4kA/Wxf9UfN6nMQUwToFOrC
- W6L7u5vVo9747/TRYwuUwNlXHhzbsPLnbBmqeChhK0z4y+abne0yq4Z4I2ipgeu255HI
- oE1w==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc:content-transfer-encoding;
- bh=FXlxvF4xhFiRMVY9dsmk97DoXxTAN7l0XRbieA4sju4=;
- b=CG3TGo1/HC7rr1clUDo+gLIoKXW7F0liNkAzjrwNyOLn3stPtcmO1oFVkTC3PUYNwb
- CSdHoU47nHQJMfbrYiVpDqjlAKAlg6UG77ujmALWqWjNw14uZRMahIu/u1Est41CfyWQ
- i+REBTQfxAritdWgASAXZf5BfN52qnucOBoMxXasH/DbRY7mTkCU3wfCKZ3mvOXdVjdE
- CDLpYNGCKpy6hqfCwDIEyGNu/mc/59NGGCh5BDOdIXN+636doQF1mcB4SpCSx8YkEtpp
- Lekal93ZbMTFTBfaj5jTi/CKUvcvGn81nao1DK1qRwq5HqxJFbe4DeHXp3/vPvQiLR7A
- 7zEw==
-X-Gm-Message-State: AHQUAuYB56qoLWLbgTBdFmJcOiSLaGaTMEYOLNOdmcTv1d8qjdc/BL1K
- P47pk3haXLzhNT74tEZAu9gpib9l+FGA2E4M7iU=
-X-Google-Smtp-Source: AHgI3IY6cWP1liHfymzWlnw5OQhm45XWPQ0FJx5U9jmWG9cYHeH/1sbmyKOzWnXjm+xeHUTemrW3pXX8onWq9TKSye0=
-X-Received: by 2002:aa7:c50b:: with SMTP id o11mr751453edq.14.1550790213842;
- Thu, 21 Feb 2019 15:03:33 -0800 (PST)
-MIME-Version: 1.0
-References: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
- <20190220094841.11129-3-thomas.petazzoni@bootlin.com>
-In-Reply-To: <20190220094841.11129-3-thomas.petazzoni@bootlin.com>
-From: =?UTF-8?B?THXDrXMgTWVuZGVz?= <luis.p.mendes@gmail.com>
-Date: Thu, 21 Feb 2019 23:03:22 +0000
-Message-ID: <CAEzXK1qiHaV_Ehfq_CAsDMVn=A65opeffpjyVAX-Mj73W7NGYw@mail.gmail.com>
-Subject: Re: [PATCH 2/2] PCI: pci-bridge-emul: Extend pci_bridge_emul_init()
- with flags
+ id 1gwxgb-0002v6-BR
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 23:23:26 +0000
+Received: from localhost (unknown [104.133.8.90])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id EBD1D20838;
+ Thu, 21 Feb 2019 23:23:17 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550791398;
+ bh=yAfyThOQRMPrqjQAjPnVKTvRkSiew9cnk1qwxbgFEsc=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=2j0FplgHYyNp9sD9rhPFHMcK936zGjydgron0x5bjSYZRTa0in/JekdlXB7SfdER2
+ nqGrS1qyX4wydhXT4aD00FV7fDYV8QFtNofKOmdZWrfzd2w6Hw3l0L4RP/VPJW9Fv3
+ s+kyiIpceD7mlRlY0D/r3KT+Bmjugrz0b9NfGutc=
+Date: Thu, 21 Feb 2019 17:23:17 -0600
+From: Bjorn Helgaas <helgaas@kernel.org>
 To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
+Subject: Re: [PATCH 0/2] PCI: fix pci-mvebu after conversion to common bridge
+ emul code
+Message-ID: <20190221232317.GB219879@google.com>
+References: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_150335_543453_C2DBECA9 
-X-CRM114-Status: GOOD (  13.29  )
+X-CRM114-CacheID: sfid-20190221_152325_411304_C7DA04AD 
+X-CRM114-Status: GOOD (  18.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,43 +77,67 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Andrew Lunn <andrew@lunn.ch>, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
  Russell King <linux@arm.linux.org.uk>, Jason Cooper <jason@lakedaemon.net>,
- Linux PCI <linux-pci@vger.kernel.org>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>, Leigh Brown <leigh@solinno.co.uk>,
+ linux-pci@vger.kernel.org, Gregory Clement <gregory.clement@bootlin.com>,
+ Leigh Brown <leigh@solinno.co.uk>,
+ =?iso-8859-1?Q?Lu=EDs?= Mendes <luis.p.mendes@gmail.com>,
  linux-arm-kernel@lists.infradead.org,
  Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-VGVzdGVkIHBhdGNoIGFnYWluc3QgVmFuaWxsYSBrZXJuZWxzIDQuMjAuMTEgYW5kIDUuMC1yYzcu
-IEl0IGlzCndvcmtpbmcgcHJvcGVybHkgb24gYm90aCBrZXJuZWxzLgoKVGVzdGVkLWJ5OiBMdWlz
-IE1lbmRlcyA8bHVpcy5wLm1lbmRlc0BnbWFpbC5jb20+CgpPbiBXZWQsIEZlYiAyMCwgMjAxOSBh
-dCA5OjQ4IEFNIFRob21hcyBQZXRhenpvbmkKPHRob21hcy5wZXRhenpvbmlAYm9vdGxpbi5jb20+
-IHdyb3RlOgo+Cj4gRGVwZW5kaW5nIG9uIHRoZSBjYXBhYmlsaXRpZXMgb2YgdGhlIFBDSSBjb250
-cm9sbGVyL3BsYXRmb3JtLCB0aGUKPiBQQ0ktdG8tUENJIGJyaWRnZSBlbXVsYXRpb24gYmVoYXZp
-b3IgbWlnaHQgbmVlZCB0byBiZSBkaWZmZXJlbnQuIEZvcgo+IGV4YW1wbGUsIG9uIHBsYXRmb3Jt
-cyB0aGF0IHVzZSB0aGUgcGNpLW12ZWJ1IGNvZGUsIHdlIGN1cnJlbnRseSBkb24ndAo+IHN1cHBv
-cnQgcHJlZmV0Y2hhYmxlIG1lbW9yeSBCQVJzLCBzbyB0aGUgY29ycmVzcG9uZGluZyBmaWVsZHMg
-aW4gdGhlCj4gUENJLXRvLVBDSSBicmlkZ2UgY29uZmlndXJhdGlvbiBzcGFjZSBzaG91bGQgYmUg
-cmVhZC1vbmx5Lgo+Cj4gVG8gaW1wbGVtZW50IHRoaXMsIHRoaXMgY29tbWl0IGV4dGVuZHMgcGNp
-X2JyaWRnZV9lbXVsX2luaXQoKSB0byB0YWtlCj4gYSAiZmxhZ3MiIGFyZ3VtZW50LCB3aXRoIGN1
-cnJlbnRseSBvbmUgZmxhZyBzdXBwb3J0ZWQ6Cj4gUENJX0JSSURHRV9FTVVMX05PX1BSRUZFVENI
-QUJMRV9CQVIsIHRoYXQgd2lsbCBtYWtlIHRoZSBwcmVmZXRjaGFibGUKPiBtZW1vcnkgYmFzZSBh
-bmQgbGltaXQgcmVnaXN0ZXJzIHJlYWQtb25seS4KPgo+IFRoZSBwY2ktbXZlYnUgYW5kIHBjaS1h
-YXJkdmFyayBkcml2ZXJzIGFyZSB1cGRhdGVkIGFjY29yZGluZ2x5Lgo+Cj4gUmVwb3J0ZWQtYnk6
-IEx1w61zIE1lbmRlcyA8bHVpcy5wLm1lbmRlc0BnbWFpbC5jb20+Cj4gUmVwb3J0ZWQtYnk6IExl
-aWdoIEJyb3duIDxsZWlnaEBzb2xpbm5vLmNvLnVrPgo+IENjOiBMdcOtcyBNZW5kZXMgPGx1aXMu
-cC5tZW5kZXNAZ21haWwuY29tPgo+IENjOiBMZWlnaCBCcm93biA8bGVpZ2hAc29saW5uby5jby51
-az4KPiBGaXhlczogMWYwODY3M2VlZjEyMyAoIlBDSTogbXZlYnU6IENvbnZlcnQgdG8gUENJIGVt
-dWxhdGVkIGJyaWRnZSBjb25maWcgc3BhY2UiKQo+IFNpZ25lZC1vZmYtYnk6IFRob21hcyBQZXRh
-enpvbmkgPHRob21hcy5wZXRhenpvbmlAYm9vdGxpbi5jb20+Cj4gLS0tCj4gIGRyaXZlcnMvcGNp
-L2NvbnRyb2xsZXIvcGNpLWFhcmR2YXJrLmMgfCAyICstCj4gIGRyaXZlcnMvcGNpL2NvbnRyb2xs
-ZXIvcGNpLW12ZWJ1LmMgICAgfCAyICstCj4gIGRyaXZlcnMvcGNpL3BjaS1icmlkZ2UtZW11bC5j
-ICAgICAgICAgfCA4ICsrKysrKystCj4gIGRyaXZlcnMvcGNpL3BjaS1icmlkZ2UtZW11bC5oICAg
-ICAgICAgfCA3ICsrKysrKy0KPiAgNCBmaWxlcyBjaGFuZ2VkLCAxNSBpbnNlcnRpb25zKCspLCA0
-IGRlbGV0aW9ucygtKQo+CgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxp
-c3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0
-aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Wed, Feb 20, 2019 at 10:48:39AM +0100, Thomas Petazzoni wrote:
+> Hello,
+> 
+> This set of two patches aim at fixing some regression reported by two
+> users (Luis and Leigh), that were introduced by the conversion of the
+> pci-mvebu driver to the common PCI bridge emulation code shared
+> between pci-aardvark and pci-mvebu.
+> 
+> Due to this conversion, some registers of the PCI configuration that
+> used to be read-only are now read-write, making the Linux PCI core
+> believe that some features are implemented by the PCI bridge. Namely
+> in the case of pci-mvebu, the prefetchable memory base/limit registers
+> were read-only, while they are now read-write. Due to this, the Linux
+> PCI core now believes it can configure a prefetchable memory area, but
+> this is not supported by pci-mvebu, which does not have the logic to
+> create the appropriate MBUs windows.
+> 
+> This set of two commits allow PCI controller code to tell the PCI
+> bridge emulation logic about their capabilities. Because we envision
+> that other capabilities than prefetchable memory support might need to
+> be communicated from the PCI controller code to the PCI bridge
+> emulation code in the future, we introduce a "flags" argument, even if
+> for now only one flag is supported.
+> 
+> Lorenzo, let me know what you think about this approach. I am open to
+> suggestions if the proposed approach is not satisfying.
+> 
+> Both patches have been confirmed by Luis and Leigh to fix the
+> regression, but I'll let them give a formal Tested-by.
+> 
+> Best regards,
+> 
+> Thomas Petazzoni
+> 
+> Thomas Petazzoni (2):
+>   PCI: pci-bridge-emul: Create per-bridge copy of register behavior
+>   PCI: pci-bridge-emul: Extend pci_bridge_emul_init() with flags
+> 
+>  drivers/pci/controller/pci-aardvark.c |  2 +-
+>  drivers/pci/controller/pci-mvebu.c    |  2 +-
+>  drivers/pci/pci-bridge-emul.c         | 86 ++++++++++++++++++---------
+>  drivers/pci/pci-bridge-emul.h         | 13 +++-
+>  4 files changed, 73 insertions(+), 30 deletions(-)
+
+Lorenzo, I assume you'll take both of these, so for both patches,
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+Maybe we should add a stable tag (v4.20+)?
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
