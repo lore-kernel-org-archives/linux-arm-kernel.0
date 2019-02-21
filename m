@@ -2,21 +2,21 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BA93C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:14:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 20DFFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:16:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DD0F82084F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:14:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E5D8D2084F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:16:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bL+7fOhQ";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ufh6WSip"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD0F82084F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RZpeQwAz";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="E8Th/qaS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E5D8D2084F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1DypR+OmJAVQO73KxGbLkQyDtsYkPZLQTurG9pjbRFs=; b=bL+7fOhQUigJiH
-	w2XFW0BrhJ0adjv/9xEK/R17ZyFjuYvJwdpr6SzTdlbx/PD9HPACFL3nEzFQ7E9xcvwmIBOnd6blv
-	Fyyepchq3Eu6AvmvbsLyErisfpi8Ok8k/SKjlITWBsqxpR13VMXQkcxoqpV5FQ0LpVFCM/dPM81fE
-	E0eZV5FaLbSUI2a04vz7bM6U1pOaHf4AEkkUpCH6vuHBEQY0WVwJdzuSvjq91Igw2FsnjnHU0tt3s
-	LvsJEVDhOai5e3Rm6T2X2ySPx0/cdnVIJBwBSK07Yi26spA93oW4ZJx7UjDMyi8BaDmql50DTnOjL
-	KoHyoKAPJ+1gQLG5jumQ==;
+	List-Owner; bh=B5tklEHwpd1W128vxOsHptcLncSKVUXZ/KK6ZzDtEX4=; b=RZpeQwAzwL61yP
+	FrPdy6VTnQFW+sIp/+sj2NL6MIY7AhWO5Sd6jaAb9zpDobPXEqUs17KrKQNbPdx+K6qBBQ/5u/91S
+	sUcgPnEWwG3Lrbxa56iKcZqB3Pvs80VfMWBBt55UTY7vG+OzuUtnUGlbRl7onQ70l2dSEYBJVCxbl
+	n980ufjgag3CmyV6755yCbTyYEvFnewVyHLg/RIsT/b+Pw8LtB/7f2tZ0IPbsP9MA4LFJEUgOgiUG
+	eO5BNbL3mBRVgCdyhoyz4Tc9HV6vLazr4oHtm/r5rwCGixXCBtPMTeq7AXirtaIrm/7ED9z494i1I
+	7hvt3PazdnPkTSK6Af0A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwmJS-0002mt-MY; Thu, 21 Feb 2019 11:14:46 +0000
+	id 1gwmLD-0004aq-Pv; Thu, 21 Feb 2019 11:16:35 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwmJQ-0002mW-0a; Thu, 21 Feb 2019 11:14:45 +0000
+ id 1gwmLB-0004aT-0E; Thu, 21 Feb 2019 11:16:34 +0000
 Received: from localhost (unknown [91.160.177.164])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4A2862084F;
- Thu, 21 Feb 2019 11:14:41 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 641A12086C;
+ Thu, 21 Feb 2019 11:16:30 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550747683;
- bh=iSxXfZoLOysfKcCozEmie9SwX3ZktmKo9HSy0fUFQDQ=;
+ s=default; t=1550747792;
+ bh=4g0fFeIOMLK4749Aw70OPodjeXCJ/xU+ILuYlLNbbRY=;
  h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=ufh6WSipYdYZdXuBWUy8RiNW1+l7hosZ9ZTdxfM98EJr8GHQl6+vgXj3pr6gyKnv/
- Js3Jw2g1F9Z8OGSPh29gCvasMo45uRIgf1snSAInVo0Bly3FVVUyDoditgRAT8LHkr
- EEOCqvG/cqWEkTl7ggG0L5jdkZVjqUDADOuPxE5w=
-Date: Thu, 21 Feb 2019 12:14:37 +0100
+ b=E8Th/qaS7iPn7WzxlZh0puUxBqg7JICMv8ZzRJmI7Ygs5jrI642zxQn6xDbwdL7CU
+ h6a1wASClJJOz5cn+dZFkfugEx1/cAE1VOAldHRZksUHSIcfa//BdB1GQVKY5PqAPX
+ AuHpPPXsvC0JqvgEJWMIPKEDT60LEkfPSCkoogAg=
+Date: Thu, 21 Feb 2019 12:16:25 +0100
 From: Boris Brezillon <bbrezillon@kernel.org>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [RFC PATCH 02/27] mtd: nand: Compile in the NAND core by default
-Message-ID: <20190221121437.7c551bc5@kernel.org>
-In-Reply-To: <20190221120610.5abb49ae@xps13>
+To: Miquel Raynal <miquel.raynal@bootlin.com>,
+ <linux-arm-kernel@lists.infradead.org>, Mason Yang
+ <masonccyang@mxic.com.tw>
+Subject: Re: [RFC PATCH 03/27] mtd: nand: Introduce the ECC engine abstraction
+Message-ID: <20190221121625.33a7f6c0@kernel.org>
+In-Reply-To: <20190221100216.25255-4-miquel.raynal@bootlin.com>
 References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
- <20190221100216.25255-3-miquel.raynal@bootlin.com>
- <20190221115554.315fbd9b@kernel.org>
- <20190221120610.5abb49ae@xps13>
+ <20190221100216.25255-4-miquel.raynal@bootlin.com>
 X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_031444_091275_A57D6E59 
-X-CRM114-Status: GOOD (  22.62  )
+X-CRM114-CacheID: sfid-20190221_031633_080132_83A1E8ED 
+X-CRM114-Status: GOOD (  18.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,97 +75,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
- Richard Weinberger <richard@nod.at>,
+Cc: Vignesh R <vigneshr@ti.com>, Tudor Ambarus <Tudor.Ambarus@microchip.com>,
+ Julien Su <juliensu@mxic.com.tw>, Richard Weinberger <richard@nod.at>,
  Schrempf Frieder <frieder.schrempf@kontron.de>,
  Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
  Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
  Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+ David Woodhouse <dwmw2@infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 12:06:10 +0100
+On Thu, 21 Feb 2019 11:01:52 +0100
 Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-> Hi Boris,
-> 
-> Boris Brezillon <bbrezillon@kernel.org> wrote on Thu, 21 Feb 2019
-> 11:55:54 +0100:
-> 
-> > On Thu, 21 Feb 2019 11:01:51 +0100
-> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> >   
-> > > Force the NAND core be compiled-in when using any kind of NAND.    
-> > 
-> > Why?  
-> 
-> Because all the logic that comes later in the series relies on this
-> change. I need the NAND core to be compiled-in,
 
-Hm, not exactly compiled-in as it can still be selected as a module.
+> diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> index 30f0fb02abe2..9e3b018d0b83 100644
+> --- a/include/linux/mtd/nand.h
+> +++ b/include/linux/mtd/nand.h
+> @@ -82,8 +82,14 @@ struct nand_pos {
+>  	unsigned int page;
+>  };
+>  
+> +enum nand_page_io_req_type {
+> +	NAND_PAGE_READ = 0,
+> +	NAND_PAGE_WRITE,
+> +};
+> +
+>  /**
+>   * struct nand_page_io_req - NAND I/O request object
+> + * @type: the type of page I/O: read or write
+>   * @pos: the position this I/O request is targeting
+>   * @dataoffs: the offset within the page
+>   * @datalen: number of data bytes to read from/write to this page
+> @@ -99,6 +105,7 @@ struct nand_pos {
+>   * specific commands/operations.
+>   */
+>  struct nand_page_io_req {
+> +	enum nand_page_io_req_type type;
 
-> as well the ECC engine
-> core, as well as everything that is shared between raw NAND and
-> SPI-NAND which I move in the NAND core.
+Can you add the reqtype enum and type field (+ patch the iterator
+helpers) in a separate patch?
 
-Yes, the core is required for SPI NAND and soon will be for RAW NAND,
-but I still don't see the problem with the "select NAND_CORE" approach,
-sorry.
+>  	struct nand_pos pos;
+>  	unsigned int dataoffs;
+>  	unsigned int datalen;
+> @@ -116,13 +123,35 @@ struct nand_page_io_req {
+>  };
+>  
+>  /**
+> - * struct nand_ecc_req - NAND ECC requirements
+> + * struct nand_ecc_conf - NAND ECC configuration
+> + * @strength: ECC strength
+> + * @step_size: Number of bytes per step
+> + * @total: Total number of bytes used for storing ECC codes, this is used by
+> + *         generic OOB layouts
+> + */
+> +struct nand_ecc_conf {
 
-> 
-> >   
-> > > 
-> > > Also remove the redundant dependencies on MTD which is enforced by the
-> > > game of the if/endif blocs.
-> > > 
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  drivers/mtd/nand/Kconfig         | 12 ++++++++++--
-> > >  drivers/mtd/nand/onenand/Kconfig |  1 -
-> > >  drivers/mtd/nand/raw/Kconfig     |  1 -
-> > >  drivers/mtd/nand/spi/Kconfig     |  1 -
-> > >  4 files changed, 10 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-> > > index 495751ed3fd7..e8d26a715922 100644
-> > > --- a/drivers/mtd/nand/Kconfig
-> > > +++ b/drivers/mtd/nand/Kconfig
-> > > @@ -1,6 +1,14 @@
-> > > -config MTD_NAND_CORE
-> > > -	tristate
-> > > +menuconfig MTD_NAND_CORE
-> > > +	tristate "NAND"    
-> > 
-> > Definitely not something we want to expose in menuconfig.  
-> 
-> I considered the NAND core as essential when using raw NAND and
-> SPI-NAND.
+Please do the s/nand_ecc_req/nand_ecc_conf/ in a separate patch.
 
-It is needed for SPI NAND, and will be for raw NAND for sure, but I
-still see no reasons for turning it into a user-visible option.
+> +	unsigned int strength;
+> +	unsigned int step_size;
+> +	unsigned int total;
 
-> Hence, turning it into a menuconfig option make the whole
-> NAND subsystem available (or not) and will appear in a different
-> "menuconfig page", which really enhances the readability.
+Do we really need to add this total field here? Looks like something
+that should be kept private to the ECC engine implementation.
 
-That's a different thing, and I have no problem with adding an extra
-level in the Kconfig hierarchy.
+> +};
+> +
+> +/**
+> + * struct nand_ecc_user_conf - User desired ECC configuration
+> + * @mode: ECC mode
+> + * @algo: ECC algorithm
+>   * @strength: ECC strength
+>   * @step_size: ECC step/block size
+> + * @maximize: ECC parameters must be maximized depending on the device
+> + *            capabilities
+> + * @flags: User flags
+>   */
+> -struct nand_ecc_req {
+> +struct nand_ecc_user_conf {
+> +	int mode;
 
-> 
-> >   
-> > > +	default y    
-> > 
-> > I don't see what's the problem with letting SPINAND, RAWNAND and
-> > ONENAND select this options if they actually need it.  
-> 
-> See the reason above, hence having it "default y" is needed to do not
-> break existing defconfigs.
+We should definitely name that one differently ('provider' maybe).
 
-Not if you make RAW_NAND select NAND_CORE.
+> +	unsigned int algo;
+>  	unsigned int strength;
+>  	unsigned int step_size;
+> +	unsigned int maximize;
+> +	unsigned int flags;
+
+maximize could be a flag.
+
+>  };
+>  
+>  #define NAND_ECCREQ(str, stp) { .strength = (str), .step_size = (stp) }
+> @@ -157,11 +186,76 @@ struct nand_ops {
+>  	bool (*isbad)(struct nand_device *nand, const struct nand_pos *pos);
+>  };
+
 
 _______________________________________________
 linux-arm-kernel mailing list
