@@ -2,86 +2,84 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE91EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:49:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19A8DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:51:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BCB24214AF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:49:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA52020880
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 08:51:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vu/JOWzo";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="QPMe/uy7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BCB24214AF
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CpvSmtbk";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="iYioyhIb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA52020880
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ikMm4/tFH6c2tFT36iBxSBIvXzX6EPj0yuhfo0g0Yic=; b=Vu/JOWzoYZ1pU8
-	pCI+lpJwKcYxeNEthiKYpJOYvpEPo/szd7glQTuJGXCbnUzVpjOK10euaj4plB/OTzlVinndIQUkG
-	C3yava2sPUL/Ycp9/+SjFrHcb3WNYWk8J2RJ6pZsmhzw2v5rXwrnxcdjpNlST/XvuT7ZnJ17Kfivy
-	aYFHI3mWFUvQPFq6HzTCLXrCiFMDbD3HjsUOcR3WhyldE3p8KJaQmX+5gi+68JsomnrkWUeJLWbAR
-	jod98D7nM5b0E98F2YdfEPsp03lP5bawR20sO5LgLG9HsG6Ljm5QNfbCjReDVKFL3Oprn1o6DhRxu
-	NiqJ+bOlrvpXtU6h3CMg==;
+	List-Owner; bh=m+AicEOaHmV000KjrfSXKx2dhOgLxhIqyh4MTk3h9Fg=; b=CpvSmtbkP9ZWJp
+	XTfDBg1j2At7M2X5BRboPDbB+cogUZIRrYbXTMKs+7Wh7o0KCNaB8v7mdVvAfrIUJdntzD4xU5DoR
+	JXhJWmnCu57yEKHxPFWxFIbal9gf/ejpNW7vPt86irqgiNK37BeFjbQAJg7MlPksvbdlbpc3H4u5k
+	MQRxtZRvPifyiH6ajKPdY9NQr+RT8hTbHErNsPOcKguq96/woqsS1oCwg8w5y0iJkEsRSQnyE7NqC
+	6aeDmbxeoH3pCpO742aw8tOQz3cD9nRsXQ6m69VoMsTYEaWlLXNHjSV3iRpiJntjcb+GzFcjhN1gt
+	roWMQkF4tpyNxnsl2uNA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwk3C-0007nF-B6; Thu, 21 Feb 2019 08:49:50 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gwk4O-0000v0-2M; Thu, 21 Feb 2019 08:51:04 +0000
+Received: from mail-qk1-x743.google.com ([2607:f8b0:4864:20::743])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwk2N-0006w8-1B
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 08:49:08 +0000
-Received: by mail-pg1-x544.google.com with SMTP id m1so13437936pgq.8
+ id 1gwk4K-0000uT-Ih
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 08:51:02 +0000
+Received: by mail-qk1-x743.google.com with SMTP id y140so3796083qkb.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 00:48:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=QGFCr26C7QVPB0iavp5n1bK4xiDL/I1sEfncjGgfqAU=;
- b=QPMe/uy7esQMtvdGCGQwk2hRTw4r1i0ROsr4i3hDuGndx8dLy5kwbYLuIRJs4Q4YfB
- q8mVZI5SeVytYXwGm2TtdkE1fukUe5pI6GB3LdHVI/DabRm5vmSnAkw0vC3LwLq4ciER
- BAeQE9Sv7kAOw90dAZfetPdqrhxb72h1N9YUI=
+ Thu, 21 Feb 2019 00:51:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=oiS4Pjl+T75fHcgICKv+6sHcTh4gWWotX7SaWHxKgzE=;
+ b=iYioyhIbgm3U5kGLRXPn6UdO1GPscv5UM4q+gsM3Yr+DevoPJmAZqHgY42JoytIrjy
+ 9Mx2CESaZDD4/8LKFf3btsznv+an2egdTTnohPlVkVF/WVt3USig5akbUzFXQIB+0MFE
+ TZ7iwFzmmDSq6DrWhZ6f+/F9bM65sAu16OgIAwMMfLXZfoGZDFnThEt0tJTE1PPMjhtK
+ ausPJvWjanbYamFaP2Py/mtdxNq//D3l7isD+27NI936JEUjH6JttbwngOkZtlbNeixP
+ l/RYRdhtAm/ya4HAPakRfcFXV1REivAZq+OMV0hF2RSaOHIQP3U/E0dnrQ2X8RM6reDc
+ vm0A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=QGFCr26C7QVPB0iavp5n1bK4xiDL/I1sEfncjGgfqAU=;
- b=dUbzX4wLMWjCxw59+c5QzlJwn0Kkts1J3x3HZngVqNN4p3GCRZcRwlWkDApz62O5qz
- hHGdIXQmCcgAXPCdkT2pLi+7jL4eU4ik9rFMfqJP4bgVzGIhgw2J3Y1BFrl5/l6ipQKE
- m8ad9AhDuarzuuvO9qBGtX9Hx1DMrE5TdfzH7ggjmf1UkmvVDz6ZYVGIJLSfcHaDMyPJ
- id+AmyCl/0XMn7JXO3bx2nJ2f7IJUO3NBc+mZRfQaunsHtRnXee5hd8UL8NrE7pPHnRV
- DdDbRxgTp+CXp0TlcMvHCuR1F6r2c6QFQ2MGNxR7vJo17ZMLSV8avzOmgF942bnl3/mS
- xrjQ==
-X-Gm-Message-State: AHQUAuZ+hv42ZB9IJ3tRcSUFh6ceMkiQ9LnULgcGdEEfek7YiYzsESpl
- YMaLGpq6DR1uJxKQGAih5kJ80dmZ06g=
-X-Google-Smtp-Source: AHgI3IboYmQUuN0UT45I14XNGJRWVk/Qu/t9HKqtON17IMhW/p5rFwEGo7jauzCBi7IBth+w3bUbYw==
-X-Received: by 2002:a63:1a5d:: with SMTP id a29mr31215105pgm.369.1550738938129; 
- Thu, 21 Feb 2019 00:48:58 -0800 (PST)
-Received: from pihsun-z840.tpe.corp.google.com
- ([2401:fa00:1:10:7889:7a43:f899:134c])
- by smtp.googlemail.com with ESMTPSA id b4sm23154027pgq.57.2019.02.21.00.48.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 00:48:57 -0800 (PST)
-From: Pi-Hsun Shih <pihsun@chromium.org>
-To: 
-Subject: [PATCH v5 4/6] rpmsg: add rpmsg support for mt8183 SCP.
-Date: Thu, 21 Feb 2019 16:47:27 +0800
-Message-Id: <20190221084729.101784-5-pihsun@chromium.org>
-X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
-In-Reply-To: <20190221084729.101784-1-pihsun@chromium.org>
-References: <20190221084729.101784-1-pihsun@chromium.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=oiS4Pjl+T75fHcgICKv+6sHcTh4gWWotX7SaWHxKgzE=;
+ b=eHS3Bz6Q4pQM1+gfuEg0XllrdDGSHY5BCeovadtwYNSqS6ot7IaO1FheKjP0bFB+/6
+ byHg3KrrBUFqkiEvYvADH0b9gMlWiykR9ty0iWg37oVdQY9Gw7s5209U+8G6rc1kK2s8
+ KmPj+dVeege2lwYvwIhS94HKc1CmLaTKRJrCMguX+hJ+uXAJeqizvk39N+xm1xyX7DWG
+ +xAlmRAVIsFR4FwU0M87lsFzKnYSiJVKnNLv4lLxZSYj+RjWNALYJYyebk8Ww0EsalPK
+ dZ90pfRQT016zaAKwYK9ROYPXo4Kw0B8AUbGpyU1kvJRkRPDwnTsSvD/ng6REI0B9SZ3
+ LW6w==
+X-Gm-Message-State: AHQUAuZrBTSC2NyLZQLPzhtJDTgupRf/A6Wfu6pZaDiasag2/CDrjxB4
+ EX4bHo2gspfgNrqRGwO8z0h30U2eDmVlN8F7hTTqig==
+X-Google-Smtp-Source: AHgI3IaORCb+guUb8l9eknxSFIPRCDgo7zbGdOaV7E28QY181l50rRuou4QtYMqqFONYiZlmXvufexGd1Z+XzywNpc8=
+X-Received: by 2002:a37:9442:: with SMTP id w63mr26956765qkd.109.1550739059402; 
+ Thu, 21 Feb 2019 00:50:59 -0800 (PST)
 MIME-Version: 1.0
+References: <20190203214205.13594-1-linus.walleij@linaro.org>
+ <20190203214205.13594-6-linus.walleij@linaro.org>
+ <CAMpxmJWRH9+fbwyhjHe-ERjQfMCXTGzOLWeq1HJbbYXsZ14nXA@mail.gmail.com>
+In-Reply-To: <CAMpxmJWRH9+fbwyhjHe-ERjQfMCXTGzOLWeq1HJbbYXsZ14nXA@mail.gmail.com>
+From: Linus Walleij <linus.walleij@linaro.org>
+Date: Thu, 21 Feb 2019 09:50:45 +0100
+Message-ID: <CACRpkdYiLPCeLGmynPeroGD9mKeRKKbA5u-1AH0+-yOyQxZ8hQ@mail.gmail.com>
+Subject: Re: [PATCH 05/17 v1] gpio: ixp4xx: Add driver for the IXP4xx GPIO
+To: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_004859_437454_A38D547A 
-X-CRM114-Status: GOOD (  29.11  )
+X-CRM114-CacheID: sfid-20190221_005100_619533_AB8132FB 
+X-CRM114-Status: GOOD (  27.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,642 +91,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ohad Ben-Cohen <ohad@wizery.com>, Nicolas Boichat <drinkcat@chromium.org>,
- Erin Lo <erin.lo@mediatek.com>,
- "open list:REMOTE PROCESSOR REMOTEPROC SUBSYSTEM"
- <linux-remoteproc@vger.kernel.org>, open list <linux-kernel@vger.kernel.org>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Pi-Hsun Shih <pihsun@chromium.org>, Matthias Brugger <matthias.bgg@gmail.com>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Arnd Bergmann <arnd@arndb.de>, Tim Harvey <tharvey@gateworks.com>,
+ Krzysztof Halasa <khalasa@piap.pl>, Olof Johansson <olof@lixom.net>,
+ Imre Kaloz <kaloz@openwrt.org>, arm-soc <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add a simple rpmsg support for mt8183 SCP, that use IPI / IPC directly.
-
-Signed-off-by: Pi-Hsun Shih <pihsun@chromium.org>
----
-Changes from v4:
- - Match and fill the device tree node to the created rpmsg subdevice,
-   so the rpmsg subdevice can utilize the properties and subnodes on
-   device tree (This is similar to what drivers/rpmsg/qcom_smd.c does).
-
-Changes from v3:
- - Change from unprepare to stop, to stop the rpmsg driver before the
-   rproc is stopped, avoiding problem that some rpmsg would fail after
-   rproc is stopped.
- - Add missing spin_lock_init, and use destroy_ept instead of kref_put.
-
-Changes from v2:
- - Unregiser IPI handler on unprepare.
- - Lock the channel list on operations.
- - Move SCP_IPI_NS_SERVICE to 0xFF.
-
-Changes from v1:
- - Do cleanup properly in mtk_rpmsg.c, which also removes the problem of
-   short-lived work items.
- - Fix several issues checkpatch found.
----
- drivers/remoteproc/mtk_common.h       |   2 +
- drivers/remoteproc/mtk_scp.c          |  30 +-
- drivers/remoteproc/mtk_scp_ipi.c      |   1 +
- drivers/rpmsg/Kconfig                 |   9 +
- drivers/rpmsg/Makefile                |   1 +
- drivers/rpmsg/mtk_rpmsg.c             | 385 ++++++++++++++++++++++++++
- include/linux/platform_data/mtk_scp.h |   4 +-
- include/linux/rpmsg/mtk_rpmsg.h       |  35 +++
- 8 files changed, 462 insertions(+), 5 deletions(-)
- create mode 100644 drivers/rpmsg/mtk_rpmsg.c
- create mode 100644 include/linux/rpmsg/mtk_rpmsg.h
-
-diff --git a/drivers/remoteproc/mtk_common.h b/drivers/remoteproc/mtk_common.h
-index 7504ae1bc0efe2..19a90781027125 100644
---- a/drivers/remoteproc/mtk_common.h
-+++ b/drivers/remoteproc/mtk_common.h
-@@ -54,6 +54,8 @@ struct mtk_scp {
- 	void __iomem *cpu_addr;
- 	phys_addr_t phys_addr;
- 	size_t dram_size;
-+
-+	struct rproc_subdev *rpmsg_subdev;
- };
- 
- /**
-diff --git a/drivers/remoteproc/mtk_scp.c b/drivers/remoteproc/mtk_scp.c
-index c689a8cc41f092..7680edb7ca5f58 100644
---- a/drivers/remoteproc/mtk_scp.c
-+++ b/drivers/remoteproc/mtk_scp.c
-@@ -13,6 +13,7 @@
- #include <linux/platform_data/mtk_scp.h>
- #include <linux/platform_device.h>
- #include <linux/remoteproc.h>
-+#include <linux/rpmsg/mtk_rpmsg.h>
- 
- #include "mtk_common.h"
- #include "remoteproc_internal.h"
-@@ -471,6 +472,23 @@ static int scp_map_memory_region(struct mtk_scp *scp)
- 	return 0;
- }
- 
-+static void scp_add_rpmsg_subdev(struct mtk_scp *scp)
-+{
-+	scp->rpmsg_subdev = mtk_rpmsg_create_rproc_subdev(
-+		to_platform_device(scp->dev), scp->rproc);
-+	if (scp->rpmsg_subdev)
-+		rproc_add_subdev(scp->rproc, scp->rpmsg_subdev);
-+}
-+
-+static void scp_remove_rpmsg_subdev(struct mtk_scp *scp)
-+{
-+	if (scp->rpmsg_subdev) {
-+		rproc_remove_subdev(scp->rproc, scp->rpmsg_subdev);
-+		mtk_rpmsg_destroy_rproc_subdev(scp->rpmsg_subdev);
-+		scp->rpmsg_subdev = NULL;
-+	}
-+}
-+
- static int scp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -552,22 +570,25 @@ static int scp_probe(struct platform_device *pdev)
- 	init_waitqueue_head(&scp->run.wq);
- 	init_waitqueue_head(&scp->ack_wq);
- 
-+	scp_add_rpmsg_subdev(scp);
-+
- 	ret = devm_request_threaded_irq(dev, platform_get_irq(pdev, 0), NULL,
- 					scp_irq_handler, IRQF_ONESHOT,
- 					pdev->name, scp);
- 
- 	if (ret) {
- 		dev_err(dev, "failed to request irq\n");
--		goto destroy_mutex;
-+		goto remove_subdev;
- 	}
- 
- 	ret = rproc_add(rproc);
- 	if (ret)
--		goto destroy_mutex;
-+		goto remove_subdev;
- 
--	return ret;
-+	return 0;
- 
--destroy_mutex:
-+remove_subdev:
-+	scp_remove_rpmsg_subdev(scp);
- 	mutex_destroy(&scp->lock);
- free_rproc:
- 	rproc_free(rproc);
-@@ -579,6 +600,7 @@ static int scp_remove(struct platform_device *pdev)
- {
- 	struct mtk_scp *scp = platform_get_drvdata(pdev);
- 
-+	scp_remove_rpmsg_subdev(scp);
- 	rproc_del(scp->rproc);
- 	rproc_free(scp->rproc);
- 
-diff --git a/drivers/remoteproc/mtk_scp_ipi.c b/drivers/remoteproc/mtk_scp_ipi.c
-index f5d271c0f6239b..10b0cbda7aee38 100644
---- a/drivers/remoteproc/mtk_scp_ipi.c
-+++ b/drivers/remoteproc/mtk_scp_ipi.c
-@@ -99,6 +99,7 @@ int scp_ipi_send(struct platform_device *pdev,
- 	int ret;
- 
- 	if (WARN_ON(id <= SCP_IPI_INIT) || WARN_ON(id >= SCP_IPI_MAX) ||
-+	    WARN_ON(id == SCP_IPI_NS_SERVICE) ||
- 	    WARN_ON(len > sizeof(send_obj->share_buf)) || WARN_ON(!buf))
- 		return -EINVAL;
- 
-diff --git a/drivers/rpmsg/Kconfig b/drivers/rpmsg/Kconfig
-index d0322b41eca54c..85e3cc075cb473 100644
---- a/drivers/rpmsg/Kconfig
-+++ b/drivers/rpmsg/Kconfig
-@@ -15,6 +15,15 @@ config RPMSG_CHAR
- 	  in /dev. They make it possible for user-space programs to send and
- 	  receive rpmsg packets.
- 
-+config RPMSG_MTK_SCP
-+	tristate "MediaTek SCP"
-+	depends on MTK_SCP
-+	select RPMSG
-+	help
-+	  Say y here to enable support providing communication channels to
-+	  remote processors in MediaTek platforms.
-+	  This use IPI and IPC to communicate with remote processors.
-+
- config RPMSG_QCOM_GLINK_NATIVE
- 	tristate
- 	select RPMSG
-diff --git a/drivers/rpmsg/Makefile b/drivers/rpmsg/Makefile
-index 9aa859502d2752..ae92a7fb08f623 100644
---- a/drivers/rpmsg/Makefile
-+++ b/drivers/rpmsg/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- obj-$(CONFIG_RPMSG)		+= rpmsg_core.o
- obj-$(CONFIG_RPMSG_CHAR)	+= rpmsg_char.o
-+obj-$(CONFIG_RPMSG_MTK_SCP)	+= mtk_rpmsg.o
- obj-$(CONFIG_RPMSG_QCOM_GLINK_RPM) += qcom_glink_rpm.o
- obj-$(CONFIG_RPMSG_QCOM_GLINK_NATIVE) += qcom_glink_native.o
- obj-$(CONFIG_RPMSG_QCOM_GLINK_SMEM) += qcom_glink_smem.o
-diff --git a/drivers/rpmsg/mtk_rpmsg.c b/drivers/rpmsg/mtk_rpmsg.c
-new file mode 100644
-index 00000000000000..fab1413a0a650c
---- /dev/null
-+++ b/drivers/rpmsg/mtk_rpmsg.c
-@@ -0,0 +1,385 @@
-+// SPDX-License-Identifier: GPL-2.0
-+//
-+// Copyright 2018 Google LLC.
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_data/mtk_scp.h>
-+#include <linux/platform_device.h>
-+#include <linux/remoteproc.h>
-+#include <linux/rpmsg/mtk_rpmsg.h>
-+#include <linux/workqueue.h>
-+
-+#include "rpmsg_internal.h"
-+
-+struct mtk_rpmsg_device {
-+	struct rpmsg_device rpdev;
-+	struct platform_device *scp_pdev;
-+};
-+
-+struct mtk_rpmsg_endpoint {
-+	struct rpmsg_endpoint ept;
-+	struct platform_device *scp_pdev;
-+};
-+
-+struct mtk_rpmsg_rproc_subdev {
-+	struct rproc *scp_rproc;
-+	struct platform_device *scp_pdev;
-+	struct rpmsg_endpoint *ns_ept;
-+	struct rproc_subdev subdev;
-+
-+	struct work_struct register_work;
-+	struct list_head channels;
-+	struct mutex channels_lock;
-+};
-+
-+#define to_mtk_subdev(d) container_of(d, struct mtk_rpmsg_rproc_subdev, subdev)
-+
-+struct mtk_rpmsg_channel_info {
-+	struct rpmsg_channel_info info;
-+	bool registered;
-+	struct list_head list;
-+};
-+
-+/**
-+ * struct rpmsg_ns_msg - dynamic name service announcement message
-+ * @name: name of remote service that is published
-+ * @addr: address of remote service that is published
-+ *
-+ * This message is sent across to publish a new service. When we receive these
-+ * messages, an appropriate rpmsg channel (i.e device) is created. In turn, the
-+ * ->probe() handler of the appropriate rpmsg driver will be invoked
-+ *  (if/as-soon-as one is registered).
-+ */
-+struct rpmsg_ns_msg {
-+	char name[RPMSG_NAME_SIZE];
-+	u32 addr;
-+} __packed;
-+
-+#define to_scp_device(r)	container_of(r, struct mtk_rpmsg_device, rpdev)
-+#define to_scp_endpoint(r)	container_of(r, struct mtk_rpmsg_endpoint, ept)
-+
-+static const struct rpmsg_endpoint_ops mtk_rpmsg_endpoint_ops;
-+
-+static void __ept_release(struct kref *kref)
-+{
-+	struct rpmsg_endpoint *ept = container_of(kref, struct rpmsg_endpoint,
-+						  refcount);
-+	kfree(to_scp_endpoint(ept));
-+}
-+
-+static void mtk_rpmsg_ipi_handler(void *data, unsigned int len, void *priv)
-+{
-+	struct mtk_rpmsg_endpoint *mept = priv;
-+	struct rpmsg_endpoint *ept = &mept->ept;
-+	int ret;
-+
-+	ret = (*ept->cb)(ept->rpdev, data, len, ept->priv, ept->addr);
-+	if (ret)
-+		dev_warn(&ept->rpdev->dev, "rpmsg handler return error = %d",
-+			 ret);
-+}
-+
-+static struct rpmsg_endpoint *
-+__rpmsg_create_ept(struct platform_device *scp_pdev, struct rpmsg_device *rpdev,
-+		   rpmsg_rx_cb_t cb, void *priv,
-+		   u32 id)
-+{
-+	struct mtk_rpmsg_endpoint *mept;
-+	struct rpmsg_endpoint *ept;
-+	int ret;
-+
-+	mept = kzalloc(sizeof(*mept), GFP_KERNEL);
-+	if (!mept)
-+		return NULL;
-+	mept->scp_pdev = scp_pdev;
-+
-+	ept = &mept->ept;
-+	kref_init(&ept->refcount);
-+
-+	ept->rpdev = rpdev;
-+	ept->cb = cb;
-+	ept->priv = priv;
-+	ept->ops = &mtk_rpmsg_endpoint_ops;
-+	ept->addr = id;
-+
-+	ret = scp_ipi_register(scp_pdev, id, mtk_rpmsg_ipi_handler, mept);
-+	if (ret) {
-+		dev_err(&scp_pdev->dev, "IPI register failed, id = %d", id);
-+		kref_put(&ept->refcount, __ept_release);
-+		return NULL;
-+	}
-+
-+	return ept;
-+}
-+
-+static struct rpmsg_endpoint *
-+mtk_rpmsg_create_ept(struct rpmsg_device *rpdev, rpmsg_rx_cb_t cb, void *priv,
-+		     struct rpmsg_channel_info chinfo)
-+{
-+	struct platform_device *scp_pdev = to_scp_device(rpdev)->scp_pdev;
-+
-+	return __rpmsg_create_ept(scp_pdev, rpdev, cb, priv, chinfo.src);
-+}
-+
-+static void mtk_rpmsg_destroy_ept(struct rpmsg_endpoint *ept)
-+{
-+	struct mtk_rpmsg_endpoint *mept = to_scp_endpoint(ept);
-+
-+	scp_ipi_unregister(mept->scp_pdev, ept->addr);
-+	kref_put(&ept->refcount, __ept_release);
-+}
-+
-+static int mtk_rpmsg_send(struct rpmsg_endpoint *ept, void *data, int len)
-+{
-+	struct mtk_rpmsg_endpoint *mept = to_scp_endpoint(ept);
-+
-+	return scp_ipi_send(mept->scp_pdev, mept->ept.addr, data, len, 0);
-+}
-+
-+static int mtk_rpmsg_trysend(struct rpmsg_endpoint *ept, void *data, int len)
-+{
-+	struct mtk_rpmsg_endpoint *mept = to_scp_endpoint(ept);
-+
-+	/*
-+	 * TODO: This currently is same as mtk_rpmsg_send, and wait until SCP
-+	 * received the last command.
-+	 */
-+	return scp_ipi_send(mept->scp_pdev, mept->ept.addr, data, len, 0);
-+}
-+
-+static const struct rpmsg_endpoint_ops mtk_rpmsg_endpoint_ops = {
-+	.destroy_ept = mtk_rpmsg_destroy_ept,
-+	.send = mtk_rpmsg_send,
-+	.trysend = mtk_rpmsg_trysend,
-+};
-+
-+static void mtk_rpmsg_release_device(struct device *dev)
-+{
-+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);
-+	struct mtk_rpmsg_device *mdev = to_scp_device(rpdev);
-+
-+	kfree(mdev);
-+}
-+
-+static const struct rpmsg_device_ops mtk_rpmsg_device_ops = {
-+	.create_ept = mtk_rpmsg_create_ept,
-+};
-+
-+static struct device_node *
-+mtk_rpmsg_match_device_subnode(struct device_node *node, const char *channel)
-+{
-+	struct device_node *child;
-+	const char *name;
-+	int ret;
-+
-+	for_each_available_child_of_node(node, child) {
-+		ret = of_property_read_string(child, "mtk,rpmsg-name", &name);
-+		if (ret)
-+			continue;
-+
-+		if (strcmp(name, channel) == 0)
-+			return child;
-+	}
-+
-+	return NULL;
-+}
-+
-+static int mtk_rpmsg_register_device(struct platform_device *scp_pdev,
-+				     struct rpmsg_channel_info *info)
-+{
-+	struct rpmsg_device *rpdev;
-+	struct mtk_rpmsg_device *mdev;
-+	int ret;
-+
-+	mdev = kzalloc(sizeof(*mdev), GFP_KERNEL);
-+	if (!mdev)
-+		return -ENOMEM;
-+
-+	mdev->scp_pdev = scp_pdev;
-+
-+	rpdev = &mdev->rpdev;
-+	rpdev->ops = &mtk_rpmsg_device_ops;
-+	rpdev->src = info->src;
-+	rpdev->dst = info->dst;
-+	strncpy(rpdev->id.name, info->name, RPMSG_NAME_SIZE);
-+
-+	rpdev->dev.of_node = mtk_rpmsg_match_device_subnode(
-+		scp_pdev->dev.of_node, info->name);
-+	rpdev->dev.parent = &scp_pdev->dev;
-+	rpdev->dev.release = mtk_rpmsg_release_device;
-+
-+	ret = rpmsg_register_device(rpdev);
-+	if (ret) {
-+		kfree(mdev);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static void mtk_register_device_work_function(struct work_struct *register_work)
-+{
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev = container_of(
-+		register_work, struct mtk_rpmsg_rproc_subdev, register_work);
-+	struct platform_device *scp_pdev = mtk_subdev->scp_pdev;
-+	struct mtk_rpmsg_channel_info *info;
-+	int ret;
-+
-+	mutex_lock(&mtk_subdev->channels_lock);
-+	list_for_each_entry(info, &mtk_subdev->channels, list) {
-+		if (info->registered)
-+			continue;
-+
-+		ret = mtk_rpmsg_register_device(scp_pdev, &info->info);
-+		if (ret) {
-+			dev_err(&scp_pdev->dev, "Can't create rpmsg_device\n");
-+			continue;
-+		}
-+
-+		info->registered = true;
-+	}
-+	mutex_unlock(&mtk_subdev->channels_lock);
-+}
-+
-+static int mtk_rpmsg_create_device(struct mtk_rpmsg_rproc_subdev *mtk_subdev,
-+				   char *name, u32 addr)
-+{
-+	struct mtk_rpmsg_channel_info *info;
-+
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
-+
-+	strncpy(info->info.name, name, RPMSG_NAME_SIZE);
-+	info->info.src = addr;
-+	info->info.dst = RPMSG_ADDR_ANY;
-+	mutex_lock(&mtk_subdev->channels_lock);
-+	list_add(&info->list, &mtk_subdev->channels);
-+	mutex_unlock(&mtk_subdev->channels_lock);
-+
-+	schedule_work(&mtk_subdev->register_work);
-+	return 0;
-+}
-+
-+static int mtk_rpmsg_ns_cb(struct rpmsg_device *rpdev, void *data, int len,
-+			   void *priv, u32 src)
-+{
-+	struct rpmsg_ns_msg *msg = data;
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev = priv;
-+	struct device *dev = &mtk_subdev->scp_pdev->dev;
-+
-+	int ret;
-+
-+	if (len != sizeof(*msg)) {
-+		dev_err(dev, "malformed ns msg (%d)\n", len);
-+		return -EINVAL;
-+	}
-+
-+	/*
-+	 * the name service ept does _not_ belong to a real rpmsg channel,
-+	 * and is handled by the rpmsg bus itself.
-+	 * for sanity reasons, make sure a valid rpdev has _not_ sneaked
-+	 * in somehow.
-+	 */
-+	if (rpdev) {
-+		dev_err(dev, "anomaly: ns ept has an rpdev handle\n");
-+		return -EINVAL;
-+	}
-+
-+	/* don't trust the remote processor for null terminating the name */
-+	msg->name[RPMSG_NAME_SIZE - 1] = '\0';
-+
-+	dev_info(dev, "creating channel %s addr 0x%x\n", msg->name, msg->addr);
-+
-+	ret = mtk_rpmsg_create_device(mtk_subdev, msg->name, msg->addr);
-+	if (ret) {
-+		dev_err(dev, "create rpmsg device failed\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+int mtk_rpmsg_prepare(struct rproc_subdev *subdev)
-+{
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev = to_mtk_subdev(subdev);
-+	struct platform_device *scp_pdev = mtk_subdev->scp_pdev;
-+
-+	/* a dedicated endpoint handles the name service msgs */
-+	mtk_subdev->ns_ept =
-+		__rpmsg_create_ept(scp_pdev, NULL, mtk_rpmsg_ns_cb, mtk_subdev,
-+				   SCP_IPI_NS_SERVICE);
-+	if (!mtk_subdev->ns_ept) {
-+		dev_err(&scp_pdev->dev,
-+			"failed to create name service endpoint\n");
-+		return -ENOMEM;
-+	}
-+
-+	return 0;
-+}
-+
-+void mtk_rpmsg_stop(struct rproc_subdev *subdev, bool crashed)
-+{
-+	struct mtk_rpmsg_channel_info *info, *next;
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev = to_mtk_subdev(subdev);
-+	struct device *dev = &mtk_subdev->scp_pdev->dev;
-+
-+	mtk_rpmsg_destroy_ept(mtk_subdev->ns_ept);
-+	cancel_work_sync(&mtk_subdev->register_work);
-+
-+	mutex_lock(&mtk_subdev->channels_lock);
-+	list_for_each_entry(info, &mtk_subdev->channels, list) {
-+		if (!info->registered)
-+			continue;
-+		if (rpmsg_unregister_device(dev, &info->info)) {
-+			dev_warn(
-+				dev,
-+				"rpmsg_unregister_device failed for %s.%d.%d\n",
-+				info->info.name, info->info.src,
-+				info->info.dst);
-+		}
-+	}
-+
-+	list_for_each_entry_safe(info, next,
-+				 &mtk_subdev->channels, list) {
-+		list_del(&info->list);
-+		kfree(info);
-+	}
-+	mutex_unlock(&mtk_subdev->channels_lock);
-+}
-+
-+struct rproc_subdev *
-+mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
-+			      struct rproc *scp_rproc)
-+{
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev;
-+
-+	mtk_subdev = kzalloc(sizeof(*mtk_subdev), GFP_KERNEL);
-+	if (!mtk_subdev)
-+		return NULL;
-+
-+	mtk_subdev->scp_pdev = scp_pdev;
-+	mtk_subdev->scp_rproc = scp_rproc;
-+	mtk_subdev->subdev.prepare = mtk_rpmsg_prepare;
-+	mtk_subdev->subdev.stop = mtk_rpmsg_stop;
-+	INIT_LIST_HEAD(&mtk_subdev->channels);
-+	INIT_WORK(&mtk_subdev->register_work,
-+		  mtk_register_device_work_function);
-+	mutex_init(&mtk_subdev->channels_lock);
-+
-+	return &mtk_subdev->subdev;
-+}
-+EXPORT_SYMBOL_GPL(mtk_rpmsg_create_rproc_subdev);
-+
-+void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev)
-+{
-+	struct mtk_rpmsg_rproc_subdev *mtk_subdev = to_mtk_subdev(subdev);
-+
-+	kfree(mtk_subdev);
-+}
-+EXPORT_SYMBOL_GPL(mtk_rpmsg_destroy_rproc_subdev);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("MediaTek scp rpmsg driver");
-diff --git a/include/linux/platform_data/mtk_scp.h b/include/linux/platform_data/mtk_scp.h
-index 7625eede2e5832..e26e5f6146e68e 100644
---- a/include/linux/platform_data/mtk_scp.h
-+++ b/include/linux/platform_data/mtk_scp.h
-@@ -34,9 +34,11 @@ enum scp_ipi_id {
- 	SCP_IPI_VENC_VP8,
- 	SCP_IPI_MDP,
- 	SCP_IPI_CROS_HOST_CMD,
--	SCP_IPI_MAX,
-+	SCP_IPI_NS_SERVICE = 0xFF,
-+	SCP_IPI_MAX = 0x100,
- };
- 
-+
- /**
-  * scp_ipi_register - register an ipi function
-  *
-diff --git a/include/linux/rpmsg/mtk_rpmsg.h b/include/linux/rpmsg/mtk_rpmsg.h
-new file mode 100644
-index 00000000000000..8d21cd3d35b012
---- /dev/null
-+++ b/include/linux/rpmsg/mtk_rpmsg.h
-@@ -0,0 +1,35 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright 2018 Google LLC.
-+ */
-+
-+#ifndef __LINUX_RPMSG_MTK_RPMSG_H
-+#define __LINUX_RPMSG_MTK_RPMSG_H
-+
-+#include <linux/device.h>
-+#include <linux/remoteproc.h>
-+
-+#if IS_ENABLED(CONFIG_RPMSG_MTK_SCP)
-+
-+struct rproc_subdev *
-+mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
-+			      struct rproc *scp_rproc);
-+
-+void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev);
-+
-+#else
-+
-+static inline struct rproc_subdev *
-+mtk_rpmsg_create_rproc_subdev(struct platform_device *scp_pdev,
-+			      struct rproc *scp_rproc)
-+{
-+	return NULL;
-+}
-+
-+static inline void mtk_rpmsg_destroy_rproc_subdev(struct rproc_subdev *subdev)
-+{
-+}
-+
-+#endif
-+
-+#endif
--- 
-2.21.0.rc0.258.g878e2cd30e-goog
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQmFydG9zeiwKCnRoYW5rcyBmb3IgdGhlIHJldmlldyEKCk9uIFdlZCwgRmViIDYsIDIwMTkg
+YXQgNTowNCBQTSBCYXJ0b3N6IEdvbGFzemV3c2tpCjxiZ29sYXN6ZXdza2lAYmF5bGlicmUuY29t
+PiB3cm90ZToKPiBuaWVkei4sIDMgbHV0IDIwMTkgbyAyMjo0MiBMaW51cyBXYWxsZWlqIDxsaW51
+cy53YWxsZWlqQGxpbmFyby5vcmc+IG5hcGlzYcWCKGEpOgooLi4uKQo+IEp1c3QgYSBuaXQsIGJ1
+dCBJJ2QgYWRkIGEgbmV3bGluZSBiZXR3ZWVuIHRoZSBpbmNsdWRlcyBhbmQgdGhlIGhlYWRlci4K
+PiBBbHNvOiBDKysgc3R5bGUgY29tbWVudCBmb3IgdGhlIGhlYWRlci4KCk9LCgo+ID4gKyNpbmNs
+dWRlIDxsaW51eC9pcnFjaGlwL2lycS1peHA0eHguaD4KPgo+IEkgdGhpbmsgYSBuZXdsaW5lIGJl
+dHdlZW4gbGludXgvIGFuZCBhc20vIGluY2x1ZGVzIGlzIGEgZ29vZCBydWxlLgoKT0sKCj4gPiAr
+I2RlZmluZSBJWFA0WFhfR1BJT19HUE9VVFIgICAgIDB4MDAKPiA+ICsjZGVmaW5lIElYUDRYWF9H
+UElPX0dQT0VSICAgICAgMHgwNAo+ID4gKyNkZWZpbmUgSVhQNFhYX0dQSU9fR1BJTlIgICAgICAw
+eDA4Cj4gPiArI2RlZmluZSBJWFA0WFhfR1BJT19HUElTUiAgICAgIDB4MEMKPiA+ICsjZGVmaW5l
+IElYUDRYWF9HUElPX0dQSVQxUiAgICAgMHgxMAo+ID4gKyNkZWZpbmUgSVhQNFhYX0dQSU9fR1BJ
+VDJSICAgICAweDE0Cj4gPiArI2RlZmluZSBJWFA0WFhfR1BJT19HUENMS1IgICAgIDB4MTgKPiA+
+ICsjZGVmaW5lIElYUDRYWF9HUElPX0dQREJTRUxSICAgMHgxQwo+Cj4gU2luY2UgdGhlc2UgYXJl
+IHJlZ2lzdGVycyBvZmZzZXRzIC0gbWF5YmUgdGhlIHByZWZpeCBjb3VsZCBiZQo+IElYUDRYWF9H
+UElPX1JFR18qIG9yIElYUDRYWF9HUElPX09GRl8qPyBJIHRoaW5rIGl0J3MgbW9yZSByZWFkYWJs
+ZS4KCk9LIEkgcmVuYW1lZCB0aGVtIElYUDRYWF9SRUdfR1BPVVQgZXRjLgoKPiA+ICsjZGVmaW5l
+IElYUDRYWF9HUElPX1NUWUxFX01BU0sgICAgICAgICAweDcKPgo+IEknZCB1c2UgR0VOTUFTSygy
+LCAwKSBoZXJlLgoKT0sKCj4gPiArICAgICAgIC8qIENsZWFyIHRoZSBzdHlsZSBmb3IgdGhlIGFw
+cHJvcHJpYXRlIHBpbiAqLwo+ID4gKyAgICAgICB2YWwgPSBfX3Jhd19yZWFkbChnLT5iYXNlICsg
+aW50X3JlZyk7Cj4gPiArICAgICAgIHZhbCAmPSB+KElYUDRYWF9HUElPX1NUWUxFX01BU0sgPDwg
+KGxpbmUgKiBJWFA0WFhfR1BJT19TVFlMRV9TSVpFKSk7Cj4gPiArICAgICAgIF9fcmF3X3dyaXRl
+bCh2YWwsIGctPmJhc2UgKyBpbnRfcmVnKTsKPgo+IEkga25vdyB5b3UncmUgbm90IHVzaW5nIHJl
+Z21hcCwgYmVjYXVzZSB0aGlzIGRyaXZlcidzIGJhc2VkIG9uCj4gZ3Bpby1tbWlvLCBidXQgSSdt
+IHdvbmRlcmluZyBpZiB5b3UgY291bGQgbWF5YmUgd3JhcCB0aG9zZSB0aHJlZQo+IG9wZXJhdGlv
+bnMgaW4gYSBoZWxwZXIgd3JhcHBlciBlLmcuIGl4cDR4eF91cGRhdGVfcmVnKCkgb3Igc29tZXRo
+aW5nCj4gdG8gbWFrZSBpdCBlYXNpZXIgdG8gcmVhZC4gU2FtZSBiZWxvdy4KCkknbSB1bmNlcnRh
+aW4gYWJvdXQgdGhhdCwgSSBmZWVsIHRoYXQga2luZCBvZiBzdHVmZiBjcmVhdGVzIGV4dHJhCnJ1
+bnBhdGhzIHRoYXQgbWFrZSB0aGUgY29kZSBoYXJkIHRvIHJlYWQsIHRoZSBjb21waWxlciB3aWxs
+Cm9mIGNvdXJzZSBpbmxpbmUgaXQsIGJ1dCBJIGxpa2UgdGhlIHJlYWQtbW9kaWZ5LXdyaXRlIGV4
+cGxpY2l0IGluc3RlYWQKb2Ygd3JhcHBlZCBpbiBhIGZ1bmN0aW9uLgoKPiA+ICtzdGF0aWMgc3Ry
+dWN0IGlycV9jaGlwIGl4cDR4eF9ncGlvX2lycWNoaXAgPSB7Cj4gPiArICAgICAgIC5uYW1lID0g
+IklYUDRHUElPIiwKPiA+ICsgICAgICAgLmlycV9hY2sgPSBpeHA0eHhfZ3Bpb19pcnFfYWNrLAo+
+ID4gKyAgICAgICAuaXJxX21hc2sgPSBpcnFfY2hpcF9tYXNrX3BhcmVudCwKPiA+ICsgICAgICAg
+LmlycV91bm1hc2sgPSBpeHA0eHhfZ3Bpb19pcnFfdW5tYXNrLAo+ID4gKyAgICAgICAuaXJxX3Nl
+dF90eXBlID0gaXhwNHh4X2dwaW9faXJxX3NldF90eXBlLAo+ID4gK307Cj4KPiBJIGFzc3VtZSB0
+aGlzIGRldmljZSBjYW5ub3QgaGF2ZSBtdWx0aXBsZSBpbnN0YW5jZXMsIHNvIGl0J3Mgc2FmZSB0
+bwo+IGhhdmUgYSBzdGF0aWMgaXJxY2hpcD8KClllcyB0aGVyZSBjYW4gYmUgb25seSBvbmUuCgo+
+ID4gK3N0YXRpYyBpbnQgaXhwNHh4X2dwaW9fdG9faXJxKHN0cnVjdCBncGlvX2NoaXAgKmdjLCB1
+bnNpZ25lZCBpbnQgb2Zmc2V0KQo+ID4gK3sKPiA+ICsgICAgICAgc3RydWN0IGl4cDR4eF9ncGlv
+ICpnID0gZ3Bpb2NoaXBfZ2V0X2RhdGEoZ2MpOwo+ID4gKyAgICAgICBzdHJ1Y3QgaXJxX2Z3c3Bl
+YyBmd3NwZWM7Cj4gPiArCj4gPiArICAgICAgIGZ3c3BlYy5md25vZGUgPSBnLT5md25vZGU7Cj4g
+PiArICAgICAgIGZ3c3BlYy5wYXJhbV9jb3VudCA9IDI7Cj4gPiArICAgICAgIGZ3c3BlYy5wYXJh
+bVswXSA9IG9mZnNldDsKPiA+ICsgICAgICAgZndzcGVjLnBhcmFtWzFdID0gSVJRX1RZUEVfTk9O
+RTsKPiA+ICsKPiA+ICsgICAgICAgcmV0dXJuIGlycV9jcmVhdGVfZndzcGVjX21hcHBpbmcoJmZ3
+c3BlYyk7Cj4gPiArfQo+ID4gKwo+Cj4gVGhpcyBpcyB3ZXJlIEkgc3RhcnQgdG8gc3RydWdnbGUu
+IEknbSBzdGlsbCBub3QgdmVyeSB3ZWxsIHZlcnNlZCBpbgo+IGlycSBkb21haW4gaGllcmFyY2hp
+ZXMgeWV0LiBZb3UgYWxyZWFkeSBleHBsYWluIHRoZSBjb25jZXB0IGluIHRoZQo+IGNvbW1pdCBt
+ZXNzYWdlLCBidXQgaXQgd291bGQgYmUgZ3JlYXQgaWYgeW91IGNvdWxkIGFkZCBhIGNvbW1lbnQK
+PiBkZXNjcmliaW5nIHRoZSB0ZWNobmljYWwgZGV0YWlscyBvZiBpbXBsZW1lbnRhdGlvbiBoZXJl
+IGFuZCBpbiBvdGhlcgo+IHJlbGF0ZWQgY2FsbGJhY2tzLiBUaGUgd2hvbGUgZndzcGVjIHRoaW5n
+eSBpcyBub3QgdmVyeSBvYnZpb3VzIGFuZCBpdAo+IHdvdWxkIHNlcnZlIGFzIGFuIGV4YW1wbGUg
+Zm9yIHRoZSBmdXR1cmUuCgpJIHdyb3RlIGEgcGFyYWdyYXBoIG9mIGV4cGxhbmF0aW9ucyBidXQg
+SSByZWFsaXplZCB0aGF0IEkgd2FzIGp1c3QKd3JpdGluZyBkb2N1bWVudGF0aW9uIHRoYXQgc2hv
+dWxkIHJhdGhlciBiZSBpbiBpcnFkb21haW4uCk15IHBsYW4gaXMgdG8gdXBkYXRlIHRoZSBHUElP
+IGRyaXZlciBkb2N1bWVudGF0aW9uIHdpdGggYQp0aG9yb3VnaCBkZXNjcmlwdGlvbiBvZiBoaWVy
+YXJjaGljYWwgaXJxcyBpbnN0ZWFkLgoKPiA+ICtzdGF0aWMgaW50IGl4cDR4eF9ncGlvX2lycV9k
+b21haW5fdHJhbnNsYXRlKHN0cnVjdCBpcnFfZG9tYWluICpkb21haW4sCj4gPiArICAgICAgICAg
+ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0cnVjdCBpcnFfZndzcGVjICpmd3Nw
+ZWMsCj4gPiArICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHVuc2ln
+bmVkIGxvbmcgKmh3aXJxLAo+ID4gKyAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg
+ICAgICAgICB1bnNpZ25lZCBpbnQgKnR5cGUpCj4gPiArewo+ID4gKwo+ID4gKyAgICAgICAvKiBX
+ZSBzdXBwb3J0IHN0YW5kYXJkIERUIHRyYW5zbGF0aW9uICovCj4gPiArICAgICAgIGlmIChpc19v
+Zl9ub2RlKGZ3c3BlYy0+Zndub2RlKSAmJiBmd3NwZWMtPnBhcmFtX2NvdW50ID09IDIpIHsKPiA+
+ICsgICAgICAgICAgICAgICAqaHdpcnEgPSBmd3NwZWMtPnBhcmFtWzBdOwo+ID4gKyAgICAgICAg
+ICAgICAgICp0eXBlID0gZndzcGVjLT5wYXJhbVsxXTsKPiA+ICsgICAgICAgICAgICAgICByZXR1
+cm4gMDsKPiA+ICsgICAgICAgfQo+Cj4gVGhpcyBsb2dpYyBpcyBhIGJpdCBub24taW50dWl0aXZl
+IC0gbWF5YmUgeW91IGNvdWxkIGZpcnN0IGNoZWNrIGZvcgo+IGVycm9yIGNvbmRpdGlvbnMgYW5k
+IHRoZW4gZG8gYW55IHByb2Nlc3Npbmc/CgpCcmlhbiBoYXMgY3JlYXRlZCBhIGdlbmVyaWMgdHdv
+Y2VsbCB0cmFuc2xhdGlvbiBoZWxwZXIgaW4gaXJxY2hpcApmb3IgdGhpcywgc28gSSB3aWxsIHJl
+ZmFjdG9yIG9uIHRvcCBvZiB0aGF0IGF0IHNvbWUgcG9pbnQgYW5kIHRoaXMKY29tcGxleGl0eSBn
+b2VzIGF3YXkuCgo+IERvbid0IHlvdSBuZWVkIHRvIGRpc3Bvc2Ugb2YgdGhlIGRvbWFpbiBpbiB0
+aGUgcmVtb3ZlIGNhbGxiYWNrPyBUaGV5Cj4gZG9uJ3Qgc2VlbSB0byBoYXZlIGRldm1fIHZhcmlh
+bnRzIHlldC4KClRoaXMgaXMgYSBib29sIEtjb25maWcgc3ltYm9sIHNvIHRoZSBkcml2ZXIgaXMg
+Y29tcGlsZWQgaW50byB0aGUga2VybmVsLgpPbmNlIHByb2JlZCwgdGhlIGlycWNoaXAvZG9tYWlu
+IG5ldmVyIGdvZXMgYXdheS4gSWYgSSB0cnkgdG8gcmVtb3ZlIGl0Cml0IHdvdWxkIGp1c3QgdGFr
+ZSBkb3duIHRoZSB3aG9sZSBzeXN0ZW0gd2l0aCBpdCwgc28gZXZlbiBpZiBJIHdvdWxkCmltcGxl
+bWVudCBpdCBpdCB3b3VsZCBtYWtlIG5vIHNlbnNlLiBUaGVyZSBpcyBzb21ldGhpbmcgb2YgYQoi
+aGFyZG5lc3MiIGluIGhvdyB0aWdodCBhbiBpcnFkb21haW4vY2hpcCBpcyBjb3VwbGVkIHRvIGEg
+c3lzdGVtLAphbmQgb24gdGhpcyBzeXN0ZW0gaXQgaXMgKGN1cnJlbnRseSkgdXNlZCBmb3IgYSBs
+b3Qgb2Ygc3RhdGljIGJvYXJkIGZpbGVzCmFuZCBpdCBqdXN0IGNhbid0IGdvIGF3YXkuIChUaGUg
+b3Bwb3NpdGUgYmVpbmcgZS5nLiBhIFVTQiBleHBhbmRlcgpncGlvY2hpcCB3aGljaCBzaG91bGQg
+bWUgYSBtb2R1bGUgYW5kIGNhbiBjb21lIGFuZCBnbyBhcyBpdApwbGVhc2UuKQoKV2UgY291bGQg
+cmVjb25zaWRlciBvbmNlIGFsbCBpcyBtb3ZlZCBvdmVyIHRvIGRldmljZSB0cmVlIGFuZCBtb3Jl
+CmR5bmFtaWMgdGhvdWdoLgoKWW91cnMsCkxpbnVzIFdhbGxlaWoKCl9fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBs
+aXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5m
+cmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
