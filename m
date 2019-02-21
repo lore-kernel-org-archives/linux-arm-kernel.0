@@ -2,71 +2,64 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CCE44C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:43:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 67ED4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:46:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F27D2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:43:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 385A320700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:46:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KyfEbr+1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="IJWu7s4/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F27D2084D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OMtOnrQg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 385A320700
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=90Nz8MnwVKJrVaLyv17ifGds60Ex+Mdd5fEysQbmNwg=; b=KyfEbr+1OBZ/GK
-	hYYSED5wra9/XldHF6buq6j2wk9Qq5HIqMf1N0Q4sZDxGdp3GsAlMcFdW9fYhPmU2KjJ2w4tH0hA+
-	5tu25QXV7scOTIhzr+B2bxsUa/1JZUWZtNLdoYAxGS9vbKllli7GZoyNJIRLAhdI/F/DIhlUN21Ig
-	rFQnkmUTcc4xuSN1CZgqB6NoLyX1FGfBUm94jc1UDBjlnIi0NCBiq360JuHuv/qK8VIpYKhHJKAa7
-	sHY6PmQgLq5413LbxHa2+hSGqNCqm1d7ze0OzO+02BQk+L9rEtScecqw7XLoli1jvx/zEO6yREArJ
-	f2F11LHfxIc0Cv+8e59g==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=fm2bY/ZhfukXTQ4ne3nlzQSMZIbcO5Uzb/w4T4As3jk=; b=OMtOnrQgcXinGG
+	pvUUDb2q4OjL6ylhp3nBDpQSOxNSKSnuAjM5K0g1lsLadbZ1lS9EXgL1ylwTtFuH4ywYJwneZvnNs
+	xj76aFU/qYVsxe+XUdi/fY1/1XqiyTMEVASpEGN15JPKsEc9FEdZ6hup6+J2YpMuyEscRx6v1b1OK
+	2YK2pBGE1BAMNlVSxwtIPC+QPbl6O4jYtgrK6P65knX66e/NkQhCQ5FBH34l/sx4w6HZi1iyRJ7E2
+	7vpLinKCw+wGmyPH8a6r9oNmngcC7omP70UlG9W34Uj1Q9ZRwsA+e3nEowSU8bD5mvy1F3XhAJ/el
+	XTJv9sVVKHkcYt30JbOQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwpZI-00040T-TF; Thu, 21 Feb 2019 14:43:20 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwpZ3-0003lJ-Sd
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:43:08 +0000
-Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 22D892080D;
- Thu, 21 Feb 2019 14:43:05 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550760185;
- bh=yurzmFbNT/hILh44KojVvUp+Hwkws22pKIXvM9WIORk=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=IJWu7s4/RuKedug/ESFjdsZQBgw/zSrbuKA7YKQULLwVTLkjTzmn25rnV6lgpGF0j
- UfU28h6paRvEaMXattQWPUl6QZ8TCgoYEBKHVRG/tFaWlxU9+kxEwuFeOqCwqXjTFn
- IZ8eEcZWuwXIgWpn1AK2OH19oMMcxfp1LtJ1gzLY=
-From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-To: linux-kernel@vger.kernel.org
-Subject: [PATCH 4.20 23/32] efi/arm: Revert "Defer persistent reservations
- until after paging_init()"
-Date: Thu, 21 Feb 2019 15:36:11 +0100
-Message-Id: <20190221125252.267742511@linuxfoundation.org>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190221125250.855065214@linuxfoundation.org>
-References: <20190221125250.855065214@linuxfoundation.org>
-User-Agent: quilt/0.65
-X-stable: review
-X-Patchwork-Hint: ignore
+	id 1gwpcL-00062r-TS; Thu, 21 Feb 2019 14:46:29 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwpcI-00062O-GO
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:46:27 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A52F3A78;
+ Thu, 21 Feb 2019 06:46:23 -0800 (PST)
+Received: from [10.1.196.69] (e112269-lin.cambridge.arm.com [10.1.196.69])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 305673F690;
+ Thu, 21 Feb 2019 06:46:20 -0800 (PST)
+Subject: Re: [PATCH v2 03/13] mm: Add generic p?d_large() macros
+To: "Kirill A. Shutemov" <kirill@shutemov.name>
+References: <20190221113502.54153-1-steven.price@arm.com>
+ <20190221113502.54153-4-steven.price@arm.com>
+ <20190221142812.oa53lfnnfmsuh6ys@kshutemo-mobl1>
+From: Steven Price <steven.price@arm.com>
+Message-ID: <a3076d01-41b3-d59b-e98c-a0fd9ba5d3f5@arm.com>
+Date: Thu, 21 Feb 2019 14:46:18 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
+In-Reply-To: <20190221142812.oa53lfnnfmsuh6ys@kshutemo-mobl1>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_064305_954722_9963D91A 
-X-CRM114-Status: GOOD (  12.42  )
+X-CRM114-CacheID: sfid-20190221_064626_552121_73605EE3 
+X-CRM114-Status: GOOD (  18.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,123 +71,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sasha Levin <sashal@kernel.org>, linux-efi@vger.kernel.org,
+Cc: Mark Rutland <Mark.Rutland@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
  Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Will Deacon <will.deacon@arm.com>, stable@vger.kernel.org,
- Mike Rapoport <rppt@linux.ibm.com>, Peter Zijlstra <peterz@infradead.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, =?UTF-8?B?SsOpcsO0bWUgR2xpc3Nl?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-4.20-stable review patch.  If anyone has any objections, please let me know.
+On 21/02/2019 14:28, Kirill A. Shutemov wrote:
+> On Thu, Feb 21, 2019 at 11:34:52AM +0000, Steven Price wrote:
+>> From: James Morse <james.morse@arm.com>
+>>
+>> Exposing the pud/pgd levels of the page tables to walk_page_range() means
+>> we may come across the exotic large mappings that come with large areas
+>> of contiguous memory (such as the kernel's linear map).
+>>
+>> For architectures that don't provide p?d_large() macros, provided a
+>> does nothing default.
+> 
+> Nak, sorry.
+> 
+> Power will get broken by the patch. It has pmd_large() inline function,
+> that will be overwritten by the define from this patch.
+> 
+> I believe it requires more ground work on arch side in general.
+> All architectures that has huge page support has to provide these helpers
+> (and matching defines) before you can use it in a generic code.
 
-------------------
+Sorry about that, I had compile tested on power, but obviously not the
+right config to actually see the breakage.
 
-Commit 582a32e708823e5957fd73ccd78dc4a9e49d21ea upstream.
+I'll do some grepping - hopefully this is just a case of exposing the
+functions/defines that already exist for those architectures.
 
-This reverts commit eff896288872d687d9662000ec9ae11b6d61766f, which
-deferred the processing of persistent memory reservations to a point
-where the memory may have already been allocated and overwritten,
-defeating the purpose.
+Note that in terms of the new page walking code, these new defines are
+only used when walking a page table without a VMA (which isn't currently
+done), so architectures which don't use p?d_large currently will work
+fine with the generic versions. They only need to provide meaningful
+definitions when switching to use the walk-without-a-VMA functionality.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Linus Torvalds <torvalds@linux-foundation.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Mike Rapoport <rppt@linux.ibm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-efi@vger.kernel.org
-Link: http://lkml.kernel.org/r/20190215123333.21209-3-ard.biesheuvel@linaro.org
-Signed-off-by: Ingo Molnar <mingo@kernel.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
----
- arch/arm64/kernel/setup.c               | 1 -
- drivers/firmware/efi/efi.c              | 4 ----
- drivers/firmware/efi/libstub/arm-stub.c | 3 ---
- include/linux/efi.h                     | 7 -------
- 4 files changed, 15 deletions(-)
+Thanks for reporting the breakage.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f4fc1e0544b73..953e316521fca 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -313,7 +313,6 @@ void __init setup_arch(char **cmdline_p)
- 	arm64_memblock_init();
- 
- 	paging_init();
--	efi_apply_persistent_mem_reservations();
- 
- 	acpi_table_upgrade();
- 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index 415849bab2339..bde3822cf539a 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -592,11 +592,7 @@ int __init efi_config_parse_tables(void *config_tables, int count, int sz,
- 
- 		early_memunmap(tbl, sizeof(*tbl));
- 	}
--	return 0;
--}
- 
--int __init efi_apply_persistent_mem_reservations(void)
--{
- 	if (efi.mem_reserve != EFI_INVALID_TABLE_ADDR) {
- 		unsigned long prsv = efi.mem_reserve;
- 
-diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
-index 3d36142cf8120..30ac0c975f8a1 100644
---- a/drivers/firmware/efi/libstub/arm-stub.c
-+++ b/drivers/firmware/efi/libstub/arm-stub.c
-@@ -75,9 +75,6 @@ void install_memreserve_table(efi_system_table_t *sys_table_arg)
- 	efi_guid_t memreserve_table_guid = LINUX_EFI_MEMRESERVE_TABLE_GUID;
- 	efi_status_t status;
- 
--	if (IS_ENABLED(CONFIG_ARM))
--		return;
--
- 	status = efi_call_early(allocate_pool, EFI_LOADER_DATA, sizeof(*rsv),
- 				(void **)&rsv);
- 	if (status != EFI_SUCCESS) {
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index 100ce4a4aff6c..845174e113ce9 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1167,8 +1167,6 @@ static inline bool efi_enabled(int feature)
- extern void efi_reboot(enum reboot_mode reboot_mode, const char *__unused);
- 
- extern bool efi_is_table_address(unsigned long phys_addr);
--
--extern int efi_apply_persistent_mem_reservations(void);
- #else
- static inline bool efi_enabled(int feature)
- {
-@@ -1187,11 +1185,6 @@ static inline bool efi_is_table_address(unsigned long phys_addr)
- {
- 	return false;
- }
--
--static inline int efi_apply_persistent_mem_reservations(void)
--{
--	return 0;
--}
- #endif
- 
- extern int efi_status_to_err(efi_status_t status);
--- 
-2.19.1
-
-
-
+Steve
 
 _______________________________________________
 linux-arm-kernel mailing list
