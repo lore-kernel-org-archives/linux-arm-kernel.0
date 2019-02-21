@@ -2,74 +2,70 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 720CFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 12:06:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A1A0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 12:08:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4223120855
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 12:06:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57C6320855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 12:08:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FTkGceRl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4223120855
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XJFbiWZl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NjEMWwKM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57C6320855
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HVTlbQVkQTvOE8IGfd0UafEa9Yln5PLhLgvkiGoT2Jg=; b=FTkGceRlDjRSmt
-	k4TQZE3uGnkAFsGQhp3R9jtkHoHkH7A66OYeVOy3cvYYo3qI9JrzANnlWsvQlOTAHa8e5kfgpKk2i
-	3/4x1Tb975e9WcMocWhU2I8l1kjHTeBiPV6zJK4e6IIbUL2nLSQES2WYIZ1+2hdOG/Sog4jW0zc1L
-	uC1tNp5b0Ovg46C330kcad/p//XgviJbwekhigj0am0w/XqQLlpj5YHloGj5cmTAvwsOkcmycSDq+
-	o1CD3WpT8Ex7ZbaUKfJCW4Y4L3zBdikD3vHeX3sMNigKqljUTjLLtmCdGJUutxwO0vGVxoDQ/Acrf
-	HYKS99UPPxr/HDpXzymQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=453Q5AySwUZ0r8SNEl744T+kY2cW5vYR0jPmxGNReBU=; b=XJFbiWZlTAPlOj
+	q9WTG9Yqr6eyX6tH5QW3DaR+n+yhy+6fDC33kQKAZ2uaAYE8VDrILD2sySSVgqnIUueDAk4HRZqVP
+	gGx1Lw6CSXk07S2S/GhLqniALH99bdqSCx7PoqQvyWGWlCH6yUh6Zmdsow0Ula0Iv/gd2kbhEhGvQ
+	kqjOkGZIi8hSsqRuiTd9t/+clU/1Lf3w+mKVJ+c45fZ7c2BxVpJJ3SiaScWapGlEczQPlmXM0k81T
+	KAit8gubdG6Du1sYL93e4f03WWlClHGQhXecyi6vJlKi5wToeW3J322jwy9T/7j2ihK8k7m87zZwS
+	ujlQ0sBATPu0tOGoEmdA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwn7w-0005jt-Er; Thu, 21 Feb 2019 12:06:56 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwn7u-0005jS-3m
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 12:06:55 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DBAB780D;
- Thu, 21 Feb 2019 04:06:53 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C73C83F5C1;
- Thu, 21 Feb 2019 04:06:50 -0800 (PST)
-Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
-To: "H. Peter Anvin" <hpa@zytor.com>, Will Deacon <will.deacon@arm.com>,
- Peter Zijlstra <peterz@infradead.org>
-References: <20190213144145.GY32494@hirez.programming.kicks-ass.net>
- <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
- <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
- <20190213222146.GC32494@hirez.programming.kicks-ass.net>
- <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
- <20190214101429.GD32494@hirez.programming.kicks-ass.net>
- <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <20190219090409.GW32494@hirez.programming.kicks-ass.net>
- <20190219124808.GG8501@fuggles.cambridge.arm.com>
- <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
-Date: Thu, 21 Feb 2019 12:06:49 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+	id 1gwn9P-00065j-73; Thu, 21 Feb 2019 12:08:27 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwn9K-00064x-70; Thu, 21 Feb 2019 12:08:25 +0000
+Received: from localhost (unknown [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 58EB720855;
+ Thu, 21 Feb 2019 12:08:19 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550750901;
+ bh=fpaFN2eK2DE98FA8SCXmmCYjNYjUVZWlfRrxsUVSUdU=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=NjEMWwKMawag2vuZ4XsYkLrWUF8tnjzh6jf6j5qspq2gZDuMJy7TOIZmA/xHGR0Mg
+ RNMXbI/WqQCjucarzwNWB5Q4HTdqvUUqh61hDGX+FX57S+eCeGC13uBnPV/ot6Me41
+ iWHb88gByPnR0zlITYWWfl9EdRiBkhKTt+LMVrM8=
+Date: Thu, 21 Feb 2019 13:08:15 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 02/27] mtd: nand: Compile in the NAND core by default
+Message-ID: <20190221130815.7bd550dd@kernel.org>
+In-Reply-To: <20190221124628.3538ecb0@xps13>
+References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
+ <20190221100216.25255-3-miquel.raynal@bootlin.com>
+ <20190221115554.315fbd9b@kernel.org>
+ <20190221120610.5abb49ae@xps13>
+ <20190221121437.7c551bc5@kernel.org>
+ <20190221124628.3538ecb0@xps13>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
-Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_040654_163804_A60BC7AC 
-X-CRM114-Status: GOOD (  23.02  )
+X-CRM114-CacheID: sfid-20190221_040823_904836_CD52E7CA 
+X-CRM114-Status: GOOD (  27.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,86 +77,118 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, jpoimboe@redhat.com, catalin.marinas@arm.com,
- valentin.schneider@arm.com, linux-kernel@vger.kernel.org,
- Andy Lutomirski <luto@amacapital.net>, mingo@redhat.com, james.morse@arm.com,
- luto@kernel.org, brgerst@gmail.com, bp@alien8.de, tglx@linutronix.de,
- torvalds@linux-foundation.org, Ingo Molnar <mingo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Thu, 21 Feb 2019 12:46:28 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-
-On 20/02/2019 22:55, H. Peter Anvin wrote:
-> On 2/19/19 4:48 AM, Will Deacon wrote:
->>
->> I think you'll still hate this, but could we not disable preemption during
->> the uaccess-enabled region, re-enabling it on the fault path after we've
->> toggled uaccess off and disable it again when we return back to the
->> uaccess-enabled region? Doesn't help with tracing, but it should at least
->> handle the common case.
->>
+> Hi Boris,
 > 
-> There is a worse problem with this, I still realize: this would mean blocking
-> preemption across what could possibly be a *very* large copy_from_user(), for
-> example.
+> Boris Brezillon <bbrezillon@kernel.org> wrote on Thu, 21 Feb 2019
+> 12:14:37 +0100:
 > 
-
-Yes, that's a good point. And I guess a userspace program could forcibly
-trigger the kernel into a large copy_from/to_user(), knowingly disabling
-preemption.
-
-I don't know how bad this could get.
-
-> Exceptions *have* to handle this; there is no way around it. Perhaps the
-> scheduler isn't the right place to put these kinds of asserts, either.
+> > On Thu, 21 Feb 2019 12:06:10 +0100
+> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> >   
+> > > Hi Boris,
+> > > 
+> > > Boris Brezillon <bbrezillon@kernel.org> wrote on Thu, 21 Feb 2019
+> > > 11:55:54 +0100:
+> > >     
+> > > > On Thu, 21 Feb 2019 11:01:51 +0100
+> > > > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> > > >       
+> > > > > Force the NAND core be compiled-in when using any kind of NAND.        
+> > > > 
+> > > > Why?      
+> > > 
+> > > Because all the logic that comes later in the series relies on this
+> > > change. I need the NAND core to be compiled-in,    
+> > 
+> > Hm, not exactly compiled-in as it can still be selected as a module.  
 > 
+> Yes, do you think it is a problem?
 
-Maybe I'm misunderstanding what you mean with "Exceptions *have* to
-handle this". Isn't the fact that the AC/PAN flags gets saved on
-exception entry and set back to "user accesses disabled" already
-handling it? Or are you referring to something else?
+Yes, it is, at least for the SPI NAND case (and soon the RAW NAND case
+too) since you remove the select but don't add a depends on. If you
+select NAND_CORE as a module and SPI_NAND compiled-in => BOOM!
 
-So far my understanding is that the exception/interrupt case is fine.
-The worrying case is what gets called in the user access regions
-(schedule(), preempt_enable(), tracing...).
-
-Did I get lost somewhere?
-
-> Now, __fentry__ is kind of a special beast; in some ways it is an "exception
-> implemented as a function call"; on x86 one could even consider using an INT
-> instruction in order to reduce the NOP footprint in the unarmed case.  Nor is
-> __fentry__ a C function; it has far more of an exception-like ABI.
-> *Regardless* of what else we do, I believe __fentry__ ought to
-> save/disable/restore AC, just like an exception does.
 > 
-
-That does make sense to me. However it doesn't solve the issue of
-calling (or preventing to call) some function that rescheds.
-
-
-> The idea of using s/a gcc plugin/objtool/ for this isn't really a bad idea.
-> Obviously the general problem is undecidable :) but the enforcement of some
-> simple, fairly draconian rules ("as tight as possible, but no tighter")
-> shouldn't be a huge problem.
+> >   
+> > > as well the ECC engine
+> > > core, as well as everything that is shared between raw NAND and
+> > > SPI-NAND which I move in the NAND core.    
+> > 
+> > Yes, the core is required for SPI NAND and soon will be for RAW NAND,
+> > but I still don't see the problem with the "select NAND_CORE" approach,
+> > sorry.
+> >   
+> > >     
+> > > >       
+> > > > > 
+> > > > > Also remove the redundant dependencies on MTD which is enforced by the
+> > > > > game of the if/endif blocs.
+> > > > > 
+> > > > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > > > ---
+> > > > >  drivers/mtd/nand/Kconfig         | 12 ++++++++++--
+> > > > >  drivers/mtd/nand/onenand/Kconfig |  1 -
+> > > > >  drivers/mtd/nand/raw/Kconfig     |  1 -
+> > > > >  drivers/mtd/nand/spi/Kconfig     |  1 -
+> > > > >  4 files changed, 10 insertions(+), 5 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> > > > > index 495751ed3fd7..e8d26a715922 100644
+> > > > > --- a/drivers/mtd/nand/Kconfig
+> > > > > +++ b/drivers/mtd/nand/Kconfig
+> > > > > @@ -1,6 +1,14 @@
+> > > > > -config MTD_NAND_CORE
+> > > > > -	tristate
+> > > > > +menuconfig MTD_NAND_CORE
+> > > > > +	tristate "NAND"        
+> > > > 
+> > > > Definitely not something we want to expose in menuconfig.      
+> > > 
+> > > I considered the NAND core as essential when using raw NAND and
+> > > SPI-NAND.    
+> > 
+> > It is needed for SPI NAND, and will be for raw NAND for sure, but I
+> > still see no reasons for turning it into a user-visible option.
+> >   
+> > > Hence, turning it into a menuconfig option make the whole
+> > > NAND subsystem available (or not) and will appear in a different
+> > > "menuconfig page", which really enhances the readability.    
+> > 
+> > That's a different thing, and I have no problem with adding an extra
+> > level in the Kconfig hierarchy.  
 > 
-> An actual gcc plugin -- which would probably be quite complex -- could make
-> gcc itself aware of user space accesses and be able to rearrange them to
-> minimize STAC/CLAC and avoid kernel-space accesses inside those brackets.
+> Then why not using this symbol? I don't get why you are opposed.
+
+Because, not only you're forcing onenand users to pull the nand core
+code in, which is not needed until the conversion to the generic NAND
+layer is done, but you're actually forcing that for all existing
+defconfigs because of your "default y" approach. Also, I don't see
+what's the benefit of letting users know about this intermediate
+framework when all they care about is supporting a specific class of
+devices.
+
 > 
+> So you would like a config NAND_CORE (invisible) and a visible
+> menuconfig NAND? And all entries in the NAND menu selecting NAND_CORE?
 
-Not sure I get this. The data that is retrieved from/stored user space
-is generally obtained from/saved into kernel-space address. And when you
-start the user_access_begin() it means you plan on doing a bunch of user
-access, so I wouldn't expect to be able to batch everything into registers.
-
-Cheers,
-
--- 
-Julien Thierry
+Not all entries, just SPI NAND, and soon, raw NAND. And yes, I'd prefer
+that.
 
 _______________________________________________
 linux-arm-kernel mailing list
