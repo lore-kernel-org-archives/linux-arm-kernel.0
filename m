@@ -2,85 +2,83 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 285D9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:06:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53297C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:08:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC54A207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:06:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2229E207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 22:08:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LviEAtyw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=amacapital-net.20150623.gappssmtp.com header.i=@amacapital-net.20150623.gappssmtp.com header.b="cEGauRB+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC54A207E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amacapital.net
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mtYanTK0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="YofCyqny"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2229E207E0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
-	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=mOzNA6RIzloTitln/h+HohD6f3M+8yQiMFhqB0J/GXQ=; b=LviEAtyw2dJ+No
-	QXCSfDgj7oPZd1MX6ikPNjAYJiesHf98994uSSJzKmMFh2bl4hkSNrHScynZk+l9UhOGeFBjkbe2K
-	lFhyFOriu/pgCkLiNMbZUDxgvp0aHr++IX0FiwGUuO6cAZmWhXdDgOR+dSz+ZX7JcRu2fbLRljaRM
-	PwkZ7OQNYjRhtkSAPXX8BPO45zMKqkW5qIuikmJ5yDkvE7NjGwYMQ/wb0lCO7wdhiL4IgJzvoEKUg
-	iExFCkwrsD5H1h/JuVywnbmfSlAHwdUNyTDZmXmaefI/NAtQthavdom+f2Q8nDJoLissHs4WmTFKq
-	zhG4d6WRw5Z2hNrAzWHg==;
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=DkkL4mVXewvO3sK2eTDE++H+5kmz+ETMKdwrt+L9j0I=; b=mtYanTK0FaYgPE
+	Ok80ZgijnKLtX8faRouRRNTIDskeJtt+c+/FS+MV+66Uds6btqEHX7Ngs5VnW83QgnSUiM+iOwoAy
+	S/bRyjP0IRMFlZdd2AZj854EFYAA0ATA/3XOP68z1Tg7bJziGs0waosW7mf/VEvNJFqvZkWzfpBAo
+	dDlSlew14btaB3rBW7uwBtA9mUrZMgz6dQ8gfdXqjzxIUpSKHeYOwOFcvvxNeZGp9Q4WeViQgEybE
+	++h+fLLWBexpVgpesLf7GS5FiC6q9p4OxHB9L+6sRgYUzFclxHH/OwAHEPSt3Kck6NBEpGuqn2EFk
+	iE57VAyilLbESDfJKK8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwwUD-0000DN-S3; Thu, 21 Feb 2019 22:06:33 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gwwWC-0000ar-Ql; Thu, 21 Feb 2019 22:08:36 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwwUA-0000Cb-Ti
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 22:06:32 +0000
-Received: by mail-pg1-x541.google.com with SMTP id r124so96512pgr.3
+ id 1gwwW9-0000aT-Ax
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 22:08:34 +0000
+Received: by mail-lf1-x143.google.com with SMTP id u21so150451lfu.1
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 14:06:30 -0800 (PST)
+ Thu, 21 Feb 2019 14:08:32 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amacapital-net.20150623.gappssmtp.com; s=20150623;
- h=mime-version:subject:from:in-reply-to:date:cc
- :content-transfer-encoding:message-id:references:to;
- bh=sNViGJvrXCaoJlnXuiNu2YjSa7SxUCjLL8DEwon24Q8=;
- b=cEGauRB+4YtZAU6hGgs5/nvyC+ld9C327auZPsEhqYsWb3OUPLwPoodFEZWbJ7kMES
- nYKnRpLL4zanjpuV09G5vUdUdCnX2kUxi/72XwRFBJQH8N0E/CypZyAAmWC3Ry7cvGVZ
- f14xvCDLwlHI5IzrU6SCmgL5z7Z/HBhFw4ip1jlAlHylG/h1hxP4htILVAqFZcouCwiF
- +MN/TiMmHhfcVvuPXAt9zRnprl4WhE07f2qS8LY4YxO9EVTlReiaO2jb9MGtJY1xBc+q
- REBP/64Zi354XtXSC3LCVTalcOzBWtW07TU3ZyFQrvWODXWqXzpKse+UY/FI+vbn2iPK
- 2zDQ==
+ d=linux-foundation.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=9wFanjEpOf9wRJE/2TXoK6Nd5+iJk15E6QWBJw3RQRU=;
+ b=YofCyqnyqCvzjrckbWI7xD8xUmCj7TZt4GsSTSNeSg0nUfbYeXjn+h+PhzPsJZV2mq
+ OvvggXO0wPkTaWdmzlqP+59NSsvMir0i9WOZQ7PsXq2CUg7ebP5NFmPux8RN55+nWKfh
+ 8oHEOCzEnxHx80nVEf6yUgeuL6gfxWfgoFV7A=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:subject:from:in-reply-to:date:cc
- :content-transfer-encoding:message-id:references:to;
- bh=sNViGJvrXCaoJlnXuiNu2YjSa7SxUCjLL8DEwon24Q8=;
- b=HXJVLmCIft7En2zBvDYhs460akRNkNn1fAEU4I0/Xz6lZvgLtW8j7JdXCkWTp0x+mo
- kDKt+mxKhAg+H9ypmOdz1lnXwoNu6loZBWBqG6W36zok/CAYHP8Cs9mM0X88DVEPeOld
- igOE6vfx+jXHiC2AuVRby+Z/lZQWhX4E8wyFpSSjgyCCT9pWclkKeJbd2Ui10qeuVz/t
- dm8hyMXI3dz1Cq0QSuX04Owps0kWtkZyUI7JNhCYru+b16u6OBbY/m9f8NL4IYNHcLpg
- 2LZZTPohvia2gB6Vfkwd9N9HcwXZX178lKX4Yy81vC6SA7QGACDl9KjWdv0pcQtUc72q
- T6yA==
-X-Gm-Message-State: AHQUAuZVPkFY2q68zqqiyp359noMVBaeW9HQ3+BFxlsWDZ6oDA65xCYI
- lm0P1URW9C+ldG/VQtk1yn898A==
-X-Google-Smtp-Source: AHgI3IY9PTilcQLs2Ybwg4yTYtSN5TxL+HhrgS9MGVT6NQHrtNXoMUUy8KMBlVZ64S+F1TM5GaoemA==
-X-Received: by 2002:a63:ef50:: with SMTP id c16mr711567pgk.3.1550786789525;
- Thu, 21 Feb 2019 14:06:29 -0800 (PST)
-Received: from ?IPv6:2600:1010:b016:9155:d0fd:1b5f:8b43:47e6?
- ([2600:1010:b016:9155:d0fd:1b5f:8b43:47e6])
- by smtp.gmail.com with ESMTPSA id q28sm28508pgl.35.2019.02.21.14.06.27
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=9wFanjEpOf9wRJE/2TXoK6Nd5+iJk15E6QWBJw3RQRU=;
+ b=ZfxORQIU9LAzPP0FoK+L/4NIMCgC86HMXrJTlddiUzZu0fwWgjotf642MyJviiX0zO
+ WBm32byhK7ocPUHaGSEDXNQ4ekZj20N5bynMD0mY2P2AyoiM0Gzfqb9rtmFi0Uw+KvyB
+ E5wnfv2RMZ7LUVTOmHMK7NTiJ8VmgdI8LKfupWHmpGL0p6NCHxe1AOLz0JiK9U/yQA4A
+ zo2s9f6N005djfhaH8uAsIxqgpYGA62Z5DhiaBsang+nRD8VOtJQF5BgvSX23yuvATne
+ gZSRSmTW8aMSyU1eau3fSJNucRhtGR1cF/nWtY/2LMgfM1krwGjOyI632zxHqCtL06ec
+ oGhQ==
+X-Gm-Message-State: AHQUAuYLSW2kUgP4iiDULB7hf2pNLT4F/tDtnbjpmnFeqjkt8yc3CI2Y
+ 2biOVi8PMJPtbluoHP6XKw9Nc84BIdo=
+X-Google-Smtp-Source: AHgI3IYQL0S+cV5XimjHCtfTsuW0Szbg9sn0wkj/fcFqBZaqoEukCYtxmVL8zg+hbkQ9yBX6R8NkVQ==
+X-Received: by 2002:ac2:52ad:: with SMTP id r13mr398171lfm.50.1550786909831;
+ Thu, 21 Feb 2019 14:08:29 -0800 (PST)
+Received: from mail-lf1-f47.google.com (mail-lf1-f47.google.com.
+ [209.85.167.47])
+ by smtp.gmail.com with ESMTPSA id q123-v6sm10941ljb.60.2019.02.21.14.08.28
+ for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 14:06:28 -0800 (PST)
-Mime-Version: 1.0 (1.0)
-Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
-From: Andy Lutomirski <luto@amacapital.net>
-X-Mailer: iPhone Mail (16D57)
-In-Reply-To: <20190221124629.GA12696@fuggles.cambridge.arm.com>
-Date: Thu, 21 Feb 2019 14:06:26 -0800
-Message-Id: <43ED7513-6A7E-45BC-973A-4EB6DB8E5505@amacapital.net>
-References: <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
+ Thu, 21 Feb 2019 14:08:28 -0800 (PST)
+Received: by mail-lf1-f47.google.com with SMTP id q12so151869lfm.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 21 Feb 2019 14:08:28 -0800 (PST)
+X-Received: by 2002:a19:24d5:: with SMTP id k204mr405084lfk.88.1550786907565; 
+ Thu, 21 Feb 2019 14:08:27 -0800 (PST)
+MIME-Version: 1.0
+References: <20190213144145.GY32494@hirez.programming.kicks-ass.net>
+ <20190213154532.GQ32534@hirez.programming.kicks-ass.net>
+ <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
  <20190213222146.GC32494@hirez.programming.kicks-ass.net>
  <D3E1B64D-3E91-4A82-9C3B-92D9EB7326CE@amacapital.net>
  <20190214101429.GD32494@hirez.programming.kicks-ass.net>
@@ -90,11 +88,18 @@ References: <D61C430D-4321-4114-AB85-671A3C7B8EAE@amacapital.net>
  <20190219090409.GW32494@hirez.programming.kicks-ass.net>
  <20190219124808.GG8501@fuggles.cambridge.arm.com>
  <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
- <20190221124629.GA12696@fuggles.cambridge.arm.com>
-To: Will Deacon <will.deacon@arm.com>
+ <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
+ <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
+In-Reply-To: <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Thu, 21 Feb 2019 14:08:11 -0800
+X-Gmail-Original-Message-ID: <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
+Message-ID: <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
+Subject: Re: [PATCH] sched/x86: Save [ER]FLAGS on context switch
+To: Thomas Gleixner <tglx@linutronix.de>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_140631_029708_54FEB74F 
-X-CRM114-Status: GOOD (  14.78  )
+X-CRM114-CacheID: sfid-20190221_140833_387139_25F94B98 
+X-CRM114-Status: GOOD (  14.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,44 +111,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dvlasenk@redhat.com, brgerst@gmail.com,
- Julien Thierry <julien.thierry@arm.com>, Peter Zijlstra <peterz@infradead.org>,
- catalin.marinas@arm.com, jpoimboe@redhat.com, linux-kernel@vger.kernel.org,
- valentin.schneider@arm.com, mingo@redhat.com, james.morse@arm.com,
- luto@kernel.org, "H. Peter Anvin" <hpa@zytor.com>, bp@alien8.de,
- tglx@linutronix.de, torvalds@linux-foundation.org,
- Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: Josh Poimboeuf <jpoimboe@redhat.com>, Denys Vlasenko <dvlasenk@redhat.com>,
+ Brian Gerst <brgerst@gmail.com>, Julien Thierry <julien.thierry@arm.com>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
+ Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
+ James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
+ "H. Peter Anvin" <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
+ Ingo Molnar <mingo@kernel.org>,
+ "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Thu, Feb 21, 2019 at 1:35 PM Thomas Gleixner <tglx@linutronix.de> wrote:
+>
+> IMNSHO any call inside a AC region is a bug lurking round the corner. The
+> only thing which is tolerable is an exception of some sort.
+>
+> Enforce that with objtool. End of story.
 
+Not quite that simple.
 
+There are some use cases where you really do want a call - albeit to
+special functions - inside the AC region.
 
-> On Feb 21, 2019, at 4:46 AM, Will Deacon <will.deacon@arm.com> wrote:
-> 
->> On Wed, Feb 20, 2019 at 02:55:59PM -0800, H. Peter Anvin wrote:
->>> On 2/19/19 4:48 AM, Will Deacon wrote:
->>> 
->>> I think you'll still hate this, but could we not disable preemption during
->>> the uaccess-enabled region, re-enabling it on the fault path after we've
->>> toggled uaccess off and disable it again when we return back to the
->>> uaccess-enabled region? Doesn't help with tracing, but it should at least
->>> handle the common case.
->>> 
->> 
->> There is a worse problem with this, I still realize: this would mean blocking
->> preemption across what could possibly be a *very* large copy_from_user(), for
->> example.
-> 
-> I don't think it's legitimate to call copy_{to,from}_user() inside a
-> user_access_{begin,end} region. You'd need to add some unsafe variants,
-> which could periodically disable uaccess and call cond_resched() inside
-> the loop to avoid the problem you're eluding to.
-> 
+The prime example of this is likely "filldir()" in fs/readdir.c, which
+is actually somewhat important for some loads (eg samba).
 
-Definitely not safe. On x86 they do CLAC and everything breaks.
+And the whole AC thing made it horribly horribly slow because readdir
+is one of those things that doesn't just copy one value (or one
+structure) to user space, but writes several different things.
+
+Kind of like signal frame setup does.
+
+You may not realize that right now signal frame setup *does* actually
+do a call with AC set. See ia32_setup_rt_frame() that does
+
+        put_user_try {
+...
+                compat_save_altstack_ex(&frame->uc.uc_stack, regs->sp);
+...
+        } put_user_catch(err);
+
+is a macro, but inside that macro is a call to sas_ss_reset().
+
+Now, that is an inline function, so it hopefully doesn't actually
+cause a call. But it's "only" an inline function, not "always_inline".
+We did already have (and I rejected, for now) patches that made those
+inlines not very strong...
+
+[ Side note: currently signal frame setup uses the absolutely
+*disgusting* put_user_ex() thing, but that's actually what
+unsafe_put_user() was designed for. I just never got around to getting
+rid of the nasty hot mess of put_user_ex() ]
+
+Anyway, while signal frame setup just writes individual values,
+"filldir()" does *both* several individual values _and_ does a
+copy_to_user().
+
+And it's that "copy_to_user()" that I want to eventually change to a
+"unsafe_copy_to_user()", along with making the individual values be
+written with unsafe_put_user().
+
+Right now "filldir()" messes with AC a total of *six* times. It sets
+four field values, and then does a "copy_to_user()", all of which
+set/clear AC right now. It's wasting hundreds of cycles on this,
+because AC is so slow to set/clear.
+
+If AC was cheap, this wouldn't be much of an issue. But AC is really
+really expensive. I think it's microcode and serializes the pipeline
+or something.
+
+Anyway. We already have a possible call site, and there are good
+reasons for future ones too. But they are hopefully all very
+controlled.
+
+                 Linus
+
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
