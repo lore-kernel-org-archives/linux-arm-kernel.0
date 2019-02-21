@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DA88EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:37:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 98A58C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:38:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A55B42086C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:37:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 656282086C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 11:38:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X0N3Ames";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="rJu6yynL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A55B42086C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t98TJFKe"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 656282086C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,55 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=A1z+EKMEpEJidP4DymUhGYM8k8DCmV4rRhfVRwi/F3g=; b=X0N3Ames7N4p4e
-	OMPh1k5mEXiwjw/l+tviu5/EVwSAPjbmrNQgEm8IHhlOk4N3E5aAd5L18H14C1TLSW1zmhvNdFlaL
-	cWYuTsYA0cTnzXz9eqwChPtafH9PJvczaO+1a99Clyqyjb3tT52TzhKrueJy4Y233xmkcbLjj5AKb
-	EVdxKZNiQTb2Mhf2bj4USMgIaIBwRYRRyaOK3HtwCUnwY3riRTYIPIwKTy/S9su/CLkR/T3ooRGU0
-	KcVseHnnN/eXpCDkGE8ItUGH2hjJU4ABpIBOxawdn0g7ICLSMLJnGjCKTh+rmfF/HaypIMKNliIIq
-	ULpPkGiy1sSc1OS+E46A==;
+	List-Owner; bh=MBLB+1ZaNNaSneVsAzG1+aTo2BhLaiQY9K+3a0umNrI=; b=t98TJFKeNFr05f
+	3k0ry9Vin5fSAMWcFMAzvXkrot/Z0t0xFlQsl5hIfxuyWGn0fMuuZDlTtqHY85TDS9FdA8NUaeFEx
+	0eSNBrlGQm6gnkqE3o2/7iK3aZYxcCwr24DinXmmVxLJVO/G/qmyNXqz5C+DY/X5scZP8kTk/3ZkO
+	W5lOa/nfzNEWPqe1Y4EB1H/7vQu5oDZT8ksbVaafdi/+ThLOHyqW8wfTUt098eu2d7UkwpR8ckX9w
+	sKnSbNEpLnHlfafUIMrbVVvyo2s+P/vG1A0pdMsnX34YEWn+WwkjohJRPHOlNWUV+EqoF9yzUqb2k
+	wdgsTksSECHqyG7kVTdg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwmf5-0006Ix-KW; Thu, 21 Feb 2019 11:37:07 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwme1-0004uJ-4e
- for linux-arm-kernel@bombadil.infradead.org; Thu, 21 Feb 2019 11:36:01 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=A6FWLpEKbC8B3Rr+irQKv2sIC2Ggbgddq6ZimVEhPUk=; b=rJu6yynL/mVYVCTw7r2SS52HF3
- oLNY6lE00iGRzuvn+Xp6IWb9dLWgG177/NfBNTwR9zYS3+oWfbbGnQTeE9BpXSlGmJTrmC3MHvcQ3
- H7uLdeB6V+rZgIzP8VMr9ZbT/XaUJGzgtModqpPovZ7xnt111cyYmTPrFAw8xYISG443SDswGqviy
- wrhzhQjaXjor3ZeaaXMponDGuDImObxLgFMh48SqpsAR6e2Si99LAhVf1c2zX48oavpVW5NTEY1II
- 4lAJSXUABFiVsHHiK9k0o0U9EZOqxY9TaBw8FV4TK0CH9YEPkNKPWgkboAtZedk2TjTGPimUPJuX6
- CZFTYOUQ==;
+	id 1gwmfv-0006oS-E5; Thu, 21 Feb 2019 11:37:59 +0000
 Received: from foss.arm.com ([217.140.101.70])
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwmdx-0008HB-UC
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 11:35:59 +0000
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gwme1-0004uW-Mh
+ for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 11:36:06 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B9D1A1715;
- Thu, 21 Feb 2019 03:35:53 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 58B7480D;
+ Thu, 21 Feb 2019 03:36:01 -0800 (PST)
 Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
  [10.1.196.69])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 397C03F5C1;
- Thu, 21 Feb 2019 03:35:50 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CB4BF3F5C1;
+ Thu, 21 Feb 2019 03:35:57 -0800 (PST)
 From: Steven Price <steven.price@arm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v2 10/13] x86/mm+efi: Convert ptdump_walk_pgd_level() to take
- a mm_struct
-Date: Thu, 21 Feb 2019 11:34:59 +0000
-Message-Id: <20190221113502.54153-11-steven.price@arm.com>
+Subject: [PATCH v2 12/13] x86/mm: Convert ptdump_walk_pgd_level_core() to take
+ an mm_struct
+Date: Thu, 21 Feb 2019 11:35:01 +0000
+Message-Id: <20190221113502.54153-13-steven.price@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190221113502.54153-1-steven.price@arm.com>
 References: <20190221113502.54153-1-steven.price@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_063558_132512_ACEF9E51 
-X-CRM114-Status: GOOD (  15.78  )
+X-CRM114-CacheID: sfid-20190221_033601_763929_72B6056E 
+X-CRM114-Status: GOOD (  15.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,78 +85,114 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-To enable x86 to use the generic walk_page_range() function, the
-callers of ptdump_walk_pgd_level() need to pass an mm_struct rather
-than the raw pgd_t pointer. Luckily since commit 7e904a91bf60
-("efi: Use efi_mm in x86 as well as ARM") we now have an mm_struct
-for EFI on x86.
+An mm_struct is needed to enable x86 to use of the generic
+walk_page_range() function.
+
+In the case of walking the user page tables (when
+CONFIG_PAGE_TABLE_ISOLATION is enabled), it is necessary to create a
+fake_mm structure because there isn't an mm_struct with a pointer
+to the pgd of the user page tables. This fake_mm structure is
+initialised with the minimum necessary for the generic page walk code.
 
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/x86/include/asm/pgtable.h | 2 +-
- arch/x86/mm/dump_pagetables.c  | 4 ++--
- arch/x86/platform/efi/efi_32.c | 2 +-
- arch/x86/platform/efi/efi_64.c | 4 ++--
- 4 files changed, 6 insertions(+), 6 deletions(-)
+ arch/x86/mm/dump_pagetables.c | 36 ++++++++++++++++++++---------------
+ 1 file changed, 21 insertions(+), 15 deletions(-)
 
-diff --git a/arch/x86/include/asm/pgtable.h b/arch/x86/include/asm/pgtable.h
-index 3695f6acb6af..371901283d5f 100644
---- a/arch/x86/include/asm/pgtable.h
-+++ b/arch/x86/include/asm/pgtable.h
-@@ -27,7 +27,7 @@
- extern pgd_t early_top_pgt[PTRS_PER_PGD];
- int __init __early_make_pgtable(unsigned long address, pmdval_t pmd);
- 
--void ptdump_walk_pgd_level(struct seq_file *m, pgd_t *pgd);
-+void ptdump_walk_pgd_level(struct seq_file *m, struct mm_struct *mm);
- void ptdump_walk_pgd_level_debugfs(struct seq_file *m, pgd_t *pgd, bool user);
- void ptdump_walk_pgd_level_checkwx(void);
- void ptdump_walk_user_pgd_level_checkwx(void);
 diff --git a/arch/x86/mm/dump_pagetables.c b/arch/x86/mm/dump_pagetables.c
-index b1b86157d456..07f62d5517da 100644
+index 8b457a65ad8e..0953bf44d792 100644
 --- a/arch/x86/mm/dump_pagetables.c
 +++ b/arch/x86/mm/dump_pagetables.c
-@@ -575,9 +575,9 @@ static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
- 		pr_info("x86/mm: Checked W+X mappings: passed, no W+X pages found.\n");
- }
+@@ -111,8 +111,6 @@ static struct addr_marker address_markers[] = {
+ 	[END_OF_SPACE_NR]	= { -1,			NULL }
+ };
  
--void ptdump_walk_pgd_level(struct seq_file *m, pgd_t *pgd)
-+void ptdump_walk_pgd_level(struct seq_file *m, struct mm_struct *mm)
- {
--	ptdump_walk_pgd_level_core(m, pgd, false, true);
-+	ptdump_walk_pgd_level_core(m, mm->pgd, false, true);
- }
+-#define INIT_PGD	((pgd_t *) &init_top_pgt)
+-
+ #else /* CONFIG_X86_64 */
  
- void ptdump_walk_pgd_level_debugfs(struct seq_file *m, pgd_t *pgd, bool user)
-diff --git a/arch/x86/platform/efi/efi_32.c b/arch/x86/platform/efi/efi_32.c
-index 9959657127f4..9175ceaa6e72 100644
---- a/arch/x86/platform/efi/efi_32.c
-+++ b/arch/x86/platform/efi/efi_32.c
-@@ -49,7 +49,7 @@ void efi_sync_low_kernel_mappings(void) {}
- void __init efi_dump_pagetable(void)
- {
- #ifdef CONFIG_EFI_PGT_DUMP
--	ptdump_walk_pgd_level(NULL, swapper_pg_dir);
-+	ptdump_walk_pgd_level(NULL, init_mm);
+ enum address_markers_idx {
+@@ -147,8 +145,6 @@ static struct addr_marker address_markers[] = {
+ 	[END_OF_SPACE_NR]	= { -1,			NULL }
+ };
+ 
+-#define INIT_PGD	(swapper_pg_dir)
+-
+ #endif /* !CONFIG_X86_64 */
+ 
+ /* Multipliers for offsets within the PTEs */
+@@ -523,10 +519,10 @@ static inline bool is_hypervisor_range(int idx)
  #endif
  }
  
-diff --git a/arch/x86/platform/efi/efi_64.c b/arch/x86/platform/efi/efi_64.c
-index cf0347f61b21..a2e0f9800190 100644
---- a/arch/x86/platform/efi/efi_64.c
-+++ b/arch/x86/platform/efi/efi_64.c
-@@ -611,9 +611,9 @@ void __init efi_dump_pagetable(void)
+-static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
++static void ptdump_walk_pgd_level_core(struct seq_file *m, struct mm_struct *mm,
+ 				       bool checkwx, bool dmesg)
  {
- #ifdef CONFIG_EFI_PGT_DUMP
- 	if (efi_enabled(EFI_OLD_MEMMAP))
--		ptdump_walk_pgd_level(NULL, swapper_pg_dir);
-+		ptdump_walk_pgd_level(NULL, init_mm);
- 	else
--		ptdump_walk_pgd_level(NULL, efi_mm.pgd);
-+		ptdump_walk_pgd_level(NULL, efi_mm);
+-	pgd_t *start = pgd;
++	pgd_t *start = mm->pgd;
+ 	pgprotval_t prot, eff;
+ 	int i;
+ 	struct pg_state st = {};
+@@ -573,39 +569,49 @@ static void ptdump_walk_pgd_level_core(struct seq_file *m, pgd_t *pgd,
+ 
+ void ptdump_walk_pgd_level(struct seq_file *m, struct mm_struct *mm)
+ {
+-	ptdump_walk_pgd_level_core(m, mm->pgd, false, true);
++	ptdump_walk_pgd_level_core(m, mm, false, true);
+ }
+ 
++#ifdef CONFIG_PAGE_TABLE_ISOLATION
++static void ptdump_walk_pgd_level_user_core(struct seq_file *m,
++					    struct mm_struct *mm,
++					    bool checkwx, bool dmesg)
++{
++	struct mm_struct fake_mm = {
++		.pgd = kernel_to_user_pgdp(mm->pgd)
++	};
++	init_rwsem(&fake_mm.mmap_sem);
++	ptdump_walk_pgd_level_core(m, &fake_mm, checkwx, dmesg);
++}
++#endif
++
+ void ptdump_walk_pgd_level_debugfs(struct seq_file *m, struct mm_struct *mm,
+ 				   bool user)
+ {
+-	pgd_t *pgd = mm->pgd;
+ #ifdef CONFIG_PAGE_TABLE_ISOLATION
+ 	if (user && static_cpu_has(X86_FEATURE_PTI))
+-		pgd = kernel_to_user_pgdp(pgd);
++		ptdump_walk_pgd_level_user_core(m, mm, false, false);
++	else
+ #endif
+-	ptdump_walk_pgd_level_core(m, pgd, false, false);
++		ptdump_walk_pgd_level_core(m, mm, false, false);
+ }
+ EXPORT_SYMBOL_GPL(ptdump_walk_pgd_level_debugfs);
+ 
+ void ptdump_walk_user_pgd_level_checkwx(void)
+ {
+ #ifdef CONFIG_PAGE_TABLE_ISOLATION
+-	pgd_t *pgd = INIT_PGD;
+-
+ 	if (!(__supported_pte_mask & _PAGE_NX) ||
+ 	    !static_cpu_has(X86_FEATURE_PTI))
+ 		return;
+ 
+ 	pr_info("x86/mm: Checking user space page tables\n");
+-	pgd = kernel_to_user_pgdp(pgd);
+-	ptdump_walk_pgd_level_core(NULL, pgd, true, false);
++	ptdump_walk_pgd_level_user_core(NULL, &init_mm, true, false);
  #endif
  }
  
+ void ptdump_walk_pgd_level_checkwx(void)
+ {
+-	ptdump_walk_pgd_level_core(NULL, INIT_PGD, true, false);
++	ptdump_walk_pgd_level_core(NULL, &init_mm, true, false);
+ }
+ 
+ static int __init pt_dump_init(void)
 -- 
 2.20.1
 
