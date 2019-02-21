@@ -2,94 +2,187 @@ Return-Path: <SRS0=b3e6=Q4=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 21FC9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:21:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E632BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:22:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E49F82070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:21:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B13DB206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 21 Feb 2019 14:22:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BFyCxlr/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=shutemov-name.20150623.gappssmtp.com header.i=@shutemov-name.20150623.gappssmtp.com header.b="si2bkdMJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E49F82070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=shutemov.name
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VN/5qk5e";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="DUTStqIG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B13DB206A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tWiu7LeSRDIMYUE/nnvnI7l8lDvQe3Oskt/2JnY9zdc=; b=BFyCxlr/4Wxb+T
-	a5vmTbO+pwYB7GXubIWquJnx0tN6ZHz/Jf1ifu5av0JB06mZ9eZB1weSei2KfwY/2ULxa1VBRGQHH
-	E3nbld0I93+VLgqQsZhfgTHtpL14Q6U6hmF4+nHfGnf+fAA71cFiSlFRCyiInl7dENGIYd1+6G5Fu
-	O07mK2ImDbIBl6gJD2K6+MApAbfvTokvw1eoPU0wvILk1F7rWf2ftuOpgsr5odUgT2jC+gwMN0exe
-	48rMkQm5pVHy2l2PP3qWnAl2qZF69AyR6bA/fIfAdODxi53dFx/GesDuLG9Yk6aoAc/IRAo6MV9Lr
-	NX9dR1nL7CKUQ1DyQ4bA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=wDDjlsd6+7ZpSOxt5EElP1ylynGPLPhyWauBovSb5JA=; b=VN/5qk5ebRPrTF
+	tefln9NBhjXZ/S/LZ6MHXSAeZ3z8K2XNsC46IFfiqRy3RUnbi8YzJSUj3COsZbegnmxwTdR/bDWeT
+	FS/FgDjjm2Yok6spsbPvi+9ecSKwrvycy+UzrZVDNRIH5kigPCnZtQUqyJ6mLHt5vKIJ6nu8lcgyy
+	pDDHDJdNcxrBf8Nn5MDvVoRyyZ8zwi3VCCDNtDYbvbJ8Oh9IGHddKDKRAwLSLv2qrCn7QkUUxwfMH
+	M9V3n47SpZBcpfejzMXf/PNXO/ZKfTwyAGCrnRMd9oBdxHIsPdGQFplIq5W0yXzaZBrHGqUJumB3D
+	QorYQTNqaSgsFN09S/Xw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwpEH-0004KT-7F; Thu, 21 Feb 2019 14:21:37 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gwpEw-0004d6-U6; Thu, 21 Feb 2019 14:22:18 +0000
+Received: from mail-ed1-x543.google.com ([2a00:1450:4864:20::543])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwpEC-0004Ip-UI
- for linux-arm-kernel@lists.infradead.org; Thu, 21 Feb 2019 14:21:35 +0000
-Received: by mail-pg1-x544.google.com with SMTP id j3so104614pgm.11
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 06:21:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=shutemov-name.20150623.gappssmtp.com; s=20150623;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=iI1RJ0SSXxDh0vlZLQrOFO/u2FUJ4ENpS3Ludw9bPw8=;
- b=si2bkdMJebBvPM0GwIvEO3/Amyao38zKAiijR3TpjprMmoqFKum3Njget2unbrFOug
- Ga5QS8HL9rNhN0+nYuT7Z1Uu30vuTxz/7QrYSi00fO0cXe2GxPw1/zwMWmVyWJcYa23o
- f+J45gf8vblmxl80YXo1DP1ukP8rOkDYFLlVRZ93Vepj3O8V/WlhKysqFYJtQLEkXXvu
- Oh7ZRasJOIPvqvl9oLSXVqrMRxLiDcJW4Jr6wY7G8ezbvntovYIWEP4ik7Idb5ominp4
- 8zG9C/Wqm3T7mqY/Z7xn00SZ3SrtBhrBwMG6aS/sCofVD/oqCyNYjTc3pB0OZzOpXqXf
- 7Dtg==
+ id 1gwpEt-0004c6-BO; Thu, 21 Feb 2019 14:22:16 +0000
+Received: by mail-ed1-x543.google.com with SMTP id f2so23236141edy.13;
+ Thu, 21 Feb 2019 06:22:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=b/3O7L9z/7EBvbyIw1CiiH9sq1gMMKclwJnG4Kg9SqQ=;
+ b=DUTStqIGjqQXkWWDtOoj9bxo8GTXRgh22iy8eNUItuV4dTH8evs5UDtxili7PXE31D
+ UfaGlPi1sZiZrb1RBsgakPsUR0VV18n/0jFokZRRDeNgFrxqQLqMQIhYwb2LYtxlcpvd
+ 7o1Zj4sqKxIBvjf3bO/qQulo9BXKhy17pB0sNOKtzURdcz2vEvbB/Apg+eMWU/xsEpTl
+ pyQBNHfsQoiLLcFG+ASEvRwJ5y/PsZfvb5RO0PYjw0pTdqdTDVgC67lbfEkas4de81Yp
+ /cYOld9UmC+Q8osGP4gfKMOXWqeKJxQ5EOZltB0Zv09hMUSidez+Sv+ZgowZHxEU6ZEI
+ L8Tw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=iI1RJ0SSXxDh0vlZLQrOFO/u2FUJ4ENpS3Ludw9bPw8=;
- b=WiuQl+5ITM3NZ4s0r1ywINFyH1G/TJNK4UVjWQlLb7uchfNTNiBN/TM38ZesRjgMfg
- fl0kpL2PHf2ZT3PdhHPaeeZlIBwZmwC3Ui7AJFAe4ZU1Mw3eu4nhJ2dHAyIALF+S4GQW
- XkDeHi8oZ74PBTHiA3HSBNBxRSPyU46zDwcQb5ARjXEn6qt0YLGTsMRT+riqww5OoXXC
- sdlbStR67eljsQ/VMBbeC0bX6ToiAAPpif+qWlMMSmO4X8GYgjYohjMs7TU1yAmH0gaa
- sGQl/80cZ+KUxtleedGGd6wmUkUeadzTyfP0z77jdD0udoClQENpARzovKzsmOf/ElHR
- dJVA==
-X-Gm-Message-State: AHQUAuaexPPFpx0VBDh1TYeCMGwdtxor8DGSMeCTgQyklPZkTOlK2XBn
- rt3SPxtF6NnwcNqdnsNMI/biFWJqelBXgQ==
-X-Google-Smtp-Source: AHgI3IZIRxhWmHk+uI4fyRE/obuhbmXUG2L9nLu0JhpIBnQ04LtmbdtCF/YGn8UplGAT9XruNQ0UOA==
-X-Received: by 2002:a63:68c9:: with SMTP id
- d192mr35656895pgc.264.1550758891142; 
- Thu, 21 Feb 2019 06:21:31 -0800 (PST)
-Received: from kshutemo-mobl1.localdomain ([192.55.54.44])
- by smtp.gmail.com with ESMTPSA id o2sm31440498pfa.76.2019.02.21.06.21.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 06:21:30 -0800 (PST)
-Received: by kshutemo-mobl1.localdomain (Postfix, from userid 1000)
- id 662E6301708; Thu, 21 Feb 2019 17:21:26 +0300 (+03)
-Date: Thu, 21 Feb 2019 17:21:26 +0300
-From: "Kirill A. Shutemov" <kirill@shutemov.name>
-To: Steven Price <steven.price@arm.com>
-Subject: Re: [PATCH v2 02/13] x86/mm: Add p?d_large() definitions
-Message-ID: <20190221142126.k54vqaacrc2ekeff@kshutemo-mobl1>
-References: <20190221113502.54153-1-steven.price@arm.com>
- <20190221113502.54153-3-steven.price@arm.com>
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=b/3O7L9z/7EBvbyIw1CiiH9sq1gMMKclwJnG4Kg9SqQ=;
+ b=b5uaicSe1qkHMXxB4p3MOAjfwfG5xihviszR+glzwciasEbpPuobujmjzlVuWFTrhC
+ 7ffwHfWeevCPJzOflXfjeEaSL2wU2eemB2xP4gl44Z/xRbVLiJhrSb35+R6PoDrOCzYy
+ uNDyja4ta6rZBGIe1Ix1Wl72PD13/MEm6w7yqCU8nQkGvjbbrSp2DAR9L4/o1JmazEa0
+ 2+aEFVI0siLB+2lRWb6xSe5XUat5QRgjgNaSBQtbF1OFCW083Mk/iC+PlI19QPkFLx9b
+ A81YsPq9akM6PHR+/y++MTPsAe9xDe31z4/1QMYqYjUrP7ITToGLp0Nk3z9Kt2Cy7HX2
+ bNJA==
+X-Gm-Message-State: AHQUAuZ5Uvhxu407JwPrBH3JDY175ybyrvlQCuhcXwq2R4ollmBRrS9d
+ VcBJF3GdmjhdI5SS585N+A7/d+S3
+X-Google-Smtp-Source: AHgI3Ib6Bilp8yj80qX6uFGUrUYkT1DnZPO3Lbqpr8QyVN4hfEgGyqP2PYnSVkGv8QXSOfsO2DaaIw==
+X-Received: by 2002:a50:eb83:: with SMTP id y3mr9002055edr.222.1550758932948; 
+ Thu, 21 Feb 2019 06:22:12 -0800 (PST)
+Received: from ziggy.stardust ([37.223.146.9])
+ by smtp.gmail.com with ESMTPSA id g18sm6716001edh.39.2019.02.21.06.22.10
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Thu, 21 Feb 2019 06:22:11 -0800 (PST)
+Subject: Re: [PATCH v4 2/3] dt-bindings: i2c: Add Mediatek MT8183 i2c binding
+To: Qii Wang <qii.wang@mediatek.com>
+References: <1550666030-30211-1-git-send-email-qii.wang@mediatek.com>
+ <1550666030-30211-3-git-send-email-qii.wang@mediatek.com>
+ <e9d544c8-576d-f52c-d805-90d695b7ed46@gmail.com>
+ <1550755929.30363.26.camel@mhfsdcap03>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <5fec5fcb-95c5-e7f0-9cf3-d2a6d35b3dfd@gmail.com>
+Date: Thu, 21 Feb 2019 15:22:09 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190221113502.54153-3-steven.price@arm.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <1550755929.30363.26.camel@mhfsdcap03>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_062133_018286_B7CB3B14 
-X-CRM114-Status: GOOD (  17.55  )
+X-CRM114-CacheID: sfid-20190221_062215_395528_A2669D0F 
+X-CRM114-Status: GOOD (  18.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,65 +194,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
- Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, linux-mm@kvack.org,
- =?utf-8?B?SsOpcsO0bWU=?= Glisse <jglisse@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
+Cc: linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
+ srv_heupstream@mediatek.com, robh@kernel.org, leilk.liu@mediatek.com,
+ wsa@the-dreams.de, linux-kernel@vger.kernel.org, liguo.zhang@mediatek.com,
+ linux-mediatek@lists.infradead.org, linux-i2c@vger.kernel.org,
+ xinping.qian@mediatek.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 11:34:51AM +0000, Steven Price wrote:
-> Exposing the pud/pgd levels of the page tables to walk_page_range() means
-> we may come across the exotic large mappings that come with large areas
-> of contiguous memory (such as the kernel's linear map).
-> 
-> Expose p?d_large() from each architecture to detect these large mappings.
-> 
-> x86 already has these defined as inline functions, add a macro of the
-> same name so we don't end up with the generic version too.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Signed-off-by: Steven Price <steven.price@arm.com>
-> ---
->  arch/x86/include/asm/pgtable.h | 3 +++
->  arch/x86/mm/dump_pagetables.c  | 3 +++
->  2 files changed, 6 insertions(+)
-> 
-> diff --git a/arch/x86/include/asm/pgtable.h b/arch/x86/include/asm/pgtable.h
-> index 2779ace16d23..3695f6acb6af 100644
-> --- a/arch/x86/include/asm/pgtable.h
-> +++ b/arch/x86/include/asm/pgtable.h
-> @@ -234,6 +234,7 @@ static inline int pmd_large(pmd_t pte)
->  {
->  	return pmd_flags(pte) & _PAGE_PSE;
->  }
-> +#define pmd_large(x)	pmd_large(x)
->  
->  #ifdef CONFIG_TRANSPARENT_HUGEPAGE
->  static inline int pmd_trans_huge(pmd_t pmd)
-> @@ -873,6 +874,7 @@ static inline int pud_large(pud_t pud)
->  	return 0;
->  }
->  #endif	/* CONFIG_PGTABLE_LEVELS > 2 */
-> +#define pud_large(x)	pud_large(x)
 
-Nit: we usually do this in form of
 
-#define pud_large pud_large
+On 21/02/2019 14:32, Qii Wang wrote:
+> On Wed, 2019-02-20 at 16:25 +0100, Matthias Brugger wrote:
+>>
+>> On 20/02/2019 13:33, Qii Wang wrote:
+>>> Add MT8183 i2c binding to binding file. Compare to MT2712 i2c
+>>> controller, MT8183 has different registers, offsets, and clock.
+>>>
+>>> Signed-off-by: Qii Wang <qii.wang@mediatek.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/i2c/i2c-mtk.txt |    5 +++--
+>>>  1 file changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+>>> index ee4c324..da2fa60 100644
+>>> --- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+>>> +++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+>>> @@ -12,14 +12,15 @@ Required properties:
+>>>        "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for MediaTek MT7623
+>>>        "mediatek,mt7629-i2c", "mediatek,mt2712-i2c": for MediaTek MT7629
+>>>        "mediatek,mt8173-i2c": for MediaTek MT8173
+>>> +      "mediatek,mt8183-i2c": for MediaTek MT8183
+>>>    - reg: physical base address of the controller and dma base, length of memory
+>>>      mapped region.
+>>>    - interrupts: interrupt number to the cpu.
+>>>    - clock-div: the fixed value for frequency divider of clock source in i2c
+>>>      module. Each IC may be different.
+>>>    - clocks: clock name from clock manager
+>>> -  - clock-names: Must include "main" and "dma", if enable have-pmic need include
+>>> -    "pmic" extra.
+>>> +  - clock-names: Must include "main" and "dma", "arb" is optional, if enable
+>>> +    have-pmic need include "pmic" extra.
+>>
+>> You have to mention that the arb clock is only necessary for mt8183.
+>>
+> 
+> Arb clock is not only necessary for mt8183. When two i2c controllers are
+> internally connected to the same GPIO pins, the arb clock is needed to
+> ensure that the waveforms do not interfere with each other.
+> Maybe ""arb" is for multi-master" is better. Not all i2c controller have
+> multi-master.
+> 
 
-and before body of the inline function.
+Ok, that's value information. I propose to put that into the commit message
+where you add arb clock to the driver.
 
--- 
- Kirill A. Shutemov
+In any case, the binding description should have this information. As you said,
+not all i2c controller have multi-master mode, so we don't need arb clock for
+all controllers.
+
+Regards,
+Matthias
+
+>>>  
+>>>  Optional properties:
+>>>    - clock-frequency: Frequency in Hz of the bus when transfer, the default value
+>>>
+> 
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
