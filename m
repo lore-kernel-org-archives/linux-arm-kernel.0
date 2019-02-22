@@ -2,22 +2,23 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,
+X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B309EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B2E87C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0519D2075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 81D58207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nl58nRay";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="B3gwK58H"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0519D2075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LHrJ2ZQr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="N/CagzxO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81D58207E0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +27,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m/r7aNJK/X5QfcQUeerfK9FbOtRb1CUCDWfee3Cmabk=; b=Nl58nRayk+H8RB
-	KMi9n9tbdhcwsMTGkrwrjtzt2erC0lHICS3BZHfhnZcHbGzbBOrJy/ouJkMgmwitQ8/zJ3OFkBwJo
-	jGEVZxtkWvZdtStIII2nP5nJyPLLbZ0EVxyAYh+m0LZYGKtCutQPIIdywHott+6LpKM6wJ3C04RvL
-	rtaG4SLtLMvrb24VWEijJRDexpbo0kh6n5BrzHT1kemoYz90GuoQEYFA10xMHrMmJV6CZGcGhxeyg
-	CZGWGvMfvlgxSJgrFoDGPmACRjidEnnGaZ3wOPXoUqzfSUKFYu5Gm2sGWFpWPE4kZ0rHogDhQiGge
-	KDy3Q0T+q95c4dCY1Oeg==;
+	List-Owner; bh=Y7tEAtxdLXeGNsl1pL/VmNqBH8kODTSVMqVBq/w1Wq4=; b=LHrJ2ZQritUvf+
+	Joj48QgkQpK5JOpTmk01PNlxpP1qQ93nWtRr8+4GIRb3UWIgnEGOVaM/J1rWVZnT8SOF7JuuhkpDl
+	zdy20+0X5/0lsg+ROCvMvOjXc1JyA79tGcQGJM1N56fIWwqCM1FdeitXCkykFEf3k/s/WRj3nw0EB
+	aYsWa3MWEkmT5c8aznl/cd1ZRK2NCYq5E6PcoIlubJ0+o2x78BpUC53FeY/Nb4mS6/ue97pZ7taZ3
+	zRR4duM+H+W173eH5SglyTh5GgqdZan+xqLK3XRoz1GMTs0EMLU7p96wI84NRaY3oH/fWnzTixCTm
+	HQZ/kj2hNbSGSeRyKJew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxANG-0002VB-TC; Fri, 22 Feb 2019 12:56:18 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gxANU-0002mt-D9; Fri, 22 Feb 2019 12:56:32 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxAKr-0007IU-43
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 12:53:53 +0000
-Received: by mail-wr1-x441.google.com with SMTP id i16so2223906wrs.13
+ id 1gxAKs-0007LY-M4
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 12:53:57 +0000
+Received: by mail-wr1-x443.google.com with SMTP id t18so2276729wrx.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 04:53:48 -0800 (PST)
+ Fri, 22 Feb 2019 04:53:50 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=2tCXxaQ0AcT215cB6TyMBJl5HSukg9TNH5t025IrNLw=;
- b=B3gwK58HnJ85CmTL2efZvH+J/Nm20KCnydLNY0dw7gbtvGIUGcldP8npiWTUpDXgKz
- /u11H7eQqGQOsrUx9Bjjx9CGJcxvqjtgzrsVE+c4Cnr2aH4wSMA3cBw28f4m5dvZcDtW
- dE9QsCl+18tkcm6KtqrSMoS1/n9nvYZMf6UFWkly4U8pHmTr2bgB/2tzCG5OvgHPbq1p
- LygIpIzOhXUWhS3SS/cArJu5XyCYKaSFAA2Xlb21EPCN/ry2nFAF1xMDOUEnala+awoK
- ndjVy074STqch02YUSBKRqql7aX75kVTJAVZrchuqsIoYuA52Cu849nBt6+cAxrGpU8H
- 43FQ==
+ bh=mpZDvMXD49QdxJt8wpvUxUfka//FLmK5Q3bpesHxKPk=;
+ b=N/CagzxODuKekdv/276f71hXtTpFv4KVsTM9wpsQCTigrrhdbo1a8DtexWnL0uLpkO
+ 18omeTVoB8fzJ0j5vhRXb57XZU1dQgAzOHIdQfbKZw9pdxjklam5LDKdghq0pF7kUS4k
+ TSktr+912xlWRX6ndEx5vBw3TcYrt2b8W0OjFZ0QWHqpApAu8Ul9v1iLffz1Em/x0Xya
+ i4dGp/mgL49JMPe5c8rQczRqypr/Nip2+Eha9JF7UL97GTTb+ns7m5QrUYDBTdT9jbCq
+ BDRsMTGNRmV1HHpb/DISeZc2DQhKRnEurBM5elN5TifJa0lXs64tIKkY6Q2oGNBe/Q7A
+ j6NQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=2tCXxaQ0AcT215cB6TyMBJl5HSukg9TNH5t025IrNLw=;
- b=ks4MAaz2vGy/mBQOh5osvQx0KYajklzM+qXJJzo2HiT0AGMIKb91MUizCZ89jQFVNu
- PwRlOKnsrF1yIw0Y0I8Ad/F32pTzTx08At1G0Vea5A77tsCmhsunDRJfyYRYBJ48oCNz
- H9Ex5EPiBnzhCK1zm0HPhJFmNQnnEseiuUjp6vVMY8L7eqUdqNtvVwjXXZXPsqqTf9WS
- KYAIN1QCA3Dhjr1uLiDyx4UEHp8Jq6mLh2LK7CucFKJ0+tVkjnTsNOSOw7s4/Q+jmQBA
- BitRYOgI8+IMMZFU8k3eus3+poPb+c7LrVIpq7V7CV10bavX83s5Ly3ICE55krHJjkAM
- xLMQ==
-X-Gm-Message-State: AHQUAuZpgNtM6ZoqnGdabhzJdmQbBdyfr81p6Y8XpF9m5MLQCEDPdWWE
- V6VCb8Ol1EFpx4VUocmcNiOS3g==
-X-Google-Smtp-Source: AHgI3IYJ4JqjThJgosMpQUX8CWU96fplWtblPpUxW7NKKKm/ffsucHxns87xgSXmASXlP8q7nFWW4A==
-X-Received: by 2002:adf:ed0f:: with SMTP id a15mr2881069wro.249.1550840027447; 
- Fri, 22 Feb 2019 04:53:47 -0800 (PST)
+ bh=mpZDvMXD49QdxJt8wpvUxUfka//FLmK5Q3bpesHxKPk=;
+ b=bEUQl/yJqY71nepu1ia/+YszNb1+cuKIhNxwDHOcFUe26sSobKE+fVtdqfAWid3ZYN
+ L8FbUsr/HYyFqW8j56B6gh7Qj4ejjPKORHUZEaCVg0JmVbGuYanwsLgXaa8/LQBpIEDw
+ o/toV4dZYqS6lCttEZ+TzLg53Gs2N5Hno3ICMqsUf+dKsS3Kt2JWvGL09VNPuEmoWSin
+ fvTcer3E2IVf28nBwTjFs7Kir6VCcmXOX2jiVOV8rmRmNrQOe6S2EaGxxQpLgnhaV2VZ
+ 4pMcEdEhrfLmHLTzpX+nH7IQ29CD+sHx8xRTuDe0oLt/eFcUvFvlGGAfTt6HqUE62HFo
+ NoBA==
+X-Gm-Message-State: AHQUAuY7vfE03MS1Ho/qhG7T9JSP1USvWgiVMylxMO4MnQLuttt+JXXH
+ T4PoUbm3fQJFLlF0eK7hhIAZpA==
+X-Google-Smtp-Source: AHgI3IavQme072cpLVKWYOoRpuCla4tOdeXjezjFtFrbJI9VPdNaXp7MfZlgZAflIs5r0SUzqIri2w==
+X-Received: by 2002:adf:fecd:: with SMTP id q13mr2883485wrs.3.1550840029193;
+ Fri, 22 Feb 2019 04:53:49 -0800 (PST)
 Received: from andreyknvl0.muc.corp.google.com
  ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id o14sm808209wrp.34.2019.02.22.04.53.45
+ by smtp.gmail.com with ESMTPSA id o14sm808209wrp.34.2019.02.22.04.53.47
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 04:53:46 -0800 (PST)
+ Fri, 22 Feb 2019 04:53:48 -0800 (PST)
 From: Andrey Konovalov <andreyknvl@google.com>
 To: Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>,
@@ -86,16 +87,17 @@ To: Catalin Marinas <catalin.marinas@arm.com>,
  linux-arm-kernel@lists.infradead.org, linux-doc@vger.kernel.org,
  linux-mm@kvack.org, linux-arch@vger.kernel.org,
  linux-kselftest@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [PATCH v10 09/12] kernel, arm64: untag user pointers in prctl_set_mm*
-Date: Fri, 22 Feb 2019 13:53:21 +0100
-Message-Id: <d6febfc14cf0190f4ccd84fc1bf9bd077a6d6a9f.1550839937.git.andreyknvl@google.com>
+Subject: [PATCH v10 10/12] tracing,
+ arm64: untag user pointers in seq_print_user_ip
+Date: Fri, 22 Feb 2019 13:53:22 +0100
+Message-Id: <99b59c349ed81d4b204353f54b89f930f01d6ee3.1550839937.git.andreyknvl@google.com>
 X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
 In-Reply-To: <cover.1550839937.git.andreyknvl@google.com>
 References: <cover.1550839937.git.andreyknvl@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_045349_541770_135983F8 
-X-CRM114-Status: GOOD (  11.59  )
+X-CRM114-CacheID: sfid-20190222_045351_155783_F860B9C7 
+X-CRM114-Status: GOOD (  13.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,48 +123,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-prctl_set_mm() and prctl_set_mm_map() use provided user pointers for vma
-lookups, which can only by done with untagged pointers.
+seq_print_user_ip() uses provided user pointers for vma lookups, which
+can only by done with untagged pointers.
 
-Untag user pointers in these functions.
+Untag user pointers in this function.
 
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- kernel/sys.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ kernel/trace/trace_output.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/kernel/sys.c b/kernel/sys.c
-index f7eb62eceb24..12910be94b7f 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -1992,6 +1992,18 @@ static int prctl_set_mm_map(int opt, const void __user *addr, unsigned long data
- 	if (copy_from_user(&prctl_map, addr, sizeof(prctl_map)))
- 		return -EFAULT;
+diff --git a/kernel/trace/trace_output.c b/kernel/trace/trace_output.c
+index 54373d93e251..7c893328f97b 100644
+--- a/kernel/trace/trace_output.c
++++ b/kernel/trace/trace_output.c
+@@ -379,7 +379,7 @@ static int seq_print_user_ip(struct trace_seq *s, struct mm_struct *mm,
+ 		const struct vm_area_struct *vma;
  
-+	prctl_map->start_code	= untagged_addr(prctl_map.start_code);
-+	prctl_map->end_code	= untagged_addr(prctl_map.end_code);
-+	prctl_map->start_data	= untagged_addr(prctl_map.start_data);
-+	prctl_map->end_data	= untagged_addr(prctl_map.end_data);
-+	prctl_map->start_brk	= untagged_addr(prctl_map.start_brk);
-+	prctl_map->brk		= untagged_addr(prctl_map.brk);
-+	prctl_map->start_stack	= untagged_addr(prctl_map.start_stack);
-+	prctl_map->arg_start	= untagged_addr(prctl_map.arg_start);
-+	prctl_map->arg_end	= untagged_addr(prctl_map.arg_end);
-+	prctl_map->env_start	= untagged_addr(prctl_map.env_start);
-+	prctl_map->env_end	= untagged_addr(prctl_map.env_end);
-+
- 	error = validate_prctl_map(&prctl_map);
- 	if (error)
- 		return error;
-@@ -2105,6 +2117,8 @@ static int prctl_set_mm(int opt, unsigned long addr,
- 			      opt != PR_SET_MM_MAP_SIZE)))
- 		return -EINVAL;
- 
-+	addr = untagged_addr(addr);
-+
- #ifdef CONFIG_CHECKPOINT_RESTORE
- 	if (opt == PR_SET_MM_MAP || opt == PR_SET_MM_MAP_SIZE)
- 		return prctl_set_mm_map(opt, (const void __user *)addr, arg4);
+ 		down_read(&mm->mmap_sem);
+-		vma = find_vma(mm, ip);
++		vma = find_vma(mm, untagged_addr(ip));
+ 		if (vma) {
+ 			file = vma->vm_file;
+ 			vmstart = vma->vm_start;
 -- 
 2.21.0.rc0.258.g878e2cd30e-goog
 
