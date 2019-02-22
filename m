@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DB2D6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:55:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AF355C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 97D502075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:55:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 66F072075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 12:56:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uSmpwsb0";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="dFFShaLk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 97D502075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EVmOcAE2";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="mN2rwWcX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 66F072075C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,53 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W+ajrnQ2SXQ9dLD7ouDhl5QX5TpLxmtSXKH6wvTYUAA=; b=uSmpwsb0XOqWXi
-	6FEOGlyE8L99wUGHV3kc7nenSxtQtwvj0v6CRnY1l43GbzsWBfEBUmCzjVYjTxKKoySoMAtSPlpTs
-	dVZk9re64S00dS0VtZ+iqCwfZOTTLJgsHfqxCjwW3EZXm3oS6kCLNPcqBR+EV7e3eH+8JoP0ybfMf
-	QE/4dmtfl831nSgvPJYsf2hTPPpKups8mok8YVpw8GRAuuB21DFuPKeoEOeE3pOaK85yredmBnsAh
-	+zusp7Z0GzDfXyCcIedIryfzSPdjEls3ERgAAre6LDGqKbyTyyWiYRPpjpyk6kANN4tbRgq4Am/Xv
-	dAaSguK8vwLi/ReM00Hg==;
+	List-Owner; bh=9Ke0VwbQ0JM3NSUCyOUsVE1/GahSyRGlJwJBYJbus1s=; b=EVmOcAE27VA6FD
+	A/YQ6s7n1wuWZWGz0G9Hgl6N3Rhw7FR57ozu2oWiIzaPwphkC2MLW7zm0xKUB8nwTfbL0ii1XIeME
+	NGYiwqZRXJGZhl7eGedy7u9VLWmO7ABvjXmV2IUaL4LUhvwsWjM2PLJdBDpZWnabUcXXDLSvrI/+X
+	e3H6DU2SihMQEnOfZRo78sRMGygWRcROI2PNgyz9Hq8W+KAdravqJyJNIcxlHSh3RCILDp6Au6oJ8
+	f+w+w9ZVYuzTv3C2lFBPZuAIrhaGN5LbvFuRjnpxwjZR/xgqYHM2Yfu5ev8Tf1e++ai1McBPXfLJk
+	0OML/KV5NP2+3ByCgG6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxAMW-00020X-Fa; Fri, 22 Feb 2019 12:55:32 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gxANA-0002N1-0L; Fri, 22 Feb 2019 12:56:12 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxAKp-0007FY-6V
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 12:53:52 +0000
-Received: by mail-wr1-x443.google.com with SMTP id l5so2256864wrw.6
+ id 1gxAKf-00072t-BU
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 12:53:38 +0000
+Received: by mail-wr1-x444.google.com with SMTP id n2so2246550wrw.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 04:53:47 -0800 (PST)
+ Fri, 22 Feb 2019 04:53:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=9mSxyMmz1xjHsHJUyT/WYIPnpYi9SCNSb/qUJqV67bQ=;
- b=dFFShaLkfC9Jd78NrGHT6+qV8Fa9yuKItk3VxryuG9FBzLyVutr/noYyEqX9rPsCPB
- 4FR/7879ajA8ORjVk4I07QF8PQLg274w2Q+K0O39R3Ga3Hhea7F4g92KaP8LM4y5+Hso
- eJt1r7agSQJ/Q7Cx/ewAN6NsplIo0lNiUtrymbVmaJov1lsCukOg7OdDCcVG/G6dymSR
- 5NrIRbGPjHAFt0tx/2kWNS9S69vHxnpOLSsET8RPCLmIYV5M4RxLn41hJi0rYK9TmjkN
- 4J4iqkL9iIltHwkRu+ZKdYA7Xy0gQC5aG2HVCItmVD26gYOu7PxGByh9QtCwnvGsjRA4
- qTzA==
+ bh=Cci7ZilHiWLbA64Mc6AMOu/bLCyx/LwY/bSfReud1WI=;
+ b=mN2rwWcXbmXv4T54C8g+dQZceONkqeqfDnfFBkdS/1z2f+11756LZtilFVL9vmN8Ub
+ asXmJYdmjDVQkCK9dtCydjOWxr+KWTUU0EEaMipiA+1WfFsqs10CUXUyp5B+yuljcBc1
+ 0C0tywzNl+KEsDi5E1V9a1Ws2dGSyCYbuw6oXbdAfIH3UZ7l6SUpfEF4GcTbMbPCNeeB
+ Ot4+ZahceUY35FVe2YDPYC6Ax0ARG1yKOQgJNw51FBiolm56hh/XyUho+qccTDZViTri
+ rRytDOGFcggeSEQD/tMlfRQXS2V8i4wpp47+jYCO3tkhuGYSljzEFFfYn0oW2evDAak3
+ 2ugw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=9mSxyMmz1xjHsHJUyT/WYIPnpYi9SCNSb/qUJqV67bQ=;
- b=G0TJkJ2Allf/6DKkiJphILrlycRQ8g/4Wzjss8I8z2N1t/2pwQAxAB55LGux0sYg+U
- NLzGXsNssR8zNynmfkhA/+a71GQ25kUJhmCQF0kTaO01Ee4m11LdED4cXF7yI4oGxH+b
- B2r/x2lyUnF8Etx+PlEgeZ2cwXv3GqsevJFFDzvbnTx8dnCInAdx+UH92RUE2da4FKru
- jJz2Vr/P8TrDcKqcx7Nm31NxMJkq0jmj3O3Evmt2rvKyutkUijhCYdtsPA0tRaHRQLvv
- 8O7xzKQSsrrrMS69kytWZ5QqIUuonwCPvactc3ownY9KrQTy3miWJi6bxmw6IIyKRiQz
- +y6Q==
-X-Gm-Message-State: AHQUAubY2miOoFu24A8uqoWp7DuGs0ddPf0Q4bFsBnWs/f9fdoEtnmIB
- WEJMg6sBUYo5yVzMETbXiqCzQg==
-X-Google-Smtp-Source: AHgI3IYB1rxXC3qLSPjqnlg3vyINEmisEJ9COGx3+BlbVTSYQsvRd/r4g+wzkk/8Tl6H/RsXQOXN5Q==
-X-Received: by 2002:a5d:500c:: with SMTP id e12mr3055201wrt.27.1550840025673; 
- Fri, 22 Feb 2019 04:53:45 -0800 (PST)
+ bh=Cci7ZilHiWLbA64Mc6AMOu/bLCyx/LwY/bSfReud1WI=;
+ b=fekZLtX5LcvwFLQ/whfChilWsH+/7OZb3zgcmbbg/Q2ciJivxldMmzyX8zIFN37ABB
+ IoOiQeUwrDOolLGJQL/OJ/PBnFJIVznDG0pafRTXC25L/hWnRS1Se+jpocSY23XB2Ble
+ 4cN1XglEc8TYQOBFCsZe3HUiruI9pN6Auuqbw903KEhPGe4VEBgRSWR0tnNpvdNZu8rs
+ yiMaKH1AmIVwJ24Vtcw8GZ6CWjZ7U//iiSdLMh61Gj7P4kQRbdbqR3/VrP1xd0kfsAUz
+ 6DqrRR5LNe26Svdb3lrH2t67Bsv3pjzILb/+c0vQVEurFa0v8/5u1zLjINDmMMhKjMuo
+ sB3w==
+X-Gm-Message-State: AHQUAubBteHosI9tiAttKhsekYGBRFP1x89C35qK7tX7rNI+EmoV+/1R
+ TfDd9CNNO9ufQVMtoOAZt0lJZQ==
+X-Google-Smtp-Source: AHgI3IYNE5YTD6dA2Rm0c87bwvFj8qPgC6wZI8wCmOm2tGxzmyo49L1MzMubdg2VCbScaD+W4rhlpw==
+X-Received: by 2002:adf:f6ca:: with SMTP id y10mr2869999wrp.148.1550840011806; 
+ Fri, 22 Feb 2019 04:53:31 -0800 (PST)
 Received: from andreyknvl0.muc.corp.google.com
  ([2a00:79e0:15:13:8ce:d7fa:9f4c:492])
- by smtp.gmail.com with ESMTPSA id o14sm808209wrp.34.2019.02.22.04.53.43
+ by smtp.gmail.com with ESMTPSA id o14sm808209wrp.34.2019.02.22.04.53.29
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 04:53:44 -0800 (PST)
+ Fri, 22 Feb 2019 04:53:30 -0800 (PST)
 From: Andrey Konovalov <andreyknvl@google.com>
 To: Catalin Marinas <catalin.marinas@arm.com>,
  Will Deacon <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>,
@@ -86,17 +86,17 @@ To: Catalin Marinas <catalin.marinas@arm.com>,
  linux-arm-kernel@lists.infradead.org, linux-doc@vger.kernel.org,
  linux-mm@kvack.org, linux-arch@vger.kernel.org,
  linux-kselftest@vger.kernel.org, linux-kernel@vger.kernel.org
-Subject: [PATCH v10 08/12] net,
- arm64: untag user pointers in tcp_zerocopy_receive
-Date: Fri, 22 Feb 2019 13:53:20 +0100
-Message-Id: <ebc80132c8ebf6016821ddffbb7e461bd2484824.1550839937.git.andreyknvl@google.com>
+Subject: [PATCH v10 01/12] uaccess: add untagged_addr definition for other
+ arches
+Date: Fri, 22 Feb 2019 13:53:13 +0100
+Message-Id: <2b5a5d7d7a36a75a2a796f0c2b9b30669d81d470.1550839937.git.andreyknvl@google.com>
 X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
 In-Reply-To: <cover.1550839937.git.andreyknvl@google.com>
 References: <cover.1550839937.git.andreyknvl@google.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_045347_841765_10049FB5 
-X-CRM114-Status: GOOD (  12.06  )
+X-CRM114-CacheID: sfid-20190222_045337_569316_438C38D1 
+X-CRM114-Status: GOOD (  12.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -122,29 +122,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-tcp_zerocopy_receive() uses provided user pointers for vma lookups, which
-can only by done with untagged pointers.
+To allow arm64 syscalls to accept tagged pointers from userspace, we must
+untag them when they are passed to the kernel. Since untagging is done in
+generic parts of the kernel, the untagged_addr macro needs to be defined
+for all architectures.
 
-Untag user pointers in this function.
+Define it as a noop for architectures other than arm64.
 
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- net/ipv4/tcp.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/memory.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/net/ipv4/tcp.c b/net/ipv4/tcp.c
-index cf3c5095c10e..80f3c1fb9809 100644
---- a/net/ipv4/tcp.c
-+++ b/net/ipv4/tcp.c
-@@ -1756,6 +1756,8 @@ static int tcp_zerocopy_receive(struct sock *sk,
- 	int inq;
- 	int ret;
+diff --git a/include/linux/memory.h b/include/linux/memory.h
+index a6ddefc60517..fc383bc39ab8 100644
+--- a/include/linux/memory.h
++++ b/include/linux/memory.h
+@@ -21,6 +21,10 @@
+ #include <linux/mutex.h>
+ #include <linux/notifier.h>
  
-+	address = untagged_addr(address);
++#ifndef untagged_addr
++#define untagged_addr(addr) (addr)
++#endif
 +
- 	if (address & (PAGE_SIZE - 1) || address != zc->address)
- 		return -EINVAL;
+ #define MIN_MEMORY_BLOCK_SIZE     (1UL << SECTION_SIZE_BITS)
  
+ struct memory_block {
 -- 
 2.21.0.rc0.258.g878e2cd30e-goog
 
