@@ -2,90 +2,93 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9835FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 18:04:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 12A65C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 18:04:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6AB5A2077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 18:04:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D41ED2070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 18:04:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a+yNrKOc";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="U4nl0W25"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6AB5A2077B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oXr7kYdO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="i01PYZ2Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D41ED2070D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=KYAncA5X0TZNWejT8eW5CMXOoTnH0ojy++olnxAOzsI=; b=a+yNrKOcMpQ4Jf
-	umyjZVJhYujYXMu9MOfBcmGnoHZ7KClbPsLet1DQT3EBBbZRvfVwnxHi9ZHaOflj3Wt6JhFVD7ywv
-	NgzuLkDNGNkw1IIB4Z8k34oDb2iq1+eIME5CK1NPX+6h4CKtY4duBu6Q7TCmKRYhv1zruG195gTpa
-	Kq1xiaM1T3tVLQDv49nB+tGr9n72CynB/NfAyYmDETq78zqo0OTk5XT7eWwq8MyATEGSTgVANUlkF
-	YkllnOgHuqHylPWp9JJUGmu1jIV7wPjYJI/QD+gph6yt2afRcc6kHCXm0daAtGNC/eRe7//rvW4gU
-	17Z7PGY87PZqIJv8I6zw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=MaSs8fPvzvDTYT6H+jAzeSShLPMyp9jNa/p76Fuqfsc=; b=oXr7kYdOX064yd
+	N4WoBGeCvMTy59Sr1fzMfcgLtLkMM2/q0+vR1UGhBt9RrbgtDZYLwgFyZHpw/Gl6C6PvBWmKIRzTx
+	DP2reV6JXtBNZNXK3VINi8HpkYEt+bWsxbd74CAqcVvPvkClU9QDgsJA4+wU7RKZam9uvGx9SElXo
+	Z+YuyRJF+ixKd2WPGfXlM3uvln7jg9tfIgbYlo2VJz5G/qNkAtGx+geadn/JfgO7eoxompO2gxyeU
+	m/IRTbhdH6lLU8kzcN7WiOkuG3SV1dz++APRx9Dw+N5AsqeqSY7TID6oQZrKwJM7EnOK3Gsc+DWZl
+	oPSxo1toGKQ8AmNkP+Cw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxFBd-0006lO-HO; Fri, 22 Feb 2019 18:04:37 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gxFBl-0006vz-Is; Fri, 22 Feb 2019 18:04:45 +0000
+Received: from mail-lf1-x141.google.com ([2a00:1450:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxFBX-0006j8-NL
+ id 1gxFBZ-0006jW-J7
  for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 18:04:35 +0000
-Received: by mail-lj1-x242.google.com with SMTP id z20so2372851ljj.10
+Received: by mail-lf1-x141.google.com with SMTP id g12so2357109lfb.13
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 10:04:31 -0800 (PST)
+ Fri, 22 Feb 2019 10:04:33 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=wJIfcNgdLwIOQgBq8MfHDWHd4OU+U5junDQOmjo7ne8=;
- b=U4nl0W25kjXAqzkYHIbSN0n/W8/x8GX5UgACZqpahcEb8Hak9t7bR/1iNs6lVzEWSo
- X5wWQ98QDBHwxKNofEUAovpjuToCDyiYDm3SKuuXvyGDGkHhAw9e7fhX1oY0lZriFkxh
- XyGc+I1pdkXebyadO6YkzQrNqSI8ghS3Q1OBfInl0qvaKI5dn+As6dw5vbeCy55pyvDs
- r8Zmrl1Zi/bCpbD58FBq6rWPIOEq7AygTloR5edQlKjNhSXie/FHBZ/QMUN0ISh7ip3k
- dnlEBWZ6ktpOqyUDPKW0NBCMKHtCec6jftG2YgDLqxne6ppf4uEop9uwIgnLb/Zp/SbF
- l2nw==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=FgOYxchHGlJHFmyyLBfbI94R8PKLM3DDEZqKom9TK2g=;
+ b=i01PYZ2QugSDZ3dOnhWtPtW6ziCYUWAwwCQH4JmZjboT/ybDxMdNa81TUNsCHq5O0s
+ MFLzAFzJW8SVgyyHW9Wor3W5WrNqdJ67hsKBRspAwPkff4d+XKtgjFyvhLYZ3siwfniM
+ fDQmKNSortbGfl/xrIDXNN+O7uJFIFhK3hG4y2gmdm8YR46Sh41BuW5jJfQ99fjLrfus
+ 38nD3GuIATlDMxjTj82faV3ATHTSGKwBjxIx4satGy3P20R6OjBE4nGvTvLxAKdDPBTk
+ wwtrBELbfiJqkhMGEHWRKrmZ9TMvZujxEQ/nAGkuA0qpPMq/xP9Kgx0mWHDBB6MMqaOu
+ FG0w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=wJIfcNgdLwIOQgBq8MfHDWHd4OU+U5junDQOmjo7ne8=;
- b=nXjwp0uuXCBqrglvV2HLwCGOSeUJKTU2cVWPfT5KXMF9gWKABiDs8EmBXEA2G+Bu1t
- vkYT4qN+3OrEVkKOBBTzx0uZHYVVH/5V6QYUwgzCkCE/ASZs6goR+m1rDWJaH7cXJTvZ
- vHG382wubkX2cYR3ZuWmj/vP1E8Cz13hfzHO19iAmptsgweZQZ9t3hhQiYncIGlrywxR
- 3HSB6Z3h4ZRZhoQZKOABdR1B3musUFU9uK1d9vQkbys1hBZuwsL8HRdEDQPT+bC2293o
- dmnPYgLNQZFHLkegVxs877FjlAgrda7NqczvP1hF5P64hOZ6TYOYLrj1PfcmN8v9W7DW
- rQ4Q==
-X-Gm-Message-State: AHQUAuZxxaO7aEZ/3AKPLROUfK4gG1quJOeuZZ97GqPLGdJGhwI1idOm
- RI2RJ01D23P8lH15SExmsAQ=
-X-Google-Smtp-Source: AHgI3IZ7h0ngBjkJPtkp453YXg2cpHpft3qtKxSzFnOnhfwqVJHuR2K01nDXgpH/hGsO+ULFvak2dA==
-X-Received: by 2002:a2e:9a95:: with SMTP id p21mr2835278lji.127.1550858669304; 
- Fri, 22 Feb 2019 10:04:29 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=FgOYxchHGlJHFmyyLBfbI94R8PKLM3DDEZqKom9TK2g=;
+ b=AmGPhdEV27HVACiZT0FKBfpUGDDuTxV0YgzB4k3URAksMUK6r7U1meJJcAHchh7iwo
+ aDQblVf8fziw53KxsldJOKbqRla8q5QZKcGW+8gegKJG6VtYWaidfz2CzoaPMRobQHUr
+ NFP5SIXk7KYWYoPOlEzc/xMwvAdLHduhKoJ6mBEWvXCJ/9PrrOiOz6LNtemkEoOJZUj0
+ Rl7y2GJMZMz5vdaMrzLmMDCKZOfKDTLzDV/JNPcCoBRX3EkrUJANmx3b0ch8m47b2vQA
+ ToW71bkWA19YTYdzUh1ZVcue6zRTJIEWzGSPJXuoQgBJaL5O0f9GIokRRq7Gpdr9Y3Ng
+ vJEA==
+X-Gm-Message-State: AHQUAuYTkxE1xEMVr4d4NuWprA0fOoJeZal+ChmhApqex04vaDQef5Yf
+ cqGs/A5l26T58jN9ZCMxqp0=
+X-Google-Smtp-Source: AHgI3IbvHApvgzaeAbdf/y+LRdcHRMhr9Zx0nePZ+s18aRqyKHJWwSIWw8f72UkMuUlKJSQ9Jj06GQ==
+X-Received: by 2002:a19:ed1a:: with SMTP id y26mr3132788lfy.161.1550858671569; 
+ Fri, 22 Feb 2019 10:04:31 -0800 (PST)
 Received: from localhost.localdomain (ppp91-79-175-49.pppoe.mtu-net.ru.
  [91.79.175.49])
- by smtp.gmail.com with ESMTPSA id j12sm721202lfg.47.2019.02.22.10.04.27
+ by smtp.gmail.com with ESMTPSA id j12sm721202lfg.47.2019.02.22.10.04.30
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 10:04:28 -0800 (PST)
+ Fri, 22 Feb 2019 10:04:30 -0800 (PST)
 From: Dmitry Osipenko <digetx@gmail.com>
 To: Russell King <linux@armlinux.org.uk>,
  Thierry Reding <thierry.reding@gmail.com>,
  Jonathan Hunter <jonathanh@nvidia.com>, Robert Yang <decatf@gmail.com>,
  =?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?= <mirq-linux@rere.qmqm.pl>
-Subject: [PATCH v5 0/8] Support Trusted Foundations firmware on Tegra30
-Date: Fri, 22 Feb 2019 20:59:18 +0300
-Message-Id: <20190222175926.23366-1-digetx@gmail.com>
+Subject: [PATCH v5 2/8] ARM: trusted_foundations: Make prepare_idle call to
+ take mode argument
+Date: Fri, 22 Feb 2019 20:59:20 +0300
+Message-Id: <20190222175926.23366-3-digetx@gmail.com>
 X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190222175926.23366-1-digetx@gmail.com>
+References: <20190222175926.23366-1-digetx@gmail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_100431_782830_D250F4A8 
-X-CRM114-Status: GOOD (  13.53  )
+X-CRM114-CacheID: sfid-20190222_100433_625370_F767DD14 
+X-CRM114-Status: GOOD (  15.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,61 +102,120 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: linux-tegra@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGVsbG8sCgpUaGlzIHBhdGNoc2V0IGFkZHMgc3VwcG9ydCBmb3IgdGhlIFRydXN0ZWQgRm91bmRh
-dGlvbnMgZmlybXdhcmUgb24KTlZJRElBIFRlZ3JhMzAuIFByZXR0eSBtdWNoIGFsbCBvZiBUZWdy
-YTMwIGNvbnN1bWVyIGRldmljZXMgaGF2ZSB0aGF0CmZpcm13YXJlIGFuZCB1cHN0cmVhbSBrZXJu
-ZWwgY2FuJ3QgYm9vdCBvbiB0aG9zZSBkZXZpY2VzIHdpdGhvdXQgdGhlCmZpcm13YXJlIHN1cHBv
-cnQuCgpDaGFuZ2Vsb2c6Cgp2NTogICAgIC0gRml4ZWQgbWFjaGluZSBoYW5naW5nIG9uIGRpc2Fi
-bGluZyBELWNhY2hlIGR1cmluZyBzdXNwZW5kLAogICAgICAgICAgdHVybmVkIG91dCB0aGVyZSBh
-cmUgc2xpZ2h0IHZhcmlhdGlvbnMgaW4gYmVoYXZpb3VyIGJldHdlZW4KICAgICAgICAgIGZpcm13
-YXJlIHZlcnNpb24gaW4gcmVnYXJkcyB0byBjYWNoZS1tYW5hZ2VtZW50LiBUaGFua3MgdG8KICAg
-ICAgICAgIFJvYmVydCBZYW5nIGZvciByZXBvcnRpbmcgdGhlIHByb2JsZW0gYW5kIGhlbHBpbmcg
-d2l0aCB0aGUKICAgICAgICAgIHNvbHV0aW9uLgoKdjQ6ICAgICAtIEZpeGVkIFRodW1iMi1rZXJu
-ZWwgaGFuZ2luZyBvbiBUZWdyYTIwLCB0dXJuZWQgb3V0IGl0IHdhcyBub3QgYQogICAgICAgICAg
-Z29vZCBpZGVhIHRvIHN3aXRjaCBDUFUgaW50byBUaHVtYjIgbW9kZSByaWdodCBhZnRlciBqdW1w
-aW5nIGludG8KICAgICAgICAgIHRoZSByZXNldCBoYW5kbGVyLgoKICAgICAgICAtIE1vdmVkIExQ
-Mi1tb2RlLXNldCBmaXJtd2FyZSBjYWxsIGludm9jYXRpb24gdG8gYSBsYXRlciBzdGFnZSB0bwog
-ICAgICAgICAgYmV0dGVyIHJlcGxpY2F0ZSB3aGF0IGRvd25zdHJlYW0ga2VybmVsIGRvZXMuIFRo
-aXMgY2hhbmdlIHdhcwogICAgICAgICAgc3VnZ2VzdGVkIGJ5IFJvYmVydCBZYW5nIGFuZCBmaXhl
-cyBzeXN0ZW0gaGFuZyBvbiBPdXlhIGdhbWUKICAgICAgICAgIGNvbnNvbGUuCgogICAgICAgIC0g
-QWRkZWQgcmVmZXJlbmNlcyB0byB0aGUgb3JpZ2luYWwgd29yayBtYWRlIGJ5IE1pY2hhxYIgTWly
-b3PFgmF3CiAgICAgICAgICBpbnRvIGNvbW1pdCBtZXNzYWdlcyBvZiB0aGUgcmVsZXZhbnQgcGF0
-Y2hlcy4KCnYzOiAgICAgLSBJbXBsZW1lbnRlZCBzdXNwZW5kLXJlc3VtZSBzdXBwb3J0LgoKICAg
-ICAgICAtIFJld29ya2VkIGFybS9maXJtd2FyZS90cnVzdGVkX2ZvdW5kYXRpb25zLmMgYSB0YWQu
-IE5vdyBjYWNoZQogICAgICAgICAgaXMgZ2V0dGluZyBwcm9wZXJseSBpbml0aWFsaXplZCwgY2Fj
-aGUgZW5hYmxpbmcgLyBkaXNhYmxpbmcgaXMKICAgICAgICAgIHN1cHBvcnRlZC4KCnYyOgogICAg
-ICAgIC0gVGhlICJEb24ndCBhcHBseSBDUFUgZXJyYXRhcyBpbiBpbnNlY3VyZSBtb2RlIiBwYXRj
-aCBnb3Qgc29tZQogICAgICAgICAgY2xlYW51cCwgaW4gcGFydGljdWxhciByZXNvbHZlZCB0aGUg
-bWVzc2luZXNzIGluCiAgICAgICAgICBfX3RlZ3JhX2NwdV9yZXNldF9oYW5kbGVyX2RhdGEuCgog
-ICAgICAgIC0gQWRkZWQgYSBjb21tZW50IHRvIHRmX2NhY2hlX3dyaXRlX3NlYygpLCBqdXN0aWZ5
-aW5nIHRoZSB3YXJuaW5nCiAgICAgICAgICBtZXNzYWdlLgoKRG1pdHJ5IE9zaXBlbmtvICg4KToK
-ICBBUk06IHRydXN0ZWRfZm91bmRhdGlvbnM6IEltcGxlbWVudCBMMiBjYWNoZSBpbml0aWFsaXph
-dGlvbiBjYWxsYmFjawogIEFSTTogdHJ1c3RlZF9mb3VuZGF0aW9uczogTWFrZSBwcmVwYXJlX2lk
-bGUgY2FsbCB0byB0YWtlIG1vZGUgYXJndW1lbnQKICBBUk06IHRydXN0ZWRfZm91bmRhdGlvbnM6
-IFByb3ZpZGUgaW5mb3JtYXRpb24gYWJvdXQgd2hldGhlciBmaXJtd2FyZQogICAgaXMgcmVnaXN0
-ZXJlZAogIEFSTTogdGVncmE6IFNldCB1cCBMMiBjYWNoZSB1c2luZyBUcnVzdGVkIEZvdW5kYXRp
-b25zIGZpcm13YXJlCiAgQVJNOiB0ZWdyYTogRG9uJ3QgYXBwbHkgQ1BVIGVycmF0YXMgaW4gaW5z
-ZWN1cmUgbW9kZQogIEFSTTogdGVncmE6IEFsd2F5cyBib290IENQVSBpbiBBUk0tbW9kZQogIEFS
-TTogdGVncmE6IFN1cHBvcnQgTDIgY2FjaGUgbWFpbnRlbmFuY2UgZG9uZSB2aWEgZmlybXdhcmUK
-ICBBUk06IHRlZ3JhOiBBZGQgZmlybXdhcmUgY2FsbHMgcmVxdWlyZWQgZm9yIHN1c3BlbmQtcmVz
-dW1lCgogYXJjaC9hcm0vZmlybXdhcmUvdHJ1c3RlZF9mb3VuZGF0aW9ucy5jICAgIHwgODAgKysr
-KysrKysrKysrKysrKysrKysrLQogYXJjaC9hcm0vaW5jbHVkZS9hc20vZmlybXdhcmUuaCAgICAg
-ICAgICAgIHwgIDIgKy0KIGFyY2gvYXJtL2luY2x1ZGUvYXNtL3RydXN0ZWRfZm91bmRhdGlvbnMu
-aCB8IDEzICsrKysKIGFyY2gvYXJtL21hY2gtdGVncmEvY3B1aWRsZS10ZWdyYTExNC5jICAgICB8
-ICAzICstCiBhcmNoL2FybS9tYWNoLXRlZ3JhL3BtLmMgICAgICAgICAgICAgICAgICAgfCA0OSAr
-KysrKysrKysrKysrCiBhcmNoL2FybS9tYWNoLXRlZ3JhL3Jlc2V0LWhhbmRsZXIuUyAgICAgICAg
-fCA1MCArKysrKysrKysrKy0tLQogYXJjaC9hcm0vbWFjaC10ZWdyYS9yZXNldC5jICAgICAgICAg
-ICAgICAgIHwgIDMgKwogYXJjaC9hcm0vbWFjaC10ZWdyYS9yZXNldC5oICAgICAgICAgICAgICAg
-IHwgIDkgKystCiBhcmNoL2FybS9tYWNoLXRlZ3JhL3NsZWVwLXRlZ3JhMjAuUyAgICAgICAgfCAg
-NCArKwogYXJjaC9hcm0vbWFjaC10ZWdyYS9zbGVlcC5TICAgICAgICAgICAgICAgIHwgMTQgKyst
-LQogYXJjaC9hcm0vbWFjaC10ZWdyYS90ZWdyYS5jICAgICAgICAgICAgICAgIHwgMTAgKysrCiAx
-MSBmaWxlcyBjaGFuZ2VkLCAyMTUgaW5zZXJ0aW9ucygrKSwgMjIgZGVsZXRpb25zKC0pCgotLSAK
-Mi4yMC4xCgoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18K
-bGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZy
-YWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGlu
-dXgtYXJtLWtlcm5lbAo=
+The Trusted Foundations firmware call varies depending on the required
+suspend-mode. Make the firmware API to take the mode argument in order
+to expose all of the modes to firmware user.
+
+Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
+---
+ arch/arm/firmware/trusted_foundations.c    | 29 ++++++++++++++++++++--
+ arch/arm/include/asm/firmware.h            |  2 +-
+ arch/arm/include/asm/trusted_foundations.h |  6 +++++
+ arch/arm/mach-tegra/cpuidle-tegra114.c     |  3 ++-
+ 4 files changed, 36 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+index 3bf61a5933b9..c496f4cc49cb 100644
+--- a/arch/arm/firmware/trusted_foundations.c
++++ b/arch/arm/firmware/trusted_foundations.c
+@@ -67,9 +67,34 @@ static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
+ 	return 0;
+ }
+ 
+-static int tf_prepare_idle(void)
++static int tf_prepare_idle(unsigned long mode)
+ {
+-	tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S1_NOFLUSH_L2, cpu_boot_addr);
++	switch (mode) {
++	case TF_PM_MODE_LP0:
++		tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S3, cpu_boot_addr);
++		break;
++
++	case TF_PM_MODE_LP1:
++		tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S2, cpu_boot_addr);
++		break;
++
++	case TF_PM_MODE_LP1_NO_MC_CLK:
++		tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S2_NO_MC_CLK,
++			       cpu_boot_addr);
++		break;
++
++	case TF_PM_MODE_LP2:
++		tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S1, cpu_boot_addr);
++		break;
++
++	case TF_PM_MODE_LP2_NOFLUSH_L2:
++		tf_generic_smc(TF_CPU_PM, TF_CPU_PM_S1_NOFLUSH_L2,
++			       cpu_boot_addr);
++		break;
++
++	default:
++		return -EINVAL;
++	}
+ 
+ 	return 0;
+ }
+diff --git a/arch/arm/include/asm/firmware.h b/arch/arm/include/asm/firmware.h
+index 34c1d96ef46d..6698272bbcbf 100644
+--- a/arch/arm/include/asm/firmware.h
++++ b/arch/arm/include/asm/firmware.h
+@@ -24,7 +24,7 @@ struct firmware_ops {
+ 	/*
+ 	 * Inform the firmware we intend to enter CPU idle mode
+ 	 */
+-	int (*prepare_idle)(void);
++	int (*prepare_idle)(unsigned long mode);
+ 	/*
+ 	 * Enters CPU idle mode
+ 	 */
+diff --git a/arch/arm/include/asm/trusted_foundations.h b/arch/arm/include/asm/trusted_foundations.h
+index 00748350cf72..cdd48ab7d191 100644
+--- a/arch/arm/include/asm/trusted_foundations.h
++++ b/arch/arm/include/asm/trusted_foundations.h
+@@ -32,6 +32,12 @@
+ #include <linux/cpu.h>
+ #include <linux/smp.h>
+ 
++#define TF_PM_MODE_LP0			0
++#define TF_PM_MODE_LP1			1
++#define TF_PM_MODE_LP1_NO_MC_CLK	2
++#define TF_PM_MODE_LP2			3
++#define TF_PM_MODE_LP2_NOFLUSH_L2	4
++
+ struct trusted_foundations_platform_data {
+ 	unsigned int version_major;
+ 	unsigned int version_minor;
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+index e3fbcfedf845..3b9af4766cdf 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra114.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+@@ -24,6 +24,7 @@
+ #include <asm/cpuidle.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
++#include <asm/trusted_foundations.h>
+ #include <asm/psci.h>
+ 
+ #include "cpuidle.h"
+@@ -46,7 +47,7 @@ static int tegra114_idle_power_down(struct cpuidle_device *dev,
+ 	tegra_set_cpu_in_lp2();
+ 	cpu_pm_enter();
+ 
+-	call_firmware_op(prepare_idle);
++	call_firmware_op(prepare_idle, TF_PM_MODE_LP2_NOFLUSH_L2);
+ 
+ 	/* Do suspend by ourselves if the firmware does not implement it */
+ 	if (call_firmware_op(do_idle, 0) == -ENOSYS)
+-- 
+2.20.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
