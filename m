@@ -2,87 +2,149 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DEBF7C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:06:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C20DFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:08:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A625F20818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:06:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9171F2077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:08:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shEpKYhw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="DWWFfiux"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A625F20818
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UTWjQ5mB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="N0z3fGbd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9171F2077B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=1nhTBt57enVMpSeQtS3JqzpLN8atgvEdstLaGeO4ULE=; b=shEpKYhwTTPVYyb1KrkBt52la
-	xhlM3w3tFzm+ptMaTh0oRhuvCFokxxBo2optWMtYBiaMYcKDb/v2727CP3g51gF4W9e1YFc/k4f83
-	wuyL9FUnDAmDvpF1Wdl+7F599hCud6KdKRqkxBuuX+YE1UT9bXdj1QNuHXxdeylXDYW7fdtRtS3xE
-	r4j4DRJw1olChTAnDmxoeIZ5Ny90EI9fiBubrYZRY2u9jP41GBeFE0Fs4ZwXBPFl5BK0n+440gd10
-	XPPUR+oawc/gir4ZqDX39SbqHf6ZXUFVZ8IOirg50dEN97KM6/0+M5F+cl2Wksfi0WwFTSZVjo2nq
-	w4mpvA1hw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vK8LkZWBRvhLID5l/4n3VHBFun777zcvU5/C4EKrvNs=; b=UTWjQ5mBEBLXg7
+	L+FTRFp5ctp4gmRuTcjbSiG6zbiQEFaLCLBTuAHwE2f1z3TDbMxd92x+0hgCsx7RWgSklgvNmDe01
+	K6wtBIqHWtL0o1+em5e9CbccJso+aAi0hcQpQ145Ld4/UPFrIgrYg0v9DajuuYQNCfLFiIvvEIWxP
+	nxXbBLjDeDs/fRe9UBpLWk8MAPrsiFXSCcsFBzqR55vklOrs+bJbXC4SULQiOyJPJDE16YuswAVrX
+	RSYX2T1OX8235CMIdiWaAB0jzyYfDiK/fjodsk47Te+14UVGSetVGhNxuGNOOW6d698qCNiLNvxBL
+	DsMs69MbA066HSHMWEfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx6n7-0004pm-Ve; Fri, 22 Feb 2019 09:06:45 +0000
-Received: from hqemgate14.nvidia.com ([216.228.121.143])
+	id 1gx6oS-000583-Jc; Fri, 22 Feb 2019 09:08:08 +0000
+Received: from esa4.microchip.iphmx.com ([68.232.154.123])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx6n3-0004pO-Kt
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:06:43 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c6fbba90000>; Fri, 22 Feb 2019 01:06:49 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Fri, 22 Feb 2019 01:06:40 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Fri, 22 Feb 2019 01:06:40 -0800
-Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
- (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 22 Feb
- 2019 09:06:37 +0000
-Subject: Re: [PATCH V7 2/8] clocksource: tegra: add Tegra210 timer support
-To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
- <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>, Thomas
- Gleixner <tglx@linutronix.de>
-References: <20190221072150.4395-1-josephl@nvidia.com>
- <20190221072150.4395-3-josephl@nvidia.com>
- <6dbc34d0-6922-0eab-48ca-ddcae4554655@linaro.org>
-From: Joseph Lo <josephl@nvidia.com>
-Message-ID: <9a7ff1e9-f425-df58-2cd7-63b2bfc0d3bb@nvidia.com>
-Date: Fri, 22 Feb 2019 17:06:24 +0800
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <6dbc34d0-6922-0eab-48ca-ddcae4554655@linaro.org>
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
- HQMAIL101.nvidia.com (172.20.187.10)
+ id 1gx6oN-000571-VI
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:08:07 +0000
+X-IronPort-AV: E=Sophos;i="5.58,398,1544511600"; d="scan'208";a="26723644"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa4.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 22 Feb 2019 02:08:01 -0700
+Received: from NAM03-CO1-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.107) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Fri, 22 Feb 2019 02:08:01 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=DGIi/Pw3DDC0pyaw7+8UWD3aVnMmQDNiJp4XUW+BNCU=;
+ b=N0z3fGbdpTMSFUu/hnFJn9mhUGbZ0VEQp3TImYTgWHNTOG/tDQljnwxKd3otZud8Lup+Cyyy7/mcbZgJRiAarTv6s90bGZVAqQ1MgNwyLlDCbmHCdw05W3xiVCEQyk9OlS1eYb+8wJPOW+j6B8KGyvAuROEQ9PqldStV1n8IXDM=
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com (10.175.54.19) by
+ MWHPR11MB1487.namprd11.prod.outlook.com (10.172.53.145) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Fri, 22 Feb 2019 09:07:57 +0000
+Received: from MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::dcd3:5ebd:191c:549e]) by MWHPR11MB1920.namprd11.prod.outlook.com
+ ([fe80::dcd3:5ebd:191c:549e%6]) with mapi id 15.20.1643.016; Fri, 22 Feb 2019
+ 09:07:57 +0000
+From: <Claudiu.Beznea@microchip.com>
+To: <u.kleine-koenig@pengutronix.de>
+Subject: Re: [PATCH v2 3/4] pwm: atmel: add support for SAM9X60's PWM
+ controller
+Thread-Topic: [PATCH v2 3/4] pwm: atmel: add support for SAM9X60's PWM
+ controller
+Thread-Index: AQHUyDsiDT3T0eJSS0SM7JH09g6VaqXqvC4AgADPgYA=
+Date: Fri, 22 Feb 2019 09:07:57 +0000
+Message-ID: <12a63031-596c-77a3-f10c-be276d75e82c@microchip.com>
+References: <1550570914-26391-1-git-send-email-claudiu.beznea@microchip.com>
+ <1550570914-26391-4-git-send-email-claudiu.beznea@microchip.com>
+ <20190221204503.w2xh4rw6rh4e5rg4@pengutronix.de>
+In-Reply-To: <20190221204503.w2xh4rw6rh4e5rg4@pengutronix.de>
+Accept-Language: en-US
 Content-Language: en-US
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1550826409; bh=QE5ImHzN3N+Rl1H5gn3uidvE/6Qj51OLgvYBTn5tTLE=;
- h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
- User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
- X-ClientProxiedBy:Content-Type:Content-Language:
- Content-Transfer-Encoding;
- b=DWWFfiuxjTtIeiStd9u71Jo8n/MIp3iu8lcGnDrbqj81XHCXBqdXb4+p5GZh4MXKP
- ARxxWdmSeokxyPazsLWBESnOdUrsglhA80Kvjt/Bu1YrtxHGAdQS2rfFKdcnNryqf0
- bFMRwfHIB34ceYc9Yb/mkBfaw8fvvbmQoJTHJJ4DAQa3bfdV+0vCou8UwJPiiwdcj3
- eHqHTxSRkTPfqMwyRfyZQUfcaqhac/N0EJycpxMWb1drrueYVoxuR3AaPYL3IFU5yr
- 3veitQtRAbxYYW8kIw6mWqmUWlcckfPxdO/TtDxrer5uEn2zcX1BQavGqmZ9ytoAT4
- sVXKiyJkKh2dg==
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR08CA0250.eurprd08.prod.outlook.com
+ (2603:10a6:803:dc::23) To MWHPR11MB1920.namprd11.prod.outlook.com
+ (2603:10b6:300:110::19)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Claudiu.Beznea@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-tagtoolbar-keys: D20190222110745438
+x-originating-ip: [94.177.32.154]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 87ad1776-9944-4da4-98b1-08d698a53c38
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1487; 
+x-ms-traffictypediagnostic: MWHPR11MB1487:
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxNDg3OzIzOkwrNXRjZDVpU0plZnhGMTZuOHIxZU9HSVVU?=
+ =?utf-8?B?YkJYUFBNZDQ2bkJqYUJTWkVvMEp2NWlWbG5wVFVQRkg2YjIrSHRmbkE5WXJ0?=
+ =?utf-8?B?TE1OemhIdUNyWnp3UDR6NTRVczBBeXNQUG9CZHJIVFgveWZsclkrOWtMSndk?=
+ =?utf-8?B?NDNVRXhPKzY4SThCUmpPOUJRQzVZdGh4RWNVSlhJcUJGMGtMODRWbnRmYWFt?=
+ =?utf-8?B?dFdBSEluVlNwQlNoWklKeC8raGZkZW4vanFoTmpTT0dWS0FSOEtXYWtHZVNp?=
+ =?utf-8?B?TUdiWCtoeVdtT2JNS2pyaUltK1EwUFp2ZkhUS3NsUzl1TlBjOGRnL2ZuSWtH?=
+ =?utf-8?B?cVVkVE82Tk5TL3hoNVhVaVBvZGFYbFQxbWhmM3RyUEFPTDBMdG14Mkw5VERk?=
+ =?utf-8?B?YVg5Z080ZURyTnBtZHMwem5IcGk4OU9YMVZmME1DYlptRVg3NGZ0bE8xOFUr?=
+ =?utf-8?B?WSt3T01kUUdZWVNYdThodklnQTVQMnljYlh0Z0RHbTMvMTlWTkFIOEZyQ0hS?=
+ =?utf-8?B?Vm9MT2Uwa0FKVTZ6Q244K0N3SC9TR2srbTdLSVBKcUVHaUpjTWdOMi9yYzJL?=
+ =?utf-8?B?OHE1Z241NXpKOVNnOHRYR3VSVkcwaHpSQ0RFUGk2YkcyUjB6VjdCd1Raamkv?=
+ =?utf-8?B?QVNtNnpqMWNMbVgzTHRNVWlnaWRGVjRqbzFTc0V5VEViT0Y5WlpqOHcyaU1k?=
+ =?utf-8?B?cmszRVpWb28ydWF6WFdOcUxFM2xEQXVvZXZyeWFwbGxKOHNtd3paRlM4N3pZ?=
+ =?utf-8?B?ODZNd2t4MHBaZDJuUlNYU01hdjgzakhCcWw0eU9pY2xpdEg3a3JrVzUrT2dW?=
+ =?utf-8?B?YjY5ZWRrSW10OXk3WVo5Z3NaVmVlV0dnTWd6dFBEK1RWdFo4UENnSXlLcTdn?=
+ =?utf-8?B?enNkaE9Xc3h5SUxBU0lvcElxRG1LRUJGb1k3b2pMeDB6c3M4dkx4b1J5U0VP?=
+ =?utf-8?B?YklHaXdwSXZENUFiY2tUZUJXT2l4OW5ER0gwMXFhTWpHZWFCNVo2WEYrYnFK?=
+ =?utf-8?B?MytjdFUxM2xERFFVblBHb1FBM0VOeUxGREdZZ2t4cEhlTlhSaVpjekRhdnU5?=
+ =?utf-8?B?blU2WkIyWnZjNUpROWNEVnl4TXlmTHowcFl5eHdCakFnbDlaZy9jZVRvTXRm?=
+ =?utf-8?B?TnlrWVpYcy9HQjhaekVxYjVuVC8wczAxRFpna0NrYkZBcFdudUVuclhlOHhB?=
+ =?utf-8?B?c1hjMW5uelRjViswaG1Lc2ROUEVNODFzaEJrNW5hWS9ESjdSdTNyL1F6Tnli?=
+ =?utf-8?B?ajRBbFVlSk9nNDJsR2I4QnpNRVNpNHRZTVV3a295QzVvaEFaQUZqT2s4d3Ft?=
+ =?utf-8?B?NjdLSmJZZlBKMHRObStkUlF5dzBFWjFxbVJPMHFxQ2VmNE9UMGJFTUdOZGY5?=
+ =?utf-8?B?Mi9GMTVTL2pQZzJxUHBhUDJ3NFNiZmdmWm1EdHFOT0lqMkp1QmZlS1A0amJt?=
+ =?utf-8?B?eVZaZE1PL3ZSamFSWDdGWmU4U1pwdnVPbmFXdEg1VkxuMHQzUW1tUE15cEdT?=
+ =?utf-8?B?NGozUmdLdUVtMnZPYWVtOGdKV3pVLys4K2IwWVNkbDlHUm1MTEwrdXhuRkUz?=
+ =?utf-8?B?REkvSExFT0tOMHRRNjMyTUVOWjZrV3ZObmRJRFpnVXIwcm1NNzlBR09ad2h3?=
+ =?utf-8?B?K1gyY05mVWdzUUpLU0FwTjZaMGllVnM3MVNzZE90WlJ5aWVjeDE1eTNFVXJu?=
+ =?utf-8?B?Y2hCS3VhYUJBeFhEaUR1KzE5elE5VzIxNmNUcGllUVRLSUlmR2ZrN3QyV2xC?=
+ =?utf-8?B?Y2QvYkViTmlxYm5jWWIxMnZ0SW53T2lyMGlEVUdXZEd1MUI5d1RWZURBaTNh?=
+ =?utf-8?Q?zHM5tCjW2Qm52?=
+x-microsoft-antispam-prvs: <MWHPR11MB1487F27B939726BB476A207E877F0@MWHPR11MB1487.namprd11.prod.outlook.com>
+x-forefront-prvs: 09565527D6
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(39860400002)(396003)(346002)(376002)(136003)(189003)(199004)(105586002)(106356001)(102836004)(316002)(31686004)(478600001)(72206003)(6916009)(14454004)(31696002)(8936002)(66066001)(97736004)(81156014)(8676002)(99286004)(2906002)(68736007)(81166006)(486006)(476003)(2616005)(76176011)(11346002)(25786009)(446003)(52116002)(53546011)(6506007)(386003)(7736002)(4326008)(6246003)(26005)(6512007)(6436002)(71190400001)(5660300002)(71200400001)(14444005)(256004)(36756003)(305945005)(54906003)(229853002)(186003)(53936002)(6486002)(86362001)(6116002)(66574012)(3846002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1487;
+ H:MWHPR11MB1920.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: TBU4Y2ZPIP5Lru714h2q2aKXSmsGwowPRLjVOomkty3sQgFN8lX4fg/njoAoMaDGO9P/CuAR/fzz4AWD24/kjrZ6DgQfkKBjg5UsiZbXdf1OhVLzIlCBC4my+2ciC2ZAHYpI1O31yOENJaG1NWh/b/hHCAjP6jKv2o5D+cSJHnkNrJoYleEFxzGShzH4qEGw8FjhahR/kgwbecVkpdKPX5ctJ534viZ/JsN8Ex8pFYILkRoonLbIidoExhx7vaMRAHBRO8GBtHN6K/mWbTEwLm1kXbK/d647lEkSuYDOM+EDNsXf+imTO1qsReUkMLtxPwLw00m2RhE6KBZfX44p6RuU/jnvhN0ROoQyNr3pGnQxbII3Td4QgPDJLOIUP0BhibpOeA/vlmBOwGbTjiJp+/hzWKhEV4aOQmKNSlOxq9Y=
+Content-ID: <4A6ED854A060F44D88C6B462F9D1E694@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: 87ad1776-9944-4da4-98b1-08d698a53c38
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Feb 2019 09:07:52.7209 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1487
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_010641_703338_69A40E2D 
-X-CRM114-Status: GOOD (  23.94  )
+X-CRM114-CacheID: sfid-20190222_010804_090101_9B123349 
+X-CRM114-Status: GOOD (  15.50  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,571 +156,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
+Cc: mark.rutland@arm.com, linux-pwm@vger.kernel.org,
+ alexandre.belloni@bootlin.com, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ linux-kernel@vger.kernel.org, Ludovic.Desroches@microchip.com,
+ thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 2/22/19 4:43 PM, Daniel Lezcano wrote:
-> On 21/02/2019 08:21, Joseph Lo wrote:
->> Add support for the Tegra210 timer that runs at oscillator clock
->> (TMR10-TMR13). We need these timers to work as clock event device and to
->> replace the ARMv8 architected timer due to it can't survive across the
->> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
->> source when CPU suspends in power down state.
->>
->> Also convert the original driver to use timer-of API.
->>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: linux-kernel@vger.kernel.org
->> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->> Acked-by: Thierry Reding <treding@nvidia.com>
->> Acked-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
-> 
-> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
-Hi Daniel,
-
-Thanks for your review again. Regarding to Thierry's suggestion in [1], 
-could you help to pick up patch 1~3 in this series in clocksource tree?
-
-[1]: https://patchwork.ozlabs.org/patch/1034075/
-
-If not, I'll let him know this series needs to go with Tegra tree.
-
-> 
-> Will you take care of dropping the persistent clocksource code in this
-> driver?
-
-Yes, will do.
-
-Thanks,
-Joseph
-
-> 
->> v7:
->>   * kconfig fix for 'depends on ARM || ARM64'
->>   * move suspend/resume to clkevt
->>   * refine the usage for the macro of TIMER_OF_DECLARE
->> v6:
->>   * refine the timer defines
->>   * add ack tag from Jon.
->> v5:
->>   * add ack tag from Thierry
->> v4:
->>   * merge timer-tegra210.c in previous version into timer-tegra20.c
->> v3:
->>   * use timer-of API
->> v2:
->>   * add error clean-up code
->> ---
->>   drivers/clocksource/Kconfig         |   3 +-
->>   drivers/clocksource/timer-tegra20.c | 370 +++++++++++++++++++---------
->>   include/linux/cpuhotplug.h          |   1 +
->>   3 files changed, 262 insertions(+), 112 deletions(-)
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 8dfd3bc448d0..5d93e580e5dc 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -131,7 +131,8 @@ config SUN5I_HSTIMER
->>   config TEGRA_TIMER
->>   	bool "Tegra timer driver" if COMPILE_TEST
->>   	select CLKSRC_MMIO
->> -	depends on ARM
->> +	select TIMER_OF
->> +	depends on ARM || ARM64
->>   	help
->>   	  Enables support for the Tegra driver.
->>   
->> diff --git a/drivers/clocksource/timer-tegra20.c b/drivers/clocksource/timer-tegra20.c
->> index 4293943f4e2b..fdb3d795a409 100644
->> --- a/drivers/clocksource/timer-tegra20.c
->> +++ b/drivers/clocksource/timer-tegra20.c
->> @@ -15,21 +15,24 @@
->>    *
->>    */
->>   
->> -#include <linux/init.h>
->> +#include <linux/clk.h>
->> +#include <linux/clockchips.h>
->> +#include <linux/cpu.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/delay.h>
->>   #include <linux/err.h>
->> -#include <linux/time.h>
->>   #include <linux/interrupt.h>
->> -#include <linux/irq.h>
->> -#include <linux/clockchips.h>
->> -#include <linux/clocksource.h>
->> -#include <linux/clk.h>
->> -#include <linux/io.h>
->>   #include <linux/of_address.h>
->>   #include <linux/of_irq.h>
->> +#include <linux/percpu.h>
->>   #include <linux/sched_clock.h>
->> -#include <linux/delay.h>
->> +#include <linux/time.h>
->> +
->> +#include "timer-of.h"
->>   
->> +#ifdef CONFIG_ARM
->>   #include <asm/mach/time.h>
->> +#endif
->>   
->>   #define RTC_SECONDS            0x08
->>   #define RTC_SHADOW_SECONDS     0x0c
->> @@ -39,74 +42,161 @@
->>   #define TIMERUS_USEC_CFG 0x14
->>   #define TIMERUS_CNTR_FREEZE 0x4c
->>   
->> -#define TIMER1_BASE 0x0
->> -#define TIMER2_BASE 0x8
->> -#define TIMER3_BASE 0x50
->> -#define TIMER4_BASE 0x58
->> -
->> -#define TIMER_PTV 0x0
->> -#define TIMER_PCR 0x4
->> -
->> +#define TIMER_PTV		0x0
->> +#define TIMER_PTV_EN		BIT(31)
->> +#define TIMER_PTV_PER		BIT(30)
->> +#define TIMER_PCR		0x4
->> +#define TIMER_PCR_INTR_CLR	BIT(30)
->> +
->> +#ifdef CONFIG_ARM
->> +#define TIMER_CPU0		0x50 /* TIMER3 */
->> +#else
->> +#define TIMER_CPU0		0x90 /* TIMER10 */
->> +#define TIMER10_IRQ_IDX		10
->> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
->> +#endif
->> +#define TIMER_BASE_FOR_CPU(cpu) (TIMER_CPU0 + (cpu) * 8)
->> +
->> +static u32 usec_config;
->>   static void __iomem *timer_reg_base;
->> +#ifdef CONFIG_ARM
->>   static void __iomem *rtc_base;
->> -
->>   static struct timespec64 persistent_ts;
->>   static u64 persistent_ms, last_persistent_ms;
->> -
->>   static struct delay_timer tegra_delay_timer;
->> -
->> -#define timer_writel(value, reg) \
->> -	writel_relaxed(value, timer_reg_base + (reg))
->> -#define timer_readl(reg) \
->> -	readl_relaxed(timer_reg_base + (reg))
->> +#endif
->>   
->>   static int tegra_timer_set_next_event(unsigned long cycles,
->>   					 struct clock_event_device *evt)
->>   {
->> -	u32 reg;
->> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
->>   
->> -	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
->> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
->> +	writel(TIMER_PTV_EN |
->> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
->> +	       reg_base + TIMER_PTV);
->>   
->>   	return 0;
->>   }
->>   
->> -static inline void timer_shutdown(struct clock_event_device *evt)
->> +static int tegra_timer_shutdown(struct clock_event_device *evt)
->>   {
->> -	timer_writel(0, TIMER3_BASE + TIMER_PTV);
->> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
->> +
->> +	writel(0, reg_base + TIMER_PTV);
->> +
->> +	return 0;
->>   }
->>   
->> -static int tegra_timer_shutdown(struct clock_event_device *evt)
->> +static int tegra_timer_set_periodic(struct clock_event_device *evt)
->>   {
->> -	timer_shutdown(evt);
->> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
->> +
->> +	writel(TIMER_PTV_EN | TIMER_PTV_PER |
->> +	       ((timer_of_rate(to_timer_of(evt)) / HZ) - 1),
->> +	       reg_base + TIMER_PTV);
->> +
->>   	return 0;
->>   }
->>   
->> -static int tegra_timer_set_periodic(struct clock_event_device *evt)
->> +static irqreturn_t tegra_timer_isr(int irq, void *dev_id)
->> +{
->> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
->> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
->> +
->> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
->> +	evt->event_handler(evt);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static void tegra_timer_suspend(struct clock_event_device *evt)
->> +{
->> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
->> +
->> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
->> +}
->> +
->> +static void tegra_timer_resume(struct clock_event_device *evt)
->> +{
->> +	writel(usec_config, timer_reg_base + TIMERUS_USEC_CFG);
->> +}
->> +
->> +#ifdef CONFIG_ARM64
->> +static DEFINE_PER_CPU(struct timer_of, tegra_to) = {
->> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE,
->> +
->> +	.clkevt = {
->> +		.name = "tegra_timer",
->> +		.rating = 460,
->> +		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
->> +		.set_next_event = tegra_timer_set_next_event,
->> +		.set_state_shutdown = tegra_timer_shutdown,
->> +		.set_state_periodic = tegra_timer_set_periodic,
->> +		.set_state_oneshot = tegra_timer_shutdown,
->> +		.tick_resume = tegra_timer_shutdown,
->> +		.suspend = tegra_timer_suspend,
->> +		.resume = tegra_timer_resume,
->> +	},
->> +};
->> +
->> +static int tegra_timer_setup(unsigned int cpu)
->>   {
->> -	u32 reg = 0xC0000000 | ((1000000 / HZ) - 1);
->> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
->> +
->> +	irq_force_affinity(to->clkevt.irq, cpumask_of(cpu));
->> +	enable_irq(to->clkevt.irq);
->> +
->> +	clockevents_config_and_register(&to->clkevt, timer_of_rate(to),
->> +					1, /* min */
->> +					0x1fffffff); /* 29 bits */
->>   
->> -	timer_shutdown(evt);
->> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
->>   	return 0;
->>   }
->>   
->> -static struct clock_event_device tegra_clockevent = {
->> -	.name			= "timer0",
->> -	.rating			= 300,
->> -	.features		= CLOCK_EVT_FEAT_ONESHOT |
->> -				  CLOCK_EVT_FEAT_PERIODIC |
->> -				  CLOCK_EVT_FEAT_DYNIRQ,
->> -	.set_next_event		= tegra_timer_set_next_event,
->> -	.set_state_shutdown	= tegra_timer_shutdown,
->> -	.set_state_periodic	= tegra_timer_set_periodic,
->> -	.set_state_oneshot	= tegra_timer_shutdown,
->> -	.tick_resume		= tegra_timer_shutdown,
->> +static int tegra_timer_stop(unsigned int cpu)
->> +{
->> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
->> +
->> +	to->clkevt.set_state_shutdown(&to->clkevt);
->> +	disable_irq_nosync(to->clkevt.irq);
->> +
->> +	return 0;
->> +}
->> +#else /* CONFIG_ARM */
->> +static struct timer_of tegra_to = {
->> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE | TIMER_OF_IRQ,
->> +
->> +	.clkevt = {
->> +		.name = "tegra_timer",
->> +		.rating	= 300,
->> +		.features = CLOCK_EVT_FEAT_ONESHOT |
->> +			    CLOCK_EVT_FEAT_PERIODIC |
->> +			    CLOCK_EVT_FEAT_DYNIRQ,
->> +		.set_next_event	= tegra_timer_set_next_event,
->> +		.set_state_shutdown = tegra_timer_shutdown,
->> +		.set_state_periodic = tegra_timer_set_periodic,
->> +		.set_state_oneshot = tegra_timer_shutdown,
->> +		.tick_resume = tegra_timer_shutdown,
->> +		.suspend = tegra_timer_suspend,
->> +		.resume = tegra_timer_resume,
->> +		.cpumask = cpu_possible_mask,
->> +	},
->> +
->> +	.of_irq = {
->> +		.index = 2,
->> +		.flags = IRQF_TIMER | IRQF_TRIGGER_HIGH,
->> +		.handler = tegra_timer_isr,
->> +	},
->>   };
->>   
->>   static u64 notrace tegra_read_sched_clock(void)
->>   {
->> -	return timer_readl(TIMERUS_CNTR_1US);
->> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
->> +}
->> +
->> +static unsigned long tegra_delay_timer_read_counter_long(void)
->> +{
->> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
->>   }
->>   
->>   /*
->> @@ -143,100 +233,155 @@ static void tegra_read_persistent_clock64(struct timespec64 *ts)
->>   	timespec64_add_ns(&persistent_ts, delta * NSEC_PER_MSEC);
->>   	*ts = persistent_ts;
->>   }
->> +#endif
->>   
->> -static unsigned long tegra_delay_timer_read_counter_long(void)
->> -{
->> -	return readl(timer_reg_base + TIMERUS_CNTR_1US);
->> -}
->> -
->> -static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
->> -{
->> -	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
->> -	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
->> -	evt->event_handler(evt);
->> -	return IRQ_HANDLED;
->> -}
->> -
->> -static struct irqaction tegra_timer_irq = {
->> -	.name		= "timer0",
->> -	.flags		= IRQF_TIMER | IRQF_TRIGGER_HIGH,
->> -	.handler	= tegra_timer_interrupt,
->> -	.dev_id		= &tegra_clockevent,
->> -};
->> -
->> -static int __init tegra20_init_timer(struct device_node *np)
->> +static int tegra_timer_common_init(struct device_node *np, struct timer_of *to)
->>   {
->> -	struct clk *clk;
->> -	unsigned long rate;
->> -	int ret;
->> -
->> -	timer_reg_base = of_iomap(np, 0);
->> -	if (!timer_reg_base) {
->> -		pr_err("Can't map timer registers\n");
->> -		return -ENXIO;
->> -	}
->> +	int ret = 0;
->>   
->> -	tegra_timer_irq.irq = irq_of_parse_and_map(np, 2);
->> -	if (tegra_timer_irq.irq <= 0) {
->> -		pr_err("Failed to map timer IRQ\n");
->> -		return -EINVAL;
->> -	}
->> +	ret = timer_of_init(np, to);
->> +	if (ret < 0)
->> +		goto out;
->>   
->> -	clk = of_clk_get(np, 0);
->> -	if (IS_ERR(clk)) {
->> -		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
->> -		rate = 12000000;
->> -	} else {
->> -		clk_prepare_enable(clk);
->> -		rate = clk_get_rate(clk);
->> -	}
->> +	timer_reg_base = timer_of_base(to);
->>   
->> -	switch (rate) {
->> +	/*
->> +	 * Configure microsecond timers to have 1MHz clock
->> +	 * Config register is 0xqqww, where qq is "dividend", ww is "divisor"
->> +	 * Uses n+1 scheme
->> +	 */
->> +	switch (timer_of_rate(to)) {
->>   	case 12000000:
->> -		timer_writel(0x000b, TIMERUS_USEC_CFG);
->> +		usec_config = 0x000b; /* (11+1)/(0+1) */
->> +		break;
->> +	case 12800000:
->> +		usec_config = 0x043f; /* (63+1)/(4+1) */
->>   		break;
->>   	case 13000000:
->> -		timer_writel(0x000c, TIMERUS_USEC_CFG);
->> +		usec_config = 0x000c; /* (12+1)/(0+1) */
->> +		break;
->> +	case 16800000:
->> +		usec_config = 0x0453; /* (83+1)/(4+1) */
->>   		break;
->>   	case 19200000:
->> -		timer_writel(0x045f, TIMERUS_USEC_CFG);
->> +		usec_config = 0x045f; /* (95+1)/(4+1) */
->>   		break;
->>   	case 26000000:
->> -		timer_writel(0x0019, TIMERUS_USEC_CFG);
->> +		usec_config = 0x0019; /* (25+1)/(0+1) */
->> +		break;
->> +	case 38400000:
->> +		usec_config = 0x04bf; /* (191+1)/(4+1) */
->> +		break;
->> +	case 48000000:
->> +		usec_config = 0x002f; /* (47+1)/(0+1) */
->>   		break;
->>   	default:
->> -		WARN(1, "Unknown clock rate");
->> +		ret = -EINVAL;
->> +		goto out;
->> +	}
->> +
->> +	writel(usec_config, timer_of_base(to) + TIMERUS_USEC_CFG);
->> +
->> +out:
->> +	return ret;
->> +}
->> +
->> +#ifdef CONFIG_ARM64
->> +static int __init tegra_init_timer(struct device_node *np)
->> +{
->> +	int cpu, ret = 0;
->> +	struct timer_of *to;
->> +
->> +	to = this_cpu_ptr(&tegra_to);
->> +	ret = tegra_timer_common_init(np, to);
->> +	if (ret < 0)
->> +		goto out;
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		struct timer_of *cpu_to;
->> +
->> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
->> +		cpu_to->of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(cpu);
->> +		cpu_to->of_clk.rate = timer_of_rate(to);
->> +		cpu_to->clkevt.cpumask = cpumask_of(cpu);
->> +		cpu_to->clkevt.irq =
->> +			irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
->> +		if (!cpu_to->clkevt.irq) {
->> +			pr_err("%s: can't map IRQ for CPU%d\n",
->> +			       __func__, cpu);
->> +			ret = -EINVAL;
->> +			goto out;
->> +		}
->> +
->> +		irq_set_status_flags(cpu_to->clkevt.irq, IRQ_NOAUTOEN);
->> +		ret = request_irq(cpu_to->clkevt.irq, tegra_timer_isr,
->> +				  IRQF_TIMER | IRQF_NOBALANCING,
->> +				  cpu_to->clkevt.name, &cpu_to->clkevt);
->> +		if (ret) {
->> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
->> +				__func__, cpu_to->clkevt.irq, cpu);
->> +			ret = -EINVAL;
->> +			goto out_irq;
->> +		}
->> +	}
->> +
->> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
->> +			  "AP_TEGRA_TIMER_STARTING", tegra_timer_setup,
->> +			  tegra_timer_stop);
->> +
->> +	return ret;
->> +out_irq:
->> +	for_each_possible_cpu(cpu) {
->> +		struct timer_of *cpu_to;
->> +
->> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
->> +		if (cpu_to->clkevt.irq) {
->> +			free_irq(cpu_to->clkevt.irq, &cpu_to->clkevt);
->> +			irq_dispose_mapping(cpu_to->clkevt.irq);
->> +		}
->>   	}
->> +out:
->> +	timer_of_cleanup(to);
->> +	return ret;
->> +}
->> +#else /* CONFIG_ARM */
->> +static int __init tegra_init_timer(struct device_node *np)
->> +{
->> +	int ret = 0;
->> +
->> +	ret = tegra_timer_common_init(np, &tegra_to);
->> +	if (ret < 0)
->> +		goto out;
->>   
->> -	sched_clock_register(tegra_read_sched_clock, 32, 1000000);
->> +	tegra_to.of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(0);
->> +	tegra_to.of_clk.rate = 1000000; /* microsecond timer */
->>   
->> +	sched_clock_register(tegra_read_sched_clock, 32,
->> +			     timer_of_rate(&tegra_to));
->>   	ret = clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
->> -				    "timer_us", 1000000, 300, 32,
->> -				    clocksource_mmio_readl_up);
->> +				    "timer_us", timer_of_rate(&tegra_to),
->> +				    300, 32, clocksource_mmio_readl_up);
->>   	if (ret) {
->>   		pr_err("Failed to register clocksource\n");
->> -		return ret;
->> +		goto out;
->>   	}
->>   
->>   	tegra_delay_timer.read_current_timer =
->>   			tegra_delay_timer_read_counter_long;
->> -	tegra_delay_timer.freq = 1000000;
->> +	tegra_delay_timer.freq = timer_of_rate(&tegra_to);
->>   	register_current_timer_delay(&tegra_delay_timer);
->>   
->> -	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
->> -	if (ret) {
->> -		pr_err("Failed to register timer IRQ: %d\n", ret);
->> -		return ret;
->> -	}
->> +	clockevents_config_and_register(&tegra_to.clkevt,
->> +					timer_of_rate(&tegra_to),
->> +					0x1,
->> +					0x1fffffff);
->>   
->> -	tegra_clockevent.cpumask = cpu_possible_mask;
->> -	tegra_clockevent.irq = tegra_timer_irq.irq;
->> -	clockevents_config_and_register(&tegra_clockevent, 1000000,
->> -					0x1, 0x1fffffff);
->> +	return ret;
->> +out:
->> +	timer_of_cleanup(&tegra_to);
->>   
->> -	return 0;
->> +	return ret;
->>   }
->> -TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
->>   
->>   static int __init tegra20_init_rtc(struct device_node *np)
->>   {
->> @@ -261,3 +406,6 @@ static int __init tegra20_init_rtc(struct device_node *np)
->>   	return register_persistent_clock(tegra_read_persistent_clock64);
->>   }
->>   TIMER_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
->> +#endif
->> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra_init_timer);
->> +TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra_init_timer);
->> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
->> index fd586d0301e7..e78281d07b70 100644
->> --- a/include/linux/cpuhotplug.h
->> +++ b/include/linux/cpuhotplug.h
->> @@ -121,6 +121,7 @@ enum cpuhp_state {
->>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
->>   	CPUHP_AP_ARM_TWD_STARTING,
->>   	CPUHP_AP_QCOM_TIMER_STARTING,
->> +	CPUHP_AP_TEGRA_TIMER_STARTING,
->>   	CPUHP_AP_ARMADA_TIMER_STARTING,
->>   	CPUHP_AP_MARCO_TIMER_STARTING,
->>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
->>
-> 
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DQoNCk9uIDIxLjAyLjIwMTkgMjI6NDUsIFV3ZSBLbGVpbmUtS8O2bmlnIHdyb3RlOg0KPiBPbiBU
+dWUsIEZlYiAxOSwgMjAxOSBhdCAxMDowOTowMEFNICswMDAwLCBDbGF1ZGl1LkJlem5lYUBtaWNy
+b2NoaXAuY29tIHdyb3RlOg0KPj4gRnJvbTogQ2xhdWRpdSBCZXpuZWEgPGNsYXVkaXUuYmV6bmVh
+QG1pY3JvY2hpcC5jb20+DQo+Pg0KPj4gQWRkIHN1cHBvcnQgZm9yIFNBTTlYNjAncyBQV00gY29u
+dHJvbGxlci4NCj4+DQo+PiBTaWduZWQtb2ZmLWJ5OiBDbGF1ZGl1IEJlem5lYSA8Y2xhdWRpdS5i
+ZXpuZWFAbWljcm9jaGlwLmNvbT4NCj4+IC0tLQ0KPj4gIGRyaXZlcnMvcHdtL3B3bS1hdG1lbC5j
+IHwgMTkgKysrKysrKysrKysrKysrKysrKw0KPj4gIDEgZmlsZSBjaGFuZ2VkLCAxOSBpbnNlcnRp
+b25zKCspDQo+Pg0KPj4gZGlmZiAtLWdpdCBhL2RyaXZlcnMvcHdtL3B3bS1hdG1lbC5jIGIvZHJp
+dmVycy9wd20vcHdtLWF0bWVsLmMNCj4+IGluZGV4IDY0N2QwNjM1NjJkYi4uMjI5Y2VkYjAyNzcw
+IDEwMDY0NA0KPj4gLS0tIGEvZHJpdmVycy9wd20vcHdtLWF0bWVsLmMNCj4+ICsrKyBiL2RyaXZl
+cnMvcHdtL3B3bS1hdG1lbC5jDQo+PiBAQCAtNTIsNiArNTIsOCBAQA0KPj4gIA0KPj4gIC8qIE9u
+bHkgdGhlIExTQiAxNiBiaXRzIGFyZSBzaWduaWZpY2FudC4gKi8NCj4+ICAjZGVmaW5lIFBXTV9N
+QVhWMV9QUkQJCTB4RkZGRg0KPj4gKy8qIEFsbCAzMiBiaXRzIGFyZSBzaWduaWZpY2FudC4gKi8N
+Cj4+ICsjZGVmaW5lIFBXTV9NQVhWMl9QUkQJCTB4RkZGRkZGRkYNCj4+ICAjZGVmaW5lIFBSRF9N
+QVhWMV9QUkVTCQkxMA0KPj4gIA0KPj4gIHN0cnVjdCBhdG1lbF9wd21fcmVnaXN0ZXJzIHsNCj4+
+IEBAIC0zMTEsNiArMzEzLDIwIEBAIHN0YXRpYyBjb25zdCBzdHJ1Y3QgYXRtZWxfcHdtX2RhdGEg
+YXRtZWxfcHdtX2RhdGFfdjIgPSB7DQo+PiAgCX0sDQo+PiAgfTsNCj4+ICANCj4+ICtzdGF0aWMg
+Y29uc3Qgc3RydWN0IGF0bWVsX3B3bV9kYXRhIGF0bWVsX3B3bV9kYXRhX3YzID0gew0KPiANCj4g
+RG9lcyBpdCBtYWtlIG1vcmUgc2Vuc2UgdG8gY2FsbCB0aGlzIC4uLl9zYW05eDYwIHRvIG1hdGNo
+IHRoZQ0KPiBjb21wYXRpYmxlPyAoSWYgeWVzLCBwYXRjaCAxIHNob3VsZCBiZSBjaGFuZ2VkIGFj
+Y29yZGluZ2x5LikNCg0KSXQgY291bGQgYmUgY2hhbmdlZCwgeWVwLg0KDQo+IA0KPiBJIHdvbmRl
+ciBob3cgdGhlIG5hbWluZyBvZiB0aGUgZGVmaW5lcyBpcyBjaG9zZW4gZ2l2ZW4gdGhhdCBwd21f
+ZGF0YV92Mw0KPiBpcyB0aGUgZmlyc3QgdGhhdCBuZWVkcyBQV01fTUFYVjJfUFJELiBMb29rcyBp
+bmNvbnNpc3RlbnQuDQoNCkkga25vdy4uLiBJJ20gYXdhcmUgb2YgdGhhdC4gVGhlIHRoaW5nIGlz
+IGNvbnRyb2xsZXJzIG1heSBkaWZmZXIgd2l0aA0KcmVnYXJkcyB0byBpbi1mbGlnaHQgZHV0eSB1
+cGRhdGUgYW5kIG5vdyB0aGVyZSBpcyB0aGlzIG5ldyBkaWZmZXJlbmNlIHcvDQpyZWdhcmRzIHRv
+IGNvdW50ZXJzIHNpemUuDQoNClJlbmFtaW5nIHRoZSBvYmplY3RzIG9mIHR5cGUgYXRtZWxfcHdt
+X2RhdGEgaW4gc29tZXRoaW5nIGxpa2UNCmF0bWVsX3B3bV9kYXRhXzxjaGlwLW5hbWU+IGFzIHlv
+dSBzdWdnZXN0ZWQgYmVmb3JlIHdvdWxkIG1ha2UgdGhpbmdzIGNsZWFyDQpmb3IgeW91Pw0KDQpU
+aGFuayB5b3UsDQpDbGF1ZGl1IEJlem5lYQ0KDQo+IA0KPiBCZXN0IHJlZ2FyZHMNCj4gVXdlDQo+
+IA0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgt
+YXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQu
+b3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJt
+LWtlcm5lbAo=
