@@ -2,62 +2,69 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D6DDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:33:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8176C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:42:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0ABB420700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:33:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 75B1A2070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:42:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Dbs2uTLW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0ABB420700
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pILjKciF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75B1A2070D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+GngfvVZbeSFnQlxofEtln3MX6YVoZxSZD7Rxxj4NZ4=; b=Dbs2uTLWDskR7g
-	4kDlxSlmcs/mfmThlhyqrUKT75tALWe/69hT5WXoGb6RXFN9uhBB4dg16pDZ9+UjdQ3CWyZ7VA43I
-	VppYjpyh9VghBMQKPT6qUDstPECZbq4TKlT/PbYPWgw1okL658NQAhE8NDz5gl4eA0SYY6o8j4KDg
-	NBHs+1m9Aqag6hd9PC3fA4L1jK2rJFqR7khw0ENREYxMN0QytX2JQhb0kVIAMgQMThwuSziwnrnkE
-	BhspYCuaxvKrxQvopZj/8Rp38GiIt0EdYeQR3wmujcdt0IRk8u85cJmw8zxNI/hNayBbpZDyTuoph
-	n4OufElPT8zP2EtceCLA==;
+	List-Owner; bh=znhegFUBpZ78thE/gaHNMnQBhGkBB9gyyrW8neT2WTk=; b=pILjKciFKatCKz
+	lmOZ/lgrwJnnaMPuy6Xv7JLDS+1o06vaW0H+n71QB+8P2GuxB2j1eGinImIGiHIOk0t+SmB+/9xo9
+	miYtYnor9sYKa14sJRRd4pDXe7TgD7djpqmND6qRhbR4z9x6VdBSfy2qI45HnTAlMb+RsnjuiIWoZ
+	0Rc6zAcpHDrdz03FLnwVwHxDEtaEBKDvOr4TOMyNloRZo3qQH7EgU+CWhMukBtnP47zVnFZ7CO7cW
+	AcJtrCn2W80/N5RIWNN+2Tc+mOA1XcrQ0KJuhT768ok3xUgpVQ6sfN/l9NPCuUnMtyGEMKvl5pgZJ
+	ZZWxbmBMBYxy1HC8vYYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxDkv-0005qh-TT; Fri, 22 Feb 2019 16:32:57 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gxDth-0000VH-Di; Fri, 22 Feb 2019 16:42:01 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxDhM-0000tM-0N
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:29:50 +0000
+ id 1gxDte-0000Uu-2S
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:41:59 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id CF672165C;
- Fri, 22 Feb 2019 08:29:15 -0800 (PST)
-Received: from big-swifty.lan (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 4A7273F5C1; Fri, 22 Feb 2019 08:29:10 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4C1DE80D;
+ Fri, 22 Feb 2019 08:41:57 -0800 (PST)
+Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E51503F5C1;
+ Fri, 22 Feb 2019 08:41:51 -0800 (PST)
+Date: Fri, 22 Feb 2019 16:41:48 +0000
+Message-ID: <86pnrjrd0z.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
-To: Paolo Bonzini <pbonzini@redhat.com>,
- =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 27/27] arm64: KVM: Fix architecturally invalid reset value for
- FPEXC32_EL2
-Date: Fri, 22 Feb 2019 16:26:05 +0000
-Message-Id: <20190222162605.5054-28-marc.zyngier@arm.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190222162605.5054-1-marc.zyngier@arm.com>
-References: <20190222162605.5054-1-marc.zyngier@arm.com>
-MIME-Version: 1.0
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [PATCH 2/5] ata: libahci_platform: Support per-port interrupts
+In-Reply-To: <20190222170348.12e45f42@xps13>
+References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
+ <20190222145356.23072-3-miquel.raynal@bootlin.com>
+ <5040d4cf-7da1-eefa-a8a3-bc4054d528da@redhat.com>
+ <20190222163114.0f4488fe@xps13>
+ <c847985c-7117-6b31-ae78-4467871714c8@redhat.com>
+ <20190222170348.12e45f42@xps13>
+User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
+ FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
+ (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
+Organization: ARM Ltd
+MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_082916_705495_58FC7BE7 
-X-CRM114-Status: GOOD (  12.65  )
+X-CRM114-CacheID: sfid-20190222_084158_120712_D71D5CA2 
+X-CRM114-Status: GOOD (  30.25  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,61 +76,115 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Thierry <julien.thierry@arm.com>, kvm@vger.kernel.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Andre Przywara <andre.przywara@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- Shaokun Zhang <zhangshaokun@hisilicon.com>,
- Masahiro Yamada <yamada.masahiro@socionext.com>,
- James Morse <james.morse@arm.com>, linux-arm-kernel@lists.infradead.org,
- Zenghui Yu <yuzenghui@huawei.com>, Colin Ian King <colin.king@canonical.com>,
- Dave Martin <Dave.Martin@arm.com>, Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org, Jason
+ Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, Hans de Goede <hdegoede@redhat.com>,
+ Rob Herring <robh+dt@kernel.org>, Jens
+ Axboe <axboe@kernel.dk>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-ide@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Dave Martin <Dave.Martin@arm.com>
+On Fri, 22 Feb 2019 16:03:48 +0000,
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> 
+> Hi Hans,
+> 
+> Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:52:55
+> +0100:
+> 
+> > Hi,
+> > 
+> > On 2/22/19 4:31 PM, Miquel Raynal wrote:
+> > > Hi Hans,
+> > > 
+> > > Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:26:01
+> > > +0100:
+> > >   
+> > >> Hi,
+> > >>
+> > >> On 2/22/19 3:53 PM, Miquel Raynal wrote:  
+> > >>> Right now the ATA core only allows IPs to use a single interrupt. Some
+> > >>> of them (for instance the Armada-CP110 one) actually has one interrupt
+> > >>> per port. Add some logic to support such situation.
+> > >>>
+> > >>> We consider that either there is one single interrupt declared in the
+> > >>> main IP node, or there are per-port interrupts, each of them being
+> > >>> declared in the port sub-nodes.
+> > >>>
+> > >>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > >>> ---
+> > >>>    drivers/ata/acard-ahci.c       |  2 +-
+> > >>>    drivers/ata/ahci.c             |  2 +-
+> > >>>    drivers/ata/ahci.h             |  3 +-
+> > >>>    drivers/ata/libahci.c          |  2 +-
+> > >>>    drivers/ata/libahci_platform.c | 66 ++++++++++++++++++++++++++++------
+> > >>>    drivers/ata/sata_highbank.c    |  2 +-
+> > >>>    6 files changed, 61 insertions(+), 16 deletions(-)
+> > >>>
+> > >>> diff --git a/drivers/ata/acard-ahci.c b/drivers/ata/acard-ahci.c
+> > >>> index 583e366be7e2..9414b81e994c 100644
+> > >>> --- a/drivers/ata/acard-ahci.c
+> > >>> +++ b/drivers/ata/acard-ahci.c
+> > >>> @@ -434,7 +434,7 @@ static int acard_ahci_init_one(struct pci_dev *pdev, const struct pci_device_id
+> > >>>    	if (!hpriv)
+> > >>>    		return -ENOMEM;  
+> > >>>    > -	hpriv->irq = pdev->irq;  
+> > >>> +	hpriv->irqs[0] = pdev->irq;
+> > >>>    	hpriv->flags |= (unsigned long)pi.private_data;  
+> > >>>      >> What code-path is going to alloc hpriv->irqs for drivers using this code-path  
+> > >> which are not using libahci_platform .c ?  
+> > > 
+> > > I don't understand the question (or the remark behind the question),
+> > > can you explain a little bit more what you have in mind?  
+> > 
+> > Sorry I got the code context wrong I meant to put that comment below this chunk:
+> > 
+> >  > diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+> >  > index 021ce46e2e57..18bce556d85f 100644
+> >  > --- a/drivers/ata/ahci.c
+> >  > +++ b/drivers/ata/ahci.c
+> >  > @@ -1817,7 +1817,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+> >  >   		/* legacy intx interrupts */
+> >  >   		pci_intx(pdev, 1);
+> >  >   	}
+> >  > -	hpriv->irq = pci_irq_vector(pdev, 0);
+> >  > +	hpriv->irqs[0] = pci_irq_vector(pdev, 0);
+> >  >
+> >  >   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
+> >  >   		host->flags |= ATA_HOST_PARALLEL_SCAN;  
+> > 
+> > 
+> > Which AFAIK is a common code-path also used by ahci drivers not using
+> > libahci_platform, and in that case hpriv->irqs will be NULL as nothing
+> > initializes it.
+> 
+> Oh I see. What do you prefer:
+> 1/
+> * I add "irqs" besides "irq" in the structure
+> * copy the value of irq in irqs[0]
+> * use irqs instead of irq in the libahci_platform ?
+> or
+> 2/
+> * Allocated one irq there if there is none ?
 
-Due to what looks like a typo dating back to the original addition
-of FPEXC32_EL2 handling, KVM currently initialises this register to
-an architecturally invalid value.
+3) you make it a union, and only use it as a pointer when some flag
+somewhere says that you have multiple interrupts.
 
-As a result, the VECITR field (RES1) in bits [10:8] is initialised
-with 0, and the two reserved (RES0) bits [6:5] are initialised with
-1.  (In the Common VFP Subarchitecture as specified by ARMv7-A,
-these two bits were IMP DEF.  ARMv8-A removes them.)
+Yes, this is terrible, but it would limit the changes to the one
+affected platform instead of inflicting the changes on all SATA users.
 
-This patch changes the reset value from 0x70 to 0x700, which
-reflects the architectural constraints and is presumably what was
-originally intended.
+	M.
 
-Cc: <stable@vger.kernel.org> # 4.12.x-
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Fixes: 62a89c44954f ("arm64: KVM: 32bit handling of coprocessor traps")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 81a342679e60..a398d04274b7 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -1523,7 +1523,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
- 	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
--	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
-+	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x700 },
- };
- 
- static bool trap_dbgidr(struct kvm_vcpu *vcpu,
 -- 
-2.20.1
-
+Jazz is not dead, it just smell funny.
 
 _______________________________________________
 linux-arm-kernel mailing list
