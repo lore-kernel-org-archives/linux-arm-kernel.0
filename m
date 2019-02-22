@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 130C5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:32:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 94675C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:32:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CE85420700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:32:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 65E4A20700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:32:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eROZOoWR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE85420700
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dNqYSg13"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65E4A20700
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iRijLHJbUMkUBmVA7UHqMEjp9a7fDvQLqf66quy1Fvo=; b=eROZOoWRr3y2l/
-	MqcIJER4JXIYbGLmxUvvtOlAzmBxGIxiFsin0fdciIFctr3iM1LNCjKxIhiSal0V45s6+vWZl3uXW
-	aVaX7RwGmw9CD8i59J0IlDZIeUms9ukr7uleqISkbJr5GjbigDNRmYvYwo1RfAKPVRCe0b6kRbXgW
-	pISDdPubWppVtVHBQ+A1YAGD9CdgnJngoFmrIC809keyI5ricYfGouJ9PQFVw5BmJrhTCC6SF8hvF
-	KC1Mpwv+6wHufEbC4jWjbXsPBpE6b5SoHR9zbUDb1ssnEE+lhvdiYs/oTfEQ0P3mHjsn4stCrdNwc
-	QbmWY95Y6Gj2amG8gMPw==;
+	List-Owner; bh=4c0BvUslZ0ZsTWdUQC36Y4YyG5HUEDIStACtM+dANKQ=; b=dNqYSg13J2Wi7Q
+	ik4m94tcBtvnwN4GxOIUQqe+e1APSuv1kY6wpfkpseWmYKuO7MihCNbIxhk7Bla67ufluGYaTNyA4
+	8qxve5nIHqHj50L6gwKPgsseQLwDT5iqACYv9WXVsL0/nqrmb7Ucf9FQnZ8weBGz11o4ArpqskBQl
+	OTwX9MKp4AZ82oeTzc/ZS5X7/yo6GO/5tGwAw6TGD8IiIGjk9Awo7ZaCfnCDqcGYzR7YWRJtF0WTQ
+	7jKYkeZfMt8w4VB/zxFBCIIhXBJ9usRCeoVPU0z/vr51v5jrdhDdF0BfyxIDopjd6vX8vgxY5n1lo
+	S4nISy8A7Z3PVpJGmM4w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxDkE-0004r2-Fe; Fri, 22 Feb 2019 16:32:14 +0000
+	id 1gxDkO-000578-U0; Fri, 22 Feb 2019 16:32:24 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxDh3-0000Rh-89
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:29:00 +0000
+ id 1gxDh8-0000Yb-1u
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:29:05 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C703480D;
- Fri, 22 Feb 2019 08:28:56 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7F8E380D;
+ Fri, 22 Feb 2019 08:29:01 -0800 (PST)
 Received: from big-swifty.lan (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 6B7EA3F5C1; Fri, 22 Feb 2019 08:28:51 -0800 (PST)
+ 5C5353F5C1; Fri, 22 Feb 2019 08:28:57 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 23/27] KVM: arm/arm64: fix spelling mistake: "auxilary" ->
- "auxiliary"
-Date: Fri, 22 Feb 2019 16:26:01 +0000
-Message-Id: <20190222162605.5054-24-marc.zyngier@arm.com>
+Subject: [PATCH 24/27] KVM: arm64: Fix comment for KVM_PHYS_SHIFT
+Date: Fri, 22 Feb 2019 16:26:02 +0000
+Message-Id: <20190222162605.5054-25-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190222162605.5054-1-marc.zyngier@arm.com>
 References: <20190222162605.5054-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_082857_809924_F6213BA9 
-X-CRM114-Status: GOOD (  10.94  )
+X-CRM114-CacheID: sfid-20190222_082902_834535_8713827E 
+X-CRM114-Status: GOOD (  10.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,28 +83,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+From: Zenghui Yu <yuzenghui@huawei.com>
 
-There is a spelling mistake in a kvm_err error message. Fix it.
+Since Suzuki K Poulose's work on Dynamic IPA support, KVM_PHYS_SHIFT will
+be used only when machine_type's bits[7:0] equal to 0 (by default). Thus
+the outdated comment should be fixed.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Zenghui Yu <yuzenghui@huawei.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_mmu.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 9fbdb9e1c51f..8de55041e7ba 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1553,7 +1553,7 @@ static int init_hyp_mode(void)
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index c423c8c4fc39..b0742a16c6c9 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -138,7 +138,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ 	})
  
- 	err = hyp_map_aux_data();
- 	if (err)
--		kvm_err("Cannot map host auxilary data: %d\n", err);
-+		kvm_err("Cannot map host auxiliary data: %d\n", err);
- 
- 	return 0;
+ /*
+- * We currently only support a 40bit IPA.
++ * We currently support using a VM-specified IPA size. For backward
++ * compatibility, the default IPA size is fixed to 40bits.
+  */
+ #define KVM_PHYS_SHIFT	(40)
  
 -- 
 2.20.1
