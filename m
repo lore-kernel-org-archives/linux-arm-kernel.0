@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
 	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C9BEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:08:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 032C1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:08:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 299E02070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:08:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C4FF72070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:08:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Pv7SK7wj";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VFEDariz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 299E02070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sndb+bav";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ESb80kNi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C4FF72070B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,63 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=3fAnoxMTthii5JRisKa+6fhBzsz9SZDb+cE+qTtsbiU=; b=Pv7SK7wjmeCa/TjCrqaHvP9rzU
-	oCr8G/d/4YEiCljcorasMerdKLY2IPYfNVYgDfdHAhezEmCEgKsJQ1OacNYKXn1Ew1qnTkm2Mcub9
-	sq9J5vPd+qb18gAmiMbupGenNKGzKPZjYVPk+KMwrYOeV8dno7o79q5XfFpEqLAE2+9pbhaANQs3r
-	d0s2kG6LPIV2gPLNxgJTreaFnXMEqs6/hwifMQGADwy0BppcMw7dzPdUBlAhCDqOqFCg9hngc3yOB
-	NuogiVp1kL1W5qF0n3M7qmXdFkRFrRVeqrzW3D1bEBUM1J4KRL34j25sPY7Zl0vIk8cQCPCB9P0HF
-	Yw9KtOUQ==;
+	bh=XmNASWLcKzmd5LRzD8X+qLdfHTr6ylAPzkxCF7e889I=; b=Sndb+bavxxg8NDTZrOIUc6d/ZJ
+	ORE0kZaNdp8MyTJqGvUHMO41zkISDIY2AfPzK9SupEgkyS2k0ldydQ1wJDBftdA3PJ757Pr6ae0lO
+	k38d8eERKA5hxGanl8fJk4f6+gyLb0WymQwDR2LfURbvVnOmsbab0Wy2DWE0Os/9AmeuiLGKfcfm7
+	2Z6fDqg/As7PPkAVb/zDDFP+hS+VK4lKgjBw0lQ6oP/mfUrSt1W16qs4sf94SZLy9LnfNGbcgkU1P
+	lD/Ay+Qf8OBsESRJgn1pL/GwglNcle5lgjxIwrFs4XJdCcUqC1xrclhGh7w44tnckCi+JyhKfe/sS
+	FlmDI+1g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxCQn-0000ew-Pr; Fri, 22 Feb 2019 15:08:05 +0000
+	id 1gxCQy-0000pK-F0; Fri, 22 Feb 2019 15:08:16 +0000
 Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxCQB-00007o-Ur
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:07:31 +0000
-Received: by mail-pg1-x542.google.com with SMTP id h11so1274402pgl.0
+ id 1gxCQJ-0000Fx-7z
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:07:39 +0000
+Received: by mail-pg1-x542.google.com with SMTP id s198so1268359pgs.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 07:07:27 -0800 (PST)
+ Fri, 22 Feb 2019 07:07:35 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=HSIeB4k5ZuogmL6MUD/u+Ar8YyEEuP4vsoidGitcBOo=;
- b=VFEDarizmQAexjrnIXw10DNn/NEU/q3swR8bwAjLeGeWR5tr50z2EvERNhdjvyBtb4
- VqcDze6oJyEG2pknFT+FiETqiVnE0DZHnLwja3h0uY8qOOjM21+Dp6SLpG/BC3cE4h81
- SF/psiWa1QApresuj0e8ND3u+47m/GWHAnUBUNUC7nvhjODQgJkjJ6VL5W9Z5qzpBEql
- aj+3/jBXo1eCh94oYlGSFb8sc69YJn3TYkh/EmPjUsk5AMD6kLLfgTmUnd3sAw1vBVnr
- hJaY7uoZAfxkdaMxF06564Gne0Mr7a2eQI5ZiDFFUQvgZkp3OVmUBVZyCVYSG/kRWDXN
- qDFA==
+ bh=YM3seOtHGatq4lqSEDt4Wr16opyBlW43DUEP6U3tUmw=;
+ b=ESb80kNiQ9yog25hPeo9L5hKj8CkvoWsClwvZnFApBr+huWEHDWQTXqNuizJjyoiLZ
+ CiXdav6OWZyQC9tqLSnqze0GiMae/oOAqV9Ud+Bd0ydew6/OsD/5XGOh4zoWPCGpyzum
+ RvRhzwTNo7shXmgxFxA0oErxpGAnGACXRAIV2H/5+tE9/MOPelqqfgFQgoPkHrPGJcva
+ OFNYA0CbwxPF4AS95pELF6Np+sXag6o6tqlsTWOYsfVykohWQxclNwxjcwzsbz78YRtX
+ ArQsaIhAhxE+H3rU76V/GO1lQSdXD6+ZWGqrTKkUG1aU8t+bF50qLOCpSMN2Xyqn7kh1
+ JrbA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=HSIeB4k5ZuogmL6MUD/u+Ar8YyEEuP4vsoidGitcBOo=;
- b=ASkCImrp/8uuGyBKoslnvhuAIHO4RoJalu42xXS+KTSNqlklBYA1AzCX0gr3R7QPOY
- 1cZ2k+mvERg2aqREnmVzk/tS8WxQj8SyOopd60aGkzWY0DS83QhKgVn3gG/e3srzYIAO
- JFTT8Hkzwp8IaYy88aIUOpN34JeyxDyCsFePrQsz7dUa2x+j4kpZw43NaUi0xxvjjbVH
- GHsDbNndZaMazqi+D/v4XMGE91Khih4oZp36PJNBoa/OTuFs4HRVnbZm9Jg1g/GmMvyj
- hwIaQsbhTvfNxsqtk8a0m4dimT6evjMZX+xO2RAoV7cxNlv8YFMO/K/JCG6Q6Hk91dOy
- UgXA==
-X-Gm-Message-State: AHQUAuZRiJeIbFRCEZFxjGl29DlufChZhteZBHGNvD10VwdQVvJJ/0S7
- wEcHd8p2yyGsisRFiU21P0o=
-X-Google-Smtp-Source: AHgI3IYeKFBy5DfEgi7+NoEfVT1WeWulgurOSdqM73OPfGXKYCvFjRfn6bTV8zsuwtVzgFf4mlVMaQ==
-X-Received: by 2002:a63:2ccb:: with SMTP id s194mr4379235pgs.214.1550848047046; 
- Fri, 22 Feb 2019 07:07:27 -0800 (PST)
+ bh=YM3seOtHGatq4lqSEDt4Wr16opyBlW43DUEP6U3tUmw=;
+ b=eFzursYqVuU9ba3Y6Yq14ZJwmlht8cK4p8Qwr641EOhklzNlPqoD6YIpoqIDroN0mu
+ hDBLpssoj3/nXKbMDnHYERPe1hbfOaG7lTz3Y66DKqcG3UzS6Toded+1m1UEj5PgcHr8
+ FQOUKvpL0vLpWuNXbv2PY7bRAyaBt/3dGn9ErO5neAikp8RlvwiYayqS32/8ryH/g1cn
+ Rz9a1fu8CF/AX6TXeBzvzf6wdvdkNnSRAdpozysUYE9xv8Pn0wW5philgAaROTtSjmV4
+ 1Q0vuvW3QSOqFli0qikE8UhJNw9dY5rTK6+6Bb0U2vRigC9AJYmxQwAr+WPNLrugT5qL
+ jbuA==
+X-Gm-Message-State: AHQUAuazO13HOBxGD8S1gDQGYDaVP6cntM/Aig35OE/sadEsTxASHwbf
+ DBY7lwrC+Q+LpPmG5Ky7hBU=
+X-Google-Smtp-Source: AHgI3IZ4Yi0roB+29f2OCEvwvH3n/OYYmCvsm0Fts14g6RKRhp0fOWP4XzYAgutWF3KiQlBf5I9nbw==
+X-Received: by 2002:a62:48c1:: with SMTP id q62mr4660304pfi.113.1550848054699; 
+ Fri, 22 Feb 2019 07:07:34 -0800 (PST)
 Received: from localhost.corp.microsoft.com ([167.220.255.67])
- by smtp.googlemail.com with ESMTPSA id a4sm6151780pga.52.2019.02.22.07.07.19
+ by smtp.googlemail.com with ESMTPSA id a4sm6151780pga.52.2019.02.22.07.07.27
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 22 Feb 2019 07:07:26 -0800 (PST)
+ Fri, 22 Feb 2019 07:07:33 -0800 (PST)
 From: lantianyu1986@gmail.com
 X-Google-Original-From: Tianyu.Lan@microsoft.com
 To: 
-Subject: [PATCH V3 4/10] KVM/MMU: Use range flush in sync_page()
-Date: Fri, 22 Feb 2019 23:06:31 +0800
-Message-Id: <20190222150637.2337-5-Tianyu.Lan@microsoft.com>
+Subject: [PATCH V3 5/10] KVM/MMU: Flush tlb directly in the
+ kvm_mmu_slot_gfn_write_protect()
+Date: Fri, 22 Feb 2019 23:06:32 +0800
+Message-Id: <20190222150637.2337-6-Tianyu.Lan@microsoft.com>
 X-Mailer: git-send-email 2.14.4
 In-Reply-To: <20190222150637.2337-1-Tianyu.Lan@microsoft.com>
 References: <20190222150637.2337-1-Tianyu.Lan@microsoft.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_070728_155496_6CC1EE9C 
-X-CRM114-Status: GOOD (  12.51  )
+X-CRM114-CacheID: sfid-20190222_070736_539002_0B04EF95 
+X-CRM114-Status: GOOD (  10.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -114,31 +115,30 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-This patch is to use range flush to flush tlbs of input struct
-kvm_mmu_page in the sync_page(). If range flush is not available,
-kvm_flush_remote_tlbs_with_address() will call kvm_flush_remote_tlbs().
+This patch is to flush tlb directly in the kvm_mmu_slot_gfn_write_protect()
+when range flush is available.
 
 Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
- arch/x86/kvm/paging_tmpl.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/x86/kvm/mmu.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/x86/kvm/paging_tmpl.h b/arch/x86/kvm/paging_tmpl.h
-index 6bdca39829bc..768c5c64e3f8 100644
---- a/arch/x86/kvm/paging_tmpl.h
-+++ b/arch/x86/kvm/paging_tmpl.h
-@@ -1033,8 +1033,9 @@ static int FNAME(sync_page)(struct kvm_vcpu *vcpu, struct kvm_mmu_page *sp)
- 					 true, false, host_writable);
+diff --git a/arch/x86/kvm/mmu.c b/arch/x86/kvm/mmu.c
+index 7a862c56b954..60b1771e400e 100644
+--- a/arch/x86/kvm/mmu.c
++++ b/arch/x86/kvm/mmu.c
+@@ -1729,6 +1729,11 @@ bool kvm_mmu_slot_gfn_write_protect(struct kvm *kvm,
+ 		write_protected |= __rmap_write_protect(kvm, rmap_head, true);
  	}
  
--	if (set_spte_ret & SET_SPTE_NEED_REMOTE_TLB_FLUSH)
--		kvm_flush_remote_tlbs(vcpu->kvm);
++	if (write_protected && kvm_available_flush_tlb_with_range()) {
++		kvm_flush_remote_tlbs_with_address(kvm, gfn, 1);
++		write_protected = false;
++	}
 +
-+	kvm_flush_remote_tlbs_with_address(vcpu->kvm, sp->gfn,
-+			KVM_PAGES_PER_HPAGE(sp->role.level + 1));
- 
- 	return nr_present;
+ 	return write_protected;
  }
+ 
 -- 
 2.14.4
 
