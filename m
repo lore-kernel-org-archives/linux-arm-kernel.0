@@ -2,64 +2,80 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92852C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 17:36:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 43D52C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 17:37:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 64CE52077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 17:36:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 17847206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 17:37:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bHkWcsrB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 64CE52077B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="h2ggI8Qk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17847206B6
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=K54wy/MDuX7R17OWqjeQeQYRTys+ABcJxIstk2F9Sy0=; b=bHkWcsrBskIsmx
-	CzN4zrcywwgRm9nS7+0Yz6i3poc5uZLaDHdsBVSDhWCWTvs9vBAii6T3XJhBseAFXJgALpX8aErr4
-	XK1igBVBxBKV65gxspJaWgOGDfd/7EILvemIcNRRadqV6qKl57kb1tTMKQdM987NoaLmq43VkpdVM
-	5SLj4zjlaYJ3ilGd/3SKaQw44OSpc6l/shxCVUJRRLQV+u/KgYrs5wsgK2OLQpjlEE2juBRh/pNf/
-	Ma3iQvQOBhUGODj7N/Fj/ygvopSq6jmBsiL0nI+AmavfW/Hoc2PE+/ntyQp2al1/jrpzfughhN55i
-	mPxRXpNPNwHPct6oBJ9g==;
+	List-Owner; bh=ZFtGPSxbKgZivtAuKHxWl7DmPljZ2vu/8+ynQprUGJQ=; b=h2ggI8Qku7oiwJ
+	CVWv1iWigL7W+SqlLM7yGmVxsb6I6dOozKYaMzVizhk96gHo3bTdlSGZEgGTJnquBYP6gE5WrZO7c
+	qeuzpJYdwwpcH3DyMweNldh2Ww2DB65gGm3t3SVbgKWITqq2wFINTtpQ/SH4kpSVThwFMFGL5Dl2q
+	qQSHZ1Dwtbzro4bf0Y69CILNJWp50JsvDvmJ2RexRJCz/hbyAPhbyUG9zuOLqd/fGYdhwjD4UAufn
+	b/q33OQQby6Nxe0ha0MGTgESUOTEXok5AXneV+T26HJPnAM9Hvu8a8+NJv/kknprqVz9HYV/TUpD+
+	/0/LPrzpqfNFLe18eGgQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxEk6-0004w9-HU; Fri, 22 Feb 2019 17:36:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxEk2-0004vb-Up
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 17:36:08 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A8B2D80D;
- Fri, 22 Feb 2019 09:36:06 -0800 (PST)
-Received: from donnerap.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5005C3F5C1;
- Fri, 22 Feb 2019 09:36:05 -0800 (PST)
-Date: Fri, 22 Feb 2019 17:36:02 +0000
-From: Andre Przywara <andre.przywara@arm.com>
-To: Steven Price <steven.price@arm.com>
-Subject: Re: [PATCH v3 1/2] KVM: arm/arm64: Add save/restore support for
- firmware workaround state
-Message-ID: <20190222173602.05f34343@donnerap.cambridge.arm.com>
-In-Reply-To: <c3dba11e-7f17-d49a-4eac-f3309f836d66@arm.com>
-References: <20190222121818.30164-1-andre.przywara@arm.com>
- <20190222121818.30164-2-andre.przywara@arm.com>
- <c3dba11e-7f17-d49a-4eac-f3309f836d66@arm.com>
-Organization: ARM
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; aarch64-unknown-linux-gnu)
+	id 1gxElc-0005UL-EL; Fri, 22 Feb 2019 17:37:44 +0000
+Received: from mail-oi1-f194.google.com ([209.85.167.194])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxElZ-0005Tw-91
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 17:37:42 +0000
+Received: by mail-oi1-f194.google.com with SMTP id b4so2339731oif.6
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 22 Feb 2019 09:37:41 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=ZGQIM3GpgLZbnfp+DGR8UCIwyuFKStrA4F203lEZjdg=;
+ b=VtI89LZ3PZV7kxHlvaklwNCFpUQ6X4uimgmSs3qR+9LV+kJegPHo4y28EpylnsglUX
+ nFq4a4JHTDfKkubIrpVQxYmHM657AFZDEsjb3j7hvQSzkWEo6gksBRlYxrvhFSkRT3xr
+ nUEtjxTlPGJjS1GR4qw2KLUnxaWwn94ByyzSFXrvU9NcIKSDYaHpD1KgbJlE2//01Qgk
+ s+Y2OwaplKgWXEqlkdUWbV9gLGqPsFJmGXcTIEphwj/DC9CID8WQ4s98GjINcbYhrWvR
+ Ge6urkkG3Dns64mDzs3u7GJ1xB55TpIN+CC8WdnWWOyBN6FIA9wYNgAZSrDcAaKtZfXy
+ XDdw==
+X-Gm-Message-State: AHQUAubrEAtIh37RzFGLOfVQCSYIIf7bhRI9nnqV3vxDBxDGzd8m68bp
+ SKir4GwkfOYe/FkzysiEbg==
+X-Google-Smtp-Source: AHgI3IZUfBK9YOhRiNGj5F8GS3/KiwiNW9Rro1YvobOAtrHDZZVXK/BrseZVXFxmCt4lGYSTEbLUFA==
+X-Received: by 2002:aca:3a87:: with SMTP id h129mr3358649oia.86.1550857060131; 
+ Fri, 22 Feb 2019 09:37:40 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id r9sm750565otp.81.2019.02.22.09.37.39
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 22 Feb 2019 09:37:39 -0800 (PST)
+Date: Fri, 22 Feb 2019 11:37:38 -0600
+From: Rob Herring <robh@kernel.org>
+To: Aisheng Dong <aisheng.dong@nxp.com>
+Subject: Re: [PATCH V4 1/4] dt-binding: irq: imx-irqsteer: use irq number
+ instead  of group number
+Message-ID: <20190222173738.GA2168@bogus>
+References: <1550662447-8565-1-git-send-email-aisheng.dong@nxp.com>
+ <1550662447-8565-2-git-send-email-aisheng.dong@nxp.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1550662447-8565-2-git-send-email-aisheng.dong@nxp.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_093607_008963_AEB42992 
-X-CRM114-Status: GOOD (  20.82  )
+X-CRM114-CacheID: sfid-20190222_093741_319039_20E9E475 
+X-CRM114-Status: GOOD (  15.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,83 +87,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: kvm@vger.kernel.org, Marc Zyngier <marc.zyngier@arm.com>,
- Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
- Dave Martin <dave.martin@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: Aisheng Dong <aisheng.dong@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "tglx@linutronix.de" <tglx@linutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 22 Feb 2019 17:16:12 +0000
-Steven Price <steven.price@arm.com> wrote:
-
-> On 22/02/2019 12:18, Andre Przywara wrote:
-> > KVM implements the firmware interface for mitigating cache speculation
-> > vulnerabilities. Guests may use this interface to ensure mitigation is
-> > active.
-> > If we want to migrate such a guest to a host with a different support
-> > level for those workarounds, migration might need to fail, to ensure that
-> > critical guests don't loose their protection.
-> > 
-> > Introduce a way for userland to save and restore the workarounds state.
-> > On restoring we do checks that make sure we don't downgrade our
-> > mitigation level.
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > ---
-> >  arch/arm/include/asm/kvm_emulate.h   |  10 +++
-> >  arch/arm/include/uapi/asm/kvm.h      |  10 +++
-> >  arch/arm64/include/asm/kvm_emulate.h |  14 ++++
-> >  arch/arm64/include/uapi/asm/kvm.h    |   9 ++
-> >  virt/kvm/arm/psci.c                  | 119 +++++++++++++++++++++++----
-> >  5 files changed, 146 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> > index 8927cae7c966..663a02d7e6f4 100644
-> > --- a/arch/arm/include/asm/kvm_emulate.h
-> > +++ b/arch/arm/include/asm/kvm_emulate.h
-> > @@ -283,6 +283,16 @@ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
-> >  	return vcpu_cp15(vcpu, c0_MPIDR) & MPIDR_HWID_BITMASK;
-> >  }
-> >  
-> > +static inline bool kvm_arm_get_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu)
-> > +{
-> > +	return false;
-> > +}
-> > +
-> > +static inline void kvm_arm_set_vcpu_workaround_2_flag(struct kvm_vcpu *vcpu,
-> > +						      bool flag)
-> > +{
-> > +}
-> > +
-> >  static inline void kvm_vcpu_set_be(struct kvm_vcpu *vcpu)
-> >  {
-> >  	*vcpu_cpsr(vcpu) |= PSR_E_BIT;
-> > diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> > index 4602464ebdfb..ba4d2afe65e3 100644
-> > --- a/arch/arm/include/uapi/asm/kvm.h
-> > +++ b/arch/arm/include/uapi/asm/kvm.h
-> > @@ -214,6 +214,16 @@ struct kvm_vcpu_events {
-> >  #define KVM_REG_ARM_FW_REG(r)		(KVM_REG_ARM | KVM_REG_SIZE_U64 | \
-> >  					 KVM_REG_ARM_FW | ((r) & 0xffff))
-> >  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
-> > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1	KVM_REG_ARM_FW_REG(1)
-> > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_NOT_AVAIL	0
-> > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_AVAIL	1
-> > +#define KVM_REG_ARM_SMCCC_ARCH_WORKAROUND_1_UNAFFECTED	2  
+On Wed, 20 Feb 2019 11:40:40 +0000, Aisheng Dong wrote:
+> Not all 64 interrupts may be used in one group. e.g. most irqsteer in
+> imx8qxp and imx8qm subsystems supports only 32 interrupts.
 > 
-> Thanks for adding the UNAFFECTED state for WORKAROUND_1 - this means the
-> ABI at least can deal with migration to a host which supports but
-> doesn't need the workaround. I'm happy for the actual support for this
-> to be added later if/when it's needed.
+> As the IP integration parameters are Channel number and interrupts number,
+> let's use fsl,irqs-num to represents how many interrupts supported
+> by this irqsteer channel.
+> 
+> Note this will break the compatibility of old binding. As the original
+> fsl,irq-groups was born out of a misunderstanding of the HW config
+> options and we are not aware of any users of the current binding.
+> And the old binding was just published in recent months, so it's
+> worth to change now to avoid confusing in the future.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: devicetree@vger.kernel.org
+> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> ChangeLog:
+> v3->v4:
+>  * add more commit messages to describe the compatibility break
+> v2->v3:
+>  * no changes
+> v1->v2:
+>  * change property name fsl,irqs-per-chan to fsl,num-irqs.
+> ---
+>  .../devicetree/bindings/interrupt-controller/fsl,irqsteer.txt       | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
 
-Thanks. Actually we *can't* do anything right now, because the host kernel only provides this "requires w/a or not" state, so for the current kernel we will never see UNAFFECTED. If QEMU wants to set UNAFFECTED because the source kernel had it, we naturally deny it, as future code would do as well. So I think this solution is forward compatible.
- 
-> Reviewed-by: Steven Price <steven.price@arm.com>
-
-Thanks for that!
-Andre.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
