@@ -2,88 +2,67 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EDEECC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:20:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88C69C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:21:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB45A2089F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:20:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57D1F20823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:21:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TrqTPEHE";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="P2jjblP2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB45A2089F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S1nPMhme"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57D1F20823
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=OlPeZavctilhyjhSZGlk5hSeq0Stb78n14TOmkZTcXM=; b=TrqTPEHEspnEmj
-	RadGSgCAxeOFP5eLXjpJdT/y11Zs1vMhYy5plABcfcZrXgqun604ZfDssMYv7b5iOEObmSOkdEhdi
-	cLEr5T25bhZm8TiPZC6HOj5TwvG3qRXe60E4lwAh4A//yL67lqVoKMhqTinw4ZOUH4595dD2MKFBh
-	gnFPVttR25r66kobvR/QcgEp4iGvfvryGRXIgcAeleV1ei/SHZbkrirrRYd4jAqeBS4B8HmTTd7zv
-	t4A2nMoAojlqBRh4bQfsp1otYZyytlngdd5diGQANiCZEYpltV4sdebmvk/oH0O0Uc8Cmp9Dru9Yc
-	EOd3SpkaZJVMWVbig24Q==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=jwGgcvEGJflrlG3Ag5PPMrn5ALJ1Yhzidr9CHPAoKP0=; b=S1nPMhmetBMSsJ
+	/K50acOkozFQ8mSjSL8rluw3qwDa90k1zHO6T98yw33seD/xdcj7/pXyKdAYaFRC+A5PYJ0nySPu7
+	CtohBFMoLV2nBMXIFX43OqUn/UJXCiznOEvYGT1GZQwss2v0/ctByWh6JQg1rNYeFLRcZBEWf2WSZ
+	Xyqnxg6Nk1UycbK2u77SedAzca9geyGFttqLI+CFBs+yBU8CR/RywLtRENaXzGrfYQ1KLp8nfwUC3
+	eZv29zX6TXBPwA1WQF7yXSH7xoDsl2/hRADa5YO7CGRvy+eHjvDCaHpOeE7E9fGUAcm0WpBfS0OBI
+	KOMwrJwj0g1SX/ZNqBzA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx7vz-00024c-P1; Fri, 22 Feb 2019 10:19:59 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx7vw-00023N-Rz
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 10:19:58 +0000
-Received: by mail-pl1-x644.google.com with SMTP id e5so913084plb.5
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 02:19:56 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=AooKzWveTVvTjP20/04jj799GvM5xIpT/iogDO3xN9A=;
- b=P2jjblP2DbX0scovVwuuZMh2AahuNzYnvArUx2qWaUl1TWzbf9qG7DIdNq9W5B/YKH
- J9t1d+3GUnSlt42t110jIGlPBLKOFeqKl2h0Hhy40UjJNx7/WLwepfBfAoOX/AwDr4Vi
- /yoHlcbA0NkRk3YrN19gkOFKSRSQiRoqtlolM8HOWc+LMfydPbJSMewiHsOZ0g6gtLBG
- /U1QbY2NLbYCMYAe6JacziHldc861GeIF4OF+0A+B/T8xjUkn/2H4CdzD/HLgddNEM1r
- tam6g3kJyX2bTcLpbbqmamVbhH3VJlct0HtIF6vIzyN2J4c3ODbTOgeijsdx2mXtyg+5
- oqow==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=AooKzWveTVvTjP20/04jj799GvM5xIpT/iogDO3xN9A=;
- b=f+9U4gf7hvds5HJKMhS7BQV1pNLGUgGkjzykbEknGVufIeN3601qurmYU/fY7fcXek
- Zo+roxq8d0UiwRUg2MZ75KkuJTYdmHzyutBmNJ5aSp4YJBiKdIwoaQHJNGprTFaL8SBG
- nEMebnRbwEZRG3fRGyuj1w1r2t7YpDjHGubJDwd+oAttBVguPV1v+XXDnQlalrkLQVpT
- Zk4Mdmhg2E2l9w/r/ZhGHVYW0V9Gj6rUPWbM7AH6gvqTF7SQRpeJQ3KgIC3Z7ipyqk56
- 1LPXYBb1Ok3Y0RorogHW5NZ+LJtF/0VMzk4lTHEd/WC0BGizYLEtsrPPF00Gz924yVUk
- KvIg==
-X-Gm-Message-State: AHQUAubcZrjvyJZB1et30EwqrFoQIbayLydHcU+GiNg+CItiZMmjHNXj
- suZUOLvY8J/jwSsqlBP+Cqs=
-X-Google-Smtp-Source: AHgI3Ib48zeEI1RhGoWcBODxTQfC23HdTer3t+Pap+ZtDoh6i9w4y3jmXfc1R4JFp+VExQMm5uJlvA==
-X-Received: by 2002:a17:902:1:: with SMTP id 1mr3287702pla.276.1550830795648; 
- Fri, 22 Feb 2019 02:19:55 -0800 (PST)
-Received: from localhost.localdomain ([103.51.74.158])
- by smtp.gmail.com with ESMTPSA id v15sm2835352pfa.75.2019.02.22.02.19.52
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 02:19:54 -0800 (PST)
-From: Anand Moon <linux.amoon@gmail.com>
-To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- linux-samsung-soc@vger.kernel.org
-Subject: [PATCH] ARM: dts: exynos: Add pin configuration for read strobe for
- Odroid XU3/XU4 eMMC
-Date: Fri, 22 Feb 2019 10:19:48 +0000
-Message-Id: <20190222101948.848-1-linux.amoon@gmail.com>
-X-Mailer: git-send-email 2.20.1
+	id 1gx7xk-0003jl-GF; Fri, 22 Feb 2019 10:21:48 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx7xh-0003jL-FH
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 10:21:46 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C24EB80D;
+ Fri, 22 Feb 2019 02:21:44 -0800 (PST)
+Received: from [10.1.196.69] (e112269-lin.cambridge.arm.com [10.1.196.69])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A30923F703;
+ Fri, 22 Feb 2019 02:21:41 -0800 (PST)
+Subject: Re: [PATCH v2 03/13] mm: Add generic p?d_large() macros
+To: "Kirill A. Shutemov" <kirill@shutemov.name>
+References: <20190221113502.54153-1-steven.price@arm.com>
+ <20190221113502.54153-4-steven.price@arm.com>
+ <20190221142812.oa53lfnnfmsuh6ys@kshutemo-mobl1>
+ <a3076d01-41b3-d59b-e98c-a0fd9ba5d3f5@arm.com>
+ <20190221145706.zqwfdoyiirn3lc7y@kshutemo-mobl1>
+ <e0c7fc0c-7924-1106-a7a3-fc12136b7b82@arm.com>
+ <20190221210618.voyfs5cnafpvgedh@kshutemo-mobl1>
+From: Steven Price <steven.price@arm.com>
+Message-ID: <9441949b-6982-eea3-a05e-e277776ff821@arm.com>
+Date: Fri, 22 Feb 2019 10:21:40 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
+In-Reply-To: <20190221210618.voyfs5cnafpvgedh@kshutemo-mobl1>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_021956_925845_8D8E99F5 
-X-CRM114-Status: GOOD (  12.89  )
+X-CRM114-CacheID: sfid-20190222_022145_513968_F6247ADD 
+X-CRM114-Status: GOOD (  17.33  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,55 +74,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh+dt@kernel.org>, linux-kernel@vger.kernel.org,
- Krzysztof Kozlowski <krzk@kernel.org>,
- Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Mark Rutland <Mark.Rutland@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, x86@kernel.org,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ linux-mm@kvack.org, =?UTF-8?B?SsOpcsO0bWUgR2xpc3Nl?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add Read Strobe RDQS pin configuration for eMMC to support higher data rate read/write.
+On 21/02/2019 21:06, Kirill A. Shutemov wrote:
+> On Thu, Feb 21, 2019 at 05:16:46PM +0000, Steven Price wrote:
+>>>> Note that in terms of the new page walking code, these new defines are
+>>>> only used when walking a page table without a VMA (which isn't currently
+>>>> done), so architectures which don't use p?d_large currently will work
+>>>> fine with the generic versions. They only need to provide meaningful
+>>>> definitions when switching to use the walk-without-a-VMA functionality.
+>>>
+>>> How other architectures would know that they need to provide the helpers
+>>> to get walk-without-a-VMA functionality? This looks very fragile to me.
+>>
+>> Yes, you've got a good point there. This would apply to the p?d_large
+>> macros as well - any arch which (inadvertently) uses the generic version
+>> is likely to be fragile/broken.
+>>
+>> I think probably the best option here is to scrap the generic versions
+>> altogether and simply introduce a ARCH_HAS_PXD_LARGE config option which
+>> would enable the new functionality to those arches that opt-in. Do you
+>> think this would be less fragile?
+> 
+> These helpers are useful beyond pagewalker.
+> 
+> Can we actually do some grinding and make *all* archs to provide correct
+> helpers? Yes, it's tedious, but not that bad.
+> 
+> I think we could provide generic helpers for folded levels in
+> <asm-generic/pgtable-nop?d.h> and rest has to be provided by the arch.
+> Architectures that support only 2 level paging would need to provide
+> pgd_large(), with 3 -- pmd_large() and so on.
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
----
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 6 ++++++
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+Fair enough, I'll have a go and hopefully people will be able to correct
+it if I make any mistakes - I'm certainly not going to be able to test
+all architectures myself.
 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index b82af7c89654..4fb3865e082a 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -206,6 +206,12 @@
- 		samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
- 	};
- 
-+	sd0_rdqs: sd0-rdqs {
-+		samsung,pins = "gpc0-7";
-+		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-+		samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
-+	};
-+
- 	sd1_clk: sd1-clk {
- 		samsung,pins = "gpc1-0";
- 		samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index b299e541cac0..d41397748ed2 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -411,7 +411,7 @@
- 	samsung,dw-mshc-hs400-timing = <0 2>;
- 	samsung,read-strobe-delay = <90>;
- 	pinctrl-names = "default";
--	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
-+	pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
- 	bus-width = <8>;
- 	cap-mmc-highspeed;
- 	mmc-hs200-1_8v;
--- 
-2.20.1
-
+Steve
 
 _______________________________________________
 linux-arm-kernel mailing list
