@@ -2,58 +2,62 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0E6A1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:50:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5FB3C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:51:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1DE12081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:50:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A6D8B2087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:51:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WfDUH5oZ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1DE12081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r2SqN1Z1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6D8B2087C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=n6xZi4W/0rMHYNIkOyI7GyvQyt6Pixx0ClWOvJtN0PQ=; b=WfDUH5oZVQlwAV
-	dEfahATcXEy5z6IXSm8E8T3JgugFBMsr0AXxaxBQ7ttoR3mJZhgwUaLQz3Wc+WsEATD9Z2UFB/GUT
-	cXEvNnmFkjgMzWRqNZf6BR0La8SMpzVMsi3EjhIuyditxQMbK3/LjAy77So4FL5mXdXZPGVBS/E9L
-	7Bbk/PRkdBRNzGmeKgROOyc9jKf6NccNCwzUdHwzQaz6639Ttus5MSC4zdgQTijSjl1HjtzD3lnJJ
-	irRLmr/PwktA7OztzZ3AuJrvw28WmtGOi1d1iZCC1QkKUTLJmtRCBOt/gTqHnXUoge5kn3MVLbsp+
-	j6k8xxQXLO+pMBKazG+g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6RTxAspIVrK3SRpXqT5dgkgg7ZDdPICeui3xZUl32mE=; b=r2SqN1Z1BFlmNp
+	4DZTMHc2pKfVTs6qBLCa1phzgabf6S3klLMJ//dF0oHKi/lWSguu2zsKN6BO1LmSD39HJ+WlFY/Ct
+	eVEFdyHwSjIaq8xFQMcky/AwozdBiq1sDUyJgVkR9KB80t+eZ86AccIyZuZ5I2wDSHvfxLpKCtjJ5
+	ePOND3uIo9cUMVEM4t9X0t+o74Zn0XvkbxZdTVHDEYBJ61RSDZ8tVPNInZnPK0Paz3csWYkUCFQNP
+	wqPN1wx/Tre2H6glB1eUx8HDhgzmRB9ThWqPe41YOtQMoO13B3eJdD4APO/2MbfIWghdKD4POb6kD
+	FcH+7FlF4F1O3LesomZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx7TE-0007qN-76; Fri, 22 Feb 2019 09:50:16 +0000
-Received: from relay8-d.mail.gandi.net ([217.70.183.201])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx7TA-0007R4-Dr
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:50:14 +0000
-X-Originating-IP: 109.212.201.85
-Received: from localhost (alyon-652-1-170-85.w109-212.abo.wanadoo.fr
- [109.212.201.85]) (Authenticated sender: gregory.clement@bootlin.com)
- by relay8-d.mail.gandi.net (Postfix) with ESMTPSA id 11BCD1BF216;
- Fri, 22 Feb 2019 09:49:56 +0000 (UTC)
-From: Gregory CLEMENT <gregory.clement@bootlin.com>
-To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>,
- <arm@kernel.org>
-Subject: [GIT PULL] ARM: mvebu: dt for v5.1 (#2)
-Date: Fri, 22 Feb 2019 10:49:54 +0100
-Message-ID: <87bm3417b1.fsf@FE-laptop>
+	id 1gx7UJ-00088J-K3; Fri, 22 Feb 2019 09:51:23 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx7UG-00087v-VI
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:51:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AAF8A80D;
+ Fri, 22 Feb 2019 01:51:19 -0800 (PST)
+Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 375A13F703;
+ Fri, 22 Feb 2019 01:51:18 -0800 (PST)
+Date: Fri, 22 Feb 2019 09:51:14 +0000
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Linus Walleij <linus.walleij@linaro.org>
+Subject: Re: [PATCH 04/30 v2] irqchip: Add driver for IXP4xx
+Message-ID: <20190222095114.498a6917@why.wild-wind.fr.eu.org>
+In-Reply-To: <20190221154458.23763-5-linus.walleij@linaro.org>
+References: <20190221154458.23763-1-linus.walleij@linaro.org>
+ <20190221154458.23763-5-linus.walleij@linaro.org>
+Organization: ARM Ltd
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_015012_619470_9B83E1A8 
-X-CRM114-Status: UNSURE (   6.77  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190222_015121_015076_BF0C8E78 
+X-CRM114-Status: GOOD (  18.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,44 +69,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>, Imre Kaloz <kaloz@openwrt.org>,
+ Krzysztof Halasa <khalasa@piap.pl>, Jason Cooper <jason@lakedaemon.net>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Thu, 21 Feb 2019 16:44:32 +0100
+Linus Walleij <linus.walleij@linaro.org> wrote:
 
-as request by Arnd, here is the follow-up pull request for dt for mvebu
-for v5.1.
+> The IXP4xx (arch/arm/mach-ixp4xx) is an old Intel XScale
+> platform that has very wide deployment and use.
+> 
+> As part of modernizing the platform, we need to implement a
+> proper irqchip in the irqchip subsystem.
+> 
+> The IXP4xx irqchip is tightly jotted together with the GPIO
+> controller, and whereas in the past we would deal with this
+> complex logic by adding necessarily different code, we can
+> nowadays modernize it using a hierarchical irqchip.
+> 
+> The actual IXP4 irqchip is a simple active low level IRQ
+> controller, whereas the GPIO functionality resides in a
+> different memory area and adds edge trigger support for
+> the interrupts.
+> 
+> The interrupts from GPIO lines 0..12 are 1:1 mapped to
+> a fixed set of hardware IRQs on this IRQchip, so we
+> expect the child GPIO interrupt controller to go in and
+> allocate descriptors for these interrupts.
+> 
+> For the other interrupts, as we do not yet have DT
+> support for this platform, we create a linear irqdomain
+> and then go in and allocate the IRQs that the legacy
+> boards use. This code will be removed on the DT probe
+> path when we add DT support to the platform.
+> 
+> We add some translation code for supporting DT
+> translations for the fwnodes, but we leave most of that
+> for later.
+> 
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Gregory
+Thanks for doing this work!
 
-The following changes since commit cb92e40411ef8a773675b522d29b6ea82e5fb8e0:
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-  arch: arm: dts: Remove disabled marvell,dsa properties (2019-02-08 18:22:55 +0100)
-
-are available in the Git repository at:
-
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-5.1-2
-
-for you to fetch changes up to 6a3b25173cd4c6c2cd1ad6f1a3a0a85b488597ed:
-
-  arch: arm: dts: kirkwood-rd88f6281: Remove disabled marvell,dsa reference (2019-02-20 09:21:27 +0100)
-
-----------------------------------------------------------------
-mvebu dt for 5.1 (part 2)
-
-Follow-up fixing DT warning introduced by previous pull request
-
-----------------------------------------------------------------
-Gregory CLEMENT (1):
-      arch: arm: dts: kirkwood-rd88f6281: Remove disabled marvell,dsa reference
-
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 9 ---------
- 1 file changed, 9 deletions(-)
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
 
 _______________________________________________
 linux-arm-kernel mailing list
