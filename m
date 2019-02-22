@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
 	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3EAF0C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:04:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5BFE8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:10:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 067E92075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:04:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 28F4920665
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:10:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OLdaeCIm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 067E92075C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TtXIZMF2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28F4920665
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
@@ -24,41 +24,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=zDd+gfongbFlFT2bxmdCWWgPXmGEM6fzSzDMomhcY0c=; b=OLdaeCImjfMW+qNKXn7ObewgC
-	P2rxoSQeQuzcrgObidgUk8c90dZtWuaFv4Cp4kMPhwULj4fJ6o4d8eBcwX4Ia96NX0dr28Wjczaml
-	yaJrZ+OrcWgex9Bvm0eNslHzbT4NOyH5ZNrkvKy9CvGh3E7i0g0g9Z+aViO2HKmjtm5EzsFG0p8kU
-	PFaCWEUY+9ZV19D/Jn0KRVuQ+AHNl9QDpQBbOrRBM32VHZyjoTkuAyNvv45m4oa/KQkazF9ylp37v
-	b3isXyjLZxYJ/3fofAYcLBSAeFTix3QByXlWSU4SV22MiLD47w5/Db6+4P+NKW/QaeDflxmmPvxxq
-	ydUW2dWrQ==;
+	 bh=lPbk4LMEKRR11PsPuuSLQaV90/hVeJtUJLSusY6bZEc=; b=TtXIZMF2N41g7mAsmvzlMXRHT
+	Gi8r1Z4PpilY3RTPBMINLpqXCzRQQ6CNGbwl/U16eF+TDzs9kgeZSGseXjtD2xISCzc+PcVmg+Wg6
+	jMPyoFowqj4VihKussiB2d1sLJvEe38zwydw6wMwirPlwPKtuQ758Pm55gOAZ+1z539itZT8Q9DZP
+	fe6O7ufNLD0lPeMWvP7ewyeyZm9txQPWcgaYB18qOGQy0YVuMtzVCCQPpjpNrdzjUJdzYXGpm2ZFR
+	EMDiDlPieuBLu8LpjHWTagcgbwSrTX+ISwdWb+1x9zItsSmQ5TWWD6WEGaVSea6lkZKQ0qDUwd979
+	IwfQjQ5iw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxDJ4-00075L-5x; Fri, 22 Feb 2019 16:04:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxDJ0-00070z-Bo
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:04:07 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7D8CF80D;
- Fri, 22 Feb 2019 08:04:05 -0800 (PST)
-Received: from [10.1.196.50] (e108454-lin.cambridge.arm.com [10.1.196.50])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8ACAF3F575;
- Fri, 22 Feb 2019 08:04:03 -0800 (PST)
-Subject: Re: [PATCH v5 11/26] KVM: arm64: Extend reset_unknown() to handle
- mixed RES0/UNKNOWN registers
-To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-12-git-send-email-Dave.Martin@arm.com>
-From: Julien Grall <julien.grall@arm.com>
-Message-ID: <a77d3eb5-58a2-5c1a-95b5-e3d54804e5ac@arm.com>
-Date: Fri, 22 Feb 2019 16:04:01 +0000
+	id 1gxDOs-0001hL-KR; Fri, 22 Feb 2019 16:10:10 +0000
+Received: from mail-wm1-f68.google.com ([209.85.128.68])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxDOp-0001Bc-49
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:10:09 +0000
+Received: by mail-wm1-f68.google.com with SMTP id j125so2468754wmj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 22 Feb 2019 08:10:06 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=SkHceDxYf4rP12qW8Jn8fWD+4xVQyxdG2zrwdDGtECo=;
+ b=WOzqjN/MqtKGBVvS/gEvRmcxPE0lhLbScnXz5SYXRpit4VHWtHTr1q6dj1ZHDin91q
+ 26B367oE8PUG/y34dloUYMmG2TrbRqjAbn8g/0n4CwPSM6q1YCxXC5bn33QfzqQp/3/r
+ CkrJnJfeWi4os8TcnzMWB/lFihNRTrUqUm04Fe3bcrC8JXuW5jwV4WQ/wX/zN7ZgQu78
+ 954OrAzQLAAxBOkvWaaZYC2c5Bp//+jIZ1BBPUxiqSuIvnsb2aIzrSDJvFjOFq4ZgdAF
+ sUUSBCtmPtS9gD6WZ4dkHZBSkm280gzoFPO5EW1edVwGRsX6DBc++AdhUulRL8yDREeU
+ xJcg==
+X-Gm-Message-State: AHQUAubRO/z0M6gct6Yx9ImJzP/eoprbh2NQGlq1o/tIjjzijzbt9QT8
+ 2E8gtKLFP70MkDVprMyjFnsRlA==
+X-Google-Smtp-Source: AHgI3Ibqj4skwjD05bQYPu/HSv9PjIdG275t6ZQMZ9IorOQFJUDhMwBpfq3F7hamnCaQh+Lv4rb/pQ==
+X-Received: by 2002:a1c:4844:: with SMTP id v65mr3185461wma.66.1550851805378; 
+ Fri, 22 Feb 2019 08:10:05 -0800 (PST)
+Received: from dhcp-44-202.space.revspace.nl
+ ([2a01:4f8:1c0c:6c86:46e0:a7ad:5246:f04d])
+ by smtp.gmail.com with ESMTPSA id 132sm2916005wmd.30.2019.02.22.08.10.03
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Fri, 22 Feb 2019 08:10:04 -0800 (PST)
+Subject: Re: [PATCH 2/5] ata: libahci_platform: Support per-port interrupts
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
+ <20190222145356.23072-3-miquel.raynal@bootlin.com>
+ <5040d4cf-7da1-eefa-a8a3-bc4054d528da@redhat.com>
+ <20190222163114.0f4488fe@xps13>
+ <c847985c-7117-6b31-ae78-4467871714c8@redhat.com>
+ <20190222170348.12e45f42@xps13>
+From: Hans de Goede <hdegoede@redhat.com>
+Message-ID: <09a58952-ca34-cbfb-d0a9-d6c9f8afcb8b@redhat.com>
+Date: Fri, 22 Feb 2019 17:10:02 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.1
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <1550519559-15915-12-git-send-email-Dave.Martin@arm.com>
+In-Reply-To: <20190222170348.12e45f42@xps13>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_080406_418598_F2958C70 
-X-CRM114-Status: GOOD (  23.53  )
+X-CRM114-CacheID: sfid-20190222_081007_172230_E72960DF 
+X-CRM114-Status: GOOD (  24.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,88 +92,110 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Maydell <peter.maydell@linaro.org>,
- Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Marc Zyngier <marc.zyngier@arm.com>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Jens Axboe <axboe@kernel.dk>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Transfer-Encoding: 7bit
 Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Dave,
+Hi,
 
-On 18/02/2019 19:52, Dave Martin wrote:
-> The reset_unknown() system register helper initialises a guest
-> register to a distinctive junk value on vcpu reset, to help expose
-> and debug deficient register initialisation within the guest.
+On 2/22/19 5:03 PM, Miquel Raynal wrote:
+> Hi Hans,
 > 
-> Some registers such as the SVE control register ZCR_EL1 contain a
-> mixture of UNKNOWN fields and RES0 bits.  For these,
-> reset_unknown() does not work at present, since it sets all bits to
-> junk values instead of just the wanted bits.
+> Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:52:55
+> +0100:
 > 
-> There is no need to craft another special helper just for that,
-> since reset_unknown() almost does the appropriate thing anyway.
-> This patch takes advantage of the unused val field in struct
-> sys_reg_desc to specify a mask of bits that should be initialised
-> to zero instead of junk.
+>> Hi,
+>>
+>> On 2/22/19 4:31 PM, Miquel Raynal wrote:
+>>> Hi Hans,
+>>>
+>>> Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:26:01
+>>> +0100:
+>>>    
+>>>> Hi,
+>>>>
+>>>> On 2/22/19 3:53 PM, Miquel Raynal wrote:
+>>>>> Right now the ATA core only allows IPs to use a single interrupt. Some
+>>>>> of them (for instance the Armada-CP110 one) actually has one interrupt
+>>>>> per port. Add some logic to support such situation.
+>>>>>
+>>>>> We consider that either there is one single interrupt declared in the
+>>>>> main IP node, or there are per-port interrupts, each of them being
+>>>>> declared in the port sub-nodes.
+>>>>>
+>>>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+>>>>> ---
+>>>>>     drivers/ata/acard-ahci.c       |  2 +-
+>>>>>     drivers/ata/ahci.c             |  2 +-
+>>>>>     drivers/ata/ahci.h             |  3 +-
+>>>>>     drivers/ata/libahci.c          |  2 +-
+>>>>>     drivers/ata/libahci_platform.c | 66 ++++++++++++++++++++++++++++------
+>>>>>     drivers/ata/sata_highbank.c    |  2 +-
+>>>>>     6 files changed, 61 insertions(+), 16 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/ata/acard-ahci.c b/drivers/ata/acard-ahci.c
+>>>>> index 583e366be7e2..9414b81e994c 100644
+>>>>> --- a/drivers/ata/acard-ahci.c
+>>>>> +++ b/drivers/ata/acard-ahci.c
+>>>>> @@ -434,7 +434,7 @@ static int acard_ahci_init_one(struct pci_dev *pdev, const struct pci_device_id
+>>>>>     	if (!hpriv)
+>>>>>     		return -ENOMEM;
+>>>>>     > -	hpriv->irq = pdev->irq;
+>>>>> +	hpriv->irqs[0] = pdev->irq;
+>>>>>     	hpriv->flags |= (unsigned long)pi.private_data;
+>>>>>       >> What code-path is going to alloc hpriv->irqs for drivers using this code-path
+>>>> which are not using libahci_platform .c ?
+>>>
+>>> I don't understand the question (or the remark behind the question),
+>>> can you explain a little bit more what you have in mind?
+>>
+>> Sorry I got the code context wrong I meant to put that comment below this chunk:
+>>
+>>   > diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
+>>   > index 021ce46e2e57..18bce556d85f 100644
+>>   > --- a/drivers/ata/ahci.c
+>>   > +++ b/drivers/ata/ahci.c
+>>   > @@ -1817,7 +1817,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+>>   >   		/* legacy intx interrupts */
+>>   >   		pci_intx(pdev, 1);
+>>   >   	}
+>>   > -	hpriv->irq = pci_irq_vector(pdev, 0);
+>>   > +	hpriv->irqs[0] = pci_irq_vector(pdev, 0);
+>>   >
+>>   >   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
+>>   >   		host->flags |= ATA_HOST_PARALLEL_SCAN;
+>>
+>>
+>> Which AFAIK is a common code-path also used by ahci drivers not using
+>> libahci_platform, and in that case hpriv->irqs will be NULL as nothing
+>> initializes it.
 > 
-> All existing users of reset_unknown() do not (and should not)
-> define a value for val, so they will implicitly set it to zero,
-> resulting in all bits being made UNKNOWN by this function: thus,
-> this patch makes no functional change for currently defined
-> registers.
-> 
-> Future patches will make use of non-zero val.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Oh I see. What do you prefer:
+> 1/
+> * I add "irqs" besides "irq" in the structure
+> * copy the value of irq in irqs[0]
+> * use irqs instead of irq in the libahci_platform ?
+> or
+> 2/
+> * Allocated one irq there if there is none ?
 
-Reviewed-by: Julien Grall <julien.grall@arm.com>
+I don't really have a preference, Jens what is your take on this?
 
-Cheers,
+Regards,
 
-> ---
->   arch/arm64/kvm/sys_regs.h | 11 +++++++++--
->   1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-> index 3b1bc7f..174ffc0 100644
-> --- a/arch/arm64/kvm/sys_regs.h
-> +++ b/arch/arm64/kvm/sys_regs.h
-> @@ -56,7 +56,12 @@ struct sys_reg_desc {
->   	/* Index into sys_reg[], or 0 if we don't need to save it. */
->   	int reg;
->   
-> -	/* Value (usually reset value) */
-> +	/*
-> +	 * Value (usually reset value)
-> +	 * For reset_unknown, each bit set to 1 in val is treated as
-> +	 * RES0 in the register: the corresponding register bit is
-> +	 * reset to 0 instead of "unknown".
-> +	 */
->   	u64 val;
->   
->   	/* Custom get/set_user functions, fallback to generic if NULL */
-> @@ -92,7 +97,9 @@ static inline void reset_unknown(struct kvm_vcpu *vcpu,
->   {
->   	BUG_ON(!r->reg);
->   	BUG_ON(r->reg >= NR_SYS_REGS);
-> -	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL;
-> +
-> +	/* If non-zero, r->val specifies which register bits are RES0: */
-> +	__vcpu_sys_reg(vcpu, r->reg) = 0x1de7ec7edbadc0deULL & ~r->val;
->   }
->   
->   static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> 
+Hans
 
--- 
-Julien Grall
 
 _______________________________________________
 linux-arm-kernel mailing list
