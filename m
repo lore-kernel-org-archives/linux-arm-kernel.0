@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A3F2FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:29:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44AE5C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:29:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 748F4207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:29:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 14C4420700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:29:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="on7zmDeG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 748F4207E0
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rSBGasKf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 14C4420700
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pY/S9QKAIpnF/a/Qqhmgq/haaAobMmzEXe9Fn+McWEc=; b=on7zmDeGFI5349
-	iPrejYBUao7jND2KaCnv8CJuXxmewlVolzg7F3/yoB9ss98TjbvmCg3HlLRQz0Uv+bv66LvQNGMVj
-	15PYlpWGMrNysboA//FGz/jxfTs+2QkxkHOlGhHqY8egOWQGyoqeZxVLSok+DgaoOV0RxJAE53syF
-	rwsrIr0HVdfc0Nu0PMaZf7RmBbDa5nbjV2dCK2Q78G5I+QBZGiGcOyA2olzELBOyuZ5sVNgdvGFSK
-	CZtIhriHKVum5wP6otGZ8YV2QUts9FU7ttC+6BbQ50JG5yTup1BdSE1bldWPvPu7NHPUjsLCEdDE/
-	h9asUWSko/vbneHEmLGw==;
+	List-Owner; bh=sfWeLrPX9q4fH5mHWWz7oteUTP7Q+aXvbWD4DKL7bfQ=; b=rSBGasKfRqENds
+	Cra9ByqFIaLI0087EtmTFoOAHaKZhlIW63pAjUtWzBvwsbFrrofHwKDsYlXUgmn2fvnS1pN8iE7ME
+	JA8cl1o7XiZU8V3EGMFgBhdB4wFOKig7hO0Gso2cXc80AAoGp/iMpL7LhHhzbCE53SKMOi6w5klNI
+	P7IygHp/HTx0VfFqJfCZMhz43jW9xhY8ldTg0xk+Ypd8RMomtiWDzC/VcosIEmkRqz3MwBlkKttTE
+	ruzzCfsxcRfwdBD29jJjrAibgptwHQTkQWUuYMAje5Sqzpx+dwIBj8c+3dA8dbWu9CJlTOMzGYPrT
+	53zjeVidzNkJCKnsd5xQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx6Cz-0005Ta-76; Fri, 22 Feb 2019 08:29:25 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
+	id 1gx6DB-0005li-3Y; Fri, 22 Feb 2019 08:29:37 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx6CH-0004jn-DG
+ id 1gx6CH-0004jW-BC
  for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 08:28:44 +0000
-Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1M8QYPU005498; Fri, 22 Feb 2019 09:28:35 +0100
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1M8LCTe006458; Fri, 22 Feb 2019 09:28:30 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qpc75hehf-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qr6x63prn-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Fri, 22 Feb 2019 09:28:34 +0100
+ Fri, 22 Feb 2019 09:28:30 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 38BD431;
- Fri, 22 Feb 2019 08:28:34 +0000 (GMT)
-Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 170B928A8;
- Fri, 22 Feb 2019 08:28:34 +0000 (GMT)
-Received: from SAFEX1HUBCAS23.st.com (10.75.90.47) by Safex1hubcas22.st.com
- (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 22 Feb
- 2019 09:28:34 +0100
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 1DCE631;
+ Fri, 22 Feb 2019 08:28:27 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas24.st.com [10.75.90.94])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id ED4BB28AB;
+ Fri, 22 Feb 2019 08:28:26 +0000 (GMT)
+Received: from SAFEX1HUBCAS23.st.com (10.75.90.47) by Safex1hubcas24.st.com
+ (10.75.90.94) with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 22 Feb
+ 2019 09:28:26 +0100
 Received: from localhost (10.201.23.166) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 22 Feb 2019 09:28:33
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Fri, 22 Feb 2019 09:28:26
  +0100
 From: Christophe Roullier <christophe.roullier@st.com>
 To: <robh@kernel.org>, <davem@davemloft.net>, <joabreu@synopsys.com>,
  <mark.rutland@arm.com>, <mcoquelin.stm32@gmail.com>,
  <alexandre.torgue@st.com>, <peppe.cavallaro@st.com>
-Subject: [PATCH V2 7/8] ARM: dts: stm32: Add Ethernet support on stm32h7 SOC
- and activate it for eval and disco boards
-Date: Fri, 22 Feb 2019 09:28:08 +0100
-Message-ID: <1550824089-19961-8-git-send-email-christophe.roullier@st.com>
+Subject: [PATCH V2 1/8] net: ethernet: stmmac: manage Ethernet WoL for
+ stm32mp157c.
+Date: Fri, 22 Feb 2019 09:28:02 +0100
+Message-ID: <1550824089-19961-2-git-send-email-christophe.roullier@st.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1550824089-19961-1-git-send-email-christophe.roullier@st.com>
 References: <1550824089-19961-1-git-send-email-christophe.roullier@st.com>
@@ -74,8 +73,8 @@ X-Originating-IP: [10.201.23.166]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-22_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_002841_731046_4491EEDD 
-X-CRM114-Status: GOOD (  11.71  )
+X-CRM114-CacheID: sfid-20190222_002841_704902_1F2D42D7 
+X-CRM114-Status: GOOD (  13.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,129 +94,79 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Synopsys GMAC 4.10 is used. And Phy mode for eval and disco is RMII
-with PHY SMSC LAN8742
+Add glue codes to support magic packet on stm32mp157c
 
 Signed-off-by: Christophe Roullier <christophe.roullier@st.com>
 ---
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi | 15 +++++++++++++++
- arch/arm/boot/dts/stm32h743.dtsi         | 19 +++++++++++++++++++
- arch/arm/boot/dts/stm32h743i-disco.dts   | 17 +++++++++++++++++
- arch/arm/boot/dts/stm32h743i-eval.dts    | 17 +++++++++++++++++
- 4 files changed, 68 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c | 30 ++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-index 24be8e6..980b276 100644
---- a/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32h743-pinctrl.dtsi
-@@ -173,6 +173,21 @@
- 				};
- 			};
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+index 7e2e79d..d1cf145 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+@@ -42,6 +42,7 @@ struct stm32_dwmac {
+ 	struct clk *clk_ethstp;
+ 	struct clk *syscfg_clk;
+ 	bool int_phyclk;	/* Clock from RCC to drive PHY */
++	int irq_pwr_wakeup;
+ 	u32 mode_reg;		/* MAC glue-logic mode register */
+ 	struct regmap *regmap;
+ 	u32 speed;
+@@ -232,7 +233,9 @@ static int stm32_dwmac_parse_data(struct stm32_dwmac *dwmac,
+ static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
+ 			       struct device *dev)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
+ 	struct device_node *np = dev->of_node;
++	int err = 0;
  
-+			ethernet_rmii: rmii@0 {
-+				pins {
-+					pinmux = <STM32_PINMUX('G', 11, AF11)>,
-+						 <STM32_PINMUX('G', 13, AF11)>,
-+						 <STM32_PINMUX('G', 12, AF11)>,
-+						 <STM32_PINMUX('C', 4, AF11)>,
-+						 <STM32_PINMUX('C', 5, AF11)>,
-+						 <STM32_PINMUX('A', 7, AF11)>,
-+						 <STM32_PINMUX('C', 1, AF11)>,
-+						 <STM32_PINMUX('A', 2, AF11)>,
-+						 <STM32_PINMUX('A', 1, AF11)>;
-+					slew-rate = <2>;
-+				};
-+			};
-+
- 			usart1_pins: usart1@0 {
- 				pins1 {
- 					pinmux = <STM32_PINMUX('B', 14, AF4)>; /* USART1_TX */
-diff --git a/arch/arm/boot/dts/stm32h743.dtsi b/arch/arm/boot/dts/stm32h743.dtsi
-index cbdd69c..f6384af 100644
---- a/arch/arm/boot/dts/stm32h743.dtsi
-+++ b/arch/arm/boot/dts/stm32h743.dtsi
-@@ -511,6 +511,25 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		syscfg: system-config@58000400 {
-+			compatible = "syscon";
-+			reg = <0x58000400 0x400>;
-+		};
-+
-+		mac: ethernet@40028000 {
-+			compatible = "st,stm32-dwmac", "snps,dwmac-4.10a";
-+			reg = <0x40028000 0x8000>;
-+			reg-names = "stmmaceth";
-+			interrupts = <61>;
-+			interrupt-names = "macirq";
-+			clock-names = "stmmaceth", "mac-clk-tx", "mac-clk-rx",
-+			"syscfg-clk";
-+			clocks = <&rcc ETH1MAC_CK>, <&rcc ETH1TX_CK>, <&rcc ETH1RX_CK>, <&rcc SYSCFG_CK>;
-+			st,syscon = <&syscfg 0x4>;
-+			snps,pbl = <8>;
-+			status = "disabled";
-+		};
- 	};
- };
+ 	dwmac->int_phyclk = of_property_read_bool(np, "st,int-phyclk");
  
-diff --git a/arch/arm/boot/dts/stm32h743i-disco.dts b/arch/arm/boot/dts/stm32h743i-disco.dts
-index 45e088c..26ddd52 100644
---- a/arch/arm/boot/dts/stm32h743i-disco.dts
-+++ b/arch/arm/boot/dts/stm32h743i-disco.dts
-@@ -66,6 +66,23 @@
- 	clock-frequency = <25000000>;
- };
+@@ -260,7 +263,26 @@ static int stm32mp1_parse_data(struct stm32_dwmac *dwmac,
+ 		return PTR_ERR(dwmac->syscfg_clk);
+ 	}
  
-+&mac {
-+	status = "okay";
-+	pinctrl-0	= <&ethernet_rmii>;
-+	pinctrl-names	= "default";
-+	phy-mode	= "rmii";
-+	phy-handle	= <&phy1>;
-+
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy0: ethernet-phy@0 {
-+			reg = <0>;
-+		};
-+	};
-+};
-+
- &usart2 {
- 	pinctrl-0 = <&usart2_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/stm32h743i-eval.dts b/arch/arm/boot/dts/stm32h743i-eval.dts
-index 3f8e0c4..c1c1cc1 100644
---- a/arch/arm/boot/dts/stm32h743i-eval.dts
-+++ b/arch/arm/boot/dts/stm32h743i-eval.dts
-@@ -104,6 +104,23 @@
- 	status = "okay";
- };
+-	return 0;
++	/* Get IRQ information early to have an ability to ask for deferred
++	 * probe if needed before we went too far with resource allocation.
++	 */
++	dwmac->irq_pwr_wakeup = platform_get_irq_byname(pdev,
++							"stm32_pwr_wakeup");
++	if (!dwmac->int_phyclk && dwmac->irq_pwr_wakeup >= 0) {
++		err = device_init_wakeup(&pdev->dev, true);
++		if (err) {
++			dev_err(&pdev->dev, "Failed to init wake up irq\n");
++			return err;
++		}
++		err = dev_pm_set_dedicated_wake_irq(&pdev->dev,
++						    dwmac->irq_pwr_wakeup);
++		if (err) {
++			dev_err(&pdev->dev, "Failed to set wake up irq\n");
++			device_init_wakeup(&pdev->dev, false);
++		}
++		device_set_wakeup_enable(&pdev->dev, false);
++	}
++	return err;
+ }
  
-+&mac {
-+	status = "okay";
-+	pinctrl-0	= <&ethernet_rmii>;
-+	pinctrl-names	= "default";
-+	phy-mode	= "rmii";
-+	phy-handle	= <&phy1>;
+ static int stm32_dwmac_probe(struct platform_device *pdev)
+@@ -326,9 +348,15 @@ static int stm32_dwmac_remove(struct platform_device *pdev)
+ 	struct net_device *ndev = platform_get_drvdata(pdev);
+ 	struct stmmac_priv *priv = netdev_priv(ndev);
+ 	int ret = stmmac_dvr_remove(&pdev->dev);
++	struct stm32_dwmac *dwmac = priv->plat->bsp_priv;
+ 
+ 	stm32_dwmac_clk_disable(priv->plat->bsp_priv);
+ 
++	if (dwmac->irq_pwr_wakeup >= 0) {
++		dev_pm_clear_wake_irq(&pdev->dev);
++		device_init_wakeup(&pdev->dev, false);
++	}
 +
-+	mdio0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "snps,dwmac-mdio";
-+		phy0: ethernet-phy@0 {
-+			reg = <0>;
-+		};
-+	};
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins>;
- 	pinctrl-names = "default";
+ 	return ret;
+ }
+ 
 -- 
 2.7.4
 
