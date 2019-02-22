@@ -2,20 +2,20 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26B0EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:46:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6018CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:47:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E78552070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:46:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2EB442070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:47:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tF3Suo3w"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E78552070D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u2s0R+Pc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2EB442070D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,57 +24,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lFfvZI4N0CPKmNVrAA7kYLdpywAytLegL4D3AFHVu/s=; b=tF3Suo3wtdpvJU
-	aM5ee8PN9Vj2FvPFhrRE2R2q33atILfcYRG6APhjxWkJ804RqWwGsTZCGDwc1TufoM3K/c6aclgzr
-	9yH681FwIczIoBw6CXJUVZrY/72UcIZYrV3c5jQG1dsLCHqlxwv2FH3eRySi0LtO/3T+iAJ+h7w5e
-	rT/4M4SfuDBn5IqJD4fJwoe7Yb779pZ6f7UcR7SoWETSuWMVvVAnOKR9Zofd+nJieRpmexq1BY+ou
-	f3u4lBuqNOAHjTzwbKlZjn40gdkMcoLGHCK8BJxiJscEE8MXcx5jCkbHr6HPmzDmNoTYT0PubeiPk
-	Kjma2DVfx9nDecmQO9aQ==;
+	List-Owner; bh=ez214HbfucfssvQtYvNR7LyoDl1hz901Z603KDIKj0I=; b=u2s0R+Pcs0+z/8
+	ysrIIqv2lYMoXGjWaZjeTkCEnqev4atQWyvY7NhJVq67+Z/xg4hre3yqB5hNXgkFQpssNS5DBQA9W
+	5boS3wT9KVoxH6LEj85OyKv7yoJPZQIfgEE7sbXJ9ZE5I413dmGdjL535QdeWteO/IiEyrzB1oJ5S
+	r8qCIquSY4Gyc1p7/MzhH3KJ2YAqvD98KilEHhq8JXPI32CsLtltnfdFDUi1NwkaBxpleJ9f5bK7c
+	SY4/jPS7BZPtOPiebhPWJohCMIBa4k8/FfLdeAKoFOeRN3OW/pyCCpnyEX7fOIzdE1HCJfGJMozBW
+	PsP9pxxDmR9dTZzCQQWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxGmG-0001dX-Qs; Fri, 22 Feb 2019 19:46:32 +0000
+	id 1gxGms-0001vo-Nj; Fri, 22 Feb 2019 19:47:10 +0000
 Received: from mail-oi1-f194.google.com ([209.85.167.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxGmC-0001a1-Kn
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:46:30 +0000
-Received: by mail-oi1-f194.google.com with SMTP id z14so2679468oid.0
+ id 1gxGmp-0001vP-7N
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:47:08 +0000
+Received: by mail-oi1-f194.google.com with SMTP id u128so2665374oie.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 11:46:28 -0800 (PST)
+ Fri, 22 Feb 2019 11:47:07 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=g/66mCBt5iuS4DHcvmT7yW3xaXm9CqK0ZEHHhvk1QgM=;
- b=cjl6oJauu+AAWY3+3wBvY49xPsLTXOKSKJTit+/n9N7VdMdh+01s3Aq05U4p3P40Cz
- BrKduSXlGjd67Adbk5lYMLSYOKTEGpJDfgJ47LI6M0e7lbZfs8Tl9O1TplExMKsdCKr0
- piZZ1lalJh5If2/tdT4Ox1ecB/y/7b8AX2DqEuOM/534sQCL0wNCB2DtP3TrVRdMcdLg
- npQ88DUQy4tlWlGG7hjWj+pyenoXptrGRudc8Tp44PIK3FpIO53EiQvZ7T/+U2Ijjrk8
- uZeQ4ouDV1RsnFo0Eggy7ue5UOlN+BbKbWKkTnA7v7D6eUD+6umQBkbnyLPcHdIXuSy3
- 0GGw==
-X-Gm-Message-State: AHQUAubyssyLdg0f4JU31mxNtoiKENAQhljwhkQ1bN1Utxb268Un/9Cf
- 5Cb8+Kg8fd6CcPLQlakc2g==
-X-Google-Smtp-Source: AHgI3IZJqrXJalFuAnhjmqzlj7jHBWFqqRuWJoIe6WXHuUn7clHWViMEWvSw1izp8MYJPAsuB0nVXw==
-X-Received: by 2002:aca:35c1:: with SMTP id c184mr2103764oia.39.1550864787562; 
- Fri, 22 Feb 2019 11:46:27 -0800 (PST)
+ bh=EjATWlf0D3UqiXU7UDCKyghVgCFxa4nCPUaTMC9D1kA=;
+ b=Kk8WdWIv2AO8cLOp4+Cxc6TTnlL4Aze3atEuOD8UUP+aWOOiGuKkOeerRDEmmpdYEk
+ E1+HQ8vEUyw7sBHijFD25I99rqm8r4jJt0qMpggwDAH72dMZE/95C5e2sOd77tVxdHf6
+ Xns2NvgvHLvjyw6x267LTCnmmeq4X8YndDn7x9sLrTecun/6Xap8eweezyFaQ5TXf7n2
+ idt6DV4GiYx0EVmP70XPJyzDXfiVzTUwf6IKxBizU3TeqI8sIDpjxGKHhq0gCLn4Y5Cv
+ JWw81UMXpDGd1DnWBkVHdS8CoDWeLd4jcK1g1Pz7OY0Agdxrlxc/LaH1iTuH0DC8j1iN
+ abng==
+X-Gm-Message-State: AHQUAuavlyFHxwtYpgb9QyGrQhj/CPbafd6CkmiSeBi2KJVhbXUiQAvS
+ 59nQqJWRSidXd/FzuF0v5w==
+X-Google-Smtp-Source: AHgI3IYO4rqhLD3rQttIBcwd4gXYLfTeGgD0WDXHjwzwijVft+Me4FdHtZnAGtZsH33A+z/GO1HwiA==
+X-Received: by 2002:aca:ac45:: with SMTP id v66mr3374705oie.134.1550864826498; 
+ Fri, 22 Feb 2019 11:47:06 -0800 (PST)
 Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.gmail.com with ESMTPSA id j1sm886053otl.43.2019.02.22.11.46.26
+ by smtp.gmail.com with ESMTPSA id g128sm945913oia.32.2019.02.22.11.47.03
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 22 Feb 2019 11:46:26 -0800 (PST)
-Date: Fri, 22 Feb 2019 13:46:26 -0600
+ Fri, 22 Feb 2019 11:47:04 -0800 (PST)
+Date: Fri, 22 Feb 2019 13:47:03 -0600
 From: Rob Herring <robh@kernel.org>
 To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH V3 1/2] dt-bindings: imx: remove unused resources from
- scu resource table
-Message-ID: <20190222194626.GA13280@bogus>
+Subject: Re: [PATCH V3 2/2] dt-bindings: imx: add new resources to scu
+ resource  table
+Message-ID: <20190222194703.GA16450@bogus>
 References: <1550673029-15910-1-git-send-email-Anson.Huang@nxp.com>
+ <1550673029-15910-2-git-send-email-Anson.Huang@nxp.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1550673029-15910-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1550673029-15910-2-git-send-email-Anson.Huang@nxp.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_114628_763745_EF8B1131 
-X-CRM114-Status: GOOD (  14.69  )
+X-CRM114-CacheID: sfid-20190222_114707_263027_5A6E46C6 
+X-CRM114-Status: GOOD (  12.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,7 +94,7 @@ Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
  "shawnguo@kernel.org" <shawnguo@kernel.org>,
  "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dl-linux-imx <linux-imx@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
  "kernel@pengutronix.de" <kernel@pengutronix.de>,
  "festevam@gmail.com" <festevam@gmail.com>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
@@ -102,50 +103,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 02:35:02PM +0000, Anson Huang wrote:
-> Removes below resources which were defined during
-> pre-silicon phase and the real silicons do NOT have
-> them, they have never been used, latest system
-> controller firmware also removed them:
+On Wed, 20 Feb 2019 14:35:06 +0000, Anson Huang wrote:
+> Add new resources as below according to latest system
+> controller firmware for new features:
 > 
-> 	IMX_SC_R_DC_0_CAPTURE0
-> 	IMX_SC_R_DC_0_CAPTURE1
-> 	IMX_SC_R_DC_0_INTEGRAL0
-> 	IMX_SC_R_DC_0_INTEGRAL1
-> 	IMX_SC_R_DC_0_FRAC1
-> 	IMX_SC_R_DC_1_CAPTURE0
-> 	IMX_SC_R_DC_1_CAPTURE1
-> 	IMX_SC_R_DC_1_INTEGRAL0
-> 	IMX_SC_R_DC_1_INTEGRAL1
-> 	IMX_SC_R_DC_1_FRAC1
-> 	IMX_SC_R_GPU_3_PID0
-> 	IMX_SC_R_M4_0_SIM
-> 	IMX_SC_R_M4_0_WDOG
-> 	IMX_SC_R_M4_1_SIM
-> 	IMX_SC_R_M4_1_WDOG
+> 	IMX_SC_R_PERF
+> 	IMX_SC_R_OCRAM
+> 	IMX_SC_R_DMA_5_CH0
+> 	IMX_SC_R_DMA_5_CH1
+> 	IMX_SC_R_DMA_5_CH2
+> 	IMX_SC_R_DMA_5_CH3
+> 	IMX_SC_R_ATTESTATION
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
 > No changes since V2, just separate the patch to 2, 1 patch to remove resources and the other is to add new
 > resources.
 > ---
->  include/dt-bindings/firmware/imx/rsrc.h | 30 +++++++++++++++---------------
->  1 file changed, 15 insertions(+), 15 deletions(-)
+>  include/dt-bindings/firmware/imx/rsrc.h | 11 ++++++++---
+>  1 file changed, 8 insertions(+), 3 deletions(-)
 > 
-> diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
-> index 4481f2d..32cce37 100644
-> --- a/include/dt-bindings/firmware/imx/rsrc.h
-> +++ b/include/dt-bindings/firmware/imx/rsrc.h
-> @@ -36,15 +36,15 @@
->  #define IMX_SC_R_DC_0_BLIT1		20
->  #define IMX_SC_R_DC_0_BLIT2		21
->  #define IMX_SC_R_DC_0_BLIT_OUT		22
-> -#define IMX_SC_R_DC_0_CAPTURE0		23
-> -#define IMX_SC_R_DC_0_CAPTURE1		24
-> +#define IMX_SC_R_UNUSED19		23
-> +#define IMX_SC_R_UNUSED5		24
 
-If unused, don't define them.
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
