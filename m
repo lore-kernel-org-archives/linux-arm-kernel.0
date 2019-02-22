@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DE07FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:29:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 823BFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:29:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 96E8E2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:29:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 510BE2070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:29:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kF67vjmt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96E8E2070B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BD5uTZcS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 510BE2070B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VmdRBPlf21kr6be+vLq813Cx8W5uVql8DppljVz1om0=; b=kF67vjmtxT1UK2
-	qJV7GvBn/uJphoi0KGzoLNsDoJ5n940/dEHAMMMTrwQySr+17TQ/Km8jcU9IPRtHAvixiFJ8QM/6J
-	kgUizH7IRqB7Vjz1p4NNlTv27HRiesKQIIR2JOtwJf2DnuBNg6dom7CPP17821EyxorGjDL9Wasos
-	V5Ocli8uznp4DVJs3iPg0cu38PEYfNuh0jPX+/vzQQwmqOADkaVkouMPbq97WoVhi1MPK5rn0pI1y
-	Y5Rup1owmqLhZSdC1QHuaeHbXKs1BdSqhTTV1SmCTWNC8xj4ODi5gL5OrH9bdCFaiHiRZGP6U2tS/
-	SB2hoi1oSJcLneggzv0g==;
+	List-Owner; bh=ssfmhsSL4kky1CYXSzoaQ113mRfMrniJpP7CyRpXjqY=; b=BD5uTZcS4jdivg
+	c4p5IcYInQ/az4fADT+OwRwmPXUrxgH97CF1eNr24Zf7dYP67KfjxBvEM6joKgNIJww166LyMistp
+	+ljMZVptAUrjkwbZQQrzhwiCXYOW90bCLoTcZhM5jXrh6EAjwP44nIHaAc29HbFTX905YqnaV+6KE
+	B6F3rpqqB4iLHy9usNA2EyGlb6iUHNgUpznigkxARB9aVbDuAs8xHpOwVg+xyzrjKvX4mgnWiyFLq
+	J6yiKoPBLa15chLeiTVg2gSyW7+E4dG4tDlXsbJlraik4EfsxCwqLX8CZw8hkyiyX+lZJ8ZLMeoye
+	rCQyo+sIYj8MNLq+9P7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxDh7-0000W1-1b; Fri, 22 Feb 2019 16:29:01 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gxDhI-0000mV-Iw; Fri, 22 Feb 2019 16:29:12 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxDfm-0007eF-RI
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:27:48 +0000
+ id 1gxDfr-0007fT-Kx
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:27:52 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D59E3165C;
- Fri, 22 Feb 2019 08:27:37 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6D1C080D;
+ Fri, 22 Feb 2019 08:27:43 -0800 (PST)
 Received: from big-swifty.lan (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- AA2893F5C1; Fri, 22 Feb 2019 08:27:32 -0800 (PST)
+ 6A1263F5C1; Fri, 22 Feb 2019 08:27:38 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 08/27] KVM: arm/arm64: Simplify bg_timer programming
-Date: Fri, 22 Feb 2019 16:25:46 +0000
-Message-Id: <20190222162605.5054-9-marc.zyngier@arm.com>
+Subject: [PATCH 09/27] KVM: arm64: Fix ICH_ELRSR_EL2 sysreg naming
+Date: Fri, 22 Feb 2019 16:25:47 +0000
+Message-Id: <20190222162605.5054-10-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190222162605.5054-1-marc.zyngier@arm.com>
 References: <20190222162605.5054-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_082739_090155_DF20CF81 
-X-CRM114-Status: GOOD (  14.26  )
+X-CRM114-CacheID: sfid-20190222_082743_896563_387CDC24 
+X-CRM114-Status: GOOD (  11.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,145 +84,63 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@arm.com>
+We previously incorrectly named the define for this system register.
 
-Instead of calling into kvm_timer_[un]schedule from the main kvm
-blocking path, test if the VCPU is on the wait queue from the load/put
-path and perform the background timer setup/cancel in this path.
-
-This has the distinct advantage that we no longer race between load/put
-and schedule/unschedule and programming and canceling of the bg_timer
-always happens when the timer state is not loaded.
-
-Note that we must now remove the checks in kvm_timer_blocking that do
-not schedule a background timer if one of the timers can fire, because
-we no longer have a guarantee that kvm_vcpu_check_block() will be called
-before kvm_timer_blocking.
-
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
 ---
- include/kvm/arm_arch_timer.h |  3 ---
- virt/kvm/arm/arch_timer.c    | 35 ++++++++++++++---------------------
- virt/kvm/arm/arm.c           |  2 --
- 3 files changed, 14 insertions(+), 26 deletions(-)
+ arch/arm/include/asm/arch_gicv3.h | 4 ++--
+ arch/arm64/include/asm/sysreg.h   | 2 +-
+ virt/kvm/arm/hyp/vgic-v3-sr.c     | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 33771352dcd6..d6e6a45d1d24 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -76,9 +76,6 @@ int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 0bd530702118..bdc87700def2 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -54,7 +54,7 @@
+ #define ICH_VTR				__ACCESS_CP15(c12, 4, c11, 1)
+ #define ICH_MISR			__ACCESS_CP15(c12, 4, c11, 2)
+ #define ICH_EISR			__ACCESS_CP15(c12, 4, c11, 3)
+-#define ICH_ELSR			__ACCESS_CP15(c12, 4, c11, 5)
++#define ICH_ELRSR			__ACCESS_CP15(c12, 4, c11, 5)
+ #define ICH_VMCR			__ACCESS_CP15(c12, 4, c11, 7)
  
- bool kvm_timer_is_pending(struct kvm_vcpu *vcpu);
+ #define __LR0(x)			__ACCESS_CP15(c12, 4, c12, x)
+@@ -151,7 +151,7 @@ CPUIF_MAP(ICH_HCR, ICH_HCR_EL2)
+ CPUIF_MAP(ICH_VTR, ICH_VTR_EL2)
+ CPUIF_MAP(ICH_MISR, ICH_MISR_EL2)
+ CPUIF_MAP(ICH_EISR, ICH_EISR_EL2)
+-CPUIF_MAP(ICH_ELSR, ICH_ELSR_EL2)
++CPUIF_MAP(ICH_ELRSR, ICH_ELRSR_EL2)
+ CPUIF_MAP(ICH_VMCR, ICH_VMCR_EL2)
+ CPUIF_MAP(ICH_AP0R3, ICH_AP0R3_EL2)
+ CPUIF_MAP(ICH_AP0R2, ICH_AP0R2_EL2)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 72dc4c011014..3e5650903d6d 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -426,7 +426,7 @@
+ #define SYS_ICH_VTR_EL2			sys_reg(3, 4, 12, 11, 1)
+ #define SYS_ICH_MISR_EL2		sys_reg(3, 4, 12, 11, 2)
+ #define SYS_ICH_EISR_EL2		sys_reg(3, 4, 12, 11, 3)
+-#define SYS_ICH_ELSR_EL2		sys_reg(3, 4, 12, 11, 5)
++#define SYS_ICH_ELRSR_EL2		sys_reg(3, 4, 12, 11, 5)
+ #define SYS_ICH_VMCR_EL2		sys_reg(3, 4, 12, 11, 7)
  
--void kvm_timer_schedule(struct kvm_vcpu *vcpu);
--void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
--
- u64 kvm_phys_timer_read(void);
+ #define __SYS__LR0_EL2(x)		sys_reg(3, 4, 12, 12, x)
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 9652c453480f..264d92da3240 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -226,7 +226,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 		int i;
+ 		u32 elrsr;
  
- void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index b07ac4614e1c..4986028d9829 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -349,22 +349,12 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
-  * thread is removed from its waitqueue and made runnable when there's a timer
-  * interrupt to handle.
-  */
--void kvm_timer_schedule(struct kvm_vcpu *vcpu)
-+static void kvm_timer_blocking(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+-		elrsr = read_gicreg(ICH_ELSR_EL2);
++		elrsr = read_gicreg(ICH_ELRSR_EL2);
  
--	vtimer_save_state(vcpu);
--
--	/*
--	 * No need to schedule a background timer if any guest timer has
--	 * already expired, because kvm_vcpu_block will return before putting
--	 * the thread to sleep.
--	 */
--	if (kvm_timer_should_fire(vtimer) || kvm_timer_should_fire(ptimer))
--		return;
--
- 	/*
- 	 * If both timers are not capable of raising interrupts (disabled or
- 	 * masked), then there's no more work for us to do.
-@@ -373,12 +363,19 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	/*
--	 * The guest timers have not yet expired, schedule a background timer.
-+	 * At least one guest time will expire. Schedule a background timer.
- 	 * Set the earliest expiration time among the guest timers.
- 	 */
- 	soft_timer_start(&timer->bg_timer, kvm_timer_earliest_exp(vcpu));
- }
- 
-+static void kvm_timer_unblocking(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+
-+	soft_timer_cancel(&timer->bg_timer);
-+}
-+
- static void vtimer_restore_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -401,15 +398,6 @@ static void vtimer_restore_state(struct kvm_vcpu *vcpu)
- 	local_irq_restore(flags);
- }
- 
--void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
--{
--	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--
--	vtimer_restore_state(vcpu);
--
--	soft_timer_cancel(&timer->bg_timer);
--}
--
- static void set_cntvoff(u64 cntvoff)
- {
- 	u32 low = lower_32_bits(cntvoff);
-@@ -485,6 +473,8 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
- 	/* Set the background timer for the physical timer emulation. */
- 	phys_timer_emulate(vcpu);
- 
-+	kvm_timer_unblocking(vcpu);
-+
- 	/* If the timer fired while we weren't running, inject it now */
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
-@@ -527,6 +517,9 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	 */
- 	soft_timer_cancel(&timer->phys_timer);
- 
-+	if (swait_active(kvm_arch_vcpu_wq(vcpu)))
-+		kvm_timer_blocking(vcpu);
-+
- 	/*
- 	 * The kernel may decide to run userspace after calling vcpu_put, so
- 	 * we reset cntvoff to 0 to ensure a consistent read between user
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b77db673bb03..9fbdb9e1c51f 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -335,13 +335,11 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
- 
- void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
- {
--	kvm_timer_schedule(vcpu);
- 	kvm_vgic_v4_enable_doorbell(vcpu);
- }
- 
- void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
- {
--	kvm_timer_unschedule(vcpu);
- 	kvm_vgic_v4_disable_doorbell(vcpu);
- }
+ 		write_gicreg(cpu_if->vgic_hcr & ~ICH_HCR_EN, ICH_HCR_EL2);
  
 -- 
 2.20.1
