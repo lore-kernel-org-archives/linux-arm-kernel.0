@@ -2,68 +2,86 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B802C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:05:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25139C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:07:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D3DA2070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:05:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E79372070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:07:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sSfqMSCi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D3DA2070B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uMXcMtqn";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="oHeHpCpv"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E79372070B
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=1NclIy3ClASYW9nhbRQVDZe0Z2nHHGYDFDySAdd0g1U=; b=sSfqMSCipdr3ZkvTHi40rMoISC
-	kbC0devjwu5/UBVJ8QA1vEdPDMal8mk+eNGHEaO4XnyZuypPOP6s0368UtcX15BrXswTBD+GukCpt
-	2NBfX9XMdU83+6VINmqaZdKMLllrhD23lSykSbK+ccgr1rnb20CzwDZh8Noj+TjABuXFQW1/9DO7r
-	+5CVBPBYDsqgl+fz5b2SkUB6LOPEgo37Rk0EU1wEQGuqVtOo9Jcay69EN4fGhv/CLli//m5Mr9s7N
-	1fki0OZxaum7zSDSOfHZjCftG9idZkRiZv0GmiqmkcokXWrioHv90VMFjOvVcJZCS6xzEKUaut3if
-	n8djghqQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=a2HACFaunbeEpKJe5aiWxiqGiEDcksVqoKiwMk4MLmc=; b=uMX
+	cMtqne/Pq/P6XBU0MeZmkABuL7zfjxvJ/a06DbTh5SpKdc+cGV2HsjfQgYV8QsGdTlfCexYBVjeeK
+	0u4INkozKZCoZkQihN18C9++VNs1PjnhVmX+ymEubB6h/2u5T3TU1mPptHTdOLJX5sZuNvTA8qNfm
+	7/y/UJyZUPTQI+5ZaQan7WzETAN46EjCzaiKJE/L55qCKRlUxcvRadWCkHrk6aw9pPc0t8BFsJNwo
+	JRmnNLF5Kjkg2bCRrPwH3Y0wlTENqK088Kk/xl3k7t2I6U9Ocz7d7fcGftb6+Te2df3TLsCrJkGzk
+	438yWgazJhbSdQjfWJY7jhB3pEoIcPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxCOB-0007aR-IG; Fri, 22 Feb 2019 15:05:23 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
+	id 1gxCPj-00084U-B4; Fri, 22 Feb 2019 15:06:59 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxCNG-0005PH-3m
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:04:29 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 3CDCF200012;
- Fri, 22 Feb 2019 16:04:22 +0100 (CET)
-Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
- [134.27.226.22])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 2E789200010;
- Fri, 22 Feb 2019 16:04:22 +0100 (CET)
-Received: from fsr-ub1664-016.ea.freescale.net
- (fsr-ub1664-016.ea.freescale.net [10.171.71.216])
- by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id C70FE2062B;
- Fri, 22 Feb 2019 16:04:21 +0100 (CET)
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
-To: Shawn Guo <shawnguo@kernel.org>, Li Yang <leoyang.li@nxp.com>,
- "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH net-next v3 3/4] enetc: Add ENETC PF level external MDIO
- support
-Date: Fri, 22 Feb 2019 17:04:18 +0200
-Message-Id: <1550847859-17346-4-git-send-email-claudiu.manoil@nxp.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1550847859-17346-1-git-send-email-claudiu.manoil@nxp.com>
-References: <1550847859-17346-1-git-send-email-claudiu.manoil@nxp.com>
-X-Virus-Scanned: ClamAV using ClamSMTP
+ id 1gxCPg-00084A-0N
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:06:57 +0000
+Received: by mail-pl1-x642.google.com with SMTP id r14so1207094pls.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 22 Feb 2019 07:06:55 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id;
+ bh=EiQBCSDAIf/suoeIwapm+FX4BR230o85XgcWooq6xpo=;
+ b=oHeHpCpvC2AoMktGH/FylVXGTrHXAAlZwXTLNGNTPVr+jXY93hFWcuEeceYTyB2prt
+ 2rvvFgZ3gQU9hBYqEtXQWn4hXd7/3XkuVewfkGv86mW/NUOf2IvLU9H7mEBwl9Gp1u5L
+ +jVImO1D2WzSZMxc7RsGxQtHnhV52l0CIjRzNeg1ujDJqpuVFpblk6qFUaS5lAJagbAQ
+ BAyxleQsFdr6Gar/VUDt0QtIf4RMlt73YvIZG7rrHMOcsQUVh68pS/QQCfbhRVvtNJN7
+ yZbM5BhQLh6tbXzh5iSAT/wgHpkQqs+pDJZ27Fh8wqM/R9hDywOjjUORLVOpG/utNIkI
+ X0nw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=EiQBCSDAIf/suoeIwapm+FX4BR230o85XgcWooq6xpo=;
+ b=ScZdJ3qpdW2EuOJlY+m87LJpmwfZi/Sf6GxOZamUmdRCq0AsB16EYUeCL6lKUOyBkp
+ mAk4P8T589hNqFuSCEMyqwlOYG0QJQTSkNfQEzCR89oiwtvR3pNVFHqsL+mWwcb8MrvW
+ lKZKuYNjIRZX5IJuquAkv85i4ytcaTbUz7YyP/bN3bB+Lu8YjG2yjLGupG2xmYp2t0Pz
+ 1TPZZQJDqx9Uxxsa2HWHm2akgrMolGbHHgxaVnVkOvTk7GDCVd2I5ahW/zMOxlaB0XZI
+ 6GXfEHpuJy/eV/A2g2uh7STQLCb1kJ3o76YI9f6jT48NwSKO2RZ3AEk0WrxRZRXbipPm
+ qX/g==
+X-Gm-Message-State: AHQUAuYk2MUJ2xbCnXlqDsOtuXWdd02OmvYg6bYT6TQy2Y7TpSqh0ZJ0
+ UKfJSGabNoE6FUb+4Bf843c=
+X-Google-Smtp-Source: AHgI3IZbPWlYQzuwjEhbQFDPOboaR5xFVm1PNF+pNbeBeCaY7FX4MLfmcdiKb1W6D3NMvqNF02xA3A==
+X-Received: by 2002:a17:902:2de4:: with SMTP id
+ p91mr4658872plb.215.1550848015074; 
+ Fri, 22 Feb 2019 07:06:55 -0800 (PST)
+Received: from localhost.corp.microsoft.com ([167.220.255.67])
+ by smtp.googlemail.com with ESMTPSA id a4sm6151780pga.52.2019.02.22.07.06.46
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 22 Feb 2019 07:06:54 -0800 (PST)
+From: lantianyu1986@gmail.com
+X-Google-Original-From: Tianyu.Lan@microsoft.com
+To: 
+Subject: [PATCH V3 00/10] X86/KVM/Hyper-V: Add HV ept tlb range list flush
+ support in KVM 
+Date: Fri, 22 Feb 2019 23:06:27 +0800
+Message-Id: <20190222150637.2337-1-Tianyu.Lan@microsoft.com>
+X-Mailer: git-send-email 2.14.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_070426_629373_21C5D3F1 
-X-CRM114-Status: GOOD (  17.14  )
+X-CRM114-CacheID: sfid-20190222_070656_048640_B1C549C3 
+X-CRM114-Status: GOOD (  10.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,318 +93,83 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, alexandru.marginean@nxp.com,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- netdev@vger.kernel.org
+Cc: kvm@vger.kernel.org, rkrcmar@redhat.com, benh@kernel.crashing.org,
+ will.deacon@arm.com, christoffer.dall@arm.com, paulus@ozlabs.org,
+ hpa@zytor.com, kys@microsoft.com, kvmarm@lists.cs.columbia.edu,
+ sashal@kernel.org, sthemmin@microsoft.com, mpe@ellerman.id.au, x86@kernel.org,
+ linux@armlinux.org.uk, michael.h.kelley@microsoft.com, mingo@redhat.com,
+ catalin.marinas@arm.com, jhogan@kernel.org, linux-mips@vger.kernel.org,
+ Lan Tianyu <Tianyu.Lan@microsoft.com>, marc.zyngier@arm.com,
+ haiyangz@microsoft.com, kvm-ppc@vger.kernel.org, bp@alien8.de,
+ pbonzini@redhat.com, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, ralf@linux-mips.org, paul.burton@mips.com,
+ devel@linuxdriverproject.org, vkuznets@redhat.com,
+ linuxppc-dev@lists.ozlabs.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Each ENETC PF has its own MDIO interface, the corresponding
-MDIO registers are mapped in the ENETC's Port register block.
-The current patch adds a driver for these PF level MDIO buses,
-so that each PF can manage directly its own external link.
+From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
-Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
----
-v2 - used readx_poll_timeout()
-   - added mdio node child to the port node
-   - added code comments, removed redundant err messages,
-     minor code cleanup
-v3 - replaced dev_err w/ dev_dbg for read() issues
+This patchset is to introduce hv ept tlb range list flush function
+support in the KVM MMU component. Flushing ept tlbs of several address
+range can be done via single hypercall and new list flush function is
+used in the kvm_mmu_commit_zap_page() and FNAME(sync_page). This patchset
+also adds more hv ept tlb range flush support in more KVM MMU function.
 
- drivers/net/ethernet/freescale/enetc/Makefile     |   3 +-
- drivers/net/ethernet/freescale/enetc/enetc_mdio.c | 199 ++++++++++++++++++++++
- drivers/net/ethernet/freescale/enetc/enetc_pf.c   |  12 ++
- drivers/net/ethernet/freescale/enetc/enetc_pf.h   |   6 +
- 4 files changed, 219 insertions(+), 1 deletion(-)
- create mode 100644 drivers/net/ethernet/freescale/enetc/enetc_mdio.c
+This patchset is based on the fix patch "x86/Hyper-V: Fix definition HV_MAX_FLUSH_REP_COUNT".
+(https://www.mail-archive.com/linux-kernel@vger.kernel.org/msg1939455.html)
 
-diff --git a/drivers/net/ethernet/freescale/enetc/Makefile b/drivers/net/ethernet/freescale/enetc/Makefile
-index 6976602..7139e41 100644
---- a/drivers/net/ethernet/freescale/enetc/Makefile
-+++ b/drivers/net/ethernet/freescale/enetc/Makefile
-@@ -1,6 +1,7 @@
- # SPDX-License-Identifier: GPL-2.0
- obj-$(CONFIG_FSL_ENETC) += fsl-enetc.o
--fsl-enetc-$(CONFIG_FSL_ENETC) += enetc.o enetc_cbdr.o enetc_ethtool.o
-+fsl-enetc-$(CONFIG_FSL_ENETC) += enetc.o enetc_cbdr.o enetc_ethtool.o \
-+				 enetc_mdio.o
- fsl-enetc-$(CONFIG_PCI_IOV) += enetc_msg.o
- fsl-enetc-objs := enetc_pf.o $(fsl-enetc-y)
- 
-diff --git a/drivers/net/ethernet/freescale/enetc/enetc_mdio.c b/drivers/net/ethernet/freescale/enetc/enetc_mdio.c
-new file mode 100644
-index 0000000..77b9cd1
---- /dev/null
-+++ b/drivers/net/ethernet/freescale/enetc/enetc_mdio.c
-@@ -0,0 +1,199 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
-+/* Copyright 2019 NXP */
-+
-+#include <linux/mdio.h>
-+#include <linux/of_mdio.h>
-+#include <linux/iopoll.h>
-+#include <linux/of.h>
-+
-+#include "enetc_pf.h"
-+
-+struct enetc_mdio_regs {
-+	u32	mdio_cfg;	/* MDIO configuration and status */
-+	u32	mdio_ctl;	/* MDIO control */
-+	u32	mdio_data;	/* MDIO data */
-+	u32	mdio_addr;	/* MDIO address */
-+};
-+
-+#define bus_to_enetc_regs(bus)	(struct enetc_mdio_regs __iomem *)((bus)->priv)
-+
-+#define ENETC_MDIO_REG_OFFSET	0x1c00
-+#define ENETC_MDC_DIV		258
-+
-+#define MDIO_CFG_CLKDIV(x)	((((x) >> 1) & 0xff) << 8)
-+#define MDIO_CFG_BSY		BIT(0)
-+#define MDIO_CFG_RD_ER		BIT(1)
-+#define MDIO_CFG_ENC45		BIT(6)
-+ /* external MDIO only - driven on neg MDC edge */
-+#define MDIO_CFG_NEG		BIT(23)
-+
-+#define MDIO_CTL_DEV_ADDR(x)	((x) & 0x1f)
-+#define MDIO_CTL_PORT_ADDR(x)	(((x) & 0x1f) << 5)
-+#define MDIO_CTL_READ		BIT(15)
-+#define MDIO_DATA(x)		((x) & 0xffff)
-+
-+#define TIMEOUT	1000
-+static int enetc_mdio_wait_complete(struct enetc_mdio_regs __iomem *regs)
-+{
-+	u32 val;
-+
-+	return readx_poll_timeout(enetc_rd_reg, &regs->mdio_cfg, val,
-+				  !(val & MDIO_CFG_BSY), 10, 10 * TIMEOUT);
-+}
-+
-+static int enetc_mdio_write(struct mii_bus *bus, int phy_id, int regnum,
-+			    u16 value)
-+{
-+	struct enetc_mdio_regs __iomem *regs = bus_to_enetc_regs(bus);
-+	u32 mdio_ctl, mdio_cfg;
-+	u16 dev_addr;
-+	int ret;
-+
-+	mdio_cfg = MDIO_CFG_CLKDIV(ENETC_MDC_DIV) | MDIO_CFG_NEG;
-+	if (regnum & MII_ADDR_C45) {
-+		dev_addr = (regnum >> 16) & 0x1f;
-+		mdio_cfg |= MDIO_CFG_ENC45;
-+	} else {
-+		/* clause 22 (ie 1G) */
-+		dev_addr = regnum & 0x1f;
-+		mdio_cfg &= ~MDIO_CFG_ENC45;
-+	}
-+
-+	enetc_wr_reg(&regs->mdio_cfg, mdio_cfg);
-+
-+	ret = enetc_mdio_wait_complete(regs);
-+	if (ret)
-+		return ret;
-+
-+	/* set port and dev addr */
-+	mdio_ctl = MDIO_CTL_PORT_ADDR(phy_id) | MDIO_CTL_DEV_ADDR(dev_addr);
-+	enetc_wr_reg(&regs->mdio_ctl, mdio_ctl);
-+
-+	/* set the register address */
-+	if (regnum & MII_ADDR_C45) {
-+		enetc_wr_reg(&regs->mdio_addr, regnum & 0xffff);
-+
-+		ret = enetc_mdio_wait_complete(regs);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* write the value */
-+	enetc_wr_reg(&regs->mdio_data, MDIO_DATA(value));
-+
-+	ret = enetc_mdio_wait_complete(regs);
-+	if (ret)
-+		return ret;
-+
-+	return 0;
-+}
-+
-+static int enetc_mdio_read(struct mii_bus *bus, int phy_id, int regnum)
-+{
-+	struct enetc_mdio_regs __iomem *regs = bus_to_enetc_regs(bus);
-+	u32 mdio_ctl, mdio_cfg;
-+	u16 dev_addr, value;
-+	int ret;
-+
-+	mdio_cfg = MDIO_CFG_CLKDIV(ENETC_MDC_DIV) | MDIO_CFG_NEG;
-+	if (regnum & MII_ADDR_C45) {
-+		dev_addr = (regnum >> 16) & 0x1f;
-+		mdio_cfg |= MDIO_CFG_ENC45;
-+	} else {
-+		dev_addr = regnum & 0x1f;
-+		mdio_cfg &= ~MDIO_CFG_ENC45;
-+	}
-+
-+	enetc_wr_reg(&regs->mdio_cfg, mdio_cfg);
-+
-+	ret = enetc_mdio_wait_complete(regs);
-+	if (ret)
-+		return ret;
-+
-+	/* set port and device addr */
-+	mdio_ctl = MDIO_CTL_PORT_ADDR(phy_id) | MDIO_CTL_DEV_ADDR(dev_addr);
-+	enetc_wr_reg(&regs->mdio_ctl, mdio_ctl);
-+
-+	/* set the register address */
-+	if (regnum & MII_ADDR_C45) {
-+		enetc_wr_reg(&regs->mdio_addr, regnum & 0xffff);
-+
-+		ret = enetc_mdio_wait_complete(regs);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* initiate the read */
-+	enetc_wr_reg(&regs->mdio_ctl, mdio_ctl | MDIO_CTL_READ);
-+
-+	ret = enetc_mdio_wait_complete(regs);
-+	if (ret)
-+		return ret;
-+
-+	/* return all Fs if nothing was there */
-+	if (enetc_rd_reg(&regs->mdio_cfg) & MDIO_CFG_RD_ER) {
-+		dev_dbg(&bus->dev,
-+			"Error while reading PHY%d reg at %d.%hhu\n",
-+			phy_id, dev_addr, regnum);
-+		return 0xffff;
-+	}
-+
-+	value = enetc_rd_reg(&regs->mdio_data) & 0xffff;
-+
-+	return value;
-+}
-+
-+int enetc_mdio_probe(struct enetc_pf *pf)
-+{
-+	struct device *dev = &pf->si->pdev->dev;
-+	struct enetc_mdio_regs __iomem *regs;
-+	struct device_node *np;
-+	struct mii_bus *bus;
-+	int ret;
-+
-+	bus = mdiobus_alloc_size(sizeof(regs));
-+	if (!bus)
-+		return -ENOMEM;
-+
-+	bus->name = "Freescale ENETC MDIO Bus";
-+	bus->read = enetc_mdio_read;
-+	bus->write = enetc_mdio_write;
-+	bus->parent = dev;
-+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s", dev_name(dev));
-+
-+	/* store the enetc mdio base address for this bus */
-+	regs = pf->si->hw.port + ENETC_MDIO_REG_OFFSET;
-+	bus->priv = regs;
-+
-+	np = of_get_child_by_name(dev->of_node, "mdio");
-+	if (!np) {
-+		dev_err(dev, "MDIO node missing\n");
-+		ret = -EINVAL;
-+		goto err_registration;
-+	}
-+
-+	ret = of_mdiobus_register(bus, np);
-+	if (ret) {
-+		of_node_put(np);
-+		dev_err(dev, "cannot register MDIO bus\n");
-+		goto err_registration;
-+	}
-+
-+	of_node_put(np);
-+	pf->mdio = bus;
-+
-+	return 0;
-+
-+err_registration:
-+	mdiobus_free(bus);
-+
-+	return ret;
-+}
-+
-+void enetc_mdio_remove(struct enetc_pf *pf)
-+{
-+	if (pf->mdio) {
-+		mdiobus_unregister(pf->mdio);
-+		mdiobus_free(pf->mdio);
-+	}
-+}
-diff --git a/drivers/net/ethernet/freescale/enetc/enetc_pf.c b/drivers/net/ethernet/freescale/enetc/enetc_pf.c
-index 7d28f5e..15876a6 100644
---- a/drivers/net/ethernet/freescale/enetc/enetc_pf.c
-+++ b/drivers/net/ethernet/freescale/enetc/enetc_pf.c
-@@ -746,6 +746,7 @@ static void enetc_pf_netdev_setup(struct enetc_si *si, struct net_device *ndev,
- 
- static int enetc_of_get_phy(struct enetc_ndev_priv *priv)
- {
-+	struct enetc_pf *pf = enetc_si_priv(priv->si);
- 	struct device_node *np = priv->dev->of_node;
- 	int err;
- 
-@@ -770,12 +771,22 @@ static int enetc_of_get_phy(struct enetc_ndev_priv *priv)
- 		priv->phy_node = of_node_get(np);
- 	}
- 
-+	if (!of_phy_is_fixed_link(np)) {
-+		err = enetc_mdio_probe(pf);
-+		if (err) {
-+			of_node_put(priv->phy_node);
-+			return err;
-+		}
-+	}
-+
- 	priv->if_mode = of_get_phy_mode(np);
- 	if (priv->if_mode < 0) {
- 		dev_err(priv->dev, "missing phy type\n");
- 		of_node_put(priv->phy_node);
- 		if (of_phy_is_fixed_link(np))
- 			of_phy_deregister_fixed_link(np);
-+		else
-+			enetc_mdio_remove(pf);
- 
- 		return -EINVAL;
- 	}
-@@ -898,6 +909,7 @@ static void enetc_pf_remove(struct pci_dev *pdev)
- 
- 	unregister_netdev(si->ndev);
- 
-+	enetc_mdio_remove(pf);
- 	enetc_of_put_phy(priv);
- 
- 	enetc_free_msix(priv);
-diff --git a/drivers/net/ethernet/freescale/enetc/enetc_pf.h b/drivers/net/ethernet/freescale/enetc/enetc_pf.h
-index 2061ae5..10dd1b5 100644
---- a/drivers/net/ethernet/freescale/enetc/enetc_pf.h
-+++ b/drivers/net/ethernet/freescale/enetc/enetc_pf.h
-@@ -42,8 +42,14 @@ struct enetc_pf {
- 	char vlan_promisc_simap; /* bitmap of SIs in VLAN promisc mode */
- 	DECLARE_BITMAP(vlan_ht_filter, ENETC_VLAN_HT_SIZE);
- 	DECLARE_BITMAP(active_vlans, VLAN_N_VID);
-+
-+	struct mii_bus *mdio; /* saved for cleanup */
- };
- 
- int enetc_msg_psi_init(struct enetc_pf *pf);
- void enetc_msg_psi_free(struct enetc_pf *pf);
- void enetc_msg_handle_rxmsg(struct enetc_pf *pf, int mbox_id, u16 *status);
-+
-+/* MDIO */
-+int enetc_mdio_probe(struct enetc_pf *pf);
-+void enetc_mdio_remove(struct enetc_pf *pf);
+Change since v2:
+	1) Fix calculation of flush pages in the kvm_fill_hv_flush_list_func()
+	2) Change the logic of setting/clearing last_level flag
+
+Change since v1:
+	1) Make flush list as a hlist instead of list in order to 
+	keep struct kvm_mmu_page size.
+	2) Add last_level flag in the struct kvm_mmu_page instead
+	of spte pointer
+	3) Move tlb flush from kvm_mmu_notifier_clear_flush_young() to kvm_age_hva()
+	4) Use range flush in the kvm_vm_ioctl_get/clear_dirty_log()
+
+
+Lan Tianyu (10):
+  X86/Hyper-V: Add parameter offset for
+    hyperv_fill_flush_guest_mapping_list()
+  KVM/VMX: Fill range list in kvm_fill_hv_flush_list_func()
+  KVM/MMU: Introduce tlb flush with range list
+  KVM/MMU: Use range flush in sync_page()
+  KVM/MMU: Flush tlb directly in the kvm_mmu_slot_gfn_write_protect()
+  KVM: Add kvm_get_memslot() to get memslot via slot id
+  KVM: Use tlb range flush in the kvm_vm_ioctl_get/clear_dirty_log()
+  KVM: Add flush parameter for kvm_age_hva()
+  KVM/MMU: Use tlb range flush in the kvm_age_hva()
+  KVM/MMU: Add last_level flag in the struct mmu_spte_page
+
+ arch/arm/include/asm/kvm_host.h     |  3 +-
+ arch/arm64/include/asm/kvm_host.h   |  3 +-
+ arch/mips/include/asm/kvm_host.h    |  3 +-
+ arch/mips/kvm/mmu.c                 | 11 ++++++--
+ arch/powerpc/include/asm/kvm_host.h |  3 +-
+ arch/powerpc/kvm/book3s.c           | 10 +++++--
+ arch/powerpc/kvm/e500_mmu_host.c    |  3 +-
+ arch/x86/hyperv/nested.c            |  4 +--
+ arch/x86/include/asm/kvm_host.h     | 11 +++++++-
+ arch/x86/include/asm/mshyperv.h     |  2 +-
+ arch/x86/kvm/mmu.c                  | 55 ++++++++++++++++++++++++++++++-------
+ arch/x86/kvm/mmu.h                  |  7 +++++
+ arch/x86/kvm/paging_tmpl.h          |  5 ++--
+ arch/x86/kvm/vmx/vmx.c              | 18 ++++++++++--
+ arch/x86/kvm/x86.c                  | 16 ++++++++---
+ include/linux/kvm_host.h            |  1 +
+ virt/kvm/arm/mmu.c                  | 13 +++++++--
+ virt/kvm/kvm_main.c                 | 51 ++++++++++++++--------------------
+ 18 files changed, 156 insertions(+), 63 deletions(-)
+
 -- 
-2.7.4
+2.14.4
 
 
 _______________________________________________
