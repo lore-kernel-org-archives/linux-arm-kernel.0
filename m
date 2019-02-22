@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE3D9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:30:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F155FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:30:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 939372075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:30:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C09152070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 16:30:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kkh+gaDL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 939372075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BaFPy6kE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C09152070B
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LFK3XA8qgO4P1DPVWRswFRwkxATrFHlHvVO6knVoxj8=; b=Kkh+gaDLfSZy5G
-	CQqh2DpCUxM2oAIG7UAo4Y/GnQ6XJi8oi2E7BoI/Oz8e43Pnr4jU9Xv53D8JAs8bfkJs8b9KyQ143
-	IbuhHl3eMk1TaYOdyPRBfQ9sAJO2jQtfa1CbOiNDln01np9TNfHt2g1B5UKJCR43fXU6LLdGCBYGp
-	GBQD44ctk6Pp6FkJ6ORbRG9nsbTB6F/PhiaTn+4Cg6uEQSUYVWaTKV3Qy+F5Hz//IC1Nm9AFPDAQH
-	pOW4/83Os8Q275Wk2bPaumw9lb8nLw+AYZ9bixr6sH2d//5C4d1jI+DSjxsBxMCYl3Khfy4QbqvE6
-	OuGXS2khEbSqCHj4aDqA==;
+	List-Owner; bh=NQpCLY/MxgrmY+1J7agRcHlAN1K3605Yy4bHeYiliD8=; b=BaFPy6kEGWDCf3
+	LHnKlfMSJTkwRZE6nj8W3JxkOuO9RL0Y+vUjwF+QXicsTuYsIgADP6jacsLukk1f9Cjp5nQF0IH7V
+	88xK7aB7s4/4MkMFCCSBLY3TU3EFpTLfrlaFa7DodjJ+N1uBGTrlFHb07lL9xBe5U2co6ZNHwpiYl
+	Vp5eacmsB7biRU85GXplxxIPKcWyDP15Rwg9z1jqUdTvkuDbObMzHyOAiX4pjlmWWLebt/VD02sDy
+	4XjvEs4Rth1r3U5ccQzZlZ/IYjn5Tat7jcJBpu+mPPDzWR9I+BJBtcAKeaCbUooqFr9ZEd3lJsu2r
+	l++6bBv9Qv/jpcDLvt4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxDi1-0001l8-Fq; Fri, 22 Feb 2019 16:29:57 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gxDiH-0002b6-VP; Fri, 22 Feb 2019 16:30:13 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxDgD-00089P-HU
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:28:36 +0000
+ id 1gxDgO-0007tV-04
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 16:28:37 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1A7C4A78;
- Fri, 22 Feb 2019 08:28:05 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E988480D;
+ Fri, 22 Feb 2019 08:28:15 -0800 (PST)
 Received: from big-swifty.lan (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- E366A3F5C1; Fri, 22 Feb 2019 08:27:59 -0800 (PST)
+ C6DDF3F5C1; Fri, 22 Feb 2019 08:28:11 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Paolo Bonzini <pbonzini@redhat.com>,
  =?UTF-8?q?Radim=20Kr=C4=8Dm=C3=A1=C5=99?= <rkrcmar@redhat.com>
-Subject: [PATCH 13/27] KVM: arm/arm64: arch_timer: Assign the phys timer on
- VHE systems
-Date: Fri, 22 Feb 2019 16:25:51 +0000
-Message-Id: <20190222162605.5054-14-marc.zyngier@arm.com>
+Subject: [PATCH 15/27] KVM: arm/arm64: Move kvm_is_write_fault to header file
+Date: Fri, 22 Feb 2019 16:25:53 +0000
+Message-Id: <20190222162605.5054-16-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190222162605.5054-1-marc.zyngier@arm.com>
 References: <20190222162605.5054-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_082806_469418_A232AE01 
-X-CRM114-Status: GOOD (  21.06  )
+X-CRM114-CacheID: sfid-20190222_082816_721910_C84F892E 
+X-CRM114-Status: GOOD (  12.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,513 +86,74 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Christoffer Dall <christoffer.dall@arm.com>
 
-VHE systems don't have to emulate the physical timer, we can simply
-assign the EL1 physical timer directly to the VM as the host always
-uses the EL2 timers.
+Move this little function to the header files for arm/arm64 so other
+code can make use of it directly.
 
-In order to minimize the amount of cruft, AArch32 gets definitions for
-the physical timer too, but is should be generally unused on this
-architecture.
-
-Co-written with Marc Zyngier <marc.zyngier@arm.com>
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_hyp.h |   4 +
- include/kvm/arm_arch_timer.h   |   6 +
- virt/kvm/arm/arch_timer.c      | 219 +++++++++++++++++++++++++--------
- 3 files changed, 180 insertions(+), 49 deletions(-)
+ arch/arm/include/asm/kvm_emulate.h   | 8 ++++++++
+ arch/arm64/include/asm/kvm_emulate.h | 8 ++++++++
+ virt/kvm/arm/mmu.c                   | 8 --------
+ 3 files changed, 16 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index e93a0cac9add..87bcd18df8d5 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -40,6 +40,7 @@
- #define TTBR1		__ACCESS_CP15_64(1, c2)
- #define VTTBR		__ACCESS_CP15_64(6, c2)
- #define PAR		__ACCESS_CP15_64(0, c7)
-+#define CNTP_CVAL	__ACCESS_CP15_64(2, c14)
- #define CNTV_CVAL	__ACCESS_CP15_64(3, c14)
- #define CNTVOFF		__ACCESS_CP15_64(4, c14)
- 
-@@ -85,6 +86,7 @@
- #define TID_PRIV	__ACCESS_CP15(c13, 0, c0, 4)
- #define HTPIDR		__ACCESS_CP15(c13, 4, c0, 2)
- #define CNTKCTL		__ACCESS_CP15(c14, 0, c1, 0)
-+#define CNTP_CTL	__ACCESS_CP15(c14, 0, c2, 1)
- #define CNTV_CTL	__ACCESS_CP15(c14, 0, c3, 1)
- #define CNTHCTL		__ACCESS_CP15(c14, 4, c1, 0)
- 
-@@ -94,6 +96,8 @@
- #define read_sysreg_el0(r)		read_sysreg(r##_el0)
- #define write_sysreg_el0(v, r)		write_sysreg(v, r##_el0)
- 
-+#define cntp_ctl_el0			CNTP_CTL
-+#define cntp_cval_el0			CNTP_CVAL
- #define cntv_ctl_el0			CNTV_CTL
- #define cntv_cval_el0			CNTV_CVAL
- #define cntvoff_el2			CNTVOFF
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index ab835112204d..6d4a33a9c45a 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -50,6 +50,10 @@ struct arch_timer_context {
- 
- 	/* Emulated Timer (may be unused) */
- 	struct hrtimer			hrtimer;
-+
-+	/* Duplicated state from arch_timer.c for convenience */
-+	u32				host_timer_irq;
-+	u32				host_timer_irq_flags;
- };
- 
- struct arch_timer_cpu {
-@@ -104,6 +108,8 @@ bool kvm_arch_timer_get_input_level(int vintid);
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.timers[TIMER_VTIMER])
- #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.timers[TIMER_PTIMER])
- 
-+#define arch_timer_ctx_index(ctx)	((ctx) - vcpu_timer((ctx)->vcpu)->timers)
-+
- u64 kvm_arm_timer_read_sysreg(struct kvm_vcpu *vcpu,
- 			      enum kvm_arch_timers tmr,
- 			      enum kvm_arch_timer_regs treg);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 471f9fd004c9..10c15151c87e 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -35,7 +35,9 @@
- 
- static struct timecounter *timecounter;
- static unsigned int host_vtimer_irq;
-+static unsigned int host_ptimer_irq;
- static u32 host_vtimer_irq_flags;
-+static u32 host_ptimer_irq_flags;
- 
- static DEFINE_STATIC_KEY_FALSE(has_gic_active_state);
- 
-@@ -86,20 +88,24 @@ static void soft_timer_cancel(struct hrtimer *hrt)
- static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
- {
- 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
--	struct arch_timer_context *vtimer;
-+	struct arch_timer_context *ctx;
- 
- 	/*
- 	 * We may see a timer interrupt after vcpu_put() has been called which
- 	 * sets the CPU's vcpu pointer to NULL, because even though the timer
--	 * has been disabled in vtimer_save_state(), the hardware interrupt
-+	 * has been disabled in timer_save_state(), the hardware interrupt
- 	 * signal may not have been retired from the interrupt controller yet.
- 	 */
- 	if (!vcpu)
- 		return IRQ_HANDLED;
- 
--	vtimer = vcpu_vtimer(vcpu);
--	if (kvm_timer_should_fire(vtimer))
--		kvm_timer_update_irq(vcpu, true, vtimer);
-+	if (irq == host_vtimer_irq)
-+		ctx = vcpu_vtimer(vcpu);
-+	else
-+		ctx = vcpu_ptimer(vcpu);
-+
-+	if (kvm_timer_should_fire(ctx))
-+		kvm_timer_update_irq(vcpu, true, ctx);
- 
- 	if (userspace_irqchip(vcpu->kvm) &&
- 	    !static_branch_unlikely(&has_gic_active_state))
-@@ -208,13 +214,25 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
- static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
- {
- 	struct arch_timer_cpu *timer = vcpu_timer(timer_ctx->vcpu);
-+	enum kvm_arch_timers index = arch_timer_ctx_index(timer_ctx);
- 	u64 cval, now;
- 
- 	if (timer->loaded) {
--		u32 cnt_ctl;
-+		u32 cnt_ctl = 0;
-+
-+		switch (index) {
-+		case TIMER_VTIMER:
-+			cnt_ctl = read_sysreg_el0(cntv_ctl);
-+			break;
-+		case TIMER_PTIMER:
-+			cnt_ctl = read_sysreg_el0(cntp_ctl);
-+			break;
-+		case NR_KVM_TIMERS:
-+			/* GCC is braindead */
-+			cnt_ctl = 0;
-+			break;
-+		}
- 
--		/* Only the virtual timer can be loaded so far */
--		cnt_ctl = read_sysreg_el0(cntv_ctl);
- 		return  (cnt_ctl & ARCH_TIMER_CTRL_ENABLE) &&
- 		        (cnt_ctl & ARCH_TIMER_CTRL_IT_STAT) &&
- 		       !(cnt_ctl & ARCH_TIMER_CTRL_IT_MASK);
-@@ -310,7 +328,7 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 		return;
- 
- 	/*
--	 * The vtimer virtual interrupt is a 'mapped' interrupt, meaning part
-+	 * If the timer virtual interrupt is a 'mapped' interrupt, part
- 	 * of its lifecycle is offloaded to the hardware, and we therefore may
- 	 * not have lowered the irq.level value before having to signal a new
- 	 * interrupt, but have to signal an interrupt every time the level is
-@@ -319,31 +337,55 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	level = kvm_timer_should_fire(vtimer);
- 	kvm_timer_update_irq(vcpu, level, vtimer);
- 
-+	if (has_vhe()) {
-+		level = kvm_timer_should_fire(ptimer);
-+		kvm_timer_update_irq(vcpu, level, ptimer);
-+
-+		return;
-+	}
-+
- 	phys_timer_emulate(vcpu);
- 
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
- }
- 
--static void vtimer_save_state(struct kvm_vcpu *vcpu)
-+static void timer_save_state(struct arch_timer_context *ctx)
- {
--	struct arch_timer_cpu *timer = vcpu_timer(vcpu);
--	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_cpu *timer = vcpu_timer(ctx->vcpu);
-+	enum kvm_arch_timers index = arch_timer_ctx_index(ctx);
- 	unsigned long flags;
- 
-+	if (!timer->enabled)
-+		return;
-+
- 	local_irq_save(flags);
- 
- 	if (!timer->loaded)
- 		goto out;
- 
--	if (timer->enabled) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
--	}
-+	switch (index) {
-+	case TIMER_VTIMER:
-+		ctx->cnt_ctl = read_sysreg_el0(cntv_ctl);
-+		ctx->cnt_cval = read_sysreg_el0(cntv_cval);
- 
--	/* Disable the virtual timer */
--	write_sysreg_el0(0, cntv_ctl);
--	isb();
-+		/* Disable the timer */
-+		write_sysreg_el0(0, cntv_ctl);
-+		isb();
-+
-+		break;
-+	case TIMER_PTIMER:
-+		ctx->cnt_ctl = read_sysreg_el0(cntp_ctl);
-+		ctx->cnt_cval = read_sysreg_el0(cntp_cval);
-+
-+		/* Disable the timer */
-+		write_sysreg_el0(0, cntp_ctl);
-+		isb();
-+
-+		break;
-+	case NR_KVM_TIMERS:
-+		break; /* GCC is braindead */
-+	}
- 
- 	timer->loaded = false;
- out:
-@@ -382,21 +424,33 @@ static void kvm_timer_unblocking(struct kvm_vcpu *vcpu)
- 	soft_timer_cancel(&timer->bg_timer);
- }
- 
--static void vtimer_restore_state(struct kvm_vcpu *vcpu)
-+static void timer_restore_state(struct arch_timer_context *ctx)
- {
--	struct arch_timer_cpu *timer = vcpu_timer(vcpu);
--	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_cpu *timer = vcpu_timer(ctx->vcpu);
-+	enum kvm_arch_timers index = arch_timer_ctx_index(ctx);
- 	unsigned long flags;
- 
-+	if (!timer->enabled)
-+		return;
-+
- 	local_irq_save(flags);
- 
- 	if (timer->loaded)
- 		goto out;
- 
--	if (timer->enabled) {
--		write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
-+	switch (index) {
-+	case TIMER_VTIMER:
-+		write_sysreg_el0(ctx->cnt_cval, cntv_cval);
-+		isb();
-+		write_sysreg_el0(ctx->cnt_ctl, cntv_ctl);
-+		break;
-+	case TIMER_PTIMER:
-+		write_sysreg_el0(ctx->cnt_cval, cntp_cval);
- 		isb();
--		write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);
-+		write_sysreg_el0(ctx->cnt_ctl, cntp_ctl);
-+		break;
-+	case NR_KVM_TIMERS:
-+		break; /* GCC is braindead */
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index 77121b713bef..8927cae7c966 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -265,6 +265,14 @@ static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
  	}
- 
- 	timer->loaded = true;
-@@ -419,23 +473,23 @@ static void set_cntvoff(u64 cntvoff)
- 	kvm_call_hyp(__kvm_timer_set_cntvoff, low, high);
  }
  
--static inline void set_vtimer_irq_phys_active(struct kvm_vcpu *vcpu, bool active)
-+static inline void set_timer_irq_phys_active(struct arch_timer_context *ctx, bool active)
++static inline bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
++{
++	if (kvm_vcpu_trap_is_iabt(vcpu))
++		return false;
++
++	return kvm_vcpu_dabt_iswrite(vcpu);
++}
++
+ static inline u32 kvm_vcpu_hvc_get_imm(struct kvm_vcpu *vcpu)
  {
- 	int r;
--	r = irq_set_irqchip_state(host_vtimer_irq, IRQCHIP_STATE_ACTIVE, active);
-+	r = irq_set_irqchip_state(ctx->host_timer_irq, IRQCHIP_STATE_ACTIVE, active);
- 	WARN_ON(r);
+ 	return kvm_vcpu_get_hsr(vcpu) & HSR_HVC_IMM_MASK;
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 506386a3edde..a0d1ce9ae12b 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -331,6 +331,14 @@ static inline int kvm_vcpu_sys_get_rt(struct kvm_vcpu *vcpu)
+ 	return ESR_ELx_SYS64_ISS_RT(esr);
  }
  
--static void kvm_timer_vcpu_load_gic(struct kvm_vcpu *vcpu)
-+static void kvm_timer_vcpu_load_gic(struct arch_timer_context *ctx)
++static inline bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
++{
++	if (kvm_vcpu_trap_is_iabt(vcpu))
++		return false;
++
++	return kvm_vcpu_dabt_iswrite(vcpu);
++}
++
+ static inline unsigned long kvm_vcpu_get_mpidr_aff(struct kvm_vcpu *vcpu)
  {
--	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct kvm_vcpu *vcpu = ctx->vcpu;
- 	bool phys_active;
- 
- 	if (irqchip_in_kernel(vcpu->kvm))
--		phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
-+		phys_active = kvm_vgic_map_is_active(vcpu, ctx->irq.irq);
- 	else
--		phys_active = vtimer->irq.level;
--	set_vtimer_irq_phys_active(vcpu, phys_active);
-+		phys_active = ctx->irq.level;
-+	set_timer_irq_phys_active(ctx, phys_active);
+ 	return vcpu_read_sys_reg(vcpu, MPIDR_EL1) & MPIDR_HWID_BITMASK;
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index f8dda452ea24..e3e5a26b4845 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -1403,14 +1403,6 @@ static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+ 	return false;
  }
  
- static void kvm_timer_vcpu_load_nogic(struct kvm_vcpu *vcpu)
-@@ -467,14 +521,22 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
- 	if (unlikely(!timer->enabled))
- 		return;
- 
--	if (static_branch_likely(&has_gic_active_state))
--		kvm_timer_vcpu_load_gic(vcpu);
--	else
-+	if (static_branch_likely(&has_gic_active_state)) {
-+		kvm_timer_vcpu_load_gic(vtimer);
-+		if (has_vhe())
-+			kvm_timer_vcpu_load_gic(ptimer);
-+	} else {
- 		kvm_timer_vcpu_load_nogic(vcpu);
-+	}
- 
- 	set_cntvoff(vtimer->cntvoff);
- 
--	vtimer_restore_state(vcpu);
-+	timer_restore_state(vtimer);
-+
-+	if (has_vhe()) {
-+		timer_restore_state(ptimer);
-+		return;
-+	}
- 
- 	/* Set the background timer for the physical timer emulation. */
- 	phys_timer_emulate(vcpu);
-@@ -506,12 +568,17 @@ bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = vcpu_timer(vcpu);
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
- 	if (unlikely(!timer->enabled))
- 		return;
- 
--	vtimer_save_state(vcpu);
-+	timer_save_state(vtimer);
-+	if (has_vhe()) {
-+		timer_save_state(ptimer);
-+		return;
-+	}
- 
- 	/*
- 	 * Cancel the physical timer emulation, because the only case where we
-@@ -534,8 +601,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	 * counter of non-VHE case. For VHE, the virtual counter uses a fixed
- 	 * virtual offset of zero, so no need to zero CNTVOFF_EL2 register.
- 	 */
--	if (!has_vhe())
--		set_cntvoff(0);
-+	set_cntvoff(0);
- }
- 
- /*
-@@ -550,7 +616,7 @@ static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
- 	if (!kvm_timer_should_fire(vtimer)) {
- 		kvm_timer_update_irq(vcpu, false, vtimer);
- 		if (static_branch_likely(&has_gic_active_state))
--			set_vtimer_irq_phys_active(vcpu, false);
-+			set_timer_irq_phys_active(vtimer, false);
- 		else
- 			enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
- 	}
-@@ -625,7 +691,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 	ptimer->hrtimer.function = kvm_phys_timer_expire;
- 
- 	vtimer->irq.irq = default_vtimer_irq.irq;
-+	vtimer->host_timer_irq = host_vtimer_irq;
-+	vtimer->host_timer_irq_flags = host_vtimer_irq_flags;
-+
- 	ptimer->irq.irq = default_ptimer_irq.irq;
-+	ptimer->host_timer_irq = host_ptimer_irq;
-+	ptimer->host_timer_irq_flags = host_ptimer_irq_flags;
- 
- 	vtimer->vcpu = vcpu;
- 	ptimer->vcpu = vcpu;
-@@ -634,6 +705,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- static void kvm_timer_init_interrupt(void *info)
- {
- 	enable_percpu_irq(host_vtimer_irq, host_vtimer_irq_flags);
-+	enable_percpu_irq(host_ptimer_irq, host_ptimer_irq_flags);
- }
- 
- int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
-@@ -815,6 +887,8 @@ int kvm_timer_hyp_init(bool has_gic)
- 		return -ENODEV;
- 	}
- 
-+	/* First, do the virtual EL1 timer irq */
-+
- 	if (info->virtual_irq <= 0) {
- 		kvm_err("kvm_arch_timer: invalid virtual timer IRQ: %d\n",
- 			info->virtual_irq);
-@@ -825,15 +899,15 @@ int kvm_timer_hyp_init(bool has_gic)
- 	host_vtimer_irq_flags = irq_get_trigger_type(host_vtimer_irq);
- 	if (host_vtimer_irq_flags != IRQF_TRIGGER_HIGH &&
- 	    host_vtimer_irq_flags != IRQF_TRIGGER_LOW) {
--		kvm_err("Invalid trigger for IRQ%d, assuming level low\n",
-+		kvm_err("Invalid trigger for vtimer IRQ%d, assuming level low\n",
- 			host_vtimer_irq);
- 		host_vtimer_irq_flags = IRQF_TRIGGER_LOW;
- 	}
- 
- 	err = request_percpu_irq(host_vtimer_irq, kvm_arch_timer_handler,
--				 "kvm guest timer", kvm_get_running_vcpus());
-+				 "kvm guest vtimer", kvm_get_running_vcpus());
- 	if (err) {
--		kvm_err("kvm_arch_timer: can't request interrupt %d (%d)\n",
-+		kvm_err("kvm_arch_timer: can't request vtimer interrupt %d (%d)\n",
- 			host_vtimer_irq, err);
- 		return err;
- 	}
-@@ -851,6 +925,43 @@ int kvm_timer_hyp_init(bool has_gic)
- 
- 	kvm_debug("virtual timer IRQ%d\n", host_vtimer_irq);
- 
-+	/* Now let's do the physical EL1 timer irq */
-+
-+	if (info->physical_irq > 0) {
-+		host_ptimer_irq = info->physical_irq;
-+		host_ptimer_irq_flags = irq_get_trigger_type(host_ptimer_irq);
-+		if (host_ptimer_irq_flags != IRQF_TRIGGER_HIGH &&
-+		    host_ptimer_irq_flags != IRQF_TRIGGER_LOW) {
-+			kvm_err("Invalid trigger for ptimer IRQ%d, assuming level low\n",
-+				host_ptimer_irq);
-+			host_ptimer_irq_flags = IRQF_TRIGGER_LOW;
-+		}
-+
-+		err = request_percpu_irq(host_ptimer_irq, kvm_arch_timer_handler,
-+					 "kvm guest ptimer", kvm_get_running_vcpus());
-+		if (err) {
-+			kvm_err("kvm_arch_timer: can't request ptimer interrupt %d (%d)\n",
-+				host_ptimer_irq, err);
-+			return err;
-+		}
-+
-+		if (has_gic) {
-+			err = irq_set_vcpu_affinity(host_ptimer_irq,
-+						    kvm_get_running_vcpus());
-+			if (err) {
-+				kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
-+				goto out_free_irq;
-+			}
-+		}
-+
-+		kvm_debug("physical timer IRQ%d\n", host_ptimer_irq);
-+	} else if (has_vhe()) {
-+		kvm_err("kvm_arch_timer: invalid physical timer IRQ: %d\n",
-+			info->physical_irq);
-+		err = -ENODEV;
-+		goto out_free_irq;
-+	}
-+
- 	cpuhp_setup_state(CPUHP_AP_KVM_ARM_TIMER_STARTING,
- 			  "kvm/arm/timer:starting", kvm_timer_starting_cpu,
- 			  kvm_timer_dying_cpu);
-@@ -898,8 +1009,10 @@ bool kvm_arch_timer_get_input_level(int vintid)
- 
- 	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
- 		timer = vcpu_vtimer(vcpu);
-+	else if (vintid == vcpu_ptimer(vcpu)->irq.irq)
-+		timer = vcpu_ptimer(vcpu);
- 	else
--		BUG(); /* We only map the vtimer so far */
-+		BUG();
- 
- 	return kvm_timer_should_fire(timer);
- }
-@@ -908,6 +1021,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = vcpu_timer(vcpu);
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 	int ret;
- 
- 	if (timer->enabled)
-@@ -930,14 +1044,21 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	if (ret)
- 		return ret;
- 
-+	if (has_vhe()) {
-+		ret = kvm_vgic_map_phys_irq(vcpu, host_ptimer_irq, ptimer->irq.irq,
-+					    kvm_arch_timer_get_input_level);
-+		if (ret)
-+			return ret;
-+	}
-+
- no_vgic:
- 	timer->enabled = 1;
- 	return 0;
- }
- 
- /*
-- * On VHE system, we only need to configure trap on physical timer and counter
-- * accesses in EL0 and EL1 once, not for every world switch.
-+ * On VHE system, we only need to configure the EL2 timer trap register once,
-+ * not for every world switch.
-  * The host kernel runs at EL2 with HCR_EL2.TGE == 1,
-  * and this makes those bits have no effect for the host kernel execution.
-  */
-@@ -948,11 +1069,11 @@ void kvm_timer_init_vhe(void)
- 	u64 val;
- 
- 	/*
--	 * Disallow physical timer access for the guest.
--	 * Physical counter access is allowed.
-+	 * VHE systems allow the guest direct access to the EL1 physical
-+	 * timer/counter.
- 	 */
- 	val = read_sysreg(cnthctl_el2);
--	val &= ~(CNTHCTL_EL1PCEN << cnthctl_shift);
-+	val |= (CNTHCTL_EL1PCEN << cnthctl_shift);
- 	val |= (CNTHCTL_EL1PCTEN << cnthctl_shift);
- 	write_sysreg(val, cnthctl_el2);
- }
+-static bool kvm_is_write_fault(struct kvm_vcpu *vcpu)
+-{
+-	if (kvm_vcpu_trap_is_iabt(vcpu))
+-		return false;
+-
+-	return kvm_vcpu_dabt_iswrite(vcpu);
+-}
+-
+ /**
+  * stage2_wp_ptes - write protect PMD range
+  * @pmd:	pointer to pmd entry
 -- 
 2.20.1
 
