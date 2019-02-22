@@ -2,86 +2,69 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E6605C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:55:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF71BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:58:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B07D52075C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:55:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A63D0206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:58:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JmxBXnSW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="EnFZjWYA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B07D52075C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vsdz5mPP";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XYIA5LB1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A63D0206A3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
+	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=18Ubwx1t/wJreSV5tmcQWemxbB8r59qebOoCsZ6rmxU=; b=JmxBXnSWZEmS9m
-	oHRRQp65cJZImEOYTTpFuJYF6TGQk5sOEJcA1FHEPVY0u4zEMJZaOQvR5m1otHlFzPZLBWqJGQ7F7
-	vA4TzQBMxeTJbW3Nf0FIi8Cp6xm0dEGiiag+B80kuUxO0S+B0kWEPLOWR8RmE7rHWn2H/3oiVVFTM
-	IkgXrsiLS7vE77N94lcDQXN3uib8GOF8PwnW+b+ERZitcsoFxae7HczgpjPk3jxybf9YSWyqujPl5
-	OzoYsbM7VupXnGWC5qZaqdBugIwbBwgdzyaedxOwkyqqTPxkhjK7HlMZf2HGn61H8merzpJVI1OUx
-	kDcno8QDGeIQCpQINcvA==;
+	List-Owner; bh=WWSFpaj1q1a+YzDoU7Vi9eEYmFscG3+z/071J2VONbM=; b=Vsdz5mPPQKMyp9
+	6IEqIrcU7WIDCjKa3G1BEyar0OUPjEdfYcVmTvq0Cw5AVPe1pz+M8xwfz+vkS86ntuDywN/ZuFqTQ
+	9hJBXObwH/ngslvPNDVwjTcPi/zo4KMfAIXkMNPdrJM2pB9HI/YFX0Za55NBi+x8iv1tm1ZHIBtFd
+	HtJneHrXe+HoXJybRE9sEIsqne51hLGyfRAG5hUxedN2fiGLonC2QXEJPAlwEQwOKLBwnDzw/Qiqi
+	bQFHjHijuWHPmUlnv9DYFQaGFBPhJtmi0R/RI0mH95wFI1uI3/q1lyX+zDR3Daf6yh9q1YG/kT+nO
+	5ELkWanVjiEq7iCy2jGQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxKfS-0002Wz-6a; Fri, 22 Feb 2019 23:55:46 +0000
+	id 1gxKhV-0002yR-Sg; Fri, 22 Feb 2019 23:57:53 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxKfN-0002WA-Lc
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:55:43 +0000
-Received: from mail-wr1-f51.google.com (mail-wr1-f51.google.com
- [209.85.221.51])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ id 1gxKhS-0002xc-82
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:57:51 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id A50C72086A
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 23:55:38 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 965CE206A3;
+ Fri, 22 Feb 2019 23:57:49 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550879738;
- bh=17mG8B8lMHG5wfQsv/g1N0tTizuAj4ppTtNUCXlyCk4=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=EnFZjWYANcSBQy9/w9c+EgPuNNGZIV6T4u2tF6pcg8j9KL6D3XtsfMJKDAVoQqxY+
- nwsE0uaOSFeMGOdeCvwIsXBbWX2hZ+wruIBm2FAO6vfSGTqr9tPINUC4viFURcUtzj
- AJkxWcwiXLY3er+hISWK8VuG8sNX+658sai83cyc=
-Received: by mail-wr1-f51.google.com with SMTP id n2so4091104wrw.8
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 15:55:38 -0800 (PST)
-X-Gm-Message-State: AHQUAuYFQnCbZ+NAGozhOHmPaCfnhBtORtrE45XL9YoURWp6SmaPC59W
- VDWlgR8ki+tIrKuJv+pjlg5JtVmkNCjcNUCerxGJrA==
-X-Google-Smtp-Source: AHgI3Ib0CVIzhDnShAg0pz7M8k6P8KKBcQ9vQpJz+0avB23uRG3JQ06jBt1Y/4c3dqcHimd7PnhigfylGtd89yvYuaE=
-X-Received: by 2002:a5d:6252:: with SMTP id m18mr4445431wrv.199.1550879737087; 
- Fri, 22 Feb 2019 15:55:37 -0800 (PST)
+ s=default; t=1550879869;
+ bh=QMD3bzMoTfdQ0t7bLG1BYt49fKANSP4oc82fWCBciDs=;
+ h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
+ b=XYIA5LB1Xu1xcWqcYUEOOa3UolTuBLokkjKQ/MfFQf+Tj3w94G2jk5X8qtRn1Kko9
+ 2TKkMh5LpAQGqqkmyLD+Rn08Yxc7oW5hSPoMsfhKCeJORXQZMBxYW3hR8hOIn1qO/7
+ 6vBN/241CQ0DeRxmv/fPYoIs6i6NfPmuhjom/v9w=
 MIME-Version: 1.0
-References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <20190219090409.GW32494@hirez.programming.kicks-ass.net>
- <20190219124808.GG8501@fuggles.cambridge.arm.com>
- <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
- <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
- <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
- <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
- <alpine.DEB.2.21.1902221853330.1666@nanos.tec.linutronix.de>
- <20190222222635.GK14054@worktop.programming.kicks-ass.net>
-In-Reply-To: <20190222222635.GK14054@worktop.programming.kicks-ass.net>
-From: Andy Lutomirski <luto@kernel.org>
-Date: Fri, 22 Feb 2019 15:55:25 -0800
-X-Gmail-Original-Message-ID: <CALCETrV0XAv_tuw3WzQG+dx0iKEahw9V6DLACq4PtNQrkJBwhw@mail.gmail.com>
-Message-ID: <CALCETrV0XAv_tuw3WzQG+dx0iKEahw9V6DLACq4PtNQrkJBwhw@mail.gmail.com>
-Subject: Re: [RFC][PATCH] objtool: STAC/CLAC validation
-To: Peter Zijlstra <peterz@infradead.org>
+Subject: Re: [PATCH v2 08/15] clock: milbeaut: Add Milbeaut M10V clock
+ controller
+Message-ID: <155087986877.77512.2765555413921453918@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.8
+References: <1549628837-31574-1-git-send-email-sugaya.taichi@socionext.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <1549628837-31574-1-git-send-email-sugaya.taichi@socionext.com>
+To: Sugaya Taichi <sugaya.taichi@socionext.com>,
+ linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-kernel@vger.kernel.org
+Date: Fri, 22 Feb 2019 15:57:48 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_155541_745949_779E0507 
-X-CRM114-Status: GOOD (  22.96  )
+X-CRM114-CacheID: sfid-20190222_155750_321371_070614B1 
+X-CRM114-Status: GOOD (  14.71  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,102 +76,272 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Denys Vlasenko <dvlasenk@redhat.com>, Brian Gerst <brgerst@gmail.com>,
- Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Josh Poimboeuf <jpoimboe@redhat.com>, Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- valentin.schneider@arm.com, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- "H. Peter Anvin" <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
- Thomas Gleixner <tglx@linutronix.de>,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
+ Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+ Sugaya Taichi <sugaya.taichi@socionext.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Jassi Brar <jaswinder.singh@linaro.org>,
+ Takao Orito <orito.takao@socionext.com>,
+ Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 2:26 PM Peter Zijlstra <peterz@infradead.org> wrote:
->
-> On Fri, Feb 22, 2019 at 07:10:34PM +0100, Thomas Gleixner wrote:
->
-> > But correct :)
->
-> > I agree, that a function which is doing the actual copy should be callable,
-> > but random other functions? NO!
->
-> So find the below patch -- which spotted fail in ptrace.c
->
-> It has an AC_SAFE(func) annotation which allows marking specific
-> functions as safe to call. The patch includes 2 instances which were
-> required to make arch/x86 'build':
->
->   arch/x86/ia32/ia32_signal.o: warning: objtool: ia32_restore_sigcontext()+0x3d: call to native_load_gs_index() with AC set
->   arch/x86/kernel/ptrace.o: warning: objtool: genregs_get()+0x8e: call to getreg() with AC set
->
-> It also screams (provided one has CONFIG_FUNCTION_TRACE=y) about the
-> lack of notrace annotations on functions marked AC_SAFE():
->
->   arch/x86/kernel/ptrace.o: warning: objtool: getreg()+0x0: call to __fentry__() with AC set
->
-> It builds arch/x86 relatively clean; it only complains about some
-> redundant CLACs in entry_64.S because it doesn't understand interrupts
-> and I've not bothered creating an annotation for them yet.
->
->   arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0x4d: redundant CLAC
->   arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0x5a: redundant CLAC
->   ...
->   arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0xb1: redundant CLAC
+Quoting Sugaya Taichi (2019-02-08 04:27:17)
+> diff --git a/drivers/clk/clk-milbeaut.c b/drivers/clk/clk-milbeaut.c
+> new file mode 100644
+> index 0000000..f798939
+> --- /dev/null
+> +++ b/drivers/clk/clk-milbeaut.c
+> @@ -0,0 +1,626 @@
+[....]
+> +struct m10v_clk_div_fixed_data {
+> +       const char      *name;
+> +       const char      *parent_name;
+> +       u8              div;
+> +       u8              mult;
+> +       int             onecell_idx;
+> +};
+> +struct m10v_clk_mux_factors {
+> +       const char              *name;
+> +       const char * const      *parent_names;
+> +       u8                      num_parents;
+> +       u32                     offset;
+> +       u8                      shift;
+> +       u8                      mask;
+> +       u32                     *table;
+> +       unsigned long           mux_flags;
+> +       int                     onecell_idx;
+> +};
 
-Does objtool understand altinstr?  If it understands that this is an
-altinstr associated with a not-actually-a-fuction (i.e. END not
-ENDPROC) piece of code, it could suppress this warning.
+Please add newlines between struct definitions. It also wouldn't hurt to
+have kernel-doc on these.
 
->
-> -static unsigned long getreg(struct task_struct *task, unsigned long offset)
-> +static notrace unsigned long getreg(struct task_struct *task, unsigned long offset)
->  {
->         switch (offset) {
->         case offsetof(struct user_regs_struct, cs):
-> @@ -444,6 +444,7 @@ static unsigned long getreg(struct task_struct *task, unsigned long offset)
->
->         return *pt_regs_access(task_pt_regs(task), offset);
->  }
-> +AC_SAFE(getreg);
+> +
+> +static const struct clk_div_table emmcclk_table[] = {
+> +       { .val = 0, .div = 8 },
+> +       { .val = 1, .div = 9 },
+> +       { .val = 2, .div = 10 },
+> +       { .val = 3, .div = 15 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table mclk400_table[] = {
+> +       { .val = 1, .div = 2 },
+> +       { .val = 3, .div = 4 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table mclk200_table[] = {
+> +       { .val = 3, .div = 4 },
+> +       { .val = 7, .div = 8 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table aclk400_table[] = {
+> +       { .val = 1, .div = 2 },
+> +       { .val = 3, .div = 4 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table aclk300_table[] = {
+> +       { .val = 0, .div = 2 },
+> +       { .val = 1, .div = 3 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table aclk_table[] = {
+> +       { .val = 3, .div = 4 },
+> +       { .val = 7, .div = 8 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table aclkexs_table[] = {
+> +       { .val = 3, .div = 4 },
+> +       { .val = 4, .div = 5 },
+> +       { .val = 5, .div = 6 },
+> +       { .val = 7, .div = 8 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table hclk_table[] = {
+> +       { .val = 7, .div = 8 },
+> +       { .val = 15, .div = 16 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table hclkbmh_table[] = {
+> +       { .val = 3, .div = 4 },
+> +       { .val = 7, .div = 8 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table pclk_table[] = {
+> +       { .val = 15, .div = 16 },
+> +       { .val = 31, .div = 32 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table rclk_table[] = {
+> +       { .val = 0, .div = 8 },
+> +       { .val = 1, .div = 16 },
+> +       { .val = 2, .div = 24 },
+> +       { .val = 3, .div = 32 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table uhs1clk0_table[] = {
+> +       { .val = 0, .div = 2 },
+> +       { .val = 1, .div = 3 },
+> +       { .val = 2, .div = 4 },
+> +       { .val = 3, .div = 8 },
+> +       { .val = 4, .div = 16 },
+> +       { .div = 0 },
+> +};
+> +static const struct clk_div_table uhs2clk_table[] = {
+> +       { .val = 0, .div = 9 },
+> +       { .val = 1, .div = 10 },
+> +       { .val = 2, .div = 11 },
+> +       { .val = 3, .div = 12 },
+> +       { .val = 4, .div = 13 },
+> +       { .val = 5, .div = 14 },
+> +       { .val = 6, .div = 16 },
+> +       { .val = 7, .div = 18 },
+> +       { .div = 0 },
+> +};
 
-This takes the address and could plausibly suppress some optimizations.
+Same comment applies here. Newlines between tables please.
 
->
-> +#if defined(CONFIG_STACK_VALIDATION) && !defined(BUILD_VDSO) && !defined(BUILD_VDSO32)
-> +/*
-> + * This macro marks functions as AC-safe, that is, it is safe to call from an
-> + * EFLAGS.AC enabled region (typically user_access_begin() /
-> + * user_access_end()).
-> + *
-> + * These functions in turn will only call AC-safe functions themselves (which
-> + * precludes tracing, including __fentry__ and scheduling, including
-> + * preempt_enable).
-> + *
-> + * AC-safe functions will obviously also not change EFLAGS.AC themselves.
-> + *
-> + * Since STAC/CLAC are OPL-0 only, this is all irrelevant for VDSO builds
-> + * (and the generated symbol reference will in fact cause link failures).
-> + */
-> +#define AC_SAFE(func) \
-> +       static void __used __section(.discard.ac_safe) \
-> +               *__func_ac_safe_##func = func
+> +
+> +static u32 spi_mux_table[] = {0, 1, 2};
+> +static const char * const spi_mux_names[] = {
+> +       M10V_SPI_PARENT0, M10V_SPI_PARENT1, M10V_SPI_PARENT2
+> +};
+> +
+> +static u32 uhs1clk2_mux_table[] = {2, 3, 4, 8};
+> +static const char * const uhs1clk2_mux_names[] = {
+> +       M10V_UHS1CLK2_PARENT0, M10V_UHS1CLK2_PARENT1,
+> +       M10V_UHS1CLK2_PARENT2, M10V_PLL6DIV2
+> +};
+> +
+> +static u32 uhs1clk1_mux_table[] = {3, 4, 8};
+> +static const char * const uhs1clk1_mux_names[] = {
+> +       M10V_UHS1CLK1_PARENT0, M10V_UHS1CLK1_PARENT1, M10V_PLL6DIV2
+> +};
+> +
+[...]
+> +
+> +static const struct m10v_clk_mux_factors m10v_mux_factor_data[] = {
+> +       {"spi", spi_mux_names, ARRAY_SIZE(spi_mux_names),
+> +               CLKSEL(8), 3, 7, spi_mux_table, 0, M10V_SPICLK_ID},
+> +       {"uhs1clk2", uhs1clk2_mux_names, ARRAY_SIZE(uhs1clk2_mux_names),
+> +               CLKSEL(1), 13, 31, uhs1clk2_mux_table, 0, -1},
+> +       {"uhs1clk1", uhs1clk1_mux_names, ARRAY_SIZE(uhs1clk1_mux_names),
+> +               CLKSEL(1), 8, 31, uhs1clk1_mux_table, 0, -1},
+> +       {"nfclk", nfclk_mux_names, ARRAY_SIZE(nfclk_mux_names),
+> +               CLKSEL(1), 22, 127, nfclk_mux_table, 0, M10V_NFCLK_ID},
+> +};
+> +
+> +static u8 m10v_mux_get_parent(struct clk_hw *hw)
+> +{
+> +       struct clk_mux *mux = to_clk_mux(hw);
+> +       u32 val;
+> +
+> +       val = clk_readl(mux->reg) >> mux->shift;
 
-Are we okay with annotating function *declarations* in a way that
-their addresses get taken whenever the declaration is processed?  It
-would be nice if we could avoid this.
+Please don't use clk_readl() unless you absolutely need it.
 
-I'm wondering if we can just change the code that does getreg() and
-load_gs_index() so it doesn't do it with AC set.  Also, what about
-paravirt kernels?  They'll call into PV code for load_gs_index() with
-AC set.
+> +       val &= mux->mask;
+> +
+> +       return clk_mux_val_to_index(hw, mux->table, mux->flags, val);
+> +}
+> +
+[...]
+> +static struct clk_hw *m10v_clk_hw_register_divider(struct device *dev,
+> +               const char *name, const char *parent_name, unsigned long flags,
+> +               void __iomem *reg, u8 shift, u8 width,
+> +               u8 clk_divider_flags, const struct clk_div_table *table,
+> +               spinlock_t *lock, void __iomem *write_valid_reg)
+> +{
+> +       struct m10v_clk_divider *div;
+> +       struct clk_hw *hw;
+> +       struct clk_init_data init;
+> +       int ret;
+> +
+> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
+> +       if (!div)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = name;
+> +       if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
 
---Andy
+Is this used?
+
+> +               init.ops = &m10v_clk_divider_ro_ops;
+> +       else
+> +               init.ops = &m10v_clk_divider_ops;
+> +       init.flags = flags;
+> +       init.parent_names = &parent_name;
+> +       init.num_parents = 1;
+> +
+> +       div->reg = reg;
+> +       div->shift = shift;
+> +       div->width = width;
+> +       div->flags = clk_divider_flags;
+> +       div->lock = lock;
+> +       div->hw.init = &init;
+> +       div->table = table;
+> +       div->write_valid_reg = write_valid_reg;
+> +
+> +       /* register the clock */
+> +       hw = &div->hw;
+> +       ret = clk_hw_register(dev, hw);
+> +       if (ret) {
+> +               kfree(div);
+> +               hw = ERR_PTR(ret);
+> +       }
+> +
+> +       return hw;
+> +}
+> +
+> +static int m10v_clk_probe(struct platform_device *pdev)
+> +{
+[...]
+> +       for (id = 0; id < ARRAY_SIZE(m10v_div_fixed_data); ++id) {
+> +               const struct m10v_clk_div_fixed_data *dfd =
+> +                               &m10v_div_fixed_data[id];
+> +               const char *pn = dfd->parent_name ?
+> +                               dfd->parent_name : parent_name;
+> +               hw = clk_hw_register_fixed_factor(NULL, dfd->name,
+> +                                       pn, 0, dfd->mult, dfd->div);
+> +               if (dfd->onecell_idx >= 0)
+> +                       m10v_clk_data->hws[dfd->onecell_idx] = hw;
+> +       }
+> +       for (id = 0; id < ARRAY_SIZE(m10v_mux_factor_data); ++id) {
+> +               const struct m10v_clk_mux_factors *mfd =
+> +                               &m10v_mux_factor_data[id];
+> +               hw = m10v_clk_hw_register_mux(NULL, mfd->name,
+> +                                       mfd->parent_names, mfd->num_parents,
+> +                                       CLK_SET_RATE_PARENT,
+> +                                       base + mfd->offset, mfd->shift,
+> +                                       mfd->mask, mfd->mux_flags, mfd->table,
+> +                                       &m10v_crglock);
+> +               if (mfd->onecell_idx >= 0)
+> +                       m10v_clk_data->hws[mfd->onecell_idx] = hw;
+> +       }
+
+Similar style nitpick here. Add newlines between for loops. It may also
+make sense to make functions for each of those so that we don't need to
+put all the local variables interspersed throughout the function in each
+for loop.
+
+> +
+> +       for (id = 0; id < M10V_NUM_CLKS; id++) {
+> +               if (IS_ERR(m10v_clk_data->hws[id]))
+> +                       return PTR_ERR(m10v_clk_data->hws[id]);
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct of_device_id m10v_clk_dt_ids[] = {
+> +       { .compatible = "socionext,milbeaut-m10v-ccu", },
+> +       { },
+
+Drop the , on the sentinel please. That way nothing can ever go after it
+without causing a compilation error.
+
+> +};
 
 _______________________________________________
 linux-arm-kernel mailing list
