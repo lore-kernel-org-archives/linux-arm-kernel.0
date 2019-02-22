@@ -2,85 +2,113 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AE1BEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:33:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5617C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:35:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E22E2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:33:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A3F3120652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 10:35:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F3D+o0qZ";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="D973TjTC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E22E2081B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UJELEncD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="CiUEtZKQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3F3120652
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=16C+W0k7vrej59UC2mZuTbzCmakGRITfCkPj+AyYpxk=; b=F3D+o0qZXEFUN+
-	swaTC1ol0YFTPxdanz7lDUwsABzeBOCZ+tnmNMDh0Je4AOb71WFCy3c/5gj2M+iPDN5Net0YkmBA7
-	s6s2m92M3SQXDXXkUy+06nn7CiiIAnZQODmEOxbkAH03A7jQ0180Q349fn4/Z6yHIAceIIzR+0hLN
-	K9Pn0eIo8L/LnEQdAiEb14K3vlJneZXLyymo8Xox4LCvsgPRgTN8BRi8gukyzLF/9Sl3FWlhiKm0f
-	kTMoGzIezyTUGMub2Ib3V+2R1uLxRpD1loIPK5gEGdDrxDIcYLtUaLG5DCU8K8/ALfn19f7ui1rDA
-	V4NrCXkkljExvjd0uNAw==;
+	List-Owner; bh=5xhlgv6SGYFD2a67Nk2yoQW7ccXauOHSD8hbwV0sq6M=; b=UJELEncDr4MbhL
+	rcVUWNG3rukCtfUZxl7+DggDe/ShSIwtouoB1dWDkP6DpwSAn9OoQzw9DHaovN6amQFcfozo05yrt
+	tqB+OXMMYQMjElyp3VRctYyfEg0IdOoYQ1w3D8z4KSDCVOIZo7RrqkObniQcQJWI/RJghXDwIUnXi
+	cLXwVHPM/38yL8v5aBm6uMKQL/Gfel6hg7OWUvJY6CcIyUz6YaMddCh1SIwTMJjALoc9FgqkbR5s7
+	DnN9eOxMNGN9MDSesnMOMuovANbFxqyf0szUyu0vDuvowcEc7jU1D+Zct0j7pHRFXdIgHXSpoU8fv
+	Ye1ktso8kKAVapsG9L/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx89E-00089L-AX; Fri, 22 Feb 2019 10:33:40 +0000
-Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
+	id 1gx8Ag-0001G2-AX; Fri, 22 Feb 2019 10:35:10 +0000
+Received: from mail-eopbgr40085.outbound.protection.outlook.com ([40.107.4.85]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx89A-00088l-Ny
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 10:33:38 +0000
-Received: by mail-ot1-x341.google.com with SMTP id n71so1433113ota.10
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 02:33:36 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=kPoR1P+Jx7C7d9k/Q/XUwBrh6UJnb7qtMiFYdsFu3s4=;
- b=D973TjTCF970LNesGwfFth4msYJckQM+sHxHgHJ4SDdL5iiqks5a/orvXY4WPZYwYy
- UNi8PiT4JTX7vEhWK/SzQXaGoVhGEDeO2ylHCFz6834G+aeezHzumz7/8RpioAI/+v4r
- oG9U0fMvftjwW1PulSJK6Z+X51ozVQsvow5hrUq2/pLqZV2khUdaUFcA4XTSRVwwJ2EY
- LpX3h2T+VnhIFGfo1gnmD3vCMtYaqgPdSCoa70koMzmw3o5HDFLMbt9K/C1goNN0drrF
- DNyhzs9b0GQs+190G4DjxfvVolg9RoEkKl/ePe5yvDSQSCTKgr5HBCnCFYg5gB+YuJkf
- sPNA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=kPoR1P+Jx7C7d9k/Q/XUwBrh6UJnb7qtMiFYdsFu3s4=;
- b=RJLxGeMvW/4Z5iYBiiSdnAsWXDwWHoJnv2RYTyfx87hmKvrT+ISofAR944XoDlUZOi
- Rt8XbOxhfwvRPrQq5jPqC78suotHuh3RPofes0eSLDHjoBuoNcl/QeaMMeGWOuNmnbCX
- PV/7qqm5jvY5eBaK/ATKaOZoeVmakchGTYKt0OVMvfSNn45KY3OgGxUvnIxp6/IAiOhA
- AOB/wVLYYd4qmfuImYat9WeNu2OqCLlAwTKbxrDY1Wo89xkfQJPWxJdcJ0qwl9sJtuIP
- qgnTGOG+VBnHr6wtElf1A0NsgENXNjnSjPVAOEgsKdl8bZlXYTzsgRrnvrT7fhL9nv4b
- WQjw==
-X-Gm-Message-State: AHQUAuYlrn8/HtXNtd5rThZjwmJ/R7WXE8tKDz2clt/7nDXoLS+8xYhK
- 9dElBhr0f6ToROpKJM/dE46UZDIZO7rMenb55a8=
-X-Google-Smtp-Source: AHgI3IahvAgFj6HX0sGtDIKUruSFZn0xCxQL8wQ1GZSiE85RxiZij1ehpjQ86ayaacrUV77MAUvau4Ai6qlYrAdGp8k=
-X-Received: by 2002:a9d:69d4:: with SMTP id v20mr2314540oto.41.1550831615833; 
- Fri, 22 Feb 2019 02:33:35 -0800 (PST)
+ id 1gx8Ad-0000BN-1q
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 10:35:08 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
+ s=selector1-arm-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=oVIriTRVCTPcMUtnkUEwPQPHDMJsMQepce13OgpO0qI=;
+ b=CiUEtZKQrG9Iq6GUfIDv6OhVEMAUDj3DibaZ9jWApZRKxtytWzzlGrEVcEMswmJyfPa/F9MhC3YqvXxqTBr/Hvh1/NxXEIGZQ6ql5XGSZMWTEU4VNx8Y1G8zZ80eWkkZt5JJAawohepCb96yuqqtb/xD1uh6jbG4ScAGAw4HzDk=
+Received: from VI1PR08MB4223.eurprd08.prod.outlook.com (20.178.13.96) by
+ VI1PR08MB3310.eurprd08.prod.outlook.com (52.134.31.15) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.15; Fri, 22 Feb 2019 10:35:01 +0000
+Received: from VI1PR08MB4223.eurprd08.prod.outlook.com
+ ([fe80::896c:c125:b2a3:2f52]) by VI1PR08MB4223.eurprd08.prod.outlook.com
+ ([fe80::896c:c125:b2a3:2f52%6]) with mapi id 15.20.1622.021; Fri, 22 Feb 2019
+ 10:35:01 +0000
+From: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
+To: Dave P Martin <Dave.Martin@arm.com>, Andrew Murray <Andrew.Murray@arm.com>
+Subject: Re: [PATCH v2 2/6] arm64: HWCAP: add support for AT_HWCAP2
+Thread-Topic: [PATCH v2 2/6] arm64: HWCAP: add support for AT_HWCAP2
+Thread-Index: AQHUyd/t7tbqB8zsQECnf+yB7P6UeaXql1yAgAEJZwA=
+Date: Fri, 22 Feb 2019 10:35:01 +0000
+Message-ID: <a3b8a7f1-983a-6d39-8100-88424dc05d6a@arm.com>
+References: <1550751657-30252-1-git-send-email-andrew.murray@arm.com>
+ <1550751657-30252-3-git-send-email-andrew.murray@arm.com>
+ <20190221184500.GO16031@e103592.cambridge.arm.com>
+In-Reply-To: <20190221184500.GO16031@e103592.cambridge.arm.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+user-agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
+x-originating-ip: [217.140.106.53]
+x-clientproxiedby: LO2P265CA0278.GBRP265.PROD.OUTLOOK.COM
+ (2603:10a6:600:a1::26) To VI1PR08MB4223.eurprd08.prod.outlook.com
+ (2603:10a6:803:b5::32)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Szabolcs.Nagy@arm.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: b9371c21-0748-41ad-f91b-08d698b16612
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR08MB3310; 
+x-ms-traffictypediagnostic: VI1PR08MB3310:
+nodisclaimer: True
+x-microsoft-exchange-diagnostics: 1; VI1PR08MB3310;
+ 20:KGYMaysq13xgRTtMJnmedfcWEM+cs57nU7PLqvtXhDQoW6uRlXrGshRvoZJ9Ns3XWbZu0UDcC1ZKl7zNKqSzeoWfLgay0W40XNZpCAlGZKIAO/vly+IrOM+0lU+h9MpCLy2LPVWdjm0QFI8aVBrT2E61k3T1THfFRlKRiztgOpY=
+x-microsoft-antispam-prvs: <VI1PR08MB3310E522C718294D94CC9B8DED7F0@VI1PR08MB3310.eurprd08.prod.outlook.com>
+x-forefront-prvs: 09565527D6
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(346002)(366004)(136003)(39860400002)(376002)(396003)(52314003)(199004)(189003)(102836004)(316002)(26005)(105586002)(64126003)(386003)(6506007)(110136005)(58126008)(8936002)(4326008)(305945005)(5660300002)(85306007)(6636002)(2906002)(53546011)(52116002)(25786009)(186003)(31686004)(54906003)(106356001)(76176011)(14454004)(7736002)(6436002)(8676002)(486006)(66066001)(6486002)(2616005)(81166006)(65806001)(31696002)(14444005)(65956001)(53936002)(256004)(478600001)(86362001)(6512007)(71200400001)(68736007)(476003)(3846002)(99286004)(71190400001)(11346002)(36756003)(6116002)(81156014)(72206003)(44832011)(6246003)(97736004)(446003)(65826007)(229853002)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR08MB3310;
+ H:VI1PR08MB4223.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: arm.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 7wiVCSIUyd4gu3CWafEX7iNf/7iPgZfvanY6fnD+kP4Ua2USdn10SXbo83R33uXehvN5gIqlt0QmqWKO7DqdtTfohwjVI19gRAJ3o0NugBu3rIXiMaiu4XoKa8YRHxI8aRkerxI/s7g8QElHVtmQ7mVJowXsskE5nugzan0YTDfabGNyb36lvKh/fulWF99cPeh+KBcEyHhgGqdtWWz9TqbYfTZobGd8n2RXQ4wZVOIwz2WCxaCT3miNGAqVCf4VPl3XdVUjvCOFeONwTHe96D8ql+rVfoGLKKHCZxRcDlK+bhIMpUCZQAVqDA3WklnDQpDB+1Jq6N7mTj7eZzvhdrMr3XFxWm1A/eR1UQ13RDUYgXayP64n3YX1wVuQzqd42db2bnu4DG5d6rLQh50i6k9GoG6EJFbVqHCmDp0A26U=
+Content-ID: <1335440255E84C47B5243DD380ECFEB9@eurprd08.prod.outlook.com>
 MIME-Version: 1.0
-References: <CGME20190222102034epcas3p373245ed6e3e83e297bcaff48aec37992@epcas3p3.samsung.com>
- <20190222101948.848-1-linux.amoon@gmail.com>
- <d4f36ce1-ddef-5756-05dc-74e8dd08417c@samsung.com>
-In-Reply-To: <d4f36ce1-ddef-5756-05dc-74e8dd08417c@samsung.com>
-From: Anand Moon <linux.amoon@gmail.com>
-Date: Fri, 22 Feb 2019 16:03:26 +0530
-Message-ID: <CANAwSgSnunUbZJeT72B7HjAuBgsLQFA6_y_ijadHUKEAOoM-gA@mail.gmail.com>
-Subject: Re: [PATCH] ARM: dts: exynos: Add pin configuration for read strobe
- for Odroid XU3/XU4 eMMC
-To: Marek Szyprowski <m.szyprowski@samsung.com>
+X-OriginatorOrg: arm.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b9371c21-0748-41ad-f91b-08d698b16612
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Feb 2019 10:35:00.2112 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR08MB3310
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_023336_806547_E8950E49 
-X-CRM114-Status: GOOD (  16.07  )
+X-CRM114-CacheID: sfid-20190222_023507_183957_38BC4208 
+X-CRM114-Status: GOOD (  20.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,77 +120,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree <devicetree@vger.kernel.org>, linux-samsung-soc@vger.kernel.org,
- Linux Kernel <linux-kernel@vger.kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: Catalin Marinas <Catalin.Marinas@arm.com>, nd <nd@arm.com>,
+ Will Deacon <Will.Deacon@arm.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Marek,
+On 21/02/2019 18:45, Dave P Martin wrote:
+> For ABI purposes, we should take the opportunity to document the status
+> of the currently unused bits.
+> 
+> For interoperation with the glibc ifunc resolver ABI, we may want to
+> reserve a bit among AT_HWCAP [63:32] or AT_HWCAP2 [31:0] that will
+> never be used by the kernel and always passed to userspace as 0.
 
-On Fri, 22 Feb 2019 at 15:59, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->
-> Hi Anand,
->
-> On 2019-02-22 11:19, Anand Moon wrote:
-> > Add Read Strobe RDQS pin configuration for eMMC to support higher data rate read/write.
-> >
-> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/exynos5420-pinctrl.dtsi          | 6 ++++++
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 2 +-
-> >  2 files changed, 7 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> > index b82af7c89654..4fb3865e082a 100644
-> > --- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-> > @@ -206,6 +206,12 @@
-> >               samsung,pin-drv = <EXYNOS5420_PIN_DRV_LV4>;
-> >       };
-> >
-> > +     sd0_rdqs: sd0-rdqs {
-> > +             samsung,pins = "gpc0-7";
-> > +             samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> > +             samsung,pin-pud = <EXYNOS_PIN_PULL_DOWN>;
-> > +     };
-> > +
->
-> The above lines are not needed. There is already a sd0_rclk node with
-> exactly the same configuration just above your change.
->
+if hwcap2 is introduced at bit 32, i'd expect the top 32 bits
+of hwcap1 to be 0 on lp64 (and thus libc may use those bits
+for something internally or in the ifunc abi).
 
-Sorry once again, I failed to look closely., sorry for the noise.
+> I'm envisaging code such as
+> 
+> 	foo resolver(unsigned long hwcaps, unsigned int num_at_hwcaps,
+> 			unsigned long const *at_hwcaps)
+> 	{
+> 		if ((hwcaps & _GLIBC_EXTRA_HWCAPS) &&
+> 				num_at_hwcaps >= 2 &&
+> 				at_hwcaps[1] && HWCAP2_FOO)
+> 			/* feature present */
+> 	}
+> 
+> We would need that _GLIBC_EXTRA_HWCAPS to distinguish the second and
+> third arguments from uninitialised junk that would be passed by older
+> glibc versions.
 
-Best Regards
--Anand
+yes, i plan to do such a change.
 
-> >       sd1_clk: sd1-clk {
-> >               samsung,pins = "gpc1-0";
-> >               samsung,pin-function = <EXYNOS_PIN_FUNC_2>;
-> > diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > index b299e541cac0..d41397748ed2 100644
-> > --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-> > @@ -411,7 +411,7 @@
-> >       samsung,dw-mshc-hs400-timing = <0 2>;
-> >       samsung,read-strobe-delay = <90>;
-> >       pinctrl-names = "default";
-> > -     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
-> > +     pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_rdqs &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
-> >       bus-width = <8>;
-> >       cap-mmc-highspeed;
-> >       mmc-hs200-1_8v;
->
-> Best regards
-> --
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
->
+> Glibc might or might not choose to try and wegde AT_HWCAP2 in the top
+> bits of the first argument instead of bits [63:32] of AT_HWCAP (which
+> we expect to be zero for now, but could still be made reachable via the
+> at_hwcaps pointer).
 
+the public api via getauxval and hwcap macro defines
+will not do tricks that break lp64 vs ilp32 portability.
+(that would defeat the purpose of hwcap2)
+
+> Coordination would be needed if glibc carries on using the
+> <uapi/asm/hwcap.h> HWCAP{,2}_foo defines for here while doing tricks
+> of this sort.
+> 
+> Szabolcs may have a view on whether this is needed / useful.
+
+for now coordination is not needed, glibc does not
+use uapi hwcap.h directly, but copies it and it won't
+do tricks that change hwcap values anyway, only adds
+one new flag for ifunc resolvers.
+
+> If so, we should document any required guarantees now so that we don't
+> accidentally violate them during future maintenance.  For the benefit
+> of userspace folks, it may be a good idea to have some clear statement
+> in Documentation/arm64/ also.
+
+on lp64 glibc will expect hwcap top 32bit to be 0.
+this can be changed in the future if we no longer
+care about ilp32 and at that point we may need
+some coordination between linux and glibc so
+the ifunc resolver abi does not break.
+
+> Because of the ABI implications here, if would also be good idea to copy
+> the libc-alpha mailing list, and possibly also linux-api.
+
+yes.
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
