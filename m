@@ -2,21 +2,20 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E90EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:04:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E379CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:11:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 261CB2075A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:04:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF3D0207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:11:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gk4c7FbV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 261CB2075A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fLREF1cG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF3D0207E0
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +24,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qSh47OqZJiVk+x424lkEOOeTovoGA0AnpLzKgNhRC8c=; b=gk4c7FbVajKc/+
-	0jYucY6Z3L/hBfnRjQDRQabh618QhYOMZV+8U+saMu0EjIjU/Tsd8uMNJlml1si6qNAP/rwZ0XzUq
-	FqhsjacDuSrovWzA2ZzQvF2i8BXXBvQFwrWXRb9ryKSnMsPX9Z9mSF4f4tvHAHCrX1KjYlhzH0AWP
-	LDV43nMMDud13fUS2fXo9jAw2w+yQGyPo2S/AGZXN1T7RDKQGAL//OI1ynVU1eQ2zudIgKkAVGkx3
-	5zDx4TZJsSw4Rlasxwg0UP2VtfQTVF9gVJ9a2fsCKCmJHu7PfrPdMXzVJUp9F/qV1Hc0xdO9HeSso
-	bhKrLeg+MExkGWzedkyQ==;
+	List-Owner; bh=wW0+A02x+XJQCg/R1X1EeSKbFDvNLvAXBNzAP8zGgYM=; b=fLREF1cGD1cAKq
+	c6lrdcM/j/qaOYAD/dAK+POCSlbJsh3Ep29Ekiowh0dTrX5akC2rcWifeHDdtAPlMZ8XMMTCvqFzI
+	RebY6/ObpmI+37+dUmXqbcFDKsoQPTwoSdyPHsCxGSdtEuUnk4G0OkE0vGPuwf+z7LD4vI1qUWxPS
+	J5Nq+YqEIMbbsZxJJLY+8W7HWgR8s2KDX+08ANlsR/leJI/KuUKcPMVlH0qiZC2EYF6YXDgJD5B27
+	H1AlUAR8U0NT2mm1YA6qkb1GmKNI1VrxXQCOff2Cg93NOa3g1aWtWQ3yl38S+xEUP+epGMLIZR1Fb
+	Ev4VxMzCgQV9icJ/WNCA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxBRO-0003gL-5A; Fri, 22 Feb 2019 14:04:38 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gxBXf-0006e8-WD; Fri, 22 Feb 2019 14:11:08 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxBRJ-0003fl-HR
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 14:04:35 +0000
+ id 1gxBXc-0006dg-R5; Fri, 22 Feb 2019 14:11:06 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6F46715AB;
- Fri, 22 Feb 2019 06:04:32 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D8DF1A78;
+ Fri, 22 Feb 2019 06:11:02 -0800 (PST)
 Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C1DCE3F690;
- Fri, 22 Feb 2019 06:04:29 -0800 (PST)
-Date: Fri, 22 Feb 2019 14:04:27 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C82FA3F690;
+ Fri, 22 Feb 2019 06:11:01 -0800 (PST)
+Date: Fri, 22 Feb 2019 14:10:59 +0000
 From: Mark Rutland <mark.rutland@arm.com>
-To: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Subject: Re: [PATCH v5 08/23] arm64: compat: Add KUSER_HELPERS config option
-Message-ID: <20190222140427.GI42419@lakrids.cambridge.arm.com>
-References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
- <20190222122430.21180-9-vincenzo.frascino@arm.com>
+To: Pintu Agarwal <pintu.ping@gmail.com>
+Subject: Re: arm64 Kernel build for qemu-system-aarch64 ?
+Message-ID: <20190222141059.GJ42419@lakrids.cambridge.arm.com>
+References: <CAOuPNLhDtRJDBnwuV1kQ47Zd9B00qh2bXDNQvh9tXfTyYqAWDQ@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190222122430.21180-9-vincenzo.frascino@arm.com>
+In-Reply-To: <CAOuPNLhDtRJDBnwuV1kQ47Zd9B00qh2bXDNQvh9tXfTyYqAWDQ@mail.gmail.com>
 User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_060433_808724_D010A006 
-X-CRM114-Status: GOOD (  33.85  )
+X-CRM114-CacheID: sfid-20190222_061104_884618_564A18BD 
+X-CRM114-Status: GOOD (  13.55  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,120 +67,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Shuah Khan <shuah@kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Dmitry Safonov <0x7f454c46@gmail.com>,
- Rasmus Villemoes <linux@rasmusvillemoes.dk>,
- Thomas Gleixner <tglx@linutronix.de>, Peter Collingbourne <pcc@google.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-riscv@lists.infradead.org, open list <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel@lists.infradead.org, kernelnewbies@kernelnewbies.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 12:24:15PM +0000, Vincenzo Frascino wrote:
-> When kuser helpers are enabled the kernel maps the relative code at
-> a fixed address (0xffff0000). Making configurable the option to disable
-> them means that the kernel can remove this mapping and any access to
-> this memory area results in a sigfault.
+On Fri, Feb 22, 2019 at 07:17:00PM +0530, Pintu Agarwal wrote:
+> Hi All,
+
+Hi,
+
+> I want to build Linux Kernel 4.20 for arm64 and use it on qemu-arm64.
+> I see that there is a defconfig available in arch/arm64/configs/defconfig
+> But I am not sure whether it will work for qemu-arm64, and by default
+> which machine type is supported.
 > 
-> Add a KUSER_HELPERS config option that can be used to disable the
-> mapping when it is turned off.
+> I already have working setup for qemu-arm for both versatile and
+> vexpress machine. There is already a defconfig available for these
+> under arch/arm.
+> So I can build the kernel for it.
 > 
-> This option can be turned off if and only if the applications are
-> designed specifically for the platform and they do not make use of the
-> kuser helpers code.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+> But, whether these defconfig are supported for arm64 ?
+> If anybody have setup for qemu-arm64 kernel, please share the steps.
+> About rootfs, I am planning to use the arm32 version of busybox itself.
 
-IIUC, the KUSER bits aren't striclty dependent on the rest of the vDSO
-changes.
+The arm64 defconfig is intended to work for all platforms.
 
-I think the KUSER bits should be split into a preparatory series, so that they
-can be merged soon, rather than tying them artificially to the rest of the vDSO
-bits (which I expect will require significantly more review).
+I use that with qemu's '-machine virt'. Assuming you use virtio-net and
+virtio-block, no additional drivers are required.
 
-> ---
->  arch/arm64/Kconfig          | 21 +++++++++++++++++++++
->  arch/arm64/kernel/Makefile  |  3 ++-
->  arch/arm64/kernel/kuser32.S |  7 +++----
->  arch/arm64/kernel/vdso.c    | 15 +++++++++++++++
->  4 files changed, 41 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index d898da2e20f5..ed3290494f1c 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1465,6 +1465,27 @@ config COMPAT
->  
->  	  If you want to execute 32-bit userspace applications, say Y.
->  
-> +config KUSER_HELPERS
-> +	bool "Enable kuser helpers page for compatibility with 32 bit applications."
-> +	depends on COMPAT
-> +	default y
-> +	help
-> +	  Enables kuser helpers to be mapped in a special purpose page at a fixed
-> +	  address to maintain independence from the type of CPU present in the SoC.
-> +	  This feature is provided for compatibility reasons in fact allows 32 bit
-> +	  applications compliant with ARMv4 up to ARMv8 to run without any
-> +	  modification.
-> +
-> +	  Warning: Being always mapped at a fixed address makes it easier to create
-> +	  exploits based on ROP type of attacks.
-> +
-> +	  As a consequence of this, this feature is made configurable but be aware that
-> +	  it can be turned off if and only if the binaries and the libraries running on
-> +	  a specific platform are designed to do not make use of these helpers, otherwise
-> +	  should be left on.
-> +
-> +	  See Documentation/arm/kernel_user_helpers.txt for details.
+For example, I can boot a defconfig kernel using the followign QEMU options:
 
-This is quite divergent from the text for the 32-bit arm KUSER_HELPERS.
-
-Could we please reuse that existing text as far as possible, with minimal
-changes?
-
-e.g.
-
-config KUSER_HELPERS
-	bool "Enable kuser helpers for compat tasks"
-	depends on COMPAT
-	default y
-	help
-	  Warning: disabling this option may break user programs.
-
-	  Provide kuser helpers to compat tasks. The kernel provides
-	  helper code to userspace in read only form at a fixed location
-	  to allow userspace to be independent of the CPU type fitted to
-	  the system. This permits binaries to be run on ARMv4 through
-	  to ARMv8 without modification.
-
-	  See Documentation/arm/kernel_user_helpers.txt for details.
-
-	  However, the fixed address nature of these helpers can be used
-	  by ROP (return orientated programming) authors when creating
-	  exploits.
-
-	  If all of the binaries and libraries which run on your platform
-	  are built specifically for your platform, and make no use of
-	  these helpers, then you can turn this option off to hinder
-	  such exploits. However, in that case, if a binary or library
-	  relying on those helpers is run, it will not function correctly.
-
-	  Say N here only if you are absolutely certain that you do not
-	  need these helpers; otherwise, the safe option is to say Y.
-
-I believe that Will wanted to default the kuser helpers off, as applications
-using them need the instruction emulation which is also disabled by default.
-
-I'm also not sure which binaries we expect to work on arm64, so I'm not sure if
-the ARMv4 reference is correct.
+qemu-system-aarch64 \
+        -m 2048 -smp 4 \
+        -net nic \
+        -net user,host=10.0.2.10,hostfwd=tcp::65022-:22 \
+        -nographic \
+        -no-reboot \
+        -machine virt,accel=kvm,gic_version=host \
+        -cpu host \
+        -hda ${FILESYSTEM} \
+        -snapshot \
+        -kernel ${KERNEL} \
+        -append "earlycon root=/dev/vda panic_on_warn"
 
 Thanks,
 Mark.
