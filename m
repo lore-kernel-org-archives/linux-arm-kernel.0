@@ -2,20 +2,20 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 520ABC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:03:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3CF4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:05:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0A38E20700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:03:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 811E8206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:05:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Az9LqAoY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0A38E20700
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eKudCMD7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 811E8206C0
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,30 +24,30 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6TbzqkGaljTL6ad3OZ/FantjeIB+d9BebTlnOBQhE0M=; b=Az9LqAoYsOYKWi
-	8RPaHyD8FwZhP3kCaF3i5iSY9jVkkUGfaNoIVnrLo2xZVXCAhoes7wWWrHJRd+BI5mL2KkVPoDb/4
-	aDyPWhBQSAzvpXDrvi+1IE8CnaVTfLeZbodzlMAeOJPieTpBmZLdVHydr1wVFAjpehahvkqTQoOGo
-	GsL0BtKfrq2HXLGT/bcrM8WpkGL2tdPZb64WEGSeSdLWfFOt1P1LnOZRtXYICYa3+1vO0G+iUjOxm
-	Qk9rOeaCtyy7eesS64lTAlIzqt0qB2RIOpiQQru3IjEURRwZ529NpxgumwWHSP5f6PsRfZb0ckHB5
-	w0vVlf3Iet6yQUkODPtQ==;
+	List-Owner; bh=MCaGxf7MvLLBAhwP5fIEYi16LbY0naa9inVkCAsDXdc=; b=eKudCMD7u+VbUy
+	7BJe8yKfZjeFNMP4tmh3bzWDnPbAKC6JHaKkYlclXnCIbncHlA4per5Ejoy8dtQNa7OXk/I45gpaM
+	E8AGWIiTIqwYzTlp59v++uqkRYzPtvFW9bnt3bOq4R8M1O3J57EsD/D//5sHhmqFvx/kapw/q5+4p
+	4zBl5/BPNmTIcbRlhUjS95vcp7uMTwC9Tx6pYVLl4gBOlMyIgK9c5OfW5020UTW4Y7V51HYLmp2+O
+	gUINvw7wzXa2owSIRn1fCfY0bRA3Y0ppG0ax6GiU/nRdgBOjMx2XHAqyyw4iTPirDXwTv28piOUXc
+	Kn1dw08Knn3kd1L1OGUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxJqi-0005Az-KQ; Fri, 22 Feb 2019 23:03:20 +0000
-Received: from mga12.intel.com ([192.55.52.136])
+	id 1gxJtD-0006jJ-9C; Fri, 22 Feb 2019 23:05:55 +0000
+Received: from mga04.intel.com ([192.55.52.120])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxJqe-0005AG-UX
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:03:18 +0000
+ id 1gxJt9-0006iu-TA
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:05:53 +0000
 X-Amp-Result: SKIPPED(no attachment in message)
 X-Amp-File-Uploaded: False
 Received: from orsmga008.jf.intel.com ([10.7.209.65])
- by fmsmga106.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 22 Feb 2019 15:03:16 -0800
+ by fmsmga104.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 22 Feb 2019 15:05:51 -0800
 X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,401,1544515200"; d="scan'208";a="120102341"
+X-IronPort-AV: E=Sophos;i="5.58,401,1544515200"; d="scan'208";a="120102718"
 Received: from ray.jf.intel.com (HELO [10.7.201.17]) ([10.7.201.17])
- by orsmga008.jf.intel.com with ESMTP; 22 Feb 2019 15:03:15 -0800
-Subject: Re: [PATCH v10 06/12] fs, arm64: untag user pointers in
- copy_mount_options
+ by orsmga008.jf.intel.com with ESMTP; 22 Feb 2019 15:05:50 -0800
+Subject: Re: [PATCH v10 07/12] fs, arm64: untag user pointers in
+ fs/userfaultfd.c
 To: Andrey Konovalov <andreyknvl@google.com>,
  Catalin Marinas <catalin.marinas@arm.com>, Will Deacon
  <will.deacon@arm.com>, Mark Rutland <mark.rutland@arm.com>,
@@ -61,7 +61,7 @@ To: Andrey Konovalov <andreyknvl@google.com>,
  linux-doc@vger.kernel.org, linux-mm@kvack.org, linux-arch@vger.kernel.org,
  linux-kselftest@vger.kernel.org, linux-kernel@vger.kernel.org
 References: <cover.1550839937.git.andreyknvl@google.com>
- <a958e202cdbe6e1bac8a37b7f3d9881d1b22993d.1550839937.git.andreyknvl@google.com>
+ <8343cd77ca301df15839796f3b446b75ce5ffbbf.1550839937.git.andreyknvl@google.com>
 From: Dave Hansen <dave.hansen@intel.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=dave.hansen@intel.com; keydata=
@@ -107,16 +107,16 @@ Autocrypt: addr=dave.hansen@intel.com; keydata=
  MTsCeQDdjpgHsj+P2ZDeEKCbma4m6Ez/YWs4+zDm1X8uZDkZcfQlD9NldbKDJEXLIjYWo1PH
  hYepSffIWPyvBMBTW2W5FRjJ4vLRrJSUoEfJuPQ3vW9Y73foyo/qFoURHO48AinGPZ7PC7TF
  vUaNOTjKedrqHkaOcqB185ahG2had0xnFsDPlx5y
-Message-ID: <a38275b0-f6cd-20e1-3c48-544846586a16@intel.com>
-Date: Fri, 22 Feb 2019 15:03:15 -0800
+Message-ID: <73f2f3fe-9a66-22a1-5aae-c282779a75f5@intel.com>
+Date: Fri, 22 Feb 2019 15:05:51 -0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <a958e202cdbe6e1bac8a37b7f3d9881d1b22993d.1550839937.git.andreyknvl@google.com>
+In-Reply-To: <8343cd77ca301df15839796f3b446b75ce5ffbbf.1550839937.git.andreyknvl@google.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_150316_996166_CB51FF9A 
-X-CRM114-Status: GOOD (  13.55  )
+X-CRM114-CacheID: sfid-20190222_150551_955333_27A2CD49 
+X-CRM114-Status: GOOD (  11.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -142,24 +142,13 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On 2/22/19 4:53 AM, Andrey Konovalov wrote:
-> --- a/fs/namespace.c
-> +++ b/fs/namespace.c
-> @@ -2730,7 +2730,7 @@ void *copy_mount_options(const void __user * data)
->  	 * the remainder of the page.
->  	 */
->  	/* copy_from_user cannot cross TASK_SIZE ! */
-> -	size = TASK_SIZE - (unsigned long)data;
-> +	size = TASK_SIZE - (unsigned long)untagged_addr(data);
->  	if (size > PAGE_SIZE)
->  		size = PAGE_SIZE;
+> userfaultfd_register() and userfaultfd_unregister() use provided user
+> pointers for vma lookups, which can only by done with untagged pointers.
 
-I would have thought that copy_from_user() *is* entirely capable of
-detecting and returning an error in the case that its arguments cross
-TASK_SIZE.  It will fail and return an error, but that's what it's
-supposed to do.
-
-I'd question why this code needs to be doing its own checking in the
-first place.  Is there something subtle going on?
+So, we have to patch all these sites before the tagged values get to the
+point of hitting the vma lookup functions.  Dumb question: Why don't we
+just patch the vma lookup functions themselves instead of all of these
+callers?
 
 _______________________________________________
 linux-arm-kernel mailing list
