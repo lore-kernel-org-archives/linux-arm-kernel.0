@@ -2,20 +2,21 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80431C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:22:51 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 829C9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:38:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4E3F020700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:22:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F2932075A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:38:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZCyo0Kd8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E3F020700
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jghOufDN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F2932075A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,40 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HYDrQV7iCeBLM0Bab14N5/Ce08ZrJnC31vaJCoBhO1o=; b=ZCyo0Kd8UVSdFw
-	zP40xybge/elEOa+wKxo980/F4reoeUYv/ozd51pJTlaHI6RY88QSySuvmi9wM9U2FIJ395FJJh/F
-	jrg/DKj3L88glzGcBcnjABulNjhVMN2AWOMXR3af40My8mwFtC3jCG53veUG6pZU40ruuahls3ZeZ
-	TwJLPnAIqGXPlzWL7D7cquUwpQqWJuL7mxlt1BmAQu8S/6/G5AxWbSqP8u6+yllg2MEQ+rSPmbJLF
-	+e0byFjA3E44qSq0gwIOlBVcmpNiSwNeEYUk8vWsrZvauRdK34KNHDn/l4g7fGunWovlj6H6UWExx
-	5K/j6M4xKxCTMwGOjfPA==;
+	List-Owner; bh=41WQlIYqXEY6N+7/zMyCgVSW/XseWZmk8CvRXz5cFK4=; b=jghOufDN2AOmkH
+	xqozIDucgLWSqMKwJ4JfrMrUX01rxbfbpJ58vM98fYNgw2JCvIIbUYn/JQuChLrfDJ6lFVBRaEoe6
+	tAhMa1I1riegLV1aZ9U3KMdvKcrjH5beaB8CEl+FHopzcwZJSFhJQops7IKlH1t1xXurM+29cdNKT
+	shfYsAegnoiZ7pc56yvCq1G89N5ACWz/TGLoTUDR3me356LidFIVcUIwmou2M/S3pkwjUisT7JBn3
+	oWQ17ZX6qbbrbXWsdyDky/DchOHvtoqnMP3H9V45bct2DuaRJvYuqrXVa7ztxhJpitwFc4/u7G4qp
+	g5VV4glZeNfO4TrJ8tFg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx8un-0008PX-Ow; Fri, 22 Feb 2019 11:22:49 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gx9A9-0004rP-S3; Fri, 22 Feb 2019 11:38:41 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx8uk-0008Ou-4y
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 11:22:47 +0000
+ id 1gx9A7-0004r2-1c
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 11:38:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DFFCCA78;
- Fri, 22 Feb 2019 03:22:44 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F05EB3F5C1;
- Fri, 22 Feb 2019 03:22:42 -0800 (PST)
-Date: Fri, 22 Feb 2019 11:22:37 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-Subject: Re: [PATCH 0/2] PCI: fix pci-mvebu after conversion to common bridge
- emul code
-Message-ID: <20190222112237.GA630@e107981-ln.cambridge.arm.com>
-References: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8AB5215AB;
+ Fri, 22 Feb 2019 03:38:35 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 578F13F5C1;
+ Fri, 22 Feb 2019 03:38:34 -0800 (PST)
+Date: Fri, 22 Feb 2019 11:38:25 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH] arm64: kdump: fix warning message about failed to stop
+ secondary CPUs
+Message-ID: <20190222113824.GA42419@lakrids.cambridge.arm.com>
+References: <20190222014625.107640-1-chenzhou10@huawei.com>
+ <20190222100305.GA31945@fuggles.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190220094841.11129-1-thomas.petazzoni@bootlin.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20190222100305.GA31945@fuggles.cambridge.arm.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_032246_199931_B789B899 
-X-CRM114-Status: GOOD (  18.73  )
+X-CRM114-CacheID: sfid-20190222_033839_094865_26247578 
+X-CRM114-Status: GOOD (  18.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,64 +72,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew Lunn <andrew@lunn.ch>, Russell King <linux@arm.linux.org.uk>,
- Jason Cooper <jason@lakedaemon.net>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>,
- Bjorn Helgaas <bhelgaas@google.com>, Leigh Brown <leigh@solinno.co.uk>,
- Lu??s Mendes <luis.p.mendes@gmail.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Chen Zhou <chenzhou10@huawei.com>, catalin.marinas@arm.com,
+ cj.chengjian@huawei.com, linux-arm-kernel@lists.infradead.org,
+ takahiro.akashi@linaro.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 10:48:39AM +0100, Thomas Petazzoni wrote:
-> Hello,
+On Fri, Feb 22, 2019 at 10:03:05AM +0000, Will Deacon wrote:
+> On Fri, Feb 22, 2019 at 09:46:25AM +0800, Chen Zhou wrote:
+> > The local variable mask indicates non-boot cpus. Just print the num
+> > of failing to stop secondary CPUs using varaible waiting_for_crash_ipi.
 > 
-> This set of two patches aim at fixing some regression reported by two
-> users (Luis and Leigh), that were introduced by the conversion of the
-> pci-mvebu driver to the common PCI bridge emulation code shared
-> between pci-aardvark and pci-mvebu.
-> 
-> Due to this conversion, some registers of the PCI configuration that
-> used to be read-only are now read-write, making the Linux PCI core
-> believe that some features are implemented by the PCI bridge. Namely
-> in the case of pci-mvebu, the prefetchable memory base/limit registers
-> were read-only, while they are now read-write. Due to this, the Linux
-> PCI core now believes it can configure a prefetchable memory area, but
-> this is not supported by pci-mvebu, which does not have the logic to
-> create the appropriate MBUs windows.
-> 
-> This set of two commits allow PCI controller code to tell the PCI
-> bridge emulation logic about their capabilities. Because we envision
-> that other capabilities than prefetchable memory support might need to
-> be communicated from the PCI controller code to the PCI bridge
-> emulation code in the future, we introduce a "flags" argument, even if
-> for now only one flag is supported.
-> 
-> Lorenzo, let me know what you think about this approach. I am open to
-> suggestions if the proposed approach is not satisfying.
-> 
-> Both patches have been confirmed by Luis and Leigh to fix the
-> regression, but I'll let them give a formal Tested-by.
-> 
-> Best regards,
-> 
-> Thomas Petazzoni
-> 
-> Thomas Petazzoni (2):
->   PCI: pci-bridge-emul: Create per-bridge copy of register behavior
->   PCI: pci-bridge-emul: Extend pci_bridge_emul_init() with flags
-> 
->  drivers/pci/controller/pci-aardvark.c |  2 +-
->  drivers/pci/controller/pci-mvebu.c    |  2 +-
->  drivers/pci/pci-bridge-emul.c         | 86 ++++++++++++++++++---------
->  drivers/pci/pci-bridge-emul.h         | 13 +++-
->  4 files changed, 73 insertions(+), 30 deletions(-)
+> Why? Also s/varaible/variable/
 
-I have applied the series to pci/misc for v5.1, thanks.
+I think the point is that the mask is an over-estimate, since it's all
+of the CPUs which were online when we sent the stop IPI, not only the
+ones we failed to stop.
 
-Lorenzo
+If we had 255 secondary CPUs, and one failed to offline, we log the IDs
+of all 255 CPUs which we tried to offline.
+
+> > Also replace two pr_warning with the shorter pr_warn.
+> > 
+> > Signed-off-by: Chen Zhou <chenzhou10@huawei.com>
+> > ---
+> >  arch/arm64/kernel/smp.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > index 824de70..a4a952e 100644
+> > --- a/arch/arm64/kernel/smp.c
+> > +++ b/arch/arm64/kernel/smp.c
+> > @@ -989,7 +989,7 @@ void smp_send_stop(void)
+> >  		udelay(1);
+> >  
+> >  	if (num_online_cpus() > 1)
+> > -		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+> > +		pr_warn("SMP: failed to stop secondary CPUs %*pbl\n",
+> >  			   cpumask_pr_args(cpu_online_mask));
+> >  
+> >  	sdei_mask_local_cpu();
+> > @@ -1030,8 +1030,8 @@ void crash_smp_send_stop(void)
+> >  		udelay(1);
+> >  
+> >  	if (atomic_read(&waiting_for_crash_ipi) > 0)
+> > -		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+> > -			   cpumask_pr_args(&mask));
+> > +		pr_warn("SMP: failed to stop secondary CPUs %d\n",
+> > +				atomic_read(&waiting_for_crash_ipi));
+
+I think this should be:
+
+	pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
+		   cpumask_pr_args(cpu_online_mask));
+
+... matching smp_send_stop().
+
+In either case that includes the current processor, but that's not a new
+bug, and not a big deal.
+
+Thanks,
+Mark.
 
 _______________________________________________
 linux-arm-kernel mailing list
