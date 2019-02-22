@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B9553C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:38:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9BC38C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:38:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 887C22075A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:38:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6C5432070D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:38:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pbDzaK/n"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 887C22075A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tufe3t2O"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C5432070D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9yYR4A+cYQtVBYNX02fa5A+ZvK5Iod4pr7lmUHI+vh0=; b=pbDzaK/n+SMsRj
-	9KFiMN1HXhqCgsCe2J4PyJSYu91QoUKiklpR1/mFKBVeKza5WycwEVwv5saUMD8Teg9Y3ZMcMI7Rw
-	KDikE33IeJIR8z9N9f5i3bJfHIVG8jx1c3yhvlvGXEP4BCFaglxjXtXX1oiA8DREsGxDzFEtUl5sl
-	EAgnZn1Ix5xhmedf6uzVU8Nb2tN7p7HnNeEIf2F1M6rWqF9vMB3OAcuOZbYUrsKUG1cyeNUPTKRxV
-	nRRwHpuh0eRtWs18ST16XBpATsiGqMzhFQOQfgq02KYuJd3MdLkF/NB9qFWD+BYmfJtE4gaETyjrW
-	MOvlG3vWcF1ntrkjIzhQ==;
+	List-Owner; bh=sT0HeFMY6aSqigGWfZgvFnUttDPVxgMKl2R2ofBlvwo=; b=tufe3t2O+uEP16
+	hE38WplW7ZBPE1HR+IXndTD6kIHh/R9fHN7IiMiGI5SQjHNOSJ0xNQXJT+9ao1UbHzJW9XC1jM8VX
+	gGUeRK3fNGQevbYAw49f3QgmhbxyVXrYaku658Bksm/XGZIF/5wE//9l2R1XNg85S3rK8mvL47lxR
+	Pt24BeYWO1KE1eR6gWxl9QFiwOimiurU0Bz46XJnCSSsMhh1a0QRVD9+7Nm+OWzNoriRYcWi7I/sA
+	EYB+k0bifM2+N8+Ag2AEOr12Dd9xLx9/HdJSfO9dGTisaBLONMndOp2qMtwxR/kmaHL2p5SYLald+
+	joaElepT+jJ3fmxPEaoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxKOs-0002fc-OK; Fri, 22 Feb 2019 23:38:38 +0000
+	id 1gxKP0-0002oc-Cp; Fri, 22 Feb 2019 23:38:46 +0000
 Received: from relay3-d.mail.gandi.net ([217.70.183.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxKOK-00023s-8t
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:38:05 +0000
+ id 1gxKOO-00026h-TS
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:38:17 +0000
 X-Originating-IP: 86.201.231.99
 Received: from mc-bl-xps13.lan (lfbn-tou-1-149-99.w86-201.abo.wanadoo.fr
  [86.201.231.99])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id BC19060008;
- Fri, 22 Feb 2019 23:37:57 +0000 (UTC)
+ by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id EA7426000F;
+ Fri, 22 Feb 2019 23:38:02 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next v2 2/7] net: phy: marvell10g: Use linkmode_set_bit
- helper instead of __set_bit
-Date: Sat, 23 Feb 2019 00:37:39 +0100
-Message-Id: <20190222233744.25735-3-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next v2 3/7] net: phy: marvell10g: Use 2500BASEX when
+ using 2.5GBASET
+Date: Sat, 23 Feb 2019 00:37:40 +0100
+Message-Id: <20190222233744.25735-4-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20190222233744.25735-1-maxime.chevallier@bootlin.com>
 References: <20190222233744.25735-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_153804_459787_C82E99E5 
-X-CRM114-Status: UNSURE (   9.32  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190222_153809_343572_9463A2BC 
+X-CRM114-Status: GOOD (  12.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,28 +81,74 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Cosmetic patch making use of helpers dedicated to linkmodes handling.
+The Marvell Alaska family of PHYs supports 2.5GBaseT and 5GBaseT modes,
+as defined in the 802.3bz specification.
+
+Upon establishing a 2.5GBASET link, the PHY will reconfigure it's MII
+interface to 2500BASEX.
+
+At 5G, the PHY will reconfigure it's interface to 5GBASE-R, but this
+mode isn't supported by any MAC for now.
+
+This was tested with :
+ - The 88X3310, which is on the MacchiatoBin
+ - The 88E2010, an Alaska PHY that has no fiber interfaces, and is
+   limited to 5G maximum speed.
 
 Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 ---
- drivers/net/phy/marvell10g.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/phy/marvell10g.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
-index 89920b10d75b..821ef1b2f8cc 100644
+index 821ef1b2f8cc..9342d8c2ff7f 100644
 --- a/drivers/net/phy/marvell10g.c
 +++ b/drivers/net/phy/marvell10g.c
-@@ -253,8 +253,8 @@ static int mv3310_get_features(struct phy_device *phydev)
- 			return val;
- 
- 		if (val & MDIO_AN_STAT1_ABLE)
--			__set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
--				  phydev->supported);
-+			linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
-+					 phydev->supported);
+@@ -235,6 +235,7 @@ static int mv3310_config_init(struct phy_device *phydev)
+ {
+ 	/* Check that the PHY interface type is compatible */
+ 	if (phydev->interface != PHY_INTERFACE_MODE_SGMII &&
++	    phydev->interface != PHY_INTERFACE_MODE_2500BASEX &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_XAUI &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_RXAUI &&
+ 	    phydev->interface != PHY_INTERFACE_MODE_10GKR)
+@@ -313,18 +314,29 @@ static int mv3310_aneg_done(struct phy_device *phydev)
+ static void mv3310_update_interface(struct phy_device *phydev)
+ {
+ 	if ((phydev->interface == PHY_INTERFACE_MODE_SGMII ||
++	     phydev->interface == PHY_INTERFACE_MODE_2500BASEX ||
+ 	     phydev->interface == PHY_INTERFACE_MODE_10GKR) && phydev->link) {
+ 		/* The PHY automatically switches its serdes interface (and
+-		 * active PHYXS instance) between Cisco SGMII and 10GBase-KR
+-		 * modes according to the speed.  Florian suggests setting
+-		 * phydev->interface to communicate this to the MAC. Only do
+-		 * this if we are already in either SGMII or 10GBase-KR mode.
++		 * active PHYXS instance) between Cisco SGMII, 10GBase-KR and
++		 * 2500BaseX modes according to the speed.  Florian suggests
++		 * setting phydev->interface to communicate this to the MAC.
++		 * Only do this if we are already in one of the above modes.
+ 		 */
+-		if (phydev->speed == SPEED_10000)
++		switch (phydev->speed) {
++		case SPEED_10000:
+ 			phydev->interface = PHY_INTERFACE_MODE_10GKR;
+-		else if (phydev->speed >= SPEED_10 &&
+-			 phydev->speed < SPEED_10000)
++			break;
++		case SPEED_2500:
++			phydev->interface = PHY_INTERFACE_MODE_2500BASEX;
++			break;
++		case SPEED_1000:
++		case SPEED_100:
++		case SPEED_10:
+ 			phydev->interface = PHY_INTERFACE_MODE_SGMII;
++			break;
++		default:
++			break;
++		}
  	}
+ }
  
- 	ret = genphy_c45_pma_read_abilities(phydev);
 -- 
 2.19.2
 
