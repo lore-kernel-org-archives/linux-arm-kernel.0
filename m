@@ -2,69 +2,80 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 57D32C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:40:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D668FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:44:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0BE25206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:40:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A108A206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:44:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QwuMoPbs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0BE25206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zytor.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U3kmFw2z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A108A206C0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:From:To:Subject:MIME-Version
-	:References:In-Reply-To:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Jw8yMctQfDsPQTHc/7ICj7TD5EDDFCmPfpfqxVopCBc=; b=QwuMoPbsXXOa4r
-	wwCcUQh/9/SnQMT+VVuXqnx9VCqhBzE7JfbgaUERKxzy7gI/BoeYlWD2TQPXd6a4dQMnaSkFsoE4y
-	z3/1CfnD6kcKaczHuLZCMfq9ld8B5BKRjm7rtKZZbvigr0GJg2N34eJWHUasriEoFlRY7Q97IpgfO
-	4BMAyPAY37nuajJw46TP7PgJVLF9VKFkg35+EVsvKNCafXdEERDIW62vKEwLC55zn7raZFudEUDDI
-	tFBXJwdXIOTOyenUloMOKuNpE4DWkTrj7n0QwAiU+awLMnD3T2RauO14ixXq6xwYr+RH49YmHIVs8
-	/oINj7nO9B8Lu4glLa1A==;
+	List-Owner; bh=sssk4xW+fQg7cca+frzCHF7Iy8erhQWoTneRA+Bl2rE=; b=U3kmFw2zRzCFyw
+	xJW6qT1Qu02BnTxYgmai3npB4BFAHk4+mM8b9u+3tpwResNHzuNj2hXuiFK4tu2VrDynUorKpJMoq
+	FJ/O/w9U9i2uMRE9L4fAo1sunZUJWXYrLaEFKVA9xUcLCmyCjKNL3Cl2qv5rmicy/s0UJe/EK1dlU
+	jsNRoU9JkxECu1ddMS2QbgQiLVU7PBTNGAmDZ1MOLowCPZmpCIrJQiI3oepzEh4Ymo3qF3rhD1sdi
+	s91jdMIVsSIUd/FO1Z2P+vcon5oPue10bcPutLrHMMlGUTjK8nyurX1ueh+UfRL4rkxkdDZvXJcQY
+	+cAbI7tTPo010JGjvRXw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxKQp-0005uK-PU; Fri, 22 Feb 2019 23:40:39 +0000
-Received: from terminus.zytor.com ([198.137.202.136] helo=mail.zytor.com)
+	id 1gxKUe-0006X8-JQ; Fri, 22 Feb 2019 23:44:36 +0000
+Received: from mail-oi1-f194.google.com ([209.85.167.194])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxKQc-0005hc-RB
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:40:28 +0000
-Received: from [IPv6:2601:646:8680:2bb1:7d7e:6dae:efcc:2a6a]
- ([IPv6:2601:646:8680:2bb1:7d7e:6dae:efcc:2a6a])
- (authenticated bits=0)
- by mail.zytor.com (8.15.2/8.15.2) with ESMTPSA id x1MNduFM543461
- (version=TLSv1.2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128 verify=NO);
- Fri, 22 Feb 2019 15:39:58 -0800
-Date: Fri, 22 Feb 2019 15:39:48 -0800
-User-Agent: K-9 Mail for Android
-In-Reply-To: <20190222222635.GK14054@worktop.programming.kicks-ass.net>
-References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <20190219090409.GW32494@hirez.programming.kicks-ass.net>
- <20190219124808.GG8501@fuggles.cambridge.arm.com>
- <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
- <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
- <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
- <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
- <alpine.DEB.2.21.1902221853330.1666@nanos.tec.linutronix.de>
- <20190222222635.GK14054@worktop.programming.kicks-ass.net>
+ id 1gxKUa-0006Wp-S1
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:44:34 +0000
+Received: by mail-oi1-f194.google.com with SMTP id a81so3063407oii.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 22 Feb 2019 15:44:31 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=TsMu8Tc0IV0e0muIODVfZM/XsSXkFmUhOoNfZ/p2zng=;
+ b=fE3RWKZd45tngGjktKPO4iHqO5Y2HJgDcCbO60N2UeivpZF9EiJKZw9wpbwpKSVMBt
+ ktPWCo9qwDRmILwJ5MU8sVrp3kWj2QtaN1U6ylPFs4QDco1tmzY0rd7ygEfc3piBhjn+
+ COCq8seCg/EbCFC7RvKEMm1EwM2sj6WGCYA89v2mDWnbnuWytrLqHy0mHYqXaSkFMe8q
+ Q+TldYbbMk+S05ewZh0H/3CUxJyXK5+obB24OXSJmU79qFpeDs4EhHTNU6FIy/U3AmNb
+ CTL5lOrRVC0n4iLaEq+EZG10tevXefXKWAqdHb1CMZS8Q/1pQvZU6kmNMxqBRbX575Kt
+ bieQ==
+X-Gm-Message-State: AHQUAuYFb9+G6vq1v5s9FtWPP6MLx0giNbMvU3RjIHwIsGyp67G5MZQf
+ +lhe1DziqNZ/BpaqYcoRLw==
+X-Google-Smtp-Source: AHgI3IaoEebKMVS5eyOUh7mTHzoNK33m8zVNkovRGt1f0X7257zf1G2hI/irS//xNro7MehjmN77lA==
+X-Received: by 2002:aca:7290:: with SMTP id p138mr4075438oic.116.1550879070582; 
+ Fri, 22 Feb 2019 15:44:30 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id m89sm1163009otc.7.2019.02.22.15.44.29
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 22 Feb 2019 15:44:29 -0800 (PST)
+Date: Fri, 22 Feb 2019 17:44:29 -0600
+From: Rob Herring <robh@kernel.org>
+To: Martin Kepplinger <martin.kepplinger@ginzinger.com>
+Subject: Re: [PATCH v2 3/9] serial: core: add rs485-rts-delay-us devicetree
+ property for RS485
+Message-ID: <20190222234429.GA19985@bogus>
+References: <20190221171758.10322-1-martin.kepplinger@ginzinger.com>
+ <20190221171758.10322-3-martin.kepplinger@ginzinger.com>
 MIME-Version: 1.0
-Subject: Re: [RFC][PATCH] objtool: STAC/CLAC validation
-To: Peter Zijlstra <peterz@infradead.org>, Thomas Gleixner <tglx@linutronix.de>
-From: hpa@zytor.com
-Message-ID: <CE650687-ECB3-4A7C-96BA-A061D54AEF40@zytor.com>
+Content-Disposition: inline
+In-Reply-To: <20190221171758.10322-3-martin.kepplinger@ginzinger.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_154026_880650_1F8C66CC 
-X-CRM114-Status: GOOD (  19.44  )
+X-CRM114-CacheID: sfid-20190222_154432_914199_0C576087 
+X-CRM114-Status: GOOD (  17.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,372 +87,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Denys Vlasenko <dvlasenk@redhat.com>, Josh Poimboeuf <jpoimboe@redhat.com>,
- Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
- Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- Brian Gerst <brgerst@gmail.com>, Borislav Petkov <bp@alien8.de>,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ alexandre.belloni@bootlin.com, alexandre.torgue@st.com, corbet@lwn.net,
+ richard.genoud@gmail.com, gregkh@linuxfoundation.org,
+ linux-kernel@vger.kernel.org, ludovic.desroches@microchip.com,
+ mcoquelin.stm32@gmail.com, jslaby@suse.com, linux-serial@vger.kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On February 22, 2019 2:26:35 PM PST, Peter Zijlstra <peterz@infradead.org> wrote:
->On Fri, Feb 22, 2019 at 07:10:34PM +0100, Thomas Gleixner wrote:
->
->> But correct :)
->
->> I agree, that a function which is doing the actual copy should be
->callable,
->> but random other functions? NO!
->
->So find the below patch -- which spotted fail in ptrace.c
->
->It has an AC_SAFE(func) annotation which allows marking specific
->functions as safe to call. The patch includes 2 instances which were
->required to make arch/x86 'build':
->
->arch/x86/ia32/ia32_signal.o: warning: objtool:
->ia32_restore_sigcontext()+0x3d: call to native_load_gs_index() with AC
->set
->arch/x86/kernel/ptrace.o: warning: objtool: genregs_get()+0x8e: call to
->getreg() with AC set
->
->It also screams (provided one has CONFIG_FUNCTION_TRACE=y) about the
->lack of notrace annotations on functions marked AC_SAFE():
->
->arch/x86/kernel/ptrace.o: warning: objtool: getreg()+0x0: call to
->__fentry__() with AC set
->
->It builds arch/x86 relatively clean; it only complains about some
->redundant CLACs in entry_64.S because it doesn't understand interrupts
->and I've not bothered creating an annotation for them yet.
->
->arch/x86/entry/entry_64.o: warning: objtool:
->.altinstr_replacement+0x4d: redundant CLAC
->arch/x86/entry/entry_64.o: warning: objtool:
->.altinstr_replacement+0x5a: redundant CLAC
->  ...
->arch/x86/entry/entry_64.o: warning: objtool:
->.altinstr_replacement+0xb1: redundant CLAC
->
->Also, I realized we don't need special annotations for preempt_count;
->preempt_disable() emits a CALL instruction which should readily trigger
->the warnings added here.
->
->The VDSO thing is a bit of a hack, but I couldn't quickly find anything
->better.
->
->Comments?
->
->---
-> arch/x86/include/asm/special_insns.h |  2 ++
-> arch/x86/kernel/ptrace.c             |  3 +-
-> include/linux/frame.h                | 23 ++++++++++++++
-> tools/objtool/arch.h                 |  4 ++-
-> tools/objtool/arch/x86/decode.c      | 14 ++++++++-
->tools/objtool/check.c                | 59
->++++++++++++++++++++++++++++++++++++
-> tools/objtool/check.h                |  3 +-
-> tools/objtool/elf.h                  |  1 +
-> 8 files changed, 105 insertions(+), 4 deletions(-)
->
->diff --git a/arch/x86/include/asm/special_insns.h
->b/arch/x86/include/asm/special_insns.h
->index 43c029cdc3fe..cd31e4433f4c 100644
->--- a/arch/x86/include/asm/special_insns.h
->+++ b/arch/x86/include/asm/special_insns.h
->@@ -5,6 +5,7 @@
-> 
-> #ifdef __KERNEL__
-> 
->+#include <linux/frame.h>
-> #include <asm/nops.h>
-> 
-> /*
->@@ -135,6 +136,7 @@ static inline void native_wbinvd(void)
-> }
-> 
-> extern asmlinkage void native_load_gs_index(unsigned);
->+AC_SAFE(native_load_gs_index);
-> 
-> static inline unsigned long __read_cr4(void)
-> {
->diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
->index 4b8ee05dd6ad..e278b4055a8b 100644
->--- a/arch/x86/kernel/ptrace.c
->+++ b/arch/x86/kernel/ptrace.c
->@@ -420,7 +420,7 @@ static int putreg(struct task_struct *child,
-> 	return 0;
-> }
-> 
->-static unsigned long getreg(struct task_struct *task, unsigned long
->offset)
->+static notrace unsigned long getreg(struct task_struct *task, unsigned
->long offset)
-> {
-> 	switch (offset) {
-> 	case offsetof(struct user_regs_struct, cs):
->@@ -444,6 +444,7 @@ static unsigned long getreg(struct task_struct
->*task, unsigned long offset)
-> 
-> 	return *pt_regs_access(task_pt_regs(task), offset);
-> }
->+AC_SAFE(getreg);
-> 
-> static int genregs_get(struct task_struct *target,
-> 		       const struct user_regset *regset,
->diff --git a/include/linux/frame.h b/include/linux/frame.h
->index 02d3ca2d9598..5d354cf42a56 100644
->--- a/include/linux/frame.h
->+++ b/include/linux/frame.h
->@@ -21,4 +21,27 @@
-> 
-> #endif /* CONFIG_STACK_VALIDATION */
-> 
->+#if defined(CONFIG_STACK_VALIDATION) && !defined(BUILD_VDSO) &&
->!defined(BUILD_VDSO32)
->+/*
->+ * This macro marks functions as AC-safe, that is, it is safe to call
->from an
->+ * EFLAGS.AC enabled region (typically user_access_begin() /
->+ * user_access_end()).
->+ *
->+ * These functions in turn will only call AC-safe functions themselves
->(which
->+ * precludes tracing, including __fentry__ and scheduling, including
->+ * preempt_enable).
->+ *
->+ * AC-safe functions will obviously also not change EFLAGS.AC
->themselves.
->+ *
->+ * Since STAC/CLAC are OPL-0 only, this is all irrelevant for VDSO
->builds
->+ * (and the generated symbol reference will in fact cause link
->failures).
->+ */
->+#define AC_SAFE(func) \
->+	static void __used __section(.discard.ac_safe) \
->+		*__func_ac_safe_##func = func
->+
->+#else
->+#define AC_SAFE(func)
->+#endif
->+
-> #endif /* _LINUX_FRAME_H */
->diff --git a/tools/objtool/arch.h b/tools/objtool/arch.h
->index b0d7dc3d71b5..48327099466d 100644
->--- a/tools/objtool/arch.h
->+++ b/tools/objtool/arch.h
->@@ -33,7 +33,9 @@
-> #define INSN_STACK		8
-> #define INSN_BUG		9
-> #define INSN_NOP		10
->-#define INSN_OTHER		11
->+#define INSN_STAC		11
->+#define INSN_CLAC		12
->+#define INSN_OTHER		13
-> #define INSN_LAST		INSN_OTHER
-> 
-> enum op_dest_type {
->diff --git a/tools/objtool/arch/x86/decode.c
->b/tools/objtool/arch/x86/decode.c
->index 540a209b78ab..d1e99d1460a5 100644
->--- a/tools/objtool/arch/x86/decode.c
->+++ b/tools/objtool/arch/x86/decode.c
->@@ -369,7 +369,19 @@ int arch_decode_instruction(struct elf *elf,
->struct section *sec,
-> 
-> 	case 0x0f:
-> 
->-		if (op2 >= 0x80 && op2 <= 0x8f) {
->+		if (op2 == 0x01) {
->+
->+			if (modrm == 0xca) {
->+
->+				*type = INSN_CLAC;
->+
->+			} else if (modrm == 0xcb) {
->+
->+				*type = INSN_STAC;
->+
->+			}
->+
->+		} else if (op2 >= 0x80 && op2 <= 0x8f) {
-> 
-> 			*type = INSN_JUMP_CONDITIONAL;
-> 
->diff --git a/tools/objtool/check.c b/tools/objtool/check.c
->index 0414a0d52262..01852602ca31 100644
->--- a/tools/objtool/check.c
->+++ b/tools/objtool/check.c
->@@ -127,6 +127,24 @@ static bool ignore_func(struct objtool_file *file,
->struct symbol *func)
-> 	return false;
-> }
-> 
->+static bool ac_safe_func(struct objtool_file *file, struct symbol
->*func)
->+{
->+	struct rela *rela;
->+
->+	/* check for AC_SAFE */
->+	if (file->ac_safe && file->ac_safe->rela)
->+		list_for_each_entry(rela, &file->ac_safe->rela->rela_list, list) {
->+			if (rela->sym->type == STT_SECTION &&
->+			    rela->sym->sec == func->sec &&
->+			    rela->addend == func->offset)
->+				return true;
->+			if (/* rela->sym->type == STT_FUNC && */ rela->sym == func)
->+				return true;
->+		}
->+
->+	return false;
->+}
->+
-> /*
->  * This checks to see if the given function is a "noreturn" function.
->  *
->@@ -439,6 +457,8 @@ static void add_ignores(struct objtool_file *file)
-> 
-> 	for_each_sec(file, sec) {
-> 		list_for_each_entry(func, &sec->symbol_list, list) {
->+			func->ac_safe = ac_safe_func(file, func);
->+
-> 			if (func->type != STT_FUNC)
-> 				continue;
-> 
->@@ -1902,6 +1922,11 @@ static int validate_branch(struct objtool_file
->*file, struct instruction *first,
-> 		switch (insn->type) {
-> 
-> 		case INSN_RETURN:
->+			if (state.ac) {
->+				WARN_FUNC("return with AC set", sec, insn->offset);
->+				return 1;
->+			}
->+
-> 			if (func && has_modified_stack_frame(&state)) {
-> 				WARN_FUNC("return with modified stack frame",
-> 					  sec, insn->offset);
->@@ -1917,6 +1942,12 @@ static int validate_branch(struct objtool_file
->*file, struct instruction *first,
-> 			return 0;
-> 
-> 		case INSN_CALL:
->+			if ((state.ac_safe || state.ac) && !insn->call_dest->ac_safe) {
->+				WARN_FUNC("call to %s() with AC set", sec, insn->offset,
->+						insn->call_dest->name);
->+				return 1;
->+			}
->+
-> 			if (is_fentry_call(insn))
-> 				break;
-> 
->@@ -1928,6 +1959,11 @@ static int validate_branch(struct objtool_file
->*file, struct instruction *first,
-> 
-> 			/* fallthrough */
-> 		case INSN_CALL_DYNAMIC:
->+			if ((state.ac_safe || state.ac) && !insn->call_dest->ac_safe) {
->+				WARN_FUNC("call to %s() with AC set", sec, insn->offset,
->+						insn->call_dest->name);
->+				return 1;
->+			}
-> 			if (!no_fp && func && !has_valid_stack_frame(&state)) {
-> 				WARN_FUNC("call without frame pointer save/setup",
-> 					  sec, insn->offset);
->@@ -1980,6 +2016,26 @@ static int validate_branch(struct objtool_file
->*file, struct instruction *first,
-> 
-> 			break;
-> 
->+		case INSN_STAC:
->+			if (state.ac_safe || state.ac) {
->+				WARN_FUNC("recursive STAC", sec, insn->offset);
->+				return 1;
->+			}
->+			state.ac = true;
->+			break;
->+
->+		case INSN_CLAC:
->+			if (!state.ac) {
->+				WARN_FUNC("redundant CLAC", sec, insn->offset);
->+				return 1;
->+			}
->+			if (state.ac_safe) {
->+				WARN_FUNC("AC-safe clears AC", sec, insn->offset);
->+				return 1;
->+			}
->+			state.ac = false;
->+			break;
->+
-> 		default:
-> 			break;
-> 		}
->@@ -2141,6 +2197,8 @@ static int validate_functions(struct objtool_file
->*file)
-> 			if (!insn || insn->ignore)
-> 				continue;
-> 
->+			state.ac_safe = func->ac_safe;
->+
-> 			ret = validate_branch(file, insn, state);
-> 			warnings += ret;
-> 		}
->@@ -2198,6 +2256,7 @@ int check(const char *_objname, bool orc)
-> 	INIT_LIST_HEAD(&file.insn_list);
-> 	hash_init(file.insn_hash);
->	file.whitelist = find_section_by_name(file.elf,
->".discard.func_stack_frame_non_standard");
->+	file.ac_safe = find_section_by_name(file.elf, ".discard.ac_safe");
-> 	file.c_file = find_section_by_name(file.elf, ".comment");
-> 	file.ignore_unreachables = no_unreachable;
-> 	file.hints = false;
->diff --git a/tools/objtool/check.h b/tools/objtool/check.h
->index e6e8a655b556..c31ec3ca78f3 100644
->--- a/tools/objtool/check.h
->+++ b/tools/objtool/check.h
->@@ -31,7 +31,7 @@ struct insn_state {
-> 	int stack_size;
-> 	unsigned char type;
-> 	bool bp_scratch;
->-	bool drap, end;
->+	bool drap, end, ac, ac_safe;
-> 	int drap_reg, drap_offset;
-> 	struct cfi_reg vals[CFI_NUM_REGS];
-> };
->@@ -61,6 +61,7 @@ struct objtool_file {
-> 	struct list_head insn_list;
-> 	DECLARE_HASHTABLE(insn_hash, 16);
-> 	struct section *whitelist;
->+	struct section *ac_safe;
-> 	bool ignore_unreachables, c_file, hints, rodata;
-> };
-> 
->diff --git a/tools/objtool/elf.h b/tools/objtool/elf.h
->index bc97ed86b9cd..064c3df31e40 100644
->--- a/tools/objtool/elf.h
->+++ b/tools/objtool/elf.h
->@@ -62,6 +62,7 @@ struct symbol {
-> 	unsigned long offset;
-> 	unsigned int len;
-> 	struct symbol *pfunc, *cfunc;
->+	bool ac_safe;
-> };
-> 
-> struct rela {
+On Thu, Feb 21, 2019 at 06:17:52PM +0100, Martin Kepplinger wrote:
+> struct serial_rs485 now optionally holds the rts delay values in
+> microseconds. Users can set these delays in their devicetree descriptions,
+> so this adds the microseconds-option with the "rs485-rts-delay-us" boolean
+> property.
 
-I like it.
+If it has a value, it's not boolean.
 
-Objtool could also detect CLAC-STAC or STAC-CLAC sequences without memory operations and remove them; don't know how often that happens, but I know it *does* happen.
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+Should the old prop be deprecated?
+
+> 
+> Signed-off-by: Martin Kepplinger <martin.kepplinger@ginzinger.com>
+> ---
+>  Documentation/devicetree/bindings/serial/rs485.txt |  1 +
+>  drivers/tty/serial/serial_core.c                   | 11 +++++++++++
+>  2 files changed, 12 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/serial/rs485.txt b/Documentation/devicetree/bindings/serial/rs485.txt
+> index b92592dff6dd..77396c62b383 100644
+> --- a/Documentation/devicetree/bindings/serial/rs485.txt
+> +++ b/Documentation/devicetree/bindings/serial/rs485.txt
+> @@ -12,6 +12,7 @@ Optional properties:
+>    * b is the delay between end of data sent and rts signal in milliseconds
+>        it corresponds to the delay after sending data and actual release of the line.
+>    If this property is not specified, <0 0> is assumed.
+> +- rs485-rts-delay-us: the same as rs485-rts-delay, but in microseconds.
+>  - rs485-rts-active-low: drive RTS low when sending (default is high).
+>  - linux,rs485-enabled-at-boot-time: empty property telling to enable the rs485
+>    feature at boot time. It can be disabled later with proper ioctl.
 
 _______________________________________________
 linux-arm-kernel mailing list
