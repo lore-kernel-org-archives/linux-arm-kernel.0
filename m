@@ -2,139 +2,64 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BC85DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:42:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 18DABC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:42:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89C312077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:42:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D2F032077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:42:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zwi0b8mT";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Ip80BSJ6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89C312077B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jz79wx1I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2F032077B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=FTp20DqGqvX4BDOcsBziyC8tqXJvtNLqnPuzXB3HgTE=; b=Zwi0b8mTbdwDRy
-	3hAQ/Ay36/Jb13CQy1nYX/W1hrLg50LLBvcN2PihQMoR618NXAS7F2JnZ1MLFiDmB2yq7rcbsb+77
-	38IR3TEHelf0e3aKIGMr7mvf6ZfZVosfMhl5wW0OWnhxN0rabQKRvFPRblO/Drw5wzqTM0nnPX5pL
-	w9+BCsca+O2eVHliH+FrN0hDff47Tp1qvofI4/D1Djwu7gippnH4f9C9k9p6oordj6DbX6TxQCdUZ
-	+YcqAMu4X51ZOdSWOlbPIyPXFp7B28wBHToT8XG0cysRvGkiYB1pYdVdCZ3IWkus8puZ8rQvj1/iW
-	ti9ZVtMtT9NEhNpFDbFw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zvnsbjcgIlmiqGRB79K8uR2t18c5AY7OqS9mPhbMwGQ=; b=jz79wx1IccH3iC
+	/9m+IBnw1eDVG6aGoUnTVtR4cs9CaXPpc3gIrF8iiulDZoS/DkOOyGlb6rGsLidV71ow5EMiWNgJn
+	jyhNkqGWk93j5Wpe+riyu5895UBeJRYhnuLXiLqqILEoE+NDXMKFvGZY/MqRcRMUvB6+uWZmAHxG3
+	9FLIL4baEOoGbFtY9bgwgiCrTUTm9lzHclulCzCTxim91IZZn3I3n9xkqquj8jseAbYn0ZW02d2Bb
+	0so+jm2gPdrELqDavCiDxIktD7ai+izA8aPHqFwDr0ryF/Pd6gkZyYxe7Gks9tS4Sx1nqh/EOa8HJ
+	uxNoakHptGlf6faSFW8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx7Ll-0003h7-IA; Fri, 22 Feb 2019 09:42:33 +0000
-Received: from mail-db3eur04on0623.outbound.protection.outlook.com
- ([2a01:111:f400:fe0c::623]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx7Lh-0003YU-PU
+	id 1gx7Ls-0003pn-NN; Fri, 22 Feb 2019 09:42:40 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx7Li-0003gQ-6V
  for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:42:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=4wCXjZWWTXpTq/Jkjq25DkWcAajMly9q6Le+yHkubYY=;
- b=Ip80BSJ68zJU/wgWrURaiahoQ6f3LPmJj25mhslQ/XG4PX1qxyrJmwiP4+tOplCsTnKVqZCx4pdOa0gF14XBBGMPsNQVoKqEIrTZiTOKaBDot/dOK9iGAzbcyzsNuUICG1jaTv5yRyynIQpcyXA4qq07AchnIY2Pqjgcz8MpaQ8=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3756.eurprd04.prod.outlook.com (52.134.73.29) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1622.19; Fri, 22 Feb 2019 09:42:22 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::1cb4:3e1c:fc85:7ed7]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::1cb4:3e1c:fc85:7ed7%2]) with mapi id 15.20.1643.016; Fri, 22 Feb 2019
- 09:42:22 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
- <sboyd@kernel.org>, "l.stach@pengutronix.de" <l.stach@pengutronix.de>, Abel
- Vesa <abel.vesa@nxp.com>, "ccaione@baylibre.com" <ccaione@baylibre.com>,
- "agx@sigxcpu.org" <agx@sigxcpu.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>
-Subject: [PATCH 1/3] clk: imx8mq: initialize clock tree earlier
-Thread-Topic: [PATCH 1/3] clk: imx8mq: initialize clock tree earlier
-Thread-Index: AQHUypLopgE4RdwU6k2TGErI1f+TZw==
-Date: Fri, 22 Feb 2019 09:42:22 +0000
-Message-ID: <1550828264-9962-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0161.apcprd02.prod.outlook.com
- (2603:1096:201:1f::21) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: b550de65-dcaf-4b87-16ea-08d698aa0b45
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600110)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3756; 
-x-ms-traffictypediagnostic: DB3PR0402MB3756:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3756;
- 23:j1BliHKcQScUS+/zGynQUx145Q2+OFt4j9oF8?=
- =?iso-8859-1?Q?A7F+94rPaUKeiXtKf5QiJn8JQoAcjVR7AGrbPJZA/hI9ckwQ7XuI6B8P+v?=
- =?iso-8859-1?Q?BAjEtYp3Ha7vwuZ2A4hLZJMGzjyfYOxFg6O58qCBZlnjemCiKKlWiFUa4R?=
- =?iso-8859-1?Q?Dr7IO2b7M85+dPJqgPNHwSCm/voojpbHecaAEWjKqSnI86h1e/mly1n8iG?=
- =?iso-8859-1?Q?Nxr9sSsxLwbWKjwIRjWPb24/yHeVzTDdSoMhL3nRYU864RLJh8uu+6ZwjC?=
- =?iso-8859-1?Q?QZ8gNBqGBzymt7GCQx6ea3JNIsfzQTNWzkcUItGmT4I14jHZmdH5nXa+zn?=
- =?iso-8859-1?Q?JX7IzL7c/rDtc4rE2wFxaj8fM6V/r4BgfCYDadAoKitnHjKGFY7aRX1jmM?=
- =?iso-8859-1?Q?iaT7hF8mfiQPc0V+bgUeEwkiCJsoJ32m8WO80we4TzfYRqlWRXER9UuWld?=
- =?iso-8859-1?Q?9i0vYkaEs3Cd3TgCnUZQFp/ZGb1CUkJmf59LSfTLk4oCobAbAh5iE1v7rZ?=
- =?iso-8859-1?Q?glFyUhyYIogZhQiqTA6AdbuTJ+YSW3DXJNW52WBBx/fQhBWtO6rEWXh+Vv?=
- =?iso-8859-1?Q?d0f/MfJHzQM0XEw2t1M1HY4hAD2Mo94z2rj8U22iNQPEa+U3mRguAK0RIR?=
- =?iso-8859-1?Q?dVJt2eskwkfYYy4YyGlIM7gh198ocQUH85g8pAZ7CNyqsJMiu/F5p45V58?=
- =?iso-8859-1?Q?h8P8au4CzyEo0lGC1V8eltN1mMPty5fMjUVXCCVr9ChupUGCOdeSDyATqj?=
- =?iso-8859-1?Q?3nByrtqL1TBaVIlX4fXsYJpJunyvq4FZM9ov56KfeRbbgkKBF8PwshamgX?=
- =?iso-8859-1?Q?gF0vP29I9FrhZORM1CTpdqFwfD3jnWX5m+Fnv/Q+Xh3OqtlkxnD3RCQJ3G?=
- =?iso-8859-1?Q?SHADuhIHStHKjTAwn5Ok3hhEeA5kt3j6jgkc+Z4swng3ZKWIw5qGutae7O?=
- =?iso-8859-1?Q?aDujTh2ibBb7nTAc6e86zrrmZIqTpUrAl6H2sZbGAu1Dlokf+wjfu2/R0Q?=
- =?iso-8859-1?Q?3sohUb26pvdXO5qlfphuSC2ogeF09MF+h2upwobnZFxn+THjGDZmcxUV0b?=
- =?iso-8859-1?Q?nUcMS+1TSgmay+Fu28/lW154wh4mVfoUqdJj0+H/rmnqNXEw9F23xMh7ka?=
- =?iso-8859-1?Q?sbT2gJ5GBZMdt0mFbHRqsvf8S8+V007t/5G/cvk1zbrxigKqAf7lrNvvYu?=
- =?iso-8859-1?Q?cC1J7RZjAvG0PmKOdO2JggOLMzSC4661f8BcHZ9DeDpNdtS7a77VZN+Do2?=
- =?iso-8859-1?Q?ZrDvQxl8zacyi/bQToLhSxU7B3IxqbSsGiUzbGtUg=3D=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB3756A35E01D94D3E015DB67DF57F0@DB3PR0402MB3756.eurprd04.prod.outlook.com>
-x-forefront-prvs: 09565527D6
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(396003)(346002)(39860400002)(366004)(136003)(199004)(189003)(476003)(14454004)(102836004)(106356001)(478600001)(486006)(186003)(316002)(2616005)(99286004)(386003)(105586002)(6506007)(52116002)(26005)(2501003)(66066001)(2906002)(110136005)(68736007)(97736004)(36756003)(7416002)(5660300002)(8936002)(256004)(50226002)(25786009)(6486002)(71190400001)(71200400001)(86362001)(6116002)(53936002)(3846002)(305945005)(6436002)(81166006)(81156014)(8676002)(7736002)(6512007)(4326008)(2201001)(32563001)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3756;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: KSS9Y5WploMXhQKab8E6O3NcX7C5Mte0HRlQNZFmIpBwDbguJh1HFgNEfmAxAFuGIZc0NsTZXGKUSiW6cdtbzKPhZ/r1NyVJdbix1b38riTFcY3u94knUr6MHtJxjUt+zRKaefHNbNoknZnz28dIoD9uG5oENnYNE5dGimI+3SW8Okb99nUKKW4bQ4kuOxQzmmGFfwOq4pZ/dq04kwD6Q15wLz+m27UQ86JaAxl1HTe0SLM3cj1rkLyYEG3+g+WiL33Wox2rADDRtRL4uhBTf0T3TBw56snIy1MfFBONMb/bPHMIlbtlEiFTYLif/D0/EvrfuYHJPeFeILA68o4YiwBlABR3YYHNmhWJBL24YI+rES29GMytndVTRx+sIYDbqy0QLqM8ZRcpgpWFwk7CU9TRpP7a3ymTs9mQ7CvgidA=
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BB41E80D;
+ Fri, 22 Feb 2019 01:42:29 -0800 (PST)
+Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 15D973F703;
+ Fri, 22 Feb 2019 01:42:27 -0800 (PST)
+Date: Fri, 22 Feb 2019 09:42:24 +0000
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH -next] KVM: arm/arm64: Remove unused timer variable
+Message-ID: <20190222094224.07535ee6@why.wild-wind.fr.eu.org>
+In-Reply-To: <ea7693de-e800-1279-92ae-9844ff9cbf23@arm.com>
+References: <1550817269-57405-1-git-send-email-zhangshaokun@hisilicon.com>
+ <ea7693de-e800-1279-92ae-9844ff9cbf23@arm.com>
+Organization: ARM Ltd
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: b550de65-dcaf-4b87-16ea-08d698aa0b45
-X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Feb 2019 09:42:16.8986 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3756
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_014229_833308_D0C51067 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20190222_014230_240107_EB58B44A 
+X-CRM114-Status: GOOD (  18.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -146,100 +71,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Suzuki K Pouloze <suzuki.poulose@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Shaokun Zhang <zhangshaokun@hisilicon.com>, James Morse <james.morse@arm.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently on i.MX8MQ platform, clock driver is probed
-later than GPIO driver, and GPIO driver does NOT have
-defer probe mechanism since the GPIO clock is optional,
-some platforms have GPIO clocks and some are NOT. So
-it is an issue that on i.MX8MQ platform, there are GPIO
-clocks defined, but due to clock tree is NOT ready during
-GPIO driver probe, the GPIO clock management will fail
-and cause system hang if GPIO clocks are OFF by default.
+On Fri, 22 Feb 2019 08:49:42 +0000
+Julien Thierry <julien.thierry@arm.com> wrote:
 
-This patch changes the i.MX8MQ clock tree initialization
-using CLK_OF_DECLARE instead of platform driver model to
-make clock tree ready earlier than GPIO driver.
+> Hi Shaokun,
+> 
+> On 22/02/2019 06:34, Shaokun Zhang wrote:
+> > The 'timer' local variable became unused after commit bee038a67487
+> > ("KVM: arm/arm64: Rework the timer code to use a timer_map").
+> > Remove it to avoid [-Wunused-but-set-variable] warning.
+> > 
+> > Cc: Christoffer Dall <christoffer.dall@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Julien Thierry <julien.thierry@arm.com>
+> > Cc: Suzuki K Pouloze <suzuki.poulose@arm.com>
+> > Signed-off-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
+> > ---
+> >  virt/kvm/arm/arch_timer.c | 2 --
+> >  1 file changed, 2 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> > index af8f2f1d01cc..3417f2dbc366 100644
+> > --- a/virt/kvm/arm/arch_timer.c
+> > +++ b/virt/kvm/arm/arch_timer.c
+> > @@ -236,14 +236,12 @@ static enum hrtimer_restart kvm_hrtimer_expire(struct hrtimer *hrt)
+> >  
+> >  static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+> >  {
+> > -	struct arch_timer_cpu *timer;
+> >  	enum kvm_arch_timers index;
+> >  	u64 cval, now;
+> >  
+> >  	if (!timer_ctx)
+> >  		return false;
+> >  
+> > -	timer = vcpu_timer(timer_ctx->vcpu);
+> >  	index = arch_timer_ctx_index(timer_ctx);
+> >  
+> >  	if (timer_ctx->loaded) {  
+> 
+> This seems to be a consequence of moving the loaded state from
+> arch_timer_cpu to arch_timer_context. Thanks for fixing it.
+> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx8mq.c | 33 +++++++--------------------------
- 1 file changed, 7 insertions(+), 26 deletions(-)
+Applied to -next.
 
-diff --git a/drivers/clk/imx/clk-imx8mq.c b/drivers/clk/imx/clk-imx8mq.c
-index 26b57f4..2df1575 100644
---- a/drivers/clk/imx/clk-imx8mq.c
-+++ b/drivers/clk/imx/clk-imx8mq.c
-@@ -269,10 +269,9 @@ static const char *imx8mq_clko2_sels[] = {"osc_25m", "sys2_pll_200m", "sys1_pll_
- 
- static struct clk_onecell_data clk_data;
- 
--static int imx8mq_clocks_probe(struct platform_device *pdev)
-+static void __init imx8mq_clocks_init(struct device_node *np)
- {
--	struct device *dev = &pdev->dev;
--	struct device_node *np = dev->of_node;
-+	struct device_node *anatop_np;
- 	void __iomem *base;
- 	int err;
- 	int i;
-@@ -286,10 +285,10 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
- 	clks[IMX8MQ_CLK_EXT3] = of_clk_get_by_name(np, "clk_ext3");
- 	clks[IMX8MQ_CLK_EXT4] = of_clk_get_by_name(np, "clk_ext4");
- 
--	np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-anatop");
--	base = of_iomap(np, 0);
-+	anatop_np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-anatop");
-+	base = of_iomap(anatop_np, 0);
- 	if (WARN_ON(!base))
--		return -ENOMEM;
-+		return;
- 
- 	clks[IMX8MQ_ARM_PLL_REF_SEL] = imx_clk_mux("arm_pll_ref_sel", base + 0x28, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
- 	clks[IMX8MQ_GPU_PLL_REF_SEL] = imx_clk_mux("gpu_pll_ref_sel", base + 0x18, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
-@@ -389,10 +388,9 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
- 	clks[IMX8MQ_SYS2_PLL_500M] = imx_clk_fixed_factor("sys2_pll_500m", "sys2_pll_out", 1, 2);
- 	clks[IMX8MQ_SYS2_PLL_1000M] = imx_clk_fixed_factor("sys2_pll_1000m", "sys2_pll_out", 1, 1);
- 
--	np = dev->of_node;
- 	base = of_iomap(np, 0);
- 	if (WARN_ON(!base))
--		return -ENOMEM;
-+		return;
- 
- 	/* CORE */
- 	clks[IMX8MQ_CLK_A53_SRC] = imx_clk_mux2("arm_a53_src", base + 0x8000, 24, 3, imx8mq_a53_sels, ARRAY_SIZE(imx8mq_a53_sels));
-@@ -568,22 +566,5 @@ static int imx8mq_clocks_probe(struct platform_device *pdev)
- 
- 	err = of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
- 	WARN_ON(err);
--
--	return err;
- }
--
--static const struct of_device_id imx8mq_clk_of_match[] = {
--	{ .compatible = "fsl,imx8mq-ccm" },
--	{ /* Sentinel */ },
--};
--MODULE_DEVICE_TABLE(of, imx8mq_clk_of_match);
--
--
--static struct platform_driver imx8mq_clk_driver = {
--	.probe = imx8mq_clocks_probe,
--	.driver = {
--		.name = "imx8mq-ccm",
--		.of_match_table = of_match_ptr(imx8mq_clk_of_match),
--	},
--};
--module_platform_driver(imx8mq_clk_driver);
-+CLK_OF_DECLARE(imx8mq, "fsl,imx8mq-ccm", imx8mq_clocks_init);
+Thanks,
+
+	M.
 -- 
-2.7.4
-
+Without deviation from the norm, progress is not possible.
 
 _______________________________________________
 linux-arm-kernel mailing list
