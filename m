@@ -2,74 +2,77 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92A0AC10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:23:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFF33C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:23:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 642582086D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:23:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8AFE6206BA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:23:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cRN8vBK+";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="tMURGGIu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 642582086D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dnZXCrfQ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="E9JykKxL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AFE6206BA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=V2IrqrJFBMGKmvfxybTPGhdD/3FrUcPaROtejQN9FAI=; b=cRN
-	8vBK+h+7qGyPoR8YAWGMrG/TCMmuMRwleTa3+mzAzdPdb7rc7P0GepuY+DFJKmwCdElFiTfTQo3z8
-	85N4kk98BgAvwZBASgG1aR/pFNG+XW+vtFJX3vdk/fFZj/86FfRqns1S7/HW1Mc+AkvcmVtj77g6S
-	FcKh+W5nnrjudZiO5elnBWOneh/o+Nc4E8aEun9P0dUgzuoQVQt/e9l9Vn38OQBgi1E6tAiYKF5/0
-	ej4S4Mghp0BlYl5M+Yk6RhMBkc5+5IHE9JHcE9QiATJyGALA03rsEu483GOub2APGN8ALpyQMgEPC
-	FF6Zu73M9ixE8lNW+Cu0GFBlhHD/dag==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=GgO/TRLL3hUMPwlOcR2gcSHVmCdQ1u+KtEcphtbfMo4=; b=dnZXCrfQyF+UxweBtddpbSRTS8
+	DqzNB9zJRkVHqdRZO5w1bYw7jHuqttIbgYHO1QItH2DlaiLdsAEa8D4NkwjqrMjsnv0AdUaEp8uV0
+	iuJInFv2hr5yQqzX63KYlfVcBsQ4vBiao0UCxDF2OC1PBUkjnmIStqiVqdjGqLx45KqzMM22uVhHU
+	ALglwyNI5hAyjUOHamu52dCqrwJAuUhah3Mb4hZ69F4cBmtZL46A+iVGEUSFnsi/mC1Do/IbKjDNO
+	6tnLNBelrA5R6vRuu5a1C8thzgZ9c03YNfQXuK/UhhC7ZiXGC9DKGWMMcbyTuPy5XKzXxTsS1HZY6
+	z2hgsDMg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx67V-0001lQ-31; Fri, 22 Feb 2019 08:23:45 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gx67g-0001zC-Fh; Fri, 22 Feb 2019 08:23:56 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx67S-0001kz-3d
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 08:23:43 +0000
-Received: by mail-pg1-x544.google.com with SMTP id u9so787651pgo.7
+ id 1gx67V-0001lT-9d
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 08:23:47 +0000
+Received: by mail-pl1-x644.google.com with SMTP id bj4so762259plb.7
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 00:23:41 -0800 (PST)
+ Fri, 22 Feb 2019 00:23:45 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=Rk8dPBdJ2C0H5pzuoEG59eKAB6fJapgFAjXCmyEI8XQ=;
- b=tMURGGIuTedkoj7NevuZpdaLPYCGuOMhgNgH1eBKJyEu82rRI5LZOJTyzyJDteFCat
- J3wjIlWtGA88j8X+VwjgMCQ/9UmnMPJZCYWccuHSW+rxj4Ah1f9DcDlinfrlEvU3fLRz
- WvjcqpDaXq7tNbD6tyUBIswM6YXBFmqNfRGqm9GVim32IOCNRXZ42ZlbBadB8ZLv+RvB
- gMjakxXOrPSnEjpRLHXw3IbfSKhnOvPr+YwDsfn9GkJg8Ewh3F+zGgHgmF2sCuLmg0UF
- i12tyxgDa1EGLGOtxlsV+FQ6jNUxwFWe8v1RiL9Sji/HTqC86qwKCkFB4XUQgtKe5tYE
- 5guA==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=CWZpOa7KU5IoSG9K/3vLaR3fHpcin2VffNYLaVd5Roo=;
+ b=E9JykKxLXU3+k4vQJjpERuNJgwqlLMYvxWPzlcoDPM4s+cbq4WMQ0swQVCbYdMDISL
+ iJKV68RQ/EIyFU3hfa8393jPd6Aqbq6IBo2ph/gROiRMlHFGhQSyQ/UY/+HBwhDWK967
+ Ayz64rJ09cxSRy1x06vCxiU9EaBJCnx8LMa5kzfj8e+zbJpKACzO4ixm2dw1JCJ5rwR6
+ N4wHGXkLrKU50tsEGFyYyRrAG5kmj/J+HvSLF0lDGv570H6htjawDDrc5ZqhxrhU2IzK
+ tI2juO2pHVCJY99UuLB+Y5mU13QgvatV2cyQWjrjfspX123dEnZifYcd8tNqxYU/DOj+
+ I8Ug==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=Rk8dPBdJ2C0H5pzuoEG59eKAB6fJapgFAjXCmyEI8XQ=;
- b=t1dtIrHDPLJF84vK2hcq8bILo/2JSRt7TDXLDCCfUgxwbt9Qi3OMeTR07z1Ra700d7
- wXb3h3X9bMHWXJFYgqf4arMhlNPwFLLCywdSnV7wotJVfydQouAlhjw2tUfp3XyLanjD
- dlN+QQrVTiyntdqMZGbQLqSzhdpmkvBbp9UJ1LJkD9xs3PsVwEFqcsN5moFd9ckqM/kS
- mlN9VPVQJrH90QWbeFulD/KpVyThs8GJ4tsuWGbMVnVCP9oumqaHvYsOT698m/v7QOFv
- O0l2KENTm9ATxJfHFF27A59XkW5ZKeF7Xp91+btRYw2Pgb1G8mYoU49XfoNfD4t0FuIt
- 8bWw==
-X-Gm-Message-State: AHQUAuYfFKu8WDEKuJ4YwHSnP/r4o1dFkmlnm//sxBd7iHp0+94m8QVg
- H9CNUVYfnZ9xWiB1Qw3CH8Y4Dw==
-X-Google-Smtp-Source: AHgI3IYXCPZwppu9S4z1lHFWmqopoN/SXnz6Ozl9hQF+Nh77shHtJUsFNsLoQQdoG+gjnVCaYCoHYQ==
-X-Received: by 2002:a63:2ccd:: with SMTP id s196mr2848444pgs.194.1550823820858; 
- Fri, 22 Feb 2019 00:23:40 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=CWZpOa7KU5IoSG9K/3vLaR3fHpcin2VffNYLaVd5Roo=;
+ b=Wr94DL6k9qV8h62AEOgkSGet4/qGU/8Ub4nQ81Qr8cQZHl0nNA/IjlriY8EqOf2wIQ
+ okmjXgbogjmKZ4bAxa79smWVid8WHaOXLl3b3lyNyabMmcsfWSQS69nSXa8TploCHYD3
+ S3qWHAy0p8HwerEtfbYRNgoCLE2hrC6YQNfGbX58TZCm2vfxjSaDb/I3t3a1PN9Vxi8J
+ YmEp3Lf2r82tPm0j4f1dsHoLo7s2rBnt+buLeCvIgc3vDeuQStGM2c638JOYKfRIRsGE
+ ndUsxjDITtkceJ9WesGHQC2BoVUfdRKhElHiWdSKHf/k3TZtLrjxgPzX8T8xljq0FskH
+ 6c3g==
+X-Gm-Message-State: AHQUAuYi/nVCxV4LTFAJoyp9k1SjuNLj5HPi9KhPFKwO+Fom+K37XKHF
+ rvJxTHRmv5Xwq7LFvz7imkXJqw==
+X-Google-Smtp-Source: AHgI3IZAlCgx+vdzMMXnYCfqie9DawIRzNKTXpKS+YqirqUzOYE8VP/uLh0i/02vD5sHe2HBX09mbg==
+X-Received: by 2002:a17:902:45:: with SMTP id 63mr3010111pla.281.1550823824594; 
+ Fri, 22 Feb 2019 00:23:44 -0800 (PST)
 Received: from localhost.localdomain (li1195-158.members.linode.com.
  [45.79.96.158])
- by smtp.gmail.com with ESMTPSA id y22sm133821pfn.136.2019.02.22.00.23.37
+ by smtp.gmail.com with ESMTPSA id y22sm133821pfn.136.2019.02.22.00.23.41
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 00:23:39 -0800 (PST)
+ Fri, 22 Feb 2019 00:23:43 -0800 (PST)
 From: Leo Yan <leo.yan@linaro.org>
 To: Christoffer Dall <christoffer.dall@arm.com>,
  Marc Zyngier <marc.zyngier@arm.com>,
@@ -79,14 +82,15 @@ To: Christoffer Dall <christoffer.dall@arm.com>,
  Jun Yao <yaojun8558363@gmail.com>, Paolo Bonzini <pbonzini@redhat.com>,
  linux-arm-kernel@lists.infradead.org, kvmarm@lists.cs.columbia.edu,
  linux-kernel@vger.kernel.org
-Subject: [PATCH v1 0/4] ARM64/KVM: Minor cleanup and refactoring
-Date: Fri, 22 Feb 2019 16:23:22 +0800
-Message-Id: <20190222082327.3312-1-leo.yan@linaro.org>
+Subject: [PATCH v1 1/4] KVM: arm64: Use macro to replace hard number
+Date: Fri, 22 Feb 2019 16:23:23 +0800
+Message-Id: <20190222082327.3312-2-leo.yan@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190222082327.3312-1-leo.yan@linaro.org>
+References: <20190222082327.3312-1-leo.yan@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_002342_150294_348EC051 
-X-CRM114-Status: UNSURE (   9.58  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190222_002345_563490_E1318588 
+X-CRM114-Status: GOOD (  12.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,27 +109,26 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When I read KVM/ARM64 related code I cannot find any issue or something
-could be improved for performance; so this patch series is only for
-minor cleaning up and refactoring code.
+Use macro for ID_AA64MMFR1_EL1.VH bits shift instead of 8 directly.
 
-Hope this is helpful and can be picked up into mainline kernel,
-otherwise it's also fine for me if the maintainer or main developers
-could note these points and fix them in appropriate time.
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/kernel/head.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Leo Yan (4):
-  KVM: arm64: Use macro to replace hard number
-  KVM: arm/arm64: vgic: Improve comment on kvm_vgic_inject_irq
-  KVM: arm/arm64: Define TCR_EL2_T0SZ_MASK as TCR_T0SZ_MASK
-  KVM: arm/arm64: Fix comment on create_hyp_mappings()
-
- arch/arm64/include/asm/kvm_arm.h | 2 +-
- arch/arm64/kernel/head.S         | 2 +-
- virt/kvm/arm/mmu.c               | 2 +-
- virt/kvm/arm/vgic/vgic.c         | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4471f570a295..3ac377e9fd28 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -490,7 +490,7 @@ ENTRY(el2_setup)
+ 	 * kernel is intended to run at EL2.
+ 	 */
+ 	mrs	x2, id_aa64mmfr1_el1
+-	ubfx	x2, x2, #8, #4
++	ubfx	x2, x2, #ID_AA64MMFR1_VHE_SHIFT, #4
+ #else
+ 	mov	x2, xzr
+ #endif
 -- 
 2.17.1
 
