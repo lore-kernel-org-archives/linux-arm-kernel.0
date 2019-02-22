@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B55FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:55:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B243C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:55:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C9F320818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:55:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1E2220823
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:55:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IUlzPElm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C9F320818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n93CyxM7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1E2220823
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,25 +25,25 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oSp6F5SI2YZ9e0AaPWBsa38EZP5VHfIX1qtIkY8o5Gg=; b=IUlzPElmN6bRKa
-	Hs/oxczwfysb5MBqRFVFxyzyVHzM90FNoE8RYG5pMGAIACgJ4lsw9FKzqu0q/aJkqCSB6jsEACY8/
-	MxiVr0MrIYO+tkzdikXGaI7Dvlu6urKOFbiFHfh/9KfzZ0SY/DFxIsvnVBShU33zut0gtJtvzE2qW
-	onKDUUhnqWhsap/PYu5rP4eC46FdXA0t+r47ruenuyL6JGZUXoQoSrfTehcflwBz7783F/DrAi4yP
-	stBlVjXonV8rrPhQ15ZJM2pxscKsLnXNLaJXBA5ije5odeBQuP5Wd8XHRFtzgIbTB1gPLHSu300GN
-	Y9Djoc6r3S099LPartnA==;
+	List-Owner; bh=N4AH44LSRduP17cFQaYAu9hhX1ddUE6t93vxvsrhhj8=; b=n93CyxM7lQxyWx
+	pvluxx/JlTu1HtcO6ZTi6xSjP9P/lP8/Jn0Vd19hAj3eMUdmQqFqrevVlwfHXc0Ey4hZjCGBsJsYp
+	jqBJsIwxJQ0y8KDnPlSxhoMYKDKthoG8ptbD9WFik8pt0J5K6jK64G6Q89mQGSXlnQ56u1ZqO2InZ
+	I/VbVQbBTq9DyUZ7+XOQSzFGhfdvW/3lHWsbqUGUCvpeNOiT9ndfZSqRgjYr+JwQZLTEYgDCT61EG
+	IZ1jhH0MovufnS+DNa30CHCeFM3W3/lO6bbWzFR8QgS2BH1qQQWYK5Wys+Fl3/oev+uloKs9d2smo
+	/JWTgGRX9RN3ZweogUkQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxCEL-0002cS-SX; Fri, 22 Feb 2019 14:55:13 +0000
+	id 1gxCEX-0003Uc-V6; Fri, 22 Feb 2019 14:55:25 +0000
 Received: from relay3-d.mail.gandi.net ([217.70.183.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxCDP-00012A-QO
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 14:54:19 +0000
+ id 1gxCDS-00013o-0G
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 14:54:21 +0000
 X-Originating-IP: 90.88.23.190
 Received: from localhost.localdomain
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: miquel.raynal@bootlin.com)
- by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id AFC096001C;
- Fri, 22 Feb 2019 14:54:05 +0000 (UTC)
+ by relay3-d.mail.gandi.net (Postfix) with ESMTPSA id 057216001A;
+ Fri, 22 Feb 2019 14:54:13 +0000 (UTC)
 From: Miquel Raynal <miquel.raynal@bootlin.com>
 To: Gregory Clement <gregory.clement@bootlin.com>,
  Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
@@ -51,16 +51,17 @@ To: Gregory Clement <gregory.clement@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Jens Axboe <axboe@kernel.dk>, Hans de Goede <hdegoede@redhat.com>,
  Thomas Gleixner <tglx@linutronix.de>, Marc Zyngier <marc.zyngier@arm.com>
-Subject: [PATCH 2/5] ata: libahci_platform: Support per-port interrupts
-Date: Fri, 22 Feb 2019 15:53:53 +0100
-Message-Id: <20190222145356.23072-3-miquel.raynal@bootlin.com>
+Subject: [PATCH 5/5] arm64: dts: marvell: armada-cp110: Switch to per-port
+ SATA interrupts
+Date: Fri, 22 Feb 2019 15:53:56 +0100
+Message-Id: <20190222145356.23072-6-miquel.raynal@bootlin.com>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20190222145356.23072-1-miquel.raynal@bootlin.com>
 References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_065416_149175_E98684DE 
-X-CRM114-Status: GOOD (  20.49  )
+X-CRM114-CacheID: sfid-20190222_065418_505438_9E7FCF1D 
+X-CRM114-Status: GOOD (  12.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,227 +84,100 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Right now the ATA core only allows IPs to use a single interrupt. Some
-of them (for instance the Armada-CP110 one) actually has one interrupt
-per port. Add some logic to support such situation.
+From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 
-We consider that either there is one single interrupt declared in the
-main IP node, or there are per-port interrupts, each of them being
-declared in the port sub-nodes.
+There are two SATA ports per CP110. Each of them has a dedicated
+interrupt. Describe the real hardware by adding two SATA ports to the
+CP110 SATA node and enabling them in all the DTs including it
+(7040-db/8040-db/8040-clearfog).
 
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/ata/acard-ahci.c       |  2 +-
- drivers/ata/ahci.c             |  2 +-
- drivers/ata/ahci.h             |  3 +-
- drivers/ata/libahci.c          |  2 +-
- drivers/ata/libahci_platform.c | 66 ++++++++++++++++++++++++++++------
- drivers/ata/sata_highbank.c    |  2 +-
- 6 files changed, 61 insertions(+), 16 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts |  7 ++++++-
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts | 14 ++++++++++++--
+ arch/arm64/boot/dts/marvell/armada-cp110.dtsi  | 16 ++++++++++++++--
+ 3 files changed, 32 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/ata/acard-ahci.c b/drivers/ata/acard-ahci.c
-index 583e366be7e2..9414b81e994c 100644
---- a/drivers/ata/acard-ahci.c
-+++ b/drivers/ata/acard-ahci.c
-@@ -434,7 +434,7 @@ static int acard_ahci_init_one(struct pci_dev *pdev, const struct pci_device_id
- 	if (!hpriv)
- 		return -ENOMEM;
+diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+index 412efdb46e7c..54c1c0ddc813 100644
+--- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
+@@ -194,7 +194,12 @@
+ };
  
--	hpriv->irq = pdev->irq;
-+	hpriv->irqs[0] = pdev->irq;
- 	hpriv->flags |= (unsigned long)pi.private_data;
+ &cp0_sata0 {
+-	status = "okay";
++	sata-port@0 {
++		status = "okay";
++	};
++	sata-port@1 {
++		status = "okay";
++	};
+ };
  
- 	if (!(hpriv->flags & AHCI_HFLAG_NO_MSI))
-diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
-index 021ce46e2e57..18bce556d85f 100644
---- a/drivers/ata/ahci.c
-+++ b/drivers/ata/ahci.c
-@@ -1817,7 +1817,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
- 		/* legacy intx interrupts */
- 		pci_intx(pdev, 1);
- 	}
--	hpriv->irq = pci_irq_vector(pdev, 0);
-+	hpriv->irqs[0] = pci_irq_vector(pdev, 0);
+ &cp0_usb3_0 {
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index 1bac437369a1..988cc7dc15d9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -147,7 +147,12 @@
  
- 	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
- 		host->flags |= ATA_HOST_PARALLEL_SCAN;
-diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
-index ef356e70e6de..1f1c00be5b2e 100644
---- a/drivers/ata/ahci.h
-+++ b/drivers/ata/ahci.h
-@@ -361,7 +361,7 @@ struct ahci_host_priv {
- 	struct phy		**phys;
- 	unsigned		nports;		/* Number of ports */
- 	void			*plat_data;	/* Other platform data */
--	unsigned int		irq;		/* interrupt line */
-+	unsigned int		*irqs;		/* interrupt line(s) */
- 	/*
- 	 * Optional ahci_start_engine override, if not set this gets set to the
- 	 * default ahci_start_engine during ahci_save_initial_config, this can
-@@ -432,6 +432,7 @@ void ahci_print_info(struct ata_host *host, const char *scc_s);
- int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht);
- void ahci_error_handler(struct ata_port *ap);
- u32 ahci_handle_port_intr(struct ata_host *host, u32 irq_masked);
-+int ahci_get_per_port_irq_vector(struct ata_host *host, int port);
+ /* CON4 on CP0 expansion */
+ &cp0_sata0 {
+-	status = "okay";
++	sata-port@0 {
++		status = "okay";
++	};
++	sata-port@1 {
++		status = "okay";
++	};
+ };
  
- static inline void __iomem *__ahci_port_base(struct ata_host *host,
- 					     unsigned int port_no)
-diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
-index 66d4906a5013..25970138a65a 100644
---- a/drivers/ata/libahci.c
-+++ b/drivers/ata/libahci.c
-@@ -2602,7 +2602,7 @@ static int ahci_host_activate_multi_irqs(struct ata_host *host,
- int ahci_host_activate(struct ata_host *host, struct scsi_host_template *sht)
- {
- 	struct ahci_host_priv *hpriv = host->private_data;
--	int irq = hpriv->irq;
-+	int irq = hpriv->irqs[0];
- 	int rc;
+ /* CON9 on CP0 expansion */
+@@ -279,7 +284,12 @@
  
- 	if (hpriv->flags & AHCI_HFLAG_MULTI_MSI) {
-diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
-index 4b900fc659f7..af3d65c09087 100644
---- a/drivers/ata/libahci_platform.c
-+++ b/drivers/ata/libahci_platform.c
-@@ -24,6 +24,7 @@
- #include <linux/ahci_platform.h>
- #include <linux/phy/phy.h>
- #include <linux/pm_runtime.h>
-+#include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/reset.h>
- #include "ahci.h"
-@@ -89,6 +90,14 @@ static void ahci_platform_disable_phys(struct ahci_host_priv *hpriv)
- 	}
- }
+ /* CON4 on CP1 expansion */
+ &cp1_sata0 {
+-	status = "okay";
++	sata-port@0 {
++		status = "okay";
++	};
++	sata-port@1 {
++		status = "okay";
++	};
+ };
  
-+int ahci_get_per_port_irq_vector(struct ata_host *host, int port)
-+{
-+	struct ahci_host_priv *hpriv = host->private_data;
+ /* CON9 on CP1 expansion */
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+index b9d9f31e3ba1..f27edddcacd1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+@@ -292,10 +292,22 @@
+ 			"generic-ahci";
+ 			reg = <0x540000 0x30000>;
+ 			dma-coherent;
+-			interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&CP110_LABEL(clk) 1 15>,
+ 				 <&CP110_LABEL(clk) 1 16>;
+-			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
 +
-+	return hpriv->irqs[port];
-+}
-+EXPORT_SYMBOL_GPL(ahci_get_per_port_irq_vector);
++			sata-port@0 {
++				reg = <0>;
++				interrupts = <109 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
 +
- /**
-  * ahci_platform_enable_clks - Enable platform clocks
-  * @hpriv: host private area to store config values
-@@ -379,6 +388,7 @@ static int ahci_platform_get_regulator(struct ahci_host_priv *hpriv, u32 port,
-  *    or for non devicetree enabled platforms a single clock
-  * 4) resets, if flags has AHCI_PLATFORM_GET_RESETS (optional)
-  * 5) phys (optional)
-+ * 6) interrupt(s)
-  *
-  * RETURNS:
-  * The allocated ahci_host_priv on success, otherwise an ERR_PTR value
-@@ -390,7 +400,7 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 	struct ahci_host_priv *hpriv;
- 	struct clk *clk;
- 	struct device_node *child;
--	int i, enabled_ports = 0, rc = -ENOMEM, child_nodes;
-+	int i, enabled_ports = 0, rc = -ENOMEM, child_nodes, ctrl_irq;
- 	u32 mask_port_map = 0;
++			sata-port@1 {
++				reg = <1>;
++				interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
++				status = "disabled";
++			};
+ 		};
  
- 	if (!devres_open_group(dev, NULL, GFP_KERNEL))
-@@ -483,10 +493,29 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 		goto err_out;
- 	}
- 
-+	hpriv->irqs = kzalloc(sizeof(*hpriv->irqs) * hpriv->nports, GFP_KERNEL);
-+	if (!hpriv->irqs) {
-+		rc = -ENOMEM;
-+		goto err_out;
-+	}
-+
-+	ctrl_irq = platform_get_irq(pdev, 0);
-+	if (ctrl_irq < 0) {
-+		if (ctrl_irq == -EPROBE_DEFER) {
-+			rc = ctrl_irq;
-+			goto err_out;
-+		}
-+		ctrl_irq = 0;
-+	}
-+
-+	if (ctrl_irq > 0)
-+		hpriv->irqs[0] = ctrl_irq;
-+
- 	if (child_nodes) {
- 		for_each_child_of_node(dev->of_node, child) {
- 			u32 port;
- 			struct platform_device *port_dev __maybe_unused;
-+			int port_irq;
- 
- 			if (!of_device_is_available(child))
- 				continue;
-@@ -515,6 +544,18 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 			}
- #endif
- 
-+			if (!ctrl_irq) {
-+				port_irq = of_irq_get(child, 0);
-+				if (!port_irq)
-+					port_irq = -EINVAL;
-+				if (port_irq < 0) {
-+					rc = port_irq;
-+					goto err_out;
-+				}
-+
-+				hpriv->irqs[port] = port_irq;
-+			}
-+
- 			rc = ahci_platform_get_phy(hpriv, port, dev, child);
- 			if (rc)
- 				goto err_out;
-@@ -542,6 +583,18 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
- 		if (rc == -EPROBE_DEFER)
- 			goto err_out;
- 	}
-+
-+	if (!ctrl_irq && !enabled_ports) {
-+		dev_err(&pdev->dev, "No IRQ defined\n");
-+		rc = -ENODEV;
-+		goto err_out;
-+	}
-+
-+	if (enabled_ports > 1) {
-+		hpriv->flags |= AHCI_HFLAG_MULTI_MSI;
-+		hpriv->get_irq_vector = ahci_get_per_port_irq_vector;
-+	}
-+
- 	pm_runtime_enable(dev);
- 	pm_runtime_get_sync(dev);
- 	hpriv->got_runtime_pm = true;
-@@ -578,16 +631,7 @@ int ahci_platform_init_host(struct platform_device *pdev,
- 	struct ata_port_info pi = *pi_template;
- 	const struct ata_port_info *ppi[] = { &pi, NULL };
- 	struct ata_host *host;
--	int i, irq, n_ports, rc;
--
--	irq = platform_get_irq(pdev, 0);
--	if (irq <= 0) {
--		if (irq != -EPROBE_DEFER)
--			dev_err(dev, "no irq\n");
--		return irq;
--	}
--
--	hpriv->irq = irq;
-+	int i, n_ports, rc;
- 
- 	/* prepare host */
- 	pi.private_data = (void *)(unsigned long)hpriv->flags;
-diff --git a/drivers/ata/sata_highbank.c b/drivers/ata/sata_highbank.c
-index c8fc9280d6e4..dcfdab20021b 100644
---- a/drivers/ata/sata_highbank.c
-+++ b/drivers/ata/sata_highbank.c
-@@ -496,7 +496,7 @@ static int ahci_highbank_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	hpriv->irq = irq;
-+	hpriv->irqs[0] = irq;
- 	hpriv->flags |= (unsigned long)pi.private_data;
- 
- 	hpriv->mmio = devm_ioremap(dev, mem->start, resource_size(mem));
+ 		CP110_LABEL(xor0): xor@6a0000 {
 -- 
 2.19.1
 
