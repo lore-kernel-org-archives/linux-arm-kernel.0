@@ -2,93 +2,64 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 408AFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:37:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F2CD6C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:44:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 09B3120700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:37:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB077206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:44:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rIHfY7zb";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GHMPIDTv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 09B3120700
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EILh0Zp7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB077206C0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aTmm8YsYQEub7Fg3C+5JIq4363zQ1WApq5NqgN8KbZc=; b=rIHfY7zbn93zNq
-	9xYIyaPsDSWTDXImF3ifc3NyfOyfsnIrDoi14CK/WTw99c0kMY7r0DTRBULCO+gjEUYFeBed5PyCd
-	U+9ztUVQcD82DNlFCFHtXd251qveFpHm4equdlB73CpL02NZdymS0Hi9usigS2RqfXgruGBQ8jxyq
-	7mP5bQQZK6RqCHFrZiZ0NAGZZ8aGII/NwSfeLpPz6TAmUYgS+dCN67u/KGR0vM8z38esMjSv50J4u
-	gcZ9PNK+BMh4BVH3JELeub1rCgkCQXUK7pGORYLP56UvGkwlOmuLnZEA6duD8O088g3un59BdfLzZ
-	8/9F4EqFF9Mtpd7aWKCQ==;
+	List-Owner; bh=wwpuEyLbONJyJMIMNkhikYAVcyHJQ9witmEVV1/laIc=; b=EILh0Zp73ALwlK
+	kiJjUZO70hQbys5CqaoVWf0s3LHlMloZyOL/jFkInxTGj2ZeIt9pPDkI3q5WhQlkFeyL1mCwgC7Am
+	8MsmpPEuXMFnfIOKxfS2Cn1+w84HsKM5ocyKh/jJdILOs2I6vMPUYEBW8aSCi6629HFE0+597WEdV
+	Xf1iy60Ta0m5nqi29ZYH7fG2BYxTv7eCFkWk63erzVYQLWNIiYyUgQcug+23FEF3XY09ZPkMhFK+7
+	bJFyzXMV7otS4uD/NMHDDLtxJVEfmcZJxoXB2egifbdvuxaH5YXctUa8u71UWiBtDBhCQXTiLz6wq
+	7oNf+zFh6XKrb+4dk5WQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxGdB-0005G9-Qp; Fri, 22 Feb 2019 19:37:09 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gxGkb-0007gX-Pz; Fri, 22 Feb 2019 19:44:49 +0000
+Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxGcI-0004Eu-Tw
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:36:21 +0000
-Received: by mail-pg1-x541.google.com with SMTP id l11so1550365pgq.10
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 11:36:14 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=CmXj2CFCufbymv3cp8YFtUbtulq2NnKIhiNfkKJJYEo=;
- b=GHMPIDTvLvjBOHwS0fwhok9I+SyWu+L8neRkBq9y14Ecsvn26HH1M8ThSa6vY1+Fe7
- FRTBItk72hhlsAoylKvK+tx+16dn10IoJ1+rxTMQQv4v6wlGoWE9x9jlJ+53Ay8Hj8pt
- 2ErvJiE3dJyD7jNuFUKsJeRS3wNbhRWgHHrmCO8UdTdDpyXjM414ynqA8gH2RoaXOcKe
- vIRRDSljXvmppuxfIDvh5Zue+O74dztwNnUBeui7rZn23xhyQZ+0cbp16WW883zqhZOl
- enVgXJB5wsF5ZW2oxiWoYDbyzCAMhqMdV4DUUaGCQvp8/24MEdkZ1v7B8bcEKzD1OyPk
- s8PQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=CmXj2CFCufbymv3cp8YFtUbtulq2NnKIhiNfkKJJYEo=;
- b=cSnJypgxX7etsGOaeCq04LnIMA+rguVz1DIk3cUK2e5CnmTSb94wZi6I7ku0Ll5Cr1
- aV9O2HvMYNbCQiVQb1qYbu7V0AL/KbQYLMZCIwj3E2yNDUqcS8aWsy+oY+9acTNJxD9M
- gGI12WdNVX7W4NrlCWyj6tRH4p0hGDYK7pCc2ahM8JDfqAo/BLIDKMZZacBdV0gYOPM0
- Ms/1WvcuD6NFOFGyu78oJTBK9G0EtXkFJct1Ij4MH4WCw7qoWYVmL1dCxhMiKhUjhuml
- wSy3bdh3vLN9ESdc8nzmyFU/sqjG83CnkXkkwxXlx3djVsGH1QeMHbbw+ZSJudpOPxGA
- ER6Q==
-X-Gm-Message-State: AHQUAublUW84XQcCEqDWdyGTlM6x//Uhis3LVZLrTpNfsIvKSxRzHmdx
- KwZb+oggRmM5ZNH0PeH/sT0=
-X-Google-Smtp-Source: AHgI3IaOa/u2+3YKsR9DYtkRjEFGoGuDZpBZ63o4ogm0aGaOurDqSzqa8Yw3MvOCYQjB751aEsVlnQ==
-X-Received: by 2002:a63:d413:: with SMTP id a19mr5439163pgh.199.1550864174444; 
- Fri, 22 Feb 2019 11:36:14 -0800 (PST)
-Received: from localhost.localdomain (ppp91-79-175-49.pppoe.mtu-net.ru.
- [91.79.175.49])
- by smtp.gmail.com with ESMTPSA id e21sm7687190pfh.45.2019.02.22.11.36.08
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 11:36:13 -0800 (PST)
-From: Dmitry Osipenko <digetx@gmail.com>
-To: Russell King <linux@armlinux.org.uk>,
- Thierry Reding <thierry.reding@gmail.com>,
- Jonathan Hunter <jonathanh@nvidia.com>, Robert Yang <decatf@gmail.com>,
- =?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?= <mirq-linux@rere.qmqm.pl>
-Subject: [PATCH v6 7/7] ARM: tegra: Add firmware calls required for
- suspend-resume on Tegra30
-Date: Fri, 22 Feb 2019 22:34:26 +0300
-Message-Id: <20190222193426.10747-8-digetx@gmail.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190222193426.10747-1-digetx@gmail.com>
-References: <20190222193426.10747-1-digetx@gmail.com>
-MIME-Version: 1.0
+ id 1gxGkX-0007g8-Qq
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:44:47 +0000
+Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
+ (using TLSv1 with cipher AES256-SHA (256/256 bits))
+ (Client did not present a certificate)
+ (Authenticated sender: davem-davemloft)
+ by shards.monkeyblade.net (Postfix) with ESMTPSA id BE2E414A86563;
+ Fri, 22 Feb 2019 11:44:38 -0800 (PST)
+Date: Fri, 22 Feb 2019 11:44:38 -0800 (PST)
+Message-Id: <20190222.114438.657594655581302475.davem@davemloft.net>
+To: vlomovtsev@marvell.com
+Subject: Re: [PATCH v3 0/8] nic: thunderx: fix communication races between
+ VF & PF
+From: David Miller <davem@davemloft.net>
+In-Reply-To: <20190220110225.9497-1-vlomovtsev@marvell.com>
+References: <20180327150736.10718-1-Vadim.Lomovtsev@caviumnetworks.com>
+ <20190220110225.9497-1-vlomovtsev@marvell.com>
+X-Mailer: Mew version 6.8 on Emacs 26.1
+Mime-Version: 1.0
+X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
+ (shards.monkeyblade.net [149.20.54.216]);
+ Fri, 22 Feb 2019 11:44:39 -0800 (PST)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_113615_104435_132A9DD7 
-X-CRM114-Status: GOOD (  17.90  )
+X-CRM114-CacheID: sfid-20190222_114445_865802_9646927A 
+X-CRM114-Status: GOOD (  11.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,205 +71,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, linux-kernel@vger.kernel.org,
+Cc: sunil.kovvuri@gmail.com, rric@kernel.org, netdev@vger.kernel.org,
+ dnelson@redhat.com, linux-kernel@vger.kernel.org, sgoutham@cavium.com,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In order to suspend-resume CPU with Trusted Foundations firmware being
-present on Tegra30, the LP1/LP2 boot vectors and CPU caches need to be
-set up using the firmware calls and then suspend code shall avoid
-re-disabling parts that were disabled by the firmware.
+From: Vadim Lomovtsev <vlomovtsev@marvell.com>
+Date: Wed, 20 Feb 2019 11:02:42 +0000
 
-Signed-off-by: Dmitry Osipenko <digetx@gmail.com>
----
- arch/arm/mach-tegra/pm.c            | 49 +++++++++++++++++++++++++++++
- arch/arm/mach-tegra/reset-handler.S | 26 +++++++++++++++
- arch/arm/mach-tegra/sleep.S         | 14 ++++++---
- 3 files changed, 84 insertions(+), 5 deletions(-)
+> The ThunderX CN88XX NIC Virtual Function driver uses mailbox interface
+> to communicate to physical function driver. Each of VF has it's own pair
+> of mailbox registers to read from and write to. The mailbox registers
+> has no protection from possible races, so it has to be implemented
+> at software side.
+> 
+> After long term testing by loop of 'ip link set <ifname> up/down'
+> command it was found that there are two possible scenarios when
+> race condition appears:
+>  1. VF receives link change message from PF and VF send RX mode
+> configuration message to PF in the same time from separate thread.
+>  2. PF receives RX mode configuration from VF and in the same time,
+> in separate thread PF detects link status change and sends appropriate
+> message to particular VF.
+> 
+> Both cases leads to mailbox data to be rewritten, NIC VF messaging control
+> data to be updated incorrectly and communication sequence gets broken.
+> 
+> This patch series is to address race condition with VF & PF communication.
+> 
+> Changes:
+> v1 -> v2
+>  - 0000: correct typo in cover letter subject: 'betwen' -> 'between';
+>  - move link state polling request task from pf to vf 
+>    instead of cheking status of mailbox irq;
+> v2 -> v3
+>  - 0003: change return type of nicvf_send_cfg_done() function
+>    from int to void;
+>  - 0007: update subject and remove unused variable 'netdev'
+>    from nicvf_link_status_check_task() function;
 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 1ad5719779b0..f209f59e0daf 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -33,11 +33,13 @@
- #include <soc/tegra/pmc.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/firmware.h>
- #include <asm/idmap.h>
- #include <asm/proc-fns.h>
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
- #include <asm/tlbflush.h>
-+#include <asm/trusted_foundations.h>
- 
- #include "iomap.h"
- #include "pm.h"
-@@ -159,6 +161,28 @@ int tegra_cpu_do_idle(void)
- 
- static int tegra_sleep_cpu(unsigned long v2p)
- {
-+	/*
-+	 * L2 cache disabling using kernel API only allowed when all
-+	 * secondary CPU's are offline. Cache have to be disabled with
-+	 * MMU-on if cache maintenance is done via Trusted Foundations
-+	 * firmware. Note that CPUIDLE won't ever enter powergate on Tegra30
-+	 * if any of secondary CPU's is online and this is the LP2-idle
-+	 * code-path only for Tegra20/30.
-+	 */
-+	if (trusted_foundations_registered())
-+		outer_disable();
-+
-+	/*
-+	 * Note that besides of setting up CPU reset vector this firmware
-+	 * call may also do the following, depending on the FW version:
-+	 * 	1) Disable L2. But this doesn't matter since we already
-+	 * 	   disabled the L2.
-+	 *	2) Disable D-cache. This need to be taken into account in
-+	 *	   particular by the tegra_disable_clean_inv_dcache() which
-+	 *	   shall avoid the re-disable.
-+	 */
-+	call_firmware_op(prepare_idle, TF_PM_MODE_LP2);
-+
- 	setup_mm_for_reboot();
- 	tegra_sleep_cpu_finish(v2p);
- 
-@@ -197,6 +221,14 @@ void tegra_idle_lp2_last(void)
- 
- 	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, &tegra_sleep_cpu);
- 
-+	/*
-+	 * Resume L2 cache if it wasn't re-enabled early during resume,
-+	 * which is the case for Tegra30 that has to re-enable the cache
-+	 * via firmware call. In other cases cache is already enabled and
-+	 * hence re-enabling is a no-op. This is always a no-op on Tegra114+.
-+	 */
-+	outer_resume();
-+
- 	restore_cpu_complex();
- 	cpu_cluster_pm_exit();
- }
-@@ -215,6 +247,15 @@ enum tegra_suspend_mode tegra_pm_validate_suspend_mode(
- 
- static int tegra_sleep_core(unsigned long v2p)
- {
-+	/*
-+	 * Cache have to be disabled with MMU-on if cache maintenance is done
-+	 * via Trusted Foundations firmware. This is a no-op on Tegra114+.
-+	 */
-+	if (trusted_foundations_registered())
-+		outer_disable();
-+
-+	call_firmware_op(prepare_idle, TF_PM_MODE_LP1);
-+
- 	setup_mm_for_reboot();
- 	tegra_sleep_core_finish(v2p);
- 
-@@ -342,6 +383,14 @@ static int tegra_suspend_enter(suspend_state_t state)
- 
- 	cpu_suspend(PHYS_OFFSET - PAGE_OFFSET, tegra_sleep_func);
- 
-+	/*
-+	 * Resume L2 cache if it wasn't re-enabled early during resume,
-+	 * which is the case for Tegra30 that has to re-enable the cache
-+	 * via firmware call. In other cases cache is already enabled and
-+	 * hence re-enabling is a no-op.
-+	 */
-+	outer_resume();
-+
- 	switch (mode) {
- 	case TEGRA_SUSPEND_LP1:
- 		tegra_suspend_exit_lp1();
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 3bf202819534..19a609046547 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -20,6 +20,7 @@
- #include <soc/tegra/flowctrl.h>
- #include <soc/tegra/fuse.h>
- 
-+#include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- #include <asm/cache.h>
- 
-@@ -76,6 +77,7 @@ ENTRY(tegra_resume)
- 	orr	r1, r1, #1
- 	str	r1, [r0]
- #endif
-+	bl	tegra_resume_trusted_foundations
- 
- #ifdef CONFIG_CACHE_L2X0
- 	/* L2 cache resume & re-enable */
-@@ -88,6 +90,30 @@ end_ca9_scu_l2_resume:
- 
- 	b	cpu_resume
- ENDPROC(tegra_resume)
-+
-+/*
-+ *	tegra_resume_trusted_foundations
-+ *
-+ *	  Trusted Foundations firmware initialization.
-+ *
-+ *	Doesn't return if firmware presents.
-+ *	Corrupted registers: r1, r2
-+ */
-+ENTRY(tegra_resume_trusted_foundations)
-+	/* Check whether Trusted Foundations firmware presents. */
-+	mov32	r2, TEGRA_IRAM_BASE + TEGRA_IRAM_RESET_HANDLER_OFFSET
-+	ldr	r1, =__tegra_cpu_reset_handler_data_offset + \
-+							RESET_DATA(TF_PRESENT)
-+	ldr	r1, [r2, r1]
-+	cmp	r1, #0
-+	reteq	lr
-+
-+ .arch_extension sec
-+	/* First call after suspend wakes firmware. No arguments required. */
-+	smc	#0
-+
-+	b	cpu_resume
-+ENDPROC(tegra_resume_trusted_foundations)
- #endif
- 
- 	.align L1_CACHE_SHIFT
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 5e3496753df1..53863d59521b 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -49,8 +49,9 @@ ENTRY(tegra_disable_clean_inv_dcache)
- 
- 	/* Disable the D-cache */
- 	mrc	p15, 0, r2, c1, c0, 0
-+	tst	r2, #CR_C			@ see tegra_sleep_cpu()
- 	bic	r2, r2, #CR_C
--	mcr	p15, 0, r2, c1, c0, 0
-+	mcrne	p15, 0, r2, c1, c0, 0
- 	isb
- 
- 	/* Flush the D-cache */
-@@ -132,10 +133,13 @@ ENTRY(tegra_shut_off_mmu)
- #ifdef CONFIG_CACHE_L2X0
- 	/* Disable L2 cache */
- 	check_cpu_part_num 0xc09, r9, r10
--	movweq	r2, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
--	movteq	r2, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
--	moveq	r3, #0
--	streq	r3, [r2, #L2X0_CTRL]
-+	retne	r0
-+
-+	mov32   r2, TEGRA_ARM_PERIF_BASE + 0x3000
-+	ldr	r3, [r2, #L2X0_CTRL]
-+	mov	r9, #0
-+	tst	r3, #1				@ see tegra_sleep_cpu()
-+	strne	r9, [r2, #L2X0_CTRL]
- #endif
- 	ret	r0
- ENDPROC(tegra_shut_off_mmu)
--- 
-2.20.1
-
+Series applied, thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
