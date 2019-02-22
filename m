@@ -2,63 +2,64 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ED05FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:47:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75854C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:51:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BB84C2081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:47:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F7D220652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 11:51:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cLoqNQjE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB84C2081B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d8XKav99"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F7D220652
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+CW4Bpswp9oFPNEn3tmSREuxXdkZImpkpUxb+XNfScU=; b=cLoqNQjEDvWo+r
-	IhdKfFpeG0OVDBswHH32OrHgmzXEjwKqBPjIv5lYtLj286zUIKGNhlGvyBbfC2jqjKZqmOQj204eO
-	X2npQiecrttLdfmKVW19/IdXLjLULSh4QFDLNCzHEOj5d5T26f7e9OnHfYeBZ+tPbDWsuwV48GpPy
-	uMSwtf8UhS4QPcDwd3ZSXUbnxC80lJx7+D+86gSvj0McPRlmJop9zZH0Zc5CrsAqWG/mV6OS+NpMA
-	coQU3AGKWb8p3ogQXD+couV1wkPx4Yei+xqF8SXnuKhRo4YNzF+iy8zH0Kq96XwTeco9RZjZUHOnV
-	RPmqWzm+YGS9vEDp3znA==;
+	List-Owner; bh=Sit+FXCK1PXqtRWwh4Wv9E7j956MPJtHDf2kiqug11w=; b=d8XKav99Id7RDz
+	WjQTPxVwQ/qobSviY31AATRBW5u6vdgjEBBVigDUWIOPZ3gonh7BsWcSAX/5toAiIok95xgtv92YS
+	VRwdSEJZvLbyglo9LcQn/Oega+rxGZvSOhCJxOLdilb9kMK6nqKiJNjDbAq5wO7aCk/Ujxvmi3N6j
+	OvPyupXvfzJrewzPHmx1mBezMWvIpWfJ68Us/8ic1boeFxB3mZnxrHbuJpIXRZVOpf1s1uPuEzDkr
+	+M3dbESuyWPFX5TIj4oTPL7Arv3BHwFqE7Oq1vdiMqruHk3y2dVS5FJ6gP+bk4gQazfrXRst9G3XH
+	i3R1lq0qpuJ5SWTr7XFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx9J0-0000JC-Si; Fri, 22 Feb 2019 11:47:50 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gx9MZ-0001yD-O6; Fri, 22 Feb 2019 11:51:31 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx9Ix-0000Hf-Vp
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 11:47:49 +0000
+ id 1gx9MW-0001xW-3m
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 11:51:29 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6B5D2A78;
- Fri, 22 Feb 2019 03:47:47 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7E4133F5C1;
- Fri, 22 Feb 2019 03:47:46 -0800 (PST)
-Date: Fri, 22 Feb 2019 11:47:44 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH] arm64: Rename get_thread_info()
-Message-ID: <20190222114743.GD42419@lakrids.cambridge.arm.com>
-References: <1550827970-9355-1-git-send-email-julien.thierry@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5D32CA78;
+ Fri, 22 Feb 2019 03:51:25 -0800 (PST)
+Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
+ [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id A9D713F5C1;
+ Fri, 22 Feb 2019 03:51:23 -0800 (PST)
+Date: Fri, 22 Feb 2019 11:51:19 +0000
+From: Marc Zyngier <marc.zyngier@arm.com>
+To: Dave Martin <Dave.Martin@arm.com>
+Subject: Re: [PATCH] KVM: arm64: Fix architecturally invalid reset value for
+ FPEXC32_EL2
+Message-ID: <20190222115119.170cb5fc@why.wild-wind.fr.eu.org>
+In-Reply-To: <20190222105604.GB3567@e103592.cambridge.arm.com>
+References: <1550749352-2315-1-git-send-email-Dave.Martin@arm.com>
+ <20190222100103.03fb773d@why.wild-wind.fr.eu.org>
+ <20190222105604.GB3567@e103592.cambridge.arm.com>
+Organization: ARM Ltd
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1550827970-9355-1-git-send-email-julien.thierry@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_034748_039288_57B9098B 
-X-CRM114-Status: GOOD (  18.84  )
+X-CRM114-CacheID: sfid-20190222_035128_161044_A616A657 
+X-CRM114-Status: GOOD (  17.75  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,104 +71,63 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-arm-kernel@lists.infradead.org
+Cc: Julien Thierry <julien.thierry@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, stable@vger.kernel.org,
+ James Morse <james.morse@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 09:32:50AM +0000, Julien Thierry wrote:
-> The assembly macro get_thread_info() actually returns a task_struct and is
-> analogous to the current/get_current macro/function.
-> 
-> While it could be argued that thread_info sits at the start of
-> task_struct and the intention could have been to return a thread_info,
-> instances of loads from/stores to the address obtained from
-> get_thread_info() use offsets that are generated with
-> offsetof(struct task_struct, [...]).
-> 
-> Rename get_thread_info() to state it returns a task_struct.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+On Fri, 22 Feb 2019 10:56:07 +0000
+Dave Martin <Dave.Martin@arm.com> wrote:
 
-I should have done this along with the TI_* -> TSK_TI_* renaming. FWIW:
+> On Fri, Feb 22, 2019 at 10:01:03AM +0000, Marc Zyngier wrote:
+> > On Thu, 21 Feb 2019 11:42:32 +0000
+> > Dave Martin <Dave.Martin@arm.com> wrote:
+> >   
+> > > Due to what looks like a typo dating back to the original addition
+> > > of FPEXC32_EL2 handling, KVM currently initialises this register to
+> > > an architecturally invalid value.
+> > > 
+> > > As a result, the VECITR field (RES1) in bits [10:8] is initialised
+> > > with 0, and the two reserved (RES0) bits [6:5] are initialised with
+> > > 1.  (In the Common VFP Subarchitecture as specified by ARMv7-A,
+> > > these two bits were IMP DEF.  ARMv8-A removes them.)
+> > > 
+> > > This patch changes the reset value from 0x70 to 0x700, which
+> > > reflects the architectural constraints and is presumably what was
+> > > originally intended.
+> > > 
+> > > Cc: <stable@vger.kernel.org> # 4.12.x-
+> > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > Cc: Christoffer Dall <christoffer.dall@arm.com>
+> > > Fixes: 62a89c44954f ("arm64: KVM: 32bit handling of coprocessor traps")
+> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>  
+> > 
+> > Applied to -next.
+> > 
+> > Thanks,  
+> 
+> Thanks.
+> 
+> I have a patch for <= v4.11 which I can send to stable once this patch
+> reaches torvalds/master.
+> 
+> Is it worth it though, in your opinion?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+I don't think it has much value. To be honest, this patch mostly serves
+as documentation, as any implementation worth its salt will honour the
+RES0/RES1 properties. I've kept the cc stable in your original patch,
+but arguably it doesn't fix anything real.
 
 Thanks,
-Mark.
 
-> ---
->  arch/arm64/include/asm/asm-uaccess.h | 2 +-
->  arch/arm64/include/asm/assembler.h   | 6 +++---
->  arch/arm64/kernel/entry.S            | 4 ++--
->  3 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-> index 4128bec..f74909b 100644
-> --- a/arch/arm64/include/asm/asm-uaccess.h
-> +++ b/arch/arm64/include/asm/asm-uaccess.h
-> @@ -24,7 +24,7 @@
->  	.endm
-> 
->  	.macro	__uaccess_ttbr0_enable, tmp1, tmp2
-> -	get_thread_info \tmp1
-> +	get_current_task \tmp1
->  	ldr	\tmp1, [\tmp1, #TSK_TI_TTBR0]	// load saved TTBR0_EL1
->  	mrs	\tmp2, ttbr1_el1
->  	extr    \tmp2, \tmp2, \tmp1, #48
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 7acf243..9c5c876 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -528,9 +528,9 @@
->  	.endm
-> 
->  /*
-> - * Return the current thread_info.
-> + * Return the current task_struct.
->   */
-> -	.macro	get_thread_info, rd
-> +	.macro	get_current_task, rd
->  	mrs	\rd, sp_el0
->  	.endm
-> 
-> @@ -713,7 +713,7 @@
-> 
->  	.macro		if_will_cond_yield_neon
->  #ifdef CONFIG_PREEMPT
-> -	get_thread_info	x0
-> +	get_current_task	x0
->  	ldr		x0, [x0, #TSK_TI_PREEMPT]
->  	sub		x0, x0, #PREEMPT_DISABLE_OFFSET
->  	cbz		x0, .Lyield_\@
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 6bf7e12..c50a7a7 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -185,7 +185,7 @@ alternative_cb_end
-> 
->  	.else
->  	add	x21, sp, #S_FRAME_SIZE
-> -	get_thread_info tsk
-> +	get_current_task tsk
->  	/* Save the task's original addr_limit and set USER_DS */
->  	ldr	x20, [tsk, #TSK_TI_ADDR_LIMIT]
->  	str	x20, [sp, #S_ORIG_ADDR_LIMIT]
-> @@ -1104,7 +1104,7 @@ ENTRY(ret_from_fork)
->  	cbz	x19, 1f				// not a kernel thread
->  	mov	x0, x20
->  	blr	x19
-> -1:	get_thread_info tsk
-> +1:	get_current_task tsk
->  	b	ret_to_user
->  ENDPROC(ret_from_fork)
->  NOKPROBE(ret_from_fork)
-> --
-> 1.9.1
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
 
 _______________________________________________
 linux-arm-kernel mailing list
