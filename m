@@ -2,62 +2,141 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 719F2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 22:26:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 206F5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 22:43:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 386532077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 22:26:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB45E206C0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 22:43:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IOe0EkND"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 386532077B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L19i6qbo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amperemail.onmicrosoft.com header.i=@amperemail.onmicrosoft.com header.b="s/k7gbIT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB45E206C0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=os.amperecomputing.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:
+	In-Reply-To:References:Message-ID:Date:Subject:To:From:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XjPPO18ZNqa1vFwyMf8oHVXOA+JHjNgp0pP525uRA5I=; b=IOe0EkNDrS/11A
-	8qxQRV0TZlVGO6ExrAXStI6VQr8zb9mFpyG1iDlCc3mLSXn0LTdnwKVd/7bAeq2IG9QWWRlvCDdyk
-	BFyi+Xj2YoPaWfGsHtBPzqUbmbNvXuOHPebd2725bUPLsLqNcsts5jG4sdJiaRyO2OxSlRo9GdZIC
-	znPZ7Xy3hhTC6TySYvbTvtUAp26mmBySkjKleO2Go76yPWXlMCsbARxE73uXWncmgLC5jizDfjvFJ
-	EuLQmn01IAUJFvxJd9iY07jOAE1w98pr/VY8hlxPEPl9SpxtV61sPpV4dMOVopTYMawC0UAS7nkbt
-	uxotOoMQXhlsPB5tweEQ==;
+	List-Owner; bh=PoAaoEV6FnlCbleV2OPyeOvqHzj8mp1znXTYrCg6TDc=; b=L19i6qboZ5O4An
+	kb3JCxpOePdFBT7MsxNfCs2frgmk/e/4L6MwuSfsZk0MuzBFBFnrWOsTgHIejHDXOlJwl23YosJVn
+	7jIeE4jJpg7pxfQITmQoUjtihvSjHT8xmStrZQj/wS3G4WjnkPb1OTUmOgT1mkfGgT5TRqPiQs1Gy
+	AlSwacTXMOzQdSIVmxA2a+qpfIk6rexLLDAn/E/5kJjMqmntHsw2wBpCgClbL9gk4lJp260HSxFZt
+	YMmGCzCV6z63BpIiCGzIRE1t7Tn5kXdIGIMEMbVu5ZNCQJrvJPOzntWWLd6jfV3xn35qaL6cm5xEq
+	cnvBw1kfftq2QqxiAA2Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxJHE-0006Zj-4n; Fri, 22 Feb 2019 22:26:40 +0000
-Received: from j217100.upc-j.chello.nl ([24.132.217.100]
- helo=worktop.programming.kicks-ass.net)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxJHB-0006ZU-Cd; Fri, 22 Feb 2019 22:26:37 +0000
-Received: by worktop.programming.kicks-ass.net (Postfix, from userid 1000)
- id DDF4B984351; Fri, 22 Feb 2019 23:26:35 +0100 (CET)
-Date: Fri, 22 Feb 2019 23:26:35 +0100
-From: Peter Zijlstra <peterz@infradead.org>
-To: Thomas Gleixner <tglx@linutronix.de>
-Subject: [RFC][PATCH] objtool: STAC/CLAC validation
-Message-ID: <20190222222635.GK14054@worktop.programming.kicks-ass.net>
-References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
- <20190216103044.GR32494@hirez.programming.kicks-ass.net>
- <9e037d68-75e7-1beb-0c9c-33a7ffeced1b@zytor.com>
- <20190219090409.GW32494@hirez.programming.kicks-ass.net>
- <20190219124808.GG8501@fuggles.cambridge.arm.com>
- <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
- <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
- <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
- <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
- <alpine.DEB.2.21.1902221853330.1666@nanos.tec.linutronix.de>
+	id 1gxJXa-00045A-A0; Fri, 22 Feb 2019 22:43:34 +0000
+Received: from mail-eopbgr750102.outbound.protection.outlook.com
+ ([40.107.75.102] helo=NAM02-BL2-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxJXV-000442-Vc
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 22:43:31 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amperemail.onmicrosoft.com; s=selector1-os-amperecomputing-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=E1JAbes9OCmibZbdGqBigpi5YSYQJ3R8NHyfstfrAP0=;
+ b=s/k7gbITM6xZd6VkYdum2Ozy0XmnMrymGGGSvyB9RNBYIXzjUYqJgU0wm7Hijw1XaZtY5NDdKsnXQHlTaqihYuAHRo99wbU1DZlpiEwl5LVftvPt70Tdc9X2j37+Yn0fCin3HjQr9PmVMtIlOqfCWsv8pO1KE/R4Aoy1J5xhQNs=
+Received: from BYAPR01MB4664.prod.exchangelabs.com (20.177.227.140) by
+ BYAPR01MB5544.prod.exchangelabs.com (20.179.88.148) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Fri, 22 Feb 2019 22:43:23 +0000
+Received: from BYAPR01MB4664.prod.exchangelabs.com
+ ([fe80::6879:4bf7:794:c869]) by BYAPR01MB4664.prod.exchangelabs.com
+ ([fe80::6879:4bf7:794:c869%3]) with mapi id 15.20.1622.018; Fri, 22 Feb 2019
+ 22:43:23 +0000
+From: Khuong Dinh <khuong@os.amperecomputing.com>
+To: "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "joe@perches.com" <joe@perches.com>,
+ "arnd@arndb.de" <arnd@arndb.de>, "gregkh@linuxfoundation.org"
+ <gregkh@linuxfoundation.org>
+Subject: Re: [PATCH v2] MAINTAINERS: Update Ampere email address
+Thread-Topic: [PATCH v2] MAINTAINERS: Update Ampere email address
+Thread-Index: AQHUuD8Bl3rwJw87K0qY0JPytNqJ06Xsj4WA
+Date: Fri, 22 Feb 2019 22:43:23 +0000
+Message-ID: <e9b60c35-d8f9-7feb-ee9b-781157c246b6@os.amperecomputing.com>
+References: <1548813357-21892-1-git-send-email-khuong@os.amperecomputing.com>
+In-Reply-To: <1548813357-21892-1-git-send-email-khuong@os.amperecomputing.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: CY4PR2201CA0044.namprd22.prod.outlook.com
+ (2603:10b6:910:3e::33) To BYAPR01MB4664.prod.exchangelabs.com
+ (2603:10b6:a03:90::12)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=khuong@os.amperecomputing.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [4.28.13.142]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: ede28761-a8ff-46d0-1092-08d69917268c
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:BYAPR01MB5544; 
+x-ms-traffictypediagnostic: BYAPR01MB5544:
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtCWUFQUjAxTUI1NTQ0OzIzOlZVdldRemE5TXVNUGNQOU1NT0dqc0RQY1g2?=
+ =?utf-8?B?SzQyNDZPbmU1dTY5MlBhMityZ245ZzdRUEZqc05YZmtzbGpNSUlxZGNLRHQ4?=
+ =?utf-8?B?VkZFMWxjT0hXbDZSeWxrZ0lIbCtFa1hiVXQ2NHgxT1hjeHVFOTh2MWVDZVZL?=
+ =?utf-8?B?bG9NMEd4SWk5N3Y0am9rWkRyelo4MW82OE4xVDZtUnZ3MThaenlJSmNKUnZl?=
+ =?utf-8?B?R2VTZXVLeWh3THFzbVMzbmhobmwrNmVuNlhLR3Mzb0dPVER0UDdCUmVTOUhm?=
+ =?utf-8?B?QVF5VEVBb05UM1hsRkhZNHZOcWF5OGVMaUNlczhZdDRzQ1ZNVlgxNm0yNjZk?=
+ =?utf-8?B?RkJPaUxKcDFDNHArUmFYV1orVjFmQ1dXNUdUWlRwakhPUmRMaTJhM3lhdEFZ?=
+ =?utf-8?B?bXNwTDVFbWVvNjZJSHI0SGdGN0dka3FXbXpoUWdsVHB4cWk0NmZBY0VXRm43?=
+ =?utf-8?B?cFF5UjVxNWF3ZE9sdW10Mk1Dd3E0TTdTRTI2RnFBVzhSVDdqUzBNYlBid3lR?=
+ =?utf-8?B?TWJud0hSK3Izc25rd2NzUGRDRW5mYmhlVTA0SXVxVFJtNWF4RVh6Sml0QkV0?=
+ =?utf-8?B?cWhpQ0dqdFVMTWdDcm5YZWZiWXppNzI0K1dmTU9obWFFSGl4V1UzalJuRG96?=
+ =?utf-8?B?MWcwbXlIMzFvWllBTlN4UFlTbDMrbEIwbmVlQlo5MW84WE5sK2NtNnNidFd3?=
+ =?utf-8?B?SmpDaUhrL1V3VUFDeTRUbzJXc1BOay9lbVlVVGxvK2Z4Z0E0dERhUlZHU0sz?=
+ =?utf-8?B?eERucEpJd2JUYXNwTEdVZ29vTEVPWEdSUDVzaGp2cHlBN1ZsMktWOFlraDRn?=
+ =?utf-8?B?UlFMVDZzQWllOUZUUm91dE5IWHN0VnYwUTVCZXhLV3VwMzJPejMwOVdSRjV2?=
+ =?utf-8?B?NUFwQUNIY3FTUVk0K2lZSkZHZjBWN2JWemFpcDVlTEY0VzhvdkRIdDFLU09t?=
+ =?utf-8?B?NURkaXBrTW56RER4YVJCdHc4Y2RlaEpBVzM0NDF5clFCeWt4RVoycXEyN21p?=
+ =?utf-8?B?bkxZK2dqZ2JMN2NsMFp3bjJSVWwrR0xhVzd5RTVxTHhwTXErTG16WC9DcGVK?=
+ =?utf-8?B?Wjcwa0N6QVJZeDBBcXJJN0R0SndUK2NOVDRaY0tpSHllV2tGbkFpRkg4emhR?=
+ =?utf-8?B?RXVJcVJxODVwTnRtS3Y2d2RVNTB1TW1uSHh1ellnNHBmZUdrMVNFQUF3L1JU?=
+ =?utf-8?B?UEduNUlmbGZxRXdkMHZPUUZJa2ZrNDFPM0hwQUpOVVk1YXVPejN3VUMwUVFD?=
+ =?utf-8?B?UHY1WERhREFKVmlYM2IvWHBSVXpPZ3p2NUVCNUNTWE1CMWN3Nm5QaUJNcE9a?=
+ =?utf-8?B?QkJwakdiaWs1WlBEd21Ea3k4bWRoODFCK291R0gwVmJ6eUt2RWx4a3k0WHdi?=
+ =?utf-8?B?L3BoODg0TEV5YUMvRVZMWUNsK3NqNDhsampIeTFVNERhTWxHRkZ2QlZpdjJU?=
+ =?utf-8?B?d2VtV05jaWxxSUpVaVVQZ2xXTlBGRFZyQTVMWU0zbm9CZGdsNTNLOERwQkdD?=
+ =?utf-8?B?eWtUOVlHMDN2dUZoR2hZSzh6OCtSU2o0Y0hiZlRpT2U4OVR6RmVCM0tRNUQy?=
+ =?utf-8?B?K2cxeVBlWkJkR251dE5qUjhaYmNCQnMwVjQyUFE4SFRNdEJtSEhXQm1LT2lS?=
+ =?utf-8?B?dnQzVTJNYkxXNTVTTFdvQ3laNGtZNlFLVUk1azlrR3JCazNXVGxKMTVuWmJm?=
+ =?utf-8?B?V1AzaWpXVDV2QkFYTFA4OFhwcXVOOElEODBMeW1wUnNiSjJCU2huLzBCYkFm?=
+ =?utf-8?B?MVhvRWhBNG80T0VoY1hZUHgzcGZKSmRlM1o0WXJIUjFXSGJNeUtqVEQ5RURM?=
+ =?utf-8?B?MVFxVlMwbEJHOVBLd1dXUE54L1dxMFFZN3pHQnpYaVVIdU1jeFljem03L3FE?=
+ =?utf-8?Q?c29/7U1nEuI=3D?=
+x-microsoft-antispam-prvs: <BYAPR01MB5544FF12ECBC7F121DFFE36DE97F0@BYAPR01MB5544.prod.exchangelabs.com>
+x-forefront-prvs: 09565527D6
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10019020)(136003)(39840400004)(366004)(346002)(396003)(376002)(189003)(199004)(66066001)(2201001)(52116002)(478600001)(6116002)(25786009)(6246003)(256004)(4326008)(3846002)(99286004)(6512007)(186003)(8676002)(26005)(14454004)(43066004)(486006)(107886003)(81156014)(14444005)(31686004)(106356001)(6506007)(386003)(53936002)(53546011)(316002)(476003)(71190400001)(76176011)(68736007)(8936002)(11346002)(102836004)(2501003)(305945005)(105586002)(6486002)(5660300002)(7736002)(86362001)(81166006)(446003)(6436002)(110136005)(229853002)(2616005)(2906002)(3450700001)(15650500001)(31696002)(97736004)(71200400001);
+ DIR:OUT; SFP:1102; SCL:1; SRVR:BYAPR01MB5544;
+ H:BYAPR01MB4664.prod.exchangelabs.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:0; 
+received-spf: None (protection.outlook.com: os.amperecomputing.com does not
+ designate permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: xGYyCHHrELuRPoKREwpJ+uXvTcWXEWFYeq3ZbbC4DNL7lal9M9JkiPHYmqum95+bx5o9tB1PnWov2iJOnKGgvCSZ4+N91DcJd3HBGwsIElTTcjU/7vWS1M0aY52QrXxZ+mOZeFnooPEH/7HtgRxEWSXVuWUj18R5b3DofB03XVF15gTD7NJ+xNaSwE9vF6BNo9YEzXIcN3yrcFiwULU5PCinjQuoboumI7lD5ZTVvTiljjeYbxboDMDhkt9Q6zPVKv25GrPS7lyBbIhsWCHD/vjL1ain6Lxos4BjThOyqR7fKUbwq2p2HPy6qk+gFQJXNTwfZc1gKMkRjJt789NqCqx06+8k+2y3O1tlImkAK9dMfrBkR9tO0RpLsspvyhwc+UYWGFISif5E+FV+SbwvPMFlY9F90NGqd4O22Fjjy0M=
+Content-ID: <EE54EC5A6D5050458439DE854E4E350D@prod.exchangelabs.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <alpine.DEB.2.21.1902221853330.1666@nanos.tec.linutronix.de>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-OriginatorOrg: os.amperecomputing.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: ede28761-a8ff-46d0-1092-08d69917268c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 22 Feb 2019 22:43:22.4621 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3bc2b170-fd94-476d-b0ce-4229bdc904a7
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR01MB5544
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20190222_144330_070778_4C58AE32 
+X-CRM114-Status: GOOD (  12.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,338 +148,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Josh Poimboeuf <jpoimboe@redhat.com>, Denys Vlasenko <dvlasenk@redhat.com>,
- Brian Gerst <brgerst@gmail.com>, Julien Thierry <julien.thierry@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, valentin.schneider@arm.com,
- Will Deacon <will.deacon@arm.com>,
- Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
- Andy Lutomirski <luto@amacapital.net>, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andrew Lutomirski <luto@kernel.org>,
- "H. Peter Anvin" <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
- Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
- "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Reply-To: Khuong Dinh <khuong@os.amperecomputing.com>
+Cc: Open Source Submission <patches@amperecomputing.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 07:10:34PM +0100, Thomas Gleixner wrote:
-
-> But correct :)
-
-> I agree, that a function which is doing the actual copy should be callable,
-> but random other functions? NO!
-
-So find the below patch -- which spotted fail in ptrace.c
-
-It has an AC_SAFE(func) annotation which allows marking specific
-functions as safe to call. The patch includes 2 instances which were
-required to make arch/x86 'build':
-
-  arch/x86/ia32/ia32_signal.o: warning: objtool: ia32_restore_sigcontext()+0x3d: call to native_load_gs_index() with AC set
-  arch/x86/kernel/ptrace.o: warning: objtool: genregs_get()+0x8e: call to getreg() with AC set
-
-It also screams (provided one has CONFIG_FUNCTION_TRACE=y) about the
-lack of notrace annotations on functions marked AC_SAFE():
-
-  arch/x86/kernel/ptrace.o: warning: objtool: getreg()+0x0: call to __fentry__() with AC set
-
-It builds arch/x86 relatively clean; it only complains about some
-redundant CLACs in entry_64.S because it doesn't understand interrupts
-and I've not bothered creating an annotation for them yet.
-
-  arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0x4d: redundant CLAC
-  arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0x5a: redundant CLAC
-  ...
-  arch/x86/entry/entry_64.o: warning: objtool: .altinstr_replacement+0xb1: redundant CLAC
-
-Also, I realized we don't need special annotations for preempt_count;
-preempt_disable() emits a CALL instruction which should readily trigger
-the warnings added here.
-
-The VDSO thing is a bit of a hack, but I couldn't quickly find anything
-better.
-
-Comments?
-
----
- arch/x86/include/asm/special_insns.h |  2 ++
- arch/x86/kernel/ptrace.c             |  3 +-
- include/linux/frame.h                | 23 ++++++++++++++
- tools/objtool/arch.h                 |  4 ++-
- tools/objtool/arch/x86/decode.c      | 14 ++++++++-
- tools/objtool/check.c                | 59 ++++++++++++++++++++++++++++++++++++
- tools/objtool/check.h                |  3 +-
- tools/objtool/elf.h                  |  1 +
- 8 files changed, 105 insertions(+), 4 deletions(-)
-
-diff --git a/arch/x86/include/asm/special_insns.h b/arch/x86/include/asm/special_insns.h
-index 43c029cdc3fe..cd31e4433f4c 100644
---- a/arch/x86/include/asm/special_insns.h
-+++ b/arch/x86/include/asm/special_insns.h
-@@ -5,6 +5,7 @@
- 
- #ifdef __KERNEL__
- 
-+#include <linux/frame.h>
- #include <asm/nops.h>
- 
- /*
-@@ -135,6 +136,7 @@ static inline void native_wbinvd(void)
- }
- 
- extern asmlinkage void native_load_gs_index(unsigned);
-+AC_SAFE(native_load_gs_index);
- 
- static inline unsigned long __read_cr4(void)
- {
-diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
-index 4b8ee05dd6ad..e278b4055a8b 100644
---- a/arch/x86/kernel/ptrace.c
-+++ b/arch/x86/kernel/ptrace.c
-@@ -420,7 +420,7 @@ static int putreg(struct task_struct *child,
- 	return 0;
- }
- 
--static unsigned long getreg(struct task_struct *task, unsigned long offset)
-+static notrace unsigned long getreg(struct task_struct *task, unsigned long offset)
- {
- 	switch (offset) {
- 	case offsetof(struct user_regs_struct, cs):
-@@ -444,6 +444,7 @@ static unsigned long getreg(struct task_struct *task, unsigned long offset)
- 
- 	return *pt_regs_access(task_pt_regs(task), offset);
- }
-+AC_SAFE(getreg);
- 
- static int genregs_get(struct task_struct *target,
- 		       const struct user_regset *regset,
-diff --git a/include/linux/frame.h b/include/linux/frame.h
-index 02d3ca2d9598..5d354cf42a56 100644
---- a/include/linux/frame.h
-+++ b/include/linux/frame.h
-@@ -21,4 +21,27 @@
- 
- #endif /* CONFIG_STACK_VALIDATION */
- 
-+#if defined(CONFIG_STACK_VALIDATION) && !defined(BUILD_VDSO) && !defined(BUILD_VDSO32)
-+/*
-+ * This macro marks functions as AC-safe, that is, it is safe to call from an
-+ * EFLAGS.AC enabled region (typically user_access_begin() /
-+ * user_access_end()).
-+ *
-+ * These functions in turn will only call AC-safe functions themselves (which
-+ * precludes tracing, including __fentry__ and scheduling, including
-+ * preempt_enable).
-+ *
-+ * AC-safe functions will obviously also not change EFLAGS.AC themselves.
-+ *
-+ * Since STAC/CLAC are OPL-0 only, this is all irrelevant for VDSO builds
-+ * (and the generated symbol reference will in fact cause link failures).
-+ */
-+#define AC_SAFE(func) \
-+	static void __used __section(.discard.ac_safe) \
-+		*__func_ac_safe_##func = func
-+
-+#else
-+#define AC_SAFE(func)
-+#endif
-+
- #endif /* _LINUX_FRAME_H */
-diff --git a/tools/objtool/arch.h b/tools/objtool/arch.h
-index b0d7dc3d71b5..48327099466d 100644
---- a/tools/objtool/arch.h
-+++ b/tools/objtool/arch.h
-@@ -33,7 +33,9 @@
- #define INSN_STACK		8
- #define INSN_BUG		9
- #define INSN_NOP		10
--#define INSN_OTHER		11
-+#define INSN_STAC		11
-+#define INSN_CLAC		12
-+#define INSN_OTHER		13
- #define INSN_LAST		INSN_OTHER
- 
- enum op_dest_type {
-diff --git a/tools/objtool/arch/x86/decode.c b/tools/objtool/arch/x86/decode.c
-index 540a209b78ab..d1e99d1460a5 100644
---- a/tools/objtool/arch/x86/decode.c
-+++ b/tools/objtool/arch/x86/decode.c
-@@ -369,7 +369,19 @@ int arch_decode_instruction(struct elf *elf, struct section *sec,
- 
- 	case 0x0f:
- 
--		if (op2 >= 0x80 && op2 <= 0x8f) {
-+		if (op2 == 0x01) {
-+
-+			if (modrm == 0xca) {
-+
-+				*type = INSN_CLAC;
-+
-+			} else if (modrm == 0xcb) {
-+
-+				*type = INSN_STAC;
-+
-+			}
-+
-+		} else if (op2 >= 0x80 && op2 <= 0x8f) {
- 
- 			*type = INSN_JUMP_CONDITIONAL;
- 
-diff --git a/tools/objtool/check.c b/tools/objtool/check.c
-index 0414a0d52262..01852602ca31 100644
---- a/tools/objtool/check.c
-+++ b/tools/objtool/check.c
-@@ -127,6 +127,24 @@ static bool ignore_func(struct objtool_file *file, struct symbol *func)
- 	return false;
- }
- 
-+static bool ac_safe_func(struct objtool_file *file, struct symbol *func)
-+{
-+	struct rela *rela;
-+
-+	/* check for AC_SAFE */
-+	if (file->ac_safe && file->ac_safe->rela)
-+		list_for_each_entry(rela, &file->ac_safe->rela->rela_list, list) {
-+			if (rela->sym->type == STT_SECTION &&
-+			    rela->sym->sec == func->sec &&
-+			    rela->addend == func->offset)
-+				return true;
-+			if (/* rela->sym->type == STT_FUNC && */ rela->sym == func)
-+				return true;
-+		}
-+
-+	return false;
-+}
-+
- /*
-  * This checks to see if the given function is a "noreturn" function.
-  *
-@@ -439,6 +457,8 @@ static void add_ignores(struct objtool_file *file)
- 
- 	for_each_sec(file, sec) {
- 		list_for_each_entry(func, &sec->symbol_list, list) {
-+			func->ac_safe = ac_safe_func(file, func);
-+
- 			if (func->type != STT_FUNC)
- 				continue;
- 
-@@ -1902,6 +1922,11 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
- 		switch (insn->type) {
- 
- 		case INSN_RETURN:
-+			if (state.ac) {
-+				WARN_FUNC("return with AC set", sec, insn->offset);
-+				return 1;
-+			}
-+
- 			if (func && has_modified_stack_frame(&state)) {
- 				WARN_FUNC("return with modified stack frame",
- 					  sec, insn->offset);
-@@ -1917,6 +1942,12 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
- 			return 0;
- 
- 		case INSN_CALL:
-+			if ((state.ac_safe || state.ac) && !insn->call_dest->ac_safe) {
-+				WARN_FUNC("call to %s() with AC set", sec, insn->offset,
-+						insn->call_dest->name);
-+				return 1;
-+			}
-+
- 			if (is_fentry_call(insn))
- 				break;
- 
-@@ -1928,6 +1959,11 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
- 
- 			/* fallthrough */
- 		case INSN_CALL_DYNAMIC:
-+			if ((state.ac_safe || state.ac) && !insn->call_dest->ac_safe) {
-+				WARN_FUNC("call to %s() with AC set", sec, insn->offset,
-+						insn->call_dest->name);
-+				return 1;
-+			}
- 			if (!no_fp && func && !has_valid_stack_frame(&state)) {
- 				WARN_FUNC("call without frame pointer save/setup",
- 					  sec, insn->offset);
-@@ -1980,6 +2016,26 @@ static int validate_branch(struct objtool_file *file, struct instruction *first,
- 
- 			break;
- 
-+		case INSN_STAC:
-+			if (state.ac_safe || state.ac) {
-+				WARN_FUNC("recursive STAC", sec, insn->offset);
-+				return 1;
-+			}
-+			state.ac = true;
-+			break;
-+
-+		case INSN_CLAC:
-+			if (!state.ac) {
-+				WARN_FUNC("redundant CLAC", sec, insn->offset);
-+				return 1;
-+			}
-+			if (state.ac_safe) {
-+				WARN_FUNC("AC-safe clears AC", sec, insn->offset);
-+				return 1;
-+			}
-+			state.ac = false;
-+			break;
-+
- 		default:
- 			break;
- 		}
-@@ -2141,6 +2197,8 @@ static int validate_functions(struct objtool_file *file)
- 			if (!insn || insn->ignore)
- 				continue;
- 
-+			state.ac_safe = func->ac_safe;
-+
- 			ret = validate_branch(file, insn, state);
- 			warnings += ret;
- 		}
-@@ -2198,6 +2256,7 @@ int check(const char *_objname, bool orc)
- 	INIT_LIST_HEAD(&file.insn_list);
- 	hash_init(file.insn_hash);
- 	file.whitelist = find_section_by_name(file.elf, ".discard.func_stack_frame_non_standard");
-+	file.ac_safe = find_section_by_name(file.elf, ".discard.ac_safe");
- 	file.c_file = find_section_by_name(file.elf, ".comment");
- 	file.ignore_unreachables = no_unreachable;
- 	file.hints = false;
-diff --git a/tools/objtool/check.h b/tools/objtool/check.h
-index e6e8a655b556..c31ec3ca78f3 100644
---- a/tools/objtool/check.h
-+++ b/tools/objtool/check.h
-@@ -31,7 +31,7 @@ struct insn_state {
- 	int stack_size;
- 	unsigned char type;
- 	bool bp_scratch;
--	bool drap, end;
-+	bool drap, end, ac, ac_safe;
- 	int drap_reg, drap_offset;
- 	struct cfi_reg vals[CFI_NUM_REGS];
- };
-@@ -61,6 +61,7 @@ struct objtool_file {
- 	struct list_head insn_list;
- 	DECLARE_HASHTABLE(insn_hash, 16);
- 	struct section *whitelist;
-+	struct section *ac_safe;
- 	bool ignore_unreachables, c_file, hints, rodata;
- };
- 
-diff --git a/tools/objtool/elf.h b/tools/objtool/elf.h
-index bc97ed86b9cd..064c3df31e40 100644
---- a/tools/objtool/elf.h
-+++ b/tools/objtool/elf.h
-@@ -62,6 +62,7 @@ struct symbol {
- 	unsigned long offset;
- 	unsigned int len;
- 	struct symbol *pfunc, *cfunc;
-+	bool ac_safe;
- };
- 
- struct rela {
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGksDQoNCiDCoCBEbyB5b3UgaGF2ZSBhbnkgZmVlZGJhY2sgZm9yIHRoaXM/DQoNCkJlc3QgcmVn
+YXJkcywNCg0KS2h1b25nIERpbmgNCg0KT24gMS8yOS8yMDE5IDU6NTYgUE0sIEtodW9uZyBEaW5o
+IHdyb3RlOg0KPiBUaGlzIHBhdGNoIHVwZGF0ZXMgYWxsIEFQTSBlbWFpbCBhZGRyZXNzZXMgdG8g
+QW1wZXJlIG5ldyBlbWFpbA0KPiBhZGRyZXNzZXMuDQo+DQo+IFNpZ25lZC1vZmYtYnk6IEtodW9u
+ZyBEaW5oIDxraHVvbmdAb3MuYW1wZXJlY29tcHV0aW5nLmNvbT4NCj4gLS0tDQo+IHYyOg0KPiAg
+IC0gVXBkYXRlIG5ldyBkb21haW4gZW1haWwgYWRkcmVzcw0KPiB2MToNCj4gICAtIEluaXRpYWwg
+dmVyc2lvbg0KPiAtLS0NCj4gICBNQUlOVEFJTkVSUyB8IDIyICsrKysrKysrKysrLS0tLS0tLS0t
+LS0NCj4gICAxIGZpbGUgY2hhbmdlZCwgMTEgaW5zZXJ0aW9ucygrKSwgMTEgZGVsZXRpb25zKC0p
+DQo+DQo+IGRpZmYgLS1naXQgYS9NQUlOVEFJTkVSUyBiL01BSU5UQUlORVJTDQo+IGluZGV4IDZj
+MjdjZDcuLjFjZjA4MDEgMTAwNjQ0DQo+IC0tLSBhL01BSU5UQUlORVJTDQo+ICsrKyBiL01BSU5U
+QUlORVJTDQo+IEBAIC0xMDM2LDI2ICsxMDM2LDI2IEBAIEY6CWRyaXZlcnMvbmV0L2FwcGxldGFs
+ay8NCj4gICBGOgluZXQvYXBwbGV0YWxrLw0KPiAgIA0KPiAgIEFQUExJRUQgTUlDUk8gKEFQTSkg
+WC1HRU5FIERFVklDRSBUUkVFIFNVUFBPUlQNCj4gLU06CUR1YyBEYW5nIDxkaGRhbmdAYXBtLmNv
+bT4NCj4gK006CUtodW9uZyBEaW5oIDxraHVvbmdAb3MuYW1wZXJlY29tcHV0aW5nLmNvbT4NCj4g
+ICBTOglTdXBwb3J0ZWQNCj4gICBGOglhcmNoL2FybTY0L2Jvb3QvZHRzL2FwbS8NCj4gICANCj4g
+ICBBUFBMSUVEIE1JQ1JPIChBUE0pIFgtR0VORSBTT0MgRURBQw0KPiAtTToJTG9jIEhvIDxsaG9A
+YXBtLmNvbT4NCj4gK006CUtodW9uZyBEaW5oIDxraHVvbmdAb3MuYW1wZXJlY29tcHV0aW5nLmNv
+bT4NCj4gICBTOglTdXBwb3J0ZWQNCj4gICBGOglkcml2ZXJzL2VkYWMveGdlbmVfZWRhYy5jDQo+
+ICAgRjoJRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2VkYWMvYXBtLXhnZW5lLWVk
+YWMudHh0DQo+ICAgDQo+ICAgQVBQTElFRCBNSUNSTyAoQVBNKSBYLUdFTkUgU09DIEVUSEVSTkVU
+IChWMikgRFJJVkVSDQo+IC1NOglJeWFwcGFuIFN1YnJhbWFuaWFuIDxpc3VicmFtYW5pYW5AYXBt
+LmNvbT4NCj4gLU06CUtleXVyIENodWRnYXIgPGtjaHVkZ2FyQGFwbS5jb20+DQo+ICtNOglJeWFw
+cGFuIFN1YnJhbWFuaWFuIDxpeWFwcGFuQG9zLmFtcGVyZWNvbXB1dGluZy5jb20+DQo+ICtNOglL
+ZXl1ciBDaHVkZ2FyIDxrZXl1ckBvcy5hbXBlcmVjb21wdXRpbmcuY29tPg0KPiAgIFM6CVN1cHBv
+cnRlZA0KPiAgIEY6CWRyaXZlcnMvbmV0L2V0aGVybmV0L2FwbS94Z2VuZS12Mi8NCj4gICANCj4g
+ICBBUFBMSUVEIE1JQ1JPIChBUE0pIFgtR0VORSBTT0MgRVRIRVJORVQgRFJJVkVSDQo+IC1NOglJ
+eWFwcGFuIFN1YnJhbWFuaWFuIDxpc3VicmFtYW5pYW5AYXBtLmNvbT4NCj4gLU06CUtleXVyIENo
+dWRnYXIgPGtjaHVkZ2FyQGFwbS5jb20+DQo+IC1NOglRdWFuIE5ndXllbiA8cW5ndXllbkBhcG0u
+Y29tPg0KPiArTToJSXlhcHBhbiBTdWJyYW1hbmlhbiA8aXlhcHBhbkBvcy5hbXBlcmVjb21wdXRp
+bmcuY29tPg0KPiArTToJS2V5dXIgQ2h1ZGdhciA8a2V5dXJAb3MuYW1wZXJlY29tcHV0aW5nLmNv
+bT4NCj4gK006CVF1YW4gTmd1eWVuIDxxdWFuQG9zLmFtcGVyZWNvbXB1dGluZy5jb20+DQo+ICAg
+UzoJU3VwcG9ydGVkDQo+ICAgRjoJZHJpdmVycy9uZXQvZXRoZXJuZXQvYXBtL3hnZW5lLw0KPiAg
+IEY6CWRyaXZlcnMvbmV0L3BoeS9tZGlvLXhnZW5lLmMNCj4gQEAgLTEwNjMsNyArMTA2Myw3IEBA
+IEY6CURvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9uZXQvYXBtLXhnZW5lLWVuZXQu
+dHh0DQo+ICAgRjoJRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL25ldC9hcG0teGdl
+bmUtbWRpby50eHQNCj4gICANCj4gICBBUFBMSUVEIE1JQ1JPIChBUE0pIFgtR0VORSBTT0MgUE1V
+DQo+IC1NOglUYWkgTmd1eWVuIDx0dG5ndXllbkBhcG0uY29tPg0KPiArTToJS2h1b25nIERpbmgg
+PGtodW9uZ0Bvcy5hbXBlcmVjb21wdXRpbmcuY29tPg0KPiAgIFM6CVN1cHBvcnRlZA0KPiAgIEY6
+CWRyaXZlcnMvcGVyZi94Z2VuZV9wbXUuYw0KPiAgIEY6CURvY3VtZW50YXRpb24vcGVyZi94Z2Vu
+ZS1wbXUudHh0DQo+IEBAIC0xMTYzOSw3ICsxMTYzOSw3IEBAIEY6CURvY3VtZW50YXRpb24vZGV2
+aWNldHJlZS9iaW5kaW5ncy9wY2kvYWx0ZXJhLXBjaWUudHh0DQo+ICAgRjoJZHJpdmVycy9wY2kv
+Y29udHJvbGxlci9wY2llLWFsdGVyYS5jDQo+ICAgDQo+ICAgUENJIERSSVZFUiBGT1IgQVBQTElF
+RE1JQ1JPIFhHRU5FDQo+IC1NOglUYW5tYXkgSW5hbWRhciA8dGluYW1kYXJAYXBtLmNvbT4NCj4g
+K006CVRvYW4gTGUgPHRvYW5Ab3MuYW1wZXJlY29tcHV0aW5nLmNvbT4NCj4gICBMOglsaW51eC1w
+Y2lAdmdlci5rZXJuZWwub3JnDQo+ICAgTDoJbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRl
+YWQub3JnDQo+ICAgUzoJTWFpbnRhaW5lZA0KPiBAQCAtMTE4MTcsNyArMTE4MTcsNyBAQCBGOglE
+b2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2FsdGVyYS1wY2llLW1zaS50eHQN
+Cj4gICBGOglkcml2ZXJzL3BjaS9jb250cm9sbGVyL3BjaWUtYWx0ZXJhLW1zaS5jDQo+ICAgDQo+
+ICAgUENJIE1TSSBEUklWRVIgRk9SIEFQUExJRURNSUNSTyBYR0VORQ0KPiAtTToJRHVjIERhbmcg
+PGRoZGFuZ0BhcG0uY29tPg0KPiArTToJVG9hbiBMZSA8dG9hbkBvcy5hbXBlcmVjb21wdXRpbmcu
+Y29tPg0KPiAgIEw6CWxpbnV4LXBjaUB2Z2VyLmtlcm5lbC5vcmcNCj4gICBMOglsaW51eC1hcm0t
+a2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcNCj4gICBTOglNYWludGFpbmVkDQo+IEBAIC0xNDc2
+Myw3ICsxNDc2Myw3IEBAIFM6CU1haW50YWluZWQNCj4gICBGOglkcml2ZXJzL3R0eS9zZXJpYWwv
+ODI1MC84MjUwX2R3LmMNCj4gICANCj4gICBTWU5PUFNZUyBERVNJR05XQVJFIEFQQiBHUElPIERS
+SVZFUg0KPiAtTToJSG9hbiBUcmFuIDxob3RyYW5AYXBtLmNvbT4NCj4gK006CUhvYW4gVHJhbiA8
+aG9hbkBvcy5hbXBlcmVjb21wdXRpbmcuY29tPg0KPiAgIEw6CWxpbnV4LWdwaW9Admdlci5rZXJu
+ZWwub3JnDQo+ICAgUzoJTWFpbnRhaW5lZA0KPiAgIEY6CWRyaXZlcnMvZ3Bpby9ncGlvLWR3YXBi
+LmMNCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4
+LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFk
+Lm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFy
+bS1rZXJuZWwK
