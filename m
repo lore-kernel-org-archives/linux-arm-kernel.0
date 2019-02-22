@@ -2,64 +2,60 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3626C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:19:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 251F6C10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:26:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A150F20700
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:19:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E4C7220700
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:26:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VNNzHmIj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A150F20700
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jNTsZh0B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4C7220700
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zEUaTaZZYttto74nvlb5UC3SuvP04JODDBNLd8cErzA=; b=VNNzHmIjrMKHgU
-	mxxFNSVcjIr5xVvU4gapk1kcoqPvCBLYguCADk0ofxw17IL+338IvczhgEi0cXqM1MbMzGMjpeBrz
-	OqAAVQeowz2doq7XHOxswdfEhr5NGcekcY1MF76Ew7YVLdOKpZh1SKs7qAI3yKa2RS7PCWYXMEcGZ
-	ILTEjEkwrogyo0mfEwi7hLAyCYjbcDC+pBWmxD6ufp3hhT99MoIwIe2Uo206/cE0qKD/QyLTXOSZa
-	gWirZJBKBbwCBvr0l6BmB63/weO+Y1dW5+I1uq7h5R/JgSIIekHZ0mkAOq4UmpAn/P4TjPuLyyhTt
-	mGgOxdouSgngbJAVADpg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=NWV+E9oTX9yrQloOWHw4p7MiQDmKouzOcA/T7kE3sHY=; b=jNTsZh0Bh+RRsA
+	9R1o5sd7bMY3ciWQCx08xd6dDP44D6WZ7s0MvH1hASsztBfz9ozyV3TpyCh6m05EQCAXrUqoeMjAR
+	TcfiS31nK7Bi/Ta+e0+VumEyTVms9zK1FrUKfTQ0IGWSE8Pe42RH2/XEvxP6kMk/eaxr3W991WX5C
+	uAGPkQsPHmEsIRu4NrcXLwGT3oP+e1us1otvBbGQMgl1qzfpnOqJl3gHHLXItgaDp4upWgzLcCdQr
+	crUwozM/57k1LtQeSDyYRtpbaGvheinr4HwbJ+9tUnN0Ct7/EGMjxbiKrCehnqVN1BfK7YkALoxbg
+	PMgSPU8KaMofK3HhTJOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx6yw-0001rW-Bl; Fri, 22 Feb 2019 09:18:58 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx6yt-0001qy-F5
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:18:56 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 03AD880D;
- Fri, 22 Feb 2019 01:18:54 -0800 (PST)
-Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7F00C3F703;
- Fri, 22 Feb 2019 01:18:52 -0800 (PST)
-Date: Fri, 22 Feb 2019 09:18:48 +0000
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Julien Grall <Julien.Grall@arm.com>
-Subject: Re: [PATCH 06/14] KVM: arm/arm64: Factor out VMID into struct kvm_vmid
-Message-ID: <20190222091848.21f7f8e6@why.wild-wind.fr.eu.org>
-In-Reply-To: <1978ee57-c7bd-e55a-4e77-ad0b4b62d1d1@arm.com>
-References: <20190124140032.8588-1-christoffer.dall@arm.com>
- <20190124140032.8588-7-christoffer.dall@arm.com>
- <1978ee57-c7bd-e55a-4e77-ad0b4b62d1d1@arm.com>
-Organization: ARM Ltd
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
+	id 1gx75h-0005I4-U0; Fri, 22 Feb 2019 09:25:57 +0000
+Received: from esa6.microchip.iphmx.com ([216.71.154.253])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx75e-0005Gx-WD
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:25:56 +0000
+X-IronPort-AV: E=Sophos;i="5.58,399,1544511600"; d="scan'208";a="24284338"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa6.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 22 Feb 2019 02:25:52 -0700
+Received: from M43218.corp.atmel.com (10.10.76.4) by
+ chn-sv-exch03.mchp-main.com (10.10.76.49) with Microsoft SMTP Server id
+ 14.3.352.0; Fri, 22 Feb 2019 02:25:46 -0700
+From: Ludovic Desroches <ludovic.desroches@microchip.com>
+To: <linux-i2c@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH v5 0/3] i2c: at91: slave mode support
+Date: Fri, 22 Feb 2019 10:25:19 +0100
+Message-ID: <20190222092522.4913-1-ludovic.desroches@microchip.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_011855_512983_1AFFFB65 
-X-CRM114-Status: GOOD (  15.10  )
+X-CRM114-CacheID: sfid-20190222_012555_075716_6D49E0BB 
+X-CRM114-Status: GOOD (  14.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,60 +67,131 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "kvm@vger.kernel.org" <kvm@vger.kernel.org>, nd <nd@arm.com>,
- Christoffer Dall <Christoffer.Dall@arm.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "kvmarm@lists.cs.columbia.edu" <kvmarm@lists.cs.columbia.edu>
+Cc: alexandre.belloni@bootlin.com, wsa@the-dreams.de, me@jue.yt,
+ linux-kernel@vger.kernel.org,
+ Ludovic Desroches <ludovic.desroches@microchip.com>,
+ andriy.shevchenko@linux.intel.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 11:02:56 +0000
-Julien Grall <Julien.Grall@arm.com> wrote:
+[Ludovic Desroches: see Changes section]
 
-Hi Julien,
+Based on the discussion we had on the i2c-linux list [1], I wrote a patch for
+AT91 hardware and tried to fulfill the Linux I2C slave interface description
+[2] as good as possible. This enables aforementioned hardware to act as an I2C
+slave that can be accessed by a remote I2C master.
 
-> Hi Christoffer,
-> 
-> On 24/01/2019 14:00, Christoffer Dall wrote:
-> > Note that to avoid mapping the kvm_vmid_bits variable into hyp, we
-> > simply forego the masking of the vmid value in kvm_get_vttbr and rely on
-> > update_vmid to always assign a valid vmid value (within the supported
-> > range).  
-> 
-> [...]
-> 
-> > -	kvm->arch.vmid = kvm_next_vmid;
-> > +	vmid->vmid = kvm_next_vmid;
-> >   	kvm_next_vmid++;
-> > -	kvm_next_vmid &= (1 << kvm_vmid_bits) - 1;
-> > -
-> > -	/* update vttbr to be used with the new vmid */
-> > -	pgd_phys = virt_to_phys(kvm->arch.pgd);
-> > -	BUG_ON(pgd_phys & ~kvm_vttbr_baddr_mask(kvm));
-> > -	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
-> > -	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid | cnp;
-> > +	kvm_next_vmid &= (1 << kvm_get_vmid_bits()) - 1;  
-> 
-> The arm64 version of kvm_get_vmid_bits does not look cheap. Indeed it required 
-> to read the sanitized value of SYS_ID_AA64MMFR1_EL1 that is implemented using 
-> the function bsearch.
-> 
-> So wouldn't it be better to keep kvm_vmid_bits variable for use in update_vttbr()?
+I have tested this patchset successfully on an ATSAMA5D27.
 
-How often does this happen? Can you measure this overhead at all?
+                                 ^  3.3V   ^  3.3V
+    +-----------------------+    |         |         +-----------------------+
+    | Slave: ATSAMA5D27     |   +-+       +-+        | Master: ATSAMA5D35    |
+    | with i2c-slave-eeprom |   | | 100k  | | 100k   | with i2cset           |
+    +-------------------+-+-+   +-+       +-+        +-+-+-------------------+
+                        | |      |         |           | |
+                        | +------+---------|---(SDA)---+ |
+                        +------------------+---(SCL)-----+
 
-My understanding is that we hit this path on rollover only, having IPIed
-all CPUs and invalidated all TLBs. I seriously doubt you can observe
-any sort of overhead at all, given that it is so incredibly rare. But
-feel free to prove me wrong!
+    Schematic: Connection of slave and master with 100kOhm pullup resistors.
 
-Thanks,
+On the master the following BASH script has been used to stress the slave.
 
-	M.
+        root@emblinux:~# cat ./stress.sh
+        #!/bin/bash
+        I=0
+        while true
+        do
+                if i2cset -y -r 1 0x64 0 $I w | grep mismatch
+                then
+                        echo "$(date): Error in transmission ${I}"
+                fi
+                ((I++))
+                if [ $I -eq 65536 ]
+                then
+                        I=0
+                        echo "$(date): Sent 65536 transmissions"
+                fi
+        done
+
+After running the script for some time I had the following output. To me this
+looks promising :)
+
+        root@emblinux:~# ./stress.sh
+        Thu Nov  9 13:58:45 CTE 2017: Sent 65536 transmissions
+        Thu Nov  9 14:35:20 CTE 2017: Sent 65536 transmissions
+        Thu Nov  9 15:12:11 CTE 2017: Sent 65536 transmissions
+        Thu Nov  9 15:49:04 CTE 2017: Sent 65536 transmissions
+        Thu Nov  9 16:26:00 CTE 2017: Sent 65536 transmissions
+        Thu Nov  9 17:03:07 UTC 2017: Sent 65536 transmissions
+        Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
+
+        If you have some hardware with an at91-i2c interface included at hand, I really
+        would appreciate if you can run the test script on your hardware and test this
+        driver.
+        Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
+
+        If you have some hardware with an at91-i2c interface included at hand, I really
+        would appreciate if you can run the test script on your hardware and test this
+        driver.
+
+Best regards
+  Juergen
+
+
+[Ludovic Desroches]
+Changes in v5:
+ - use SPDX for licence
+ - replace IF_ENABLED par defined to solve compilation issue when
+   selected as module.
+Changes in v4:
+ - rebased on next-20181224
+ - update Kconfig part to state that this feature is experimental.
+ - tested quickly on a single board, SAMA5D2 Xplained, i2c-gpio as master, OK.
+Changes in v3:
+ - rebase (cherry-pick was enough)
+ - fix checkpatch errors
+ - tests:
+   - hangs with a SAMA5D4 (master and slave on different busses) after about
+   100 transfers. It's the first time I do this test.
+   - some mismatches with a SAMA5D4 as slave and a SAMA5D2 as master
+   I don't know if it's a regression. I don't remember having seen this
+   behavior previously.
+   I think it's worth taking those patches even if there are some possible
+   bugs. It'll allow to get more people using it and so to consolidate the
+   slave mode support.
+
+Changes in v2:
+ - Implemented all suggestions made by Ludovic. (Thank you!)
+ - Reworked the IRQ handler completely. Have a look in patch 3 fort further
+   details.
+
+[1] https://marc.info/?t=150824004800001&r=1&w=1
+[2] https://www.kernel.org/doc/Documentation/i2c/slave-interface
+
+Juergen Fitschen (3):
+  i2c: at91: segregate master mode specific code from probe and init
+    func
+  i2c: at91: split driver into core and master file
+  i2c: at91: added slave mode support
+
+ MAINTAINERS                                   |   3 +-
+ drivers/i2c/busses/Kconfig                    |  13 +
+ drivers/i2c/busses/Makefile                   |   4 +
+ drivers/i2c/busses/i2c-at91-core.c            | 376 ++++++++++++++
+ .../busses/{i2c-at91.c => i2c-at91-master.c}  | 459 +-----------------
+ drivers/i2c/busses/i2c-at91-slave.c           | 143 ++++++
+ drivers/i2c/busses/i2c-at91.h                 | 175 +++++++
+ 7 files changed, 721 insertions(+), 452 deletions(-)
+ create mode 100644 drivers/i2c/busses/i2c-at91-core.c
+ rename drivers/i2c/busses/{i2c-at91.c => i2c-at91-master.c} (66%)
+ create mode 100644 drivers/i2c/busses/i2c-at91-slave.c
+ create mode 100644 drivers/i2c/busses/i2c-at91.h
+
 -- 
-Without deviation from the norm, progress is not possible.
+2.20.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
