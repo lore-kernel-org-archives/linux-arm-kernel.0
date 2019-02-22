@@ -2,21 +2,21 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7BE24C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:34:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E0C18C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:42:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3CF6E206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:34:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AF3632075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:42:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lXQoPcA2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3CF6E206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZCB6+Au6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AF3632075C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,41 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f6Oin1l++58qAGi7SMFcEY1Evpvq3Ok1E7mlRs37bBU=; b=lXQoPcA2KJXOYs
-	mSGbI8NNqGEJLmeY6iOWB+MN3a0NnRQWmnT1NEpnwVoSrBhfG2y30eQsl7Z8phR7mJ1J3MSjsBHwU
-	FPJY0PEmGkSNOsUcDLADZ0Qfbhqn7InaxTfeXuaBbjRSPTdanfgliqQ0h176JeUkf38fb5NHsXLWq
-	95YJbwrrR4G49c0KPnKXQvR/7CtwTKgw9m9J9DWj3hej4Vvly/FsOsvVUDIn0czUUJhp4h00ElEv0
-	+JPvQWvPVEFDRTZQUL46E0gLDwKWxusvbrXx7hGpr7SGua0svMZH6BIRAHTHZZf0UvHFpiQzXcErA
-	QxCpFLURMh2162J2lKwQ==;
+	List-Owner; bh=T8XWqXAIyXVfF8fYsqmOboZA+54FkZ7FD/14giDXYwE=; b=ZCB6+Au6zS9K5J
+	3w6AOoZm3Wnic52ADX9fhPAIexNVmlkaXSXySxGtEEYGgwOumGRMDFbtMF59/S23qyIr8/lMcRYV1
+	FpH+woZLUABTDgx1rdL9TsZCB1o7dTvLltxgtoy7DxgHwyzNXQLDjP43MoGBS4yhBqfAxO/zfEtEa
+	S9LjS9aF4DYJL07cr3VQTAylafiVPu8zQprAts3Y4sryyHhYhAbra95PjED4DUE+WL35tRTPUfGru
+	vG8wq1mYLQqCZp8dYAGbhFwswilOHHgJy6X2dFFx5E/sy15dtCA0dZ8DjI3KhePhuOLjDs0pkAZu9
+	5RCOYfCgasgmmJQyt9Ng==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxAyH-0007s9-Ad; Fri, 22 Feb 2019 13:34:33 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gxB5v-0002SH-Vu; Fri, 22 Feb 2019 13:42:27 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxAyD-0007re-7p
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 13:34:30 +0000
+ id 1gxB5t-0002RM-32
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 13:42:26 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 71177A78;
- Fri, 22 Feb 2019 05:34:28 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 92274A78;
+ Fri, 22 Feb 2019 05:42:24 -0800 (PST)
 Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C45893F690;
- Fri, 22 Feb 2019 05:34:25 -0800 (PST)
-Date: Fri, 22 Feb 2019 13:34:23 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E30EE3F690;
+ Fri, 22 Feb 2019 05:42:21 -0800 (PST)
+Date: Fri, 22 Feb 2019 13:42:19 +0000
 From: Mark Rutland <mark.rutland@arm.com>
 To: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Subject: Re: [PATCH v5 02/23] kernel: Define gettimeofday vdso common code
-Message-ID: <20190222133423.GG42419@lakrids.cambridge.arm.com>
+Subject: Re: [PATCH v5 04/23] arm64: Substitute gettimeofday with C
+ implementation
+Message-ID: <20190222134219.GH42419@lakrids.cambridge.arm.com>
 References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
- <20190222122430.21180-3-vincenzo.frascino@arm.com>
+ <20190222122430.21180-5-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190222122430.21180-3-vincenzo.frascino@arm.com>
+In-Reply-To: <20190222122430.21180-5-vincenzo.frascino@arm.com>
 User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_053429_292364_580EA1E3 
-X-CRM114-Status: GOOD (  27.51  )
+X-CRM114-CacheID: sfid-20190222_054225_134215_952A5A6A 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -85,175 +85,50 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 12:24:09PM +0000, Vincenzo Frascino wrote:
-> In the last few years we assisted to an explosion of vdso
-> implementations that mostly share similar code.
-> 
-> Try to unify the gettimeofday vdso implementation introducing
-> lib/vdso. The code contained in this library can ideally be
-> reused by all the architectures avoiding, where possible, code
-> duplication.
-> 
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
-> ---
->  include/vdso/datapage.h |   1 +
->  include/vdso/helpers.h  |  52 ++++++++++++
->  include/vdso/types.h    |  39 +++++++++
->  lib/Kconfig             |   5 ++
->  lib/vdso/Kconfig        |  37 +++++++++
->  lib/vdso/Makefile       |  22 +++++
->  lib/vdso/gettimeofday.c | 175 ++++++++++++++++++++++++++++++++++++++++
->  7 files changed, 331 insertions(+)
->  create mode 100644 include/vdso/helpers.h
->  create mode 100644 include/vdso/types.h
->  create mode 100644 lib/vdso/Kconfig
->  create mode 100644 lib/vdso/Makefile
->  create mode 100644 lib/vdso/gettimeofday.c
-> 
-> diff --git a/include/vdso/datapage.h b/include/vdso/datapage.h
-> index da346ad02b03..ff332fcba73c 100644
-> --- a/include/vdso/datapage.h
-> +++ b/include/vdso/datapage.h
-> @@ -9,6 +9,7 @@
->  #include <linux/bits.h>
->  #include <linux/types.h>
->  #include <linux/time.h>
-> +#include <vdso/types.h>
+On Fri, Feb 22, 2019 at 12:24:11PM +0000, Vincenzo Frascino wrote:
+> diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+> index 8cd4707f832a..c904b2a9b255 100644
+> --- a/arch/arm64/kernel/vdso/Makefile
+> +++ b/arch/arm64/kernel/vdso/Makefile
+> @@ -6,16 +6,31 @@
+>  # Heavily based on the vDSO Makefiles for other archs.
+>  #
 >  
->  #define VDSO_BASES	(CLOCK_TAI + 1)
->  #define VDSO_HRES	(BIT(CLOCK_REALTIME)		| \
-> diff --git a/include/vdso/helpers.h b/include/vdso/helpers.h
-> new file mode 100644
-> index 000000000000..511dea979f6b
-> --- /dev/null
-> +++ b/include/vdso/helpers.h
-> @@ -0,0 +1,52 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +#ifndef __VDSO_HELPERS_H
-> +#define __VDSO_HELPERS_H
+> -obj-vdso := gettimeofday.o note.o sigreturn.o
+> +# Absolute relocation type $(ARCH_REL_TYPE_ABS) needs to be defined before
+> +# the inclusion of generic Makefile.
+> +ARCH_REL_TYPE_ABS := R_AARCH64_JUMP_SLOT|R_AARCH64_GLOB_DAT|R_AARCH64_ABS64
+> +include $(srctree)/lib/vdso/Makefile
 > +
-> +#ifdef __KERNEL__
-
-Nit: __KERNEL__ guards can go.
-
+> +obj-vdso := vgettimeofday.o note.o sigreturn.o
+>  
+>  # Build rules
+>  targets := $(obj-vdso) vdso.so vdso.so.dbg
+>  obj-vdso := $(addprefix $(obj)/, $(obj-vdso))
+>  
+> -ccflags-y := -shared -fno-common -fno-builtin -ffixed-x18
+> +ccflags-y := -shared -fno-common -fno-builtin -ffixed-x18 -fno-stack-protector
+> +ccflags-y += -DDISABLE_BRANCH_PROFILING
+>  ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+>  		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+>  
+> +VDSO_LDFLAGS := -Bsymbolic
 > +
-> +#ifndef __ASSEMBLY__
-> +
-> +#include <vdso/datapage.h>
-> +
-> +static __always_inline notrace u32 vdso_read_begin(const struct vdso_data *vd)
+> +CFLAGS_REMOVE_vgettimeofday.o = -pg -Os
 
-Rather than explicitly annotating all functions with notrace, can't we
-disable instrumentation for all C files used for the vDSO using compiler
-flags?
+Please use CC_FLAGS_FTRACE rather than '-pg'
 
-That would be more robust, and make the code less noisy to read.
+What said, wouldn't it be better to come up with the VDSO cflags
+entirely separately from what the main kernel uses?
 
-> +{
-> +	u32 seq;
-> +
-> +repeat:
-> +	seq = READ_ONCE(vd->seq);
-> +	if (seq & 1) {
-> +		cpu_relax();
-> +		goto repeat;
-> +	}
-> +
-> +	smp_rmb();
-> +	return seq;
-> +}
+That way we're unlikely to have any surprises in future with
+instrumentation etc.
 
-You could simplify the repeat loop as:
+I strongly suspect you need to disable more things here, e.g. UBSAN,
+KASAN, KCOV. Have you tried compiling a kernel with those features
+enabled?
 
-	while ((seq = READ_ONCE(vd->seq)) & 1)
-		cpu_relax();
-
-> +
-> +static __always_inline notrace u32 vdso_read_retry(const struct vdso_data *vd,
-> +						   u32 start)
-> +{
-> +	u32 seq;
-> +
-> +	smp_rmb();
-> +	seq = READ_ONCE(vd->seq);
-> +	return seq != start;
-> +}
-> +
-> +static __always_inline notrace void vdso_write_begin(struct vdso_data *vd)
-> +{
-> +	++vd->seq;
-> +	smp_wmb();
-> +}
-> +
-> +static __always_inline notrace void vdso_write_end(struct vdso_data *vd)
-> +{
-> +	smp_wmb();
-> +	++vd->seq;
-> +}
-
-I realise this is what existing vDSO update code does, but I do think
-that these should be using WRITE_ONCE() to perform the update, to ensure
-that the write is not torn.
-
-e.g. these should be:
-
-static __always_inline notrace void vdso_write_begin(struct vdso_data *vd)
-{
-	WRITE_ONCE(vd->seq, vd->seq + 1);
-	smp_wmb();
-}
-
-static __always_inline notrace void vdso_write_end(struct vdso_data *vd)
-{
-	smp_wmb();
-	WRITE_ONCE(vd->seq, vd->seq + 1);
-}
-
-Otherwise, the compiler can validly tear updates to vd->seq, and there's
-the possibility that a reader sees an inconsistent value for vd->seq,
-and consequently uses inconsistent data read from the vdso data page.
-
-[...]
-
-> +#include <linux/types.h>
-> +#include <linux/time.h>
-
-Nit: please order headers alphabetically>
-
-> +
-> +/*
-> + * The definitions below are required to overcome the limitations
-> + * of time_t on 32 bit architectures, which overflows in 2038.
-> + * The new code should use the replacements based on time64_t and
-> + * timespec64.
-> + *
-> + * The abstraction below will be updated once the migration to
-> + * time64_t is complete.
-> + */
-> +#ifdef CONFIG_GENERIC_VDSO_32
-> +#define __vdso_timespec		old_timespec32
-> +#define __vdso_timeval		old_timeval32
-> +#else
-> +#ifdef ENABLE_COMPAT_VDSO
-> +#define __vdso_timespec		old_timespec32
-> +#define __vdso_timeval		old_timeval32
-> +#else
-> +#define __vdso_timespec		__kernel_timespec
-> +#define __vdso_timeval		__kernel_old_timeval
-> +#endif /* CONFIG_COMPAT_VDSO */
-> +#endif /* CONFIG_GENERIC_VDSO_32 */
-
-I'm not sure what the comment is trying to say.
-
-For a 64-bit kernel, does this affec the native vDSO, or just the compat
-vDSO?
-
-[...]
-> +config HAVE_GENERIC_VDSO
-> +	bool
-> +	default n
-
-IIRC, 'n' is the implicit default.
+VDSO files probably also need to be marked as OBJECT_FILES_NON_STANDARD.
 
 Thanks,
 Mark.
