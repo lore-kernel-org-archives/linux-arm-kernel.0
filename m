@@ -2,80 +2,56 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+X-Spam-Status: No, score=-13.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id ECFA7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:14:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 995B2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:15:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BDA512070D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:14:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6903F207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 15:15:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q6D2Y75a";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="FU+ES15K"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDA512070D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FNHGzjyc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6903F207E0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AvW8jZrXyKNMWIpxeiej+LMeEsJ+trHtb0x62nbeKaM=; b=q6D2Y75a3Zctrj
-	x6YLlrpbhCe38Rop1fc0MMyEX7go93Hdao9LvTmpeH6cmzCkoqSX2E05Y/z0kwxU50RS5hXKdiCRU
-	qXKymGYzoQt8C7Fd240eazK1C3HCV/Sdsuq0l571EtiLBidhq7E+FmP0r0VkQOzV0kFyA32lnp4Rh
-	+CE5yUwGocCVrYplwt+KXE17xhpFH/4syDH+Pf+z9xAinrM+TcUm7uu6ABBiz8HDU0awIaQTg9PkV
-	/G1sE3S9rBmmbj1O99L8aWXtX93x1TDY1cH+JpBJtXrU1pC8aKuqylilmMtFtMIGRzny7Nxonm2nu
-	vhcZivD3/U390iSJsFUw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=BQA5xgLyYwc3nWJrzB8ABIp6BChbMrkGKjJ27A1psQ8=; b=FNHGzjycLNFfDF
+	z3A1i4xPuHxU0/neW1d2m3vIzkZ60ssyFSRcrAVo5Q1Nwu+C+Hu0utrQEMR+PIfu+ifGN/RYjQSw+
+	LhF18EQSqa2cavZh97kTGKIr+VXwjpjcRJ626SoOg6Y5GelxHoii95r5tTjlI6Bj5yKNbHvByLr3r
+	w8BmNd4rw4TP4KTmIZ7kYeOnw27mUyCkErQvV/jtIMYLTGN+u0LHeTcS9zpZwgedlhxM+DJHT6/48
+	0Bk98b0pgyjc7Lm4JDMFUKR9uGGUcSXpT+4+4as5DOXWx0PARY3WU0EX+j5QGHmDM+/imzs+WJ77K
+	PAH0wn1MOOULnVXH6tWg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxCWb-000449-6r; Fri, 22 Feb 2019 15:14:05 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxCWX-00043m-2I
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:14:03 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2019; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=klVEye0wFqmNyhO07dpdionhZo/NFgdLL7dYU6FSe5I=; b=FU+ES15KXUflwpZ732pqnoedj
- lgOer7RVovgT42DCshZy+DmJAEOVnecNUvKDD3dDQ8UNp8eIkeCOnMH8nH0GSGy8Gp8v5AedXB5oC
- 3ojLotXF9UNGFGoTnMfTLcBYWVIyzktrZ0eX3N8FbIf55/stl4qF0QJzsKMj07+op18g3KFt/U7Mn
- O2H+0vCDZ/FUm53DVRflHWDAisftDoLbYxqheqicbqAYfbV/I7GuRR/jBNmk9n5gJNkxwrYdYpZc1
- Y0jlbkOHNkSe/z00JZpsMwBeed4uDHIXnvLcycPBwqRsrFPPw1wIxN/ORe+mmPrGja3EIIAqvcVLl
- zgmfi1K6Q==;
-Received: from shell.armlinux.org.uk
- ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:36996)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gxCWC-0002fw-Q7; Fri, 22 Feb 2019 15:13:40 +0000
-Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
- (envelope-from <linux@shell.armlinux.org.uk>)
- id 1gxCW7-0002Ht-AW; Fri, 22 Feb 2019 15:13:35 +0000
-Date: Fri, 22 Feb 2019 15:13:35 +0000
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH 5/5] arm64: dts: marvell: armada-cp110: Switch to
- per-port SATA interrupts
-Message-ID: <20190222151335.r27yreym5bhaoqaw@shell.armlinux.org.uk>
-References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
- <20190222145356.23072-6-miquel.raynal@bootlin.com>
+	id 1gxCXo-0005f6-LQ; Fri, 22 Feb 2019 15:15:20 +0000
+Received: from muru.com ([72.249.23.125])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxCXl-0005eO-91
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 15:15:18 +0000
+Received: from hillo.muru.com (localhost [127.0.0.1])
+ by muru.com (Postfix) with ESMTP id C2C2D80AA;
+ Fri, 22 Feb 2019 15:15:25 +0000 (UTC)
+From: Tony Lindgren <tony@atomide.com>
+To: arm@kernel.org
+Subject: [GIT PULL] deprecate old cpsw driver phy mode for v5.1
+Date: Fri, 22 Feb 2019 07:15:12 -0800
+Message-Id: <pull-1550848332-146231@atomide.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190222145356.23072-6-miquel.raynal@bootlin.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_071401_720860_8F868690 
-X-CRM114-Status: GOOD (  19.84  )
+X-CRM114-CacheID: sfid-20190222_071517_392628_29C244D7 
+X-CRM114-Status: UNSURE (   7.73  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,134 +63,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Marc Zyngier <marc.zyngier@arm.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Hans de Goede <hdegoede@redhat.com>,
- Rob Herring <robh+dt@kernel.org>, Antoine Tenart <antoine.tenart@bootlin.com>,
- Jens Axboe <axboe@kernel.dk>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- linux-ide@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>,
+ Grygorii Strashko <grygorii.strashko@ti.com>, linux-omap@vger.kernel.org,
+ "David S . Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 03:53:56PM +0100, Miquel Raynal wrote:
-> From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> 
-> There are two SATA ports per CP110. Each of them has a dedicated
-> interrupt. Describe the real hardware by adding two SATA ports to the
-> CP110 SATA node and enabling them in all the DTs including it
-> (7040-db/8040-db/8040-clearfog).
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> ---
->  arch/arm64/boot/dts/marvell/armada-7040-db.dts |  7 ++++++-
->  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 14 ++++++++++++--
->  arch/arm64/boot/dts/marvell/armada-cp110.dtsi  | 16 ++++++++++++++--
->  3 files changed, 32 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> index 412efdb46e7c..54c1c0ddc813 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-> @@ -194,7 +194,12 @@
->  };
->  
->  &cp0_sata0 {
-> -	status = "okay";
-> +	sata-port@0 {
+From: "Tony Lindgren" <tony@atomide.com>
 
-Don't these all need a reg = <N> to correspond with @N in the node name?
+The following changes since commit bae2bf97939aebd74dfd8f0b76b4902a19e63eef:
 
-> +		status = "okay";
-> +	};
-> +	sata-port@1 {
-> +		status = "okay";
-> +	};
->  };
->  
->  &cp0_usb3_0 {
-> diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> index 1bac437369a1..988cc7dc15d9 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> +++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
-> @@ -147,7 +147,12 @@
->  
->  /* CON4 on CP0 expansion */
->  &cp0_sata0 {
-> -	status = "okay";
-> +	sata-port@0 {
-> +		status = "okay";
-> +	};
-> +	sata-port@1 {
-> +		status = "okay";
-> +	};
->  };
->  
->  /* CON9 on CP0 expansion */
-> @@ -279,7 +284,12 @@
->  
->  /* CON4 on CP1 expansion */
->  &cp1_sata0 {
-> -	status = "okay";
-> +	sata-port@0 {
-> +		status = "okay";
-> +	};
-> +	sata-port@1 {
-> +		status = "okay";
-> +	};
->  };
->  
->  /* CON9 on CP1 expansion */
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> index b9d9f31e3ba1..f27edddcacd1 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
-> @@ -292,10 +292,22 @@
->  			"generic-ahci";
->  			reg = <0x540000 0x30000>;
->  			dma-coherent;
-> -			interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
->  			clocks = <&CP110_LABEL(clk) 1 15>,
->  				 <&CP110_LABEL(clk) 1 16>;
-> -			status = "disabled";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			sata-port@0 {
-> +				reg = <0>;
-> +				interrupts = <109 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "disabled";
-> +			};
-> +
-> +			sata-port@1 {
-> +				reg = <1>;
-> +				interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
-> +				status = "disabled";
-> +			};
->  		};
->  
->  		CP110_LABEL(xor0): xor@6a0000 {
-> -- 
-> 2.19.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel@lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+  dt-bindings: net: ti: deprecate cpsw-phy-sel bindings (2019-02-20 08:14:04 -0800)
 
--- 
-RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v5.1/cpsw-signed
+
+for you to fetch changes up to dba235fa70cbedf7dd64d5763299451be4b9de16:
+
+  net: ethernet: ti: cpsw: deprecate cpsw-phy-sel driver (2019-02-21 07:33:51 -0800)
+
+----------------------------------------------------------------
+One change to deprecate old CPSW Ethernet PHY mode selection driver
+
+With the device tree changes configuring CPSW with a proper PHY driver,
+we want to deprecate the old driver to avoid new users for it.
+
+Note that this driver is based on the related dts changes.
+
+----------------------------------------------------------------
+Grygorii Strashko (1):
+      net: ethernet: ti: cpsw: deprecate cpsw-phy-sel driver
+
+ drivers/net/ethernet/ti/Kconfig | 6 +++---
+ drivers/net/ethernet/ti/cpsw.h  | 6 ++++++
+ 2 files changed, 9 insertions(+), 3 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
