@@ -2,64 +2,87 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1090BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:05:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DEBF7C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:06:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D2C8920878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:05:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A625F20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:06:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CRGPxT6R"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D2C8920878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="shEpKYhw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="DWWFfiux"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A625F20818
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=TtR1x/yF25hdBSQKkplOpyGHKI4wJPO+6F32av9v0BI=; b=CRGPxT6R8hWAt6
-	56Qccms/8+aEaUxZs9MayEz+p/7Z79a0p+1tcP5898uF61UDPuvaIv9+FB/FvKaUhKTjaspf6sq56
-	UyRHWyTsjcUYf8dyixsdLjHSUhDSWuCFgrXy57j4q187RgGtPv1JQmB97t/QSEYXFe0+fEcGdislH
-	FainrpxAGv64PVxscDhnWg0pYOtFRnEI5R+M6V+PtlM5Jb7+eKgRbzV9aWZ6OAs5zCkkL4DleHpeD
-	BxC12N+gGyfmO+2OSakLzgqNwCquU79uC2IB8mgv3LwZdo2R25zx3TEOnOuwQ2zw76uAVLz14Lx/q
-	KS9S7w+wj8uS1C9LuG6g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=1nhTBt57enVMpSeQtS3JqzpLN8atgvEdstLaGeO4ULE=; b=shEpKYhwTTPVYyb1KrkBt52la
+	xhlM3w3tFzm+ptMaTh0oRhuvCFokxxBo2optWMtYBiaMYcKDb/v2727CP3g51gF4W9e1YFc/k4f83
+	wuyL9FUnDAmDvpF1Wdl+7F599hCud6KdKRqkxBuuX+YE1UT9bXdj1QNuHXxdeylXDYW7fdtRtS3xE
+	r4j4DRJw1olChTAnDmxoeIZ5Ny90EI9fiBubrYZRY2u9jP41GBeFE0Fs4ZwXBPFl5BK0n+440gd10
+	XPPUR+oawc/gir4ZqDX39SbqHf6ZXUFVZ8IOirg50dEN97KM6/0+M5F+cl2Wksfi0WwFTSZVjo2nq
+	w4mpvA1hw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx6lo-0004Sd-HO; Fri, 22 Feb 2019 09:05:24 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx6ll-0004SH-B4
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:05:22 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A695380D;
- Fri, 22 Feb 2019 01:05:20 -0800 (PST)
-Received: from [10.1.197.45] (e112298-lin.cambridge.arm.com [10.1.197.45])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 034343F703;
- Fri, 22 Feb 2019 01:05:18 -0800 (PST)
-Subject: Re: [PATCH v5 23/26] KVM: arm64/sve: Allow userspace to enable SVE
- for vcpus
-To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-24-git-send-email-Dave.Martin@arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <88f7a00d-019a-5ed3-5a80-6032775dc5c5@arm.com>
-Date: Fri, 22 Feb 2019 09:05:16 +0000
+	id 1gx6n7-0004pm-Ve; Fri, 22 Feb 2019 09:06:45 +0000
+Received: from hqemgate14.nvidia.com ([216.228.121.143])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx6n3-0004pO-Kt
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:06:43 +0000
+Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
+ hqemgate14.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
+ id <B5c6fbba90000>; Fri, 22 Feb 2019 01:06:49 -0800
+Received: from hqmail.nvidia.com ([172.20.161.6])
+ by hqpgpgate101.nvidia.com (PGP Universal service);
+ Fri, 22 Feb 2019 01:06:40 -0800
+X-PGP-Universal: processed;
+ by hqpgpgate101.nvidia.com on Fri, 22 Feb 2019 01:06:40 -0800
+Received: from [10.19.108.132] (172.20.13.39) by HQMAIL101.nvidia.com
+ (172.20.187.10) with Microsoft SMTP Server (TLS) id 15.0.1395.4; Fri, 22 Feb
+ 2019 09:06:37 +0000
+Subject: Re: [PATCH V7 2/8] clocksource: tegra: add Tegra210 timer support
+To: Daniel Lezcano <daniel.lezcano@linaro.org>, Thierry Reding
+ <thierry.reding@gmail.com>, Jonathan Hunter <jonathanh@nvidia.com>, Thomas
+ Gleixner <tglx@linutronix.de>
+References: <20190221072150.4395-1-josephl@nvidia.com>
+ <20190221072150.4395-3-josephl@nvidia.com>
+ <6dbc34d0-6922-0eab-48ca-ddcae4554655@linaro.org>
+From: Joseph Lo <josephl@nvidia.com>
+Message-ID: <9a7ff1e9-f425-df58-2cd7-63b2bfc0d3bb@nvidia.com>
+Date: Fri, 22 Feb 2019 17:06:24 +0800
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-In-Reply-To: <1550519559-15915-24-git-send-email-Dave.Martin@arm.com>
+In-Reply-To: <6dbc34d0-6922-0eab-48ca-ddcae4554655@linaro.org>
+X-Originating-IP: [172.20.13.39]
+X-ClientProxiedBy: HQMAIL107.nvidia.com (172.20.187.13) To
+ HQMAIL101.nvidia.com (172.20.187.10)
 Content-Language: en-US
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
+ t=1550826409; bh=QE5ImHzN3N+Rl1H5gn3uidvE/6Qj51OLgvYBTn5tTLE=;
+ h=X-PGP-Universal:Subject:To:CC:References:From:Message-ID:Date:
+ User-Agent:MIME-Version:In-Reply-To:X-Originating-IP:
+ X-ClientProxiedBy:Content-Type:Content-Language:
+ Content-Transfer-Encoding;
+ b=DWWFfiuxjTtIeiStd9u71Jo8n/MIp3iu8lcGnDrbqj81XHCXBqdXb4+p5GZh4MXKP
+ ARxxWdmSeokxyPazsLWBESnOdUrsglhA80Kvjt/Bu1YrtxHGAdQS2rfFKdcnNryqf0
+ bFMRwfHIB34ceYc9Yb/mkBfaw8fvvbmQoJTHJJ4DAQa3bfdV+0vCou8UwJPiiwdcj3
+ eHqHTxSRkTPfqMwyRfyZQUfcaqhac/N0EJycpxMWb1drrueYVoxuR3AaPYL3IFU5yr
+ 3veitQtRAbxYYW8kIw6mWqmUWlcckfPxdO/TtDxrer5uEn2zcX1BQavGqmZ9ytoAT4
+ sVXKiyJkKh2dg==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_010521_393621_6E386C82 
-X-CRM114-Status: GOOD (  26.05  )
+X-CRM114-CacheID: sfid-20190222_010641_703338_69A40E2D 
+X-CRM114-Status: GOOD (  23.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,147 +94,569 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: linux-tegra@vger.kernel.org, Thierry Reding <treding@nvidia.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Dave,
 
-On 18/02/2019 19:52, Dave Martin wrote:
-> Now that all the pieces are in place, this patch offers a new flag
-> KVM_ARM_VCPU_SVE that userspace can pass to KVM_ARM_VCPU_INIT to
-> turn on SVE for the guest, on a per-vcpu basis.
-> 
-> As part of this, support for initialisation and reset of the SVE
-> vector length set and registers is added in the appropriate places.
-> Allocation SVE registers is deferred until kvm_arm_vcpu_finalize(),
-> by which time the size of the registers is known.
-> 
-> Setting the vector lengths supported by the vcpu is considered
-> configuration of the emulated hardware rather than runtime
-> configuration, so no support is offered for changing the vector
-> lengths of an existing vcpu across reset.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> ---
-> 
-> Changes since v4:
-> 
->  * Pull out vcpu_sve_state_size(), for use earlier in the series.
-> 
->  * Remove unnecessary vcpu->arch.sve_vqs[], and clamp maximum guest
->    vector length to 256 bytes for forwards compatibility.
-> 
->    (See "KVM: arm64/sve: Add pseudo-register for the guest's vector
->    lengths".)
-> 
->  * Minor tidyups to make some checks less verbose.
-> ---
->  arch/arm64/include/asm/kvm_host.h |  2 +-
->  arch/arm64/include/uapi/asm/kvm.h |  1 +
->  arch/arm64/kvm/reset.c            | 70 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 71 insertions(+), 2 deletions(-)
-> 
 
-[...]
+On 2/22/19 4:43 PM, Daniel Lezcano wrote:
+> On 21/02/2019 08:21, Joseph Lo wrote:
+>> Add support for the Tegra210 timer that runs at oscillator clock
+>> (TMR10-TMR13). We need these timers to work as clock event device and to
+>> replace the ARMv8 architected timer due to it can't survive across the
+>> power cycle of the CPU core or CPUPORESET signal. So it can't be a wake-up
+>> source when CPU suspends in power down state.
+>>
+>> Also convert the original driver to use timer-of API.
+>>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: linux-kernel@vger.kernel.org
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> Acked-by: Thierry Reding <treding@nvidia.com>
+>> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+> 
+> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 7ff1bd4..6963b7e 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -102,6 +102,7 @@ struct kvm_regs {
->  #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
->  #define KVM_ARM_VCPU_PSCI_0_2		2 /* CPU uses PSCI v0.2 */
->  #define KVM_ARM_VCPU_PMU_V3		3 /* Support guest PMUv3 */
-> +#define KVM_ARM_VCPU_SVE		4 /* enable SVE for this CPU */
->  
->  struct kvm_vcpu_init {
->  	__u32 target;
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 1379fb2..e67cd2e 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
+Hi Daniel,
 
-[...]
+Thanks for your review again. Regarding to Thierry's suggestion in [1], 
+could you help to pick up patch 1~3 in this series in clocksource tree?
 
-> @@ -98,11 +100,69 @@ int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	return r;
->  }
->  
-> +static int kvm_reset_sve(struct kvm_vcpu *vcpu)
-> +{
-> +	if (!system_supports_sve())
-> +		return -EINVAL;
-> +
-> +	/* If resetting an already-configured vcpu, just zero the SVE regs: */
-> +	if (vcpu->arch.sve_state) {
-> +		size_t size = vcpu_sve_state_size(vcpu);
-> +
-> +		if (!size || WARN_ON(!vcpu_has_sve(vcpu)))
-> +			return -EINVAL;
-> +
-> +		memset(vcpu->arch.sve_state, 0, size);
-> +		return 0;
-> +	}
-> +
-> +	if (WARN_ON(!sve_vl_valid(sve_max_vl)))
-> +		return -EINVAL;
-> +
-> +	/* If the full set of host vector lengths cannot be used, give up: */
-> +	if (sve_max_virtualisable_vl < sve_max_vl)
-> +		return -EINVAL;
-> +
-> +	/* Default to the set of vector lengths supported by the host */
-> +	vcpu->arch.sve_max_vl = sve_max_vl;
-> +
-> +	/*
-> +	 * The get_sve_reg()/set_sve_reg() ioctl interface will need
-> +	 * to be extended with multiple register slice support in
-> +	 * order to support vector lengths greater than
-> +	 * SVE_VL_ARCH_MAX:
-> +	 */
-> +	if (WARN_ONCE(vcpu->arch.sve_max_vl > SVE_VL_ARCH_MAX,
-> +		      "KVM: SVE vector length for guests limited to %d bytes\n",
-> +		      SVE_VL_ARCH_MAX))
-> +		vcpu->arch.sve_max_vl = SVE_VL_ARCH_MAX;
-> +
-> +	/*
-> +	 * Userspace can still customize the vector lengths by writing
-> +	 * KVM_REG_ARM64_SVE_VLS.  Allocation is deferred until
-> +	 * kvm_arm_vcpu_finalize(), which freezes the configuration.
-> +	 */
-> +	vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
-> +
-> +	return 0;
-> +}
-> +
->  int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
->  {
->  	if (likely(kvm_arm_vcpu_finalized(vcpu)))
->  		return 0;
->  
-> +	if (vcpu_has_sve(vcpu)) {
-> +		size_t size = vcpu_sve_state_size(vcpu);
-> +
-> +		if (!size)
-> +			return -EINVAL;
-> +
-> +		vcpu->arch.sve_state = kzalloc(size, GFP_KERNEL);
+[1]: https://patchwork.ozlabs.org/patch/1034075/
 
-We should probably free this in kvm_arch_vcpu_free().
+If not, I'll let him know this series needs to go with Tegra tree.
 
-Cheers,
+> 
+> Will you take care of dropping the persistent clocksource code in this
+> driver?
 
--- 
-Julien Thierry
+Yes, will do.
+
+Thanks,
+Joseph
+
+> 
+>> v7:
+>>   * kconfig fix for 'depends on ARM || ARM64'
+>>   * move suspend/resume to clkevt
+>>   * refine the usage for the macro of TIMER_OF_DECLARE
+>> v6:
+>>   * refine the timer defines
+>>   * add ack tag from Jon.
+>> v5:
+>>   * add ack tag from Thierry
+>> v4:
+>>   * merge timer-tegra210.c in previous version into timer-tegra20.c
+>> v3:
+>>   * use timer-of API
+>> v2:
+>>   * add error clean-up code
+>> ---
+>>   drivers/clocksource/Kconfig         |   3 +-
+>>   drivers/clocksource/timer-tegra20.c | 370 +++++++++++++++++++---------
+>>   include/linux/cpuhotplug.h          |   1 +
+>>   3 files changed, 262 insertions(+), 112 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 8dfd3bc448d0..5d93e580e5dc 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -131,7 +131,8 @@ config SUN5I_HSTIMER
+>>   config TEGRA_TIMER
+>>   	bool "Tegra timer driver" if COMPILE_TEST
+>>   	select CLKSRC_MMIO
+>> -	depends on ARM
+>> +	select TIMER_OF
+>> +	depends on ARM || ARM64
+>>   	help
+>>   	  Enables support for the Tegra driver.
+>>   
+>> diff --git a/drivers/clocksource/timer-tegra20.c b/drivers/clocksource/timer-tegra20.c
+>> index 4293943f4e2b..fdb3d795a409 100644
+>> --- a/drivers/clocksource/timer-tegra20.c
+>> +++ b/drivers/clocksource/timer-tegra20.c
+>> @@ -15,21 +15,24 @@
+>>    *
+>>    */
+>>   
+>> -#include <linux/init.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/clockchips.h>
+>> +#include <linux/cpu.h>
+>> +#include <linux/cpumask.h>
+>> +#include <linux/delay.h>
+>>   #include <linux/err.h>
+>> -#include <linux/time.h>
+>>   #include <linux/interrupt.h>
+>> -#include <linux/irq.h>
+>> -#include <linux/clockchips.h>
+>> -#include <linux/clocksource.h>
+>> -#include <linux/clk.h>
+>> -#include <linux/io.h>
+>>   #include <linux/of_address.h>
+>>   #include <linux/of_irq.h>
+>> +#include <linux/percpu.h>
+>>   #include <linux/sched_clock.h>
+>> -#include <linux/delay.h>
+>> +#include <linux/time.h>
+>> +
+>> +#include "timer-of.h"
+>>   
+>> +#ifdef CONFIG_ARM
+>>   #include <asm/mach/time.h>
+>> +#endif
+>>   
+>>   #define RTC_SECONDS            0x08
+>>   #define RTC_SHADOW_SECONDS     0x0c
+>> @@ -39,74 +42,161 @@
+>>   #define TIMERUS_USEC_CFG 0x14
+>>   #define TIMERUS_CNTR_FREEZE 0x4c
+>>   
+>> -#define TIMER1_BASE 0x0
+>> -#define TIMER2_BASE 0x8
+>> -#define TIMER3_BASE 0x50
+>> -#define TIMER4_BASE 0x58
+>> -
+>> -#define TIMER_PTV 0x0
+>> -#define TIMER_PCR 0x4
+>> -
+>> +#define TIMER_PTV		0x0
+>> +#define TIMER_PTV_EN		BIT(31)
+>> +#define TIMER_PTV_PER		BIT(30)
+>> +#define TIMER_PCR		0x4
+>> +#define TIMER_PCR_INTR_CLR	BIT(30)
+>> +
+>> +#ifdef CONFIG_ARM
+>> +#define TIMER_CPU0		0x50 /* TIMER3 */
+>> +#else
+>> +#define TIMER_CPU0		0x90 /* TIMER10 */
+>> +#define TIMER10_IRQ_IDX		10
+>> +#define IRQ_IDX_FOR_CPU(cpu)	(TIMER10_IRQ_IDX + cpu)
+>> +#endif
+>> +#define TIMER_BASE_FOR_CPU(cpu) (TIMER_CPU0 + (cpu) * 8)
+>> +
+>> +static u32 usec_config;
+>>   static void __iomem *timer_reg_base;
+>> +#ifdef CONFIG_ARM
+>>   static void __iomem *rtc_base;
+>> -
+>>   static struct timespec64 persistent_ts;
+>>   static u64 persistent_ms, last_persistent_ms;
+>> -
+>>   static struct delay_timer tegra_delay_timer;
+>> -
+>> -#define timer_writel(value, reg) \
+>> -	writel_relaxed(value, timer_reg_base + (reg))
+>> -#define timer_readl(reg) \
+>> -	readl_relaxed(timer_reg_base + (reg))
+>> +#endif
+>>   
+>>   static int tegra_timer_set_next_event(unsigned long cycles,
+>>   					 struct clock_event_device *evt)
+>>   {
+>> -	u32 reg;
+>> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>>   
+>> -	reg = 0x80000000 | ((cycles > 1) ? (cycles-1) : 0);
+>> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+>> +	writel(TIMER_PTV_EN |
+>> +	       ((cycles > 1) ? (cycles - 1) : 0), /* n+1 scheme */
+>> +	       reg_base + TIMER_PTV);
+>>   
+>>   	return 0;
+>>   }
+>>   
+>> -static inline void timer_shutdown(struct clock_event_device *evt)
+>> +static int tegra_timer_shutdown(struct clock_event_device *evt)
+>>   {
+>> -	timer_writel(0, TIMER3_BASE + TIMER_PTV);
+>> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>> +
+>> +	writel(0, reg_base + TIMER_PTV);
+>> +
+>> +	return 0;
+>>   }
+>>   
+>> -static int tegra_timer_shutdown(struct clock_event_device *evt)
+>> +static int tegra_timer_set_periodic(struct clock_event_device *evt)
+>>   {
+>> -	timer_shutdown(evt);
+>> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>> +
+>> +	writel(TIMER_PTV_EN | TIMER_PTV_PER |
+>> +	       ((timer_of_rate(to_timer_of(evt)) / HZ) - 1),
+>> +	       reg_base + TIMER_PTV);
+>> +
+>>   	return 0;
+>>   }
+>>   
+>> -static int tegra_timer_set_periodic(struct clock_event_device *evt)
+>> +static irqreturn_t tegra_timer_isr(int irq, void *dev_id)
+>> +{
+>> +	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+>> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>> +
+>> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+>> +	evt->event_handler(evt);
+>> +
+>> +	return IRQ_HANDLED;
+>> +}
+>> +
+>> +static void tegra_timer_suspend(struct clock_event_device *evt)
+>> +{
+>> +	void __iomem *reg_base = timer_of_base(to_timer_of(evt));
+>> +
+>> +	writel(TIMER_PCR_INTR_CLR, reg_base + TIMER_PCR);
+>> +}
+>> +
+>> +static void tegra_timer_resume(struct clock_event_device *evt)
+>> +{
+>> +	writel(usec_config, timer_reg_base + TIMERUS_USEC_CFG);
+>> +}
+>> +
+>> +#ifdef CONFIG_ARM64
+>> +static DEFINE_PER_CPU(struct timer_of, tegra_to) = {
+>> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE,
+>> +
+>> +	.clkevt = {
+>> +		.name = "tegra_timer",
+>> +		.rating = 460,
+>> +		.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+>> +		.set_next_event = tegra_timer_set_next_event,
+>> +		.set_state_shutdown = tegra_timer_shutdown,
+>> +		.set_state_periodic = tegra_timer_set_periodic,
+>> +		.set_state_oneshot = tegra_timer_shutdown,
+>> +		.tick_resume = tegra_timer_shutdown,
+>> +		.suspend = tegra_timer_suspend,
+>> +		.resume = tegra_timer_resume,
+>> +	},
+>> +};
+>> +
+>> +static int tegra_timer_setup(unsigned int cpu)
+>>   {
+>> -	u32 reg = 0xC0000000 | ((1000000 / HZ) - 1);
+>> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
+>> +
+>> +	irq_force_affinity(to->clkevt.irq, cpumask_of(cpu));
+>> +	enable_irq(to->clkevt.irq);
+>> +
+>> +	clockevents_config_and_register(&to->clkevt, timer_of_rate(to),
+>> +					1, /* min */
+>> +					0x1fffffff); /* 29 bits */
+>>   
+>> -	timer_shutdown(evt);
+>> -	timer_writel(reg, TIMER3_BASE + TIMER_PTV);
+>>   	return 0;
+>>   }
+>>   
+>> -static struct clock_event_device tegra_clockevent = {
+>> -	.name			= "timer0",
+>> -	.rating			= 300,
+>> -	.features		= CLOCK_EVT_FEAT_ONESHOT |
+>> -				  CLOCK_EVT_FEAT_PERIODIC |
+>> -				  CLOCK_EVT_FEAT_DYNIRQ,
+>> -	.set_next_event		= tegra_timer_set_next_event,
+>> -	.set_state_shutdown	= tegra_timer_shutdown,
+>> -	.set_state_periodic	= tegra_timer_set_periodic,
+>> -	.set_state_oneshot	= tegra_timer_shutdown,
+>> -	.tick_resume		= tegra_timer_shutdown,
+>> +static int tegra_timer_stop(unsigned int cpu)
+>> +{
+>> +	struct timer_of *to = per_cpu_ptr(&tegra_to, cpu);
+>> +
+>> +	to->clkevt.set_state_shutdown(&to->clkevt);
+>> +	disable_irq_nosync(to->clkevt.irq);
+>> +
+>> +	return 0;
+>> +}
+>> +#else /* CONFIG_ARM */
+>> +static struct timer_of tegra_to = {
+>> +	.flags = TIMER_OF_CLOCK | TIMER_OF_BASE | TIMER_OF_IRQ,
+>> +
+>> +	.clkevt = {
+>> +		.name = "tegra_timer",
+>> +		.rating	= 300,
+>> +		.features = CLOCK_EVT_FEAT_ONESHOT |
+>> +			    CLOCK_EVT_FEAT_PERIODIC |
+>> +			    CLOCK_EVT_FEAT_DYNIRQ,
+>> +		.set_next_event	= tegra_timer_set_next_event,
+>> +		.set_state_shutdown = tegra_timer_shutdown,
+>> +		.set_state_periodic = tegra_timer_set_periodic,
+>> +		.set_state_oneshot = tegra_timer_shutdown,
+>> +		.tick_resume = tegra_timer_shutdown,
+>> +		.suspend = tegra_timer_suspend,
+>> +		.resume = tegra_timer_resume,
+>> +		.cpumask = cpu_possible_mask,
+>> +	},
+>> +
+>> +	.of_irq = {
+>> +		.index = 2,
+>> +		.flags = IRQF_TIMER | IRQF_TRIGGER_HIGH,
+>> +		.handler = tegra_timer_isr,
+>> +	},
+>>   };
+>>   
+>>   static u64 notrace tegra_read_sched_clock(void)
+>>   {
+>> -	return timer_readl(TIMERUS_CNTR_1US);
+>> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+>> +}
+>> +
+>> +static unsigned long tegra_delay_timer_read_counter_long(void)
+>> +{
+>> +	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+>>   }
+>>   
+>>   /*
+>> @@ -143,100 +233,155 @@ static void tegra_read_persistent_clock64(struct timespec64 *ts)
+>>   	timespec64_add_ns(&persistent_ts, delta * NSEC_PER_MSEC);
+>>   	*ts = persistent_ts;
+>>   }
+>> +#endif
+>>   
+>> -static unsigned long tegra_delay_timer_read_counter_long(void)
+>> -{
+>> -	return readl(timer_reg_base + TIMERUS_CNTR_1US);
+>> -}
+>> -
+>> -static irqreturn_t tegra_timer_interrupt(int irq, void *dev_id)
+>> -{
+>> -	struct clock_event_device *evt = (struct clock_event_device *)dev_id;
+>> -	timer_writel(1<<30, TIMER3_BASE + TIMER_PCR);
+>> -	evt->event_handler(evt);
+>> -	return IRQ_HANDLED;
+>> -}
+>> -
+>> -static struct irqaction tegra_timer_irq = {
+>> -	.name		= "timer0",
+>> -	.flags		= IRQF_TIMER | IRQF_TRIGGER_HIGH,
+>> -	.handler	= tegra_timer_interrupt,
+>> -	.dev_id		= &tegra_clockevent,
+>> -};
+>> -
+>> -static int __init tegra20_init_timer(struct device_node *np)
+>> +static int tegra_timer_common_init(struct device_node *np, struct timer_of *to)
+>>   {
+>> -	struct clk *clk;
+>> -	unsigned long rate;
+>> -	int ret;
+>> -
+>> -	timer_reg_base = of_iomap(np, 0);
+>> -	if (!timer_reg_base) {
+>> -		pr_err("Can't map timer registers\n");
+>> -		return -ENXIO;
+>> -	}
+>> +	int ret = 0;
+>>   
+>> -	tegra_timer_irq.irq = irq_of_parse_and_map(np, 2);
+>> -	if (tegra_timer_irq.irq <= 0) {
+>> -		pr_err("Failed to map timer IRQ\n");
+>> -		return -EINVAL;
+>> -	}
+>> +	ret = timer_of_init(np, to);
+>> +	if (ret < 0)
+>> +		goto out;
+>>   
+>> -	clk = of_clk_get(np, 0);
+>> -	if (IS_ERR(clk)) {
+>> -		pr_warn("Unable to get timer clock. Assuming 12Mhz input clock.\n");
+>> -		rate = 12000000;
+>> -	} else {
+>> -		clk_prepare_enable(clk);
+>> -		rate = clk_get_rate(clk);
+>> -	}
+>> +	timer_reg_base = timer_of_base(to);
+>>   
+>> -	switch (rate) {
+>> +	/*
+>> +	 * Configure microsecond timers to have 1MHz clock
+>> +	 * Config register is 0xqqww, where qq is "dividend", ww is "divisor"
+>> +	 * Uses n+1 scheme
+>> +	 */
+>> +	switch (timer_of_rate(to)) {
+>>   	case 12000000:
+>> -		timer_writel(0x000b, TIMERUS_USEC_CFG);
+>> +		usec_config = 0x000b; /* (11+1)/(0+1) */
+>> +		break;
+>> +	case 12800000:
+>> +		usec_config = 0x043f; /* (63+1)/(4+1) */
+>>   		break;
+>>   	case 13000000:
+>> -		timer_writel(0x000c, TIMERUS_USEC_CFG);
+>> +		usec_config = 0x000c; /* (12+1)/(0+1) */
+>> +		break;
+>> +	case 16800000:
+>> +		usec_config = 0x0453; /* (83+1)/(4+1) */
+>>   		break;
+>>   	case 19200000:
+>> -		timer_writel(0x045f, TIMERUS_USEC_CFG);
+>> +		usec_config = 0x045f; /* (95+1)/(4+1) */
+>>   		break;
+>>   	case 26000000:
+>> -		timer_writel(0x0019, TIMERUS_USEC_CFG);
+>> +		usec_config = 0x0019; /* (25+1)/(0+1) */
+>> +		break;
+>> +	case 38400000:
+>> +		usec_config = 0x04bf; /* (191+1)/(4+1) */
+>> +		break;
+>> +	case 48000000:
+>> +		usec_config = 0x002f; /* (47+1)/(0+1) */
+>>   		break;
+>>   	default:
+>> -		WARN(1, "Unknown clock rate");
+>> +		ret = -EINVAL;
+>> +		goto out;
+>> +	}
+>> +
+>> +	writel(usec_config, timer_of_base(to) + TIMERUS_USEC_CFG);
+>> +
+>> +out:
+>> +	return ret;
+>> +}
+>> +
+>> +#ifdef CONFIG_ARM64
+>> +static int __init tegra_init_timer(struct device_node *np)
+>> +{
+>> +	int cpu, ret = 0;
+>> +	struct timer_of *to;
+>> +
+>> +	to = this_cpu_ptr(&tegra_to);
+>> +	ret = tegra_timer_common_init(np, to);
+>> +	if (ret < 0)
+>> +		goto out;
+>> +
+>> +	for_each_possible_cpu(cpu) {
+>> +		struct timer_of *cpu_to;
+>> +
+>> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
+>> +		cpu_to->of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(cpu);
+>> +		cpu_to->of_clk.rate = timer_of_rate(to);
+>> +		cpu_to->clkevt.cpumask = cpumask_of(cpu);
+>> +		cpu_to->clkevt.irq =
+>> +			irq_of_parse_and_map(np, IRQ_IDX_FOR_CPU(cpu));
+>> +		if (!cpu_to->clkevt.irq) {
+>> +			pr_err("%s: can't map IRQ for CPU%d\n",
+>> +			       __func__, cpu);
+>> +			ret = -EINVAL;
+>> +			goto out;
+>> +		}
+>> +
+>> +		irq_set_status_flags(cpu_to->clkevt.irq, IRQ_NOAUTOEN);
+>> +		ret = request_irq(cpu_to->clkevt.irq, tegra_timer_isr,
+>> +				  IRQF_TIMER | IRQF_NOBALANCING,
+>> +				  cpu_to->clkevt.name, &cpu_to->clkevt);
+>> +		if (ret) {
+>> +			pr_err("%s: cannot setup irq %d for CPU%d\n",
+>> +				__func__, cpu_to->clkevt.irq, cpu);
+>> +			ret = -EINVAL;
+>> +			goto out_irq;
+>> +		}
+>> +	}
+>> +
+>> +	cpuhp_setup_state(CPUHP_AP_TEGRA_TIMER_STARTING,
+>> +			  "AP_TEGRA_TIMER_STARTING", tegra_timer_setup,
+>> +			  tegra_timer_stop);
+>> +
+>> +	return ret;
+>> +out_irq:
+>> +	for_each_possible_cpu(cpu) {
+>> +		struct timer_of *cpu_to;
+>> +
+>> +		cpu_to = per_cpu_ptr(&tegra_to, cpu);
+>> +		if (cpu_to->clkevt.irq) {
+>> +			free_irq(cpu_to->clkevt.irq, &cpu_to->clkevt);
+>> +			irq_dispose_mapping(cpu_to->clkevt.irq);
+>> +		}
+>>   	}
+>> +out:
+>> +	timer_of_cleanup(to);
+>> +	return ret;
+>> +}
+>> +#else /* CONFIG_ARM */
+>> +static int __init tegra_init_timer(struct device_node *np)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	ret = tegra_timer_common_init(np, &tegra_to);
+>> +	if (ret < 0)
+>> +		goto out;
+>>   
+>> -	sched_clock_register(tegra_read_sched_clock, 32, 1000000);
+>> +	tegra_to.of_base.base = timer_reg_base + TIMER_BASE_FOR_CPU(0);
+>> +	tegra_to.of_clk.rate = 1000000; /* microsecond timer */
+>>   
+>> +	sched_clock_register(tegra_read_sched_clock, 32,
+>> +			     timer_of_rate(&tegra_to));
+>>   	ret = clocksource_mmio_init(timer_reg_base + TIMERUS_CNTR_1US,
+>> -				    "timer_us", 1000000, 300, 32,
+>> -				    clocksource_mmio_readl_up);
+>> +				    "timer_us", timer_of_rate(&tegra_to),
+>> +				    300, 32, clocksource_mmio_readl_up);
+>>   	if (ret) {
+>>   		pr_err("Failed to register clocksource\n");
+>> -		return ret;
+>> +		goto out;
+>>   	}
+>>   
+>>   	tegra_delay_timer.read_current_timer =
+>>   			tegra_delay_timer_read_counter_long;
+>> -	tegra_delay_timer.freq = 1000000;
+>> +	tegra_delay_timer.freq = timer_of_rate(&tegra_to);
+>>   	register_current_timer_delay(&tegra_delay_timer);
+>>   
+>> -	ret = setup_irq(tegra_timer_irq.irq, &tegra_timer_irq);
+>> -	if (ret) {
+>> -		pr_err("Failed to register timer IRQ: %d\n", ret);
+>> -		return ret;
+>> -	}
+>> +	clockevents_config_and_register(&tegra_to.clkevt,
+>> +					timer_of_rate(&tegra_to),
+>> +					0x1,
+>> +					0x1fffffff);
+>>   
+>> -	tegra_clockevent.cpumask = cpu_possible_mask;
+>> -	tegra_clockevent.irq = tegra_timer_irq.irq;
+>> -	clockevents_config_and_register(&tegra_clockevent, 1000000,
+>> -					0x1, 0x1fffffff);
+>> +	return ret;
+>> +out:
+>> +	timer_of_cleanup(&tegra_to);
+>>   
+>> -	return 0;
+>> +	return ret;
+>>   }
+>> -TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra20_init_timer);
+>>   
+>>   static int __init tegra20_init_rtc(struct device_node *np)
+>>   {
+>> @@ -261,3 +406,6 @@ static int __init tegra20_init_rtc(struct device_node *np)
+>>   	return register_persistent_clock(tegra_read_persistent_clock64);
+>>   }
+>>   TIMER_OF_DECLARE(tegra20_rtc, "nvidia,tegra20-rtc", tegra20_init_rtc);
+>> +#endif
+>> +TIMER_OF_DECLARE(tegra210_timer, "nvidia,tegra210-timer", tegra_init_timer);
+>> +TIMER_OF_DECLARE(tegra20_timer, "nvidia,tegra20-timer", tegra_init_timer);
+>> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+>> index fd586d0301e7..e78281d07b70 100644
+>> --- a/include/linux/cpuhotplug.h
+>> +++ b/include/linux/cpuhotplug.h
+>> @@ -121,6 +121,7 @@ enum cpuhp_state {
+>>   	CPUHP_AP_EXYNOS4_MCT_TIMER_STARTING,
+>>   	CPUHP_AP_ARM_TWD_STARTING,
+>>   	CPUHP_AP_QCOM_TIMER_STARTING,
+>> +	CPUHP_AP_TEGRA_TIMER_STARTING,
+>>   	CPUHP_AP_ARMADA_TIMER_STARTING,
+>>   	CPUHP_AP_MARCO_TIMER_STARTING,
+>>   	CPUHP_AP_MIPS_GIC_TIMER_STARTING,
+>>
+> 
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
