@@ -2,21 +2,21 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B0D81C10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:02:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 587A7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:03:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 81C4320818
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:02:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2836E20818
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 08:03:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CKMsmSZY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UP6PL3RW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81C4320818
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C63cxW76";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="UvizMhpK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2836E20818
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
 	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Fy0p/QN3HTq6f6G1aM7mmDBCpqy1VREecCy2kuNkE6Y=; b=CKMsmSZYTbtPdD
-	iktQDrxmQiC+IbBwSNMwtUgi5XwOHpsLwfTL4l22CvEyisYKatxkES5asyx0oyYv9bCN1bkJpxceR
-	W3ftyMjjHCTeCOuezcz0O3eBhFd9iYyexilNVxzrSKkw+qFqlQdWQDt0e2bZTRLWQJsFB4C+qpAQ1
-	7z7K3i586KJfvZ9T5oHbUQBCJZJWv1YdHSc8TurzxLCB9qgQSqBBKqPHXFcRTs8jWGA00dCY874qH
-	3DTZvd4Xp2o7fZoNnA8fvwo/bzgu7XV5jmg25XppWnxVEYstL44RLSkPAj/tPAIxbphTHuhoAjfym
-	7NOS6dMKJzljbvyayUFg==;
+	List-Owner; bh=SWL4S9hOsx5Ri6JduPloIUPcwXH7cPsR7voJbJjxLJI=; b=C63cxW7699riYE
+	G0E6HzQjQf5QdlgaaIYwETKuL8fT+y05xELCMP6zTfEO/bDVqcSyIefU7fhGZ9c4jZjjm4v9Z7nku
+	lQhdwkL5M93+KogXyLuYSrvMuLCb/VxuRe5KdCtvo95XAPTCeS17LuM0e2N4DitJ9PA1SMdJUxq2W
+	1YhvgNZ5H8eJOL4C/a8Vv/JRDg9xQkNvmJX8jEHDbih123WWwb752c1dBAKoVFtRI7QVBr3xkb2I0
+	6tz7mRnWPHBq4nICp3MbtVXjC4b290ZcSTHylDa5vJ7sNa24kPmUh2IN7qfjlTmoYV90mJCZzkoNC
+	EPtIi+kYhO2XC2E3OoKQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx5nC-0001PY-2n; Fri, 22 Feb 2019 08:02:46 +0000
+	id 1gx5nU-0001kG-UC; Fri, 22 Feb 2019 08:03:04 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx5n9-0001P3-4n; Fri, 22 Feb 2019 08:02:44 +0000
+ id 1gx5nR-0001hu-4S; Fri, 22 Feb 2019 08:03:02 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id A25C320818;
- Fri, 22 Feb 2019 08:02:42 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id B599320818;
+ Fri, 22 Feb 2019 08:03:00 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550822562;
- bh=rzNzALqErAPnwJRW0AzmQYlT0Gmt30ILBXGTVjpDzZk=;
+ s=default; t=1550822580;
+ bh=RicdjWSA+G9qBUgR2bL/JC/oMLgNOjuxLyLIQUJg+q0=;
  h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
- b=UP6PL3RWo5BApPQR6Y3M/r/WvafosAMBTMXb1HdKSqRx3/gtEeziexx+ptydISF01
- P5FcKFB6tXD7uIURrCIcfV1a3kNZ57oxCiVEoBLnvzaQcngai+lbi8S0d0aJcklMcx
- W7ayvOjYT4/8z+WtvoGrbs4MuUHFZWirvKSMPOgw=
+ b=UvizMhpK0/J9P6SC8vjyGuw1CyEp6rtXLstzYat7hMArbrSR2cOVknErRVd/xzfoL
+ hYJzMwIJpxib5RPqxUHYdEWBrZdiWZ4JG4iaWjoLR3ntU26d7DbXFGkE28+xe5xpb1
+ J+NTJ45K3qq8QJj5WM780G/nhIihWfYqeQ8OqH1U=
 MIME-Version: 1.0
-Subject: Re: [PATCH v2 0/6] Add clock support for Actions Semi S500 SoC
-Message-ID: <155082256184.77512.7380378442221286861@swboyd.mtv.corp.google.com>
+Subject: Re: [PATCH v2 1/6] clk: actions: Add configurable PLL delay
+Message-ID: <155082258002.77512.8979526306640099690@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.8
 References: <20190115033340.25016-1-manivannan.sadhasivam@linaro.org>
- <20190201035343.GB4283@Mani-XPS-13-9360>
- <20190216041541.GB3054@Mani-XPS-13-9360>
+ <20190115033340.25016-2-manivannan.sadhasivam@linaro.org>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20190216041541.GB3054@Mani-XPS-13-9360>
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-Date: Fri, 22 Feb 2019 00:02:41 -0800
+In-Reply-To: <20190115033340.25016-2-manivannan.sadhasivam@linaro.org>
+To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>, afaerber@suse.de,
+ devicetree@vger.kernel.org, linux-actions@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
+ linux-kernel@vger.kernel.org, mturquette@baylibre.com, robh+dt@kernel.org
+Date: Fri, 22 Feb 2019 00:03:00 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_000243_205817_BE8F6323 
-X-CRM114-Status: GOOD (  12.51  )
+X-CRM114-CacheID: sfid-20190222_000301_209584_7E6CB5E5 
+X-CRM114-Status: UNSURE (   5.33  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,42 +77,22 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, mturquette@baylibre.com,
- linux-actions@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-clk@vger.kernel.org, robh+dt@kernel.org, afaerber@suse.de,
- linux-arm-kernel@lists.infradead.org
+Cc: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Manivannan Sadhasivam (2019-02-15 20:15:41)
-> Hi Stephen,
+Quoting Manivannan Sadhasivam (2019-01-14 19:33:35)
+> S500 SoC requires configurable delay for different PLLs. Hence, add
+> a separate macro for declaring a PLL with configurable delay and also
+> modify the existing OWL_PLL_NO_PARENT macro to use default delay so
+> that no need to modify the existing S700/S900 drivers.
 > 
-> On Fri, Feb 01, 2019 at 09:23:43AM +0530, Manivannan Sadhasivam wrote:
-> > Hi Stephen,
-> > 
-> > On Tue, Jan 15, 2019 at 09:03:34AM +0530, Manivannan Sadhasivam wrote:
-> > > Hello,
-> > > 
-> > > This patchset adds common clock support for Actions Semi S500 SoC of
-> > > the Owl family SoCs. This series is based on the initial work done
-> > > by Edgar Bernardi Righi. https://patchwork.kernel.org/cover/10587527/
-> > > 
-> > > Since there isn't any update from him for long time, I took the liberty
-> > > to modify his patches, address review comments and send to list for review.
-> > > 
-> > > This series has been tested on Allo Sparky SBC.
-> > > 
-> > 
-> > Can you please merge the clk patches so that I can take the DT bits through
-> > Actions sub-tree?
-> > 
-> 
-> Any update on this patchset?
-> 
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> ---
 
-Merged the three clk and binding patches into clk-next.
+Applied to clk-next
 
 
 _______________________________________________
