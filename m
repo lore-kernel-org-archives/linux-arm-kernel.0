@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BE6CEC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:04:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2251DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:08:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8EBAE206BB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:04:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E58CC206BB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 19:08:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AsY0QNOa";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="oht29A8G"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8EBAE206BB
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eJ1S7HSd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="rvJ71P0v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E58CC206BB
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,35 +25,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
 	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=C0QzS2qKf9nKDk1McGoL9mc5cWhOsmcXAWzOAtEw4SY=; b=AsY0QNOaj0gIFx
-	kTO4yyHmGuxwqXr8FXnIFJitC8S7KOiaQK2v07mtpexgqOIitJzT8o/1R1qhhn1HeXmxzGnfwxC0e
-	GFVCt4k6CxFTikr4A8QxVn9YBAi8+PEF3LZp2z6d6x7bv58xmoVmunmsO3PjLHJ8Bf1UB9U4cfMCL
-	rds+ApgZoptmBL0kn9RELyUK2E8f+bkSOQf1zPPb/7Q6o4B2s5e5DRXKSWXWebuDi1heEcXmjrnZc
-	Ch1baqeYFmycNC+u3pD1Gv4JICZ1rP3gvgdWu7Li3nxDW1eOiUoBAkzdsVQxwzDTDqFkhuAXeZB1M
-	xrfjgW33bbI/4+erT2gQ==;
+	List-Owner; bh=K4tRsZ62GGEGSQE/bwY6HihVhChhEKxLRqgS+xtNJfo=; b=eJ1S7HSdh18Ucx
+	88RK+FRck9wsPVF/sIegseHE+n3CJHxhdLL0w/snVMQYuvhEbFYYW50/D6c4Cj3THaOJOrGlZPQbm
+	EfhfP3bws0bb6GoaP38x+pHRekO3Q9/jhE0EYGzDk0Sn82nSQb5CUDLMAosl827WnyA9vQCTAYEA1
+	331Jb6MvwpiDD1wU3b8psUXNQuuuVwfyWqO7y+ZYeoor9AHvxMfZ4M/dPjHbgjjoK0+ptlDhb4vyr
+	r1uKUPoEO4NQKONKEDoiQohMD8qb8ngKVzkhEJSv+5gMsnCsD+jF3xwBIVJ7OtwHpqFNZbOhBBwpg
+	jd6psUmdZDzwG8tJJCJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxG6z-000089-7o; Fri, 22 Feb 2019 19:03:53 +0000
+	id 1gxGBF-0001mb-7w; Fri, 22 Feb 2019 19:08:17 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxG6w-00007r-HA
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:03:51 +0000
+ id 1gxGB9-0001lm-A0
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 19:08:12 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 0E5DB20700;
- Fri, 22 Feb 2019 19:03:50 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id D23B3206BB;
+ Fri, 22 Feb 2019 19:08:10 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550862230;
- bh=oHYuZyL+hSxgM6rvJNLmVtPyPI9Zmo8DfRJ6wDGNVqk=;
+ s=default; t=1550862490;
+ bh=zn5gREfnAEgVz2BI4KrdGye4NvLUosAjzJ0G//JMftY=;
  h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
- b=oht29A8Geq9cg3EWochvXypGVtOlH1d1DhNwq39sJUF/DdAG7F8BaFD2/UBbXjTSh
- vjkKDUxrg1e7vkSxKiMqz5ivvvL7BsBB1GW5Ncx4OEoQsZ7W0QLCKQGUDboc9YmMw4
- RecOwsq0dibUEzmMRUg4zqF0vE742ABAzqZSygNk=
+ b=rvJ71P0vQdSAFNlEJjZ4Pe8azzNtfsV9AtdZmcTkrOuZxK9geLTwKtG7YAf3l8Vwm
+ qWX1lnThkUN9xUae0vOKy2p3arrmCbUPxQZo2AWLVfKPqH/orPjaPlLAAxHIC359l6
+ YxCnzqmv8kafRdWDmgPjp8LHeKyvH7XdIBIXTvIQ=
 MIME-Version: 1.0
 Subject: Re: [PATCH RESEND V6 2/2] clk: imx: scu: add cpu frequency scaling
  support
-Message-ID: <155086222918.77512.13959395913988791957@swboyd.mtv.corp.google.com>
+Message-ID: <155086249004.77512.8709011386763447047@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.8
 References: <1550802436-13007-1-git-send-email-Anson.Huang@nxp.com>
  <1550802436-13007-2-git-send-email-Anson.Huang@nxp.com>
@@ -72,11 +72,10 @@ To: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
  "shawnguo@kernel.org" <shawnguo@kernel.org>,
  Aisheng Dong <aisheng.dong@nxp.com>, Anson Huang <anson.huang@nxp.com>,
  Daniel Baluta <daniel.baluta@nxp.com>
-Date: Fri, 22 Feb 2019 11:03:49 -0800
+Date: Fri, 22 Feb 2019 11:08:10 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_110350_586356_5955FDDC 
-X-CRM114-Status: UNSURE (   8.86  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190222_110811_367382_2AD7D944 
+X-CRM114-Status: GOOD (  12.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,10 +105,38 @@ Quoting Anson Huang (2019-02-21 18:32:10)
 > inside SCU clock driver.
 > 
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
 
-Applied to clk-next
+Ah I missed one thing, see below.
 
+> @@ -180,6 +185,23 @@ static long clk_scu_round_rate(struct clk_hw *hw, unsigned long rate,
+>         return rate;
+>  }
+>  
+> +static int clk_scu_atf_set_cpu_rate(struct clk_hw *hw, unsigned long rate,
+> +                                   unsigned long parent_rate)
+> +{
+> +       struct clk_scu *clk = to_clk_scu(hw);
+> +       struct arm_smccc_res res;
+> +       unsigned long cluster_id;
+> +
+> +       if (clk->rsrc_id == IMX_SC_R_A35)
+> +               cluster_id = 0;
+
+Do we still need to check this anymore? Why not just always use
+cluster_id 0?
+
+> +
+> +       /* CPU frequency scaling can ONLY be done by ARM-Trusted-Firmware */
+> +       arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
+> +                     cluster_id, rate, 0, 0, 0, 0, &res);
+
+Because not checking would make this work, vs. checking causes this code
+to sometimes use an uninitialized value from the stack.
+
+> +
+> +       return 0;
+> +}
+> +
 
 _______________________________________________
 linux-arm-kernel mailing list
