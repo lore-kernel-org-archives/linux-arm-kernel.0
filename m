@@ -2,62 +2,75 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-11.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 49A80C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:52:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5E95EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:53:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1A5F02081B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:52:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 259CB2081B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 09:53:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mjnegtOt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1A5F02081B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZiZUifif";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="tLlNBpBV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 259CB2081B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Qq/mlHG6oUUMP4r0e4klDXgIPgeu6IPBgV039RIlXK4=; b=mjnegtOtCdH/XK
-	eYuJyC+A4ZR94Btuem8T7bUIPzdqT4SJAAsvnJVFHUmLRyTVuipDzrdHPULLRhchwZ5b7NYkbJ5LV
-	a2vCcT/Ge4KT7zC5YsSoDs6GNGywMjwwo+4/zfb0m8X53fNUi2/gUONeKuTjTisAy/xOJQ/aYLZrM
-	WBebmM4HFioOzWRS0JLw222rKrM9l/V9yDOCTcXoWHUFsecRGb8dAxC9IIzWtnKzli8KsF1pSXytM
-	fKJeRDLKjolljow2xNNpi3x4J+4lWwPs3jVDA/bRrhRn48y0qy34KuRyA/xSoZ3G7XgOiP09/izD3
-	PUGrWmg/ysof05oItXIg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Tw0NImKATE6mXNDfUE44UyPVKaF8SkIBDQf1YD80aGM=; b=ZiZUififkvf+os
+	T1Xzl8VdCEP2OhklqsDReQ77OlIgKijZBkjCoevlRNbYwvqtS6R3ZesROCB0Mld1gRSv7vwLtwVEh
+	6TpbtmSMzKfQkBqMXo/5Z44Jhop7Q2Su/LRahzw4MOtjLHLBkEyiMC+Jh11jhy9F27W2U8F2Pffq2
+	YAIHtOQ+T7r8kqhdmTs8m0hSC5u2jRmra6CM459bYA80CQbmID5it5NcCMNxVypOjyR08xupHmGTN
+	4GqnGPxRMmQZF3QYpmftRXTrdsXcrm5bJf0nzS6BkSG8l+IKxXbOCMBwc07wqqcNwuWih08OCy1R5
+	nswAEEArp8rM7pQCKpjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gx7Ut-0008Q1-9O; Fri, 22 Feb 2019 09:51:59 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gx7Ur-0008Pd-2K
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:51:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BC6EA80D;
- Fri, 22 Feb 2019 01:51:55 -0800 (PST)
-Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 16D263F703;
- Fri, 22 Feb 2019 01:51:53 -0800 (PST)
-Date: Fri, 22 Feb 2019 09:51:49 +0000
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [PATCH 06/30 v2] ARM: ixp4xx: Switch to use new IRQ+GPIO drivers
-Message-ID: <20190222095149.7c102414@why.wild-wind.fr.eu.org>
-In-Reply-To: <20190221154458.23763-7-linus.walleij@linaro.org>
-References: <20190221154458.23763-1-linus.walleij@linaro.org>
- <20190221154458.23763-7-linus.walleij@linaro.org>
-Organization: ARM Ltd
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
+	id 1gx7WG-0000MH-1R; Fri, 22 Feb 2019 09:53:24 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx7WE-0000Lv-8n
+ for linux-arm-kernel@bombadil.infradead.org; Fri, 22 Feb 2019 09:53:22 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=Content-Type:MIME-Version:Message-ID:
+ Date:Subject:Cc:To:From:Sender:Reply-To:Content-Transfer-Encoding:Content-ID:
+ Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+ :Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:
+ List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=HLxIPactJv6OF936WWNNMtfpz6/NuTqORLy2Vnh+Pqk=; b=tLlNBpBVFIigBQxpFMXA76FRig
+ 8QLVO9pwvFss62xSuzuD39ClJ2va/XU4pvlLrRkvMhNdsC6aB35h42Zxkgy0vGbpSFczo0Y21UUfM
+ XQbMJiAkeo5UyD3MObmKyIj8KXClftsa0SOMiQ8hVqRGv/Iy4d2fsALgdpEa+Ax/nwANfn4mqLIw0
+ +2eMbu1xyfSstmqIz8otEPNextttBHiXiKpFA6tgoVgi+e15bkz8f451hNQHEitRe2BUcIGSsfqhk
+ JmvIRDs2W65h1gXjoAwSli8alY7DovPTFL5s1uJJVcTH2wrcMWhGxRS/Dzpuwyvw/Yld8gF/felEA
+ 3kAIH14A==;
+Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gx7WB-0001Og-11
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 09:53:20 +0000
+X-Originating-IP: 109.212.201.85
+Received: from localhost (alyon-652-1-170-85.w109-212.abo.wanadoo.fr
+ [109.212.201.85]) (Authenticated sender: gregory.clement@bootlin.com)
+ by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 7B85920003;
+ Fri, 22 Feb 2019 09:52:43 +0000 (UTC)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>,
+ <arm@kernel.org>
+Subject: [GIT PULL] ARM: mvebu: fixes for v5.0 (#2)
+Date: Fri, 22 Feb 2019 10:52:43 +0100
+Message-ID: <87a7io176c.fsf@FE-laptop>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_015157_112925_B8A6B39F 
-X-CRM114-Status: GOOD (  10.10  )
+X-CRM114-CacheID: sfid-20190222_045319_183265_11CB2ECA 
+X-CRM114-Status: UNSURE (   8.81  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,33 +82,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jason Cooper <jason@lakedaemon.net>,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>,
- Krzysztof Halasa <khalasa@piap.pl>, Thomas Gleixner <tglx@linutronix.de>,
- Imre Kaloz <kaloz@openwrt.org>, linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Jason Cooper <jason@lakedaemon.net>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 16:44:34 +0100
-Linus Walleij <linus.walleij@linaro.org> wrote:
+Hi,
 
-> This deletes the old irq+gpiochip combo from the IXP4xx
-> machine and switches it over to use the new drivers merged
-> in respective subsystem.
-> 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Here is the second pull request for fixes for mvebu for v5.0.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Gregory
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+The following changes since commit b5f034845e70916fd33e172fad5ad530a29c10ab:
+
+  ARM: dts: kirkwood: Fix polarity of GPIO fan lines (2019-01-10 12:23:47 +0100)
+
+are available in the Git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-fixes-5.0-2
+
+for you to fetch changes up to bdd22a41d55bb0068c8685e28839ed9492e96aba:
+
+  arm64: dts: clearfog-gt-8k: fix SGMII PHY reset signal (2019-02-19 16:09:11 +0100)
+
+----------------------------------------------------------------
+mvebu fixes for 5.0 (part 2)
+
+Fix PHY reset signal on clearfog gt 8K (Armada 8040 based)
+Fix NAND description on Armada XP boards which was broken since a few
+release
+
+----------------------------------------------------------------
+Baruch Siach (1):
+      arm64: dts: clearfog-gt-8k: fix SGMII PHY reset signal
+
+Thomas Petazzoni (1):
+      ARM: dts: armada-xp: fix Armada XP boards NAND description
+
+ arch/arm/boot/dts/armada-xp-db.dts                 | 46 ++++++------
+ arch/arm/boot/dts/armada-xp-gp.dts                 | 13 ++--
+ arch/arm/boot/dts/armada-xp-lenovo-ix4-300d.dts    | 85 +++++++++++-----------
+ .../dts/marvell/armada-8040-clearfog-gt-8k.dts     |  2 +-
+ 4 files changed, 77 insertions(+), 69 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
