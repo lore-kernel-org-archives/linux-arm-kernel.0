@@ -2,87 +2,67 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 60355C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:37:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0A94FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:39:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1BCE42075A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:37:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA666207E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:39:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t+rxdwjg";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=essensium-com.20150623.gappssmtp.com header.i=@essensium-com.20150623.gappssmtp.com header.b="VF9ZC/pw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BCE42075A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=essensium.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r7U885Ls";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="mVbysrqn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA666207E0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b/1nDXsPYZ8B+DlwF6qvJGvANsQzcBukdgxb6T94Oos=; b=t+rxdwjgn/7CF1
-	qHGN67c8Yovab8efx7WbWHnhYiHDV/6j9kjBb0HVBsIVqi94ABBeCmxOMIntI4OzWsLT0Q1KPxJN6
-	7raaSKYeRIb6giPravl+X1h50r7mkL8+aWpNuOZnUOm7xkMGwmyvpMw6DOYtKpyLvSQRP4+1X8OqI
-	EcTQQQHvUvTGsbFZEdYqn05S9FOw55wxsDBw0ghuf/c/FNw3eT1mVBIVrQ7W2PRdWOLB+Ij/fuLfo
-	FNEHfd04jsVvsbmA4V1YzoOz+EzOYBBDYMedmRNZm4enUAtm0fv3m/pwplIcoBWi979lSW0vt/bQ2
-	R4BU6W55N/B47r4CpO5Q==;
+	List-Owner; bh=6VjPi57hL+7A/dCRqBpaR4pOML6kwwwPv6JaO6TRQRA=; b=r7U885LsUainsT
+	Er0/WQ+pjObdczfnudDnunAOZ/DtbINj/V/3s4Dut5Yk8c8XvhyAUiJ/TWNhZ7CG0VZQJxxpN3G67
+	PKVAyI9aoIk0q7W+CjscjBsuCSPweu+iGTeQRDjaxYGZMXXlj+LRSyHc3a+t084FIcuMIw+UY9iEv
+	nBERSf0yx1Dr53LEAgnsWsh1jON1i158NXtwQhzx7jWIA6wjLE47rDde6iQ8pE/Nk5M8h2pJ0B63o
+	6g4SsXpN6QB1XMEn+W/7E7nhbMuJHAX0rRCHQZNFjbha5cmx0YBHeGq4YJxEuPz3+Ru/zVBP6/oI2
+	CfVmCEePXKtqJ/udpWEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxBxP-0002SQ-79; Fri, 22 Feb 2019 14:37:43 +0000
-Received: from mail-yb1-xb41.google.com ([2607:f8b0:4864:20::b41])
+	id 1gxByh-0002nB-An; Fri, 22 Feb 2019 14:39:03 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxBxC-0002Cv-5g
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 14:37:38 +0000
-Received: by mail-yb1-xb41.google.com with SMTP id j85so899073ybg.11
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 06:37:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=essensium-com.20150623.gappssmtp.com; s=20150623;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=71FWYCSYqolUNYdHB6h+7aw1EHmEdZQNjgmLsAFRBRQ=;
- b=VF9ZC/pwjqPWKGz+OnP5zP6UW1KRZmpKMyefSgpo9M4yhncv/srNYQXlaNPT0mMYSc
- CevSxczb1xOBYFBXTS3F+Ew3X3+rl+AWcvsSIEmeMaROY+QfKiQ/mkb1o6/5OqqgPadL
- v74SSsCtOtxqHNRLTdexqtC6ozLYX9HZIGDNtSSjI5wuocWlAw0jmT4sOe/2WTDX43St
- oT9RvASxAW2w7WNgyfZc7R5fhl5OhAUvYNAeP7wQfNB74k6hrb8IjoZ8CVtpTweE74Yw
- 0LC8wiVx/gJd6mjqVP/BisAAxFNEvvOEPUcCxGESDRUZ+AZFw1BfN2bxkVr2Zgd74g+b
- 3Ugw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=71FWYCSYqolUNYdHB6h+7aw1EHmEdZQNjgmLsAFRBRQ=;
- b=qASGU8mP0Pohob5YH+ApoG7ji8lbnyoMtWSIY224aMhO+JIc4eX9utxWWjQKd5a7oH
- VX8n8qYpMQc08nSzds3Y46/mTDlPt8MdUshIl+XroIKheTUrpOfGiY1uC9fASrUdyAoT
- LZ/Nz+hOGhKDpsyOXaoo5rfHWqqxrUzqK2gV+FmyXeKDhpzSqALF4xjrp00pVXApfm+h
- Wb+tQZ04hOCnQfX9697rDNF+pvPS1BMBAko5ONINhNrOvywv5CtPzPi2emjwv+ZB3tnA
- u+m/k52XromwcxUZ6XUW87pF+D6t05wMPZJZzU06r4csE/fZLSX+yHYQ6W54UdbcJ7km
- aRXg==
-X-Gm-Message-State: AHQUAubLV6yTKvLw8RRusu3uWKl+DMKvTZAqIQmRVP96IoF3LPkRWFHc
- yUDDuuV33RKf0QfV8Lc42QnNyOYuSZ72rFBE/k+Yng==
-X-Google-Smtp-Source: AHgI3IbiwWkiGGT/QpFlIkUVk7q36nI0iMQVsQ7TPGxhgsjNk6oh2vnC2sXcuWD3EAz203Sc3uaEff/B8CXyMvysFGc=
-X-Received: by 2002:a25:bec2:: with SMTP id k2mr3650739ybm.328.1550846248027; 
- Fri, 22 Feb 2019 06:37:28 -0800 (PST)
+ id 1gxBye-0002mg-I9; Fri, 22 Feb 2019 14:39:02 +0000
+Received: from localhost (91-160-177-164.subs.proxad.net [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id E66C32075A;
+ Fri, 22 Feb 2019 14:38:57 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550846340;
+ bh=zjinuR813AkGthV/dSUOKPEjfqFS2Hzi/KUrQT9O0Os=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=mVbysrqnDOioD+lRxLiXps2k+ztmvDk353SSMBnr4uzUHVUnN12t/aQWIroz6RKvO
+ 7W3yrwmj3vPpRXpddNymFofTK81YHYEUnfz3zl0YihOV+nPYYgE24mFRhAxAzs+ELC
+ iaTnq6/n5JM8tOESRF4sfbHV8buAMAKBT7TvxC9c=
+Date: Fri, 22 Feb 2019 15:38:53 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 24/27] mtd: spinand: Instantiate a SPI-NAND on-die
+ ECC engine
+Message-ID: <20190222153853.3347b253@kernel.org>
+In-Reply-To: <20190221125806.28875-12-miquel.raynal@bootlin.com>
+References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
+ <20190221125806.28875-12-miquel.raynal@bootlin.com>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-References: <20190218140321.19166-1-patrick.havelange@essensium.com>
- <20190218140321.19166-5-patrick.havelange@essensium.com>
- <20190220164154.00547a77@archlinux>
- <20190221010931.GA3471@icarus> <20190221082758.GA3380@icarus>
-In-Reply-To: <20190221082758.GA3380@icarus>
-From: Patrick Havelange <patrick.havelange@essensium.com>
-Date: Fri, 22 Feb 2019 15:37:16 +0100
-Message-ID: <CAKKE0ZEKLp2NJE55by5VHc36P=w_rrMxsPxQG60T0BtCzYkSEw@mail.gmail.com>
-Subject: Re: [PATCH 5/8] iio/counter: add FlexTimer Module Quadrature decoder
- counter driver
-To: William Breathitt Gray <vilhelm.gray@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_063730_757451_089794E2 
-X-CRM114-Status: GOOD (  29.83  )
+X-CRM114-CacheID: sfid-20190222_063900_633445_6BC30191 
+X-CRM114-Status: GOOD (  22.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,99 +74,164 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Lars-Peter Clausen <lars@metafoo.de>, linux-pwm@vger.kernel.org,
- linux-iio@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- Linus Walleij <linus.walleij@linaro.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Li Yang <leoyang.li@nxp.com>, Rob Herring <robh+dt@kernel.org>,
- Thierry Reding <thierry.reding@gmail.com>,
- Esben Haabendal <esben@haabendal.dk>,
- Peter Meerwald-Stadler <pmeerw@pmeerw.net>, Hartmut Knaack <knaack.h@gmx.de>,
- Thomas Gleixner <tglx@linutronix.de>, Shawn Guo <shawnguo@kernel.org>,
- Jonathan Cameron <jic23@kernel.org>, linux-arm-kernel@lists.infradead.org
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Jonathan,
+On Thu, 21 Feb 2019 13:58:03 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-Thanks for your comments, I'll make a new version of the patch based
-on your input.
+> Make use of the existing functions taken from the SPI-NAND core to
+> instantiate an on-die ECC engine specific to the SPI-NAND core. The
+> next step will be to tweak the core to use this object instead of
+> calling the helpers directly.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/spi/on-die-ecc-engine.c   | 105 +++++++++++++++++++++
 
-William, I'll rebase the next version on top of your branch.
+Maybe on-die-ecc.c is enough. To be honest, given the amount of code,
+I'd even prefer to have this code directly in core.c.
 
-I'm glad the counter subsystem effort is progressing :)
+
+>  include/linux/mtd/nand-spi-on-die-engine.h |  35 +++++++
+
+Hm, let's make those defs part of the spinand.h file instead of
+creating a new one.
 
 
-Patrick Havelange.
+>  include/linux/mtd/nand.h                   |   1 +
+>  3 files changed, 141 insertions(+)
+>  create mode 100644 include/linux/mtd/nand-spi-on-die-engine.h
+> 
+> diff --git a/drivers/mtd/nand/spi/on-die-ecc-engine.c b/drivers/mtd/nand/spi/on-die-ecc-engine.c
+> index 3d5b83238e14..515b9e3efc93 100644
+> --- a/drivers/mtd/nand/spi/on-die-ecc-engine.c
+> +++ b/drivers/mtd/nand/spi/on-die-ecc-engine.c
+> @@ -45,3 +45,108 @@ int spinand_check_ecc_status(struct spinand_device *spinand, u8 status)
+>  
+>  	return -EINVAL;
+>  }
+> +
+> +static int spinand_noecc_ooblayout_ecc(struct mtd_info *mtd, int section,
+> +				       struct mtd_oob_region *region)
+> +{
+> +	return -ERANGE;
+> +}
+> +
+> +static int spinand_noecc_ooblayout_free(struct mtd_info *mtd, int section,
+> +					struct mtd_oob_region *region)
+> +{
+> +	if (section)
+> +		return -ERANGE;
+> +
+> +	/* Reserve 2 bytes for the BBM. */
+> +	region->offset = 2;
+> +	region->length = 62;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct mtd_ooblayout_ops spinand_noecc_ooblayout = {
+> +	.ecc = spinand_noecc_ooblayout_ecc,
+> +	.free = spinand_noecc_ooblayout_free,
+> +};
+> +
+> +static int ecc_spinand_ondie_init_ctx(struct nand_device *nand)
+> +{
+> +	struct spinand_device *spinand = nand_to_spinand(nand);
+> +	struct mtd_info *mtd = nanddev_to_mtd(nand);
+> +	struct ecc_sw_hamming_conf *engine_conf;
+> +
+> +	nand->ecc.ctx.conf.step_size = nand->ecc.requirements.step_size;
+> +	nand->ecc.ctx.conf.strength = nand->ecc.requirements.strength;
+> +
+> +	engine_conf = kzalloc(sizeof(*engine_conf), GFP_KERNEL);
+> +	if (!engine_conf)
+> +		return -ENOMEM;
+> +
+> +	nand->ecc.ctx.priv = engine_conf;
+> +
+> +	if (spinand->eccinfo.ooblayout)
+> +		mtd_set_ooblayout(mtd, spinand->eccinfo.ooblayout);
+> +	else
+> +		mtd_set_ooblayout(mtd, &spinand_noecc_ooblayout);
+> +
+> +	return 0;
+> +}
+> +
+> +static void ecc_spinand_ondie_cleanup_ctx(struct nand_device *nand)
+> +{
+> +	kfree(nand->ecc.ctx.priv);
+> +}
+> +
+> +static int ecc_spinand_ondie_prepare_io_req(struct nand_device *nand,
+> +					    struct nand_page_io_req *req,
+> +					    void *oobbuf)
+> +{
+> +	struct spinand_device *spinand = nand_to_spinand(nand);
+> +	bool enable = (req->mode != MTD_OPS_RAW);
+> +
+> +	/* Only enable or disable the engine */
+> +	return spinand_ecc_enable(spinand, enable);
+> +}
+> +
+> +static int ecc_spinand_ondie_finish_io_req(struct nand_device *nand,
+> +					   struct nand_page_io_req *req,
+> +					   void *oobbuf)
+> +{
+> +	struct ecc_spinand_ondie_conf *engine_conf = nand->ecc.ctx.priv;
+> +	struct spinand_device *spinand = nand_to_spinand(nand);
+> +
+> +	if (req->mode == MTD_OPS_RAW)
+> +		return 0;
+> +
+> +	/* Nothing to do when finishing a page write */
+> +	if (req->type == NAND_PAGE_WRITE)
+> +		return 0;
+> +
+> +	/* Finish a page write: check the status, report errors/bitflips */
+> +	return spinand_check_ecc_status(spinand, engine_conf->status);
+> +}
+> +
+> +static struct nand_ecc_engine_ops spinand_ondie_engine_ops = {
+> +	.init_ctx = ecc_spinand_ondie_init_ctx,
+> +	.cleanup_ctx = ecc_spinand_ondie_cleanup_ctx,
+> +	.prepare_io_req = ecc_spinand_ondie_prepare_io_req,
+> +	.finish_io_req = ecc_spinand_ondie_finish_io_req,
+> +};
+> +
+> +static struct nand_ecc_engine spinand_ondie_engine = {
+> +	.ops = &spinand_ondie_engine_ops,
+> +};
+> +
+> +void spinand_ondie_ecc_save_status(struct nand_device *nand, u8 status)
+> +{
+> +	struct ecc_spinand_ondie_conf *engine_conf = nand->ecc.ctx.priv;
+> +
+> +	if (nand->ecc.engine == &spinand_ondie_engine && engine_conf)
+> +		engine_conf->status = status;
+> +}
+> +
+> +struct nand_ecc_engine *spinand_ondie_ecc_get_engine(void)
+> +{
+> +	return &spinand_ondie_engine;
 
-On Thu, Feb 21, 2019 at 9:27 AM William Breathitt Gray
-<vilhelm.gray@gmail.com> wrote:
->
-> On Thu, Feb 21, 2019 at 10:09:54AM +0900, William Breathitt Gray wrote:
-> > On Wed, Feb 20, 2019 at 04:41:54PM +0000, Jonathan Cameron wrote:
-> > > On Mon, 18 Feb 2019 15:03:18 +0100
-> > > Patrick Havelange <patrick.havelange@essensium.com> wrote:
-> > >
-> > > > This driver exposes the counter for the quadrature decoder of the
-> > > > FlexTimer Module, present in the LS1021A soc.
-> > > >
-> > > > Signed-off-by: Patrick Havelange <patrick.havelange@essensium.com>
-> > > > Reviewed-by: Esben Haabendal <esben@haabendal.dk>
-> > > Given you cc'd William, I'm guessing you know about the counter
-> > > subsystem effort.  I would really rather not take any drivers
-> > > into IIO if we have any hope of getting that upstreamed soon
-> > > (which I personally think we do and should!).  The reason is
-> > > we end up having to maintain old ABI just because someone might be using
-> > > it and it makes the drivers very messy.
-> > >
-> > > I'll review as is though as may be there are some elements that will
-> > > cross over.
-> > >
-> > > Comments inline.  William: Looks like a straight forward conversion if
-> > > it makes sense to get this lined up as part of your initial submission?
-> > > You have quite a few drivers so I wouldn't have said it needs to be there
-> > > at the start, but good to have it soon after.
-> > >
-> > > Jonathan
-> >
-> > I agree, we should try to merge this as part of Counter subsystem
-> > introduction rather than as another IIO Counter driver. As we determined
-> > when adding support for the STM32 timers, the existing IIO Counter API
-> > is fundamentally unsuitable for representing counter devices. So
-> > regardless of how a new Counter API is merged, the existing IIO Counter
-> > API must be deprecated.
-> >
-> > Patrick, I apologize for the confusion this has caused. Would you be
-> > able to convert this driver to use the proposed Counter subsystem API
-> > from this patchset that I believe you encountered before:
-> > https://marc.info/?l=linux-arm-kernel&m=153229982404051
-> >
-> > Although it was last updated in October, I believe you should be able to
-> > rebase that Counter subsystem introduction patchset cleanly on top of
-> > the IIO tree (if there are any merge conflicts send me an email). Take a
-> > look at the generic-counter.rst file under the Documentation/driver-api/
-> > directory for an overview of the API; the counter drivers under the
-> > drivers/counter/ directory also make good references.
-> >
-> > If you have any difficulties understanding the API, or any other
-> > troubles, don't hesitate to ask. Hopefully, I've made the documentation
-> > clear enough to make the conversion of this driver quick and easy -- and
-> > if not, then it's something I need to fix, so let me know. :-)
-> >
-> > William Breathitt Gray
->
-> Patrick,
->
-> It looks like there were some minor conflicts with the v9 patchset, so
-> I've rebased it on top of the latest iio tree testing branch and
-> resolved the conflicts in my personal repository. Please pull from my
-> personal repository at https://gitlab.com/vilhelmgray/iio.git and base
-> your patches on top of the generic_counter_v10 branch.
->
-> William Breathitt Gray
+Hm, I was expecting to have one engine instance directly embedded in
+spinand_device. The ECC engine is not a global thing here, it's
+actually tied to the SPI NAND device itself.
+
+> +}
+
 
 _______________________________________________
 linux-arm-kernel mailing list
