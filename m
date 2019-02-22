@@ -4,84 +4,84 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3D32C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 00:34:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 548D0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 00:34:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8F0602083E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 00:34:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 205952077B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 00:34:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J5wBVhlB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="CZMR79TE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F0602083E
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I9nxBcIe";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="EfnqGPOX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 205952077B
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=ubR9sIHwZtdm4J/yh3Hl9Hqzb1bcnAzO9Ll2eqeamEs=; b=J5wBVhlBpN1I/M
-	g0oyiErfaQwo0qt09tOvFly+NiKGWMkEjN2esqHggCdZfAUR11VM0HsVkfxC81Ty8EhDzMVSYDTb6
-	He51KYRMtEkREUEhP+Oe9pZ4wwkqhkOY/0VWdz7Xxk7rhQ8EZfDRfcwKvEfLFojVRKG96hpYKWEoZ
-	/R4B+E5GrLKGw4oxRFRSGa/Es43K7xqayEUlgPuNw/yw5F112uONjf+u1KE67veVqamEMs+Dgsj1P
-	VNYjuP5b/HiAAMCYYlB27NfITWFo2eJ/N94au7iVZuuTxEg0FmYvDzwgqdwxCBvf0ZwxQecuydVBF
-	UGMBS57NsznIGaOUYFvA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=THAiiZVeW5MVe1t0EbuLcM4XWp14DX8gGKAE5Ej0jyo=; b=I9nxBcIe1oMyF1
+	ku471zV9TwhamkE0d7yWhOLwdVwlHIg1kbgJqymPAB4cU2s2BwS5GWvtoaQ+DStko9Dft/oybuI83
+	fMccgeztDMi7sVByOhd/zSH0cKFsD+bSloxrIO4RWyFiR82UNEn42UBLocX4nt1RA89a0k+RBXOwe
+	03+c/I4p05ccyGGwjiiWbniG27/aBjU0++SWGSGEuFCQjOWG6iAAW5jjw/jt5dH8ckJETpegjyGIx
+	lWqp9kc91GiDxHOb2P40D0WOjweQRDmbJMvppWcIoqWLy0vyTFzrWoByadNEbfndbdNVDcKqNmQhG
+	tOM4vH562fqUEcfmjlmg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gwynD-00077k-3C; Fri, 22 Feb 2019 00:34:19 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gwynS-0007Q6-0i; Fri, 22 Feb 2019 00:34:34 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gwyn9-00075Z-FP
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 00:34:17 +0000
-Received: by mail-pl1-x641.google.com with SMTP id s1so225245plp.9
+ id 1gwyn9-00075e-Ue
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 00:34:18 +0000
+Received: by mail-pf1-x441.google.com with SMTP id g6so219386pfh.13
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 21 Feb 2019 16:34:14 -0800 (PST)
+ Thu, 21 Feb 2019 16:34:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=zY2jb25QAq1g/TE6DFipzC1VS/FPvRjbhYIqEGjdavA=;
- b=CZMR79TEp6okgbitRKUrx/zE6k1bvOTpS/MJdf4JgULsf7t8svMY7HCb5syEO4GOEw
- B/zo7Iztup8iB5CN2rh/IeFUIjF94xXCHiJVPZ7+6sLxqxhqVkbWUE/bEz6fM2aU+ZSv
- UuOkwX3OYX5UmrWRhNAdIBt1Zuq2nko3J0gts=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references
+ :mime-version:content-transfer-encoding;
+ bh=OBVnoqXuO6HFOZ085kg+BDnfHXIhy9OmFMZxP4tCxpw=;
+ b=EfnqGPOXB+Uhq1/DNgFMPxIVt3T3GMCie9YVOIrnCRIlVx3XOSiSvyj2HCPFtVOlQP
+ 1mh9XqgjQnMQTy3kMk4IR4CbmdabuKi3QUub2B4kB9rowmtLAYzKjXJLn8Oqx7b0AYyE
+ yMntsAzKhhAdRDaEuFyxnJQ8w8oN/QDj0rXqk=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=zY2jb25QAq1g/TE6DFipzC1VS/FPvRjbhYIqEGjdavA=;
- b=XVivRk7rbQOThGi4Hroe1xBhM2CfTjRI2e8l7jD2CvoASR7ve7Lro+ecuQ8j5L6TzP
- 8l+4lFi0wojljWFzl8pByOdNjlwCrFhnX5XniQ6GqXmUc1Hxn94iOREpB7lwmsMzkaJX
- rf0cZPa485YHYavcK1jo64PB3eGQ8V0hlGPPHS5iYtJZW3LxhVFt77iaueNtWKah4kiG
- B8rwnv0VJSISDPOWKEruCYA2nwe+vKajs3uFWupsYbBxym9SMWFRhY6VzVnfk3Bf1Oh0
- cjEZfj5okpVj1aFfiXdtsMlQWA95T3QK2ytR0Me5k1aSYnixUqcUoSacdXaCZeM67wpl
- rh3g==
-X-Gm-Message-State: AHQUAuaJ6tEe6Jj2JQ28WCPr8cIksO0Pvo07hxYaqeQeg7GyeoSQGFW6
- J25Mn8jLwUcYhLhyrkE+aeYjvQ==
-X-Google-Smtp-Source: AHgI3Ib0CD3XpdWcv9QpJUjgdjW+aFVX0c54CH4gaJNQ02kxILdUJXAW0fFC8DTGWsMsGfuPCO2ylg==
-X-Received: by 2002:a17:902:33c1:: with SMTP id
- b59mr1345131plc.220.1550795650564; 
- Thu, 21 Feb 2019 16:34:10 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:content-transfer-encoding;
+ bh=OBVnoqXuO6HFOZ085kg+BDnfHXIhy9OmFMZxP4tCxpw=;
+ b=GyOhhnkS/XUj8xMzKjpqd9RmyYgRq/NudM9t5OJbCxN1i7pLW9PKPUEiPTRxTl4ngA
+ EMaZ40Ln6wKu08zsigNgoKeWmRFnrmQxslv33N3sF4TeFv1ruEVUC0sQE3rs29JLZtVj
+ QCJUhKPALDjKoNdhtPTS/u6RwCKFxsHevQjtVvPts1F/cZWOl//UMmM1hcQoa66y1tdn
+ 7WCJ3bEp3dK1+gQnHsHj8q9hsIBQp2iH74zbzuyDPs7qBzDX1V5NxfKlV/tG/0TAuGeO
+ mCZAjE/vVU8WDkc0zG5OF5eziFVY7J0QZs43B10TTu3f1T7Z+VpToPpuwFlN/kexHkuZ
+ 7sIA==
+X-Gm-Message-State: AHQUAuag6I1SAwUVA78KjVLgrIX1VXmHaKb3pfmbBLwePiTU/e8mHEhs
+ VBm0mMlU4w88YyoN5m6moBx9wA==
+X-Google-Smtp-Source: AHgI3IbGOJeo1tMct7+tFWXD7jLSXbSNtxVZdnkGfxrjSW81ok1QIOiXQPjcBYhWfdhBjDo0Ual3WA==
+X-Received: by 2002:a62:7086:: with SMTP id l128mr1333899pfc.68.1550795652021; 
+ Thu, 21 Feb 2019 16:34:12 -0800 (PST)
 Received: from smtp.gmail.com ([2620:15c:202:1:534:b7c0:a63c:460c])
- by smtp.gmail.com with ESMTPSA id c3sm269830pfg.53.2019.02.21.16.34.09
+ by smtp.gmail.com with ESMTPSA id c3sm269830pfg.53.2019.02.21.16.34.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 21 Feb 2019 16:34:09 -0800 (PST)
+ Thu, 21 Feb 2019 16:34:11 -0800 (PST)
 From: Brian Norris <briannorris@chromium.org>
 To: Heiko Stuebner <heiko@sntech.de>, Marcel Holtmann <marcel@holtmann.org>,
  Johan Hedberg <johan.hedberg@gmail.com>
-Subject: [PATCH 1/3] Bluetooth: btusb: add QCA6174A compatible properties
-Date: Thu, 21 Feb 2019 16:34:01 -0800
-Message-Id: <20190222003403.128243-1-briannorris@chromium.org>
+Subject: [PATCH 2/3] dt-bindings: net: btusb: add QCA6174A IDs
+Date: Thu, 21 Feb 2019 16:34:02 -0800
+Message-Id: <20190222003403.128243-2-briannorris@chromium.org>
 X-Mailer: git-send-email 2.21.0.rc0.258.g878e2cd30e-goog
+In-Reply-To: <20190222003403.128243-1-briannorris@chromium.org>
+References: <20190222003403.128243-1-briannorris@chromium.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190221_163415_519475_D0621B3C 
-X-CRM114-Status: UNSURE (   9.44  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190221_163416_136118_F9315E73 
+X-CRM114-Status: GOOD (  10.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,30 +105,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We may need to specify a GPIO wake pin for this device, so add a
-compatible property for it.
-
-There are at least to USB PID/VID variations of this chip: one with a
-Lite-On ID and one with an Atheros ID.
+There are two USB PID/VID variations I've seen for this chip, and I want
+to utilize the 'interrupts' property defined here already.
 
 Signed-off-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/bluetooth/btusb.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/net/btusb.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
-index 470ee68555d9..380e6f38c607 100644
---- a/drivers/bluetooth/btusb.c
-+++ b/drivers/bluetooth/btusb.c
-@@ -2862,6 +2862,8 @@ static irqreturn_t btusb_oob_wake_handler(int irq, void *priv)
+diff --git a/Documentation/devicetree/bindings/net/btusb.txt b/Documentation/devicetree/bindings/net/btusb.txt
+index 37d67926dd6d..43c96c3380a6 100644
+--- a/Documentation/devicetree/bindings/net/btusb.txt
++++ b/Documentation/devicetree/bindings/net/btusb.txt
+@@ -9,6 +9,9 @@ Required properties:
+ 		 (more may be added later) are:
  
- static const struct of_device_id btusb_match_table[] = {
- 	{ .compatible = "usb1286,204e" },
-+	{ .compatible = "usb0cf3,e300" }, /* QCA6174A */
-+	{ .compatible = "usb04ca,301a" }, /* QCA6174A (Lite-On) */
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, btusb_match_table);
+ 		  "usb1286,204e" (Marvell 8997)
++		  "usb0cf3,e300" (Qualcomm QCA6174A)
++		  "usb04ca,301a" (Qualcomm QCA6174A (Lite-On))
++
+ 
+ Also, vendors that use btusb may have device additional properties, e.g:
+ Documentation/devicetree/bindings/net/marvell-bt-8xxx.txt
 -- 
 2.21.0.rc0.258.g878e2cd30e-goog
 
