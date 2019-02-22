@@ -2,72 +2,67 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 42056C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:43:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DAC7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:44:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0CB3720823
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:43:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5C6EA206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 14:44:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bvPOu9An"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CB3720823
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hpN2kWZ3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="u+kWVgXo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C6EA206A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=YJ7u2g3W4qW9S7YvFFonT34+6s6Y+8vVSlLWmJE3X3g=; b=bvPOu9AnCfmdvm
-	/CcenX4ct0V1ILNHgYRiZp/UBGfYVgdVjgwXcslnZtvqETc3+MUBY1HiyK0tta7OrDLS0qyhBMHgc
-	hAXIaCwQrfm8YV2nskmEnhJek/zbIjd/q8k+bUt7lBBSTMFiEd7FnZhaeJSrAUYElAAM1O/f1nLkT
-	bEdA9b/u8hpCrhpTDYCECNL5il2lG8n4Q1UXs6lSZAFF+QmaspMh9p/CHQY88W8XcjmaUqAn24keL
-	uRNVO02XRxfhc2wZEx1CPb7pOdDsfv3O9SqBe1nG5Wmk7sqhTB6q/6kL0oImx2bHltNjKJOGFywWx
-	DC8IOorUS4gvnOSCd4DA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=IZxAt0T0YTSnWaux2mT6cQxMwqXRaGgbN8C/aeWjeR0=; b=hpN2kWZ3wgIiie
+	hEBk1SQoLt7CHbaiFbMxOwxHN4gCpuP4tkhjvBf2rzQQsKrVKPbNnD+KejoJscIgFXCe6paMvTsko
+	pXQbZ0OtVmZpYqRNbiiu12zY8gdI+FKAJ4lSOulzg1d7wV+2KKvCH8klb4x2vLQ6EcrR6SMnXybQa
+	Kmi2wUR8XQscwdNLkK9Ps2lMNy7sLHpC2wFHy3+Ttwod8V0GOV3e6CLmN4rv8GXd2UEGSHerTR5fl
+	VojEEfCCykenwFfnoIE36vlIODIdx4lQ2SMt1MD/Ng7IlVabtjZd55g2vRI8YPzCYlJg3ghs1Ckja
+	WU+H7p6FvRHOhaL68lFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxC36-0005uK-DO; Fri, 22 Feb 2019 14:43:36 +0000
-Received: from mout.kundenserver.de ([212.227.126.135])
+	id 1gxC49-0006FO-2B; Fri, 22 Feb 2019 14:44:41 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxC2q-0005cy-EW
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 14:43:22 +0000
-Received: from wuerfel.lan ([109.192.41.194]) by mrelayeu.kundenserver.de
- (mreue009 [212.227.15.129]) with ESMTPA (Nemesis) id
- 1MLA6k-1ggD7c2B8s-00IEXc; Fri, 22 Feb 2019 15:43:10 +0100
-From: Arnd Bergmann <arnd@arndb.de>
-To: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>
-Subject: [PATCH] arm64: avoid clang warning about self-assignment
-Date: Fri, 22 Feb 2019 15:42:23 +0100
-Message-Id: <20190222144301.3516708-1-arnd@arndb.de>
-X-Mailer: git-send-email 2.20.0
+ id 1gxC46-0006Ex-BE; Fri, 22 Feb 2019 14:44:39 +0000
+Received: from localhost (91-160-177-164.subs.proxad.net [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id B42AC206A3;
+ Fri, 22 Feb 2019 14:44:35 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550846678;
+ bh=tN25kIKYaNYglinCUMie+OtgsYRXUvZu1czGWjxoA38=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=u+kWVgXoluqZHUrOWD5TmXYFlmf1J8BTJYw1/palZ7CdweBvNlZMIda56/DsRKAGy
+ UYqNlqjJhhLbU7XHirInmeU3LRtQziUSTB/CNEjIv8MQQygAvMkyaf4C/s0ZjrE4pr
+ dljqc5hKB3wcoTNYu9q+0SCkwE75awwFvz1MPVIg=
+Date: Fri, 22 Feb 2019 15:44:31 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 25/27] mtd: nand: Add helpers to manage ECC engines
+ and configurations
+Message-ID: <20190222154431.66c6911f@kernel.org>
+In-Reply-To: <20190221125806.28875-13-miquel.raynal@bootlin.com>
+References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
+ <20190221125806.28875-13-miquel.raynal@bootlin.com>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-X-Provags-ID: V03:K1:3vMyVhA/NmVqE8rVfJt7N/FIr5UNMdS5rMFHSOEzM3LfFmczuSG
- EzAhqToaSsNSdgXGQsijk7viVCnMc7EEKtj1uIaDoFTYr8f16BtiaZ/FdzEenc+spaitemW
- +E61FF0sTXICXZQaJwFD3iiKxXLaNf9E+YwRfuVvxArXKSh09EJfik25dgqHLqzC9Pkhema
- GiviClDZF+/BliRAHNftg==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:pUS0q+W4c4E=:E90vViuwwtsZ9RWcqz+rmP
- X+CtVWP0w8KbG6uCQiAEFb8tJdRb9yg9x72I8fXOyzTKUzO0ngS6EduS+17FyD3sh7Yqzs8ei
- 9cNqtjRpaaUtOpoTGSVmTzcqHWBaoyU7XF6vmy2DoCl8hXoB9MHThBVXDnynh+nZPWF4hLCIL
- KoMQUOCARFPR7ewCyAKlOXD/jB49Miz1HVe1Ktq3s9A8Td04/i+BdfXm71sBLyhLFEVx+vJ+C
- rfEbz9/9idvSn/gdmiCIo1LQrqawsdT5CLyWmM1KTXBtififY1juoNujhgx/1JWxfdbBoxZcY
- CVZSttvrLRel0O1BbtRiBRVAzFPxC5Iaq3TKWBGGMKnPosflrx5dHY4hq4jxH+4yQizpiVvYe
- +1Uxw89GKpIcsbNqJtC+XgytymnUB0GROoXamayNUI2gCCaQFFt5ogiyeHv7HQ59oecG0yzcz
- unHt4ecf1ynVcQWwDjV5MPYR6zHO20i+pntYYiGnJast5JoimOhxXbuEWL0W4IDO8fuNFVoFa
- EYQTxYZQ8T+WHlgCghuJW3O4DED8M8WmgljPt6bcs4r07acH26kupzy2k7tJZ1XaMjkSpbbL/
- i4jiDys7460v7AGGaAO6zu/Fw4htWneuDzcg4N2nemNL6NdEDXIxPe+X2gCrdUVsLs3tokhq6
- LKVC5QcRE5ZhTTb0ke2LIRTPPdd7zR6mPkNfw26E6PSJGN3g8FvCONrgrEpLvd0E3wqux4Eks
- LrMqSATVcEFs48lJ7QOZGL7TJFyy3oC7jKwZRA==
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_064320_783167_03656521 
-X-CRM114-Status: GOOD (  10.29  )
+X-CRM114-CacheID: sfid-20190222_064438_422280_54103144 
+X-CRM114-Status: GOOD (  20.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,46 +74,111 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, Andrey Konovalov <andreyknvl@google.com>,
- ndesaulniers@google.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Andrey Ryabinin <aryabinin@virtuozzo.com>, natechancellor@gmail.com,
- Dmitry Vyukov <dvyukov@google.com>
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Building a preprocessed source file for arm64 now always produces
-a warning with clang because of the page_to_virt() macro assigning
-a variable to itself.
+On Thu, 21 Feb 2019 13:58:04 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-Adding a new temporary variable avoids this issue.
+> Add the logic in the NAND core to find the right ECC engine depending
+> on the NAND chip requirements and the user desires. Right now, the
+> choice may be made between (more will come):
+> * software Hamming
+> * software BCH
+> * on-die (SPI-NAND devices only)
+> 
+> Once the ECC engine has been found, the ECC engine must be
+> configured.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/mtd/nand/core.c  | 107 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/mtd/nand.h |   4 ++
+>  2 files changed, 111 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/core.c b/drivers/mtd/nand/core.c
+> index 872d46b5fc0f..9feb118c9f68 100644
+> --- a/drivers/mtd/nand/core.c
+> +++ b/drivers/mtd/nand/core.c
+> @@ -207,6 +207,113 @@ int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len)
+>  }
+>  EXPORT_SYMBOL_GPL(nanddev_mtd_max_bad_blocks);
+>  
+> +/**
+> + * nanddev_find_ecc_engine() - Find a suitable ECC engine
+> + * @nand: NAND device
+> + */
+> +static int nanddev_find_ecc_engine(struct nand_device *nand)
 
-Fixes: 2813b9c02962 ("kasan, mm, arm64: tag non slab memory allocated via pagealloc")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm64/include/asm/memory.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Can we pass the conf in argument instead of reading it from
+nand->ecc.user_conf?
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b01ef0180a03..290195168bb3 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -312,8 +312,9 @@ static inline void *phys_to_virt(phys_addr_t x)
- #define page_to_virt(page)	({					\
- 	unsigned long __addr =						\
- 		((__page_to_voff(page)) | PAGE_OFFSET);			\
--	__addr = __tag_set(__addr, page_kasan_tag(page));		\
--	((void *)__addr);						\
-+	unsigned long __addr_tag =					\
-+		 __tag_set(__addr, page_kasan_tag(page));		\
-+	((void *)__addr_tag);						\
- })
- 
- #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
--- 
-2.20.0
+> +{
+> +	bool is_spinand = mtd_type_is_spinand(&nand->mtd);
+
+And here is the reason for the SPINAND type.
+
+> +
+> +	/* Read the user desires in terms of ECC engine/configuration */
+> +	nand_ecc_read_user_conf(nand);
+> +
+> +	/* No ECC engine requestedn, let's return without error */
+> +	if (nand->ecc.user_conf.mode == NAND_ECC_NONE)
+> +		return 0;
+> +
+> +	/* Raw NAND default mode is hardware */
+> +	if (!is_spinand && nand->ecc.user_conf.mode < 0)
+> +		nand->ecc.user_conf.mode = NAND_ECC_HW;
+
+We should let the raw NAND layer take this decision (actually, it's
+even a raw NAND controller driver decision). Please complain if
+user_conf.mode is invalid.
+This way you won't need the SPINAND type you added in one of your
+previous patch.
+
+> +
+> +	/* SPI-NAND default mode is on-die */
+> +	if (is_spinand && nand->ecc.user_conf.mode < 0)
+> +		nand->ecc.user_conf.mode = NAND_ECC_ON_DIE;
+> +
+> +	switch (nand->ecc.user_conf.mode) {
+> +	case NAND_ECC_SOFT:
+> +		nand->ecc.engine = nand_ecc_sw_get_engine(nand);
+> +		break;
+> +	case NAND_ECC_ON_DIE:
+> +		if (is_spinand)
+> +			nand->ecc.engine = spinand_ondie_ecc_get_engine();
+
+So, maybe it's worth having the ondie ECC engine instance directly
+embedded in nand_device instead of spinand, or maybe just a pointer, so
+that you don't reserve extra space when the NAND device does not have
+on-die ECC.
+
+> +		else
+> +			pr_err("On-die ECC engines for non SPI devices not supported yet\n");
+> +		break;
+> +	case NAND_ECC_HW:
+> +		pr_err("Hardware ECC engines not supported yet\n");
+> +		break;
+> +	default:
+> +		pr_err("Missing ECC engine property\n");
+> +	}
+> +
+> +	if (!nand->ecc.engine)
+> +		return  -EINVAL;
+> +
+> +	return 0;
+> +}
 
 
 _______________________________________________
