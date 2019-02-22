@@ -2,80 +2,72 @@ Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C6514C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:47:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F18B7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:49:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 976BF207E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:47:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C1AC32075C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 13:49:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mCOwRZvX";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="R/o4V6dO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 976BF207E0
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PuV/UpUK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C1AC32075C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	MIME-Version:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=A/GTUL6SKXJqzx8XK5XWni7NPYUGvk7mFPGfYjVfPY8=; b=mCO
-	wRZvXWJAEfOhUfT4bTo2rV5zf5nyY9E1jkTLAprX5+gY9YpfGPLtia0wXYHdNQ8J8ve5v0XvIWQaN
-	jsUjcIEIpihn2LOcf5tupI0+3uJPF/jCoIzbdvWiK9tcFSGN7WKxbwIM4o9xmR1JT9H90kpYar6Lk
-	d1rQVzwNZ94wo3LJIvQcXtoI01QwXSLmLeH2K55TVCgyrYUsNzWiJYl+NqVpSwwoCvLGVrLQxD18B
-	2yX1XNtkXiBt1O39zVOPixMcwQfjscNFbJ1XLo14EgjYCORNkvCCcXCGMIjsBuvWgwdV2PB5hnztO
-	VkS7CvJo5rrbMNJtY/xmjmqrlsN9axA==;
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=kyfIKejmB6sMqL0clkL4Iqjk7PpYzaMYQ/dU4pcJvA0=; b=PuV/UpUKaXo3Nj
+	8CIxGVfB0n/tdQI8s07aUUqe4QofZMonyvApG9XZ/PNvI1obFjBQWgTtWXNio+Nyj7zEAQwVM4huU
+	4jUsyTZ11y62BwZjhH/hUwH+PxNR1dmSY6sIqKquYR0wlUpxc6oIH25VEpbqW0305HtgsyrXdIoeR
+	Ul02KzxNAroSFV3LrSJemsv7hQ5NsLXGPC9mYekEq5fMwjyslv1POzK0CIS1uw9uxEX54RYF2Graf
+	psFfObtZua0uUQ+nchBEz/gKixuO/95i2q493DFaELDEv/U+r3+4LKXkQfEgV+jeowx7zQazGhtkG
+	PCzllfs9QruRvxieHbSw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxBAb-0004EN-GQ; Fri, 22 Feb 2019 13:47:17 +0000
-Received: from mail-ua1-x943.google.com ([2607:f8b0:4864:20::943])
+	id 1gxBD1-0004yB-Lf; Fri, 22 Feb 2019 13:49:47 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxBAX-0004A4-UD; Fri, 22 Feb 2019 13:47:15 +0000
-Received: by mail-ua1-x943.google.com with SMTP id z24so1951833ual.8;
- Fri, 22 Feb 2019 05:47:13 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:from:date:message-id:subject:to;
- bh=aPDUL23UbS//3iJMmULFAIatEpA4+JfxwfASuQY5x2M=;
- b=R/o4V6dOWF7U9/SRWhJCfyUMQD5INNHT07TY/7jtJNMUJp7Yamg4QT+zsuNPiw+wRf
- icVyH1l18lum87NFuWR+NTwHmQWvLHrjW/oI8K7lKlbBJ0OaFZIBqrOrbd/Depq6LFJm
- bi0RgJyRL3ZlbiDGu3ZPmvxUvozZWyJD4g84AMWOQGaV1MwGuPEcqSiBVPmX/z/IK+/v
- s9SRjCI/7CQaP6m2mINzLN1cCj0qI8NVBFuS7J1/1C1URUqCMKVZdythMzCYZ1+oM3GD
- VybPLISdL02v2/r5tGo2fKYF2gP7jtzFvoMLKAanrruVFdUTUJEmyVUSG3jdGpRqV1ZU
- 57vQ==
+ id 1gxBCz-0004xC-3x
+ for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 13:49:46 +0000
+Received: by mail-qt1-f196.google.com with SMTP id z39so2529990qtz.0
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 22 Feb 2019 05:49:43 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:from:date:message-id:subject:to;
- bh=aPDUL23UbS//3iJMmULFAIatEpA4+JfxwfASuQY5x2M=;
- b=YGW5eFz6Bw2czHyLxNBQUrMCGZ08VV7S6D/hg8HrWduDOZN9ra3l8Z/nrllwu6M7fE
- SuX0wtHErD16rcPLJMZgXHAp5nVytnNZNagTKsnvLpiWthjG5CWg9CECQSjFQyyaAXD6
- lacpLWws5poPepqZl9AScOIHwbf7cBuQn2AFb0YcGEH5xYZ1gNOjBajDflqY3PmuPX39
- dYaxLDaKg4BWOooGveggkYjubt1UJyc0qJCnkHEZM2epiqTWtoy8g0nHN8gvSZj8eHyI
- vwkcOP69X/rhF83btSw/GgtkKojzZbRI77BMPs+Gm6POodmCTnZvMuBJhx/2H8vrVMeV
- S+Fw==
-X-Gm-Message-State: AHQUAuY1ix10I8dgoiZOipLjwiZPxC+2Y4BigHRpTtK634Ipfqb72LVe
- NC6DVlmuwa4DuQWP/e+OYq6whyh30tsiEOuT+hU=
-X-Google-Smtp-Source: AHgI3IaClSMENoIJy7f7CljnlX/Pq5hck0APCEuxnytYmqKU2FrD/O7lBl+jSgx68wZNZiVCVY2mq4mcM0oxvKbbBC4=
-X-Received: by 2002:a67:6887:: with SMTP id d129mr2231318vsc.144.1550843232002; 
- Fri, 22 Feb 2019 05:47:12 -0800 (PST)
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=YCdzHUnCVid6VQpyu7+gAywSyiJ0Zvm252ZRUXeryVw=;
+ b=ESuzCGf5nVzErb6atiNBIwUQBEpm6GUjrJtpe6vPAokZnYm9MhjsQwS2+vF4EAmZqs
+ HswiSncCokTvP877hKquWh2kVi4DTRkqmzuavNEVoIEEx6nyZ0ay9HN26//F4Y3Upq3o
+ RiZJzT/DZCyJONy6gWLHjNEaSigAGK5hulZl6x7V0EN6+KM1F2VJpLBPhj+p7bZthDHf
+ VakxsWlgIT6VUmL8Yg+zxVYpsHQ/bhrCCc9S5wxOmz9V+xnR1xe0fiPfgD4W2gdStxHh
+ UDvZ/0U/PZbzLaH8M/fAa0Q1WlQGbdPSgCi6ukgISMOpXo7IzzLAvDFyoKYqqxQcv4jn
+ hhng==
+X-Gm-Message-State: AHQUAuY+qVt4LbqKYdstSWe6TE742HHHzC9wvFX099gRyodqHX8xLRgV
+ HElAMwX0WuK3QXUyZVzjlRteByy/ZUtdwp2B3nA=
+X-Google-Smtp-Source: AHgI3IbexA327EtterpQO4g1wJgTy49ml8cI2NeubF0E+iRdBcMFo7B6SZbUSZD6hTJwTjBrTgdDCfgaDZF9wNUYqRE=
+X-Received: by 2002:a0c:e98f:: with SMTP id z15mr3225301qvn.115.1550843382721; 
+ Fri, 22 Feb 2019 05:49:42 -0800 (PST)
 MIME-Version: 1.0
-From: Pintu Agarwal <pintu.ping@gmail.com>
-Date: Fri, 22 Feb 2019 19:17:00 +0530
-Message-ID: <CAOuPNLhDtRJDBnwuV1kQ47Zd9B00qh2bXDNQvh9tXfTyYqAWDQ@mail.gmail.com>
-Subject: arm64 Kernel build for qemu-system-aarch64 ?
-To: open list <linux-kernel@vger.kernel.org>,
- linux-arm-kernel@lists.infradead.org, 
- linux-riscv@lists.infradead.org, kernelnewbies@kernelnewbies.org
+References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
+ <20190222122430.21180-3-vincenzo.frascino@arm.com>
+In-Reply-To: <20190222122430.21180-3-vincenzo.frascino@arm.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 22 Feb 2019 14:49:26 +0100
+Message-ID: <CAK8P3a1ssUdsqk7YW-tjD-dihEAP-voKLOEGO-W=TL7Lb8E7vw@mail.gmail.com>
+Subject: Re: [PATCH v5 02/23] kernel: Define gettimeofday vdso common code
+To: Vincenzo Frascino <vincenzo.frascino@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_054714_019567_09157195 
-X-CRM114-Status: UNSURE (   7.21  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190222_054945_155956_3BD72B5F 
+X-CRM114-Status: GOOD (  14.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,30 +79,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: linux-arch <linux-arch@vger.kernel.org>, Shuah Khan <shuah@kernel.org>,
+ Rasmus Villemoes <linux@rasmusvillemoes.dk>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Dmitry Safonov <0x7f454c46@gmail.com>, Thomas Gleixner <tglx@linutronix.de>,
+ Peter Collingbourne <pcc@google.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi All,
+On Fri, Feb 22, 2019 at 1:25 PM Vincenzo Frascino
+<vincenzo.frascino@arm.com> wrote:
 
-I want to build Linux Kernel 4.20 for arm64 and use it on qemu-arm64.
-I see that there is a defconfig available in arch/arm64/configs/defconfig
-But I am not sure whether it will work for qemu-arm64, and by default
-which machine type is supported.
+> +/*
+> + * The definitions below are required to overcome the limitations
+> + * of time_t on 32 bit architectures, which overflows in 2038.
+> + * The new code should use the replacements based on time64_t and
+> + * timespec64.
+> + *
+> + * The abstraction below will be updated once the migration to
+> + * time64_t is complete.
+> + */
+> +#ifdef CONFIG_GENERIC_VDSO_32
+> +#define __vdso_timespec                old_timespec32
+> +#define __vdso_timeval         old_timeval32
+> +#else
+> +#ifdef ENABLE_COMPAT_VDSO
+> +#define __vdso_timespec                old_timespec32
+> +#define __vdso_timeval         old_timeval32
+> +#else
+> +#define __vdso_timespec                __kernel_timespec
+> +#define __vdso_timeval         __kernel_old_timeval
+> +#endif /* CONFIG_COMPAT_VDSO */
+> +#endif /* CONFIG_GENERIC_VDSO_32 */
 
-I already have working setup for qemu-arm for both versatile and
-vexpress machine. There is already a defconfig available for these
-under arch/arm.
-So I can build the kernel for it.
+I don't think we need __vdso_timeval at all, just use
+__kernel_old_timeval everywhere. There is no generic
+64-bit timeval type in the kernel, and there won't be because
+gettimeofday() is deprecated.
 
-But, whether these defconfig are supported for arm64 ?
-If anybody have setup for qemu-arm64 kernel, please share the steps.
-About rootfs, I am planning to use the arm32 version of busybox itself.
+For __vdso_timespec, I see how you ended up with this
+redefinition, and it makes the current version of your patches
+easier, but I fear it will in turn make it harder to add the
+__kernel_old_timeval based variant.
 
+What I'd prefer to see here is to always use the fixed length
+types everywhere in the code, such as
 
-Thanks,
-Pintu
+static notrace int __cvdso_clock_gettime64(clockid_t clock,
+                                        struct __kernel_timespec *ts)
+{
+... /* normal clock_gettime using 64-bit times */
+}
+
+static notrace int __cvdso_clock_gettime32(clockid_t clock,
+                                        struct old_timespec32 *ts32)
+{
+     struct __kernel_timespec ts;
+     int ret = __cvdso_clock_gettime64(clock, &ts);
+
+     ts32->tv_sec = ts->tv_sec;
+     ts32->tv_nsec = ts->tv_nsec;
+
+     return ret;
+}
+
+and then have two different versions for 32-bit and 64-bit
+architectures, calling one or the other function of the
+generic code.
+
+        Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
