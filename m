@@ -2,84 +2,81 @@ Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D084C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:24:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EEE2EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:33:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE85F206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:24:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BB20020684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:33:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BI92zGaN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="ixwMxwKj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE85F206BA
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AK8qbkHh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="w6VY6TEc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BB20020684
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jPql1gvzB6f2HCY9J9DO3tdMyrDgRRlyVhfO7Cw4WYk=; b=BI92zGaNi2Q4sY
-	l2e+lyBOehd22Ew2h0a2U/+hWphOk3/nZjWdyLXUZsUDOZAOFn5QdHzKjsoD9mpeZ3fRseAPXOxSp
-	t8ba1H6of1qbU6OslzT6yMYWi5hA50oAaoMZ6GwH1CXkyge+1RKS+XbRcpfIs2Me9L7GBEASAL3PN
-	so2r644/4k48WI2DuFrdYOqhLXTabbLikcNVbta+WRdvT/tZWBtutmX2gol/2AQFDHVws7zypV+mO
-	OXB+2aidYy547UBtguWEIcb28ClvF0CePPjancyj+qTVQnHEV/Gd6q+oxhI9sq4ZgUSPfkSuUs1sh
-	lofgTKVEe3soHZ5h4rqQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=mnmAz0qn2ly+ClHVPN+fl3jZBp/8W1bUJ0qAeq9W1pg=; b=AK8qbkHhNpmLgJ
+	jO9ZOgA1TximOeAaIVvIPDfP6MhvfjD0o8cFtGIzZhqD0tD3rF/vYJxxgh3NizyWkh6FV8WnpVvKh
+	v1uqPsRwqW4jbcJRh46hIsNLMm+szCNnLO6TsHOZ5Zu8sO/8Ijc208nK3/9uINev4vLiQXqHnJ7/S
+	oiTK+3U7KTeJnAFffu9i25QAr5ISFRwxnhB6l2aUCbSFVrqJBpqN94PWTgjKjOj22FaamW2K2XXJZ
+	pmlCyJ8n+nj/ijGX9mT05b3nCcJ1WuGMnZknQMCQMHOEboFfzYZaEqlriY2k/3LTB9PVRr2/Gk/WQ
+	0QlnS9JfVJMIRPirtspw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxTXq-000312-Mx; Sat, 23 Feb 2019 09:24:30 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gxTg9-00067e-NC; Sat, 23 Feb 2019 09:33:05 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxTXn-00030J-PM
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 09:24:29 +0000
-Received: by mail-io1-xd42.google.com with SMTP id e186so3811640ioa.0
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 01:24:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=5GEK9T81wP2kkW0fGPs84l3c71v8YZl8ebkkAOY+AUg=;
- b=ixwMxwKjOA02jOAfKReQH+U5dJf/7Bmtwf3QJaS+JfgRgYPnSWd5rEmC/uXwj2AYMk
- rs6WjAxjqWUcRnYQ3aJQwfS6XDolm1/HJ0QMKQgWAsoxsXjD3INaSmPG6W+FBEZh3GHR
- iLEb3JvdCg+cj5xo1eu+ew9JvCx3XyMVvLh+uYNOpKOMN77gpTaOn4gQK3FJuIdh6xeP
- bYEJGvxIRRVEQOtSim17Pgc6VMH0MlTsesDvi36k5ju7kEtGEckI/s2lDfkHS3NzPpwF
- T2YKr/R0h1D439jYfUHew7HaQWOb00Yz1tCOjmNU6ClDFvs9HfpolhOGME1KCw3Qd/D1
- VUqA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=5GEK9T81wP2kkW0fGPs84l3c71v8YZl8ebkkAOY+AUg=;
- b=Hj6hWToChCfvOF0ZoM4R69jsN0woeMQrKAAPihs8bhC5e8OnD6hlABvflHxOcqQYvT
- 8dYDAMEGfxtYveMAZJLtiZexV1/n2t0taAjXgaSQ4mmGGT7RLaiKGSi43z1IK9yRAUds
- HvQYxGDgqpM9k+tOd7dW7YxVljtj/EMAS6CNsilxJXSzPW0F+lfWq24fqK95uR+KjBTD
- V6wJ8T2gN0YC/eJXKMwdAC+yqleluT8niruYQ016V7YJYtQTG4igWq1FzUDHoaGaYuvl
- qaJ42GSQnf84l5GfZYAqI70oflE9LZ9v0FuuBjxSVDih9lHbJxFmWN8GGASxxdVOUHUU
- vVjw==
-X-Gm-Message-State: AHQUAuaimpVH/O7DcOQv7RUF0U3zca/u63hfaHz4APK/WR/rjtPGMY3r
- 0jGsO4wM+ItD1+wX5IDx3UsBGFVcFVXNdxd0b1nxow==
-X-Google-Smtp-Source: AHgI3IYioZEEo5dn3jF15pSfs4EhC5bMFtq0C3+fDzEYnTq5fNsnlhhErGYj6uKxNsjXoUV9gFrOfFC5rQ+QUsxPgto=
-X-Received: by 2002:a5e:d609:: with SMTP id w9mr4457196iom.170.1550913866814; 
- Sat, 23 Feb 2019 01:24:26 -0800 (PST)
+ id 1gxTg5-000671-PI
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 09:33:03 +0000
+Received: from fllv0035.itg.ti.com ([10.64.41.0])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1N9WuTo103998;
+ Sat, 23 Feb 2019 03:32:56 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1550914377;
+ bh=hekSgN0RAfdwNHhQWSUOHFs3OTGGciWCnt4NBTIkjCM=;
+ h=From:To:CC:Subject:Date;
+ b=w6VY6TEctOjNJuZMEQYKNAs0ZpN13cWN7nl+jdxZZRgqsrwSPUyvoe+LSr0/JRbxh
+ a54yRT2MtD9yOG7dPN5UVU76rRohhN6n/swykJqF2t+x4EYkuBMOSu93QLuV+iMML8
+ QIbsAvr+N5ACDYLGfnlwywNe8lP2AIWhNjswvQDs=
+Received: from DFLE111.ent.ti.com (dfle111.ent.ti.com [10.64.6.32])
+ by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1N9Wuw8030989
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Sat, 23 Feb 2019 03:32:56 -0600
+Received: from DFLE114.ent.ti.com (10.64.6.35) by DFLE111.ent.ti.com
+ (10.64.6.32) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sat, 23
+ Feb 2019 03:32:56 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE114.ent.ti.com
+ (10.64.6.35) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Sat, 23 Feb 2019 03:32:56 -0600
+Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
+ [10.172.224.153])
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1N9WrQh028361;
+ Sat, 23 Feb 2019 03:32:54 -0600
+From: Lokesh Vutla <lokeshvutla@ti.com>
+To: Nishanth Menon <nm@ti.com>, Tero Kristo <t-kristo@ti.com>, Santosh
+ Shilimkar <ssantosh@kernel.org>
+Subject: [PATCH v2 0/5] soc: ti: k3-am654: Allow for exclsive request of
+ devices
+Date: Sat, 23 Feb 2019 15:02:27 +0530
+Message-ID: <20190223093232.29003-1-lokeshvutla@ti.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-References: <20190223065408.6279-1-ebiggers@kernel.org>
- <20190223065408.6279-3-ebiggers@kernel.org>
-In-Reply-To: <20190223065408.6279-3-ebiggers@kernel.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Sat, 23 Feb 2019 10:24:15 +0100
-Message-ID: <CAKv+Gu99nQc-eoOu4=Vxzmc0ypYecYhSThmsr3gu4T84tYStOA@mail.gmail.com>
-Subject: Re: [PATCH 2/2] crypto: arm64/chacha - fix hchacha_block_neon() for
- big endian
-To: Eric Biggers <ebiggers@kernel.org>
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_012427_826896_2DFEA486 
-X-CRM114-Status: GOOD (  13.60  )
+X-CRM114-CacheID: sfid-20190223_013301_917033_80346890 
+X-CRM114-Status: GOOD (  11.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,51 +88,47 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Herbert Xu <herbert@gondor.apana.org.au>
+Cc: Lokesh Vutla <lokeshvutla@ti.com>,
+ Device Tree Mailing List <devicetree@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Sekhar Nori <nsekhar@ti.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, 23 Feb 2019 at 07:54, Eric Biggers <ebiggers@kernel.org> wrote:
->
-> From: Eric Biggers <ebiggers@google.com>
->
-> On big endian arm64 kernels, the xchacha20-neon and xchacha12-neon
-> self-tests fail because hchacha_block_neon() outputs little endian words
-> but the C code expects native endianness.  Fix it to output the words in
-> native endianness (which also makes it match the arm32 version).
->
-> Fixes: cc7cf991e9eb ("crypto: arm64/chacha20 - add XChaCha20 support")
-> Signed-off-by: Eric Biggers <ebiggers@google.com>
+Sysfw provides an option for requesting exclusive access for a
+device using the flags MSG_FLAG_DEVICE_EXCLUSIVE. Once a device
+is requested from a host with this flag set, any request to this
+device from a different host will be nacked by sysfw. Current tisci
+driver enables this flag for every device requests. But this may not
+be true for all the devices. This series adds support for providing
+an option to enable or disable exclusive permissions.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+v1: https://patchwork.kernel.org/cover/10817307/
 
-> ---
->  arch/arm64/crypto/chacha-neon-core.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/crypto/chacha-neon-core.S b/arch/arm64/crypto/chacha-neon-core.S
-> index bfb80e10ff7b0..706c4e10e9e29 100644
-> --- a/arch/arm64/crypto/chacha-neon-core.S
-> +++ b/arch/arm64/crypto/chacha-neon-core.S
-> @@ -158,8 +158,8 @@ ENTRY(hchacha_block_neon)
->         mov             w3, w2
->         bl              chacha_permute
->
-> -       st1             {v0.16b}, [x1], #16
-> -       st1             {v3.16b}, [x1]
-> +       st1             {v0.4s}, [x1], #16
-> +       st1             {v3.4s}, [x1]
->
->         ldp             x29, x30, [sp], #16
->         ret
-> --
-> 2.20.1
->
+Changes since v1:
+- Split the dt-bindings doc to a separate patch
+
+Lokesh Vutla (5):
+  firmware: ti_sci: (Dis)Allow for device exclusive permissions
+  dt-bindings: ti_sci_pm_domains: Add support for exclusive access
+  soc: ti: ti_sci_pm_domains: Add support for exclusive access
+  soc: ti: ti_sci_pm_domains: Switch to SPDX Licensing
+  arm64: dts: ti: k3-am654: Update the power domain cells
+
+ .../bindings/soc/ti/sci-pm-domain.txt         |  7 ++-
+ arch/arm64/boot/dts/ti/k3-am65-main.dtsi      | 26 +++++------
+ arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi       | 10 ++---
+ arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi    |  6 +--
+ drivers/firmware/ti_sci.c                     | 45 ++++++++++++++++++-
+ drivers/soc/ti/ti_sci_pm_domains.c            | 32 ++++++++-----
+ include/linux/soc/ti/ti_sci_protocol.h        |  3 ++
+ 7 files changed, 93 insertions(+), 36 deletions(-)
+
+-- 
+2.19.2
+
 
 _______________________________________________
 linux-arm-kernel mailing list
