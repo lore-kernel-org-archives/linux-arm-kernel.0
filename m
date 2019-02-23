@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E3300C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:16:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1503C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:20:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B51F82084F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:16:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D5F72084F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:20:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JvzSnO9r"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B51F82084F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r2rlSIln"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D5F72084F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kontron.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,55 +25,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
 	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oyzyOWQMk7TytUy9yjT+yJNx70dCHoFuT2TArrOyGQI=; b=JvzSnO9r2oZcGJ
-	p4MDbFXbeHrzHDO57epcRBeZwHNw4blGgBURQin15BZianceEqwVyo91jU30rQW3rbAC2r0h05UYB
-	Z/UcW/jX2Fg4zP1DAql/hs4WLOnai24QkK4vbDQ8r0d0vwri01jCI4duVPPiyAGxux+AwB+IPOl8P
-	WpC7cMaj3SSb9mP1C9qfnZTKz26+p2jog9AgpqmgbZ/TIMjSp7ERrxTIae2X5pWObi6NnHlrb5efM
-	yLsWcUW/UNvRpZGC9qr5GxziJk575gQtEytKz+5TGJbpOOAPlGtX3o5ONCrNV9jD3+WFCNu5YYN0g
-	1s9cG7r2ejhFTlITrs3g==;
+	List-Owner; bh=2GmGA7jWWKZ7QTh6dZRNf7yb7OAte3RW1P+orSub67A=; b=r2rlSIlnHb1pPF
+	1b/idPzk60DCud68tfb58c/+vfIWbDXfjIvqx9uA0gzTU1k7mrhLpEErVBZko8YVTLtirXkLwrLy/
+	XBjmzNFGS7CMLWEfr0ZuDfbtgFxCHQw3HN/vQ39xdRHBBU8H4XLRC/TpBl9bIJCe8f3ugj1opSqRw
+	54hJqBMz2vImRUaInnjrUJ5umFdXVfpNGM9uwqsrYpiBL9wEDw2vZiMSSG6wfJSL8VtZdqM56uYC7
+	KpWDUbdynS3D4v2Doa2SWfAM1b9p1ER4dYG55M2JyOaLQrYaQe3MSCgz7YSvVqQvdOnOzGFV8aeFY
+	5OKJHSHDwLSlD05rsNXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxX9w-0000Ny-9G; Sat, 23 Feb 2019 13:16:04 +0000
-Received: from skedge03.snt-world.com ([91.208.41.68])
+	id 1gxXDu-0002Su-Jw; Sat, 23 Feb 2019 13:20:10 +0000
+Received: from skedge04.snt-world.com ([91.208.41.69])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxX9Y-0008W1-2m; Sat, 23 Feb 2019 13:15:59 +0000
-Received: from sntmail14r.snt-is.com (unknown [10.203.32.184])
+ id 1gxXDq-00020i-Sz; Sat, 23 Feb 2019 13:20:08 +0000
+Received: from sntmail12r.snt-is.com (unknown [10.203.32.182])
  (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
  (No client certificate requested)
- by skedge03.snt-world.com (Postfix) with ESMTPS id 6B90460B909;
- Sat, 23 Feb 2019 14:15:20 +0100 (CET)
-Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail14r.snt-is.com
- (10.203.32.184) with Microsoft SMTP Server (version=TLS1_2,
+ by skedge04.snt-world.com (Postfix) with ESMTPS id 9806867A7D4;
+ Sat, 23 Feb 2019 14:20:04 +0100 (CET)
+Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail12r.snt-is.com
+ (10.203.32.182) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1713.5; Sat, 23 Feb
- 2019 14:15:19 +0100
+ 2019 14:20:04 +0100
 Received: from sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305]) by
  sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305%3]) with mapi id
- 15.01.1713.004; Sat, 23 Feb 2019 14:15:19 +0100
+ 15.01.1713.004; Sat, 23 Feb 2019 14:20:04 +0100
 From: Schrempf Frieder <frieder.schrempf@kontron.de>
 To: Miquel Raynal <miquel.raynal@bootlin.com>, Boris Brezillon
  <bbrezillon@kernel.org>, Richard Weinberger <richard@nod.at>, David Woodhouse
  <dwmw2@infradead.org>, Brian Norris <computersforpeace@gmail.com>, "Marek
  Vasut" <marek.vasut@gmail.com>, Tudor Ambarus <Tudor.Ambarus@microchip.com>
-Subject: Re: [PATCH 15/15] mtd: rawnand: Get rid of
- chip->ecc_{strength,step}_ds
-Thread-Topic: [PATCH 15/15] mtd: rawnand: Get rid of
- chip->ecc_{strength,step}_ds
-Thread-Index: AQHUycabN6FZscuud0q2ZaZU/U95pKXtT1WA
-Date: Sat, 23 Feb 2019 13:15:19 +0000
-Message-ID: <81a28820-97ed-79b8-bb34-fb0c8c44e068@kontron.de>
+Subject: Re: [PATCH 08/15] mtd: rawnand: Initialize the nand_device object
+Thread-Topic: [PATCH 08/15] mtd: rawnand: Initialize the nand_device object
+Thread-Index: AQHUycZhBmLIPJoXaEinc4gZs5zUB6XtUKiA
+Date: Sat, 23 Feb 2019 13:20:04 +0000
+Message-ID: <203a9ef5-1469-9d1f-bfa1-64070b4dbb01@kontron.de>
 References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
- <20190221091527.20497-16-miquel.raynal@bootlin.com>
-In-Reply-To: <20190221091527.20497-16-miquel.raynal@bootlin.com>
+ <20190221091527.20497-9-miquel.raynal@bootlin.com>
+In-Reply-To: <20190221091527.20497-9-miquel.raynal@bootlin.com>
 Accept-Language: de-DE, en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
 x-originating-ip: [172.25.9.43]
 x-c2processedorg: 51b406b7-48a2-4d03-b652-521f56ac89f3
-Content-ID: <F1C702FE0E9DEB41A8670CFAD01C93C1@snt-world.com>
+Content-ID: <947F45F9B836CA41945648A4912CC4B1@snt-world.com>
 MIME-Version: 1.0
 X-SnT-MailScanner-Information: Please contact the ISP for more information
-X-SnT-MailScanner-ID: 6B90460B909.AFBAD
+X-SnT-MailScanner-ID: 9806867A7D4.AE9F4
 X-SnT-MailScanner: Not scanned: please contact your Internet E-Mail Service
  Provider for details
 X-SnT-MailScanner-SpamCheck: 
@@ -86,8 +84,8 @@ X-SnT-MailScanner-To: bbrezillon@kernel.org, computersforpeace@gmail.com,
  thomas.petazzoni@bootlin.com, tudor.ambarus@microchip.com,
  vigneshr@ti.com, yamada.masahiro@socionext.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_051540_457830_50FEFE75 
-X-CRM114-Status: GOOD (  21.71  )
+X-CRM114-CacheID: sfid-20190223_052007_267181_9202D206 
+X-CRM114-Status: GOOD (  24.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,11 +111,12 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 On 21.02.19 10:15, Miquel Raynal wrote:
 > From: Boris Brezillon <bbrezillon@kernel.org>
 > 
-> nand_device embeds a nand_ecc_req object which contains the minimum
-> strength and step-size required by the NAND device.
+> In order to use some of the nanddev_xxx() helpers, we need to
+> initialize the nand_device object embedded in nand_chip using
+> nanddev_init(). This requires implementing nand_ops.
 > 
-> Drop the chip->ecc_{strength,step}_ds fields and use
-> chip->base.eccreq.{strength,step_size} instead.
+> We also drop useless mtd->xxx initialization when they're already taken
+> case of by nanddev_init().
 > 
 > Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
@@ -125,516 +124,136 @@ On 21.02.19 10:15, Miquel Raynal wrote:
 Reviewed-by: Frieder Schrempf <frieder.schrempf@kontron.de>
 
 > ---
->   drivers/mtd/nand/raw/atmel/nand-controller.c |  8 ++--
->   drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c   | 11 ++++--
->   drivers/mtd/nand/raw/marvell_nand.c          |  6 +--
->   drivers/mtd/nand/raw/mtk_nand.c              |  4 +-
->   drivers/mtd/nand/raw/nand_base.c             | 15 ++++----
->   drivers/mtd/nand/raw/nand_esmt.c             | 10 ++---
->   drivers/mtd/nand/raw/nand_hynix.c            | 40 ++++++++++----------
->   drivers/mtd/nand/raw/nand_jedec.c            |  4 +-
->   drivers/mtd/nand/raw/nand_micron.c           | 12 +++---
->   drivers/mtd/nand/raw/nand_onfi.c             |  8 ++--
->   drivers/mtd/nand/raw/nand_samsung.c          | 18 ++++-----
->   drivers/mtd/nand/raw/nand_toshiba.c          | 10 ++---
->   drivers/mtd/nand/raw/sunxi_nand.c            |  4 +-
->   drivers/mtd/nand/raw/tegra_nand.c            |  8 ++--
->   include/linux/mtd/rawnand.h                  |  8 ----
->   15 files changed, 81 insertions(+), 85 deletions(-)
+>   drivers/mtd/nand/raw/Kconfig     |  1 +
+>   drivers/mtd/nand/raw/nand_base.c | 65 ++++++++++++++++++++++++++++----
+>   2 files changed, 59 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/raw/atmel/nand-controller.c b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> index 5781fcf6b76c..9867e9115399 100644
-> --- a/drivers/mtd/nand/raw/atmel/nand-controller.c
-> +++ b/drivers/mtd/nand/raw/atmel/nand-controller.c
-> @@ -1068,15 +1068,15 @@ static int atmel_nand_pmecc_init(struct nand_chip *chip)
->   		req.ecc.strength = ATMEL_PMECC_MAXIMIZE_ECC_STRENGTH;
->   	else if (chip->ecc.strength)
->   		req.ecc.strength = chip->ecc.strength;
-> -	else if (chip->ecc_strength_ds)
-> -		req.ecc.strength = chip->ecc_strength_ds;
-> +	else if (chip->base.eccreq.strength)
-> +		req.ecc.strength = chip->base.eccreq.strength;
->   	else
->   		req.ecc.strength = ATMEL_PMECC_MAXIMIZE_ECC_STRENGTH;
->   
->   	if (chip->ecc.size)
->   		req.ecc.sectorsize = chip->ecc.size;
-> -	else if (chip->ecc_step_ds)
-> -		req.ecc.sectorsize = chip->ecc_step_ds;
-> +	else if (chip->base.eccreq.step_size)
-> +		req.ecc.sectorsize = chip->base.eccreq.step_size;
->   	else
->   		req.ecc.sectorsize = ATMEL_PMECC_SECTOR_SIZE_AUTO;
->   
-> diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-> index 6151214eddec..dbefb6bac5c9 100644
-> --- a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-> +++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.c
-> @@ -204,7 +204,8 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this,
->   	default:
->   		dev_err(this->dev,
->   			"unsupported nand chip. ecc bits : %d, ecc size : %d\n",
-> -			chip->ecc_strength_ds, chip->ecc_step_ds);
-> +			chip->base.eccreq.strength,
-> +			chip->base.eccreq.step_size);
->   		return -EINVAL;
->   	}
->   	geo->ecc_chunk_size = ecc_step;
-> @@ -417,11 +418,13 @@ int common_nfc_set_geometry(struct gpmi_nand_data *this)
->   
->   	if ((of_property_read_bool(this->dev->of_node, "fsl,use-minimum-ecc"))
->   				|| legacy_set_geometry(this)) {
-> -		if (!(chip->ecc_strength_ds > 0 && chip->ecc_step_ds > 0))
-> +		if (!(chip->base.eccreq.strength > 0 &&
-> +		      chip->base.eccreq.step_size > 0))
->   			return -EINVAL;
->   
-> -		return set_geometry_by_ecc_info(this, chip->ecc_strength_ds,
-> -						chip->ecc_step_ds);
-> +		return set_geometry_by_ecc_info(this,
-> +						chip->base.eccreq.strength,
-> +						chip->base.eccreq.step_size);
->   	}
->   
->   	return 0;
-> diff --git a/drivers/mtd/nand/raw/marvell_nand.c b/drivers/mtd/nand/raw/marvell_nand.c
-> index e8023b32be93..d21e808bb075 100644
-> --- a/drivers/mtd/nand/raw/marvell_nand.c
-> +++ b/drivers/mtd/nand/raw/marvell_nand.c
-> @@ -2248,9 +2248,9 @@ static int marvell_nand_ecc_init(struct mtd_info *mtd,
->   	int ret;
->   
->   	if (ecc->mode != NAND_ECC_NONE && (!ecc->size || !ecc->strength)) {
-> -		if (chip->ecc_step_ds && chip->ecc_strength_ds) {
-> -			ecc->size = chip->ecc_step_ds;
-> -			ecc->strength = chip->ecc_strength_ds;
-> +		if (chip->base.eccreq.step_size && chip->base.eccreq.strength) {
-> +			ecc->size = chip->base.eccreq.step_size;
-> +			ecc->strength = chip->base.eccreq.strength;
->   		} else {
->   			dev_info(nfc->dev,
->   				 "No minimum ECC strength, using 1b/512B\n");
-> diff --git a/drivers/mtd/nand/raw/mtk_nand.c b/drivers/mtd/nand/raw/mtk_nand.c
-> index b6b4602f5132..bfb89aca4155 100644
-> --- a/drivers/mtd/nand/raw/mtk_nand.c
-> +++ b/drivers/mtd/nand/raw/mtk_nand.c
-> @@ -1197,8 +1197,8 @@ static int mtk_nfc_ecc_init(struct device *dev, struct mtd_info *mtd)
->   	/* if optional dt settings not present */
->   	if (!nand->ecc.size || !nand->ecc.strength) {
->   		/* use datasheet requirements */
-> -		nand->ecc.strength = nand->ecc_strength_ds;
-> -		nand->ecc.size = nand->ecc_step_ds;
-> +		nand->ecc.strength = nand->base.eccreq.strength;
-> +		nand->ecc.size = nand->base.eccreq.step_size;
->   
->   		/*
->   		 * align eccstrength and eccsize
+> diff --git a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
+> index 1a55d3e3d4c5..8c38f2c116a2 100644
+> --- a/drivers/mtd/nand/raw/Kconfig
+> +++ b/drivers/mtd/nand/raw/Kconfig
+> @@ -14,6 +14,7 @@ menuconfig MTD_NAND
+>   	tristate "Raw/Parallel NAND Device Support"
+>   	depends on MTD
+>   	select MTD_NAND_ECC
+> +	select MTD_NAND_CORE
+>   	help
+>   	  This enables support for accessing all type of raw/parallel
+>   	  NAND flash devices. For further information see
 > diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
-> index e4bc851b099a..3bd077ca58bb 100644
+> index cb03877c775c..e8c1ad17f3c6 100644
 > --- a/drivers/mtd/nand/raw/nand_base.c
 > +++ b/drivers/mtd/nand/raw/nand_base.c
-> @@ -4592,8 +4592,8 @@ static bool find_full_id_nand(struct nand_chip *chip,
->   					   memorg->pagesize *
->   					   memorg->pages_per_eraseblock);
->   		chip->options |= type->options;
-> -		chip->ecc_strength_ds = NAND_ECC_STRENGTH(type);
-> -		chip->ecc_step_ds = NAND_ECC_STEP(type);
-> +		chip->base.eccreq.strength = NAND_ECC_STRENGTH(type);
-> +		chip->base.eccreq.step_size = NAND_ECC_STEP(type);
->   		chip->onfi_timing_mode_default =
->   					type->onfi_timing_mode_default;
->   
-> @@ -5266,8 +5266,8 @@ nand_match_ecc_req(struct nand_chip *chip,
->   {
->   	struct mtd_info *mtd = nand_to_mtd(chip);
->   	const struct nand_ecc_step_info *stepinfo;
-> -	int req_step = chip->ecc_step_ds;
-> -	int req_strength = chip->ecc_strength_ds;
-> +	int req_step = chip->base.eccreq.step_size;
-> +	int req_strength = chip->base.eccreq.strength;
->   	int req_corr, step_size, strength, nsteps, ecc_bytes, ecc_bytes_total;
->   	int best_step, best_strength, best_ecc_bytes;
->   	int best_ecc_bytes_total = INT_MAX;
-> @@ -5460,7 +5460,7 @@ static bool nand_ecc_strength_good(struct nand_chip *chip)
->   	struct nand_ecc_ctrl *ecc = &chip->ecc;
->   	int corr, ds_corr;
->   
-> -	if (ecc->size == 0 || chip->ecc_step_ds == 0)
-> +	if (ecc->size == 0 || chip->base.eccreq.step_size == 0)
->   		/* Not enough information */
->   		return true;
->   
-> @@ -5469,9 +5469,10 @@ static bool nand_ecc_strength_good(struct nand_chip *chip)
->   	 * the correction density.
->   	 */
->   	corr = (mtd->writesize * ecc->strength) / ecc->size;
-> -	ds_corr = (mtd->writesize * chip->ecc_strength_ds) / chip->ecc_step_ds;
-> +	ds_corr = (mtd->writesize * chip->base.eccreq.strength) /
-> +		  chip->base.eccreq.step_size;
->   
-> -	return corr >= ds_corr && ecc->strength >= chip->ecc_strength_ds;
-> +	return corr >= ds_corr && ecc->strength >= chip->base.eccreq.strength;
+> @@ -5519,6 +5519,50 @@ static bool nand_ecc_strength_good(struct nand_chip *chip)
+>   	return corr >= ds_corr && ecc->strength >= chip->ecc_strength_ds;
 >   }
 >   
->   static int rawnand_erase(struct nand_device *nand, const struct nand_pos *pos)
-> diff --git a/drivers/mtd/nand/raw/nand_esmt.c b/drivers/mtd/nand/raw/nand_esmt.c
-> index 96f039a83bc8..3de5e89482f5 100644
-> --- a/drivers/mtd/nand/raw/nand_esmt.c
-> +++ b/drivers/mtd/nand/raw/nand_esmt.c
-> @@ -14,20 +14,20 @@ static void esmt_nand_decode_id(struct nand_chip *chip)
->   
->   	/* Extract ECC requirements from 5th id byte. */
->   	if (chip->id.len >= 5 && nand_is_slc(chip)) {
-> -		chip->ecc_step_ds = 512;
-> +		chip->base.eccreq.step_size = 512;
->   		switch (chip->id.data[4] & 0x3) {
->   		case 0x0:
-> -			chip->ecc_strength_ds = 4;
-> +			chip->base.eccreq.strength = 4;
->   			break;
->   		case 0x1:
-> -			chip->ecc_strength_ds = 2;
-> +			chip->base.eccreq.strength = 2;
->   			break;
->   		case 0x2:
-> -			chip->ecc_strength_ds = 1;
-> +			chip->base.eccreq.strength = 1;
->   			break;
->   		default:
->   			WARN(1, "Could not get ECC info");
-> -			chip->ecc_step_ds = 0;
-> +			chip->base.eccreq.step_size = 0;
->   			break;
->   		}
+> +static int rawnand_erase(struct nand_device *nand, const struct nand_pos *pos)
+> +{
+> +	struct nand_chip *chip = container_of(nand, struct nand_chip,
+> +					      base);
+> +	unsigned int eb = nanddev_pos_to_row(nand, pos);
+> +	int ret;
+> +
+> +	eb >>= nand->rowconv.eraseblock_addr_shift;
+> +
+> +	nand_select_target(chip, pos->target);
+> +	ret = nand_erase_op(chip, eb);
+> +	nand_deselect_target(chip);
+> +
+> +	return ret;
+> +}
+> +
+> +static int rawnand_markbad(struct nand_device *nand,
+> +			   const struct nand_pos *pos)
+> +{
+> +	struct nand_chip *chip = container_of(nand, struct nand_chip,
+> +					      base);
+> +
+> +	return nand_markbad_bbm(chip, nanddev_pos_to_offs(nand, pos));
+> +}
+> +
+> +static bool rawnand_isbad(struct nand_device *nand, const struct nand_pos *pos)
+> +{
+> +	struct nand_chip *chip = container_of(nand, struct nand_chip,
+> +					      base);
+> +	int ret;
+> +
+> +	nand_select_target(chip, pos->target);
+> +	ret = nand_isbad_bbm(chip, nanddev_pos_to_offs(nand, pos));
+> +	nand_deselect_target(chip);
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct nand_ops rawnand_ops = {
+> +	.erase = rawnand_erase,
+> +	.markbad = rawnand_markbad,
+> +	.isbad = rawnand_isbad,
+> +};
+> +
+>   /**
+>    * nand_scan_tail - Scan for the NAND device
+>    * @chip: NAND chip object
+> @@ -5787,10 +5831,15 @@ static int nand_scan_tail(struct nand_chip *chip)
+>   		break;
 >   	}
-> diff --git a/drivers/mtd/nand/raw/nand_hynix.c b/drivers/mtd/nand/raw/nand_hynix.c
-> index 272b934dffb7..821d221b83eb 100644
-> --- a/drivers/mtd/nand/raw/nand_hynix.c
-> +++ b/drivers/mtd/nand/raw/nand_hynix.c
-> @@ -508,30 +508,30 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
 >   
->   	if (valid_jedecid) {
->   		/* Reference: H27UCG8T2E datasheet */
-> -		chip->ecc_step_ds = 1024;
-> +		chip->base.eccreq.step_size = 1024;
+> +	ret = nanddev_init(&chip->base, &rawnand_ops, mtd->owner);
+> +	if (ret)
+> +		goto err_nand_manuf_cleanup;
+> +
+> +	/* Adjust the MTD_CAP_ flags when NAND_ROM is set. */
+> +	if (chip->options & NAND_ROM)
+> +		mtd->flags = MTD_CAP_ROM;
+> +
+>   	/* Fill in remaining MTD driver data */
+> -	mtd->type = nand_is_slc(chip) ? MTD_NANDFLASH : MTD_MLCNANDFLASH;
+> -	mtd->flags = (chip->options & NAND_ROM) ? MTD_CAP_ROM :
+> -						MTD_CAP_NANDFLASH;
+>   	mtd->_erase = nand_erase;
+>   	mtd->_point = NULL;
+>   	mtd->_unpoint = NULL;
+> @@ -5807,7 +5856,6 @@ static int nand_scan_tail(struct nand_chip *chip)
+>   	mtd->_block_isbad = nand_block_isbad;
+>   	mtd->_block_markbad = nand_block_markbad;
+>   	mtd->_max_bad_blocks = nand_max_bad_blocks;
+> -	mtd->writebufsize = mtd->writesize;
 >   
->   		switch (ecc_level) {
->   		case 0:
-> -			chip->ecc_step_ds = 0;
-> -			chip->ecc_strength_ds = 0;
-> +			chip->base.eccreq.step_size = 0;
-> +			chip->base.eccreq.strength = 0;
->   			break;
->   		case 1:
-> -			chip->ecc_strength_ds = 4;
-> +			chip->base.eccreq.strength = 4;
->   			break;
->   		case 2:
-> -			chip->ecc_strength_ds = 24;
-> +			chip->base.eccreq.strength = 24;
->   			break;
->   		case 3:
-> -			chip->ecc_strength_ds = 32;
-> +			chip->base.eccreq.strength = 32;
->   			break;
->   		case 4:
-> -			chip->ecc_strength_ds = 40;
-> +			chip->base.eccreq.strength = 40;
->   			break;
->   		case 5:
-> -			chip->ecc_strength_ds = 50;
-> +			chip->base.eccreq.strength = 50;
->   			break;
->   		case 6:
-> -			chip->ecc_strength_ds = 60;
-> +			chip->base.eccreq.strength = 60;
->   			break;
->   		default:
->   			/*
-> @@ -552,14 +552,14 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
->   		if (nand_tech < 3) {
->   			/* > 26nm, reference: H27UBG8T2A datasheet */
->   			if (ecc_level < 5) {
-> -				chip->ecc_step_ds = 512;
-> -				chip->ecc_strength_ds = 1 << ecc_level;
-> +				chip->base.eccreq.step_size = 512;
-> +				chip->base.eccreq.strength = 1 << ecc_level;
->   			} else if (ecc_level < 7) {
->   				if (ecc_level == 5)
-> -					chip->ecc_step_ds = 2048;
-> +					chip->base.eccreq.step_size = 2048;
->   				else
-> -					chip->ecc_step_ds = 1024;
-> -				chip->ecc_strength_ds = 24;
-> +					chip->base.eccreq.step_size = 1024;
-> +				chip->base.eccreq.strength = 24;
->   			} else {
->   				/*
->   				 * We should never reach this case, but if that
-> @@ -572,14 +572,14 @@ static void hynix_nand_extract_ecc_requirements(struct nand_chip *chip,
->   		} else {
->   			/* <= 26nm, reference: H27UBG8T2B datasheet */
->   			if (!ecc_level) {
-> -				chip->ecc_step_ds = 0;
-> -				chip->ecc_strength_ds = 0;
-> +				chip->base.eccreq.step_size = 0;
-> +				chip->base.eccreq.strength = 0;
->   			} else if (ecc_level < 5) {
-> -				chip->ecc_step_ds = 512;
-> -				chip->ecc_strength_ds = 1 << (ecc_level - 1);
-> +				chip->base.eccreq.step_size = 512;
-> +				chip->base.eccreq.strength = 1 << (ecc_level - 1);
->   			} else {
-> -				chip->ecc_step_ds = 1024;
-> -				chip->ecc_strength_ds = 24 +
-> +				chip->base.eccreq.step_size = 1024;
-> +				chip->base.eccreq.strength = 24 +
->   							(8 * (ecc_level - 5));
->   			}
->   		}
-> diff --git a/drivers/mtd/nand/raw/nand_jedec.c b/drivers/mtd/nand/raw/nand_jedec.c
-> index 99e2f017c79b..9b540e76f84f 100644
-> --- a/drivers/mtd/nand/raw/nand_jedec.c
-> +++ b/drivers/mtd/nand/raw/nand_jedec.c
-> @@ -110,8 +110,8 @@ int nand_jedec_detect(struct nand_chip *chip)
->   	ecc = &p->ecc_info[0];
->   
->   	if (ecc->codeword_size >= 9) {
-> -		chip->ecc_strength_ds = ecc->ecc_bits;
-> -		chip->ecc_step_ds = 1 << ecc->codeword_size;
-> +		chip->base.eccreq.strength = ecc->ecc_bits;
-> +		chip->base.eccreq.step_size = 1 << ecc->codeword_size;
->   	} else {
->   		pr_warn("Invalid codeword size\n");
->   	}
-> diff --git a/drivers/mtd/nand/raw/nand_micron.c b/drivers/mtd/nand/raw/nand_micron.c
-> index 98ce6575aa64..7a2cef02eacd 100644
-> --- a/drivers/mtd/nand/raw/nand_micron.c
-> +++ b/drivers/mtd/nand/raw/nand_micron.c
-> @@ -391,7 +391,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
 >   	/*
->   	 * We only support on-die ECC of 4/512 or 8/512
->   	 */
-> -	if  (chip->ecc_strength_ds != 4 && chip->ecc_strength_ds != 8)
-> +	if  (chip->base.eccreq.strength != 4 && chip->base.eccreq.strength != 8)
->   		return MICRON_ON_DIE_UNSUPPORTED;
+>   	 * Initialize bitflip_threshold to its default prior scan_bbt() call.
+> @@ -5820,13 +5868,13 @@ static int nand_scan_tail(struct nand_chip *chip)
+>   	/* Initialize the ->data_interface field. */
+>   	ret = nand_init_data_interface(chip);
+>   	if (ret)
+> -		goto err_nand_manuf_cleanup;
+> +		goto err_nanddev_cleanup;
 >   
->   	/* 0x2 means on-die ECC is available. */
-> @@ -424,7 +424,7 @@ static int micron_supports_on_die_ecc(struct nand_chip *chip)
->   	/*
->   	 * We only support on-die ECC of 4/512 or 8/512
->   	 */
-> -	if  (chip->ecc_strength_ds != 4 && chip->ecc_strength_ds != 8)
-> +	if  (chip->base.eccreq.strength != 4 && chip->base.eccreq.strength != 8)
->   		return MICRON_ON_DIE_UNSUPPORTED;
->   
->   	return MICRON_ON_DIE_SUPPORTED;
-> @@ -479,7 +479,7 @@ static int micron_nand_init(struct nand_chip *chip)
->   		 * That's not needed for 8-bit ECC, because the status expose
->   		 * a better approximation of the number of bitflips in a page.
->   		 */
-> -		if (chip->ecc_strength_ds == 4) {
-> +		if (chip->base.eccreq.strength == 4) {
->   			micron->ecc.rawbuf = kmalloc(mtd->writesize +
->   						     mtd->oobsize,
->   						     GFP_KERNEL);
-> @@ -489,16 +489,16 @@ static int micron_nand_init(struct nand_chip *chip)
->   			}
->   		}
->   
-> -		if (chip->ecc_strength_ds == 4)
-> +		if (chip->base.eccreq.strength == 4)
->   			mtd_set_ooblayout(mtd,
->   					  &micron_nand_on_die_4_ooblayout_ops);
->   		else
->   			mtd_set_ooblayout(mtd,
->   					  &micron_nand_on_die_8_ooblayout_ops);
->   
-> -		chip->ecc.bytes = chip->ecc_strength_ds * 2;
-> +		chip->ecc.bytes = chip->base.eccreq.strength * 2;
->   		chip->ecc.size = 512;
-> -		chip->ecc.strength = chip->ecc_strength_ds;
-> +		chip->ecc.strength = chip->base.eccreq.strength;
->   		chip->ecc.algo = NAND_ECC_BCH;
->   		chip->ecc.read_page = micron_nand_read_page_on_die_ecc;
->   		chip->ecc.write_page = micron_nand_write_page_on_die_ecc;
-> diff --git a/drivers/mtd/nand/raw/nand_onfi.c b/drivers/mtd/nand/raw/nand_onfi.c
-> index 7b468e7214c7..0b879bd0a68c 100644
-> --- a/drivers/mtd/nand/raw/nand_onfi.c
-> +++ b/drivers/mtd/nand/raw/nand_onfi.c
-> @@ -94,8 +94,8 @@ static int nand_flash_detect_ext_param_page(struct nand_chip *chip,
->   		goto ext_out;
+>   	/* Enter fastest possible mode on all dies. */
+>   	for (i = 0; i < chip->numchips; i++) {
+>   		ret = nand_setup_data_interface(chip, i);
+>   		if (ret)
+> -			goto err_nand_manuf_cleanup;
+> +			goto err_nanddev_cleanup;
 >   	}
 >   
-> -	chip->ecc_strength_ds = ecc->ecc_bits;
-> -	chip->ecc_step_ds = 1 << ecc->codeword_size;
-> +	chip->base.eccreq.strength = ecc->ecc_bits;
-> +	chip->base.eccreq.step_size = 1 << ecc->codeword_size;
->   	ret = 0;
+>   	/* Check, if we should skip the bad block table scan */
+> @@ -5836,11 +5884,14 @@ static int nand_scan_tail(struct nand_chip *chip)
+>   	/* Build bad block table */
+>   	ret = nand_create_bbt(chip);
+>   	if (ret)
+> -		goto err_nand_manuf_cleanup;
+> +		goto err_nanddev_cleanup;
 >   
->   ext_out:
-> @@ -252,8 +252,8 @@ int nand_onfi_detect(struct nand_chip *chip)
->   		chip->options |= NAND_BUSWIDTH_16;
+>   	return 0;
 >   
->   	if (p->ecc_bits != 0xff) {
-> -		chip->ecc_strength_ds = p->ecc_bits;
-> -		chip->ecc_step_ds = 512;
-> +		chip->base.eccreq.strength = p->ecc_bits;
-> +		chip->base.eccreq.step_size = 512;
->   	} else if (onfi_version >= 21 &&
->   		(le16_to_cpu(p->features) & ONFI_FEATURE_EXT_PARAM_PAGE)) {
 >   
-> diff --git a/drivers/mtd/nand/raw/nand_samsung.c b/drivers/mtd/nand/raw/nand_samsung.c
-> index 9a9ad43cc97d..f7d7041b6213 100644
-> --- a/drivers/mtd/nand/raw/nand_samsung.c
-> +++ b/drivers/mtd/nand/raw/nand_samsung.c
-> @@ -80,23 +80,23 @@ static void samsung_nand_decode_id(struct nand_chip *chip)
->   		/* Extract ECC requirements from 5th id byte*/
->   		extid = (chip->id.data[4] >> 4) & 0x07;
->   		if (extid < 5) {
-> -			chip->ecc_step_ds = 512;
-> -			chip->ecc_strength_ds = 1 << extid;
-> +			chip->base.eccreq.step_size = 512;
-> +			chip->base.eccreq.strength = 1 << extid;
->   		} else {
-> -			chip->ecc_step_ds = 1024;
-> +			chip->base.eccreq.step_size = 1024;
->   			switch (extid) {
->   			case 5:
-> -				chip->ecc_strength_ds = 24;
-> +				chip->base.eccreq.strength = 24;
->   				break;
->   			case 6:
-> -				chip->ecc_strength_ds = 40;
-> +				chip->base.eccreq.strength = 40;
->   				break;
->   			case 7:
-> -				chip->ecc_strength_ds = 60;
-> +				chip->base.eccreq.strength = 60;
->   				break;
->   			default:
->   				WARN(1, "Could not decode ECC info");
-> -				chip->ecc_step_ds = 0;
-> +				chip->base.eccreq.step_size = 0;
->   			}
->   		}
->   	} else {
-> @@ -106,8 +106,8 @@ static void samsung_nand_decode_id(struct nand_chip *chip)
->   			switch (chip->id.data[1]) {
->   			/* K9F4G08U0D-S[I|C]B0(T00) */
->   			case 0xDC:
-> -				chip->ecc_step_ds = 512;
-> -				chip->ecc_strength_ds = 1;
-> +				chip->base.eccreq.step_size = 512;
-> +				chip->base.eccreq.strength = 1;
->   				break;
+> +err_nanddev_cleanup:
+> +	nanddev_cleanup(&chip->base);
+> +
+>   err_nand_manuf_cleanup:
+>   	nand_manufacturer_cleanup(chip);
 >   
->   			/* K9F1G08U0E 21nm chips do not support subpage write */
-> diff --git a/drivers/mtd/nand/raw/nand_toshiba.c b/drivers/mtd/nand/raw/nand_toshiba.c
-> index d8465049dfd6..13f9632f1cb4 100644
-> --- a/drivers/mtd/nand/raw/nand_toshiba.c
-> +++ b/drivers/mtd/nand/raw/nand_toshiba.c
-> @@ -130,20 +130,20 @@ static void toshiba_nand_decode_id(struct nand_chip *chip)
->   	 *  - 24nm: 8 bit ECC for each 512Byte is required.
->   	 */
->   	if (chip->id.len >= 6 && nand_is_slc(chip)) {
-> -		chip->ecc_step_ds = 512;
-> +		chip->base.eccreq.step_size = 512;
->   		switch (chip->id.data[5] & 0x7) {
->   		case 0x4:
-> -			chip->ecc_strength_ds = 1;
-> +			chip->base.eccreq.strength = 1;
->   			break;
->   		case 0x5:
-> -			chip->ecc_strength_ds = 4;
-> +			chip->base.eccreq.strength = 4;
->   			break;
->   		case 0x6:
-> -			chip->ecc_strength_ds = 8;
-> +			chip->base.eccreq.strength = 8;
->   			break;
->   		default:
->   			WARN(1, "Could not get ECC info");
-> -			chip->ecc_step_ds = 0;
-> +			chip->base.eccreq.step_size = 0;
->   			break;
->   		}
->   	}
-> diff --git a/drivers/mtd/nand/raw/sunxi_nand.c b/drivers/mtd/nand/raw/sunxi_nand.c
-> index d5de0a7114bc..69599854fdd6 100644
-> --- a/drivers/mtd/nand/raw/sunxi_nand.c
-> +++ b/drivers/mtd/nand/raw/sunxi_nand.c
-> @@ -1821,8 +1821,8 @@ static int sunxi_nand_attach_chip(struct nand_chip *nand)
->   	nand->options |= NAND_SUBPAGE_READ;
->   
->   	if (!ecc->size) {
-> -		ecc->size = nand->ecc_step_ds;
-> -		ecc->strength = nand->ecc_strength_ds;
-> +		ecc->size = nand->base.eccreq.step_size;
-> +		ecc->strength = nand->base.eccreq.strength;
->   	}
->   
->   	if (!ecc->size || !ecc->strength)
-> diff --git a/drivers/mtd/nand/raw/tegra_nand.c b/drivers/mtd/nand/raw/tegra_nand.c
-> index 13be32c38194..3cc9a4c41443 100644
-> --- a/drivers/mtd/nand/raw/tegra_nand.c
-> +++ b/drivers/mtd/nand/raw/tegra_nand.c
-> @@ -853,7 +853,7 @@ static int tegra_nand_get_strength(struct nand_chip *chip, const int *strength,
->   		} else {
->   			strength_sel = strength[i];
->   
-> -			if (strength_sel < chip->ecc_strength_ds)
-> +			if (strength_sel < chip->base.eccreq.strength)
->   				continue;
->   		}
->   
-> @@ -917,9 +917,9 @@ static int tegra_nand_attach_chip(struct nand_chip *chip)
->   	chip->ecc.mode = NAND_ECC_HW;
->   	chip->ecc.size = 512;
->   	chip->ecc.steps = mtd->writesize / chip->ecc.size;
-> -	if (chip->ecc_step_ds != 512) {
-> +	if (chip->base.eccreq.step_size != 512) {
->   		dev_err(ctrl->dev, "Unsupported step size %d\n",
-> -			chip->ecc_step_ds);
-> +			chip->base.eccreq.step_size);
->   		return -EINVAL;
->   	}
->   
-> @@ -950,7 +950,7 @@ static int tegra_nand_attach_chip(struct nand_chip *chip)
->   		if (ret < 0) {
->   			dev_err(ctrl->dev,
->   				"No valid strength found, minimum %d\n",
-> -				chip->ecc_strength_ds);
-> +				chip->base.eccreq.strength);
->   			return ret;
->   		}
->   
-> diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
-> index e5a25ba75211..14748183508b 100644
-> --- a/include/linux/mtd/rawnand.h
-> +++ b/include/linux/mtd/rawnand.h
-> @@ -1004,12 +1004,6 @@ struct nand_legacy {
->    * @badblockbits:	[INTERN] minimum number of set bits in a good block's
->    *			bad block marker position; i.e., BBM == 11110111b is
->    *			not bad when badblockbits == 7
-> - * @ecc_strength_ds:	[INTERN] ECC correctability from the datasheet.
-> - *			Minimum amount of bit errors per @ecc_step_ds guaranteed
-> - *			to be correctable. If unknown, set to zero.
-> - * @ecc_step_ds:	[INTERN] ECC step required by the @ecc_strength_ds,
-> - *			also from the datasheet. It is the recommended ECC step
-> - *			size, if known; if unknown, set to zero.
->    * @onfi_timing_mode_default: [INTERN] default ONFI timing mode. This field is
->    *			      set to the actually used ONFI mode if the chip is
->    *			      ONFI compliant or deduced from the datasheet if
-> @@ -1069,8 +1063,6 @@ struct nand_chip {
->   	} pagecache;
->   
->   	int subpagesize;
-> -	uint16_t ecc_strength_ds;
-> -	uint16_t ecc_step_ds;
->   	int onfi_timing_mode_default;
->   	int badblockpos;
->   	int badblockbits;
 > 
 _______________________________________________
 linux-arm-kernel mailing list
