@@ -3,21 +3,21 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 387E2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:17:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2BAAC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:33:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F02BD2077B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:17:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 86E7720663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:33:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nqb4foDD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="dvNrr/QF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F02BD2077B
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="URciRMvd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="c5WT/13v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86E7720663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,41 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b3sDVNwXHUj85YTIH9fqHsABeqp0WQjcGdZaXpgL+tM=; b=nqb4foDDuh7VY3
-	8l0wtDcoCzEBaBrAwvx6/R8cYKOpLY42rNechE/9n7Zdeua1zdhsTH7qNUtIVoTDwEXmJj4axKn53
-	GONrnHpHabk1jC9JOIKigUWQHPTL6TdwUNyqfe8l/I0/Ofc4h3WRQkpZQlMHcrK6+O6fpHDflPuhj
-	IumU54jZZe+zv2dckYTdAPLb+/esBDvdVbFeYFeGnqsmX0kHVf30054QohY7gVTjuufkDxMJxrWvh
-	LBRHI2tFrOCGWZdVGDfD9an4cI4ayxVSCWmP4Go88aHca2MzAUuffYeOZbvlxOzm3fzQUPOguu0ej
-	Tlk9c/eBLF+0RE5j4Vug==;
+	List-Owner; bh=Ac6E/nM6+UpS4Sg19d4sjrvwRHkbUdjCBaJ5OvAZ/Ig=; b=URciRMvdS/KADw
+	RfmVrq3/dbMd3dZh6E0CLgFycCZeiUCs9n075DjlqkW2lTNZhZUx3E3nBs/Pb+4s0R6q9tgM/jvEW
+	9Gv8R/RAnAFGOzw3Yg6IC/QotJAT34SufC6iXDwSlYtVEF/oWDGFTlAACyMbWVLYIXg18ObYOB0SB
+	xGL5XEBK/DKwVJCrhYwPB735QktpYyz82+UU3ihuFDSOd3ni46/WPtjJK3wSV1vnfUgYH4iGsJzDT
+	w5VnpLRpYQ3evR2xeVon8aVQFS/p0U8/avMKtR8mXjq9bQTIHww+gaEPdZQXSW+wjF8uoDNNj4Wht
+	d/q2OCpiyKrVk91rU8EQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxLwF-0005UI-KF; Sat, 23 Feb 2019 01:17:11 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gxMCL-0001UZ-1A; Sat, 23 Feb 2019 01:33:49 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxLwC-0005Tu-8q
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 01:17:09 +0000
-Received: from mail-wr1-f49.google.com (mail-wr1-f49.google.com
- [209.85.221.49])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 41BD820879
+ id 1gxMCI-0001UD-0Y
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 01:33:47 +0000
+Received: by mail-lj1-x244.google.com with SMTP id l5so3145957lje.1
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 01:17:06 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550884626;
- bh=qM14GEA1kkynPtQj8xGQpiWRgD0+Lb0IQ9VIKLs/xlo=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=dvNrr/QF9nsP3SA1IxNklWLSjsgEC0KkyQ0P+5ccFpOKQ3gB62tFXDpB5qdjMFmj1
- hGKWNOWGvyBwZzgx7RRxc+QDd43ZD/tqC0xWyq+5zKkOWbVKw1FAiVXYRjI2camFNq
- A2yw+oN7p4QJcFNtWWp/cYZRlnTBJX91kFyJxQl0=
-Received: by mail-wr1-f49.google.com with SMTP id d17so4182736wre.10
+ Fri, 22 Feb 2019 17:33:44 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=linux-foundation.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=xQrTZV50/Bgg7212a/45Y9EdOSbPZgi+4d9Y0GVvGEw=;
+ b=c5WT/13vLhi3PqGKRGbFwslWRp9pu5UMMwRtgAqHJk58mB6kxFjBKqr1SuePbM8JkL
+ nXyQGf75Il/C6LcZFRzjjzXcfEJj9CMgETh25TySxBCb9yK/fgSmXCiq6PTLWEU3oYVR
+ XTVcgiwcW0BbV9xNhCvYTXrfERGN3AryKzPos=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=xQrTZV50/Bgg7212a/45Y9EdOSbPZgi+4d9Y0GVvGEw=;
+ b=ZSnbHZMBNrFNCFPiCu0kPRESIWOB5I1iVMUGWYiCrO5saUlr7jgWwMI+XdfTVWVYmy
+ zLSi8OKTKeRpx4KvZnNJF4QRIjclNPsNZyA5x3t/jGehpV4jrrVKMUyyhw3q6yLOwbl3
+ KGXsXoz7nA73aQOvvobr0EonkkuULbdaQNBMD+JUVrHxauB1HNaJKceUp+YDlAedw3TP
+ gCIwFAmncJgblfntmPaBJ1UAMxfszsx0X3KOE+wmU6LQoYkxwuoKts/5Ni5dVOunRiiw
+ 8AeQcKw6lRcm6fO+zOzECggjVeqHvy2w8+iaLoc6s4xSZQRrfyIDEdFpXP/PA69fIeZP
+ Op9A==
+X-Gm-Message-State: AHQUAuYSLd492eAahEVB6B72kAlMKb7Hv6FRnl0TgAT2g+jB+KggA44d
+ D1kAR2bo2MJJ6IJcPqZMKBwcfOweOgE=
+X-Google-Smtp-Source: AHgI3IZ0Aub98gtcueeOS2DMmLZBLI3wnyVViKD0avvR4VxHvzxJNGSkKOU/ZMcXDjezGU1URERXqw==
+X-Received: by 2002:a2e:6309:: with SMTP id x9mr3722021ljb.75.1550885622065;
+ Fri, 22 Feb 2019 17:33:42 -0800 (PST)
+Received: from mail-lj1-f173.google.com (mail-lj1-f173.google.com.
+ [209.85.208.173])
+ by smtp.gmail.com with ESMTPSA id e25sm946009lfc.13.2019.02.22.17.33.40
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 22 Feb 2019 17:33:40 -0800 (PST)
+Received: by mail-lj1-f173.google.com with SMTP id v10so3140821lji.3
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 17:17:06 -0800 (PST)
-X-Gm-Message-State: AHQUAuZUDL2J01wbKfbrtpqUMjgcMSKgVaBTFQ+MXUlSMWavOgi2ZQd1
- Bvjmqhs0PbJgDCkgMWcl4JF2HhNEJ7QYqMN5XthXLA==
-X-Google-Smtp-Source: AHgI3IZJwjT2wJcsX85CRD/D/STdl4TV9r2/HnoSQuEPGbPMohFdTxvJg2kZuRLCdObU7Vur8NVU0PfUkc2IgTa4/VQ=
-X-Received: by 2002:adf:e747:: with SMTP id c7mr4674564wrn.176.1550884624657; 
- Fri, 22 Feb 2019 17:17:04 -0800 (PST)
+ Fri, 22 Feb 2019 17:33:40 -0800 (PST)
+X-Received: by 2002:a2e:9117:: with SMTP id m23mr3745506ljg.94.1550885619751; 
+ Fri, 22 Feb 2019 17:33:39 -0800 (PST)
 MIME-Version: 1.0
 References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
  <20190216103044.GR32494@hirez.programming.kicks-ass.net>
@@ -74,16 +89,18 @@ References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
  <20190222222635.GK14054@worktop.programming.kicks-ass.net>
  <CALCETrVw18nHQGPqg_OF=pD7NePafYQ_c1MhfSm_OCQ-O3xzhQ@mail.gmail.com>
  <CAHk-=wjmp0UugFnD2KaXyGO8RprfgULwMhseDhAxQQMqqL1Eiw@mail.gmail.com>
-In-Reply-To: <CAHk-=wjmp0UugFnD2KaXyGO8RprfgULwMhseDhAxQQMqqL1Eiw@mail.gmail.com>
-From: Andy Lutomirski <luto@kernel.org>
-Date: Fri, 22 Feb 2019 17:16:53 -0800
-X-Gmail-Original-Message-ID: <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
-Message-ID: <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
+ <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
+In-Reply-To: <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
+From: Linus Torvalds <torvalds@linux-foundation.org>
+Date: Fri, 22 Feb 2019 17:33:23 -0800
+X-Gmail-Original-Message-ID: <CAHk-=who4OcP6UrYX94ANLPnNjkEDh-sbgE=c2tvWpBpDP_PSQ@mail.gmail.com>
+Message-ID: <CAHk-=who4OcP6UrYX94ANLPnNjkEDh-sbgE=c2tvWpBpDP_PSQ@mail.gmail.com>
 Subject: Re: [RFC][PATCH] objtool: STAC/CLAC validation
-To: Linus Torvalds <torvalds@linux-foundation.org>
+To: Andy Lutomirski <luto@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_171708_335472_FE9ED3D5 
-X-CRM114-Status: GOOD (  12.07  )
+X-CRM114-CacheID: sfid-20190222_173346_067112_2F12D9B6 
+X-CRM114-Status: UNSURE (   8.27  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,40 +117,27 @@ Cc: Denys Vlasenko <dvlasenk@redhat.com>, Brian Gerst <brgerst@gmail.com>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Josh Poimboeuf <jpoimboe@redhat.com>, Will Deacon <will.deacon@arm.com>,
  valentin.schneider@arm.com, Ingo Molnar <mingo@redhat.com>,
- James Morse <james.morse@arm.com>, Andy Lutomirski <luto@kernel.org>,
- "H. Peter Anvin" <hpa@zytor.com>, Borislav Petkov <bp@alien8.de>,
- Thomas Gleixner <tglx@linutronix.de>, Ingo Molnar <mingo@kernel.org>,
+ James Morse <james.morse@arm.com>, "H. Peter Anvin" <hpa@zytor.com>,
+ Borislav Petkov <bp@alien8.de>, Thomas Gleixner <tglx@linutronix.de>,
+ Ingo Molnar <mingo@kernel.org>,
  "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 5:12 PM Linus Torvalds
-<torvalds@linux-foundation.org> wrote:
+On Fri, Feb 22, 2019 at 5:17 PM Andy Lutomirski <luto@kernel.org> wrote:
 >
-> On Fri, Feb 22, 2019 at 4:34 PM Andy Lutomirski <luto@kernel.org> wrote:
-> >
-> > [mailing lists removed because this is a potentially large source of exploits]
->
-> I think you're overly worried.
->
-> AC doesn't protect against "large source of exploits".
+> What I meant was: a potentially large grab bag of ways to help turn a
+> bug into an exploit.
 
-What I meant was: a potentially large grab bag of ways to help turn a
-bug into an exploit.
+Well, apparently there's only one place, and that one looks pretty harmless.
 
-> That said:
->
-> > Um, wait a moment.  You didn't find an oddity in ptrace.c.  You found
-> > a giant freaking error in uaccess.h.
->
-> I agree that your patch is good, and should be applied. Mind writing
-> up a changelog and committing it to -tip?
+Of course, I don't think PeterZ said what his config was. Maybe it was
+a very minimal config and only found that one case because all the
+truly scary cases were configured out ;)
 
-I don't have commit access :)  But I shall email it out once I test it a bit.
-
---Andy
+                   Linus
 
 _______________________________________________
 linux-arm-kernel mailing list
