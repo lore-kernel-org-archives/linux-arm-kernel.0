@@ -4,63 +4,87 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 56D43C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 12:12:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4F50C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:00:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1FEF5206BA
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 12:12:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 77D2620675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:00:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="W37+CIov"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FEF5206BA
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NLlmgFRj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 77D2620675
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kontron.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QcAjnGw9/2Tu95jzZwu9Z8H7r0KupdmRiU44Lw9BmtM=; b=W37+CIovNmi/Mt
-	kkYgMGNyIYRAvFECEixcNXYcm+RvGgHnY5f+VPHyeDBMYwJGoQqrztciPinexpnDDOrHiYdN6E8pO
-	AD09sCOslvJWoFBkGb0LHQs8qtxKTIsZHKP5ltPWqFeVPqXMx/BhDxqwQ2cNmkc2oeFSTMSqJfNVJ
-	4j1qNtPOkV7xE8HeSnhQv7u7fcJuU8OQo76vPBaAQ3Zs9NpNd4raflh7JgW1Deq5gJ7R0YO572Gg5
-	aVb1/aYcnkfpZSz2L53N+FVsYoySzGtEaipfVajwFl4/tO6vzSjT+kgpPUAZvAVzcldb8GFHlXgid
-	r1bHSHZNxl1kYmuG1CfQ==;
+	List-Owner; bh=g45fT3X1GB0FpU+CDsVtkMBIcW6Gz1MHTfatzR55X/Q=; b=NLlmgFRjw9VMVu
+	6q2x2cehoCIrwGo9exvtMZ8npMJh8tvFP2ZmqHYxu7RCYkD6OUQbGFHLahQ67OgWM9bILDz1qjn9b
+	7SzQJtaQT1KbrBJeZ1rF/fzcsPH52uZnK/GH+eiiFOTw7J5UiLk/LLD44PHKzmUH/oierdZ1Spmbl
+	lLnmZLARHbwhVYfEQrMGboPD2rc5A2GdSpB0pWB9oZdpxSCOoqOnmwjWV2DjJbBkkl8dTe1q02hc8
+	MMY1LcbV2vgvVppOAZtE81zFz8XZnv7dA3vJfZIep70AJCmbyHFsimBvkhI2KRXQHItazp5IRoWrv
+	N/iWW0XqoMoY6NYdVevg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxW9w-0005De-L5; Sat, 23 Feb 2019 12:12:00 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxW9s-0005C5-2H
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 12:11:58 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AB881A78;
- Sat, 23 Feb 2019 04:11:49 -0800 (PST)
-Received: from why.wild-wind.fr.eu.org (usa-sjc-mx-foss1.foss.arm.com
- [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9EBE23F575;
- Sat, 23 Feb 2019 04:11:47 -0800 (PST)
-Date: Sat, 23 Feb 2019 12:11:43 +0000
-From: Marc Zyngier <marc.zyngier@arm.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: Re: [PATCH v4 3/9] PCI: keystone: Convert to using hierarchy domain
- for legacy interrupts
-Message-ID: <20190223121143.14c1f150@why.wild-wind.fr.eu.org>
-In-Reply-To: <20190221162413.GA5815@e107981-ln.cambridge.arm.com>
-References: <20190221101518.22604-1-kishon@ti.com>
- <20190221101518.22604-4-kishon@ti.com>
- <20190221162413.GA5815@e107981-ln.cambridge.arm.com>
-Organization: ARM Ltd
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.31; x86_64-pc-linux-gnu)
+	id 1gxWut-0003U1-19; Sat, 23 Feb 2019 13:00:31 +0000
+Received: from skedge04.snt-world.com ([91.208.41.69])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxWun-0003T7-DE; Sat, 23 Feb 2019 13:00:28 +0000
+Received: from sntmail14r.snt-is.com (unknown [10.203.32.184])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by skedge04.snt-world.com (Postfix) with ESMTPS id 8B8B367A7D4;
+ Sat, 23 Feb 2019 14:00:15 +0100 (CET)
+Received: from sntmail12r.snt-is.com (10.203.32.182) by sntmail14r.snt-is.com
+ (10.203.32.184) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256) id 15.1.1713.5; Sat, 23 Feb
+ 2019 14:00:14 +0100
+Received: from sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305]) by
+ sntmail12r.snt-is.com ([fe80::e551:8750:7bba:3305%3]) with mapi id
+ 15.01.1713.004; Sat, 23 Feb 2019 14:00:14 +0100
+From: Schrempf Frieder <frieder.schrempf@kontron.de>
+To: Miquel Raynal <miquel.raynal@bootlin.com>, Boris Brezillon
+ <bbrezillon@kernel.org>, Richard Weinberger <richard@nod.at>, David Woodhouse
+ <dwmw2@infradead.org>, Brian Norris <computersforpeace@gmail.com>, "Marek
+ Vasut" <marek.vasut@gmail.com>, Tudor Ambarus <Tudor.Ambarus@microchip.com>
+Subject: Re: [PATCH 07/15] mtd: rawnand: Fill memorg during detection
+Thread-Topic: [PATCH 07/15] mtd: rawnand: Fill memorg during detection
+Thread-Index: AQHUycZr9ZtG7bS1jEKIexInFgZ6m6XtSx4A
+Date: Sat, 23 Feb 2019 13:00:14 +0000
+Message-ID: <2442d400-d50d-bbe9-4275-cce2241f6609@kontron.de>
+References: <20190221091527.20497-1-miquel.raynal@bootlin.com>
+ <20190221091527.20497-8-miquel.raynal@bootlin.com>
+In-Reply-To: <20190221091527.20497-8-miquel.raynal@bootlin.com>
+Accept-Language: de-DE, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [172.25.9.43]
+x-c2processedorg: 51b406b7-48a2-4d03-b652-521f56ac89f3
+Content-ID: <BB56438D82402A4A88001632C0757491@snt-world.com>
 MIME-Version: 1.0
+X-SnT-MailScanner-Information: Please contact the ISP for more information
+X-SnT-MailScanner-ID: 8B8B367A7D4.A3363
+X-SnT-MailScanner: Not scanned: please contact your Internet E-Mail Service
+ Provider for details
+X-SnT-MailScanner-SpamCheck: 
+X-SnT-MailScanner-From: frieder.schrempf@kontron.de
+X-SnT-MailScanner-To: bbrezillon@kernel.org, computersforpeace@gmail.com,
+ dwmw2@infradead.org, juliensu@mxic.com.tw,
+ linux-arm-kernel@lists.infradead.org, linux-mtd@lists.infradead.org,
+ marek.vasut@gmail.com, masonccyang@mxic.com.tw,
+ miquel.raynal@bootlin.com, richard@nod.at,
+ thomas.petazzoni@bootlin.com, tudor.ambarus@microchip.com,
+ vigneshr@ti.com, yamada.masahiro@socionext.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_041156_124503_2CA5CBD6 
-X-CRM114-Status: GOOD (  33.63  )
+X-CRM114-CacheID: sfid-20190223_050025_778243_6597B314 
+X-CRM114-Status: GOOD (  22.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,386 +96,224 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Jingoo Han <jingoohan1@gmail.com>, linux-kernel@vger.kernel.org,
- Kishon Vijay Abraham I <kishon@ti.com>, Murali Karicheri <m-karicheri2@ti.com>,
- linux-pci@vger.kernel.org, Bjorn Helgaas <bhelgaas@google.com>,
- Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Vignesh R <vigneshr@ti.com>, Julien Su <juliensu@mxic.com.tw>, Masahiro
+ Yamada <yamada.masahiro@socionext.com>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mason Yang <masonccyang@mxic.com.tw>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 16:24:14 +0000
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-
-> On Thu, Feb 21, 2019 at 03:45:12PM +0530, Kishon Vijay Abraham I wrote:
-> > K2G provides separate IRQ lines for each of the four legacy interrupts.
-> > Model this using hierarchy domain instead of linear domain with chained
-> > IRQ handler.
-> > 
-> > Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> > ---
-> >  drivers/pci/controller/dwc/pci-keystone.c | 205 +++++++++++++---------
-> >  1 file changed, 118 insertions(+), 87 deletions(-)  
+On 21.02.19 10:15, Miquel Raynal wrote:
+> From: Boris Brezillon <bbrezillon@kernel.org>
 > 
-> Hi Kishon,
+> If we want to use the generic NAND layer, we need to have the memorg
+> struct appropriately filled. Patch the detection code to fill this
+> struct.
 > 
-> I CC'ed Marc because you are actually re-writing an interrupt controller
-> driver so I would be happier to merge this refactoring if Marc can have
-> a look and he is satisfied with it - more so because most of the code can
-> be reused by other host bridge drivers with similar behaviour.
-
-Cheers Lorenzo.
-
-It doesn't look too bad, but there is a couple of points I'd like to see
-clarified. Comments below.
-
+> Signed-off-by: Boris Brezillon <bbrezillon@kernel.org>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>   drivers/mtd/nand/raw/denali.c       |  5 +++
+>   drivers/mtd/nand/raw/diskonchip.c   |  4 ++
+>   drivers/mtd/nand/raw/jz4740_nand.c  |  4 ++
+>   drivers/mtd/nand/raw/nand_amd.c     | 11 ++++--
+>   drivers/mtd/nand/raw/nand_base.c    | 60 ++++++++++++++++++++++++++---
+>   drivers/mtd/nand/raw/nand_hynix.c   | 48 +++++++++++++++--------
+>   drivers/mtd/nand/raw/nand_jedec.c   | 22 ++++++++---
+>   drivers/mtd/nand/raw/nand_onfi.c    | 23 ++++++++---
+>   drivers/mtd/nand/raw/nand_samsung.c | 24 ++++++++----
+>   drivers/mtd/nand/raw/nand_toshiba.c |  9 ++++-
+>   drivers/mtd/nand/raw/nandsim.c      |  6 +++
+>   11 files changed, 172 insertions(+), 44 deletions(-)
 > 
-> I will have a look too, unfortunately it is becoming a bit tight for
-> v5.1 but let's see how it goes.
+[...]
+> diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+> index d3092c9a3e21..cb03877c775c 100644
+> --- a/drivers/mtd/nand/raw/nand_base.c
+> +++ b/drivers/mtd/nand/raw/nand_base.c
+> @@ -4530,21 +4530,30 @@ static int nand_get_bits_per_cell(u8 cellinfo)
+>    */
+>   void nand_decode_ext_id(struct nand_chip *chip)
+>   {
+> +	struct nand_memory_organization *memorg;
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+>   	int extid;
+>   	u8 *id_data = chip->id.data;
+> +
+> +	memorg = nanddev_get_memorg(&chip->base);
+> +
+>   	/* The 3rd id byte holds MLC / multichip data */
+> +	memorg->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+>   	chip->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+>   	/* The 4th id byte is the important one */
+>   	extid = id_data[3];
+>   
+>   	/* Calc pagesize */
+> -	mtd->writesize = 1024 << (extid & 0x03);
+> +	memorg->pagesize = 1024 << (extid & 0x03);
+> +	mtd->writesize = memorg->pagesize;
+>   	extid >>= 2;
+>   	/* Calc oobsize */
+> -	mtd->oobsize = (8 << (extid & 0x01)) * (mtd->writesize >> 9);
+> +	memorg->oobsize = (8 << (extid & 0x01)) * (mtd->writesize >> 9);
+> +	mtd->oobsize = memorg->oobsize;
+>   	extid >>= 2;
+>   	/* Calc blocksize. Blocksize is multiples of 64KiB */
+> +	memorg->pages_per_eraseblock = ((64 * 1024) << (extid & 0x03)) /
+> +				       memorg->pagesize;
+>   	mtd->erasesize = (64 * 1024) << (extid & 0x03);
+>   	extid >>= 2;
+>   	/* Get buswidth information */
+> @@ -4561,12 +4570,19 @@ EXPORT_SYMBOL_GPL(nand_decode_ext_id);
+>   static void nand_decode_id(struct nand_chip *chip, struct nand_flash_dev *type)
+>   {
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct nand_memory_organization *memorg;
+>   
+> +	memorg = nanddev_get_memorg(&chip->base);
+> +
+> +	memorg->pages_per_eraseblock = type->erasesize / type->pagesize;
+>   	mtd->erasesize = type->erasesize;
+> -	mtd->writesize = type->pagesize;
+> -	mtd->oobsize = mtd->writesize / 32;
+> +	memorg->pagesize = type->pagesize;
+> +	mtd->writesize = memorg->pagesize;
+> +	memorg->oobsize = memorg->pagesize / 32;
+> +	mtd->oobsize = memorg->oobsize;
+>   
+>   	/* All legacy ID NAND are small-page, SLC */
+> +	memorg->bits_per_cell = 1;
+>   	chip->bits_per_cell = 1;
+>   }
+>   
+> @@ -4595,13 +4611,21 @@ static bool find_full_id_nand(struct nand_chip *chip,
+>   			      struct nand_flash_dev *type)
+>   {
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct nand_memory_organization *memorg;
+>   	u8 *id_data = chip->id.data;
+>   
+> +	memorg = nanddev_get_memorg(&chip->base);
+> +
+>   	if (!strncmp(type->id, id_data, type->id_len)) {
+> -		mtd->writesize = type->pagesize;
+> +		memorg->pagesize = type->pagesize;
+> +		mtd->writesize = memorg->pagesize;
+> +		memorg->pages_per_eraseblock = type->erasesize /
+> +					       type->erasesize;
+
+This should be:
+		memorg->pages_per_eraseblock = type->erasesize /
+					       type->pagesize;
+
+>   		mtd->erasesize = type->erasesize;
+> -		mtd->oobsize = type->oobsize;
+> +		memorg->oobsize = type->oobsize;
+> +		mtd->oobsize = memorg->oobsize;
+>   
+> +		memorg->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+>   		chip->bits_per_cell = nand_get_bits_per_cell(id_data[2]);
+>   		chip->chipsize = (uint64_t)type->chipsize << 20;
+>   		chip->options |= type->options;
+> @@ -4632,7 +4656,12 @@ static void nand_manufacturer_detect(struct nand_chip *chip)
+>   	 */
+>   	if (chip->manufacturer.desc && chip->manufacturer.desc->ops &&
+>   	    chip->manufacturer.desc->ops->detect) {
+> +		struct nand_memory_organization *memorg;
+> +
+> +		memorg = nanddev_get_memorg(&chip->base);
+> +
+>   		/* The 3rd id byte holds MLC / multichip data */
+> +		memorg->bits_per_cell = nand_get_bits_per_cell(chip->id.data[2]);
+>   		chip->bits_per_cell = nand_get_bits_per_cell(chip->id.data[2]);
+>   		chip->manufacturer.desc->ops->detect(chip);
+>   	} else {
+> @@ -4682,10 +4711,20 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+>   {
+>   	const struct nand_manufacturer *manufacturer;
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct nand_memory_organization *memorg;
+>   	int busw, ret;
+>   	u8 *id_data = chip->id.data;
+>   	u8 maf_id, dev_id;
+>   
+> +	/*
+> +	 * Let's start by initializing memorg fields that might be left
+> +	 * unassigned by the ID-based detection logic.
+> +	 */
+> +	memorg = nanddev_get_memorg(&chip->base);
+> +	memorg->planes_per_lun = 1;
+> +	memorg->luns_per_target = 1;
+> +	memorg->ntargets = 1;
+> +
+>   	/*
+>   	 * Reset the chip, required by some chips (e.g. Micron MT29FxGxxxxx)
+>   	 * after power-up.
+> @@ -4790,6 +4829,11 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+>   	/* Get chip options */
+>   	chip->options |= type->options;
+>   
+> +	memorg->eraseblocks_per_lun =
+> +			DIV_ROUND_DOWN_ULL((u64)type->chipsize << 20,
+> +					   memorg->pagesize *
+> +					   memorg->pages_per_eraseblock);
+> +
+>   ident_done:
+>   	if (!mtd->name)
+>   		mtd->name = chip->parameters.model;
+> @@ -5016,10 +5060,13 @@ static int nand_scan_ident(struct nand_chip *chip, unsigned int maxchips,
+>   			   struct nand_flash_dev *table)
+>   {
+>   	struct mtd_info *mtd = nand_to_mtd(chip);
+> +	struct nand_memory_organization *memorg;
+>   	int nand_maf_id, nand_dev_id;
+>   	unsigned int i;
+>   	int ret;
+>   
+> +	memorg = nanddev_get_memorg(&chip->base);
+> +
+>   	/* Assume all dies are deselected when we enter nand_scan_ident(). */
+>   	chip->cur_cs = -1;
+>   
+> @@ -5081,6 +5128,7 @@ static int nand_scan_ident(struct nand_chip *chip, unsigned int maxchips,
+>   		pr_info("%d chips detected\n", i);
+>   
+>   	/* Store the number of chips and calc total size for mtd */
+> +	memorg->ntargets = i;
+>   	chip->numchips = i;
+>   	mtd->size = i * chip->chipsize;
+>   
+[...]
+> --- a/drivers/mtd/nand/raw/nandsim.c
+> +++ b/drivers/mtd/nand/raw/nandsim.c
+> @@ -2302,6 +2302,11 @@ static int __init ns_init_module(void)
+>   
+>   	if (overridesize) {
+>   		uint64_t new_size = (uint64_t)nsmtd->erasesize << overridesize;
+> +		struct nand_memory_organization *memorg;
+> +		u64 targetsize;
+
+This variable is not used yet. It rather belongs into patch 13.
+
+> +
+> +		memorg = nanddev_get_memorg(&chip->base);
+> +
+>   		if (new_size >> overridesize != nsmtd->erasesize) {
+>   			NS_ERR("overridesize is too big\n");
+>   			retval = -EINVAL;
+> @@ -2309,6 +2314,7 @@ static int __init ns_init_module(void)
+>   		}
+>   		/* N.B. This relies on nand_scan not doing anything with the size before we change it */
+>   		nsmtd->size = new_size;
+> +		memorg->eraseblocks_per_lun = 1 << overridesize;
+>   		chip->chipsize = new_size;
+>   		chip->chip_shift = ffs(nsmtd->erasesize) + overridesize - 1;
+>   		chip->pagemask = (chip->chipsize >> chip->page_shift) - 1;
 > 
-> Thanks,
-> Lorenzo
-> 
-> > diff --git a/drivers/pci/controller/dwc/pci-keystone.c b/drivers/pci/controller/dwc/pci-keystone.c
-> > index 47f0dcf638f2..7f1648453f54 100644
-> > --- a/drivers/pci/controller/dwc/pci-keystone.c
-> > +++ b/drivers/pci/controller/dwc/pci-keystone.c
-> > @@ -61,6 +61,7 @@
-> >  
-> >  #define IRQ_STATUS(n)			(0x184 + ((n) << 4))
-> >  #define IRQ_ENABLE_SET(n)		(0x188 + ((n) << 4))
-> > +#define IRQ_ENABLE_CLR(n)		(0x18C + ((n) << 4))
-> >  #define INTx_EN				BIT(0)
-> >  
-> >  #define ERR_IRQ_STATUS			0x1c4
-> > @@ -87,7 +88,6 @@ struct keystone_pcie {
-> >  	struct dw_pcie		*pci;
-> >  	/* PCI Device ID */
-> >  	u32			device_id;
-> > -	int			legacy_host_irqs[PCI_NUM_INTX];
-> >  	struct			device_node *legacy_intc_np;
-> >  
-> >  	int			msi_host_irqs[MAX_MSI_HOST_IRQS];
-> > @@ -96,7 +96,6 @@ struct keystone_pcie {
-> >  	struct phy		**phy;
-> >  	struct device_link	**link;
-> >  	struct			device_node *msi_intc_np;
-> > -	struct irq_domain	*legacy_irq_domain;
-> >  	struct device_node	*np;
-> >  
-> >  	int error_irq;
-> > @@ -199,26 +198,6 @@ static int ks_pcie_msi_host_init(struct pcie_port *pp)
-> >  	return dw_pcie_allocate_domains(pp);
-> >  }
-> >  
-> > -static void ks_pcie_handle_legacy_irq(struct keystone_pcie *ks_pcie,
-> > -				      int offset)
-> > -{
-> > -	struct dw_pcie *pci = ks_pcie->pci;
-> > -	struct device *dev = pci->dev;
-> > -	u32 pending;
-> > -	int virq;
-> > -
-> > -	pending = ks_pcie_app_readl(ks_pcie, IRQ_STATUS(offset));
-> > -
-> > -	if (BIT(0) & pending) {
-> > -		virq = irq_linear_revmap(ks_pcie->legacy_irq_domain, offset);
-> > -		dev_dbg(dev, ": irq: irq_offset %d, virq %d\n", offset, virq);
-> > -		generic_handle_irq(virq);
-> > -	}
-> > -
-> > -	/* EOI the INTx interrupt */
-> > -	ks_pcie_app_writel(ks_pcie, IRQ_EOI, offset);
-> > -}
-> > -
-> >  static void ks_pcie_enable_error_irq(struct keystone_pcie *ks_pcie)
-> >  {
-> >  	ks_pcie_app_writel(ks_pcie, ERR_IRQ_ENABLE_SET, ERR_IRQ_ALL);
-> > @@ -256,39 +235,117 @@ static irqreturn_t ks_pcie_handle_error_irq(struct keystone_pcie *ks_pcie)
-> >  	return IRQ_HANDLED;
-> >  }
-> >  
-> > -static void ks_pcie_ack_legacy_irq(struct irq_data *d)
-> > +void ks_pcie_irq_eoi(struct irq_data *data)
-> >  {
-> > +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> > +	irq_hw_number_t hwirq = data->hwirq;
-> > +
-> > +	ks_pcie_app_writel(ks_pcie, IRQ_EOI, hwirq);
-> > +	irq_chip_eoi_parent(data);
-> >  }
-> >  
-> > -static void ks_pcie_mask_legacy_irq(struct irq_data *d)
-> > +void ks_pcie_irq_enable(struct irq_data *data)
-> >  {
-> > +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> > +	irq_hw_number_t hwirq = data->hwirq;
-> > +
-> > +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(hwirq), INTx_EN);
-> > +	irq_chip_enable_parent(data);
-> >  }
-> >  
-> > -static void ks_pcie_unmask_legacy_irq(struct irq_data *d)
-> > +void ks_pcie_irq_disable(struct irq_data *data)
-> >  {
-> > +	struct keystone_pcie *ks_pcie = irq_data_get_irq_chip_data(data);
-> > +	irq_hw_number_t hwirq = data->hwirq;
-> > +
-> > +	ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_CLR(hwirq), INTx_EN);
-> > +	irq_chip_disable_parent(data);
-> >  }
-> >  
-> >  static struct irq_chip ks_pcie_legacy_irq_chip = {
-> > -	.name = "Keystone-PCI-Legacy-IRQ",
-> > -	.irq_ack = ks_pcie_ack_legacy_irq,
-> > -	.irq_mask = ks_pcie_mask_legacy_irq,
-> > -	.irq_unmask = ks_pcie_unmask_legacy_irq,
-> > +	.name			= "Keystone-PCI-Legacy-IRQ",
-> > +	.irq_enable		= ks_pcie_irq_enable,
-> > +	.irq_disable		= ks_pcie_irq_disable,
-> > +	.irq_eoi		= ks_pcie_irq_eoi,
-> > +	.irq_mask		= irq_chip_mask_parent,
-> > +	.irq_unmask		= irq_chip_unmask_parent,
-> > +	.irq_retrigger		= irq_chip_retrigger_hierarchy,
-> > +	.irq_set_type		= irq_chip_set_type_parent,
-> > +	.irq_set_affinity	= irq_chip_set_affinity_parent,
-> >  };
-> >  
-> > -static int ks_pcie_init_legacy_irq_map(struct irq_domain *d,
-> > -				       unsigned int irq,
-> > -				       irq_hw_number_t hw_irq)
-> > +static int ks_pcie_legacy_irq_domain_alloc(struct irq_domain *domain,
-> > +					   unsigned int virq,
-> > +					   unsigned int nr_irqs, void *data)
-> >  {
-> > -	irq_set_chip_and_handler(irq, &ks_pcie_legacy_irq_chip,
-> > -				 handle_level_irq);
-> > -	irq_set_chip_data(irq, d->host_data);
-> > +	struct keystone_pcie *ks_pcie = domain->host_data;
-> > +	struct device_node *np = ks_pcie->legacy_intc_np;
-> > +	struct irq_fwspec parent_fwspec, *fwspec = data;
-> > +	struct of_phandle_args out_irq;
-> > +	int ret, i;
-> > +
-> > +	if (nr_irqs != 1)
-> > +		return -EINVAL;
-> > +
-> > +	ret = of_irq_parse_one(np, fwspec->param[0], &out_irq);
-> > +	if (ret < 0) {
-> > +		pr_err("Failed to parse interrupt node\n");
-> > +		return ret;
-> > +	}
-
-What it this trying to do? Fishing out the interrupts from DT based on
-the legacy pin? This looks at best obscure. I wonder why you don't do
-that at probe time instead. Anyway, this requires documenting.
-
-> > +
-> > +	parent_fwspec.fwnode = &out_irq.np->fwnode;
-> > +	parent_fwspec.param_count = out_irq.args_count;
-> > +
-> > +	for (i = 0; i < out_irq.args_count; i++)
-> > +		parent_fwspec.param[i] = out_irq.args[i];
-
-This feels like a duplicate of of_phandle_args_to_fwspec(). If you need
-such a helper, please export it from the irqdomain code.
-
-> > +
-> > +	ret = irq_domain_alloc_irqs_parent(domain, virq, 1, &parent_fwspec);
-> > +	if (ret < 0) {
-> > +		pr_err("Failed to allocate parent irq %u: %d\n",
-> > +		       parent_fwspec.param[0], ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = irq_domain_set_hwirq_and_chip(domain, virq, fwspec->param[0],
-> > +					    &ks_pcie_legacy_irq_chip, ks_pcie);
-> > +	if (ret < 0) {
-> > +		pr_err("Failed to set hwirq and chip\n");
-> > +		goto err_set_hwirq_and_chip;
-> > +	}
-> >  
-> >  	return 0;
-> > +
-> > +err_set_hwirq_and_chip:
-> > +	irq_domain_free_irqs_parent(domain, virq, 1);
-> > +
-> > +	return ret;
-> > +}
-> > +
-> > +static int ks_pcie_irq_domain_translate(struct irq_domain *domain,
-> > +					struct irq_fwspec *fwspec,
-> > +					unsigned long *hwirq,
-> > +					unsigned int *type)
-> > +{
-> > +	if (is_of_node(fwspec->fwnode)) {
-
-If you don't plan to support ACPI, you can drop this.
-
-> > +		if (fwspec->param_count != 2)
-> > +			return -EINVAL;
-
-From the DT binding:
-
-pcie_intc: Interrupt controller device node for Legacy IRQ chip
-        interrupt-cells: should be set to 1
-
-So why do we have 2 cells here?
-
-> > +
-> > +		if (fwspec->param[0] >= PCI_NUM_INTX)
-> > +			return -EINVAL;
-
-Most of the OF code assumes that the pin number describing the legacy
-interrupt is 1-based, while you obviously treat it as 0-based. How does
-it work?
-
-> > +
-> > +		*hwirq = fwspec->param[0];
-> > +		*type = fwspec->param[1];
-
-As far as I remember, PCI legacy interrupts are level triggered, so
-there should be no need to advertise the trigger (which is consistent
-with the way the binding is written).
-
-> > +
-> > +		return 0;
-> > +	}
-> > +
-> > +	return -EINVAL;
-> >  }
-> >  
-> >  static const struct irq_domain_ops ks_pcie_legacy_irq_domain_ops = {
-> > -	.map = ks_pcie_init_legacy_irq_map,
-> > -	.xlate = irq_domain_xlate_onetwocell,
-> > +	.alloc		= ks_pcie_legacy_irq_domain_alloc,
-> > +	.free		= irq_domain_free_irqs_common,
-> > +	.translate	= ks_pcie_irq_domain_translate,
-> >  };
-> >  
-> >  /**
-> > @@ -572,35 +629,6 @@ static void ks_pcie_msi_irq_handler(struct irq_desc *desc)
-> >  	chained_irq_exit(chip, desc);
-> >  }
-> >  
-> > -/**
-> > - * ks_pcie_legacy_irq_handler() - Handle legacy interrupt
-> > - * @irq: IRQ line for legacy interrupts
-> > - * @desc: Pointer to irq descriptor
-> > - *
-> > - * Traverse through pending legacy interrupts and invoke handler for each. Also
-> > - * takes care of interrupt controller level mask/ack operation.
-> > - */
-> > -static void ks_pcie_legacy_irq_handler(struct irq_desc *desc)
-> > -{
-> > -	unsigned int irq = irq_desc_get_irq(desc);
-> > -	struct keystone_pcie *ks_pcie = irq_desc_get_handler_data(desc);
-> > -	struct dw_pcie *pci = ks_pcie->pci;
-> > -	struct device *dev = pci->dev;
-> > -	u32 irq_offset = irq - ks_pcie->legacy_host_irqs[0];
-> > -	struct irq_chip *chip = irq_desc_get_chip(desc);
-> > -
-> > -	dev_dbg(dev, ": Handling legacy irq %d\n", irq);
-> > -
-> > -	/*
-> > -	 * The chained irq handler installation would have replaced normal
-> > -	 * interrupt driver handler so we need to take care of mask/unmask and
-> > -	 * ack operation.
-> > -	 */
-> > -	chained_irq_enter(chip, desc);
-> > -	ks_pcie_handle_legacy_irq(ks_pcie, irq_offset);
-> > -	chained_irq_exit(chip, desc);
-> > -}
-> > -
-> >  static int ks_pcie_config_msi_irq(struct keystone_pcie *ks_pcie)
-> >  {
-> >  	struct device *dev = ks_pcie->pci->dev;
-> > @@ -655,14 +683,33 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
-> >  	struct device *dev = ks_pcie->pci->dev;
-> >  	struct irq_domain *legacy_irq_domain;
-> >  	struct device_node *np = ks_pcie->np;
-> > +	struct irq_domain *parent_domain;
-> > +	struct device_node *parent_node;
-> >  	struct device_node *intc_np;
-> > -	int irq_count, irq, ret = 0, i;
-> > +	int irq_count, ret = 0;
-> >  
-> >  	intc_np = of_get_child_by_name(np, "legacy-interrupt-controller");
-> >  	if (!intc_np) {
-> >  		dev_warn(dev, "legacy-interrupt-controller node is absent\n");
-> >  		return -EINVAL;
-> >  	}
-> > +	ks_pcie->legacy_intc_np = intc_np;
-> > +
-> > +	parent_node = of_irq_find_parent(intc_np);
-> > +	if (!parent_node) {
-> > +		dev_err(dev, "unable to obtain parent node\n");
-> > +		ret = -ENXIO;
-> > +		goto err;
-> > +	}
-> > +
-> > +	parent_domain = irq_find_host(parent_node);
-> > +	if (!parent_domain) {
-> > +		dev_err(dev, "unable to obtain parent domain\n");
-> > +		ret = -ENXIO;
-> > +		goto err;
-> > +	}
-> > +
-> > +	of_node_put(parent_node);
-> >  
-> >  	irq_count = of_irq_count(intc_np);
-> >  	if (!irq_count) {
-> > @@ -671,31 +718,15 @@ static int ks_pcie_config_legacy_irq(struct keystone_pcie *ks_pcie)
-> >  		goto err;
-> >  	}
-> >  
-> > -	for (i = 0; i < irq_count; i++) {
-> > -		irq = irq_of_parse_and_map(intc_np, i);
-> > -		if (!irq) {
-> > -			ret = -EINVAL;
-> > -			goto err;
-> > -		}
-> > -		ks_pcie->legacy_host_irqs[i] = irq;
-> > -
-> > -		irq_set_chained_handler_and_data(irq,
-> > -						 ks_pcie_legacy_irq_handler,
-> > -						 ks_pcie);
-> > -	}
-> > -
-> >  	legacy_irq_domain =
-> > -		irq_domain_add_linear(intc_np, PCI_NUM_INTX,
-> > -				      &ks_pcie_legacy_irq_domain_ops, NULL);
-> > +		irq_domain_add_hierarchy(parent_domain, 0, PCI_NUM_INTX,
-> > +					 intc_np,
-> > +					 &ks_pcie_legacy_irq_domain_ops,
-> > +					 ks_pcie);
-> >  	if (!legacy_irq_domain) {
-> >  		dev_err(dev, "Failed to add irq domain for legacy irqs\n");
-> >  		ret = -EINVAL;
-> > -		goto err;
-> >  	}
-> > -	ks_pcie->legacy_irq_domain = legacy_irq_domain;
-> > -
-> > -	for (i = 0; i < PCI_NUM_INTX; i++)
-> > -		ks_pcie_app_writel(ks_pcie, IRQ_ENABLE_SET(i), INTx_EN);
-> >  
-> >  err:
-> >  	of_node_put(intc_np);
-> > -- 
-> > 2.17.1
-> >   
-
-The structure of the code otherwise looks good. I trust you'd be able
-to shed some light on the questions I have.
-
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
-
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
