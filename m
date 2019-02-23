@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 207FCC10F0B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:08:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 68830C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:09:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D756920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:08:51 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 39CA220661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:09:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q0jhw6cr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="qSVc/DD1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D756920850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B0fhB1ux";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="mn8OH9P9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 39CA220661
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +27,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=b2xi1+1XNkmJYWxbOM/MZpy6sEig63WR5azVWYPt4o0=; b=Q0jhw6crU7JGBrUDPEgqfDWwyf
-	hxg/kTIY6uFiGs7qvYm22gYJwW9pw0P2bDHrfBOHShvdm/Lpm9ryEhVCyEhopofca6+r7opjrgORu
-	BAD3yRltsBDNj+79P8whzmk+K03sFeLfvahsENCj17QLfS4dsITVzR/HACwPLcu6yFzYXpid0RQtJ
-	gbnnhc86XbhNRyxyAX3nGssMAehXw7GhWcSf9Q+If5P6dOt7iXlzt0h49JbHAy7PzmmMmOjPjklFB
-	vSWYN2BXXtaSk132XF3X7xAs78U0UFk4DPfKFBVsEKbw3u3wr/wyy9PkHwwR8Jde65QgB9Zx6Sk1I
-	tnFJ0e+A==;
+	bh=2FEl+9RgBO8vHHGy2kQolpI2ELbyZfsk6VY/qnQIDjE=; b=B0fhB1uxRMs/YRiMebRC7OVcYb
+	F0Xg62QnIMXyQ+5vVcU+74jUyRMYuAc6zIHfevhHaW7RJy15cT3R/lMunP2fEOUK710HyXqYHbnLW
+	4zxEYJ1TT4DBJIcQFLuEEj1ylK4+zvTrFFtjA4YGz7ZDlg4q66M1DqNw2M7oePMoOc3Zq5HZ2NSU2
+	MtE0sm5D3lMUKOPy/BWkiOBEvaJnq+4VUKw4K49lbai8TnvDBdle3AssqLJl4xjAVJG7imWDckvG+
+	iE+QBuBwQV1HU4Pa5Efna7ksPTnipZRCWW6V1jPIIc1rtYsqJgzP7+ZF6S/8jgHSZFHsLE7aIDSPN
+	wxzAyydg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxX2r-00020m-6a; Sat, 23 Feb 2019 13:08:45 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gxX35-0002KH-2M; Sat, 23 Feb 2019 13:08:59 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxX29-0001HB-Kz
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 13:08:03 +0000
-Received: by mail-wr1-x444.google.com with SMTP id w17so5158959wrn.12
+ id 1gxX2G-0001NS-EC
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 13:08:17 +0000
+Received: by mail-wr1-x443.google.com with SMTP id d17so5163606wre.10
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 05:08:01 -0800 (PST)
+ Sat, 23 Feb 2019 05:08:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=1aU82OCB8EaU5gSyx1GLNfzRZ/n+CtM0wF3xQO3ltdE=;
- b=qSVc/DD17GWnUdCpaw7WaO089XVB4WI0aYdiodmu3f4mRuCbyMNJjLWac5g+UrKCQH
- z5WOU7kh32bdNH1BYvU5e73cwM1JmBOGIArhuhbVUZPeYPVjs7OhbIfQPSm06yXJmvZC
- 7MePrRJ/7paUPIdNOEjGgDt+YrxchIsvPmno26wEolNiHDFzqNalM2LxtzZhTPHmBoJg
- zlCMZ9qGohEvCxa25K/jTtMRzVF8icL/EeS3xumqm7Bi95oUXE+uABbAD+HAPAZ6W+Z0
- Q22ZJV1TK8DE1kk4ypHu5Pqu3PS/UYih/I0c8u53EQvgweT2Wcg1dwoNOkCMJX9HTkNG
- E/EA==
+ bh=X/dC9KlJ2HFYdYmnw3hP+wmPZpOjWjCgiVR8KWlL9Mw=;
+ b=mn8OH9P9jFUIYYwT9kiZtDMLsfnnQog8op/FqCeDhCxl6cce6Vdd7Wdw0vWCXytVew
+ hQeeJLFOnoeZCo8i2xzI+sz5g1qnpuMF+XI/9+zCUPrmBLZtbCwkPLkHSVUq8rFdeGIK
+ cl3vcKrLW0+SABVcEQV2OQXJvISPjid22tkKM8zpoemfCNLcg3OUzjwvKgDH0SM+4yhh
+ vmqo+WCEMY9XWvavr4uBlUrV86W0LyHBRRN2RRHpT0HrgyBnE9rRaPGbsF20BIf7e35z
+ 0EI9Cpc6sz27ZX98jLWYmEF2uFvI1l2JdY1ljjyAVPGKcU3BKI+PmuCmndRPYDbxn7Qm
+ RYmw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=1aU82OCB8EaU5gSyx1GLNfzRZ/n+CtM0wF3xQO3ltdE=;
- b=bUI4ABu3R8XO82k40lyUxqZ5jGowb6QQXPIdZGc5r4qv2HB9gT8GqBvd3sHuz+yUJW
- 5DIQc8PB3k2rtgcbHVehakwZMFvhpgnAZjKAQa3VcPqTv4fSADcJtPFKIKG+5l8i1k7r
- bd1zeXSmPTH/DtohOSECI2mlDx1XJveo/1nx63/UOaeIKhX5DIvHStwZwVKmKiyEWwEG
- 1SK53V2QHivcTLcZiCtdGl8R38rHHHmdSL+5ytTTkFFAiNzef8NR8DkMv3gAue2GCZ0V
- 5RaxC0RMZnLF/tx/5peNYZaAghIRFr3SqenVKjM8AJGoq8/t7Eabxgt+PBSOuq414say
- wERA==
-X-Gm-Message-State: AHQUAuZp8mMidcllRC02wcHj14hHEOH5wrBbbAvTKTgzSBQSSoOXWqX3
- 3ybpqLDi+qB5zgFmDmQxCCJgqg==
-X-Google-Smtp-Source: AHgI3IbVSKg4gdtbIp6JL/bIu4AfzpxP6z3ySoB1CaQgud8u8kuxTeg7pUq6c1WhDyxFvU9/cajSHQ==
-X-Received: by 2002:a5d:4985:: with SMTP id r5mr6191029wrq.90.1550927279831;
- Sat, 23 Feb 2019 05:07:59 -0800 (PST)
+ bh=X/dC9KlJ2HFYdYmnw3hP+wmPZpOjWjCgiVR8KWlL9Mw=;
+ b=NnfNUv6l+sAemM7s+trLBkhpmAbUXn4+gzXgS9oZhhAflJcZ5VnB5+JjHRTUujg8DJ
+ WalMSbAcGrzNkZCzHN+tDmMJYeihFl5sxcvuMDFqm0oty8T8rksfGJYf8mAs4ZM05/nH
+ gLE91XxCotgAbqsHdM1+tVCfrn619ugnw8975V8A1vfNiUvXjnVkzl+T14K1ObffeKcq
+ yB6x3BP7o/k5BfOdimlgkbgvFaVffV8dLTyvPKoRT7Jx504ND3aTAp78jIq64LhyfZkt
+ qjJSuPL8pO4mfV29smkhAbnkSo2IgTAgKJ5Nv450FrZ1bDAwU1//lEBzeg/04poy3V6Z
+ 0A0g==
+X-Gm-Message-State: AHQUAuZR1n4nu4av0zRY8eVeO25Fyqhwm14sxVrjPnepVrs5hA8pEIJz
+ If1man784DLjxLpZTjgg1gteFw==
+X-Google-Smtp-Source: AHgI3IYrtIY9J9dmnkdasoQHFpCzIooEdynI8zgiDvf+ZmHsNPrBbuzx6F/oElnuqwV3ijzRVwBF5g==
+X-Received: by 2002:adf:f845:: with SMTP id d5mr6886036wrq.113.1550927286421; 
+ Sat, 23 Feb 2019 05:08:06 -0800 (PST)
 Received: from clegane.local (189.126.130.77.rev.sfr.net. [77.130.126.189])
- by smtp.gmail.com with ESMTPSA id i12sm7830746wrq.21.2019.02.23.05.07.58
+ by smtp.gmail.com with ESMTPSA id i12sm7830746wrq.21.2019.02.23.05.08.05
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 23 Feb 2019 05:07:59 -0800 (PST)
+ Sat, 23 Feb 2019 05:08:05 -0800 (PST)
 From: Daniel Lezcano <daniel.lezcano@linaro.org>
 To: tglx@linutronix.de
-Subject: [PATCH 04/18] clocksource/drivers/exynos_mct: Clear timer interrupt
- when shutdown
-Date: Sat, 23 Feb 2019 14:06:52 +0100
-Message-Id: <20190223130707.16704-4-daniel.lezcano@linaro.org>
+Subject: [PATCH 08/18] clocksource/drivers/exynos_mct: Remove dead code
+Date: Sat, 23 Feb 2019 14:06:56 +0100
+Message-Id: <20190223130707.16704-8-daniel.lezcano@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20190223130707.16704-1-daniel.lezcano@linaro.org>
 References: <b5d75b05-b78c-535c-2b35-9a1f5a3a853f@linaro.org>
  <20190223130707.16704-1-daniel.lezcano@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_050801_686056_FA86606D 
-X-CRM114-Status: GOOD (  12.52  )
+X-CRM114-CacheID: sfid-20190223_050808_840174_ADFBDA08 
+X-CRM114-Status: GOOD (  13.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,10 +96,8 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: "moderated list:ARM/SAMSUNG EXYNOS ARM ARCHITECTURES"
- <linux-samsung-soc@vger.kernel.org>,
- Stuart Menefy <stuart.menefy@mathembedded.com>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Kukjin Kim <kgene@kernel.org>,
- Krzysztof Kozlowski <krzk@kernel.org>,
+ <linux-samsung-soc@vger.kernel.org>, linux-kernel@vger.kernel.org,
+ Krzysztof Kozlowski <krzk@kernel.org>, Kukjin Kim <kgene@kernel.org>,
  "moderated list:ARM/SAMSUNG EXYNOS ARM ARCHITECTURES"
  <linux-arm-kernel@lists.infradead.org>,
  Marek Szyprowski <m.szyprowski@samsung.com>
@@ -110,34 +107,53 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Stuart Menefy <stuart.menefy@mathembedded.com>
+From: Marek Szyprowski <m.szyprowski@samsung.com>
 
-When shutting down the timer, ensure that after we have stopped the
-timer any pending interrupts are cleared. This fixes a problem when
-suspending, as interrupts are disabled before the timer is stopped,
-so the timer interrupt may still be asserted, preventing the system
-entering a low power state when the wfi is executed.
+Exynos Multi-Core Timer driver is used only on device-tree based
+systems, so remove non-dt related code. In case of !CONFIG_OF
+the code is anyway equal because of_irq_count() has a stub
+returning 0. Device node pointer is always provided when driver
+has been probed from device tree.
 
-Signed-off-by: Stuart Menefy <stuart.menefy@mathembedded.com>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: <stable@vger.kernel.org> # v4.3+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/exynos_mct.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clocksource/exynos_mct.c | 9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 1e325f89d408..d55c30f6981d 100644
+index d55c30f6981d..647ea9fc752f 100644
 --- a/drivers/clocksource/exynos_mct.c
 +++ b/drivers/clocksource/exynos_mct.c
-@@ -411,6 +411,7 @@ static int set_state_shutdown(struct clock_event_device *evt)
+@@ -508,13 +508,12 @@ static int __init exynos4_timer_resources(struct device_node *np, void __iomem *
+ 	int err, cpu;
+ 	struct clk *mct_clk, *tick_clk;
  
- 	mevt = container_of(evt, struct mct_clock_event_device, evt);
- 	exynos4_mct_tick_stop(mevt);
-+	exynos4_mct_tick_clear(mevt);
- 	return 0;
- }
+-	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
+-				clk_get(NULL, "fin_pll");
++	tick_clk = of_clk_get_by_name(np, "fin_pll");
+ 	if (IS_ERR(tick_clk))
+ 		panic("%s: unable to determine tick clock rate\n", __func__);
+ 	clk_rate = clk_get_rate(tick_clk);
+ 
+-	mct_clk = np ? of_clk_get_by_name(np, "mct") : clk_get(NULL, "mct");
++	mct_clk = of_clk_get_by_name(np, "mct");
+ 	if (IS_ERR(mct_clk))
+ 		panic("%s: unable to retrieve mct clock instance\n", __func__);
+ 	clk_prepare_enable(mct_clk);
+@@ -582,11 +581,7 @@ static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+ 	 * timer irqs are specified after the four global timer
+ 	 * irqs are specified.
+ 	 */
+-#ifdef CONFIG_OF
+ 	nr_irqs = of_irq_count(np);
+-#else
+-	nr_irqs = 0;
+-#endif
+ 	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
+ 		mct_irqs[i] = irq_of_parse_and_map(np, i);
  
 -- 
 2.17.1
