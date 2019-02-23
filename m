@@ -4,19 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D9EF8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 19:20:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9F6A1C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 19:21:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9E153206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 19:20:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 59A2B206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 19:21:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KKwlx3uC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9E153206B6
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="F665TlqG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 59A2B206B6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,44 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Subject:To:From:Message-ID:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0+7JLenYXM45ws7SpY6Uoh26ICqn0PCkD6+SzCy9DZQ=; b=KKwlx3uCB62G2s
-	7AkpeC3bBzwTmAJBD63gKlNCVUXzAZSPoKHi2vQeZhx6TLIui1VMPXVJrYk+i3tXcB0JylS0vQXCh
-	sX2tTBAQ+GkIYPrqMTKPciPAgldTz7AgN8K8evrUyQxudLOkTv/g3lbJWkQ2Tkyq+JcoPIu3Ai4x5
-	VSJehBcE5UHBKI/Rbjz64hsDPwu5Zkv2K7ocrK4Do1m01Bx5leiKfayYBnWO5hPJo+MoRWCC5VFfb
-	/1jaNy54/VRX7ktD+h8f0A9Lno7zCEEizi6l3rWUP2eepeucFjYh0wEpgXE5JEnTGY+aDerTtnsOg
-	I8EFXIe5+5CGLOwLDPjA==;
+	List-Owner; bh=HeAagVZdTfBai2kj2NQdpzDtS77JQFAhSRiFzSpwn7c=; b=F665TlqGRBAeaC
+	mSD/wNiaNYg7f/jJRcJIadpr0+yINOuSvgMOHR4cNzxRsOAGGrw6J95pNssRhMjjxRSV8Y+XCvsAq
+	t2qJykw24Z5lBP9gpAX1zCydGOkm45z2I+fgxZRiuSPfHcpxBqkXLTjx5tBdNoWjA2HN6L9C1R6pm
+	5Y6AA/D4egawvFd2JssgCi3Mc2wmtZMDBxA1lBLcpnaHHGKezkOyfjfyMLOe8QF250Dc53BR0aAgO
+	crVWIOy+7yAxL90hNY45NKC9UbsGmegWWr9ZHlop/2RsGu7K7rM0mer4PWEYUhHrR76+YD/7jdwr0
+	qF9+TiLTwMZQ6Qee6fuQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxcpq-0000Y2-Qq; Sat, 23 Feb 2019 19:19:42 +0000
+	id 1gxcrH-00021k-Vc; Sat, 23 Feb 2019 19:21:11 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxcpj-0000Xh-Lu
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 19:19:37 +0000
+ id 1gxcrE-00020v-Us
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 19:21:10 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 511C8A78;
- Sat, 23 Feb 2019 11:19:34 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DCF2CA78;
+ Sat, 23 Feb 2019 11:21:07 -0800 (PST)
 Received: from big-swifty.misterjones.org (usa-sjc-mx-foss1.foss.arm.com
  [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5DBF83F575;
- Sat, 23 Feb 2019 11:19:30 -0800 (PST)
-Date: Sat, 23 Feb 2019 19:19:27 +0000
-Message-ID: <86y3668g8w.wl-marc.zyngier@arm.com>
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BA8103F575;
+ Sat, 23 Feb 2019 11:21:03 -0800 (PST)
+Date: Sat, 23 Feb 2019 19:21:00 +0000
+Message-ID: <86wolq8g6b.wl-marc.zyngier@arm.com>
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH 3/5] irqchip/irq-mvebu-icu: Move the double SATA ports
- interrupt hack
-In-Reply-To: <20190222145356.23072-4-miquel.raynal@bootlin.com>
+Subject: Re: [PATCH 5/5] arm64: dts: marvell: armada-cp110: Switch to per-port
+ SATA interrupts
+In-Reply-To: <20190222145356.23072-6-miquel.raynal@bootlin.com>
 References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
- <20190222145356.23072-4-miquel.raynal@bootlin.com>
+ <20190222145356.23072-6-miquel.raynal@bootlin.com>
 User-Agent: Wanderlust/2.15.9 (Almost Unreal) SEMI-EPG/1.14.7 (Harue)
  FLIM/1.14.9 (=?UTF-8?B?R29qxY0=?=) APEL/10.8 EasyPG/1.0.0 Emacs/25.1
  (aarch64-unknown-linux-gnu) MULE/6.0 (HANACHIRUSATO)
 Organization: ARM Ltd
 MIME-Version: 1.0 (generated by SEMI-EPG 1.14.7 - "Harue")
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_111935_730440_04BBB5A8 
-X-CRM114-Status: GOOD (  38.67  )
+X-CRM114-CacheID: sfid-20190223_112109_002810_68D79A88 
+X-CRM114-Status: GOOD (  21.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,307 +87,62 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 22 Feb 2019 14:53:54 +0000,
+On Fri, 22 Feb 2019 14:53:56 +0000,
 Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 > 
-> When writing the driver, a hack was introduced to configure both SATA
-> interrupts regardless of the port in use to overcome a limitation in
-> the SATA core. Now that this limitation has been addressed, let's
-> clean this driver section and move the hack into the (historically)
-> responsible SATA driver: ahci_platform.
+> From: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 > 
+> There are two SATA ports per CP110. Each of them has a dedicated
+> interrupt. Describe the real hardware by adding two SATA ports to the
+> CP110 SATA node and enabling them in all the DTs including it
+> (7040-db/8040-db/8040-clearfog).
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@bootlin.com>
 > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 > ---
->  drivers/ata/ahci_platform.c     | 174 ++++++++++++++++++++++++++++++++
->  drivers/irqchip/irq-mvebu-icu.c |  18 ----
->  2 files changed, 174 insertions(+), 18 deletions(-)
+>  arch/arm64/boot/dts/marvell/armada-7040-db.dts |  7 ++++++-
+>  arch/arm64/boot/dts/marvell/armada-8040-db.dts | 14 ++++++++++++--
+>  arch/arm64/boot/dts/marvell/armada-cp110.dtsi  | 16 ++++++++++++++--
+>  3 files changed, 32 insertions(+), 5 deletions(-)
 > 
-> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
-> index cf1e0e18a7a9..4401a137e6d5 100644
-> --- a/drivers/ata/ahci_platform.c
-> +++ b/drivers/ata/ahci_platform.c
-> @@ -17,6 +17,7 @@
->  #include <linux/pm.h>
->  #include <linux/device.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_irq.h>
->  #include <linux/platform_device.h>
->  #include <linux/libata.h>
->  #include <linux/ahci_platform.h>
-> @@ -26,6 +27,9 @@
+
+[...]
+
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> index b9d9f31e3ba1..f27edddcacd1 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110.dtsi
+> @@ -292,10 +292,22 @@
+>  			"generic-ahci";
+>  			reg = <0x540000 0x30000>;
+>  			dma-coherent;
+> -			interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+>  			clocks = <&CP110_LABEL(clk) 1 15>,
+>  				 <&CP110_LABEL(clk) 1 16>;
+> -			status = "disabled";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			sata-port@0 {
+> +				reg = <0>;
+> +				interrupts = <109 IRQ_TYPE_LEVEL_HIGH>;
+
+Where has this change to the binding been documented?
+
+> +				status = "disabled";
+> +			};
+> +
+> +			sata-port@1 {
+> +				reg = <1>;
+> +				interrupts = <107 IRQ_TYPE_LEVEL_HIGH>;
+> +				status = "disabled";
+> +			};
+>  		};
 >  
->  #define DRV_NAME "ahci"
->  
-> +#define ICU_SATA0_ICU_ID 109
-> +#define ICU_SATA1_ICU_ID 107
-> +
->  static const struct ata_port_info ahci_port_info = {
->  	.flags		= AHCI_FLAG_COMMON,
->  	.pio_mask	= ATA_PIO4,
-> @@ -44,6 +48,170 @@ static struct scsi_host_template ahci_platform_sht = {
->  	AHCI_SHT(DRV_NAME),
->  };
->  
-> +/*
-> + * The Armada CP110 SATA unit (on A7k/A8k SoCs) has 2 ports, and a dedicated ICU
-> + * entry per port. In the past, the AHCI SATA driver only supported one
-> + * interrupt per SATA unit. To solve this, the 2 SATA wired interrupts in the
-> + * South-Bridge got configured as 1 GIC interrupt in the North-Bridge,
-> + * regardless of the number of SATA ports actually enabled/in use.
-> + *
-> + * Since then, this limitation has been addressed and the hack described
-> + * above has been removed from the ICU driver. However, for compatibility
-> + * it is needed to support DT with just one interrupt and no SATA ports.
-> + * Instead of hacking everywhere in the ahci/libahci code, this quirk has been
-> + * written to manually create the SATA port sub-nodes if they are missing,
-> + * assign them the right port numbers through the "reg" properties and their
-> + * respective "interrupts".
-
-I don't think this write-up, however interesting, is useful here. That's the
-kind of war story that makes perfect sense in a commit log, and not much in
-the actual code. I'd suggest you keep the story short and only explain the
-problem the workaround tries to paper over.
-
-> + */
-> +static int ahci_armada_8k_quirk(struct device *dev)
-> +{
-> +	struct device_node *dn = dev->of_node;
-> +	struct property *interrupt = of_find_property(dn, "interrupts", NULL);
-
-It'd make more sense if you checked the interrupt property once you actually
-need it.
-
-> +	struct device_node *ports;
-> +	struct property *regs, *ints;
-> +	int rc, i;
-> +
-> +	if (!(of_device_is_compatible(dn, "marvell,armada-8k-ahci") &&
-
-Where is this compat string documented?
-
-> +	      !of_get_child_count(dn)))
-> +		return 0;
-> +
-> +	if (!of_node_get(dn))
-> +		return -EINVAL;
-
-Shouldn't you do that first, before having started to mess with the node?
-
-> +
-> +	/* Verify the main SATA node "interrupts" property validity */
-> +	if (!interrupt) {
-> +		rc = -EINVAL;
-> +		goto put_dn;
-> +	}
-> +
-> +	/* Create the two sub-nodes */
-> +	ports = kzalloc(2 * sizeof(*ports), GFP_KERNEL);
-> +	if (!ports) {
-> +		rc = -ENOMEM;
-> +		goto put_dn;
-> +	}
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		of_node_set_flag(&ports[i], OF_DYNAMIC);
-
-Do you really expect all users to now have to select OF_DYNAMIC to be able
-to use their system? I'm not sure that's the right thing to do.
-
-I'd rather see this workaround be handled at probe time, generating the
-right data structures right away, rather than patching the DT from inside
-the kernel to eventually generate these structures. Also, how does this work
-for non-DT?
-
-> +		of_node_init(&ports[i]);
-> +		ports[i].parent = dn;
-> +	}
-> +
-> +	ports[0].full_name = kstrdup("sata-port@0", GFP_KERNEL);
-> +	ports[1].full_name = kstrdup("sata-port@1", GFP_KERNEL);
-> +	if (!ports[0].full_name || !ports[1].full_name) {
-> +		rc = -ENOMEM;
-> +		goto free_ports_names;
-> +	}
-> +
-> +	/* Create the two "reg" and "interrupts" property for the sub-nodes */
-> +	regs = kzalloc(2 * sizeof(*regs), GFP_KERNEL);
-> +	ints = kzalloc(2 * sizeof(*ints), GFP_KERNEL);
-> +	if (!regs || !ints) {
-> +		rc = -ENOMEM;
-> +		goto free_props;
-> +	}
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		regs[i].name = kstrdup("reg", GFP_KERNEL);
-> +		regs[i].length = sizeof(u32);
-> +		regs[i].value = kmalloc(sizeof(regs[i].length), GFP_KERNEL);
-> +
-> +		ints[i].name = kstrdup("interrupts", GFP_KERNEL);
-> +		ints[i].length = interrupt->length;
-> +		ints[i].value = kmemdup(interrupt->value, interrupt->length,
-> +					GFP_KERNEL);
-> +
-> +		if (!regs[i].name || !regs[i].value ||
-> +		    !ints[i].name || !ints[i].value) {
-> +			rc = -ENOMEM;
-> +			goto free_props_allocs;
-> +		}
-> +	}
-> +
-> +	/* Force the values of the ICU interrupts for both ports.
-
-Comment formatting.
-
-> +	 * In the past, "interrupts" properties had three values:
-> +	 * 1/ ICU interrupt type, 2/ interrupt ID, 3/ interrupt type
-
-I don't understand this comment. From what I can see in the last patch, the
-interrupts property always had 2 cells.
-
-> +	 * Now there are only two:
-> +	 * 1/ interrupt ID, 2/ interrupt type
-> +	 * In both case we want to access the penultimate.
-> +	 */
-> +	for (i = 0; i < 2; i++) {
-> +		u32 *reg, *icu_int;
-> +		u8 *value;
-> +
-> +		reg = regs[i].value;
-> +		*reg = cpu_to_be32(i);
-> +
-> +		value = ints[i].value;
-> +		value = &value[ints[i].length - (2 * sizeof(u32))];
-> +		icu_int = (u32 *)value;
-> +		if (!i)
-> +			*icu_int = cpu_to_be32(ICU_SATA0_ICU_ID);
-> +		else
-> +			*icu_int = cpu_to_be32(ICU_SATA1_ICU_ID);
-> +	}
-> +
-> +	for (i = 0; i < 2; i++) {
-> +		ports[i].properties = &regs[i];
-> +		regs[i].next = &ints[i];
-> +		ints[i].next = NULL;
-> +	}
-> +
-> +	/* Create the two sub-nodes by attaching them */
-> +	rc = of_attach_node(&ports[0]);
-> +	if (rc) {
-> +		dev_err(dev, "Compat: cannot attach port0 (err %d)\n", rc);
-> +		goto free_props_allocs;
-> +	}
-> +
-> +	rc = of_attach_node(&ports[1]);
-> +	if (rc) {
-> +		dev_err(dev, "Compat: cannot attach port1 (err %d)\n", rc);
-> +		goto detach_port0;
-> +	}
-> +
-> +	/* Delete the "interrupts" property from the SATA host node */
-> +	rc = of_remove_property(dn, interrupt);
-> +	if (rc) {
-> +		dev_err(dev, "Compat: cannot delete SATA host interrupt\n");
-> +		goto detach_ports;
-> +	}
-> +
-> +	of_node_put(dn);
-> +
-> +	return 0;
-> +
-> +detach_ports:
-> +	of_detach_node(&ports[1]);
-> +
-> +detach_port0:
-> +	of_detach_node(&ports[0]);
-> +
-> +free_props_allocs:
-> +	for (i = 0; i < 2; i++) {
-> +		kfree(regs[i].name);
-> +		kfree(regs[i].value);
-> +		kfree(ints[i].name);
-> +		kfree(ints[i].value);
-> +	}
-> +
-> +free_props:
-> +	kfree(regs);
-> +	kfree(ints);
-> +
-> +free_ports_names:
-> +	for (i = 0; i < 2; i++)
-> +		kfree(ports[i].full_name);
-> +
-> +	kfree(ports);
-
-How about using devm allocations instead, since you're going to fail the
-probe anyway?
-
-> +
-> +put_dn:
-> +	of_node_put(dn);
-> +
-> +	return rc;
-> +	}
-> +
->  static int ahci_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -51,6 +219,12 @@ static int ahci_probe(struct platform_device *pdev)
->  	const struct ata_port_info *port;
->  	int rc;
->  
-> +	rc = ahci_armada_8k_quirk(dev);
-> +	if (rc) {
-> +		dev_err(dev, "Problem with CP110 backward compatibility\n");
-> +		return rc;
-> +	}
-> +
->  	hpriv = ahci_platform_get_resources(pdev,
->  					    AHCI_PLATFORM_GET_RESETS);
->  	if (IS_ERR(hpriv))
-> diff --git a/drivers/irqchip/irq-mvebu-icu.c b/drivers/irqchip/irq-mvebu-icu.c
-> index 547045d89c4b..f3b43f63fe2e 100644
-> --- a/drivers/irqchip/irq-mvebu-icu.c
-> +++ b/drivers/irqchip/irq-mvebu-icu.c
-> @@ -38,8 +38,6 @@
->  
->  /* ICU definitions */
->  #define ICU_MAX_IRQS		207
-> -#define ICU_SATA0_ICU_ID	109
-> -#define ICU_SATA1_ICU_ID	107
->  
->  struct mvebu_icu_subset_data {
->  	unsigned int icu_group;
-> @@ -111,22 +109,6 @@ static void mvebu_icu_write_msg(struct msi_desc *desc, struct msi_msg *msg)
->  	}
->  
->  	writel_relaxed(icu_int, icu->base + ICU_INT_CFG(d->hwirq));
-> -
-> -	/*
-> -	 * The SATA unit has 2 ports, and a dedicated ICU entry per
-> -	 * port. The ahci sata driver supports only one irq interrupt
-> -	 * per SATA unit. To solve this conflict, we configure the 2
-> -	 * SATA wired interrupts in the south bridge into 1 GIC
-> -	 * interrupt in the north bridge. Even if only a single port
-> -	 * is enabled, if sata node is enabled, both interrupts are
-> -	 * configured (regardless of which port is actually in use).
-> -	 */
-> -	if (d->hwirq == ICU_SATA0_ICU_ID || d->hwirq == ICU_SATA1_ICU_ID) {
-> -		writel_relaxed(icu_int,
-> -			       icu->base + ICU_INT_CFG(ICU_SATA0_ICU_ID));
-> -		writel_relaxed(icu_int,
-> -			       icu->base + ICU_INT_CFG(ICU_SATA1_ICU_ID));
-> -	}
->  }
->  
->  static struct irq_chip mvebu_icu_nsr_chip = {
-
-Clearly, this is not much of an irqchip patch. I'd expect you either extract
-the irqchip bit in a separate patch.
-
-Overall, I'm not sure this patch can fly as is. The dependency on OF_DYNAMIC
-is not exactly great, and the whole thing is likely to fail anyway, as you
-don't even bother selecting that new dependency. I strongly suggest you
-implement the quirk by generating the right structures at the right time.
+>  		CP110_LABEL(xor0): xor@6a0000 {
+> -- 
+> 2.19.1
+> 
 
 Thanks,
 
