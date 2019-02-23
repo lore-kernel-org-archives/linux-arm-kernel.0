@@ -2,83 +2,58 @@ Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D82FAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:34:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 255A5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:49:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1D7E20684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:34:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6CD62070B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:49:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NORH/tLl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="jCPB67Az"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1D7E20684
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b5KC9nPf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6CD62070B
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=F4fiegz65/ib2ZHhwtS8AX/9azIkhik6Xuozzrd8ofU=; b=NORH/tLldn9I8K
-	EGQkoVJDNH12YujP8YiTq+lVX+qh3gHpylL/GO6opau0zt68+kcnc9Plh30pMSLZ9qay+7TibYj99
-	QN3h3w0pur9I3m44f2gukJ5yHw1xUaQyALKTNlDl+DwCaoOJtXettxIIhdFBORB0rr48isaudYgWa
-	MQvwSjskhRJtDEzD4sfBdS0+7LGQ+9/j0PdqkFJiy3+0GS8slfw8kooBIY5aVUzb2w2m3ZYXmCw/9
-	/F3yVzCcdU+oFgNW4z+Ij+IqZ/eKyXAVYFPMAwuKjglTUmgn7EOzJq/q1+X/xZb4EwWzOWZwa0afW
-	HUaKSmAwOq5e/ihfs01A==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=16k85QRsxSCRudUxyRLksLYYUZfDw+bQ6AnTgwZUw/8=; b=b5KC9nPfs2dazXcnk1n2itAi0
+	0W//+8eWU7lob2Aezb80csRbLTixpJkZd6xklXuVmcSBxbCtvkkN9oExJ4TbltPtAaGatiUEctU19
+	xkRcwK4lKD99QFf52EukuOVyk2HvLNXbOg+/+ofOI25dnAV1f0lUXdCzAQcLaS5tbpV6rZ6ba54/X
+	F8sCRk6SngoWNDwGGvCn3Q1MOsxRCO3hjhd4xFtwndxnuQ39rpfgjZdJAKjFt9rSvGvhvs3RS6Fxw
+	0fgV58Cd3Wx09qA2KUtoj8Y7ja9p5CcEZtgVTXWjBD47zfemGpSTRwweg2c9Hw8g0jyEfeK43q7fp
+	A78zR1tqA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxTh1-0007HB-9j; Sat, 23 Feb 2019 09:33:59 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxTgF-0006FL-Af
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 09:33:14 +0000
-Received: from lelv0265.itg.ti.com ([10.180.67.224])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1N9XAcD018811;
- Sat, 23 Feb 2019 03:33:10 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1550914390;
- bh=aqg3zzmHWhLl0edQ2GE+ZfD9o9QwzLsnJ2r6fBLu+t8=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=jCPB67Az4uer4ayVoK8Af0cmEo/t1XDRydc2HgEkthJsZVo7MFJhrJgjiEC74PnVs
- dEBmalHvH7WNJlTXoRh4SZTex4cJyhLfeEpQ/Ii6BTRf0T8iCWsF0hvhn435cxUGVR
- EIWVjTVVFwzFwzSAt73d64u074IowawpUE/PhDE0=
-Received: from DLEE103.ent.ti.com (dlee103.ent.ti.com [157.170.170.33])
- by lelv0265.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1N9XAKL118921
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Sat, 23 Feb 2019 03:33:10 -0600
-Received: from DLEE110.ent.ti.com (157.170.170.21) by DLEE103.ent.ti.com
- (157.170.170.33) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Sat, 23
- Feb 2019 03:33:09 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE110.ent.ti.com
- (157.170.170.21) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Sat, 23 Feb 2019 03:33:09 -0600
-Received: from uda0131933.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1N9WrQm028361;
- Sat, 23 Feb 2019 03:33:07 -0600
-From: Lokesh Vutla <lokeshvutla@ti.com>
-To: Nishanth Menon <nm@ti.com>, Tero Kristo <t-kristo@ti.com>, Santosh
- Shilimkar <ssantosh@kernel.org>
-Subject: [PATCH v2 5/5] arm64: dts: ti: k3-am654: Update the power domain cells
-Date: Sat, 23 Feb 2019 15:02:32 +0530
-Message-ID: <20190223093232.29003-6-lokeshvutla@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20190223093232.29003-1-lokeshvutla@ti.com>
-References: <20190223093232.29003-1-lokeshvutla@ti.com>
+	id 1gxTvQ-0003Uc-6c; Sat, 23 Feb 2019 09:48:52 +0000
+Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxTvM-0003U2-1i
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 09:48:50 +0000
+Received: from localhost (p57BC9845.dip0.t-ipconnect.de [87.188.152.69])
+ by pokefinder.org (Postfix) with ESMTPSA id 7AE942C3312;
+ Sat, 23 Feb 2019 10:48:43 +0100 (CET)
+Date: Sat, 23 Feb 2019 10:48:43 +0100
+From: Wolfram Sang <wsa@the-dreams.de>
+To: Shikai Wang <sxauwsk@163.com>
+Subject: Re: [PATCH v2] i2c: cadence: try reset when master receive
+ arbitration lost
+Message-ID: <20190223094842.GF1018@kunai>
+References: <20190219012447.5900-1-sxauwsk@163.com>
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
+In-Reply-To: <20190219012447.5900-1-sxauwsk@163.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_013311_815662_F0152467 
-X-CRM114-Status: GOOD (  12.74  )
+X-CRM114-CacheID: sfid-20190223_014848_239724_8B251135 
+X-CRM114-Status: UNSURE (   7.57  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,229 +65,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lokesh Vutla <lokeshvutla@ti.com>,
- Device Tree Mailing List <devicetree@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Sekhar Nori <nsekhar@ti.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-kernel@vger.kernel.org,
+ Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
+ Michal Simek <michal.simek@xilinx.com>, linux-arm-kernel@lists.infradead.org,
+ linux-i2c@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============3221561182276501595=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Update the power-domain cells to 2 and mark all devices as
-exclusive for now.
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm64/boot/dts/ti/k3-am65-main.dtsi   | 26 +++++++++++-----------
- arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi    | 10 ++++-----
- arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi |  6 ++---
- 3 files changed, 21 insertions(+), 21 deletions(-)
+--===============3221561182276501595==
+Content-Type: multipart/signed; micalg=pgp-sha512;
+	protocol="application/pgp-signature"; boundary="4VrXvz3cwkc87Wze"
+Content-Disposition: inline
 
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-index 272cf8fc8d30..0156cf0e7205 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-main.dtsi
-@@ -48,7 +48,7 @@
- 		interrupts = <GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
- 		current-speed = <115200>;
--		power-domains = <&k3_pds 146>;
-+		power-domains = <&k3_pds 146 1>;
- 	};
- 
- 	main_uart1: serial@2810000 {
-@@ -58,7 +58,7 @@
- 		reg-io-width = <4>;
- 		interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
--		power-domains = <&k3_pds 147>;
-+		power-domains = <&k3_pds 147 1>;
- 	};
- 
- 	main_uart2: serial@2820000 {
-@@ -68,7 +68,7 @@
- 		reg-io-width = <4>;
- 		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
--		power-domains = <&k3_pds 148>;
-+		power-domains = <&k3_pds 148 1>;
- 	};
- 
- 	main_pmx0: pinmux@11c000 {
-@@ -95,7 +95,7 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 110 1>;
--		power-domains = <&k3_pds 110>;
-+		power-domains = <&k3_pds 110 1>;
- 	};
- 
- 	main_i2c1: i2c@2010000 {
-@@ -106,7 +106,7 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 111 1>;
--		power-domains = <&k3_pds 111>;
-+		power-domains = <&k3_pds 111 1>;
- 	};
- 
- 	main_i2c2: i2c@2020000 {
-@@ -117,7 +117,7 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 112 1>;
--		power-domains = <&k3_pds 112>;
-+		power-domains = <&k3_pds 112 1>;
- 	};
- 
- 	main_i2c3: i2c@2030000 {
-@@ -128,14 +128,14 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 113 1>;
--		power-domains = <&k3_pds 113>;
-+		power-domains = <&k3_pds 113 1>;
- 	};
- 
- 	ecap0: pwm@3100000 {
- 		compatible = "ti,am654-ecap", "ti,am3352-ecap";
- 		#pwm-cells = <3>;
- 		reg = <0x0 0x03100000 0x0 0x60>;
--		power-domains = <&k3_pds 39>;
-+		power-domains = <&k3_pds 39 1>;
- 		clocks = <&k3_clks 39 0>;
- 		clock-names = "fck";
- 	};
-@@ -145,7 +145,7 @@
- 		reg = <0x0 0x2100000 0x0 0x400>;
- 		interrupts = <GIC_SPI 184 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 137 1>;
--		power-domains = <&k3_pds 137>;
-+		power-domains = <&k3_pds 137 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-@@ -155,7 +155,7 @@
- 		reg = <0x0 0x2110000 0x0 0x400>;
- 		interrupts = <GIC_SPI 185 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 138 1>;
--		power-domains = <&k3_pds 138>;
-+		power-domains = <&k3_pds 138 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		assigned-clocks = <&k3_clks 137 1>;
-@@ -167,7 +167,7 @@
- 		reg = <0x0 0x2120000 0x0 0x400>;
- 		interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 139 1>;
--		power-domains = <&k3_pds 139>;
-+		power-domains = <&k3_pds 139 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-@@ -177,7 +177,7 @@
- 		reg = <0x0 0x2130000 0x0 0x400>;
- 		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 140 1>;
--		power-domains = <&k3_pds 140>;
-+		power-domains = <&k3_pds 140 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-@@ -187,7 +187,7 @@
- 		reg = <0x0 0x2140000 0x0 0x400>;
- 		interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 141 1>;
--		power-domains = <&k3_pds 141>;
-+		power-domains = <&k3_pds 141 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi b/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-index 593f718e8fb5..f2f54d80cf39 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-mcu.dtsi
-@@ -14,7 +14,7 @@
- 			interrupts = <GIC_SPI 565 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-frequency = <96000000>;
- 			current-speed = <115200>;
--			power-domains = <&k3_pds 149>;
-+			power-domains = <&k3_pds 149 1>;
- 	};
- 
- 	mcu_i2c0: i2c@40b00000 {
-@@ -25,7 +25,7 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 114 1>;
--		power-domains = <&k3_pds 114>;
-+		power-domains = <&k3_pds 114 1>;
- 	};
- 
- 	mcu_spi0: spi@40300000 {
-@@ -33,7 +33,7 @@
- 		reg = <0x0 0x40300000 0x0 0x400>;
- 		interrupts = <GIC_SPI 560 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 142 1>;
--		power-domains = <&k3_pds 142>;
-+		power-domains = <&k3_pds 142 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-@@ -43,7 +43,7 @@
- 		reg = <0x0 0x40310000 0x0 0x400>;
- 		interrupts = <GIC_SPI 561 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 143 1>;
--		power-domains = <&k3_pds 143>;
-+		power-domains = <&k3_pds 143 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-@@ -53,7 +53,7 @@
- 		reg = <0x0 0x40320000 0x0 0x400>;
- 		interrupts = <GIC_SPI 562 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&k3_clks 144 1>;
--		power-domains = <&k3_pds 144>;
-+		power-domains = <&k3_pds 144 1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 	};
-diff --git a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-index 7cbdc0912ab7..68fd833c130a 100644
---- a/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-+++ b/arch/arm64/boot/dts/ti/k3-am65-wakeup.dtsi
-@@ -20,7 +20,7 @@
- 
- 		k3_pds: power-controller {
- 			compatible = "ti,sci-pm-domain";
--			#power-domain-cells = <1>;
-+			#power-domain-cells = <2>;
- 		};
- 
- 		k3_clks: clocks {
-@@ -50,7 +50,7 @@
- 		interrupts = <GIC_SPI 697 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <48000000>;
- 		current-speed = <115200>;
--		power-domains = <&k3_pds 150>;
-+		power-domains = <&k3_pds 150 1>;
- 	};
- 
- 	wkup_i2c0: i2c@42120000 {
-@@ -61,6 +61,6 @@
- 		#size-cells = <0>;
- 		clock-names = "fck";
- 		clocks = <&k3_clks 115 1>;
--		power-domains = <&k3_pds 115>;
-+		power-domains = <&k3_pds 115 1>;
- 	};
- };
--- 
-2.19.2
 
+--4VrXvz3cwkc87Wze
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Feb 19, 2019 at 09:24:47AM +0800, Shikai Wang wrote:
+> When the adapter receive arbitration lost error interrupts,
+> cdns_i2c_master_xfer return to the caller directly instead of resetting
+> the adapter which resulted in the adapter being out of control.
+>=20
+> So when driver detect err_status such as arbitration lost,
+> then try to repair and fix it.
+
+Just checking because resetting looks like a big hammer to me: there is
+no way to gracefully recover form 'arbitration lost' interrupt?
+
+
+--4VrXvz3cwkc87Wze
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAABCgAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxxFvoACgkQFA3kzBSg
+KbZIOw//X4tPGtaKdCAKY08zneHiiw2dqMHmf69zg2wD7wYcSKApFyY0SdxqehEm
+Zv68Ud90qMfJ+Aecvv1t5zRgwWQPNJSB6f45ujlRAdn45VKtHlMAeiyk6VYelNwX
+Bx2GXX7ZedpfkmdMGEjiPRsKuHX84kug+xlAHeT5mjGJCjDIrGkZdOSuP3DTDCCM
+wzLQ1U8yo9DyfNr8DerZ+co07r5Bi7JXwZdHJ1CoI59DS0gf1MnyLj1+dhv3eVU2
+TVz13o0m6QO3kT1eGrDaVl4SskXBAL848Lc6r0DnkxynQs/EiosI+QwbziLZkPr2
+FZBFk93NoHVJAlSYSFgpbzvWSxiHUy9pknoPTIgz0f0c1/3XmMjH2ziFALy7Uar7
+T++7N8amNhDdt8GbsyEmAzIyLuZcaulLk2vS30cjTJG+Ve9crSpSDJRiMyJ/436U
+WU70k9WuIVG7gwiO3PgXrxon/bu4O3bhQAIJT+Tj2lC6iOj183GJW/sxwj1Pbtb0
+/iPQA38/G94zqD9lIyhfdTmsXIOJaGgaCXGlqK2TiK3idxqOuvoxVMRJFhoUb0xJ
+hKHB8QVoMX0K6SCMh9Lsif6ubum0wrkP4+LFoDq1PDSDU5zlpv0fxUjrJW8p9qhm
+Gp7eN5oepPgSVV51IHbbAxu8h5X8wkt2Pho8WjvZY5xwlvmty0k=
+=arbP
+-----END PGP SIGNATURE-----
+
+--4VrXvz3cwkc87Wze--
+
+
+--===============3221561182276501595==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============3221561182276501595==--
+
