@@ -2,58 +2,62 @@ Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 255A5C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:49:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BEBEFC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:35:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E6CD62070B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 09:49:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D7B4206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:35:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b5KC9nPf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6CD62070B
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=the-dreams.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AGnjLudf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D7B4206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=16k85QRsxSCRudUxyRLksLYYUZfDw+bQ6AnTgwZUw/8=; b=b5KC9nPfs2dazXcnk1n2itAi0
-	0W//+8eWU7lob2Aezb80csRbLTixpJkZd6xklXuVmcSBxbCtvkkN9oExJ4TbltPtAaGatiUEctU19
-	xkRcwK4lKD99QFf52EukuOVyk2HvLNXbOg+/+ofOI25dnAV1f0lUXdCzAQcLaS5tbpV6rZ6ba54/X
-	F8sCRk6SngoWNDwGGvCn3Q1MOsxRCO3hjhd4xFtwndxnuQ39rpfgjZdJAKjFt9rSvGvhvs3RS6Fxw
-	0fgV58Cd3Wx09qA2KUtoj8Y7ja9p5CcEZtgVTXWjBD47zfemGpSTRwweg2c9Hw8g0jyEfeK43q7fp
-	A78zR1tqA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
+	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=8slmK4YKrcnziJFwjH3hA5BlbLh6rNAROEjIGAJy8CE=; b=AGnjLudftLD12z
+	k4CXeFYo+lbFxmo6Qjp8+bZkFQBLBscVHZbL7/PQucWivsTdlcufAsIk7G562l5ymN+INQ6Q7O5ze
+	Q8MGT+CPq4+dXhJcyvWbZ7iz3Zmalg23ZcwHoWrpjxGO6CHJlQWsKLe4d5Cj6vEJ22D7bGC3KuXmK
+	CMwgpPV2ZH9ar3OaQEPCM47w5BsJ2fdClunPNaEKPPh+vxldsjHabWPFAVM51122iD5h9ulZGujc8
+	b9LC14Ein6C5b4nVMKjpmUfim14RzgGQ8PlRp/nZv1P/2Htz5mMGv2OtIH3SAZI+xuhVXsML6j9GA
+	W8UfcGq+MfdDiHcBZmyA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxTvQ-0003Uc-6c; Sat, 23 Feb 2019 09:48:52 +0000
-Received: from sauhun.de ([88.99.104.3] helo=pokefinder.org)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxTvM-0003U2-1i
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 09:48:50 +0000
-Received: from localhost (p57BC9845.dip0.t-ipconnect.de [87.188.152.69])
- by pokefinder.org (Postfix) with ESMTPSA id 7AE942C3312;
- Sat, 23 Feb 2019 10:48:43 +0100 (CET)
-Date: Sat, 23 Feb 2019 10:48:43 +0100
-From: Wolfram Sang <wsa@the-dreams.de>
-To: Shikai Wang <sxauwsk@163.com>
-Subject: Re: [PATCH v2] i2c: cadence: try reset when master receive
- arbitration lost
-Message-ID: <20190223094842.GF1018@kunai>
-References: <20190219012447.5900-1-sxauwsk@163.com>
+	id 1gxUeA-0000vy-Rm; Sat, 23 Feb 2019 10:35:06 +0000
+Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxUe6-00007u-EW
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 10:35:04 +0000
+Received: from p5492e0d8.dip0.t-ipconnect.de ([84.146.224.216] helo=nanos)
+ by Galois.linutronix.de with esmtpsa (TLS1.2:DHE_RSA_AES_256_CBC_SHA256:256)
+ (Exim 4.80) (envelope-from <tglx@linutronix.de>)
+ id 1gxUdw-0007DO-6G; Sat, 23 Feb 2019 11:34:52 +0100
+Date: Sat, 23 Feb 2019 11:34:51 +0100 (CET)
+From: Thomas Gleixner <tglx@linutronix.de>
+To: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Subject: Re: [PATCH v5 02/23] kernel: Define gettimeofday vdso common code
+In-Reply-To: <20190222122430.21180-3-vincenzo.frascino@arm.com>
+Message-ID: <alpine.DEB.2.21.1902231123030.1666@nanos.tec.linutronix.de>
+References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
+ <20190222122430.21180-3-vincenzo.frascino@arm.com>
+User-Agent: Alpine 2.21 (DEB 202 2017-01-01)
 MIME-Version: 1.0
-In-Reply-To: <20190219012447.5900-1-sxauwsk@163.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-Linutronix-Spam-Score: -1.0
+X-Linutronix-Spam-Level: -
+X-Linutronix-Spam-Status: No , -1.0 points, 5.0 required, ALL_TRUSTED=-1,
+ SHORTCIRCUIT=-0.0001
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_014848_239724_8B251135 
-X-CRM114-Status: UNSURE (   7.57  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190223_023502_643891_5625B56E 
+X-CRM114-Status: GOOD (  15.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -65,71 +69,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org,
- Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>,
- Michal Simek <michal.simek@xilinx.com>, linux-arm-kernel@lists.infradead.org,
- linux-i2c@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============3221561182276501595=="
+Cc: linux-arch@vger.kernel.org, Shuah Khan <shuah@kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Dmitry Safonov <0x7f454c46@gmail.com>,
+ Rasmus Villemoes <linux@rasmusvillemoes.dk>,
+ Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Fri, 22 Feb 2019, Vincenzo Frascino wrote:
+> +static notrace int __cvdso_clock_getres(clockid_t clock,
+> +					struct __vdso_timespec *res)
+> +{
+> +	u64 sec, ns;
+> +	u32 msk;
+> +
+> +	/* Check for negative values or invalid clocks */
+> +	if (unlikely((u32) clock >= MAX_CLOCKS))
+> +		goto fallback;
+> +
+> +	/*
+> +	 * Convert the clockid to a bitmask and use it to check which
+> +	 * clocks are handled in the VDSO directly.
+> +	 */
+> +	msk = 1U << clock;
+> +	if (msk & VDSO_HRES) {
+> +		/*
+> +		 * Preserves the behaviour of posix_get_hrtimer_res().
+> +		 */
 
---===============3221561182276501595==
-Content-Type: multipart/signed; micalg=pgp-sha512;
-	protocol="application/pgp-signature"; boundary="4VrXvz3cwkc87Wze"
-Content-Disposition: inline
+So much for the theory.
 
+> +		sec = 0;
+> +		ns = MONOTONIC_RES_NSEC;
 
---4VrXvz3cwkc87Wze
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
+posix_get_hrtimer_res() does:
 
-On Tue, Feb 19, 2019 at 09:24:47AM +0800, Shikai Wang wrote:
-> When the adapter receive arbitration lost error interrupts,
-> cdns_i2c_master_xfer return to the caller directly instead of resetting
-> the adapter which resulted in the adapter being out of control.
->=20
-> So when driver detect err_status such as arbitration lost,
-> then try to repair and fix it.
+	sec = 0;
+	ns = hrtimer_resolution;
 
-Just checking because resetting looks like a big hammer to me: there is
-no way to gracefully recover form 'arbitration lost' interrupt?
+and hrtimer_resolution depends on the enablement of high resolution timers
+either compile or run time.
 
+So you need to have a copy of hrtimer_resolution in the vdso data and use
+that.
 
---4VrXvz3cwkc87Wze
-Content-Type: application/pgp-signature; name="signature.asc"
+> +	} else if (msk & VDSO_COARSE) {
+> +		/*
+> +		 * Preserves the behaviour of posix_get_coarse_res().
+> +		 */
+> +		ns = LOW_RES_NSEC;
+> +		sec = __iter_div_u64_rem(ns, NSEC_PER_SEC, &ns);
 
------BEGIN PGP SIGNATURE-----
+Do we allow CONFIG_HZ = 1?
 
-iQIzBAABCgAdFiEEOZGx6rniZ1Gk92RdFA3kzBSgKbYFAlxxFvoACgkQFA3kzBSg
-KbZIOw//X4tPGtaKdCAKY08zneHiiw2dqMHmf69zg2wD7wYcSKApFyY0SdxqehEm
-Zv68Ud90qMfJ+Aecvv1t5zRgwWQPNJSB6f45ujlRAdn45VKtHlMAeiyk6VYelNwX
-Bx2GXX7ZedpfkmdMGEjiPRsKuHX84kug+xlAHeT5mjGJCjDIrGkZdOSuP3DTDCCM
-wzLQ1U8yo9DyfNr8DerZ+co07r5Bi7JXwZdHJ1CoI59DS0gf1MnyLj1+dhv3eVU2
-TVz13o0m6QO3kT1eGrDaVl4SskXBAL848Lc6r0DnkxynQs/EiosI+QwbziLZkPr2
-FZBFk93NoHVJAlSYSFgpbzvWSxiHUy9pknoPTIgz0f0c1/3XmMjH2ziFALy7Uar7
-T++7N8amNhDdt8GbsyEmAzIyLuZcaulLk2vS30cjTJG+Ve9crSpSDJRiMyJ/436U
-WU70k9WuIVG7gwiO3PgXrxon/bu4O3bhQAIJT+Tj2lC6iOj183GJW/sxwj1Pbtb0
-/iPQA38/G94zqD9lIyhfdTmsXIOJaGgaCXGlqK2TiK3idxqOuvoxVMRJFhoUb0xJ
-hKHB8QVoMX0K6SCMh9Lsif6ubum0wrkP4+LFoDq1PDSDU5zlpv0fxUjrJW8p9qhm
-Gp7eN5oepPgSVV51IHbbAxu8h5X8wkt2Pho8WjvZY5xwlvmty0k=
-=arbP
------END PGP SIGNATURE-----
+Thanks,
 
---4VrXvz3cwkc87Wze--
-
-
---===============3221561182276501595==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+	tglx
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============3221561182276501595==--
-
