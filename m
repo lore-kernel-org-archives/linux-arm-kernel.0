@@ -2,82 +2,88 @@ Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D4E87C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:07:18 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C545CC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:08:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A634720675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:07:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 986BA20675
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 13:08:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FiEoeqmG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A634720675
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NeQXUQge";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="FweXRpwO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 986BA20675
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1Vp3f1E+mKaODxOz514RlvCPQuX7foqpTvxop7LYmdc=; b=FiEoeqmGfMVxWV
-	ouF2okE9RLA+gAP7r3GrdgXYzqy7AkNovDsnc5gjjECxWHWclXQ1vcPRt7OcsP9/9+DovcJK6AV/5
-	qiIGO2ugv0DhtJQk/ee9RYX6qL1OYa22uiDNFv02f0UkUJAG3dW4nNHxjLKxPkhTkQn3Z/yHsDcGS
-	1RNGBgEX/VBl2Orxq6oJ5o79J6whtkE0A5OB3pD5C1wy/pTuHbdY0P5MVZ+1PU7oJdJgt0orfZ7UY
-	KQVFRlQcUEpvB09p3JLmVoUGN8Hq5IlD5uqNzuQNUJQxXDP2xIhYysQkRaUjpM0I0Cbu3h9PsYN0s
-	4x/uY12DxXM9RK0Uqktg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=a3FPg5xaqTK7YvFjwSQ5zsXkYuFCCIc9QjldoGZLM0I=; b=NeQXUQgeMRY7DIkv4y56ZmLlFB
+	Ci00mwIg6IXkXqIVItk5mBuRX5h4EEWGh5x11KqZEso2cX9vweTJbUPyLbOtjfaxizOB9eej8GbXQ
+	zQ4fibYcHnzyI8pRvLLhcEoJxwNnNN64kru2td6HRad/XBJi61kv0e7v0mHM6jCxXG6fZvjXzoGq6
+	rd7jfWOWpTcT3rRsS7LOTz8Ias/GHKdFYjtPWkqx2Fz+y9l7FTh968TLw5kgsZ7VD//XC1niaaroK
+	P72+ar8qUJg/yTOIb61voi8WXac3nTN42aacV1Cq560kCcj5QcX+ADay+58u7aeNwHRd5Fa0EKdu3
+	s9UiCn9A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxX1L-0000zE-Pg; Sat, 23 Feb 2019 13:07:11 +0000
-Received: from mgwym01.jp.fujitsu.com ([211.128.242.40])
+	id 1gxX2B-0001Hf-2Z; Sat, 23 Feb 2019 13:08:03 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxX19-0000qY-6r
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 13:07:09 +0000
-Received: from yto-m4.gw.nic.fujitsu.com (unknown [192.168.229.97]) by
- mgwym01.jp.fujitsu.com with smtp
- id 34c3_ec67_65acab05_ef48_4f44_aa0c_7120c8baeacf;
- Sat, 23 Feb 2019 22:06:49 +0900
-Received: from g01jpfmpwkw02.exch.g01.fujitsu.local
- (g01jpfmpwkw02.exch.g01.fujitsu.local [10.0.193.56])
- by yto-m4.gw.nic.fujitsu.com (Postfix) with ESMTP id 325DC40E9D24
+ id 1gxX23-0001G2-Pq
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 13:08:00 +0000
+Received: by mail-wm1-x342.google.com with SMTP id q187so4261814wme.5
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 22:06:48 +0900 (JST)
-Received: from G01JPEXCHKW14.g01.fujitsu.local
- (G01JPEXCHKW14.g01.fujitsu.local [10.0.194.53])
- by g01jpfmpwkw02.exch.g01.fujitsu.local (Postfix) with ESMTP id CCE723283A0;
- Sat, 23 Feb 2019 22:06:46 +0900 (JST)
-Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
- g01jpexchkw14 ([10.0.194.53]) with mapi id 14.03.0415.000; Sat, 23 Feb 2019
- 22:06:46 +0900
-From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
-To: 'James Morse' <james.morse@arm.com>, Mark Rutland <mark.rutland@arm.com>
-Subject: RE: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
-Thread-Topic: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
-Thread-Index: AdTENhuVebuKtHOoRzCPb6sZ5vznO///+H8AgAAo/wD//jk2sP/v2FHA
-Date: Sat, 23 Feb 2019 13:06:45 +0000
-Message-ID: <8898674D84E3B24BA3A2D289B872026A6A319D26@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A6A311EAE@G01JPEXMBKW03>
- <20190214155605.GC27547@lakrids.cambridge.arm.com>
- <90347cf4-4d7b-d553-d4db-1bacd000ff75@arm.com>
- <8898674D84E3B24BA3A2D289B872026A6A313313@G01JPEXMBKW03>
-In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A313313@G01JPEXMBKW03>
-Accept-Language: ja-JP, en-US
-Content-Language: ja-JP
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
-x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
-x-originating-ip: [10.18.70.198]
-MIME-Version: 1.0
-X-SecurityPolicyCheck-GC: OK by FENCE-Mail
-X-TM-AS-GCONF: 00
+ Sat, 23 Feb 2019 05:07:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=AKSyCQMNYBv5nWh/KBmSW8hTM6N2dO+8FV84ST3V3Mk=;
+ b=FweXRpwO5ayiperaVHweKq29vXe1C65x4VoJdxMjwwWtiWIxgUPzCZSzW/8DqrMai2
+ hSqP3E3K3ifNxd/Gge8QibnK+XGe5pOOfv6rSIwfhdIzMgxiKHeXGHgBQZD67QYnbf3T
+ 5AyEFpWFeSFb9IroZT//XYiQONOYhenc402TUug3Kwux0CPMkKHM7Ok/1DudjXLDOMoB
+ JJGa2pFrr/icqFrcL/atpIBLOKxtWwg2LpQrIS5j9KWr+r2vmmO9iXOd2KbvoV3YbDsm
+ ieFGVDuJm5mkrKNy57dTXf2e/gdauqaWwYdmLPBjZWjspQo9InxfgMSmMlisfgfN+EFX
+ FesQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=AKSyCQMNYBv5nWh/KBmSW8hTM6N2dO+8FV84ST3V3Mk=;
+ b=p7vaknMd7EBTr7b5HfKDmmLa58dGQSvPH9Q9UQ3g6VRz0rUZeCOvehdMPL0in3alpR
+ St8qPGWLSs9zTsyPQKBeevnj0qSBWPbITaq3Tl8SileycKgIZcISuNZQCLhudIZqHZwM
+ B6K73vPeadZWTzxRxLoalrH7RImIuiYF+N4g7MWC1hG8Hq35yDvzvJaEMp/X2Ci2nzIJ
+ sEwpmewBQ96Dg6K8p6uhYg0wqBkmRwleXVP3m3G2R+PMh5eEJ4AyWb+czWIQJBtS2aaM
+ llenpiCwOVAoCrWkpimx+Sj1GmjpTURN2TjyKHPzvdpaFKlTv/5k1p1Cy2r1vyOcsZ9J
+ HRxg==
+X-Gm-Message-State: AHQUAuYOgxrgbf3mG8CyVbSGzoZDFY7tuBuQEDEWeZEmZPUtJQ9IKktd
+ 659XvFv0fWKn0tZ1JF5ABLS2Rw==
+X-Google-Smtp-Source: AHgI3IY+jcPSsKN69Gcm2EYvn3Rne57hr42so/SgmhoskLAweyRxnWBIC0/vmLnIlDCyk9AEoD6CaQ==
+X-Received: by 2002:a1c:96c5:: with SMTP id y188mr5548250wmd.103.1550927273393; 
+ Sat, 23 Feb 2019 05:07:53 -0800 (PST)
+Received: from clegane.local (189.126.130.77.rev.sfr.net. [77.130.126.189])
+ by smtp.gmail.com with ESMTPSA id i12sm7830746wrq.21.2019.02.23.05.07.52
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Sat, 23 Feb 2019 05:07:52 -0800 (PST)
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+To: tglx@linutronix.de
+Subject: [PATCH 01/18] clocksource/drivers/sun5i: Fail gracefully when clock
+ rate is unavailable
+Date: Sat, 23 Feb 2019 14:06:49 +0100
+Message-Id: <20190223130707.16704-1-daniel.lezcano@linaro.org>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <b5d75b05-b78c-535c-2b35-9a1f5a3a853f@linaro.org>
+References: <b5d75b05-b78c-535c-2b35-9a1f5a3a853f@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_050659_677241_1570EB7D 
-X-CRM114-Status: GOOD (  17.54  )
+X-CRM114-CacheID: sfid-20190223_050759_484827_AA00C858 
+X-CRM114-Status: GOOD (  14.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,93 +95,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: 'Catalin Marinas' <catalin.marinas@arm.com>,
- 'Will Deacon' <will.deacon@arm.com>,
- "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
- "'linux-arm-kernel@lists.infradead.org'"
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
+ linux-kernel@vger.kernel.org,
+ "moderated list:ARM/Allwinner sunXi SoC support"
  <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-2022-jp"
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi guys,
+From: Chen-Yu Tsai <wens@csie.org>
 
-> -----Original Message-----
-> From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org> On
-> Behalf Of Zhang, Lei
-> Sent: Friday, February 15, 2019 9:36 PM
-> To: 'James Morse' <james.morse@arm.com>; Mark Rutland
-> <mark.rutland@arm.com>
-> Cc: 'Catalin Marinas' <catalin.marinas@arm.com>; 'Will Deacon'
-> <will.deacon@arm.com>; 'linux-kernel@vger.kernel.org'
-> <linux-kernel@vger.kernel.org>; 'linux-arm-kernel@lists.infradead.org'
-> <linux-arm-kernel@lists.infradead.org>
-> Subject: RE: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum
-> 010001
-> 
-> 
-> I think you mean it may be a problem to modify the KPTI trampoline because
-> some patches about KPTI will be merged to mainline in the near future.
-> I understood that.
-> I should discuss with my colleagues whether we can set NFDx=0 all of time on
-> A64FX.
+If the clock tree is not fully populated when the timer-sun5i init code
+is called, attempts to get the clock rate for the timer would fail and
+return 0.
 
-The result of our investigation also supports your suggestion. 
-We surely agree with you that your proposed method (never set NFDx=1 on A64FX)
-is the best to resolve this erratum.
-	
-For this erratum, James's patch should be merged to mainline
-instead of my previous patches (v1 to v4).
-Since KPTI fully covers the effect of NFD1 for A64FX, KPTI is
-recommended to be used in conjunction with James’s patch.
+Make the init code for both clock events and clocksource check the
+returned clock rate and fail gracefully if the result is 0, instead of
+causing a divide by 0 exception later on.
 
-> And thanks for your patch.
-> If we can set NFDx=0 all of time, I will review, test and report the result.
+Fixes: 4a59058f0b09 ("clocksource/drivers/sun5i: Refactor the current code")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/timer-sun5i.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I have already tested James's patch on A64FX, and the result is no problem at all.
-
-Tested-by:zhang.lei<zhang.lei@jp.fujitsu.com>
-
-
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
-> a4168d366127..b0b7f1c4e816 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -643,6 +643,25 @@ config QCOM_FALKOR_ERRATUM_E1041
-> 
->  	  If unsure, say Y.
-> 
-> +config FUJITSU_ERRATUM_010001
-> +	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
-> +	default y
-> +	help
-> +	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
-> +	  On some variants of the Fujitsu-A64FX cores version (1.0, 1.1), memory
-> +	  accesses may cause undefined fault (Data abort, DFSC=0b111111).
-> +	  This fault occurs under a specific hardware condition when a
-> +	  load/store instruction performs an address translation using:
-> +	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
-> +	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
-> +	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
-> +	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
-> +
-> +	  The workaround is to ensure these bits are clear in TCR_ELx.
-> +	  The workaround only affect the Fujitsu-A64FX.
-
-I think it is better to add a notice here as follows:
-
-  Recommend to enable KPTI (UNMAP_KERNEL_AT_EL0 = y).
-
-> +
-> +	  If unsure, say Y.
-> +
->  endmenu
-
-Thanks a lot.
-
-Best Regards,
-Zhang Lei 
+diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+index 3b56ea3f52af..552c5254390c 100644
+--- a/drivers/clocksource/timer-sun5i.c
++++ b/drivers/clocksource/timer-sun5i.c
+@@ -202,6 +202,11 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+ 	}
+ 
+ 	rate = clk_get_rate(clk);
++	if (!rate) {
++		pr_err("Couldn't get parent clock rate\n");
++		ret = -EINVAL;
++		goto err_disable_clk;
++	}
+ 
+ 	cs->timer.base = base;
+ 	cs->timer.clk = clk;
+@@ -275,6 +280,11 @@ static int __init sun5i_setup_clockevent(struct device_node *node, void __iomem
+ 	}
+ 
+ 	rate = clk_get_rate(clk);
++	if (!rate) {
++		pr_err("Couldn't get parent clock rate\n");
++		ret = -EINVAL;
++		goto err_disable_clk;
++	}
+ 
+ 	ce->timer.base = base;
+ 	ce->timer.ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+-- 
+2.17.1
 
 
 _______________________________________________
