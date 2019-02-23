@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1FC78C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 08:51:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 642D7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 08:51:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DBFBE20684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 08:51:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2DDD720684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 08:51:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H0+O9ACy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DBFBE20684
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PES/xeKd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DDD720684
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=martin.sperl.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,36 +26,35 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=LVTZhdLNNvqnJdXfq/Prypbs54vKJ0qBmkmn2hXouKY=; b=H0+O9ACyZHBGjs2tC4bkz7iFZr
-	reoIAe+kV1vugg6dliR3B/+R7PkxcpJUSvKpokW4M3NBDXS7m/lWbkyxmCDjNUGkDYyqGWGS53dEu
-	OjZPZyDv4Eq93cYd61cn1lw4pyVzUYwKk1NdlwmFqbivLY56Ih098yVr8lTnx1roZqffTn7MPucJ3
-	MaDZhkBrtivivwKFTllEPVmb6+i5p2ICj/rdZ7dJ4FXtCbqwWKc4iCHo0Gk11W/nHwqYnFe9v3KUK
-	KJPrWIOOg6aiwNDPZfi8uVxXYs7fDi0z4I+rjfDLmQsl/v+DYjs7QMukUUAfz+txssmdH9Ep4Tot2
-	4XoHRyxQ==;
+	bh=lt4OKczlwATP2cteMOfTkiPvwtf0gujTJq+Ii3kYNJ4=; b=PES/xeKdJkE+KwalucJC3PF3Ip
+	dc5qeKqO7eHNLt0vFOQZn5sXiP4budyeCCBf4aBhKFYFRG3H31crYnWmH9e9BxcgMC7+nYn4MtTQQ
+	Uni3+t+rSyCP8LInVFV8Zv2EFpnP4Mjh++Wv6LoX/tbjxXQORhg8UkPVbeiR0El6aF3el8E1N9yiN
+	8Ek+dhpICOjKRxVtJTvLmPh+efxGW3u4HaFGxlKQbFDhTLGcjs0H8P9vQV3DQ2QvMUOaPQSa+L+TM
+	5ANjV9Nv4p4v1A0MZUhAaP8gqnz7tGu5xd8+HlwQzz+ABO/HU8fKWgVR43bO7gqqF6EgL0z38THYR
+	9aXUQVpg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxT1c-0002Fy-5Z; Sat, 23 Feb 2019 08:51:12 +0000
+	id 1gxT1o-0002XY-Tp; Sat, 23 Feb 2019 08:51:24 +0000
 Received: from 212-186-180-163.static.upcbusiness.at ([212.186.180.163]
  helo=cgate.sperl.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxT14-0001PS-DD; Sat, 23 Feb 2019 08:50:42 +0000
+ id 1gxT19-0001PS-0g; Sat, 23 Feb 2019 08:50:45 +0000
 Received: from hc1.intern.sperl.org (account martin@sperl.org [10.10.10.59]
  verified) by sperl.org (CommuniGate Pro SMTP 6.2.1 _community_)
- with ESMTPSA id 7757393; Sat, 23 Feb 2019 08:50:05 +0000
+ with ESMTPSA id 7757394; Sat, 23 Feb 2019 08:50:05 +0000
 From: kernel@martin.sperl.org
 To: Mark Brown <broonie@kernel.org>, Eric Anholt <eric@anholt.net>,
  Stefan Wahren <stefan.wahren@i2se.com>, linux-spi@vger.kernel.org,
  linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 3/5] spi: core: allow defining time that cs is deasserted as a
- multiple of SCK
-Date: Sat, 23 Feb 2019 08:49:50 +0000
-Message-Id: <20190223084952.14758-4-kernel@martin.sperl.org>
+Subject: [PATCH 4/5] spi: bcm2835: support effective_speed_hz
+Date: Sat, 23 Feb 2019 08:49:51 +0000
+Message-Id: <20190223084952.14758-5-kernel@martin.sperl.org>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20190223084952.14758-1-kernel@martin.sperl.org>
 References: <20190223084952.14758-1-kernel@martin.sperl.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_005039_343676_C9355E63 
-X-CRM114-Status: UNSURE (   8.84  )
+X-CRM114-CacheID: sfid-20190223_005043_318327_B99A39F6 
+X-CRM114-Status: UNSURE (   7.76  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -77,53 +76,45 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Support setting a delay between cs assert and deassert as
-a multiple of spi clock length.
+Setting spi_transfer->effective_speed_hz in transfer_one so that
+it can get used in cs_change_delay configured with delay as a muliple
+of SPI clock cycles.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/spi/spi.c       | 8 ++++++++
- include/linux/spi/spi.h | 1 +
- 2 files changed, 9 insertions(+)
+ drivers/spi/spi-bcm2835.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 5a4616894d57..d5259bdd4b88 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -1092,6 +1092,7 @@ static void _spi_transfer_cs_change_delay(struct spi_message *msg,
+diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
+index 35aebdfd3b4e..c2912c1e09c5 100644
+--- a/drivers/spi/spi-bcm2835.c
++++ b/drivers/spi/spi-bcm2835.c
+@@ -777,7 +777,6 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
  {
- 	u32 delay = xfer->cs_change_delay;
- 	u32 unit = xfer->cs_change_delay_unit;
-+	u32 hz;
+ 	struct bcm2835_spi *bs = spi_master_get_devdata(master);
+ 	unsigned long spi_hz, clk_hz, cdiv;
+-	unsigned long spi_used_hz;
+ 	unsigned long long xfer_time_us;
+ 	u32 cs = bcm2835_rd(bs, BCM2835_SPI_CS);
 
- 	/* return early on "fast" mode - for everything but USECS */
- 	if (!delay && unit != SPI_DELAY_UNIT_USECS)
-@@ -1107,6 +1108,13 @@ static void _spi_transfer_cs_change_delay(struct spi_message *msg,
- 		break;
- 	case SPI_DELAY_UNIT_NSECS: /* nothing to do here */
- 		break;
-+	case SPI_DELAY_UNIT_SCK:
-+		/* if there is no effective speed know, then approximate
-+		 * by underestimating with half the requested hz
-+		 */
-+		hz = xfer->effective_speed_hz ?: xfer->speed_hz / 2;
-+		delay *= DIV_ROUND_UP(1000000000, hz);
-+		break;
- 	default:
- 		dev_err_once(&msg->spi->dev,
- 			     "Use of unsupported delay unit %i, using default of 10us\n",
-diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-index f503a712423d..0b1d5e2b8b8b 100644
---- a/include/linux/spi/spi.h
-+++ b/include/linux/spi/spi.h
-@@ -799,6 +799,7 @@ struct spi_transfer {
- 	u8		cs_change_delay_unit;
- #define SPI_DELAY_UNIT_USECS	0
- #define SPI_DELAY_UNIT_NSECS	1
-+#define SPI_DELAY_UNIT_SCK	2
- 	u32		speed_hz;
- 	u16		word_delay;
+@@ -797,7 +796,7 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
+ 	} else {
+ 		cdiv = 0; /* 0 is the slowest we can go */
+ 	}
+-	spi_used_hz = cdiv ? (clk_hz / cdiv) : (clk_hz / 65536);
++	tfr->effective_speed_hz = cdiv ? (clk_hz / cdiv) : (clk_hz / 65536);
+ 	bcm2835_wr(bs, BCM2835_SPI_CLK, cdiv);
 
+ 	/* handle all the 3-wire mode */
+@@ -823,7 +822,7 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
+ 	xfer_time_us = (unsigned long long)tfr->len
+ 		* 9 /* clocks/byte - SPI-HW waits 1 clock after each byte */
+ 		* 1000000;
+-	do_div(xfer_time_us, spi_used_hz);
++	do_div(xfer_time_us, tfr->effective_speed_hz);
+
+ 	/* for short requests run polling*/
+ 	if (xfer_time_us <= BCM2835_SPI_POLLING_LIMIT_US)
 --
 2.11.0
 
