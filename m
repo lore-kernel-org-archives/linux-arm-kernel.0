@@ -3,20 +3,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C2BAAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:33:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C106C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:41:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 86E7720663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:33:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F736206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 01:41:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="URciRMvd";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="c5WT/13v"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 86E7720663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Nqq/QY3A";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linux-foundation.org header.i=@linux-foundation.org header.b="INy8o/ct"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F736206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux-foundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,56 +25,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ac6E/nM6+UpS4Sg19d4sjrvwRHkbUdjCBaJ5OvAZ/Ig=; b=URciRMvdS/KADw
-	RfmVrq3/dbMd3dZh6E0CLgFycCZeiUCs9n075DjlqkW2lTNZhZUx3E3nBs/Pb+4s0R6q9tgM/jvEW
-	9Gv8R/RAnAFGOzw3Yg6IC/QotJAT34SufC6iXDwSlYtVEF/oWDGFTlAACyMbWVLYIXg18ObYOB0SB
-	xGL5XEBK/DKwVJCrhYwPB735QktpYyz82+UU3ihuFDSOd3ni46/WPtjJK3wSV1vnfUgYH4iGsJzDT
-	w5VnpLRpYQ3evR2xeVon8aVQFS/p0U8/avMKtR8mXjq9bQTIHww+gaEPdZQXSW+wjF8uoDNNj4Wht
-	d/q2OCpiyKrVk91rU8EQ==;
+	List-Owner; bh=r0HqgKn1+CIJJY8/meuV0o32X8xSm/ZIRfoTtfJyTRc=; b=Nqq/QY3A4YeoCx
+	7Vcy7PxGGHe4YVp4xvK8ozLSihwplQ1c1pKNU3zueiB70KA5Q9u+lvhXdQv9rxE3HAIjoCP7gBI1t
+	40ePY6X9gVd5U3zf96nev4nCDwwJCVcWT12Cm3d0ZWDeF+b89e9b/Sg+4+vPSYnc1+CPrFL3BmyPh
+	E4XwCL1w6UHKKxR7Ud2sXjpMSK/xWUG347Ba+b1MbAepL7EiYlC+JQnodUhVVJRFOArmRkkH41M7i
+	wGs15HIERAEH0exBcuLyKsJWqShp6mB4WrmFoPSZQFQNZoJ+7ornRljDjyJ+0V5/fTN3ruMgsx1Gp
+	YZsG5VFsHnRib2F2UOjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxMCL-0001UZ-1A; Sat, 23 Feb 2019 01:33:49 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gxMJf-0004W8-VI; Sat, 23 Feb 2019 01:41:23 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxMCI-0001UD-0Y
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 01:33:47 +0000
-Received: by mail-lj1-x244.google.com with SMTP id l5so3145957lje.1
+ id 1gxMJc-0004Vm-05
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 01:41:21 +0000
+Received: by mail-lf1-x143.google.com with SMTP id u21so3129192lfu.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 17:33:44 -0800 (PST)
+ Fri, 22 Feb 2019 17:41:18 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=linux-foundation.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=xQrTZV50/Bgg7212a/45Y9EdOSbPZgi+4d9Y0GVvGEw=;
- b=c5WT/13vLhi3PqGKRGbFwslWRp9pu5UMMwRtgAqHJk58mB6kxFjBKqr1SuePbM8JkL
- nXyQGf75Il/C6LcZFRzjjzXcfEJj9CMgETh25TySxBCb9yK/fgSmXCiq6PTLWEU3oYVR
- XTVcgiwcW0BbV9xNhCvYTXrfERGN3AryKzPos=
+ :cc; bh=P49xMeyF5J6dkhgL0eq+Y26r/h/xwT05CxEGNqvL/4M=;
+ b=INy8o/ctFmmbqOrqZN9kIUgR+Q2DsO2pa06gc+yFao5qEROjrtaO++RsOBiLOhCdd7
+ KsgBwhiuBEnyS3h9Eo4/Uze9Zpgztba47Pajs1Dy+nZJ8KEhIL9ton73Djz8SoQUJb1X
+ uoXjoI7Iqy+aLM9iF0i+RFWAtinLP9K2KATJY=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=xQrTZV50/Bgg7212a/45Y9EdOSbPZgi+4d9Y0GVvGEw=;
- b=ZSnbHZMBNrFNCFPiCu0kPRESIWOB5I1iVMUGWYiCrO5saUlr7jgWwMI+XdfTVWVYmy
- zLSi8OKTKeRpx4KvZnNJF4QRIjclNPsNZyA5x3t/jGehpV4jrrVKMUyyhw3q6yLOwbl3
- KGXsXoz7nA73aQOvvobr0EonkkuULbdaQNBMD+JUVrHxauB1HNaJKceUp+YDlAedw3TP
- gCIwFAmncJgblfntmPaBJ1UAMxfszsx0X3KOE+wmU6LQoYkxwuoKts/5Ni5dVOunRiiw
- 8AeQcKw6lRcm6fO+zOzECggjVeqHvy2w8+iaLoc6s4xSZQRrfyIDEdFpXP/PA69fIeZP
- Op9A==
-X-Gm-Message-State: AHQUAuYSLd492eAahEVB6B72kAlMKb7Hv6FRnl0TgAT2g+jB+KggA44d
- D1kAR2bo2MJJ6IJcPqZMKBwcfOweOgE=
-X-Google-Smtp-Source: AHgI3IZ0Aub98gtcueeOS2DMmLZBLI3wnyVViKD0avvR4VxHvzxJNGSkKOU/ZMcXDjezGU1URERXqw==
-X-Received: by 2002:a2e:6309:: with SMTP id x9mr3722021ljb.75.1550885622065;
- Fri, 22 Feb 2019 17:33:42 -0800 (PST)
-Received: from mail-lj1-f173.google.com (mail-lj1-f173.google.com.
- [209.85.208.173])
- by smtp.gmail.com with ESMTPSA id e25sm946009lfc.13.2019.02.22.17.33.40
+ bh=P49xMeyF5J6dkhgL0eq+Y26r/h/xwT05CxEGNqvL/4M=;
+ b=j1xNnS/kc5V4KuvmzEHed1JZNVgyVfwYcEhz+HCqIyHkcytTJ64wYmN5aYs9BdAUKk
+ /6Kpk2VCmLSXIkgD7ZGvsIA3587pNELOl/ndumucGJh2pKk4X8rtOV6r41pRo/sLq3Oo
+ a6O17q0VNTUSA/urU4BnLct8Vu6CE7qe73R/g/+rbf/dGXwpjrwduTH8P/hxO3y2TdBP
+ NtBIRwOS5mxI6ayZ2SLy/7RBRswBgP04LmKLlMheETNxQIYQ7lsWKfxhrv/PCarfHKtZ
+ mOqgbGcNueCuArzajA0YeUJibklAlnvJBdLd6ho3LcypSwZUMbPcM9jWzMCxDDoRrT2V
+ +GvQ==
+X-Gm-Message-State: AHQUAuabJoxJ6HaoaKQWWbZUGKoJj2KyuRCZqeKkp7c1MJbHtlgIJ7x/
+ XNRSMBfswv8oAqZc2l/h+taB3GvtK+g=
+X-Google-Smtp-Source: AHgI3IbkK1khMbFAaBOLNXuhp7nlk6/DAbxQ+XoEJ4omYNFc2ytd4yVbhLH4PMlUahxhr8hmAoe96Q==
+X-Received: by 2002:a19:4ac4:: with SMTP id x187mr436620lfa.166.1550886076377; 
+ Fri, 22 Feb 2019 17:41:16 -0800 (PST)
+Received: from mail-lf1-f51.google.com (mail-lf1-f51.google.com.
+ [209.85.167.51])
+ by smtp.gmail.com with ESMTPSA id m26sm802670lji.22.2019.02.22.17.41.14
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 22 Feb 2019 17:33:40 -0800 (PST)
-Received: by mail-lj1-f173.google.com with SMTP id v10so3140821lji.3
+ Fri, 22 Feb 2019 17:41:15 -0800 (PST)
+Received: by mail-lf1-f51.google.com with SMTP id q12so3122382lfm.0
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 22 Feb 2019 17:33:40 -0800 (PST)
-X-Received: by 2002:a2e:9117:: with SMTP id m23mr3745506ljg.94.1550885619751; 
- Fri, 22 Feb 2019 17:33:39 -0800 (PST)
+ Fri, 22 Feb 2019 17:41:14 -0800 (PST)
+X-Received: by 2002:ac2:415a:: with SMTP id c26mr4408793lfi.62.1550886074294; 
+ Fri, 22 Feb 2019 17:41:14 -0800 (PST)
 MIME-Version: 1.0
 References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
  <20190216103044.GR32494@hirez.programming.kicks-ass.net>
@@ -92,14 +92,14 @@ References: <20ABBED1-E505-45F6-8520-FB93786DF9A9@zytor.com>
  <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
 In-Reply-To: <CALCETrXX1cWxp7m7WVL7VWj4BKriEePxhj0noEFeHtAXvm8Dow@mail.gmail.com>
 From: Linus Torvalds <torvalds@linux-foundation.org>
-Date: Fri, 22 Feb 2019 17:33:23 -0800
-X-Gmail-Original-Message-ID: <CAHk-=who4OcP6UrYX94ANLPnNjkEDh-sbgE=c2tvWpBpDP_PSQ@mail.gmail.com>
-Message-ID: <CAHk-=who4OcP6UrYX94ANLPnNjkEDh-sbgE=c2tvWpBpDP_PSQ@mail.gmail.com>
+Date: Fri, 22 Feb 2019 17:40:58 -0800
+X-Gmail-Original-Message-ID: <CAHk-=wg6JtGsQQe6v3OiHMmhsT_LtpwsrbM8=_GeV3ejforUvw@mail.gmail.com>
+Message-ID: <CAHk-=wg6JtGsQQe6v3OiHMmhsT_LtpwsrbM8=_GeV3ejforUvw@mail.gmail.com>
 Subject: Re: [RFC][PATCH] objtool: STAC/CLAC validation
 To: Andy Lutomirski <luto@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_173346_067112_2F12D9B6 
-X-CRM114-Status: UNSURE (   8.27  )
+X-CRM114-CacheID: sfid-20190222_174120_044329_EEA45892 
+X-CRM114-Status: UNSURE (   9.04  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -128,16 +128,24 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Fri, Feb 22, 2019 at 5:17 PM Andy Lutomirski <luto@kernel.org> wrote:
 >
-> What I meant was: a potentially large grab bag of ways to help turn a
-> bug into an exploit.
+> I don't have commit access :)  But I shall email it out once I test it a bit.
 
-Well, apparently there's only one place, and that one looks pretty harmless.
+Btw, looking at it, with that change every user of __put_user_size()
+now passes in the properly type-cast value in 'x'.
 
-Of course, I don't think PeterZ said what his config was. Maybe it was
-a very minimal config and only found that one case because all the
-truly scary cases were configured out ;)
+Which means that you could remove the odd typecast in the 8-byte case:
 
-                   Linus
+        case 8:                                                         \
+                __put_user_goto_u64((__typeof__(*ptr))(x), ptr, label); \
+
+and make it match all the other cases:
+
+        case 8:                                                         \
+                __put_user_goto_u64(x, ptr, label);                     \
+
+but that's just from looking at the patch, and maybe I'm missing something.
+
+                  Linus
 
 _______________________________________________
 linux-arm-kernel mailing list
