@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.2 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FBACC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 21:39:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 589F0C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 21:40:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25CA420665
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 21:39:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2658320665
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 21:40:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lg5pXXZH";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="FYiPrlAH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25CA420665
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qdpgdZ99";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aFl/S5dY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2658320665
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,68 +27,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pTos5Y1aUN56VueX2T/f3+77kABQv9CyYTEKzq0uhYA=; b=lg5pXXZHYi35CB
-	VXSMGqAVvzVp0wUGBtE4DogiwMJBwBvbtcrZt6SDRA3QgrwbIFqIl+Atk7k9UDt+UpD+Gr93VYtT7
-	9Pe4vvylKXmTZQfdLp27L2d2/rc6CW0vyj6nvHdgnsDXp4apoq8OUbZzHlyejgrm4Jax3JLK3JKn0
-	cSNGInf+7nfij0uPHbwlhnWO1G5GXw+qAKO9ewLP1VELv+mxEqkDs5Mqf7ZrnnxvlGqPn6fx8eQY9
-	iKDDMWZr1LmFt4IiLixB8hXYYOnCmcisY3PgnTqmnVuZ7kWPxLr/fDAKvSwDUgOcrGwvQxWdNyFyo
-	tM47EewizOqKDkFMP4Kw==;
+	List-Owner; bh=d12tGK+UMbr0y4+0kJj9j0H5/U+KwF4bGa0v3624Xl8=; b=qdpgdZ99e1Oel1
+	LQkjYs++XEIYE6I3gdYsCFiu1fQ7q8HP4UKsyFLe0tV1CDMDV3msLxiOT144+0y5GPe/NDk3F7IYD
+	kbc7dzoK+BaToVW0RVZGgUPyeM/hrBM7wDkguArogAAsHd4j5+PRfzqXyVhDirzsxqkSWezndV7L5
+	BiljulHlrgf5uV7wio30DWcaCHPwJqwDIeTSKR4kymT3AQZ75+P9EJQgWbcp2sJeJXPvmINqPnCB2
+	2IpNjTgUlgQtZ613zyqySE0nGJVg9aXu2nc/xH7xewSjRHb01iKtfITMlzQxHNJLs6ZEMCu+t55V/
+	9e61NexlASyD5UuO1Ksg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxf0k-0002Rt-DL; Sat, 23 Feb 2019 21:39:06 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gxf1w-0003wN-27; Sat, 23 Feb 2019 21:40:20 +0000
+Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxf0h-0002RG-0d
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 21:39:04 +0000
-Received: by mail-pl1-x641.google.com with SMTP id c4so2680558pls.11
+ id 1gxf1s-0003vw-Pz
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 21:40:18 +0000
+Received: by mail-pl1-x642.google.com with SMTP id 101so2697041pld.6
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 13:39:02 -0800 (PST)
+ Sat, 23 Feb 2019 13:40:16 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=zyXgafyQQfxp3wHOQiHpiJ/IXgmLY3NFW587N2PcJVs=;
- b=FYiPrlAHTENNU6Cbv34ztjLmFgvM9+3b8UgtrcJRWZyO3Esxjs0/JHO2c8NGvgPW8P
- 5gPI+p5R/ShHWdV5Y39HaKOQgNMScrY4EayUyR6nzkHWmsXhTjRjT74CQBYgQ+a3tRSQ
- TUytEAPcIuLcrVt2oNB6xltfpLiD1CiG+ycttZRdvcHPJ6ZkcMUj5ElHN4hCiHSfb1Do
- jpdwtwrOROpTJcgSwb+KvXNIDoSJObAlZzliAMMGzCFlkvLSBzQ87XACYxq+FNZN+Abs
- WNtSUuInUnIirFHUXczn8IX9OvZoUxx9fKMj7GbTG4t6m09KhygrOMUrFDpVeJp09a8S
- 7qzQ==
+ bh=K/cw/i+biX0xbzs1U/A5+Hg2bR0HgcIHCETYcKZn9BA=;
+ b=aFl/S5dY7FViy+Ul4JqGXxC/tKj4PKPMkAgPMZlX1+vQ7Bx7GL4EsxdRN5mOqknwBJ
+ odxExLrlyV+/7zi1/Jwa2z+yEtt0nYxD8ebBMmbAkkvAp7YDn+BLd5EM9VWlWOLD93IZ
+ nZ3op9eUN743CljmOLuJzInlYvSs3Hzvyjx6KP0ytWFUaKMcfjEs7RmAWjA3TZEOZq/K
+ LQj+U0yUvZdA2i+yBDSiqfKe1j1ZsJuM8fU7X9kRA2lw5Ty5rA9RFpRxzTAUueMw8Jkq
+ udZ0FD/0ZGXlDSpRXjbmt07ccj67bacfoQbRg+ltzC0pH/hRktGvMHOJpqKry4GLkBbk
+ hRcw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=zyXgafyQQfxp3wHOQiHpiJ/IXgmLY3NFW587N2PcJVs=;
- b=nwtlCUJbeKzqgp33jR/nw273OiUNs2Om1sRW7+W8GqlS1UYAqtVcqsyY6unM2y/Y1l
- N9lbelSgmKjgGAW6yR6N/QJ3E6VF7sHxB2vQ1DLgeKIG4xoIwTAU+qJLFPfvccDtGhJk
- BLeRqbRbnEMvTdF07qb0FxRKI/OQy8zMZ2yeXwUdVmNolfDOYr05vVFalKGcAyBYDwkl
- A4ylco1EvDW4h7RO43pVcnKG8bhSShNPDdDN79hxs4JOh6DsnLq54jXvr8XhR0SF4oE4
- 3n0LCv0tdYSaFZ4DU5+kyeo1Ux9+QgLH4dWZWtXJ9+OrOEAAfKeYtRljAw6wJCxkY9jV
- xCvQ==
-X-Gm-Message-State: AHQUAubw7p+9jku4NCBz2j27AqeUv3DzHuY6HqsbLlRjtlXDwZLmX7Nz
- L9GOVV596cj0BDd1U+KMKsA=
-X-Google-Smtp-Source: AHgI3IY3gA8lwthBaUcZZml4J9bUr/QrUkc4fl/6dhVINUdMhrmlMDlchB1JaYYE+4q/aHKNERAUGg==
-X-Received: by 2002:a17:902:5066:: with SMTP id
- f35mr10792137plh.184.1550957942199; 
- Sat, 23 Feb 2019 13:39:02 -0800 (PST)
+ bh=K/cw/i+biX0xbzs1U/A5+Hg2bR0HgcIHCETYcKZn9BA=;
+ b=XmkkiM4Be7ZD8GKNkigxhzg3PaHigkc341Jok7oqVzCnN5N58LkTh5sSK+70jhTbyY
+ 1qnSyLE5R2NPTKhJstY9KrLWV+SwD5OsSpYCR49xu7Fs/7waeKXW0rJs+Nf6MQ7FPK/s
+ KsJzy0bG76N3IQWzu6fnM52O3KtAAXkntWCPoYEzir/MLO5L60rJUaGmPpP8L5ADUE2L
+ nTR2Z2hcR2PSXNgVRjLWTyp9v5f/yhwi+7PeFxd0rrCORxU62V4b+hZyGh2lofL6Txnv
+ a92sW0Tn37KrKy5No/stvZ7CyEWJqWRpF6g2s/V4QFqUAizQJt9/HeuxaDyd8q77H1NY
+ XEyg==
+X-Gm-Message-State: AHQUAubtFwK9nvcPx0MKg4TJdmNinwMwWv5VXqmdozStkEd2NkdCsvXq
+ 9K8F50LYdUyjQgBzpKmTQBg=
+X-Google-Smtp-Source: AHgI3IYH1OXM8cGDa7ACH/eSL++QXZuFZ8mCW7sMC0Dm+XCrMzSDtUsZJ9QzSHtf7Z9sT6X8lndJQQ==
+X-Received: by 2002:a17:902:264:: with SMTP id
+ 91mr11281442plc.108.1550958016031; 
+ Sat, 23 Feb 2019 13:40:16 -0800 (PST)
 Received: from localhost.localdomain ([2601:644:8201:32e0:7256:81ff:febd:926d])
- by smtp.gmail.com with ESMTPSA id y19sm6708849pfm.181.2019.02.23.13.38.58
+ by smtp.gmail.com with ESMTPSA id q28sm6734443pgl.35.2019.02.23.13.40.13
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 23 Feb 2019 13:39:01 -0800 (PST)
-Date: Sat, 23 Feb 2019 13:38:59 -0800
+ Sat, 23 Feb 2019 13:40:15 -0800 (PST)
+Date: Sat, 23 Feb 2019 13:40:19 -0800
 From: Eduardo Valentin <edubezval@gmail.com>
 To: Anson Huang <anson.huang@nxp.com>
-Subject: Re: [PATCH V8 2/4] thermal: imx_sc: add i.MX system controller
- thermal support
-Message-ID: <20190223213858.GB1472@localhost.localdomain>
+Subject: Re: [PATCH V8 1/4] dt-bindings: fsl: scu: add thermal binding
+Message-ID: <20190223214018.GC1472@localhost.localdomain>
 References: <1550730831-14995-1-git-send-email-Anson.Huang@nxp.com>
- <1550730831-14995-2-git-send-email-Anson.Huang@nxp.com>
+ <20190223213759.GA1472@localhost.localdomain>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1550730831-14995-2-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <20190223213759.GA1472@localhost.localdomain>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_133903_058077_D2499BF6 
-X-CRM114-Status: GOOD (  28.86  )
+X-CRM114-CacheID: sfid-20190223_134017_022470_2BCDEC45 
+X-CRM114-Status: GOOD (  24.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,235 +130,76 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hey Anson,
-
-On Thu, Feb 21, 2019 at 06:38:39AM +0000, Anson Huang wrote:
-> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
-> inside, the system controller is in charge of controlling power,
-> clock and thermal sensors etc..
+On Sat, Feb 23, 2019 at 01:38:00PM -0800, Eduardo Valentin wrote:
+> On Thu, Feb 21, 2019 at 06:38:30AM +0000, Anson Huang wrote:
+> > NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
+> > system controller, the system controller is in charge of system
+> > power, clock and thermal sensors etc. management, Linux kernel
+> > has to communicate with system controller via MU (message unit)
+> > IPC to get temperature from thermal sensors, this patch adds
+> > binding doc for i.MX system controller thermal driver.
+> > 
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > Reviewed-by: Rob Herring <robh@kernel.org>
+> > ---
+> > Changes since V7:
+> >         - remove unused property "tsens-num";
+> >         - improve the compatible description;
+> >         - update examples according to latest dts file.
+> > ---
+> >  .../devicetree/bindings/arm/freescale/fsl,scu.txt     | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > index 72d481c..d89147e 100644
+> > --- a/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,scu.txt
+> > @@ -122,6 +122,19 @@ RTC bindings based on SCU Message Protocol
+> >  Required properties:
+> >  - compatible: should be "fsl,imx8qxp-sc-rtc";
+> >  
+> > +Thermal bindings based on SCU Message Protocol
+> > +------------------------------------------------------------
+> > +
+> > +Required properties:
+> > +- compatible:			Should be :
+> > +				  "fsl,imx8qxp-sc-thermal"
+> > +				followed by "fsl,imx-sc-thermal";
+> > +
+> > +- #thermal-sensor-cells:	See Documentation/devicetree/bindings/thermal/thermal.txt
+> > +				for a description.
+> > +
+> > +- imx,sensor-resource-id: 	Property array to specify each thermal zone's sensor resource ID.
 > 
-> This patch adds i.MX system controller thermal driver support,
-> Linux kernel has to communicate with system controller via MU
-> (message unit) IPC to get each thermal sensor's temperature,
-> it supports multiple sensors which are passed from device tree,
-> please see the binding doc for details.
+> If this is an array...
 > 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
-> Changes since V7:
-> 	- remove unused structure imx_sc_thermal_data to simply the driver;
-> 	- move the "imx,sensor-resource-id" property from thermal zone node to scu tsens node, and
-> 	  get this property using phandle;
-> 	- remove unused sensor number got from dts, now it is not needed.
-> ---
->  drivers/thermal/Kconfig          |  11 +++
->  drivers/thermal/Makefile         |   1 +
->  drivers/thermal/imx_sc_thermal.c | 144 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 156 insertions(+)
->  create mode 100644 drivers/thermal/imx_sc_thermal.c
+> > +
+> >  Example (imx8qxp):
+> >  -------------
+> >  lsio_mu1: mailbox@5d1c0000 {
+> > @@ -168,6 +181,12 @@ firmware {
+> >  		rtc: rtc {
+> >  			compatible = "fsl,imx8qxp-sc-rtc";
+> >  		};
+> > +
+> > +		tsens: thermal-sensor {
+> > +			compatible = "fsl,imx8qxp-sc-thermal", "fsl,imx-sc-thermal";
+> > +			#thermal-sensor-cells = <0>;
+> > +			imx,sensor-resource-id = <IMX_SC_R_SYSTEM>;
 > 
-> diff --git a/drivers/thermal/Kconfig b/drivers/thermal/Kconfig
-> index 58bb7d7..fec0ef5 100644
-> --- a/drivers/thermal/Kconfig
-> +++ b/drivers/thermal/Kconfig
-> @@ -223,6 +223,17 @@ config IMX_THERMAL
->  	  cpufreq is used as the cooling device to throttle CPUs when the
->  	  passive trip is crossed.
->  
-> +config IMX_SC_THERMAL
-> +	tristate "Temperature sensor driver for NXP i.MX SoCs with System Controller"
-> +	depends on (ARCH_MXC && IMX_SCU) || COMPILE_TEST
-> +	depends on OF
-> +	help
-> +	  Support for Temperature Monitor (TEMPMON) found on NXP i.MX SoCs with
-> +	  system controller inside, Linux kernel has to communicate with system
-> +	  controller via MU (message unit) IPC to get temperature from thermal
-> +	  sensor. It supports one critical trip point and one
-> +	  passive trip point for each thermal sensor.
-> +
->  config MAX77620_THERMAL
->  	tristate "Temperature sensor driver for Maxim MAX77620 PMIC"
->  	depends on MFD_MAX77620
-> diff --git a/drivers/thermal/Makefile b/drivers/thermal/Makefile
-> index 486d682..4062627 100644
-> --- a/drivers/thermal/Makefile
-> +++ b/drivers/thermal/Makefile
-> @@ -40,6 +40,7 @@ obj-$(CONFIG_DB8500_THERMAL)	+= db8500_thermal.o
->  obj-$(CONFIG_ARMADA_THERMAL)	+= armada_thermal.o
->  obj-$(CONFIG_TANGO_THERMAL)	+= tango_thermal.o
->  obj-$(CONFIG_IMX_THERMAL)	+= imx_thermal.o
-> +obj-$(CONFIG_IMX_SC_THERMAL)	+= imx_sc_thermal.o
->  obj-$(CONFIG_MAX77620_THERMAL)	+= max77620_thermal.o
->  obj-$(CONFIG_QORIQ_THERMAL)	+= qoriq_thermal.o
->  obj-$(CONFIG_DA9062_THERMAL)	+= da9062-thermal.o
-> diff --git a/drivers/thermal/imx_sc_thermal.c b/drivers/thermal/imx_sc_thermal.c
-> new file mode 100644
-> index 0000000..145e73b
-> --- /dev/null
-> +++ b/drivers/thermal/imx_sc_thermal.c
-> @@ -0,0 +1,144 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright 2018-2019 NXP.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/firmware/imx/sci.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/thermal.h>
-> +
-> +#include "thermal_core.h"
-> +
-> +#define IMX_SC_MISC_FUNC_GET_TEMP	13
-> +#define IMX_SC_C_TEMP			0
-> +
-> +static struct imx_sc_ipc *thermal_ipc_handle;
-> +
-> +struct imx_sc_sensor {
-> +	struct thermal_zone_device *tzd;
-> +	u32 resource_id;
-> +};
-> +
-> +struct req_get_temp {
-> +	u16 resource_id;
-> +	u8 type;
-> +} __packed;
-> +
-> +struct resp_get_temp {
-> +	u16 celsius;
-> +	u8 tenths;
-> +} __packed;
-> +
-> +struct imx_sc_msg_misc_get_temp {
-> +	struct imx_sc_rpc_msg hdr;
-> +	union {
-> +		struct req_get_temp req;
-> +		struct resp_get_temp resp;
-> +	} data;
-> +} __packed;
-> +
-> +static int imx_sc_thermal_get_temp(void *data, int *temp)
-> +{
-> +	struct imx_sc_msg_misc_get_temp msg;
-> +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
-> +	struct imx_sc_sensor *sensor = data;
-> +	int ret;
-> +
-> +	msg.data.req.resource_id = sensor->resource_id;
-> +	msg.data.req.type = IMX_SC_C_TEMP;
-> +
-> +	hdr->ver = IMX_SC_RPC_VERSION;
-> +	hdr->svc = IMX_SC_RPC_SVC_MISC;
-> +	hdr->func = IMX_SC_MISC_FUNC_GET_TEMP;
-> +	hdr->size = 2;
-> +
-> +	ret = imx_scu_call_rpc(thermal_ipc_handle, &msg, true);
-> +	if (ret) {
-> +		pr_err("read temp sensor %d failed, ret %d\n",
-> +			sensor->resource_id, ret);
-> +		return ret;
-> +	}
-> +
-> +	*temp = msg.data.resp.celsius * 1000 + msg.data.resp.tenths * 100;
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct thermal_zone_of_device_ops imx_sc_thermal_ops = {
-> +	.get_temp = imx_sc_thermal_get_temp,
-> +};
-> +
-> +static int imx_sc_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np, *sensor_np;
-> +	int ret, i = 0;
-> +
-> +	ret = imx_scu_get_handle(&thermal_ipc_handle);
-> +	if (ret)
-> +		return ret;
-> +
-> +	np = of_find_node_by_name(NULL, "thermal-zones");
-> +	if (!np)
-> +		return -ENODEV;
+> then this example should have an array, to be better express how this is
+> supposed to work. Can you please resend this with an array instead?
 
-I am still failing to understand why you need to do the search above
-and ..
+I mean this could be one example of an array with more than one element.
 
-> +
-> +	for_each_available_child_of_node(np, sensor_np) {
-> +		struct of_phandle_args tsens_args;
-> +		struct imx_sc_sensor *sensor =
-> +			devm_kzalloc(&pdev->dev, sizeof(*sensor), GFP_KERNEL);
-> +		if (!sensor)
-> +			return -ENOMEM;
-> +
-> +		ret = of_parse_phandle_with_args(sensor_np, "thermal-sensors",
-> +				"#thermal-sensor-cells", i, &tsens_args);
-
-the above shouldnt be needed too.
-
-> +		if (ret < 0)
-> +			return ret;
-> +
-> +		ret = of_property_read_u32_index(tsens_args.np,
-> +			"imx,sensor-resource-id", i, &sensor->resource_id);
-
-If you put "imx,sensor-resource-id" inside tsens node, like described in
-your patch 01, you should be able to get  np from pdev->dev.of_node,
-right?
-
-Then you should be able to just read the "imx,sensor-resource-id"
-directly from pdev->dev.of_node, no?
-
-> +		if (ret) {
-> +			dev_err(&pdev->dev,
-> +				"failed to get valid sensor resource id: %d\n",
-> +				ret);
-> +			break;
-> +		}
-> +
-> +		sensor->tzd = devm_thermal_zone_of_sensor_register(&pdev->dev,
-> +								   i++,
-> +								   sensor,
-> +								   &imx_sc_thermal_ops);
-> +		if (IS_ERR(sensor->tzd)) {
-> +			dev_err(&pdev->dev, "failed to register thermal zone\n");
-> +			ret = PTR_ERR(sensor->tzd);
-> +			break;
-> +		}
-> +	}
-> +
-> +	of_node_put(np);
-> +	of_node_put(sensor_np);
-> +
-> +	return ret;
-> +}
-> +
-> +static const struct of_device_id imx_sc_thermal_table[] = {
-> +	{ .compatible = "fsl,imx-sc-thermal", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, imx_sc_thermal_table);
-> +
-> +static struct platform_driver imx_sc_thermal_driver = {
-> +		.probe = imx_sc_thermal_probe,
-> +		.driver = {
-> +			.name = "imx-sc-thermal",
-> +			.of_match_table = imx_sc_thermal_table,
-> +		},
-> +};
-> +module_platform_driver(imx_sc_thermal_driver);
-> +
-> +MODULE_AUTHOR("Anson Huang <Anson.Huang@nxp.com>");
-> +MODULE_DESCRIPTION("Thermal driver for NXP i.MX SoCs with system controller");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.7.4
 > 
+> > +		};
+> >  	};
+> >  };
+> >  
+> > -- 
+> > 2.7.4
+> > 
 
 _______________________________________________
 linux-arm-kernel mailing list
