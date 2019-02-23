@@ -2,99 +2,66 @@ Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2295CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 20:19:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81C07C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 20:29:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E595620675
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 20:19:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 49311206A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 20:29:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oK4fwoB8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=cogentembedded-com.20150623.gappssmtp.com header.i=@cogentembedded-com.20150623.gappssmtp.com header.b="fJrQpQTL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E595620675
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cogentembedded.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gyZ7ksE3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="sS6o5q2R"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 49311206A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NXiUyS4O4CS7bAlijFXW1BAnL9ct9CLlW0AqLATT/EA=; b=oK4fwoB8QGGEme
-	OcP3Ppa9bHMaOcCtyMR50ZcMIG8efxBTZZYqJ+hGhb5pzSerK60LdbKOS77KrG3lSHlAAn7oDa5GV
-	BzrXeeZc+3crVFI5CWMbaocQHhhM3PLp4FCkU9abhf1LFEEx6U8ratLe/jukjc08GVKkpi0RqPPzQ
-	yrLipx8L8bncfpNKxEsDZGTgb4VAVUs76WZoGxsOKcPMXiAFT9RuQFmL6BeLTWSNFma8HbkLw07gM
-	gw5uOIMQ7VXC9GlhX0Se8cYYWkdlAgsOM/XDYK2i9409yc2x1reoXsB295Cl7aMlXrFzj2EFCCU4K
-	gVQzZcaV80g2rL9ZBb/g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:List-Subscribe:List-Help:
+	List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:Subject:To:
+	From:Reply-To:Cc:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Q6bQYLO3MYNCv7UYpJE8qj4gPJ+P+sIz6sDoQUvu4oI=; b=gyZ7ksE3lhLGPE
+	XXsbXnTorB3OBySVHkfE14R2V/jJTUiy9dohwYKmQuMKNv13mi9HanfoH30wWKtlJ7UXIwOvD/s6d
+	wGmCaB8lTzJ3gAmKzu5gDISsvMZ6k+8+vWVZtOaGu8yOkh1Is050Tw516c0gCbP2oPcNGN8sIIqqs
+	+H+VskkjmSnng4Mjhrb5NVkdjq61UK3KGm40svad97/DSZK2IMV7X39kwdbOQDOqOu4uTVNr+uGkM
+	A8wpmdZnLugHFNAF50OgovYJNGsNQ8dZNRJTBvHIAF0nrpoexsmauaE9n0A1pxMkLCZMQNMaT0dCd
+	KIWOfc+gbrSiaM9xgVvA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxdlw-0001ce-Be; Sat, 23 Feb 2019 20:19:44 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gxdvb-0004vX-Qr; Sat, 23 Feb 2019 20:29:43 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxdls-0001c0-Ih
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 20:19:42 +0000
-Received: by mail-lf1-x143.google.com with SMTP id q11so4168270lfd.3
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 12:19:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=cogentembedded-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:organization:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=so8S+8x06h6Zr8gUjb8awpqJDd6cT+YXwuKXyySAEiQ=;
- b=fJrQpQTLFIZsHW/1c1u60xD516EODx1gKRsnVMUk9QDHdA3VfgDJ/SWb8ItUvXb6PD
- 3cYA3Vxkxe3rpzBxrZqK3wtBqrBafR7wYlGOVO5Oflb8dqVzCmlj76+5N2ldk60bzolx
- yRy4cLbBgvC1YFql+WUsOeywFxWtzFXU091nrxYwNJoiihz0SBur1tuj6mZS+2VcvvXz
- RezhumVnGnUsorLs90xZQh8JUhhn8afpoByAtHgLMxWj+z8qzNnYajfmzkx4MhHcLyH8
- HSGWH6FmCv+YdGwoseu8RI8TQceDvFqwXiWU0bfW8OU8htxHF0d3IkQA0wQrGKMVa7PI
- eXAg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=so8S+8x06h6Zr8gUjb8awpqJDd6cT+YXwuKXyySAEiQ=;
- b=UqDrFxA2JuS9aZnYHrHW7z/ffsRzJIZLCxq0Rvugjhq4u8xXPYUnZ+IN8hKK2+oX6B
- NDWkg00BhJGVZTV64EDq8zToNq0ZYY/7Jk3Tch0PCS3xBe9bZK0E8TM0nShBX4hhOVdh
- B4cPiXjBmmyZbXPpECd7yrN394g+oKkOS2hbfeZuOmL9PfKsOvPTwiBigZftLEfM/C/K
- c0VT12/cTxKioZLLuJu6iQ0dORChs1tdwAMzDv16acST0C0bFUoyGLtVZFoGA7H71ptF
- Rsyd7tqeJxI8hSUODB8Pdw7Sony9REeMrcuTEIyZ0PshdiGE03STBv2qSGli0E5uLN5N
- ufog==
-X-Gm-Message-State: AHQUAuZhgsIdKGW44UVJbkmWq8R/EbNeIL8X6nz5ZXmGjPWfjTKcB6pw
- 7Ib3JhTJbT5e9ZMbYY5aC9eS7L7l+9g=
-X-Google-Smtp-Source: AHgI3IauWVHFbjXrqfyY9RnkQHwJtNGWDzJPMocksY6i+4RHJvRwBXB/bnMWQoV6uU50OlxdP7pBAg==
-X-Received: by 2002:ac2:5542:: with SMTP id l2mr6574223lfk.108.1550953178019; 
- Sat, 23 Feb 2019 12:19:38 -0800 (PST)
-Received: from wasted.cogentembedded.com ([31.173.83.184])
- by smtp.gmail.com with ESMTPSA id h3sm1647428lfj.25.2019.02.23.12.19.36
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 23 Feb 2019 12:19:36 -0800 (PST)
-Subject: Re: [RFC PATCH 3/5] mtd: Add support for Hyperbus memory devices
-To: "Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>)"
- <vigneshr@ti.com>, David Woodhouse <dwmw2@infradead.org>,
- Brian Norris <computersforpeace@gmail.com>,
- Boris Brezillon <bbrezillon@kernel.org>, Marek Vasut
- <marek.vasut@gmail.com>, Richard Weinberger <richard@nod.at>,
- Rob Herring <robh+dt@kernel.org>
-References: <20190219063607.29949-1-vigneshr@ti.com>
- <20190219063607.29949-4-vigneshr@ti.com>
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Organization: Cogent Embedded
-Message-ID: <42d0fd7b-42e0-605c-70ee-6e308908fc90@cogentembedded.com>
-Date: Sat, 23 Feb 2019 23:19:35 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
-MIME-Version: 1.0
-In-Reply-To: <20190219063607.29949-4-vigneshr@ti.com>
-Content-Language: en-MW
+ id 1gxdvY-0004vA-Ar
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 20:29:41 +0000
+Received: from localhost.localdomain (unknown [194.230.155.153])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2E5D0206A3;
+ Sat, 23 Feb 2019 20:29:36 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1550953778;
+ bh=R3k2D3NZRTblDzylVeOIFiXsy0ImTaxs2gXWHcb7OCk=;
+ h=From:To:Subject:Date:From;
+ b=sS6o5q2Rqc+ljjiSqR2IwLSGKsbBdVX5gr2EnFC7wJCMrDZbEH5913XOLFg4pKmza
+ h1R0EtMTA0UIuD+DAEdmA5fGEdjaVbUi+9HW594mIVmqsgJgs6/TB4/sZnUbf2DA5g
+ Knhy/+bvksz4dWjhZnH2kBtAfNfeKiN50sNxs7vk=
+From: Krzysztof Kozlowski <krzk@kernel.org>
+To: Kukjin Kim <kgene@kernel.org>, Krzysztof Kozlowski <krzk@kernel.org>,
+ devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-samsung-soc@vger.kernel.org, linux-kernel@vger.kernel.org
+Subject: [PATCH] ARM: dts: exynos: Enable ADC on Arndale Octa
+Date: Sat, 23 Feb 2019 21:29:32 +0100
+Message-Id: <20190223202932.630-1-krzk@kernel.org>
+X-Mailer: git-send-email 2.17.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_121940_789826_48C4EB99 
-X-CRM114-Status: GOOD (  32.64  )
+X-CRM114-CacheID: sfid-20190223_122940_387687_8067061B 
+X-CRM114-Status: UNSURE (   9.61  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,272 +73,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- tudor.ambarus@microchip.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- nsekhar@ti.com, linux-kernel@vger.kernel.org, linux-mtd@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello!
+Arndale Octa (Exynos5420) has two ADC pins (AIN0 and AIN1) exposed on
+CON6 header pins.  Add ADC node to DTS file to enable it.
 
-On 02/19/2019 09:36 AM, Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>) wrote:
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/boot/dts/exynos5420-arndale-octa.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> Cypress HyperBus is Low Signal Count, High Performance Double Data Rate Bus
-> interface between a host system master and one or more slave interfaces.
-> HyperBus is used to connect microprocessor, microcontroller, or ASIC
-> devices with random access NOR flash memory(called HyperFlash) or
-
-  Need space before (.
-
-> self refresh DRAM(called HyperRAM).
-> 
-> Its a 8-bit data bus (DQ[7:0]) with  Read-Write Data Strobe (RWDS)
-> signal and either Single-ended clock(3.0V parts) or Differential clock
-> (1.8V parts). It uses ChipSelect lines to select b/w multiple slaves.
-> At bus level, it follows a separate protocol described in HyperBus
-> specification[1].
-> 
-> HyperFlash follows CFI AMD/Fujitsu Extended Command Set (0x0002) similar
-> to that of existing parallel NORs. Since Hyperbus is x8 DDR bus,
-> its equivalent to x16 parallel NOR flash wrt bits per clk. But Hyperbus
-> operates at >166MHz frequencies.
-> HyperRAM provides direct random read/write access to flash memory
-> array.
-> 
-> But, Hyperbus memory controllers seem to abstract implementation details
-> and expose a simple MMIO interface to access connected flash.
-> 
-> Add support for registering HyperFlash devices with MTD framework. MTD
-> maps framework along with CFI chip support framework are used to support
-> communicate with flash.
-
-   Communicating.
-
-> Framework is modelled along the lines of spi-nor framework. HyperBus
-> memory controller(HBMC) drivers call hb_register_device() to register a
-
-   Again, space needed before (.
-
-> single HyperFlash device. HyperFlash core parses MMIO access
-> information from DT, sets up the map_info struct, probes CFI flash and
-> registers it with MTD framework.
-> 
-> Some HBMC masters need calibration/training sequence[3] to be carried
-> out, in order for DLL inside the controller to lock, by reading a known
-> string/pattern. This is done by repeatedly reading CFI Query
-> Identification String. Calibration needs to be done before try to detect
-
-   Trying.
-
-> flash as part of CFI flash probe.
-> 
-> HyperRAM is not supported atm.
-
-   ATM?
-
-> HyperBus specification can be found at[1]
-> HyperFlash datasheet can be found at[2]
-> 
-> [1] https://www.cypress.com/file/213356/download
-> [2] https://www.cypress.com/file/213346/download
-> [3] http://www.ti.com/lit/ug/spruid7b/spruid7b.pdf
->     Table 12-5741. HyperFlash Access Sequence
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-[...]
-> diff --git a/drivers/mtd/hyperbus/Kconfig b/drivers/mtd/hyperbus/Kconfig
-> new file mode 100644
-> index 000000000000..02c38afc5c50
-> --- /dev/null
-> +++ b/drivers/mtd/hyperbus/Kconfig
-> @@ -0,0 +1,23 @@
-> +menuconfig MTD_HYPERBUS
-> +	tristate "Hyperbus support"
-> +	select MTD_CFI
-> +	select MTD_MAP_BANK_WIDTH_2
-> +	select MTD_CFI_AMDSTD
-> +	select MTD_COMPLEX_MAPPINGS
-> +	help
-> +	  This is the framework for the Hyperbus which can be used by
-> +	  the Hyperbus Controller driver to commmunicate with
-                                              ^^^
-  Too many m's. :-)
-
-> +	  Hyperflash. See Cypress Hyperbus specification for more
-> +	  details
-> +
-> +
-> +if MTD_HYPERBUS
-> +
-> +config HBMC_AM654
-> +	tristate "Hyperbus controller driver for AM65x SoC"
-> +	help
-> +	 This is the driver for Hyperbus controller on TI's AM65x and
-> +	 other SoCs
-> +
-> +endif # MTD_HYPERBUS
-
-  The above clearly belongs to patch #5.
-
-> +
-
-   No empty lines at end of file, please...
-
-> diff --git a/drivers/mtd/hyperbus/Makefile b/drivers/mtd/hyperbus/Makefile
-> new file mode 100644
-> index 000000000000..64e377d7f636
-> --- /dev/null
-> +++ b/drivers/mtd/hyperbus/Makefile
-> @@ -0,0 +1,4 @@
-> +# SPDX-License-Identifier: GPL-2.0
-> +
-> +obj-$(CONFIG_MTD_HYPERBUS)	+= core.o
-> +obj-$(CONFIG_HBMC_AM654)	+= hbmc_am654.o
-
-   The above line clearly belongs to patch #5 as well...
-
-> diff --git a/drivers/mtd/hyperbus/core.c b/drivers/mtd/hyperbus/core.c
-> new file mode 100644
-> index 000000000000..d3d44aab7503
-> --- /dev/null
-> +++ b/drivers/mtd/hyperbus/core.c
-> @@ -0,0 +1,167 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +//
-> +// Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
-> +// Author: Vignesh R <vigneshr@ti.com>
-> +
-> +#include <linux/err.h>
-> +#include <linux/kernel.h>
-> +#include <linux/mtd/hyperbus.h>
-> +#include <linux/mtd/map.h>
-> +#include <linux/mtd/mtd.h>
-> +#include <linux/mtd/cfi.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/types.h>
-> +
-> +#define HB_CALIB_COUNT 25
-
-   Isn't this controller specific?
-
-[...]
-> +/* Calibrate HBMC by repeatedly reading "QRY" string from CFI space */
-> +static int hb_calibrate(struct hb_device *hbdev)
-
-   s/int/bool/, perhaps?
-
-[...]
-> +int hb_register_device(struct hb_device *hbdev)
-> +{
-> +	struct resource res;
-> +	struct device *dev;
-> +	struct device_node *np;
-> +	struct map_info *map;
-> +	struct hb_ops *ops;
-> +	int err;
-> +
-> +	if (!hbdev || !hbdev->dev || !hbdev->np) {
-> +		pr_err("hyperbus: please fill all the necessary fields!\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	np = hbdev->np;
-> +	if (!of_device_is_compatible(np, "cypress,hyperflash"))
-> +		return -ENODEV;
-> +
-> +	hbdev->memtype = HYPERFLASH;
-> +
-> +	if (of_address_to_resource(np, 0, &res))
-
-    Isn't the direct mapping property of the HF controller, not of HyperFlash
-itself?
-
-> +		return -EINVAL;
-> +
-> +	dev = hbdev->dev;
-> +	map = &hbdev->map;
-> +	map->size = resource_size(&res);
-> +	map->virt = devm_ioremap_resource(dev, &res);
-> +	if (IS_ERR(map->virt))
-> +		return PTR_ERR(map->virt);
-> +
-> +	map->name = dev_name(dev);
-> +	map->bankwidth = 2;
-> +
-> +	simple_map_init(map);
-
-   It's not that simple, I'm afraid -- e.g. Renesas RPC-IF has read and write
-mappings in the separate memory resources.
-
-[...]
-> +	if (hbdev->needs_calib) {
-> +		err = hb_calibrate(hbdev);
-> +		if (!err) {
-
-   Why call this variable 'err' when it indicates successful calibration?
-
-> +			dev_err(hbdev->dev, "Calibration failed\n");
-> +			return -ENODEV;
-> +		}
-> +	}
-> +
-> +	hbdev->mtd = do_map_probe("cfi_probe", map);
-> +	if (!hbdev->mtd) {
-> +		dev_err(hbdev->dev, "probing failed\n");
-
-   "map probe", perhaps?
-
-> +		return -ENXIO;
-> +	}
-> +
-> +	hbdev->mtd->dev.parent = hbdev->dev;
-> +	mtd_set_of_node(hbdev->mtd, np);
-> +
-> +	err = mtd_device_register(hbdev->mtd, NULL, 0);
-> +	if (err) {
-> +		dev_err(hbdev->dev, "failed to register mtd device\n");
-> +		goto err_destroy;
-> +	}
-> +	hbdev->registered = true;
-> +
-> +	return 0;
-> +
-> +err_destroy:
-
-   The label and the code below doesn't seem necessary. Just do it above
-instead of *goto*.
-
-> +	map_destroy(hbdev->mtd);
-> +	return err;
-> +}
-[...]
-> diff --git a/include/linux/mtd/hyperbus.h b/include/linux/mtd/hyperbus.h
-> new file mode 100644
-> index 000000000000..0aa11458c424
-> --- /dev/null
-> +++ b/include/linux/mtd/hyperbus.h
-> @@ -0,0 +1,73 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> + *
-> + * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
-> + */
-> +
-> +#ifndef __LINUX_MTD_HYPERBUS_H__
-> +#define __LINUX_MTD_HYPERBUS_H__
-> +
-> +#include <linux/mtd/map.h>
-> +
-> +enum hb_memtype {
-
-   I'm for the full hyperbus_ prefixes, it's not that long and seems clearer.
-
-[...]
-
-MBR, Sergei
+diff --git a/arch/arm/boot/dts/exynos5420-arndale-octa.dts b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+index 6b4bf5ee2e45..6f5e6e2fde22 100644
+--- a/arch/arm/boot/dts/exynos5420-arndale-octa.dts
++++ b/arch/arm/boot/dts/exynos5420-arndale-octa.dts
+@@ -51,6 +51,11 @@
+ 	};
+ };
+ 
++&adc {
++	vdd-supply = <&ldo4_reg>;
++	status = "okay";
++};
++
+ &cci {
+ 	status = "disabled";
+ };
+-- 
+2.17.1
 
 
 _______________________________________________
