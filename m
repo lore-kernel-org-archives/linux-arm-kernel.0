@@ -1,70 +1,60 @@
-Return-Path: <SRS0=2lwk=Q5=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS autolearn=unavailable
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF71BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:58:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 60EE6C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 00:09:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A63D0206A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 22 Feb 2019 23:58:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 327E120651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 00:09:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Vsdz5mPP";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XYIA5LB1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A63D0206A3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mVeeIo+v"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 327E120651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:To:In-Reply-To:From:References:
-	Message-ID:Subject:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=WWSFpaj1q1a+YzDoU7Vi9eEYmFscG3+z/071J2VONbM=; b=Vsdz5mPPQKMyp9
-	6IEqIrcU7WIDCjKa3G1BEyar0OUPjEdfYcVmTvq0Cw5AVPe1pz+M8xwfz+vkS86ntuDywN/ZuFqTQ
-	9hJBXObwH/ngslvPNDVwjTcPi/zo4KMfAIXkMNPdrJM2pB9HI/YFX0Za55NBi+x8iv1tm1ZHIBtFd
-	HtJneHrXe+HoXJybRE9sEIsqne51hLGyfRAG5hUxedN2fiGLonC2QXEJPAlwEQwOKLBwnDzw/Qiqi
-	bQFHjHijuWHPmUlnv9DYFQaGFBPhJtmi0R/RI0mH95wFI1uI3/q1lyX+zDR3Daf6yh9q1YG/kT+nO
-	5ELkWanVjiEq7iCy2jGQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=g8vC99sdp9LKzbx4T4uYO/R3ZfrDPzpr8+kUoiafk6Y=; b=mVeeIo+vpQ1nfD
+	6lrFPepUsYv832Nlzc7beEIao9x4HOotzX7THuKou22uTvoIBZLWFvvIEd1Awp1fJf1QHTojwxuP8
+	1LKIn70x49S3S93m3x458OpCx7P0lPiaGddC2dOrj72OsWGotI817SLpT0KfeGiEczfzcbbhzzGFA
+	PRzJEOqf7WfEYyiLAVSO6MTMH2lrfvHT+/lIZlk1z2mCs/64v9NQUe1ApWYc3faTxka+JorHYZDlA
+	kRv9ALDeLiZ2n7rZi9KxAYOHnV3a0i9stvjaqoSP4UdJFfs9bIWYNkvB46PpWpoifUq4pJAK/Vt/C
+	yhBGBMW2evqohm1jgDsw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxKhV-0002yR-Sg; Fri, 22 Feb 2019 23:57:53 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gxKsW-0006V0-2v; Sat, 23 Feb 2019 00:09:16 +0000
+Received: from relay5-d.mail.gandi.net ([217.70.183.197])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxKhS-0002xc-82
- for linux-arm-kernel@lists.infradead.org; Fri, 22 Feb 2019 23:57:51 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 965CE206A3;
- Fri, 22 Feb 2019 23:57:49 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550879869;
- bh=QMD3bzMoTfdQ0t7bLG1BYt49fKANSP4oc82fWCBciDs=;
- h=Subject:References:From:In-Reply-To:To:Cc:Date:From;
- b=XYIA5LB1Xu1xcWqcYUEOOa3UolTuBLokkjKQ/MfFQf+Tj3w94G2jk5X8qtRn1Kko9
- 2TKkMh5LpAQGqqkmyLD+Rn08Yxc7oW5hSPoMsfhKCeJORXQZMBxYW3hR8hOIn1qO/7
- 6vBN/241CQ0DeRxmv/fPYoIs6i6NfPmuhjom/v9w=
+ id 1gxKsS-0006UJ-Bz
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 00:09:14 +0000
+X-Originating-IP: 86.202.231.219
+Received: from localhost (lfbn-lyo-1-149-219.w86-202.abo.wanadoo.fr
+ [86.202.231.219])
+ (Authenticated sender: alexandre.belloni@bootlin.com)
+ by relay5-d.mail.gandi.net (Postfix) with ESMTPSA id 7A4091C000F;
+ Sat, 23 Feb 2019 00:09:00 +0000 (UTC)
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: [PATCH] clk: at91: programmable: remove unneeded register read
+Date: Sat, 23 Feb 2019 01:08:58 +0100
+Message-Id: <20190223000858.28094-1-alexandre.belloni@bootlin.com>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Subject: Re: [PATCH v2 08/15] clock: milbeaut: Add Milbeaut M10V clock
- controller
-Message-ID: <155087986877.77512.2765555413921453918@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.8
-References: <1549628837-31574-1-git-send-email-sugaya.taichi@socionext.com>
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1549628837-31574-1-git-send-email-sugaya.taichi@socionext.com>
-To: Sugaya Taichi <sugaya.taichi@socionext.com>,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org
-Date: Fri, 22 Feb 2019 15:57:48 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190222_155750_321371_070614B1 
-X-CRM114-Status: GOOD (  14.71  )
+X-CRM114-CacheID: sfid-20190222_160912_558758_F68C2D0B 
+X-CRM114-Status: UNSURE (   8.42  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,272 +66,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Shinji Kanematsu <kanematsu.shinji@socionext.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Sugaya Taichi <sugaya.taichi@socionext.com>,
- Michael Turquette <mturquette@baylibre.com>,
- Jassi Brar <jaswinder.singh@linaro.org>,
- Takao Orito <orito.takao@socionext.com>,
- Kazuhiro Kasai <kasai.kazuhiro@socionext.com>
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Michael Turquette <mturquette@baylibre.com>, linux-kernel@vger.kernel.org,
+ Claudiu Beznea <claudiu.beznea@microchip.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Sugaya Taichi (2019-02-08 04:27:17)
-> diff --git a/drivers/clk/clk-milbeaut.c b/drivers/clk/clk-milbeaut.c
-> new file mode 100644
-> index 0000000..f798939
-> --- /dev/null
-> +++ b/drivers/clk/clk-milbeaut.c
-> @@ -0,0 +1,626 @@
-[....]
-> +struct m10v_clk_div_fixed_data {
-> +       const char      *name;
-> +       const char      *parent_name;
-> +       u8              div;
-> +       u8              mult;
-> +       int             onecell_idx;
-> +};
-> +struct m10v_clk_mux_factors {
-> +       const char              *name;
-> +       const char * const      *parent_names;
-> +       u8                      num_parents;
-> +       u32                     offset;
-> +       u8                      shift;
-> +       u8                      mask;
-> +       u32                     *table;
-> +       unsigned long           mux_flags;
-> +       int                     onecell_idx;
-> +};
+From: Nicolas Ferre <nicolas.ferre@microchip.com>
 
-Please add newlines between struct definitions. It also wouldn't hurt to
-have kernel-doc on these.
+This register read is a leftover of a previous read/modify/write. We now use
+regmap_update_bits(), so we don't need it anymore.
 
-> +
-> +static const struct clk_div_table emmcclk_table[] = {
-> +       { .val = 0, .div = 8 },
-> +       { .val = 1, .div = 9 },
-> +       { .val = 2, .div = 10 },
-> +       { .val = 3, .div = 15 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table mclk400_table[] = {
-> +       { .val = 1, .div = 2 },
-> +       { .val = 3, .div = 4 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table mclk200_table[] = {
-> +       { .val = 3, .div = 4 },
-> +       { .val = 7, .div = 8 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table aclk400_table[] = {
-> +       { .val = 1, .div = 2 },
-> +       { .val = 3, .div = 4 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table aclk300_table[] = {
-> +       { .val = 0, .div = 2 },
-> +       { .val = 1, .div = 3 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table aclk_table[] = {
-> +       { .val = 3, .div = 4 },
-> +       { .val = 7, .div = 8 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table aclkexs_table[] = {
-> +       { .val = 3, .div = 4 },
-> +       { .val = 4, .div = 5 },
-> +       { .val = 5, .div = 6 },
-> +       { .val = 7, .div = 8 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table hclk_table[] = {
-> +       { .val = 7, .div = 8 },
-> +       { .val = 15, .div = 16 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table hclkbmh_table[] = {
-> +       { .val = 3, .div = 4 },
-> +       { .val = 7, .div = 8 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table pclk_table[] = {
-> +       { .val = 15, .div = 16 },
-> +       { .val = 31, .div = 32 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table rclk_table[] = {
-> +       { .val = 0, .div = 8 },
-> +       { .val = 1, .div = 16 },
-> +       { .val = 2, .div = 24 },
-> +       { .val = 3, .div = 32 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table uhs1clk0_table[] = {
-> +       { .val = 0, .div = 2 },
-> +       { .val = 1, .div = 3 },
-> +       { .val = 2, .div = 4 },
-> +       { .val = 3, .div = 8 },
-> +       { .val = 4, .div = 16 },
-> +       { .div = 0 },
-> +};
-> +static const struct clk_div_table uhs2clk_table[] = {
-> +       { .val = 0, .div = 9 },
-> +       { .val = 1, .div = 10 },
-> +       { .val = 2, .div = 11 },
-> +       { .val = 3, .div = 12 },
-> +       { .val = 4, .div = 13 },
-> +       { .val = 5, .div = 14 },
-> +       { .val = 6, .div = 16 },
-> +       { .val = 7, .div = 18 },
-> +       { .div = 0 },
-> +};
+Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ drivers/clk/at91/clk-programmable.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-Same comment applies here. Newlines between tables please.
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 5bc68b9c5498..89d6f3736dbf 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -132,11 +132,8 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct clk_programmable *prog = to_clk_programmable(hw);
+ 	const struct clk_programmable_layout *layout = prog->layout;
+ 	unsigned long div = parent_rate / rate;
+-	unsigned int pckr;
+ 	int shift = 0;
+ 
+-	regmap_read(prog->regmap, AT91_PMC_PCKR(prog->id), &pckr);
+-
+ 	if (!div)
+ 		return -EINVAL;
+ 
+-- 
+2.20.1
 
-> +
-> +static u32 spi_mux_table[] = {0, 1, 2};
-> +static const char * const spi_mux_names[] = {
-> +       M10V_SPI_PARENT0, M10V_SPI_PARENT1, M10V_SPI_PARENT2
-> +};
-> +
-> +static u32 uhs1clk2_mux_table[] = {2, 3, 4, 8};
-> +static const char * const uhs1clk2_mux_names[] = {
-> +       M10V_UHS1CLK2_PARENT0, M10V_UHS1CLK2_PARENT1,
-> +       M10V_UHS1CLK2_PARENT2, M10V_PLL6DIV2
-> +};
-> +
-> +static u32 uhs1clk1_mux_table[] = {3, 4, 8};
-> +static const char * const uhs1clk1_mux_names[] = {
-> +       M10V_UHS1CLK1_PARENT0, M10V_UHS1CLK1_PARENT1, M10V_PLL6DIV2
-> +};
-> +
-[...]
-> +
-> +static const struct m10v_clk_mux_factors m10v_mux_factor_data[] = {
-> +       {"spi", spi_mux_names, ARRAY_SIZE(spi_mux_names),
-> +               CLKSEL(8), 3, 7, spi_mux_table, 0, M10V_SPICLK_ID},
-> +       {"uhs1clk2", uhs1clk2_mux_names, ARRAY_SIZE(uhs1clk2_mux_names),
-> +               CLKSEL(1), 13, 31, uhs1clk2_mux_table, 0, -1},
-> +       {"uhs1clk1", uhs1clk1_mux_names, ARRAY_SIZE(uhs1clk1_mux_names),
-> +               CLKSEL(1), 8, 31, uhs1clk1_mux_table, 0, -1},
-> +       {"nfclk", nfclk_mux_names, ARRAY_SIZE(nfclk_mux_names),
-> +               CLKSEL(1), 22, 127, nfclk_mux_table, 0, M10V_NFCLK_ID},
-> +};
-> +
-> +static u8 m10v_mux_get_parent(struct clk_hw *hw)
-> +{
-> +       struct clk_mux *mux = to_clk_mux(hw);
-> +       u32 val;
-> +
-> +       val = clk_readl(mux->reg) >> mux->shift;
-
-Please don't use clk_readl() unless you absolutely need it.
-
-> +       val &= mux->mask;
-> +
-> +       return clk_mux_val_to_index(hw, mux->table, mux->flags, val);
-> +}
-> +
-[...]
-> +static struct clk_hw *m10v_clk_hw_register_divider(struct device *dev,
-> +               const char *name, const char *parent_name, unsigned long flags,
-> +               void __iomem *reg, u8 shift, u8 width,
-> +               u8 clk_divider_flags, const struct clk_div_table *table,
-> +               spinlock_t *lock, void __iomem *write_valid_reg)
-> +{
-> +       struct m10v_clk_divider *div;
-> +       struct clk_hw *hw;
-> +       struct clk_init_data init;
-> +       int ret;
-> +
-> +       div = kzalloc(sizeof(*div), GFP_KERNEL);
-> +       if (!div)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.name = name;
-> +       if (clk_divider_flags & CLK_DIVIDER_READ_ONLY)
-
-Is this used?
-
-> +               init.ops = &m10v_clk_divider_ro_ops;
-> +       else
-> +               init.ops = &m10v_clk_divider_ops;
-> +       init.flags = flags;
-> +       init.parent_names = &parent_name;
-> +       init.num_parents = 1;
-> +
-> +       div->reg = reg;
-> +       div->shift = shift;
-> +       div->width = width;
-> +       div->flags = clk_divider_flags;
-> +       div->lock = lock;
-> +       div->hw.init = &init;
-> +       div->table = table;
-> +       div->write_valid_reg = write_valid_reg;
-> +
-> +       /* register the clock */
-> +       hw = &div->hw;
-> +       ret = clk_hw_register(dev, hw);
-> +       if (ret) {
-> +               kfree(div);
-> +               hw = ERR_PTR(ret);
-> +       }
-> +
-> +       return hw;
-> +}
-> +
-> +static int m10v_clk_probe(struct platform_device *pdev)
-> +{
-[...]
-> +       for (id = 0; id < ARRAY_SIZE(m10v_div_fixed_data); ++id) {
-> +               const struct m10v_clk_div_fixed_data *dfd =
-> +                               &m10v_div_fixed_data[id];
-> +               const char *pn = dfd->parent_name ?
-> +                               dfd->parent_name : parent_name;
-> +               hw = clk_hw_register_fixed_factor(NULL, dfd->name,
-> +                                       pn, 0, dfd->mult, dfd->div);
-> +               if (dfd->onecell_idx >= 0)
-> +                       m10v_clk_data->hws[dfd->onecell_idx] = hw;
-> +       }
-> +       for (id = 0; id < ARRAY_SIZE(m10v_mux_factor_data); ++id) {
-> +               const struct m10v_clk_mux_factors *mfd =
-> +                               &m10v_mux_factor_data[id];
-> +               hw = m10v_clk_hw_register_mux(NULL, mfd->name,
-> +                                       mfd->parent_names, mfd->num_parents,
-> +                                       CLK_SET_RATE_PARENT,
-> +                                       base + mfd->offset, mfd->shift,
-> +                                       mfd->mask, mfd->mux_flags, mfd->table,
-> +                                       &m10v_crglock);
-> +               if (mfd->onecell_idx >= 0)
-> +                       m10v_clk_data->hws[mfd->onecell_idx] = hw;
-> +       }
-
-Similar style nitpick here. Add newlines between for loops. It may also
-make sense to make functions for each of those so that we don't need to
-put all the local variables interspersed throughout the function in each
-for loop.
-
-> +
-> +       for (id = 0; id < M10V_NUM_CLKS; id++) {
-> +               if (IS_ERR(m10v_clk_data->hws[id]))
-> +                       return PTR_ERR(m10v_clk_data->hws[id]);
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id m10v_clk_dt_ids[] = {
-> +       { .compatible = "socionext,milbeaut-m10v-ccu", },
-> +       { },
-
-Drop the , on the sentinel please. That way nothing can ever go after it
-without causing a compilation error.
-
-> +};
 
 _______________________________________________
 linux-arm-kernel mailing list
