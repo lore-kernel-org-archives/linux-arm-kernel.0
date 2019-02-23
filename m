@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-4.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54FD9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:41:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 120C7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:42:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 24CC220854
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:41:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CF9C120854
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 10:42:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DgxrkTTD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="cQG4/Ffa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 24CC220854
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JgQx5ask";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="RMDcgZSb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF9C120854
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,33 +25,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:From:To:
 	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=DVaACqHH+KMdMiXQs9taGDeUWqOqbuYX5XP+JqkSMt4=; b=DgxrkTTDUlkI36
-	jB/k9D8sXxJ/jRS6zevoOwibVTlJeyjpR48UAXOveIXgAYGgmLCxvOSvvNoBIw3pI+2A3205INIzK
-	+faSAbzZ28Pp/Vt7Kel4mVetcQ8/624/RmvWtraLtLaeBH4NvveMRFEXat4hJE5p/99HPEUWBO03T
-	XGNpGg4Rfb+n9fr0MkAlato7BxrFrhDjja/H0r2SDPs6mvsCV2GIo/uBp64wC+a8NGFmXCHWm9O3B
-	qibCihksq21dLyx3vldsBe7PhE2JoW5gCxbPc2WRY/+wKZDi1VO0+MHKT1JjsqVkgBvUtzZGB3fkN
-	qwBGLLSsL5+DZ7xBwIDw==;
+	List-Owner; bh=IgpLzk4hjlczstfpbxQNZcrvGedSBm2JvqC0sSnzKV8=; b=JgQx5askjfXLbH
+	TyRwy3fwdz3upaZBgRJKKxC5iJWTfPF6dncBM/VtEiUJfuSm0EDx0kLzEN71K3a+z9oQ+CZufmilL
+	fkP0JtamwG5Z16YJuKr7H6Y6iQtakZXelsT20RO5jkfZUoi99m1Iz3hTpqZUmhvnthW9S9Xusw/A7
+	jPFMTnqFEM9WWW7sW8wYTzEog0wX7yRCe8d9DJwGIOLBbkBpytBq2mCnKD379vm4YWquxr/IiCVRL
+	hYOXV0nQ+OnSjYEn9sUCT8Sf6UXtSoQIZkoT7hWTg58UXSgSlZ4sG6H9eoiQYz1UgXfNIHYsWy3WD
+	s2NZh+nrIaTaQUq0QvtA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxUkk-0003CT-AU; Sat, 23 Feb 2019 10:41:54 +0000
+	id 1gxUl3-0003Wa-CZ; Sat, 23 Feb 2019 10:42:13 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxUkg-0003Bm-Rg
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 10:41:52 +0000
+ id 1gxUky-0003UL-Rj
+ for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 10:42:11 +0000
 Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1386F206B6;
- Sat, 23 Feb 2019 10:41:49 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 163D2206B6;
+ Sat, 23 Feb 2019 10:42:07 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1550918510;
- bh=K5oji0qBCyXb/HcARp49/1jk+dVrV7xI9b2+d9J3aX8=;
+ s=default; t=1550918528;
+ bh=DX5QPasWaG47AftUlVeJnEIdq5wwFlD/sXtIQJXkErY=;
  h=Subject:To:Cc:From:Date:From;
- b=cQG4/FfaXpZFpOIM3W7DqCi3bVPPBayETEy0V6ydU8cl2pSjwIqGoWaeKcQCYMEJO
- 99x0e7qUlt2kNr5PVqMTjDSfqxC++q01MMOHMqmTUoMKiqxfLDzDxEi7XNugUqvr6k
- NHKz3AegMdB5/U2RFrmKbc+tS4LW5XvpAcSlYkN0=
+ b=RMDcgZSbkXcGVf6zGig4oy4Cn8VVjN013dMsjCM2/UjrhFxsqux3LvV1yzASeao6x
+ XsQ65DmCD5dGdaA4KqkDQxGiqmFY0zEcXPEkWXXpehKajtu0bPlLz8xWm/1ivFK5ZB
+ +IfahLTRS1m+Bs3g9PltU5yC77BF14/0zXYcD6/8=
 Subject: Patch "ARM: 8834/1: Fix: kprobes: optimized kprobes illegal
- instruction" has been added to the 4.19-stable tree
+ instruction" has been added to the 4.20-stable tree
 To: 342740659.2887.1549307721609.JavaMail.zimbra@efficios.com,
  Robert.Berger@ReliableEmbeddedSystems.com, gregkh@linuxfoundation.org,
  keescook@chromium.org, labbott@redhat.com,
@@ -59,13 +59,13 @@ To: 342740659.2887.1549307721609.JavaMail.zimbra@efficios.com,
  mhiramat@kernel.org, patches@armlinux.org.uk, rmk+kernel@armlinux.org.uk,
  wcohen@redhat.com
 From: <gregkh@linuxfoundation.org>
-Date: Sat, 23 Feb 2019 11:41:47 +0100
-Message-ID: <1550918507154127@kroah.com>
+Date: Sat, 23 Feb 2019 11:42:05 +0100
+Message-ID: <1550918525127206@kroah.com>
 MIME-Version: 1.0
 X-stable: commit
 X-Patchwork-Hint: ignore 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_024150_937194_E7C7973F 
+X-CRM114-CacheID: sfid-20190223_024208_938331_1E632E12 
 X-CRM114-Status: GOOD (  11.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -89,12 +89,12 @@ This is a note to let you know that I've just added the patch titled
 
     ARM: 8834/1: Fix: kprobes: optimized kprobes illegal instruction
 
-to the 4.19-stable tree which can be found at:
+to the 4.20-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
      arm-8834-1-fix-kprobes-optimized-kprobes-illegal-instruction.patch
-and it can be found in the queue-4.19 subdirectory.
+and it can be found in the queue-4.20 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
@@ -157,7 +157,7 @@ Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 Patches currently in stable-queue which might be from mathieu.desnoyers@efficios.com are
 
-queue-4.19/arm-8834-1-fix-kprobes-optimized-kprobes-illegal-instruction.patch
+queue-4.20/arm-8834-1-fix-kprobes-optimized-kprobes-illegal-instruction.patch
 
 _______________________________________________
 linux-arm-kernel mailing list
