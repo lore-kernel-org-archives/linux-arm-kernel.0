@@ -1,4 +1,4 @@
-Return-Path: <SRS0=s0b7=Q6=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=QUhG=Q7=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
@@ -7,82 +7,68 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9FB7BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 23:05:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 64DC2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 01:51:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5C8B0206A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat, 23 Feb 2019 23:05:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D78820663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 01:51:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MfKIZUF8";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="gq0hKRPX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C8B0206A3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LmCOBIc7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D78820663
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.panasonic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=9qLlLAOnDhPuGVL4c1uBJu6oSmtbkLL+M6sgMK4BC7k=; b=MfKIZUF88XgjWK
-	7kxWeZ7Obwg12S9yUFnJvRRZuL0uCsO7VbWgAsmJLRdWRtldI+RZGHL9m1Q0DfPjBr0OuGHszz55x
-	bR2wK6Axj9Y/ggh1ajh2T3DHXgbfWa+mnMpO9VAlQyGv12jCaraVviB5kq35yj38EJSHclmSolAaF
-	gOiiALQV2BVEtZVmqjPMHFX4snNn5aolGJOnyg9SrWObs4CB+GF6gVkxWyuDEwWzZl+qTKIS3cz6Q
-	3ZyeSWlb3OZCBrnmRHCQnkpvFh+iNPGwc9d6+SqVbuvXWpJxY3yfSCpcG3ikYU1HOpIJQe19+OKgE
-	H9pkocAvHUPyZJPgrTJg==;
+	List-Owner; bh=PEU0YrmnJpYO9u9FXCty2Y/WVWCxW/8FV8UHazvzIrc=; b=LmCOBIc73vY9pK
+	kUR7B/nPdhlBKriDxHUsQ/xcW9D/hjunfJBfkvpOo5JqRHQAxLgxSAvZ4rfqNb7bjlcXNSQDxcvLt
+	XASU7BJklUYGfCh4bq1corDD2by2Zc2L0msBJMj+CVS2o8D1mSuptzXw459aqco2R/9p4GbR86KNY
+	+/N1Akyd0pdB9BfNpmO8aPBPFwnQv3r9wMB7xlqJbRelgXoyOorQ53jY/OYKz6I+yh1QRK37m4ERI
+	awg1XM+xggZxSZhhaDtAEOv20J6KUxA/XajBypLTUD48iQtwoMflStr5Yt9xvSxgCOCr1wqzfXOTj
+	Y3WNWyWVp3M4yJXNvw+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxgMV-0002kq-94; Sat, 23 Feb 2019 23:05:39 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxgMS-0002kN-8c
- for linux-arm-kernel@lists.infradead.org; Sat, 23 Feb 2019 23:05:37 +0000
-Received: by mail-lj1-x241.google.com with SMTP id w6so4453073ljd.7
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 23 Feb 2019 15:05:34 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=WpiXH5h64M3sk/a6xEnem5MFSQhTbjPz6ug7lC3/Jo8=;
- b=gq0hKRPXa7ZSFOYbyf/FLp3V465UN+FWMkkGZbS9q0mzjC11yJX3nBKNBt/m3to+9o
- xH0RXyq5OULQf7qkSRjOZC6sRg5EBqSX8Gz8jTXIhis1I0HZh/rBnW18t4wqEWxMvRZb
- 0DRRY/fafb5V8305LUHW5qGi/RCm1r8DWXAIfZTjtCxgL2PS3VSBM5Wgewj3A6oh1jwd
- lzGMFYfulN0SGUVFO60rAqzKcyS4U5yFR6b8iORQ5zSoMtEhrASjxBB0mbiiZ8Z4aU//
- svHNk/H6kMdl+ioKME2hbh1CSwymkUdfSpTcyTuZa3RJ+2D5PzZ3zWs+zBhQ/Cm+BiTK
- /IEA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=WpiXH5h64M3sk/a6xEnem5MFSQhTbjPz6ug7lC3/Jo8=;
- b=Qaag1n1kDdQosg30NFQIBeoyPC/BPK9B7LDUeHZs3hPX10bwuxB+RWpKQTbqAs0VBK
- wlgMZcwl3EKgfPspVVc7Ikb7Z5S+aFYbXMObSLl1ajnhyyVNPOYkMKedaWz8WTxOWAcR
- ggiioVtgnrlaxrqSFPnrcjPxPxw/OEZRxjEROM3RUtvgbmb0/ihca23/pznIVoKGcAkB
- 2o0DGsW0xBcGJlXi8+WZ68TvOdOJ5eQcq6DVV1vx8c4VEPzhV0cj4WCHSAJ7eksRi/xJ
- Q262QEWpqPBEJe+FSw3V8/QgziyT8GiuV3NUIBDxv1f9JFoeCrQxet4E6TFACz8CvJ+/
- UCSw==
-X-Gm-Message-State: AHQUAubSW2/ibVsmggoq4DmSzQidMQzCcoHnzRjWjrJZBL9WYVEdPXiY
- izhHl6fs0oHEH5o4tKfasu2vMg==
-X-Google-Smtp-Source: AHgI3IZ3Fv3b7cjhs0MRquswynTXsrM6xO37ZTWjTPFK5i7uxqNviBpKH83FZgUzToBULvP55l4law==
-X-Received: by 2002:a2e:20cf:: with SMTP id g76mr6026606lji.36.1550963133167; 
- Sat, 23 Feb 2019 15:05:33 -0800 (PST)
-Received: from localhost.bredbandsbolaget
- (c-ae7b71d5.014-348-6c756e10.bbcust.telenor.se. [213.113.123.174])
- by smtp.gmail.com with ESMTPSA id p22sm1551554ljb.93.2019.02.23.15.05.29
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Sat, 23 Feb 2019 15:05:30 -0800 (PST)
-From: Linus Walleij <linus.walleij@linaro.org>
-To: arm@kernel.org
-Subject: [PATCH] ARM: dts: gemini: Re-enable display controller
-Date: Sun, 24 Feb 2019 00:04:52 +0100
-Message-Id: <20190223230452.8913-1-linus.walleij@linaro.org>
-X-Mailer: git-send-email 2.20.1
+	id 1gxiwy-00015h-J3; Sun, 24 Feb 2019 01:51:28 +0000
+Received: from smtp.mei.co.jp ([133.183.100.20])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gxiwu-00015E-Ac
+ for linux-arm-kernel@lists.infradead.org; Sun, 24 Feb 2019 01:51:26 +0000
+Received: from mail-gw.jp.panasonic.com ([157.8.1.157])
+ by smtp.mei.co.jp (8.14.4/8.14.4/lvzy13) with ESMTP id x1O1pJml021378;
+ Sun, 24 Feb 2019 10:51:19 +0900
+Received: from epochmail.jp.panasonic.com ([157.8.1.130])
+ by mail.jp.panasonic.com (8.11.6p2/3.7W/kc-maili13) with ESMTP id x1O1pIX20857;
+ Sun, 24 Feb 2019 10:51:18 +0900
+Received: by epochmail.jp.panasonic.com (8.12.11.20060308/3.7W/pml-send3) id
+ x1O1pIOr003320; Sun, 24 Feb 2019 10:51:18 +0900
+Received: from jpa000secmn21.palet.jp.panasonic.com [10.74.216.56] 
+ by JPA000SGWMN01.palet.jp.panasonic.com with ESMTP id LAA12219;
+ Sun, 24 Feb 2019 10:51:18 +0900
+Received: from localhost.localdomain (10.74.216.125) by
+ JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56) with Microsoft SMTP
+ Server (TLS) id 15.0.1076.9; Sun, 24 Feb 2019 10:51:18 +0900
+From: Kohji Okuno <okuno.kohji@jp.panasonic.com>
+To: <linux-arm-kernel@lists.infradead.org>, Shawn Guo <shawnguo@kernel.org>,
+ Sascha Hauer <s.hauer@pengutronix.de>, Pengutronix Kernel Team
+ <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>, NXP Linux
+ Team <linux-imx@nxp.com>
+Subject: [PATCH] ARM: imx6q: cpuidle: fix bug that CPU may not wake up at
+ expected time
+Date: Sun, 24 Feb 2019 10:50:30 +0900
+Message-ID: <20190224015030.7558-1-okuno.kohji@jp.panasonic.com>
+X-Mailer: git-send-email 2.17.1
 MIME-Version: 1.0
+X-Originating-IP: [10.74.216.125]
+X-ClientProxiedBy: JPA000SECMN03.palet.jp.panasonic.com (10.74.216.12) To
+ JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190223_150536_333482_5B035F81 
-X-CRM114-Status: GOOD (  14.95  )
+X-CRM114-CacheID: sfid-20190223_175124_619991_D396D32E 
+X-CRM114-Status: GOOD (  13.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,45 +80,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linus Walleij <linus.walleij@linaro.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Kohji Okuno <okuno.kohji@jp.panasonic.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-commit 137cd7100ec6fa36d610e106df00acb4d8af99df
-"ARM: dts: Enable Gemini flash access" contained a bug
-by disabling the display controller, while the whole
-idea with the patch was to enable flash access AND
-the display controller, simultaneously. Fix it up.
+ In the current cpuidle implementation for i.MX6q, the CPU that sets
+"WAIT_UNCLOCKED" and the CPU that returns to "WAIT_CLOCKED" are always
+the same. While the CPU that sets "WAIT_UNCLOCKED" is in IDLE state of
+"WAIT", if the other CPU wakes up and enters IDLE state of "WFI"
+istead of "WAIT", this CPU can not wake up at expired time.
+ Because, in the case of "WFI", the CPU must be waked up by the local
+timer interrupt. But, while "WAIT_UNCLOCKED" is set, the local timer
+is stopped, when all CPUs execute "wfi" instruction. As a result, the
+local timer interrupt is not fired at the expected time.
+ In this situation, this CPU will wake up by IRQ different from local
+timer. (e.g. broacast tiemr)
+ So, this fix changes CPU to return to "WAIT_CLOCKED".
 
-Fixes: 137cd7100ec6 ("ARM: dts: Enable Gemini flash access")
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Kohji Okuno <okuno.kohji@jp.panasonic.com>
 ---
-ARM SoC folks: please apply this directly for ARM
-SoC, as it is a regression fix (late) for a bug
-appearing in the v5.0-rc cycle, it should be tagged for
-stable if it does not make it into the merge window.
----
- arch/arm/boot/dts/gemini-dlink-dir-685.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-imx/cpuidle-imx6q.c | 25 ++++++++++---------------
+ 1 file changed, 10 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/gemini-dlink-dir-685.dts b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-index 6198fe5f698a..c0f26558092e 100644
---- a/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-+++ b/arch/arm/boot/dts/gemini-dlink-dir-685.dts
-@@ -443,7 +443,7 @@
- 		};
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index bfeb25aaf9a2..22d982d451d1 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -16,30 +16,25 @@
+ #include "cpuidle.h"
+ #include "hardware.h"
  
- 		display-controller@6a000000 {
--			status = "disabled";
-+			status = "okay";
+-static atomic_t master = ATOMIC_INIT(0);
++static int master = 0;
+ static DEFINE_SPINLOCK(master_lock);
  
- 			port@0 {
- 				reg = <0>;
+ static int imx6q_enter_wait(struct cpuidle_device *dev,
+ 			    struct cpuidle_driver *drv, int index)
+ {
+-	if (atomic_inc_return(&master) == num_online_cpus()) {
+-		/*
+-		 * With this lock, we prevent other cpu to exit and enter
+-		 * this function again and become the master.
+-		 */
+-		if (!spin_trylock(&master_lock))
+-			goto idle;
++	spin_lock(&master_lock);
++	if (++master == num_online_cpus()) {
+ 		imx6_set_lpm(WAIT_UNCLOCKED);
+-		cpu_do_idle();
+-		imx6_set_lpm(WAIT_CLOCKED);
+-		spin_unlock(&master_lock);
+-		goto done;
+ 	}
++	spin_unlock(&master_lock);
+ 
+-idle:
+ 	cpu_do_idle();
+-done:
+-	atomic_dec(&master);
++
++	spin_lock(&master_lock);
++	if (master-- == num_online_cpus()) {
++		imx6_set_lpm(WAIT_CLOCKED);
++	}
++	spin_unlock(&master_lock);
+ 
+ 	return index;
+ }
 -- 
-2.20.1
+2.17.1
 
 
 _______________________________________________
