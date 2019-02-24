@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 36313C10F18
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 14:05:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 76A59C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 14:05:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0637C20842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 14:05:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3F129206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 14:05:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C/uvt6uM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0637C20842
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O3CATBM3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3F129206B6
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,25 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8P/XMouJk04Sv3KEXEQeGNz2qWmFmCaTiAN21T6jhsE=; b=C/uvt6uMyCrGSn
-	6xGTkLa8fDNn35on2JDlLRAAKAJDG+FMwp/VuZR4e/QcoKOjhdHOROtzpULDxVDFYJ6CYx728yq6U
-	4k48PSmp1LQort6FPuLbcLU1A0mCoczeZuLtpGGee08OrbsVfuLfuhxBdSzaABfkTYNPvnQF9meOM
-	tCAESZYtQ09tYKIQ0op4qQvU8CNlVMqyZv22jGJAT38+9JQfR0+0lieHU2bUf++kIJBLwykNKTwL/
-	8VCotc9ym0rgXX92KHUMovIUA0eQcVklo4cqXjluWRbOi5U2HJ1WewWYBp/iem09pnvMl41AtizHj
-	pGDaQvN3Pys2b2sWxqxw==;
+	List-Owner; bh=68dX7EZd6hgk5QUeV2AuaMH6sxK9+vivuSFkgvWpAEQ=; b=O3CATBM3kPvUUl
+	eNz32C7YbmMt+OJ9sWmueUcg3664+As8SuNwkOAHSstaqPw1rfjzcH9b/W/PrnNrwDn2BmJGMzMTB
+	Ktqyt0riBoQDbIsRoe+3ga+GIlPHiFSdf61pz8VGVrnn+tKqqS7icJJLVc3HszA5t1BsMANjPtti+
+	IOvH1+uRF63AytBSAd+v22j/OqU+7PVh7KZzR8KsW4D1m74DXJXUiuuL7tApN5eLIV0MkRxDrCOW+
+	pi5OoPNS/C6mle0cm8mTk/8XufNRjmMPjYS7oafC/t5lDIc0AyH7AhzKYFt7TCayLPjkNtEKfbD+1
+	CYph+SnVpJ9iWs/ZmNAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxuPT-0007n4-Fo; Sun, 24 Feb 2019 14:05:39 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gxuPi-0008Ay-Tj; Sun, 24 Feb 2019 14:05:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxuP9-0007ZL-VM; Sun, 24 Feb 2019 14:05:21 +0000
+ id 1gxuPD-0007ah-UI; Sun, 24 Feb 2019 14:05:25 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3950E16A3;
- Sun, 24 Feb 2019 06:05:19 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A6DD1A78;
+ Sun, 24 Feb 2019 06:05:22 -0800 (PST)
 Received: from why.lan (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 1AF9E3F690;
- Sun, 24 Feb 2019 06:05:15 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8B4963F690;
+ Sun, 24 Feb 2019 06:05:19 -0800 (PST)
 From: Marc Zyngier <marc.zyngier@arm.com>
 To: Amitkumar Karwar <amitkarwar@gmail.com>,
  Enric Balletbo i Serra <enric.balletbo@collabora.com>,
@@ -51,17 +50,17 @@ To: Amitkumar Karwar <amitkarwar@gmail.com>,
  Kalle Valo <kvalo@codeaurora.org>,
  Nishant Sarmukadam <nishants@marvell.com>,
  Rob Herring <robh+dt@kernel.org>, Xinming Hu <huxinming820@gmail.com>
-Subject: [PATCH 3/4] mwifiex: Flag wake-up interrupt as IRQ_NOAUTOEN rather
- than disabling it too late
-Date: Sun, 24 Feb 2019 14:04:25 +0000
-Message-Id: <20190224140426.3267-4-marc.zyngier@arm.com>
+Subject: [PATCH 4/4] arm64: dts: rockchip: gru: Move wifi wake-up interrupt
+ into its own subnode
+Date: Sun, 24 Feb 2019 14:04:26 +0000
+Message-Id: <20190224140426.3267-5-marc.zyngier@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190224140426.3267-1-marc.zyngier@arm.com>
 References: <20190224140426.3267-1-marc.zyngier@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_060520_009694_41148D7F 
-X-CRM114-Status: GOOD (  13.46  )
+X-CRM114-CacheID: sfid-20190224_060523_977181_CC6B309D 
+X-CRM114-Status: GOOD (  11.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,41 +81,37 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The mwifiex driver makes unsafe assumptions about the state of the
-wake-up interrupt. It requests it and only then disable it. Of
-course, the interrupt may be screaming for whatever reason at that
-time, and the handler will then be called without the interrupt
-having been registered with the PM/wakeup subsystem. Oops.
-
-The right way to handle this kind of situation is to flag the
-interrupt with IRQ_NOAUTOEN before requesting it. It will then
-stay disabled until someone (the wake-up subsystem) enables it.
+In order to get PCIe legacy interrupts working on gru-based Chromebooks,
+let's move the wake-up interrupt out of the way and into its own
+subnode. This ensures that this interrupt specifier will not be
+mistaken as a PCI interrupt.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/net/wireless/marvell/mwifiex/main.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/wireless/marvell/mwifiex/main.c b/drivers/net/wireless/marvell/mwifiex/main.c
-index 2105c2b7c627..82cf35e50579 100644
---- a/drivers/net/wireless/marvell/mwifiex/main.c
-+++ b/drivers/net/wireless/marvell/mwifiex/main.c
-@@ -1610,6 +1610,7 @@ static void mwifiex_probe_of(struct mwifiex_adapter *adapter)
- 			 "wake-up interrupt outside 'wake-up' subnode of %pOF\n",
- 			 adapter->dt_node);
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi
+index c400be64170e..61fff688770c 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-chromebook.dtsi
+@@ -310,11 +310,13 @@ ap_i2c_tp: &i2c5 {
+ 		compatible = "pci1b4b,2b42";
+ 		reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
+ 		       0x83010000 0x0 0x00100000 0x0 0x00100000>;
+-		interrupt-parent = <&gpio0>;
+-		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&wlan_host_wake_l>;
+-		wakeup-source;
++		wake-up {
++			interrupt-parent = <&gpio0>;
++			interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
++			wakeup-source;
++		};
+ 	};
+ };
  
-+	irq_set_status_flags(adapter->irq_wakeup, IRQ_NOAUTOEN);
- 	ret = devm_request_irq(dev, adapter->irq_wakeup,
- 			       mwifiex_irq_wakeup_handler, IRQF_TRIGGER_LOW,
- 			       "wifi_wake", adapter);
-@@ -1619,7 +1620,6 @@ static void mwifiex_probe_of(struct mwifiex_adapter *adapter)
- 		goto err_exit;
- 	}
- 
--	disable_irq(adapter->irq_wakeup);
- 	if (device_init_wakeup(dev, true)) {
- 		dev_err(dev, "fail to init wakeup for mwifiex\n");
- 		goto err_exit;
 -- 
 2.20.1
 
