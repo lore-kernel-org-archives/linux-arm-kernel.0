@@ -2,83 +2,60 @@ Return-Path: <SRS0=QUhG=Q7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.8 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 01751C00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 19:53:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E3F2FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 20:08:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C4C2D20663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 19:53:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B21A4206B6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 20:08:02 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ia/28hRO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="s4q6dvmV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C4C2D20663
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jjYrXwy3"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B21A4206B6
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lH8NTj7JkBusNm7iwbrf5D299OTMQN2JY8aBQsk8mTI=; b=Ia/28hRO4U6oUi
-	FAQdOA6PZo2tnQsjdE9ODj4yJWZhUu6y25Q5EwP5IQhPmf0QxBXEG4pPdIloE6vGACUnPZgRbt1fj
-	GMVAUtNBLC2md6+D/M+MdqSRo2TM5B61hxf8Mx6/qsQ5TtiTs3zzGVYPUe3jjuGFval1iIt9RA3ad
-	HY7eazXDBp+y3txnvdwDV5pCQ2vjnqiaWdBCu0W8DR9zJlaL3/ipFS5HrPw4ZjfSbCnt8xhEnYHAE
-	xLrVzq9s/5gCbMjkDfyKqWryr/4gsUXrlJNY6a+jktnF7OJOUOPjsR7TCnkAuzkAQ1v54fudU8A8z
-	sMKv0qwHwbRkYjBFO+0Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=w+V87GXCvoIQ7+0BjznYoi6fi76mFHPPBwcxv3zWEbo=; b=jjYrXwy3JlgjYY1VxV7UfemBm
+	nh85ViEn6LCRzG9Bgko1OturWyaXz9/hoeKi/EyxvPU+Pl75tqUIEAFfYDJFXHsP6/mWg5+c5tR3P
+	MCmjH6hLyftd56/1sq9QUsDeLX1UgmkdRdsknxJCWrW1Re+BWpjNet1yeY9DRXaZ8GtYQWk7q86fb
+	bKQ34JUMZ0snTqUmfmyzlorJqjUhSTFQ++AWAA5qW/LL84jKJHFRcbBKUvDvx73Wk/6N0LWwFBTJs
+	/DQG4XPz+fP2kKdPIazHSakieuKOkJNCmojThJ0FFeJuHIoSZRO6fsinSojEQfHO29Lx+tJDvo64y
+	H/neZZQ3A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxzpZ-0001fe-BI; Sun, 24 Feb 2019 19:52:57 +0000
-Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxzpV-0001eU-35; Sun, 24 Feb 2019 19:52:54 +0000
-Received: by mail-oi1-x243.google.com with SMTP id u128so5658327oie.2;
- Sun, 24 Feb 2019 11:52:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=MYQcmmvOWPoSOeQLQkGxZasGkeWzPpVbLTX8A4pezEg=;
- b=s4q6dvmV8vzyo06grp4cC+jC04xPsR8+JpkdIPVXUy45VgdXNnGRcaFxBKuURWkBUb
- p6ddlpeIaURXH91qcCtIpHOiUmVD40NLv0LSb70q48NMh76kJN2Wo2gxhAVec670W47K
- 28uZyPp1Shy73IVAlvqvGGQ+HIJQ6WTGqvXdLczF/p4YhxpDHYV++DtYdU6RdP2ZQv2t
- uoWynKM/57sKPB592SsOLBeByczmtqnsHCeh1hYh7tZCrHIcS8mRZ7SLQfBvaiZKxWL/
- zLsvaB+7A4IXljqaoQrEHDKEMfMfmg54USMV1rBVp1mxyYAuoxw4lGrUrw/a8U+uJioj
- SUBQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=MYQcmmvOWPoSOeQLQkGxZasGkeWzPpVbLTX8A4pezEg=;
- b=erxl3/Uvf9O0B5t6GF8uwuKBPV+7OWbxyB+11iGb/aS0sMOsNul0pR6jNI4cScxHrl
- AA1aDD1dBW1q2T2XFJQxI6IhN4vbkscaLTNgPaRRH16zPZMYKnS+xw1wrGv4xxEobgvP
- v3ixcAuFMMUdLBvfQOgIpeVRG9d7mthCnV8ZoyLFISDEm9+mSA/tdEW2xAhlUF0ZR3Kg
- fDawdvrKfX+sgd7k1bjF8o3cBEfefb+W4yUt9ElPrqOqgudpvAIUvsGhz/hMakMSiSNN
- X1T4Nmd+qPZn9qd3QiURcMcpAdyMfdLAJjWdAhV7BuBAneZkQ6bRSwh6mfq2N7WkJiRS
- Yf9g==
-X-Gm-Message-State: AHQUAuZt0BthRsDFMntaajAubuUMl5WCCkk36fmiobU5pxuiw/k9Gh2D
- +FxibrTA4NMXN/5tHc3gLAxwnvBQoBmDtAK6USo=
-X-Google-Smtp-Source: AHgI3IbIeKx3wATaNvdtt2nNjW6v0A+ktUiVw6Fniny1gw2+4boGchyewPpYn/tjfrbZtpEjSJl6SsL2In8Jigb70hE=
-X-Received: by 2002:aca:5d87:: with SMTP id r129mr9232994oib.39.1551037971667; 
- Sun, 24 Feb 2019 11:52:51 -0800 (PST)
+	id 1gy048-0006eF-Id; Sun, 24 Feb 2019 20:08:00 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gy045-0006dt-TZ; Sun, 24 Feb 2019 20:07:59 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 783ED80D;
+ Sun, 24 Feb 2019 12:07:53 -0800 (PST)
+Received: from [192.168.1.123] (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E9CDD3F5C1;
+ Sun, 24 Feb 2019 12:07:50 -0800 (PST)
+Subject: Re: [PATCH] arm64: rk3399: Add capacity-dmips-mhz attributes
+To: Marc Zyngier <marc.zyngier@arm.com>, Heiko Stuebner <heiko@sntech.de>
+References: <20190224143525.15539-1-marc.zyngier@arm.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <9562f9e4-b832-5cc1-821f-696ededf8a02@arm.com>
+Date: Sun, 24 Feb 2019 20:07:49 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
 MIME-Version: 1.0
-References: <20190212151413.24632-1-narmstrong@baylibre.com>
- <20190212151413.24632-5-narmstrong@baylibre.com>
-In-Reply-To: <20190212151413.24632-5-narmstrong@baylibre.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Sun, 24 Feb 2019 20:52:40 +0100
-Message-ID: <CAFBinCC87H+Do3dGooYMpFjozBTCv2agmS_p5cJRbFQ7QCiuiA@mail.gmail.com>
-Subject: Re: [PATCH 4/8] dt-bindings: usb: dwc3: Add Amlogic G12A DWC3 Glue
- Bindings
-To: Neil Armstrong <narmstrong@baylibre.com>
+In-Reply-To: <20190224143525.15539-1-marc.zyngier@arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_115253_159167_8210C666 
-X-CRM114-Status: GOOD (  10.35  )
+X-CRM114-CacheID: sfid-20190224_120757_963097_3678110C 
+X-CRM114-Status: GOOD (  20.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,87 +67,107 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, balbi@kernel.org, gregkh@linuxfoundation.org,
- linux-usb@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
- hminas@synopsys.com, linux-amlogic@lists.infradead.org,
+Cc: Lin Huang <hl@rock-chips.com>, Jeffy Chen <jeffy.chen@rock-chips.com>,
+ Douglas Anderson <dianders@chromium.org>, linux-rockchip@lists.infradead.org,
+ Enric Balletbo i Serra <enric.balletbo@collabora.com>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Neil,
+Hi Marc,
 
-On Tue, Feb 12, 2019 at 4:15 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
-[...]
-> +
-> +Example device nodes:
-> +       usb: usb@ffe09000 {
-> +                       compatible = "amlogic,meson-g12a-usb-ctrl";
-> +                       reg = <0x0 0xffe09000 0x0 0xa0>;
-> +                       interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> +                       #address-cells = <2>;
-> +                       #size-cells = <2>;
-> +                       ranges;
-> +
-> +                       clocks = <&clkc CLKID_USB>;
-> +                       clock-names = "usb";
-> +                       resets = <&reset RESET_USB>;
-> +                       reset-names = "usb";
-> +
-> +                       ports {
-> +                               #address-cells = <1>;
-> +                               #size-cells = <0>;
-> +
-> +                               /* USB2 Port 0 */
-> +                               usb20: port@0 {
-> +                                       reg = <0>;
-> +                                       phys = <&usb2_phy0>;
-> +                               };
-> +
-> +                               /* USB2 Port 1 */
-> +                               usb21: port@1 {
-> +                                       reg = <1>;
-> +                                       phys = <&usb2_phy1>;
-> +                               };
-> +
-> +                               /* USB3 Port 0 */
-> +                               usb3: port@4 {
-> +                                       reg = <4>;
-> +                                       phys = <&usb3_pcie_phy PHY_TYPE_USB3>;
-> +                               };
-> +                       };
-> +
-> +                       dwc2: usb@ff400000 {
-> +                               compatible = "amlogic,meson-g12a-usb", "snps,dwc2";
-> +                               reg = <0x0 0xff400000 0x0 0x40000>;
-> +                               interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-> +                               clocks = <&clkc CLKID_USB1_DDR_BRIDGE>;
-> +                               clock-names = "ddr";
-> +                               dr_mode = "peripheral";
-> +                               g-rx-fifo-size = <192>;
-> +                               g-np-tx-fifo-size = <128>;
-> +                               g-tx-fifo-size = <128 128 16 16 16>;
-> +                       };
-you suggested (off-list) that the OTG capable PHY should be passed to
-the dwc2 instance
-I'm aware that this is an example - could you please still add it for
-consistency?
+On 2019-02-24 2:35 pm, Marc Zyngier wrote:
+> The RK3399 has the interesting property to be a so called "big-little"
+> system, where not all the CPUs are equal (the A53s are much weaker
+> than the A72s).
+> 
+> So far, we're not telling the OS that there is such a difference in
+> processing capacity, and Linux assumes that they are equal. Too bad.
+> 
+> Let's tell the OS about this by using the capacity-dmips-mhz
+> property. The values used here are those used on the Juno platform,
+> which is quite similar. This leads to the scheduler knowing that
+> it can pack more tasks on the A72s, and leads to a better interactive
+> experience.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 ++++++-
+>   1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 6cc1c9fa4ea6..7eab31184aee 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -75,6 +75,7 @@
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <100>;
+>   			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			capacity-dmips-mhz = <578>;
 
-> +
-> +                       dwc3: dwc3@ff500000 {
-> +                               compatible = "snps,dwc3";
-> +                               reg = <0x0 0xff500000 0x0 0x100000>;
-> +                               interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-> +                               dr_mode = "host";
-> +                               snps,dis_u2_susphy_quirk;
-> +                               snps,quirk-frame-length-adjustment;
-> +                       };
-maybe the phys should also be passed to the dwc3 instance?
+Probably better to use the value from Juno r2 (485) which should more 
+appropriately represent A53 vs. A72, rather than A53 vs. A57.
 
+>   		};
+>   
+>   		cpu_l1: cpu@1 {
+> @@ -86,6 +87,7 @@
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <100>;
+>   			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			capacity-dmips-mhz = <578>;
+>   		};
+>   
+>   		cpu_l2: cpu@2 {
+> @@ -97,6 +99,7 @@
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <100>;
+>   			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			capacity-dmips-mhz = <578>;
+>   		};
+>   
+>   		cpu_l3: cpu@3 {
+> @@ -108,6 +111,7 @@
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <100>;
+>   			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			capacity-dmips-mhz = <578>;
+>   		};
+>   
+>   		cpu_b0: cpu@100 {
+> @@ -118,7 +122,7 @@
+>   			clocks = <&cru ARMCLKB>;
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <436>;
+> -			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
 
-Regards
-Martin
+Oops.
+
+Otherwise, though, I was on the verge of tackling this myself now that 
+my 3399 board is building its own kernels - annoyance at the linking 
+bottleneck steadfastly refusing to move off CPU0 (except occasionally to 
+another little core) has been growing steadily :) With the nits fixed,
+
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+
+Cheers,
+Robin.
+
+> +			capacity-dmips-mhz = <1024>;
+>   		};
+>   
+>   		cpu_b1: cpu@101 {
+> @@ -130,6 +134,7 @@
+>   			#cooling-cells = <2>; /* min followed by max */
+>   			dynamic-power-coefficient = <436>;
+>   			cpu-idle-states = <&CPU_SLEEP &CLUSTER_SLEEP>;
+> +			capacity-dmips-mhz = <1024>;
+>   		};
+>   
+>   		idle-states {
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
