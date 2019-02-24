@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7ADC4C00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E1E4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:24:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4B75E20663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E31B320645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:24:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d5OhGeZs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B75E20663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OBuLusfP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E31B320645
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=martin.sperl.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,36 +26,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=5w/l4Mu2P5lSzd0tl9MygUyPdR0AIbWJgetufYJHee8=; b=d5OhGeZsDZtQisopm8I3O5mvRj
-	gtYUCYQ0h01s6FxExnkGGUIYd+OUO2RZLt+XtbWRttwN/prgfl0g1BD1Y85uZlsbvHksgT6UZdphU
-	D9ZlTG3XhrEvWTBRYYCdONYuy8pkujecMFkWA7XHbxD2RMHDXtugjCTA4ddk3mltZIJJuXlOfzVse
-	LeHCl9TcBaFk+x3QTw2/NuaR3+RQ4Q/6J5+uDmhGAUiqtt7Rh1RlLRcTLbfkXPhHlMUoDX6X97GBq
-	xAmkAXtR4jUecKmbF4Yrr69ivp4eLbyRVirenHy87zJpRMHIxCOaDlYSyWMSJ7Pk9GqwX+t4pf1HZ
-	0Z5nlMQQ==;
+	bh=GCYlGvFyNfFJ5AEyz4MA8k9N7wKO3sCKRbfLbGl4JXc=; b=OBuLusfPI7yPBxJEOUI4Ma1Zp+
+	L5PPo1nRJxbkMX558eaSBZxI3m9/VTImctGGn6mKF6PB033ERj6D1mERH0BHQivdUlY8Vb15LXHcL
+	Os4MTqHIKNqzEyH889vn+tHCE0YFWOZZx0Op90OiFpc5DKwtbpnztrqKyU4l+/hy2bF/O2LesJ35L
+	kapeO/+OUPF421UBvhBycPgq0vaKjIfi0E5eYPIJX8gIhISHN88BbIxmJCL2WcoYlZ+x5YI2DooJT
+	8myFYQex1+6GlvKoEyDeXgfh/6E7DrumQpusoK2coDqdsUc7Rry5gQpjgF+7A6u+Dc+JXmrEOnal4
+	xmlX6mvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxwZ3-0006b7-Rr; Sun, 24 Feb 2019 16:23:41 +0000
+	id 1gxwZE-0006p2-UO; Sun, 24 Feb 2019 16:23:52 +0000
 Received: from 212-186-180-163.static.upcbusiness.at ([212.186.180.163]
  helo=cgate.sperl.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxwYn-0006IK-1E; Sun, 24 Feb 2019 16:23:26 +0000
+ id 1gxwYp-0006IK-Nf; Sun, 24 Feb 2019 16:23:31 +0000
 Received: from hc1.intern.sperl.org (account martin@sperl.org [10.10.10.59]
  verified) by sperl.org (CommuniGate Pro SMTP 6.2.1 _community_)
- with ESMTPSA id 7757584; Sun, 24 Feb 2019 16:23:15 +0000
+ with ESMTPSA id 7757585; Sun, 24 Feb 2019 16:23:15 +0000
 From: kernel@martin.sperl.org
 To: Mark Brown <broonie@kernel.org>, Eric Anholt <eric@anholt.net>,
  Stefan Wahren <stefan.wahren@i2se.com>, linux-spi@vger.kernel.org,
  linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 2/3] spi: bcm2835: avoid 64 bit arithmetic and allow to
- configure polling limit
-Date: Sun, 24 Feb 2019 16:23:10 +0000
-Message-Id: <20190224162311.23899-2-kernel@martin.sperl.org>
+Subject: [PATCH 3/3] spi: bcm2835: add module parameter to configure minimum
+ length for dma
+Date: Sun, 24 Feb 2019 16:23:11 +0000
+Message-Id: <20190224162311.23899-3-kernel@martin.sperl.org>
 X-Mailer: git-send-email 2.11.0
 In-Reply-To: <20190224162311.23899-1-kernel@martin.sperl.org>
 References: <20190224162311.23899-1-kernel@martin.sperl.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_082325_414338_9E6E5A7A 
-X-CRM114-Status: GOOD (  10.45  )
+X-CRM114-CacheID: sfid-20190224_082328_114135_116A0358 
+X-CRM114-Status: GOOD (  12.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,102 +76,93 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-In analogy to commit d704afffe65c ("spi: bcm2835aux: Avoid 64-bit
-arithmetic in xfer len calc") avoid 64 bit calculations and make
-the polling interval configurable as a module parameter.
+Allow setting the length of the transfer at which dma is used by
+setting a module parameter.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
-Note this patch requires the effective_speed_hz patch to be included
-
----
- drivers/spi/spi-bcm2835.c | 36 ++++++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 16 deletions(-)
+ drivers/spi/spi-bcm2835.c | 40 +++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 37 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
-index 0ccc6a2733c6..dcf922ca2603 100644
+index dcf922ca2603..ef4b3468a97d 100644
 --- a/drivers/spi/spi-bcm2835.c
 +++ b/drivers/spi/spi-bcm2835.c
-@@ -38,6 +38,12 @@
- #include <linux/of_irq.h>
- #include <linux/spi/spi.h>
+@@ -31,6 +31,7 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/moduleparam.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_device.h>
+@@ -44,6 +45,39 @@ module_param(polling_limit_us, uint, 0664);
+ MODULE_PARM_DESC(polling_limit_us,
+ 		 "time in us to run a transfer in polling mode\n");
 
-+/* define polling limits */
-+unsigned int polling_limit_us = 30;
-+module_param(polling_limit_us, uint, 0664);
-+MODULE_PARM_DESC(polling_limit_us,
-+		 "time in us to run a transfer in polling mode\n");
++/* define dma min number of bytes to use in dma mode with value validation */
++static int dma_min_bytes_limit_set(const char *val,
++				   const struct kernel_param *kp)
++{
++	unsigned int v;
++
++	if (kstrtouint(val, 10, &v))
++		return -EINVAL;
++	/* value needs to be a multiple of 4 */
++	if (v % 4) {
++		pr_err("dma_min_bytes_limit needs to be a multiple of 4\n");
++		return -EINVAL;
++	}
++	/* value needs to be at least 6 - so actually 8 - rational below */
++	if (v < 6) {
++		pr_err("dma_min_bytes_limit needs to be at least 8\n");
++		return -EINVAL;
++	}
++
++	return param_set_uint(val, kp);
++}
++
++static const struct kernel_param_ops dma_min_bytes_limit_ops = {
++	.set	= dma_min_bytes_limit_set,
++	.get	= param_get_int,
++};
++
++unsigned int dma_min_bytes_limit = 96;
++module_param_cb(dma_min_bytes_limit, &dma_min_bytes_limit_ops,
++		&dma_min_bytes_limit, 0664);
++MODULE_PARM_DESC(dma_min_bytes_limit,
++		 "minimum number of bytes to run a transfer in dma mode\n");
 +
  /* SPI register offsets */
  #define BCM2835_SPI_CS			0x00
  #define BCM2835_SPI_FIFO		0x04
-@@ -74,8 +80,6 @@
+@@ -80,7 +114,6 @@ MODULE_PARM_DESC(polling_limit_us,
 
  #define BCM2835_SPI_FIFO_SIZE		64
  #define BCM2835_SPI_FIFO_SIZE_3_4	48
--#define BCM2835_SPI_POLLING_LIMIT_US	30
--#define BCM2835_SPI_POLLING_JIFFIES	2
- #define BCM2835_SPI_DMA_MIN_LENGTH	96
+-#define BCM2835_SPI_DMA_MIN_LENGTH	96
  #define BCM2835_SPI_MODE_BITS	(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH \
  				| SPI_NO_CS | SPI_3WIRE)
-@@ -784,8 +788,7 @@ static void bcm2835_dma_init(struct spi_master *master, struct device *dev)
- static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
- 					 struct spi_device *spi,
- 					 struct spi_transfer *tfr,
--					 u32 cs,
--					 unsigned long long xfer_time_us)
-+					 u32 cs)
+
+@@ -447,7 +480,8 @@ static int bcm2835_spi_transfer_one_irq(struct spi_master *master,
+  * if the length of the first is *exactly* 1.
+  *
+  * At most 6 bytes are written and at most 3 bytes read.  Do we know the
+- * transfer has this many bytes?  Yes, see BCM2835_SPI_DMA_MIN_LENGTH.
++ * transfer has this many bytes?  Yes, see validation in
++ * dma_min_bytes_limit_set.
+  *
+  * The FIFO is normally accessed with 8-bit width by the CPU and 32-bit width
+  * by the DMA engine.  Toggling the DMA Enable flag in the CS register switches
+@@ -690,7 +724,7 @@ static bool bcm2835_spi_can_dma(struct spi_master *master,
+ 				struct spi_transfer *tfr)
  {
- 	struct bcm2835_spi *bs = spi_master_get_devdata(master);
- 	unsigned long timeout;
-@@ -802,8 +805,8 @@ static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
- 	 */
- 	bcm2835_wr_fifo_blind(bs, BCM2835_SPI_FIFO_SIZE);
+ 	/* we start DMA efforts only on bigger transfers */
+-	if (tfr->len < BCM2835_SPI_DMA_MIN_LENGTH)
++	if (tfr->len < dma_min_bytes_limit)
+ 		return false;
 
--	/* set the timeout */
--	timeout = jiffies + BCM2835_SPI_POLLING_JIFFIES;
-+	/* set the timeout to at least 2 jiffies */
-+	timeout = jiffies + 2 + HZ * polling_limit_us / 1000000;
-
- 	/* loop until finished the transfer */
- 	while (bs->rx_len) {
-@@ -840,8 +843,7 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
- 				    struct spi_transfer *tfr)
- {
- 	struct bcm2835_spi *bs = spi_master_get_devdata(master);
--	unsigned long spi_hz, clk_hz, cdiv;
--	unsigned long long xfer_time_us;
-+	unsigned long spi_hz, clk_hz, cdiv, hz_per_byte, byte_limit;
- 	u32 cs = bcm2835_rd(bs, BCM2835_SPI_CS);
-
- 	/* set clock */
-@@ -882,16 +884,18 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
- 	bs->tx_len = tfr->len;
- 	bs->rx_len = tfr->len;
-
--	/* calculate the estimated time in us the transfer runs */
--	xfer_time_us = (unsigned long long)tfr->len
--		* 9 /* clocks/byte - SPI-HW waits 1 clock after each byte */
--		* 1000000;
--	do_div(xfer_time_us, tfr->effective_speed_hz);
-+	/* Calculate the estimated time in us the transfer runs.  Note that
-+	 * there is 1 idle clocks cycles after each byte transferredo - so
-+	 *  9 cycles/byte.  This is used to find the number
-+	 * of Hz per byte per polling limit.  E.g., we can transfer 1 byte in
-+	 * 30 us per 300,000 Hz of bus clock.
-+	 */
-+	hz_per_byte = polling_limit_us ? (9 * 1000000) / polling_limit_us : 0;
-+	byte_limit = hz_per_byte ? tfr->effective_speed_hz / hz_per_byte : 1;
-
- 	/* for short requests run polling*/
--	if (xfer_time_us <= BCM2835_SPI_POLLING_LIMIT_US)
--		return bcm2835_spi_transfer_one_poll(master, spi, tfr,
--						     cs, xfer_time_us);
-+	if (tfr->len < byte_limit)
-+		return bcm2835_spi_transfer_one_poll(master, spi, tfr, cs);
-
- 	/* run in dma mode if conditions are right */
- 	if (master->can_dma && bcm2835_spi_can_dma(master, spi, tfr))
+ 	/* BCM2835_SPI_DLEN has defined a max transfer size as
 --
 2.11.0
 
