@@ -2,57 +2,60 @@ Return-Path: <SRS0=QUhG=Q7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.3 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AE45C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7ADC4C00319
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 28F7220663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4B75E20663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 16:23:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MzmWUwg+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 28F7220663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d5OhGeZs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B75E20663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=martin.sperl.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=AIOZunx5aEf8MiuqZ4y7sv2mbbnDc1Ml+T+mgKpHBB0=; b=Mzm
-	WUwg+8ErQKUN4xNMs7/rfQqBfCBJ2Y6ol032/qbSaAX7hlMd2H8caQYRXaBLYW2/trcr4g9AIP9rI
-	0iyeabi8cUL21nyzsfW3NxjsFprczgwpoIChFqoz1nNewC9rtIrxiT3lNwaRDxcdAGXOQN1LD5eV5
-	deR4z7H6Nho6WaBUdcG7XrrS80tNLEz8eVgB90mAlm9U9pzj38AfHrSg/1dgeqlCIdvi3/8LWTKOw
-	JICxExQn+vKGhKpp38HLB3uIj60N62Wv63ZGx37rgyjnmvHd/wyvGMnK+MvlCfbnSYVAF4M1R4/7R
-	sgGFmJQbzKzVYVakgGBd1TZLeiwujDw==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=5w/l4Mu2P5lSzd0tl9MygUyPdR0AIbWJgetufYJHee8=; b=d5OhGeZsDZtQisopm8I3O5mvRj
+	gtYUCYQ0h01s6FxExnkGGUIYd+OUO2RZLt+XtbWRttwN/prgfl0g1BD1Y85uZlsbvHksgT6UZdphU
+	D9ZlTG3XhrEvWTBRYYCdONYuy8pkujecMFkWA7XHbxD2RMHDXtugjCTA4ddk3mltZIJJuXlOfzVse
+	LeHCl9TcBaFk+x3QTw2/NuaR3+RQ4Q/6J5+uDmhGAUiqtt7Rh1RlLRcTLbfkXPhHlMUoDX6X97GBq
+	xAmkAXtR4jUecKmbF4Yrr69ivp4eLbyRVirenHy87zJpRMHIxCOaDlYSyWMSJ7Pk9GqwX+t4pf1HZ
+	0Z5nlMQQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxwYp-0006Jv-AW; Sun, 24 Feb 2019 16:23:27 +0000
+	id 1gxwZ3-0006b7-Rr; Sun, 24 Feb 2019 16:23:41 +0000
 Received: from 212-186-180-163.static.upcbusiness.at ([212.186.180.163]
  helo=cgate.sperl.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxwYj-0006IK-HF; Sun, 24 Feb 2019 16:23:24 +0000
+ id 1gxwYn-0006IK-1E; Sun, 24 Feb 2019 16:23:26 +0000
 Received: from hc1.intern.sperl.org (account martin@sperl.org [10.10.10.59]
  verified) by sperl.org (CommuniGate Pro SMTP 6.2.1 _community_)
- with ESMTPSA id 7757580; Sun, 24 Feb 2019 16:23:15 +0000
+ with ESMTPSA id 7757584; Sun, 24 Feb 2019 16:23:15 +0000
 From: kernel@martin.sperl.org
 To: Mark Brown <broonie@kernel.org>, Eric Anholt <eric@anholt.net>,
  Stefan Wahren <stefan.wahren@i2se.com>, linux-spi@vger.kernel.org,
  linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
-Subject: [PATCH 1/3] spi: bcm2835: add driver stats to debugfs
-Date: Sun, 24 Feb 2019 16:23:09 +0000
-Message-Id: <20190224162311.23899-1-kernel@martin.sperl.org>
+Subject: [PATCH 2/3] spi: bcm2835: avoid 64 bit arithmetic and allow to
+ configure polling limit
+Date: Sun, 24 Feb 2019 16:23:10 +0000
+Message-Id: <20190224162311.23899-2-kernel@martin.sperl.org>
 X-Mailer: git-send-email 2.11.0
+In-Reply-To: <20190224162311.23899-1-kernel@martin.sperl.org>
+References: <20190224162311.23899-1-kernel@martin.sperl.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_082321_919375_A630978A 
-X-CRM114-Status: UNSURE (   8.94  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190224_082325_414338_9E6E5A7A 
+X-CRM114-Status: GOOD (  10.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,144 +76,102 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-To estimate efficiency add statistics on transfer types
-(polling, interrupt and dma) used to debugfs.
+In analogy to commit d704afffe65c ("spi: bcm2835aux: Avoid 64-bit
+arithmetic in xfer len calc") avoid 64 bit calculations and make
+the polling interval configurable as a module parameter.
 
 Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 ---
- drivers/spi/spi-bcm2835.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
+Note this patch requires the effective_speed_hz patch to be included
+
+---
+ drivers/spi/spi-bcm2835.c | 36 ++++++++++++++++++++----------------
+ 1 file changed, 20 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
-index c2912c1e09c5..0ccc6a2733c6 100644
+index 0ccc6a2733c6..dcf922ca2603 100644
 --- a/drivers/spi/spi-bcm2835.c
 +++ b/drivers/spi/spi-bcm2835.c
-@@ -22,6 +22,7 @@
+@@ -38,6 +38,12 @@
+ #include <linux/of_irq.h>
+ #include <linux/spi/spi.h>
 
- #include <linux/clk.h>
- #include <linux/completion.h>
-+#include <linux/debugfs.h>
- #include <linux/delay.h>
- #include <linux/dma-mapping.h>
- #include <linux/dmaengine.h>
-@@ -111,8 +112,60 @@ struct bcm2835_spi {
- 	int rx_prologue;
- 	unsigned int tx_spillover;
- 	unsigned int dma_pending;
++/* define polling limits */
++unsigned int polling_limit_us = 30;
++module_param(polling_limit_us, uint, 0664);
++MODULE_PARM_DESC(polling_limit_us,
++		 "time in us to run a transfer in polling mode\n");
 +
-+#if defined(CONFIG_DEBUG_FS)
-+#define BCM2835_AUX_INCR(field) ((field)++)
-+	u64 count_transfer_polling;
-+	u64 count_transfer_irq;
-+	u64 count_transfer_irq_after_poll;
-+	u64 count_transfer_dma;
-+
-+	struct dentry *debugfs_dir;
-+#else
-+#define BCM2835_AUX_INCR(field)
-+#endif /* CONFIG_DEBUG_FS */
- };
+ /* SPI register offsets */
+ #define BCM2835_SPI_CS			0x00
+ #define BCM2835_SPI_FIFO		0x04
+@@ -74,8 +80,6 @@
 
-+#if defined(CONFIG_DEBUG_FS)
-+static void bcm2835_debugfs_create(struct bcm2835_spi *bs,
-+				   const char *dname)
-+{
-+	char name[64];
-+	struct dentry *dir;
-+
-+	/* get full name */
-+	snprintf(name, sizeof(name), "spi-bcm2835-%s", dname);
-+
-+	/* the base directory */
-+	dir = debugfs_create_dir(name, NULL);
-+	bs->debugfs_dir = dir;
-+
-+	/* the counters */
-+	debugfs_create_u64("count_transfer_polling", 0444, dir,
-+			   &bs->count_transfer_polling);
-+	debugfs_create_u64("count_transfer_irq", 0444, dir,
-+			   &bs->count_transfer_irq);
-+	debugfs_create_u64("count_transfer_irq_after_poll", 0444, dir,
-+			   &bs->count_transfer_irq_after_poll);
-+	debugfs_create_u64("count_transfer_dma", 0444, dir,
-+			   &bs->count_transfer_dma);
-+}
-+
-+static void bcm2835_debugfs_remove(struct bcm2835_spi *bs)
-+{
-+	debugfs_remove_recursive(bs->debugfs_dir);
-+	bs->debugfs_dir = NULL;
-+}
-+#else
-+static void bcm2835_debugfs_create(struct bcm2835_spi *bs)
-+{
-+}
-+
-+static void bcm2835_debugfs_remove(struct bcm2835_spi *bs)
-+{
-+}
-+#endif /* CONFIG_DEBUG_FS */
-+
- static inline u32 bcm2835_rd(struct bcm2835_spi *bs, unsigned reg)
+ #define BCM2835_SPI_FIFO_SIZE		64
+ #define BCM2835_SPI_FIFO_SIZE_3_4	48
+-#define BCM2835_SPI_POLLING_LIMIT_US	30
+-#define BCM2835_SPI_POLLING_JIFFIES	2
+ #define BCM2835_SPI_DMA_MIN_LENGTH	96
+ #define BCM2835_SPI_MODE_BITS	(SPI_CPOL | SPI_CPHA | SPI_CS_HIGH \
+ 				| SPI_NO_CS | SPI_3WIRE)
+@@ -784,8 +788,7 @@ static void bcm2835_dma_init(struct spi_master *master, struct device *dev)
+ static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
+ 					 struct spi_device *spi,
+ 					 struct spi_transfer *tfr,
+-					 u32 cs,
+-					 unsigned long long xfer_time_us)
++					 u32 cs)
  {
- 	return readl(bs->regs + reg);
-@@ -316,6 +369,9 @@ static int bcm2835_spi_transfer_one_irq(struct spi_master *master,
- {
- 	struct bcm2835_spi *bs = spi_master_get_devdata(master);
-
-+	/* update statistics */
-+	BCM2835_AUX_INCR(bs->count_transfer_irq);
-+
- 	/*
- 	 * Enable HW block, but with interrupts still disabled.
- 	 * Otherwise the empty TX FIFO would immediately trigger an interrupt.
-@@ -574,6 +630,9 @@ static int bcm2835_spi_transfer_one_dma(struct spi_master *master,
- 	struct bcm2835_spi *bs = spi_master_get_devdata(master);
- 	int ret;
-
-+	/* update statistics */
-+	BCM2835_AUX_INCR(bs->count_transfer_dma);
-+
- 	/*
- 	 * Transfer first few bytes without DMA if length of first TX or RX
- 	 * sglist entry is not a multiple of 4 bytes (hardware limitation).
-@@ -731,6 +790,9 @@ static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
  	struct bcm2835_spi *bs = spi_master_get_devdata(master);
  	unsigned long timeout;
+@@ -802,8 +805,8 @@ static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
+ 	 */
+ 	bcm2835_wr_fifo_blind(bs, BCM2835_SPI_FIFO_SIZE);
 
-+	/* update statistics */
-+	BCM2835_AUX_INCR(bs->count_transfer_polling);
-+
- 	/* enable HW block without interrupts */
- 	bcm2835_wr(bs, BCM2835_SPI_CS, cs | BCM2835_SPI_CS_TA);
+-	/* set the timeout */
+-	timeout = jiffies + BCM2835_SPI_POLLING_JIFFIES;
++	/* set the timeout to at least 2 jiffies */
++	timeout = jiffies + 2 + HZ * polling_limit_us / 1000000;
 
-@@ -759,6 +821,8 @@ static int bcm2835_spi_transfer_one_poll(struct spi_master *master,
- 					    "timeout period reached: jiffies: %lu remaining tx/rx: %d/%d - falling back to interrupt mode\n",
- 					    jiffies - timeout,
- 					    bs->tx_len, bs->rx_len);
-+			/* update statistics */
-+			BCM2835_AUX_INCR(bs->count_transfer_irq_after_poll);
- 			/* fall back to interrupt mode */
- 			return bcm2835_spi_transfer_one_irq(master, spi,
- 							    tfr, cs, false);
-@@ -991,6 +1055,8 @@ static int bcm2835_spi_probe(struct platform_device *pdev)
- 		goto out_clk_disable;
- 	}
-
-+	bcm2835_debugfs_create(bs, dev_name(&pdev->dev));
-+
- 	return 0;
-
- out_clk_disable:
-@@ -1005,6 +1071,8 @@ static int bcm2835_spi_remove(struct platform_device *pdev)
- 	struct spi_master *master = platform_get_drvdata(pdev);
+ 	/* loop until finished the transfer */
+ 	while (bs->rx_len) {
+@@ -840,8 +843,7 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
+ 				    struct spi_transfer *tfr)
+ {
  	struct bcm2835_spi *bs = spi_master_get_devdata(master);
+-	unsigned long spi_hz, clk_hz, cdiv;
+-	unsigned long long xfer_time_us;
++	unsigned long spi_hz, clk_hz, cdiv, hz_per_byte, byte_limit;
+ 	u32 cs = bcm2835_rd(bs, BCM2835_SPI_CS);
 
-+	bcm2835_debugfs_remove(bs);
-+
- 	/* Clear FIFOs, and disable the HW block */
- 	bcm2835_wr(bs, BCM2835_SPI_CS,
- 		   BCM2835_SPI_CS_CLEAR_RX | BCM2835_SPI_CS_CLEAR_TX);
+ 	/* set clock */
+@@ -882,16 +884,18 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
+ 	bs->tx_len = tfr->len;
+ 	bs->rx_len = tfr->len;
+
+-	/* calculate the estimated time in us the transfer runs */
+-	xfer_time_us = (unsigned long long)tfr->len
+-		* 9 /* clocks/byte - SPI-HW waits 1 clock after each byte */
+-		* 1000000;
+-	do_div(xfer_time_us, tfr->effective_speed_hz);
++	/* Calculate the estimated time in us the transfer runs.  Note that
++	 * there is 1 idle clocks cycles after each byte transferredo - so
++	 *  9 cycles/byte.  This is used to find the number
++	 * of Hz per byte per polling limit.  E.g., we can transfer 1 byte in
++	 * 30 us per 300,000 Hz of bus clock.
++	 */
++	hz_per_byte = polling_limit_us ? (9 * 1000000) / polling_limit_us : 0;
++	byte_limit = hz_per_byte ? tfr->effective_speed_hz / hz_per_byte : 1;
+
+ 	/* for short requests run polling*/
+-	if (xfer_time_us <= BCM2835_SPI_POLLING_LIMIT_US)
+-		return bcm2835_spi_transfer_one_poll(master, spi, tfr,
+-						     cs, xfer_time_us);
++	if (tfr->len < byte_limit)
++		return bcm2835_spi_transfer_one_poll(master, spi, tfr, cs);
+
+ 	/* run in dma mode if conditions are right */
+ 	if (master->can_dma && bcm2835_spi_can_dma(master, spi, tfr))
 --
 2.11.0
 
