@@ -2,62 +2,61 @@ Return-Path: <SRS0=QUhG=Q7=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.6 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F1586C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 11:09:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6579CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 12:55:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A6C9F206B6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 11:09:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 344C520848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun, 24 Feb 2019 12:55:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qIgRIlZr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A6C9F206B6
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fp/6YYTf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 344C520848
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=martin.sperl.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=g96k33tvJRJBzi//Wl9I4aDSO2Pnkewgv3UNmdLDwCc=; b=qIgRIlZrCy8/5j
-	FBiXOLHTLLgNr7VSt+wJcVuuhiTOMmLo06Ze2H8u9s2xf361Z4I2CgTPQ8X6Dl0Sti1ccsgOj2X0k
-	1Jn7gZffj/746FHl2qwZzVSZgwbFutwdxwx1S7AV54UAC5tBfhSKPJtxfJcawKt5jLxyquMSo9J0l
-	gX3nyFLO1WPcRsTrPvIbN7dmykdGPbh/fho/yuB6eI1IMk7i0z5MmBQ+zUOAdat3sHvYYIGnEjUyC
-	IdG8jJej6R6yUPh/YpUtHFr5zky11VQh2KNNdKrX7yUX+WSWY9n1U7DXzxlqqBmqsul1YCTFjzJUt
-	jkf/wSoLbSMGHs3jo6Eg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=armUVZ5I5h2ba0MrU258VcTeeTMdSiAwZCMBcFuCwuY=; b=fp/6YYTf7WDvPLiQd1YnXpPTDU
+	LJ1TLTbxyHks7B9KwEpNgCT1uHeWWcMdwpIgYktNRzqaJICvRqAy3WxU0OE+ha+iwkuYtM9lljbGz
+	h7s23OdwwXq75J798ZnYYMwpdJG9ZA4S4qsdTz2J4JL9gATSEP4tYlJ2RPOGuj5WZkMWWP7fCsVL1
+	exc61zWFKbZYc2r1omPfOtBEDCLdDdomN3N5Bin8fyM4IDFLMgwtd8vz8io86q2OVtm25A3U3wbc/
+	xoJ2BPkbxfmRhZWrWv8oCabF31Gpv8WKbXx2j0L/w6K0S14VSUggnAJDdTrZP9AbxrgbJWEziz64Y
+	pYV9AgTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gxref-0008US-IN; Sun, 24 Feb 2019 11:09:09 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gxtJw-00021R-AW; Sun, 24 Feb 2019 12:55:52 +0000
+Received: from 212-186-180-163.static.upcbusiness.at ([212.186.180.163]
+ helo=cgate.sperl.org)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gxrec-0008U7-9l
- for linux-arm-kernel@lists.infradead.org; Sun, 24 Feb 2019 11:09:07 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E72C7EBD;
- Sun, 24 Feb 2019 03:08:59 -0800 (PST)
-Received: from MBP.local (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C90AB3F575;
- Sun, 24 Feb 2019 03:08:58 -0800 (PST)
-Date: Sun, 24 Feb 2019 11:08:56 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Xuefeng Wang <wxf.wang@hisilicon.com>
-Subject: Re: [PATCH] Use flush tlb last level when change protection
-Message-ID: <20190224110855.GA26770@MBP.local>
-References: <1550904447-45567-1-git-send-email-wxf.wang@hisilicon.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1550904447-45567-1-git-send-email-wxf.wang@hisilicon.com>
-User-Agent: Mutt/1.11.2 (2019-01-07)
+ id 1gxtJa-0001f9-MA; Sun, 24 Feb 2019 12:55:32 +0000
+Received: from hc1.intern.sperl.org (account martin@sperl.org [10.10.10.59]
+ verified) by sperl.org (CommuniGate Pro SMTP 6.2.1 _community_)
+ with ESMTPSA id 7757560; Sun, 24 Feb 2019 12:55:07 +0000
+From: kernel@martin.sperl.org
+To: Mark Brown <broonie@kernel.org>, Eric Anholt <eric@anholt.net>,
+ Stefan Wahren <stefan.wahren@i2se.com>,
+ Hubert Denkmair <h.denkmair@intence.de>, linux-spi@vger.kernel.org,
+ linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 2/9] spi: bcm2835aux: warn in dmesg that native cs is not
+ really supported
+Date: Sun, 24 Feb 2019 12:54:33 +0000
+Message-Id: <20190224125440.16117-3-kernel@martin.sperl.org>
+X-Mailer: git-send-email 2.11.0
+In-Reply-To: <20190224125440.16117-1-kernel@martin.sperl.org>
+References: <20190224125440.16117-1-kernel@martin.sperl.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_030906_345166_F3C92CA8 
-X-CRM114-Status: GOOD (  16.23  )
+X-CRM114-CacheID: sfid-20190224_045531_065064_7BD006E6 
+X-CRM114-Status: GOOD (  12.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,42 +68,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: will.deacon@arm.com, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, guohanjun@huawei.com
+Cc: Martin Sperl <kernel@martin.sperl.org>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Feb 23, 2019 at 02:47:27PM +0800, Xuefeng Wang wrote:
-> The protection attributes are only kept in last level tlb, so
-> protection changing only need invalidate last level tlb, exclude
-> the PWC entries.
-> 
-> Signed-off-by: Xuefeng Wang <wxf.wang@hisilicon.com>
-> ---
->  mm/mprotect.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/mm/mprotect.c b/mm/mprotect.c
-> index 36cb358..0c4303d 100644
-> --- a/mm/mprotect.c
-> +++ b/mm/mprotect.c
-> @@ -287,7 +287,7 @@ static unsigned long change_protection_range(struct vm_area_struct *vma,
->  
->  	/* Only flush the TLB if we actually modified any entries: */
->  	if (pages)
-> -		flush_tlb_range(vma, start, end);
-> +		__flush_tlb_range(vma, start, end, PAGE_SIZE, true);
->  	dec_tlb_flush_pending(mm);
+From: Martin Sperl <kernel@martin.sperl.org>
 
-You are changing a generic file to call an arm64-internal function,
-breaking all the other architectures, so NAK.
+From personal bad experience (even as the author of the original driver)
+it shows that native-cs is "somewhat" supported by the spi bus driver
+when using a buggy device tree.
 
-Do you actually see any performance improvement?
+So make sure that the driver is warning in dmesg about this fact
+that we are running in a not supported mode that may have surprizing
+limitations.
 
--- 
-Catalin
+Fixes: 1ea29b39f4c812ece2f936065a0a3d6fe44a263e
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ drivers/spi/spi-bcm2835aux.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
+
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index 2ece25250d86..4b6fdcb2cf4b 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -420,6 +420,38 @@ static void bcm2835aux_spi_handle_err(struct spi_master *master,
+ 	bcm2835aux_spi_reset_hw(bs);
+ }
+
++static int bcm2835aux_spi_setup(struct spi_device *spi)
++{
++	int ret;
++
++	if (spi->mode & SPI_NO_CS)
++		return 0;
++	/* sanity check for native cs */
++	if (!gpio_is_valid(spi->cs_gpio)) {
++		/* for dt-backwards compatibility: only support native on CS0
++		 * known things not supported with broken native CS:
++		 * * multiple chip-selects: cs0-cs2 are all
++		 *     simultaniously asserted whenever there is a transfer
++		 *     this even includes SPI_NO_CS
++		 * * SPI_CS_HIGH: cs are always asserted low
++		 * * cs_change: cs is deasserted after each spi_transfer
++		 * * cs_delay_usec: cs is always deasserted one SCK cycle
++		 *     after the last transfer
++		 * probably more...
++		 */
++		if (spi->chip_select == 0) {
++			dev_err(&spi->dev,
++				"native CS is not supported but may work for some use-cases for cs = 0 -  please define a valid value cs-gpios in DT for complete feature set\n");
++			return 0;
++		}
++		dev_err(&spi->dev,
++			"native CS is not supported for cs > 0 -  please define a valid value cs-gpios in DT to enable multiple cs\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int bcm2835aux_spi_probe(struct platform_device *pdev)
+ {
+ 	struct spi_master *master;
+@@ -449,6 +481,7 @@ static int bcm2835aux_spi_probe(struct platform_device *pdev)
+ 	 *     a spi_transfer
+ 	 */
+ 	master->num_chipselect = 1;
++	master->setup = bcm2835aux_spi_setup;
+ 	master->transfer_one = bcm2835aux_spi_transfer_one;
+ 	master->handle_err = bcm2835aux_spi_handle_err;
+ 	master->prepare_message = bcm2835aux_spi_prepare_message;
+--
+2.11.0
 
 _______________________________________________
 linux-arm-kernel mailing list
