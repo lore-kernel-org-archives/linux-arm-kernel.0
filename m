@@ -3,62 +3,112 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 02CCCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:34:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F08C2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:35:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C282E20684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:34:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id BDF8F20684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:35:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dtzbJUD5"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C282E20684
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q8eu/9Nf";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="TFU1Rzrd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BDF8F20684
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LRbJbbfk2DHuXLMsz8N4JasoAcswCSyWmDaHHcLfK4I=; b=dtzbJUD5X4vN5q
-	0wdcYzHa1UauluXvFSehXEqIvdOqMVuVDQ6RHxpCy5EKTez+ul3IVnlfCYmQHeNO5Zb5c0XpYbCdd
-	gOytzCXPzw3U49x5OKojCiwYlp09xg7fp2/38q0j+Kg8v86JmHE603+iZEfN9fE4AcUKLDLV2EMdS
-	T+cfjfG3Y1cKg3UQFiMErTpMs8KJof5xuqApTAzU/AHnCp5NgtY8hz+IMCXYkKfi/gnD4Qsp/WP4A
-	k4yIlHcOXqwsqxUR6EcJD2YnhaHL+alXqSCrpLyqif1WGyAA5WCFPSPnfj7xk3HQw+8j0mrvWQx2v
-	geD8YuOwCHk4SXf8qsYw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=xqYOrv4FsDOQUovRHA9u3V2JxLrFmoq3wEFa/5vtkiA=; b=Q8eu/9NfAyM3SY
+	ej3S0oHttUaLxu8YY4kJ3OdiaCY4aTTqjw7cz1Fh1VlRIKXq+jqmloeeafPehN2iFtTHl4fWAs+H2
+	BL40dEVrffF7J38FpLIA6S7zC7GQ1rw6zi5wbwsybIOXbDfnmPxpF3141faxP1mknWpNNecCR98oP
+	rsiYGjnN42hzpVwRMD7SoL0rJheQnhLll8VMX/KoM2rV9GwMCRZ8hYww0le2J9gC0Mr49D6Gnlu8u
+	pvGItSdPWrPeT0JSfIKEIzR/Mp0naGi5yGsXSGuu4zZJuCrjST0ewYQ2ouNRaoWdIX5O1UP/Tc0vp
+	OLpi40MimJS876uXQeuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyJD6-00030e-N2; Mon, 25 Feb 2019 16:34:32 +0000
-Received: from bhuna.collabora.co.uk ([46.235.227.227])
+	id 1gyJDo-0004nG-Bt; Mon, 25 Feb 2019 16:35:16 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyJD2-00030D-Mw; Mon, 25 Feb 2019 16:34:30 +0000
-Received: from localhost (unknown [IPv6:2a01:e0a:2c:6930:5cf4:84a1:2763:fe0d])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256
- bits)) (No client certificate requested)
- (Authenticated sender: bbrezillon)
- by bhuna.collabora.co.uk (Postfix) with ESMTPSA id D83C828092C;
- Mon, 25 Feb 2019 16:34:25 +0000 (GMT)
-Date: Mon, 25 Feb 2019 17:34:22 +0100
-From: Boris Brezillon <boris.brezillon@collabora.com>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [RFC PATCH 25/27] mtd: nand: Add helpers to manage ECC engines
- and configurations
-Message-ID: <20190225173414.1836f0a8@kernel.org>
-In-Reply-To: <20190225170118.62739fc4@xps13>
-References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
- <20190221125806.28875-13-miquel.raynal@bootlin.com>
- <20190222154431.66c6911f@kernel.org>
- <20190225170118.62739fc4@xps13>
-Organization: Collabora
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+ id 1gyJDk-0004RM-G3
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 16:35:13 +0000
+Received: from [192.168.1.19] (cpe-70-114-128-244.austin.res.rr.com
+ [70.114.128.244])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2B62C20684;
+ Mon, 25 Feb 2019 16:35:11 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1551112511;
+ bh=ucV2jObkbwpw4YUPj94zTzkgYsOi0yKzvxBekD8Yt5s=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=TFU1RzrddfvrHu0M1bUXV+hgz1K5X7k+ibabmjZA5inmtis4Vf4LmBzdaEQ9yZuRH
+ f9QgJ1X2875C+YPMsCZ/bswoFSLJrpsuaDz+ouGVQ8HdnGGnA858XpuCKLKxKxDuFg
+ V7uU0h1RTocrVK/2S0/cSgGCMlzXOsGqjTjpwFHg=
+Subject: Re: [PATCH] ARM: socfpga_defconfig: enable support for large block
+ devices
+To: Andrey Zhizhikin <andrey.z@gmail.com>
+References: <20190222122147.27132-1-andrey.z@gmail.com>
+From: Dinh Nguyen <dinguyen@kernel.org>
+Openpgp: preference=signencrypt
+Autocrypt: addr=dinguyen@kernel.org; prefer-encrypt=mutual; keydata=
+ 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
+Message-ID: <c4fce9a2-2d9c-ad0a-8389-cea795af9f74@kernel.org>
+Date: Mon, 25 Feb 2019 10:35:10 -0600
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <20190222122147.27132-1-andrey.z@gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_083429_016180_A4845A44 
-X-CRM114-Status: GOOD (  36.01  )
+X-CRM114-CacheID: sfid-20190225_083512_578657_E79CF1EE 
+X-CRM114-Status: GOOD (  16.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,162 +120,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
- Richard Weinberger <richard@nod.at>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Cc: linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 25 Feb 2019 17:01:18 +0100
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+Hi Andrey,
 
-> Hi Boris,
+On 2/22/19 6:21 AM, Andrey Zhizhikin wrote:
+> Enable CONFIG_LBDAF, which is required by ext4 fs. This option could
+> hanle both ext3 and ext4, and ex4 requires this option to be enabled,
+> otherwise the filesystem is mounted RO mode.
 > 
-> Boris Brezillon <bbrezillon@kernel.org> wrote on Fri, 22 Feb 2019
-> 15:44:31 +0100:
+> Signed-off-by: Andrey Zhizhikin <andrey.z@gmail.com>
+> ---
+>  arch/arm/configs/socfpga_defconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> > On Thu, 21 Feb 2019 13:58:04 +0100
-> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> >   
-> > > Add the logic in the NAND core to find the right ECC engine depending
-> > > on the NAND chip requirements and the user desires. Right now, the
-> > > choice may be made between (more will come):
-> > > * software Hamming
-> > > * software BCH
-> > > * on-die (SPI-NAND devices only)
-> > > 
-> > > Once the ECC engine has been found, the ECC engine must be
-> > > configured.
-> > > 
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  drivers/mtd/nand/core.c  | 107 +++++++++++++++++++++++++++++++++++++++
-> > >  include/linux/mtd/nand.h |   4 ++
-> > >  2 files changed, 111 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/core.c b/drivers/mtd/nand/core.c
-> > > index 872d46b5fc0f..9feb118c9f68 100644
-> > > --- a/drivers/mtd/nand/core.c
-> > > +++ b/drivers/mtd/nand/core.c
-> > > @@ -207,6 +207,113 @@ int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len)
-> > >  }
-> > >  EXPORT_SYMBOL_GPL(nanddev_mtd_max_bad_blocks);
-> > >  
-> > > +/**
-> > > + * nanddev_find_ecc_engine() - Find a suitable ECC engine
-> > > + * @nand: NAND device
-> > > + */
-> > > +static int nanddev_find_ecc_engine(struct nand_device *nand)    
-> > 
-> > Can we pass the conf in argument instead of reading it from
-> > nand->ecc.user_conf?
-> >   
-> > > +{
-> > > +	bool is_spinand = mtd_type_is_spinand(&nand->mtd);    
-> > 
-> > And here is the reason for the SPINAND type.
-> >   
-> > > +
-> > > +	/* Read the user desires in terms of ECC engine/configuration */
-> > > +	nand_ecc_read_user_conf(nand);
-> > > +
-> > > +	/* No ECC engine requestedn, let's return without error */
-> > > +	if (nand->ecc.user_conf.mode == NAND_ECC_NONE)
-> > > +		return 0;
-> > > +
-> > > +	/* Raw NAND default mode is hardware */
-> > > +	if (!is_spinand && nand->ecc.user_conf.mode < 0)
-> > > +		nand->ecc.user_conf.mode = NAND_ECC_HW;    
-> > 
-> > We should let the raw NAND layer take this decision (actually, it's
-> > even a raw NAND controller driver decision). Please complain if
-> > user_conf.mode is invalid.
-> > This way you won't need the SPINAND type you added in one of your
-> > previous patch.
-> >   
-> > > +
-> > > +	/* SPI-NAND default mode is on-die */
-> > > +	if (is_spinand && nand->ecc.user_conf.mode < 0)
-> > > +		nand->ecc.user_conf.mode = NAND_ECC_ON_DIE;
-> > > +
-> > > +	switch (nand->ecc.user_conf.mode) {
-> > > +	case NAND_ECC_SOFT:
-> > > +		nand->ecc.engine = nand_ecc_sw_get_engine(nand);
-> > > +		break;
-> > > +	case NAND_ECC_ON_DIE:
-> > > +		if (is_spinand)
-> > > +			nand->ecc.engine = spinand_ondie_ecc_get_engine();    
-> > 
-> > So, maybe it's worth having the ondie ECC engine instance directly
-> > embedded in nand_device instead of spinand, or maybe just a pointer, so
-> > that you don't reserve extra space when the NAND device does not have
-> > on-die ECC.
-> >   
-> > > +		else
-> > > +			pr_err("On-die ECC engines for non SPI devices not supported yet\n");
-> > > +		break;
-> > > +	case NAND_ECC_HW:
-> > > +		pr_err("Hardware ECC engines not supported yet\n");
-> > > +		break;
-> > > +	default:
-> > > +		pr_err("Missing ECC engine property\n");
-> > > +	}
-> > > +
-> > > +	if (!nand->ecc.engine)
-> > > +		return  -EINVAL;
-> > > +
-> > > +	return 0;
-> > > +}    
-> >   
-> 
-> I think this is the root patch were our ideas diverge. For me, each
-> 'ECC engine' has a _get() helper and the NAND core decides which one to
-> call to retrieve the right engine. Can you please explain what was your
-> idea if this one does not fit?
+> diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
+> index 08d1b3e11d68..b4b387486cd9 100644
+> --- a/arch/arm/configs/socfpga_defconfig
+> +++ b/arch/arm/configs/socfpga_defconfig
+> @@ -21,7 +21,7 @@ CONFIG_NEON=y
+>  CONFIG_OPROFILE=y
+>  CONFIG_MODULES=y
+>  CONFIG_MODULE_UNLOAD=y
+> -# CONFIG_LBDAF is not set
 
-Each class of ECC engine has its own way of getting a pointer to an ECC
-engine instance:
+CONFIG_LDBAF is turned on by default for 32-bit. So all you have to do
+is remove this line.
 
-- ondie: the engine is directly attached to the device and can be
-  retrieved by accessing a nand_device field (nanddev->ondie_ecc?).
-- sw ECC: you can create a new instance for each device and possibly
-  pass the OOB layout you want to use (assuming you don't want to use
-  the default one)
-- HW-controller-side engine: refers to the controller device (parent
-  node) or the device pointed by the ecc-engine DT prop (we'll probably
-  need a way to pass this info when for non-DT platforms). For this one
-  we'll add a nanddev_get_hw_ecc_engine() which will search for all
-  registered HW ECC engines and try to match with some search keys (in
-  case of DT, it's the ->of_node pointer address)
-
-Clearly, for SW-based ECC, you'll need more than just the nanddev
-object, as layouts can differ depending on the controller driver. So,
-what I'm suggesting is to have a
-
-	nand_create_sw_ecc_engine(algo, layout) 
-
-funtion that returns this ECC engine instance which the driver will
-then attach to the NAND device.
-
-> 
-> Also, the parsing of the DT (in nand_ecc_read_user_conf()) gives me the
-> user ECC mode and algo, so I cannot let the raw NAND core (or a raw
-> NAND controller driver) or the SPI NAND core decide which mode is the
-> default if not provided by the user.
-
-Except this prop is optional in most cases, and the default value is
-not always the same, which is why I think this ECC engine retrieval step
-should be left to each sub-layer (and sometimes to the controller driver
-behind it). Maybe you can provide helpers to help with that, but I
-don't think taking this decision here, based on the bus type, is a good
-idea. And I also don't like the idea of adding a new SPINAND type.
+Thanks,
+Dinh
 
 _______________________________________________
 linux-arm-kernel mailing list
