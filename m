@@ -4,99 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98D4CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:29:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02CCCC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:34:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6BD8720684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:29:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C282E20684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:34:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SJntLAos";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=cogentembedded-com.20150623.gappssmtp.com header.i=@cogentembedded-com.20150623.gappssmtp.com header.b="VFEtUOzH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6BD8720684
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=cogentembedded.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dtzbJUD5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C282E20684
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:References:To:Subject:From:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Gis+TXW3RkULQJCcsyGKiNszHTRiSY/kzANjQt1MsQE=; b=SJntLAosXbt5VP
-	pci2pSal/HweI482LBX2CXtJpCAjauhGjkzhH1d+poquE1tkFe8v7P467dfeXzL/Lp1W12O4bMEbP
-	Azu9mIqv8ugAAeRsH1rlZxI0ong8GLh5r1c/AKJUdeRCyeypvOJDHeVXHIQIlXSOishWFbe+fZWHZ
-	MLC0NVpAW6iKqw0969/WKVX4Y01Uj8UrNgf8rpMqImKZXYFpxtk7SuggNq5/W3YlqmZJL8KEur50K
-	ZHxYhg2NN2q8G3pSi3S3fzKqVWSc4MDdpGNqkLrYt4c9Gw+2ahi/gggKQf9YwDhZpyEiLXgnQ3V5w
-	gG2ajxU5HrY/hxLcqcKg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LRbJbbfk2DHuXLMsz8N4JasoAcswCSyWmDaHHcLfK4I=; b=dtzbJUD5X4vN5q
+	0wdcYzHa1UauluXvFSehXEqIvdOqMVuVDQ6RHxpCy5EKTez+ul3IVnlfCYmQHeNO5Zb5c0XpYbCdd
+	gOytzCXPzw3U49x5OKojCiwYlp09xg7fp2/38q0j+Kg8v86JmHE603+iZEfN9fE4AcUKLDLV2EMdS
+	T+cfjfG3Y1cKg3UQFiMErTpMs8KJof5xuqApTAzU/AHnCp5NgtY8hz+IMCXYkKfi/gnD4Qsp/WP4A
+	k4yIlHcOXqwsqxUR6EcJD2YnhaHL+alXqSCrpLyqif1WGyAA5WCFPSPnfj7xk3HQw+8j0mrvWQx2v
+	geD8YuOwCHk4SXf8qsYw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyJ8B-0000tp-EV; Mon, 25 Feb 2019 16:29:27 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gyJD6-00030e-N2; Mon, 25 Feb 2019 16:34:32 +0000
+Received: from bhuna.collabora.co.uk ([46.235.227.227])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyJ86-0000sh-TV
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 16:29:24 +0000
-Received: by mail-lj1-x244.google.com with SMTP id t13so3595333lji.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 08:29:21 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=cogentembedded-com.20150623.gappssmtp.com; s=20150623;
- h=from:subject:to:cc:references:organization:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=77QWyaOvI4TWPkxmGkA0CNCiytGViRfoudTqrVdJ1sA=;
- b=VFEtUOzHjjMvjKjWe28jdukO6Eqb1NTwUui0nv9p0cWKhkLU5mV6KCail7FeJ7OJIs
- AumIQ9rgIlFy3zXvPOJ0BNUgWXuP4f28CPm13HpUsgrkTU6SvLuHpQOJVNGv/KrqpvHz
- 03WU+x0fKLYIuOV/ndcJ5r88dRnee8LX6k22w3b8yknMyvrMig51UUEsJML2hOPfAXph
- B/sMxl4BWKhsnVIc6bp7+8697m71pXS8Tvw+O51RGpw37Rz204Pxnzx3Q/tBLDPQCuKv
- 1DHXdryAbWGkpeI5wS6+OZzrWKo37S23Ms+2USe1eew6SybQY/HDNk2VOSDSx2b3vkxi
- 1yOA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:subject:to:cc:references:organization
- :message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=77QWyaOvI4TWPkxmGkA0CNCiytGViRfoudTqrVdJ1sA=;
- b=oUMlVl/wUgBtDpMmU/PrtAaKAgRUn0S4FfX+ER/BDtto7hZBoi440aMomHnrS9dMkZ
- oFpUQceOvH5q3e1YPUftgIIfyoTbmrNT3QkAp9og5BAsY+Ak7sj1xl2VpSmhRHEyCMDk
- F/ogcP3KPhpfssyg1hxcRMXxIvK1Io8Tel5QhixxpI/guiJbkUUZeP2tfE4qwM/Hl6TO
- 9HpPasy5gCVzmIPfDHiqaHlIp4607aNScWhoZZ0n0dthLv3VUCl2ICjYRL5q2d4/Zjg/
- qemDXLeH46B2gNN6wVYgqV1kXKbeUSlTFCqurfbrPJ+FOZgMnOPCOBwEkUwqcYDGoX9b
- 6h+A==
-X-Gm-Message-State: AHQUAuYF+QYxpL2Q4IjkO2se/VorMQm+X2yYIBIRHWNEEqBcdXz8DnWp
- Kn9FeNO4iHWF8fSp5k0urYF+ybinAbw=
-X-Google-Smtp-Source: AHgI3IYYdp8ellX2609vk7mUpmN7j1raOop0Ut9baFTdGn7sWHszjVWlrWh8+ZWGmp3MGqsf4W4hrQ==
-X-Received: by 2002:a2e:5d59:: with SMTP id r86mr9097130ljb.158.1551112159217; 
- Mon, 25 Feb 2019 08:29:19 -0800 (PST)
-Received: from wasted.cogentembedded.com ([31.173.86.138])
- by smtp.gmail.com with ESMTPSA id i15sm2361409ljb.48.2019.02.25.08.29.17
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 08:29:18 -0800 (PST)
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Subject: Re: [RFC PATCH 5/5] mtd: hyperbus: Add driver for TI's Hyperbus
- memory controller
-To: "Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>)"
- <vigneshr@ti.com>, David Woodhouse <dwmw2@infradead.org>,
- Brian Norris <computersforpeace@gmail.com>,
- Boris Brezillon <bbrezillon@kernel.org>, Marek Vasut
- <marek.vasut@gmail.com>, Richard Weinberger <richard@nod.at>,
- Rob Herring <robh+dt@kernel.org>
-References: <20190219063607.29949-1-vigneshr@ti.com>
- <20190219063607.29949-6-vigneshr@ti.com>
-Organization: Cogent Embedded
-Message-ID: <907041d1-8412-22ca-3716-109a56251850@cogentembedded.com>
-Date: Mon, 25 Feb 2019 19:29:17 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.2.1
+ id 1gyJD2-00030D-Mw; Mon, 25 Feb 2019 16:34:30 +0000
+Received: from localhost (unknown [IPv6:2a01:e0a:2c:6930:5cf4:84a1:2763:fe0d])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256
+ bits)) (No client certificate requested)
+ (Authenticated sender: bbrezillon)
+ by bhuna.collabora.co.uk (Postfix) with ESMTPSA id D83C828092C;
+ Mon, 25 Feb 2019 16:34:25 +0000 (GMT)
+Date: Mon, 25 Feb 2019 17:34:22 +0100
+From: Boris Brezillon <boris.brezillon@collabora.com>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 25/27] mtd: nand: Add helpers to manage ECC engines
+ and configurations
+Message-ID: <20190225173414.1836f0a8@kernel.org>
+In-Reply-To: <20190225170118.62739fc4@xps13>
+References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
+ <20190221125806.28875-13-miquel.raynal@bootlin.com>
+ <20190222154431.66c6911f@kernel.org>
+ <20190225170118.62739fc4@xps13>
+Organization: Collabora
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-In-Reply-To: <20190219063607.29949-6-vigneshr@ti.com>
-Content-Language: en-MW
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_082923_209032_E3A99A31 
-X-CRM114-Status: GOOD (  24.92  )
+X-CRM114-CacheID: sfid-20190225_083429_016180_A4845A44 
+X-CRM114-Status: GOOD (  36.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,104 +70,162 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- tudor.ambarus@microchip.com, Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- nsekhar@ti.com, linux-kernel@vger.kernel.org, linux-mtd@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello!
+On Mon, 25 Feb 2019 17:01:18 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-On 02/19/2019 09:36 AM, Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>) wrote:
-
-> Add driver for Hyperbus memory controller on TI's AM654 SoC. Programming
-> IP is pretty simple and provides direct memory mapped access to
-> connected Flash devices.
-
-   Are you sure you posted the _complete_ driver?
-
-> Add basic support for the IP without DMA. Second ChipSelect is not
-> supported for now.
+> Hi Boris,
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  drivers/mtd/hyperbus/hbmc_am654.c | 105 ++++++++++++++++++++++++++++++
->  1 file changed, 105 insertions(+)
->  create mode 100644 drivers/mtd/hyperbus/hbmc_am654.c
+> Boris Brezillon <bbrezillon@kernel.org> wrote on Fri, 22 Feb 2019
+> 15:44:31 +0100:
 > 
-> diff --git a/drivers/mtd/hyperbus/hbmc_am654.c b/drivers/mtd/hyperbus/hbmc_am654.c
-> new file mode 100644
-> index 000000000000..1f0d2dc52f9f
-> --- /dev/null
-> +++ b/drivers/mtd/hyperbus/hbmc_am654.c
-> @@ -0,0 +1,105 @@
-[...]
-> +static int am654_hbmc_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct am654_hbmc_priv *priv;
-> +	struct resource *res;
-> +	int err;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (IS_ERR(res)) {
-> +		dev_err(&pdev->dev, "failed to get memory resource\n");
-> +		return -ENOENT;
-> +	}
-> +
-> +	priv->regbase = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(priv->regbase)) {
-> +		dev_err(dev, "Cannot remap controller address.\n");
-> +		return PTR_ERR(priv->regbase);
-> +	}
-> +
-> +	pm_runtime_enable(&pdev->dev);
-> +	err = pm_runtime_get_sync(&pdev->dev);
+> > On Thu, 21 Feb 2019 13:58:04 +0100
+> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> >   
+> > > Add the logic in the NAND core to find the right ECC engine depending
+> > > on the NAND chip requirements and the user desires. Right now, the
+> > > choice may be made between (more will come):
+> > > * software Hamming
+> > > * software BCH
+> > > * on-die (SPI-NAND devices only)
+> > > 
+> > > Once the ECC engine has been found, the ECC engine must be
+> > > configured.
+> > > 
+> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > ---
+> > >  drivers/mtd/nand/core.c  | 107 +++++++++++++++++++++++++++++++++++++++
+> > >  include/linux/mtd/nand.h |   4 ++
+> > >  2 files changed, 111 insertions(+)
+> > > 
+> > > diff --git a/drivers/mtd/nand/core.c b/drivers/mtd/nand/core.c
+> > > index 872d46b5fc0f..9feb118c9f68 100644
+> > > --- a/drivers/mtd/nand/core.c
+> > > +++ b/drivers/mtd/nand/core.c
+> > > @@ -207,6 +207,113 @@ int nanddev_mtd_max_bad_blocks(struct mtd_info *mtd, loff_t offs, size_t len)
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(nanddev_mtd_max_bad_blocks);
+> > >  
+> > > +/**
+> > > + * nanddev_find_ecc_engine() - Find a suitable ECC engine
+> > > + * @nand: NAND device
+> > > + */
+> > > +static int nanddev_find_ecc_engine(struct nand_device *nand)    
+> > 
+> > Can we pass the conf in argument instead of reading it from
+> > nand->ecc.user_conf?
+> >   
+> > > +{
+> > > +	bool is_spinand = mtd_type_is_spinand(&nand->mtd);    
+> > 
+> > And here is the reason for the SPINAND type.
+> >   
+> > > +
+> > > +	/* Read the user desires in terms of ECC engine/configuration */
+> > > +	nand_ecc_read_user_conf(nand);
+> > > +
+> > > +	/* No ECC engine requestedn, let's return without error */
+> > > +	if (nand->ecc.user_conf.mode == NAND_ECC_NONE)
+> > > +		return 0;
+> > > +
+> > > +	/* Raw NAND default mode is hardware */
+> > > +	if (!is_spinand && nand->ecc.user_conf.mode < 0)
+> > > +		nand->ecc.user_conf.mode = NAND_ECC_HW;    
+> > 
+> > We should let the raw NAND layer take this decision (actually, it's
+> > even a raw NAND controller driver decision). Please complain if
+> > user_conf.mode is invalid.
+> > This way you won't need the SPINAND type you added in one of your
+> > previous patch.
+> >   
+> > > +
+> > > +	/* SPI-NAND default mode is on-die */
+> > > +	if (is_spinand && nand->ecc.user_conf.mode < 0)
+> > > +		nand->ecc.user_conf.mode = NAND_ECC_ON_DIE;
+> > > +
+> > > +	switch (nand->ecc.user_conf.mode) {
+> > > +	case NAND_ECC_SOFT:
+> > > +		nand->ecc.engine = nand_ecc_sw_get_engine(nand);
+> > > +		break;
+> > > +	case NAND_ECC_ON_DIE:
+> > > +		if (is_spinand)
+> > > +			nand->ecc.engine = spinand_ondie_ecc_get_engine();    
+> > 
+> > So, maybe it's worth having the ondie ECC engine instance directly
+> > embedded in nand_device instead of spinand, or maybe just a pointer, so
+> > that you don't reserve extra space when the NAND device does not have
+> > on-die ECC.
+> >   
+> > > +		else
+> > > +			pr_err("On-die ECC engines for non SPI devices not supported yet\n");
+> > > +		break;
+> > > +	case NAND_ECC_HW:
+> > > +		pr_err("Hardware ECC engines not supported yet\n");
+> > > +		break;
+> > > +	default:
+> > > +		pr_err("Missing ECC engine property\n");
+> > > +	}
+> > > +
+> > > +	if (!nand->ecc.engine)
+> > > +		return  -EINVAL;
+> > > +
+> > > +	return 0;
+> > > +}    
+> >   
+> 
+> I think this is the root patch were our ideas diverge. For me, each
+> 'ECC engine' has a _get() helper and the NAND core decides which one to
+> call to retrieve the right engine. Can you please explain what was your
+> idea if this one does not fit?
 
-   That's all nice but where's the code that accesses the actual registers?
+Each class of ECC engine has its own way of getting a pointer to an ECC
+engine instance:
 
-> +	if (err < 0) {
-> +		pm_runtime_put_noidle(&pdev->dev);
+- ondie: the engine is directly attached to the device and can be
+  retrieved by accessing a nand_device field (nanddev->ondie_ecc?).
+- sw ECC: you can create a new instance for each device and possibly
+  pass the OOB layout you want to use (assuming you don't want to use
+  the default one)
+- HW-controller-side engine: refers to the controller device (parent
+  node) or the device pointed by the ecc-engine DT prop (we'll probably
+  need a way to pass this info when for non-DT platforms). For this one
+  we'll add a nanddev_get_hw_ecc_engine() which will search for all
+  registered HW ECC engines and try to match with some search keys (in
+  case of DT, it's the ->of_node pointer address)
 
-   Calling "put" with previously failed "get" sees strange...
+Clearly, for SW-based ECC, you'll need more than just the nanddev
+object, as layouts can differ depending on the controller driver. So,
+what I'm suggesting is to have a
 
-> +		return err;
-> +	}
-> +
-> +	priv->hbdev.needs_calib = true;
-> +	priv->hbdev.dev = &pdev->dev;
-> +	priv->hbdev.np = of_get_next_child(dev->of_node, NULL);
-> +	err = hb_register_device(&priv->hbdev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "failed to register controller\n");
-> +		goto err_destroy;
-> +	}
-> +
-> +	return 0;
-> +
-> +err_destroy:
-> +	hb_unregister_device(&priv->hbdev);
+	nand_create_sw_ecc_engine(algo, layout) 
 
-   Calling "unregister" with "register" previously failed also looks strange...
+funtion that returns this ECC engine instance which the driver will
+then attach to the NAND device.
 
-> +	pm_runtime_put_sync(&pdev->dev);
+> 
+> Also, the parsing of the DT (in nand_ecc_read_user_conf()) gives me the
+> user ECC mode and algo, so I cannot let the raw NAND core (or a raw
+> NAND controller driver) or the SPI NAND core decide which mode is the
+> default if not provided by the user.
 
-   Why the sync() version?
-
-> +	return err;
-> +}
-[...]
-
-MBR, Sergei
+Except this prop is optional in most cases, and the default value is
+not always the same, which is why I think this ECC engine retrieval step
+should be left to each sub-layer (and sometimes to the controller driver
+behind it). Maybe you can provide helpers to help with that, but I
+don't think taking this decision here, based on the bus type, is a good
+idea. And I also don't like the idea of adding a new SPINAND type.
 
 _______________________________________________
 linux-arm-kernel mailing list
