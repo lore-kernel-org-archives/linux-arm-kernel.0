@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D121C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B6183C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:05:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 05BA92087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 843442087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:05:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="afW4dmYC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05BA92087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PMM05F2e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 843442087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=NTenXRt7wa/8I0Ah9I980mzxvytg39B+meIjO7iIAqg=; b=afW4dmYCFcUVisnHX+jAqoSS3c
-	ZnAihv2BxlPJvWs1kAX6RTwBbwllsdC2fyt5/ZD9JEYQ+E1Kz2VOMnn2ec17tSh91AQGIl5RNSQJ5
-	ZSpU0JWhhBYPwSH/wkFNmPMrxGseXJqAj6ijL1bFBnSLHkXcNhaKTNGBZl5WF+utgN8UxPPAlPNjT
-	l4U0FaCTsj2pPCtDWNcIV/e2pmJzLT4NMP6hWqRfLKo/ltq/CLbWSvtNhX61zLvp7kKRRaqizV5XI
-	KQTD7VSoYsJbdOgKOp1vDOuXD+nM6X9P+TRkMlitxj4ohQmgTvCbh9KaPZ+t1fTKmTP7x3HVudiU7
-	mqT5gVTQ==;
+	bh=uunBTmomxELR21JJkTonFp052bKHGJiOLpMiaQzeQdk=; b=PMM05F2ezFldqUaok2VpFFhCww
+	CdnI7gmHIDQ+5Z7D76Raq39Nv7L9Z8VvedMWL1IG0BMFcSH9THouMpXwaAhLipAqjfVOZPjSz+pi9
+	wcbmvhTh3lRSsOR2Rmx+3xtIkONEJnLtn2OMWRxpoj1W7wRgMng2BH1o7McrzsR0famwlYPb+RtWN
+	LelDbKhMn0tRqoElWW2s8txYzVSE0E7hBBebkNIlMzbB0QIL95WqaI2G1ZLA1tJsVGMvlQbUGoYcU
+	HSfvjgZjlWTUByoensxRER0sXZhgeCyXySd8ZV5D/CxYEj6xZ5faeM8j7Hn26FWWOp1baMHWYXU8d
+	PD43SKFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy8RZ-0006gS-AB; Mon, 25 Feb 2019 05:04:45 +0000
+	id 1gy8Rg-0006oz-Ni; Mon, 25 Feb 2019 05:04:52 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy8R1-00069k-OO
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:13 +0000
+ id 1gy8R3-0006A9-Eu
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:17 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6391815AD;
- Sun, 24 Feb 2019 21:04:09 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BADEE80D;
+ Sun, 24 Feb 2019 21:04:12 -0800 (PST)
 Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
  [10.162.42.159])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 843233F5C1;
- Sun, 24 Feb 2019 21:04:06 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D79D33F5C1;
+ Sun, 24 Feb 2019 21:04:09 -0800 (PST)
 From: Anshuman Khandual <anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH V2 2/6] arm64/mm: Make pgd_pgtable_alloc() call
- pte_alloc_one() always
-Date: Mon, 25 Feb 2019 10:33:55 +0530
-Message-Id: <1551071039-20192-3-git-send-email-anshuman.khandual@arm.com>
+Subject: [PATCH V2 3/6] arm64/mm: Make all page table pages cycles through
+ standard constructs
+Date: Mon, 25 Feb 2019 10:33:56 +0530
+Message-Id: <1551071039-20192-4-git-send-email-anshuman.khandual@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
 References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_210411_791857_062D906E 
-X-CRM114-Status: GOOD (  14.14  )
+X-CRM114-CacheID: sfid-20190224_210413_613170_F1DB2328 
+X-CRM114-Status: GOOD (  16.05  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,49 +79,156 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-pgd_pgtable_alloc() provides page allocation function while creating all
-levels of page table (PGD, PUD, CONT PMD etc) for various kernel mappings.
-It calls __get_free_page() and initializes page with pagetable_page_ctor().
-pte_alloc_one() already provides a standard interface for allocating a page
-table page and initializes it with pagetable_page_ctor(). This removes the
-redundancy and instead make it call pte_alloc_one() directly.
+Currently there are inconsistencies during page table page's allocation,
+initialization and destruction. Not all those pages go through standard
+constructors pgtable_page_ctor/pgtable_page_dtor which is very much
+essential for proper initialization and accounting. Not going through
+proper pgtable_page_ctor/pgtable_page_dtor cycle makes them vulnerable
+for bad page state errors during page table tear down process.
+
+This makes all levels of page table pages either for the user space or
+for the kernel mappings go through these standard constructs. While
+here pte_free() has been modified to accommodate pages which might not
+have been allocated through buddy system but instead came from memblock
+[1] directly during early boot process. Those pages must not go through
+the pgtable_page_dtor() and instead are freed with free_reserved_page().
+
+PGD based page table page which is allocated from 'pgd_cache' kmem cache
+in certain situations (PGD_SIZE != PAGE_SIZE ) is excluded from being
+cycled through pgtable_page_[ctor/dtor]. This is not a problem because
+this slab never gets freed back to buddy allocator.
+
+[1] Page table page allocation from memblock
+
+(a) early_pgtable_alloc (passed with __create_pgd_mapping)
+(b) vmemmap_pgd|pud_populate (vmemmap_populate)
 
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- arch/arm64/mm/mmu.c | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/pgalloc.h | 42 ++++++++++++++++++++++++++------
+ arch/arm64/mm/pgd.c              |  4 +--
+ 2 files changed, 36 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index b6f5aa52ac67..2dbd72319152 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -372,13 +372,22 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
+diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
+index 52fa47c73bf0..076764f66fb0 100644
+--- a/arch/arm64/include/asm/pgalloc.h
++++ b/arch/arm64/include/asm/pgalloc.h
+@@ -29,17 +29,21 @@
+ #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
+ #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
  
- static phys_addr_t pgd_pgtable_alloc(void)
++static inline pgtable_t pte_alloc_one(struct mm_struct *mm);
++static inline unsigned long pte_alloc_one_virt(struct mm_struct *mm);
++static inline void pte_free(struct mm_struct *mm, pgtable_t pte);
++
+ #if CONFIG_PGTABLE_LEVELS > 2
+ 
+ static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
  {
--	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
--	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
--		BUG();
-+
-+	pgtable_t ptr;
-+
-+	/*
-+	 * pgd_pgtable_alloc() is called while creating kernel mappings
-+	 * through __create_pgd_mapping() might not install it through
-+	 * swapper_pg_dir (&init_mm). Even then init_mm is passed here
-+	 * just to indicate that the allocation is kernel specific not
-+	 * for the user space page tables.
-+	 */
-+	ptr = pte_alloc_one(&init_mm);
-+	BUG_ON(!ptr);
- 
- 	/* Ensure the zeroed page is visible to the page table walker */
- 	dsb(ishst);
--	return __pa(ptr);
-+	return page_to_phys(ptr);
+-	return (pmd_t *)__get_free_page(PGALLOC_GFP);
++	return (pmd_t *)pte_alloc_one_virt(mm);
  }
  
+ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmdp)
+ {
+ 	BUG_ON((unsigned long)pmdp & (PAGE_SIZE-1));
+-	free_page((unsigned long)pmdp);
++	pte_free(mm, virt_to_page(pmdp));
+ }
+ 
+ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
+@@ -62,13 +66,13 @@ static inline void __pud_populate(pud_t *pudp, phys_addr_t pmdp, pudval_t prot)
+ 
+ static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
+ {
+-	return (pud_t *)__get_free_page(PGALLOC_GFP);
++	return (pud_t *)pte_alloc_one_virt(mm);
+ }
+ 
+ static inline void pud_free(struct mm_struct *mm, pud_t *pudp)
+ {
+ 	BUG_ON((unsigned long)pudp & (PAGE_SIZE-1));
+-	free_page((unsigned long)pudp);
++	pte_free(mm, virt_to_page(pudp));
+ }
+ 
+ static inline void __pgd_populate(pgd_t *pgdp, phys_addr_t pudp, pgdval_t prot)
+@@ -93,7 +97,7 @@ extern void pgd_free(struct mm_struct *mm, pgd_t *pgdp);
+ static inline pte_t *
+ pte_alloc_one_kernel(struct mm_struct *mm)
+ {
+-	return (pte_t *)__get_free_page(PGALLOC_GFP);
++	return (pte_t *)pte_alloc_one_virt(mm);
+ }
+ 
+ static inline pgtable_t
+@@ -111,19 +115,41 @@ pte_alloc_one(struct mm_struct *mm)
+ 	return pte;
+ }
+ 
++static inline unsigned long
++pte_alloc_one_virt(struct mm_struct *mm)
++{
++	pgtable_t ptr;
++
++	ptr = pte_alloc_one(mm);
++	if (!ptr)
++		return 0;
++
++	return (unsigned long) page_to_virt(ptr);
++}
++
  /*
+  * Free a PTE table.
+  */
+ static inline void pte_free_kernel(struct mm_struct *mm, pte_t *ptep)
+ {
+ 	if (ptep)
+-		free_page((unsigned long)ptep);
++		pte_free(mm, virt_to_page(ptep));
+ }
+ 
+ static inline void pte_free(struct mm_struct *mm, pgtable_t pte)
+ {
+-	pgtable_page_dtor(pte);
+-	__free_page(pte);
++	/*
++	 * Some page table pages might have come from memblock either
++	 * with vmemmap_alloc_block (during vmemmap_populate) or with
++	 * early_pgtable_alloc (during __create_pgd_mapping). These
++	 * pages should be freed with free_reserved_page() instead.
++	 */
++	if (PageReserved(pte)) {
++		free_reserved_page(pte);
++	} else {
++		pgtable_page_dtor(pte);
++		__free_page(pte);
++	}
+ }
+ 
+ static inline void __pmd_populate(pmd_t *pmdp, phys_addr_t ptep,
+diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+index 289f9113a27a..ea588c8825e2 100644
+--- a/arch/arm64/mm/pgd.c
++++ b/arch/arm64/mm/pgd.c
+@@ -31,7 +31,7 @@ static struct kmem_cache *pgd_cache __ro_after_init;
+ pgd_t *pgd_alloc(struct mm_struct *mm)
+ {
+ 	if (PGD_SIZE == PAGE_SIZE)
+-		return (pgd_t *)__get_free_page(PGALLOC_GFP);
++		return (pgd_t *)pte_alloc_one_virt(mm);
+ 	else
+ 		return kmem_cache_alloc(pgd_cache, PGALLOC_GFP);
+ }
+@@ -39,7 +39,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
+ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
+ {
+ 	if (PGD_SIZE == PAGE_SIZE)
+-		free_page((unsigned long)pgd);
++		pte_free(mm, virt_to_page(pgd));
+ 	else
+ 		kmem_cache_free(pgd_cache, pgd);
+ }
 -- 
 2.20.1
 
