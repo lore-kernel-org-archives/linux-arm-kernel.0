@@ -2,82 +2,65 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 86EE4C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:48:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8546BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57B572087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:48:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 54FEE20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TDJXR97W"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57B572087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ln53/Mdb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54FEE20651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uRtxcZ14i+Dqxmqol023eG3IZP1V+4SMK5jIv7m/EzY=; b=TDJXR97WmbVpLq
-	qLbFEMufa9D2rXwFCtPtSy5sckqbpwuU1s+9Hlf59AFLoa50dxprcyqHKeIAdijFGpdk9M/7jc4vn
-	S3PaShxqibqJ6d9jhntbZfYHOLyL5Udr5exGTRgLHu3UTHGWKaQBNRs5cTbS6pCfMoGa8OHt6z/Hh
-	F22SVH9zHrqpJdLCfyTOmMOhlU+tSUHLm9B6l4ZGknviHCqyDASmoeSvhV9iv3wVlwyxPVcL6wLjf
-	HgzbKaSmSoWuh/Qorzbi2k5k21D4Ll0QHSULFwfx374+ZQuhc0YwTQOUXRbdtMUirWg+OcaOmvUMM
-	DYF7F4yRL7q0/9kp5EaA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=jEMMPjkVEhqTiqWBz3WrBcHiqDbA2/AU5qhmK9k7GUc=; b=Ln53/MdbTEzIE1
+	fym3I5JdF5MQ9vHmxWK3Z+zE/9JpTSwI8yFdUOsWrU3Qs79pfB256Hub1bAAnJkVh7q8loPMuk+7j
+	nWGcLX3/XcJzjqqEBvyb3cezf/f/eg0BoVLGUnIrGSTv4voTVplbW2luHswDCJWUr3g9Mpi4bZ3/3
+	C75J1UYDZreJ1AGCBPc8ua1cZzq/rCYK2wfGdKFIpcM25xx7dX3vg3/8VYHYmqjf5RQPGqLVbLU2E
+	BWRWZe7xr3LA2b40pToqoijNzb2Jnvx+X39S2gY2kJmd1rOoFRpb5nNmrCpoonqvNrjx4fjbl/XW5
+	tMiB9dEiO/onsbWS0Bjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyIUr-0000fj-5s; Mon, 25 Feb 2019 15:48:49 +0000
-Received: from mx08-00178001.pphosted.com ([91.207.212.93]
- helo=mx07-00178001.pphosted.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyIUn-0000cY-LJ
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 15:48:47 +0000
-Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
- by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1PFg3FD011731; Mon, 25 Feb 2019 16:48:37 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx08-00178001.pphosted.com with ESMTP id 2qtwxntjsw-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Mon, 25 Feb 2019 16:48:37 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 432E531;
- Mon, 25 Feb 2019 15:48:36 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag5node2.st.com [10.75.127.14])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 16F7F51FA;
- Mon, 25 Feb 2019 15:48:36 +0000 (GMT)
-Received: from [10.48.0.160] (10.75.127.44) by SFHDAG5NODE2.st.com
- (10.75.127.14) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Mon, 25 Feb
- 2019 16:48:35 +0100
-Subject: Re: [PATCH v1 1/3] ARM: dts: stm32: Add Vivante GPU support on
- STM32MP157c
-To: Lucas Stach <l.stach@pengutronix.de>, Rob Herring <robh+dt@kernel.org>,
- Mark Rutland <mark.rutland@arm.com>, Maxime Coquelin
- <mcoquelin.stm32@gmail.com>, Alexandre Torgue <alexandre.torgue@st.com>
-References: <1550246316-9747-1-git-send-email-pierre-yves.mordret@st.com>
- <1550246316-9747-2-git-send-email-pierre-yves.mordret@st.com>
- <1550247118.2546.56.camel@pengutronix.de>
-From: Pierre Yves MORDRET <pierre-yves.mordret@st.com>
-Message-ID: <44bb72aa-8e49-4ec5-dd9a-5fce6f0bce29@st.com>
-Date: Mon, 25 Feb 2019 16:48:34 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gyIVW-00010R-Fl; Mon, 25 Feb 2019 15:49:30 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyIVT-0000zo-3f
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 15:49:28 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ABBE380D;
+ Mon, 25 Feb 2019 07:49:26 -0800 (PST)
+Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0D5CD3F703;
+ Mon, 25 Feb 2019 07:49:24 -0800 (PST)
+Date: Mon, 25 Feb 2019 15:49:22 +0000
+From: Mark Rutland <mark.rutland@arm.com>
+To: Anshuman Khandual <anshuman.khandual@arm.com>
+Subject: Re: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
+ stage-2 page tables
+Message-ID: <20190225154922.GJ26236@lakrids.cambridge.arm.com>
+References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
+ <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
+ <20190225110014.GB26236@lakrids.cambridge.arm.com>
+ <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
 MIME-Version: 1.0
-In-Reply-To: <1550247118.2546.56.camel@pengutronix.de>
-Content-Language: en-US
-X-Originating-IP: [10.75.127.44]
-X-ClientProxiedBy: SFHDAG1NODE1.st.com (10.75.127.1) To SFHDAG5NODE2.st.com
- (10.75.127.14)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2019-02-25_08:, , signatures=0
+Content-Disposition: inline
+In-Reply-To: <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
+User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_074845_975125_178D6E08 
-X-CRM114-Status: GOOD (  16.67  )
+X-CRM114-CacheID: sfid-20190225_074927_156678_817823FB 
+X-CRM114-Status: GOOD (  18.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,41 +72,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-stm32@st-md-mailman.stormreply.com,
- Philippe Cornu <philippe.cornu@st.com>, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: yuzhao@google.com, Steve.Capper@arm.com, marc.zyngier@arm.com,
+ Catalin.Marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
+ james.morse@arm.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTHVjYXMKCnNvcnJ5IGZvciB0aGUgZGVsYXkgOiB3aW50ZXIgc2Vhc29uIDopCgpPbiAyLzE1
-LzE5IDU6MTEgUE0sIEx1Y2FzIFN0YWNoIHdyb3RlOgo+IEhpIFBpZXJyZS1ZdmVzLAo+IAo+IEFt
-IEZyZWl0YWcsIGRlbiAxNS4wMi4yMDE5LCAxNjo1OCArMDEwMCBzY2hyaWViIFBpZXJyZS1ZdmVz
-IE1PUkRSRVQ6Cj4+IEFwcGVuZCBWaXZhbnRlIEdQVSBEVCBjb25maWd1cmF0aW9uLgo+Pgo+PiBT
-aWduZWQtb2ZmLWJ5OiBQaWVycmUtWXZlcyBNT1JEUkVUIDxwaWVycmUteXZlcy5tb3JkcmV0QHN0
-LmNvbT4KPj4gLS0tCj4+IMKgYXJjaC9hcm0vYm9vdC9kdHMvc3RtMzJtcDE1N2MuZHRzaSB8IDEw
-ICsrKysrKysrKysKPj4gwqAxIGZpbGUgY2hhbmdlZCwgMTAgaW5zZXJ0aW9ucygrKQo+Pgo+PiBk
-aWZmIC0tZ2l0IGEvYXJjaC9hcm0vYm9vdC9kdHMvc3RtMzJtcDE1N2MuZHRzaSBiL2FyY2gvYXJt
-L2Jvb3QvZHRzL3N0bTMybXAxNTdjLmR0c2kKPj4gaW5kZXggZjhiYmZmZi4uMjk1NDBiYyAxMDA2
-NDQKPj4gLS0tIGEvYXJjaC9hcm0vYm9vdC9kdHMvc3RtMzJtcDE1N2MuZHRzaQo+PiArKysgYi9h
-cmNoL2FybS9ib290L2R0cy9zdG0zMm1wMTU3Yy5kdHNpCj4+IEBAIC0xMTA2LDYgKzExMDYsMTYg
-QEAKPj4+IMKgCQkJc3RhdHVzID0gImRpc2FibGVkIjsKPj4+IMKgCQl9Owo+PiDCoAo+PiArCQln
-cHU6IGdwdUA1OTAwMDAwMCB7Cj4+ICsJCQljb21wYXRpYmxlID0gInZpdmFudGUsZ2MiOwo+PiAr
-CQkJcmVnID0gPDB4NTkwMDAwMDAgMHg4MDA+Owo+PiArCQkJaW50ZXJydXB0cyA9IDxHSUNfU1BJ
-IDEwOSBJUlFfVFlQRV9MRVZFTF9ISUdIPjsKPj4gKwkJCWNsb2NrcyA9IDwmcmNjIEdQVT4sIDwm
-cmNjIEdQVV9LPjsKPj4gKwkJCWNsb2NrLW5hbWVzID0gImJ1cyIgLCJjb3JlIjsKPiAKPiBJcyB0
-aGlzIGEgMkQgb25seSBjb3JlPyBJZiBpdCBpcyBhbHNvIDNEIGNhcGFibGUgdGhlIGJpbmRpbmcg
-c2F5cyB5b3UKPiBuZWVkIHRvIHNwZWNpZnkgdGhlIHNoYWRlciBjbG9jayAobWF5IGJlIHRoZSBz
-YW1lIGNsb2NrIGZlZWRpbmcgdGhlCj4gY29yZSkuCgpZZXMsIHRoaXMgaXMgYSAzRCBjb3JlLgpB
-cyBmb3IgInNoYWRlciIgY2xvY2sgYm90aCAiY29yZSIgYW5kICJzaGFkZXIiIGFyZSBjb25uZWN0
-ZWQgaW50ZXJuYWxseS4gVGhpcyBpcwp3aHkgbm8gInNoYWRlciIgaW5wdXQgY2xvY2sgaXMgc2Vl
-bi4KTm9uZXRoZWxlc3Mgd2UgbWF5IGFkZCBpdCBmb3IgYmluZGluZ3MgY29tcGxpYW5jZSBidXQg
-ZnJvbSBTVE0zMk1QMSBwb3YgdGhpcwp3b24ndCBtYWtlIGFueSBjaGFuZ2VzLgoKSG9wZSBpdCBj
-bGFyaWZpZXMuCgpSZWdhcmRzCj4gCj4gUmVnYXJkcywKPiBMdWNhcwo+IAo+PiArCQkJcmVzZXRz
-ID0gPCZyY2MgR1BVX1I+Owo+PiArCQkJc3RhdHVzID0gImRpc2FibGVkIjsKPj4gKwkJfTsKPj4g
-Kwo+PiDCoAkJZHNpOiBkc2lANWEwMDAwMDAgewo+PiDCoAkJCWNvbXBhdGlibGUgPSAic3Qsc3Rt
-MzItZHNpIjsKPj4gwqAJCQlyZWcgPSA8MHg1YTAwMDAwMCAweDgwMD47CgpfX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxp
-bmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3Rz
-LmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Mon, Feb 25, 2019 at 07:50:27PM +0530, Anshuman Khandual wrote:
+> 
+> 
+> On 02/25/2019 04:30 PM, Mark Rutland wrote:
+> > Hi Anshuman,
+> > 
+> > On Mon, Feb 25, 2019 at 10:33:54AM +0530, Anshuman Khandual wrote:
+> >> ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
+> >> constructs. Certain stage-2 page table allocations are multi order which
+> >> cannot be allocated through a generic pgtable function as it does not exist
+> >> right now. This prevents all pgtable allocations including multi order ones
+> >> in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
+> >> functions. Hence remove all generic pgtable allocation function dependency
+> >> from stage-2 page tables till there is one multi-order allocation function
+> >> available.
+> > 
+> > I'm a bit confused by this. Which allocations are multi-order?
+> > 
+> 
+> Stage-2 PGD.
+> 
+> kvm_alloc_stage2_pgd -> alloc_pages_exact
+> kvm_free_stage2_pgd -> free_pages_exact
+>  
+> > Why does that prevent other allcoations from using the regular routines?
+> 
+> At present both stage-2 PGD (kvm_alloc_stage2_pgd -> alloc_pages_exact), PUD|PMD
+> (mmu_memory_cache_alloc) allocates directly from buddy allocator but then while
+> freeing back stage-2 PGD directly calls buddy allocator via free_pages_exact but
+> PUD|PMD get freed with stage2_[pud|pmd]_free which calls pud|pmd_free instead
+> of calling free_pages() directly.
+
+If we allocate/free the stage-2 PGD with {alloc,free}_pages_exact(),
+then the PGD level is balanced today.
+
+I don't see what that has to do with the other levels of table.
+
+> All of these worked fine because pud|pmd_free called free_pages() directly with
+> out going through pgtable_page_dtor(). But now we are changing pud|pmd_free to
+> use pgtable_page_dtor() both for user and host kernel page tables. This will
+> break stage2 page table (bad page state errors) because the new free path which
+> would call pgtable_page_dtor() where as alloc patch never called pgtable_page_ctor().
+
+I'm lost as to how that relates to the alloc/free of the PGD. AFAICT,
+that's unrelated to the problem at hand.
+
+What subtlety am I missing?
+
+> To fix this situation either we move all stage-2 page table to use pte_alloc_one()
+> and pte_free() which goes through pgtable_page_ctor/dtor cycle or just keep the
+> virtualization page tables out of it (stage2/hyp) and remove the only dependency
+> which breaks because of these changes. This series went with the second option. 
+
+It sounds to me like this is just a mismatch between the alloc/free
+paths for the PUD and PMD levels of table.
+
+IIUC, we allocate those with {pmd,pud}_alloc_one(), and free them with
+stage2_{pud,pmd}_free(), which call {pud,pmd}_free().
+
+I would naively expect p?d_alloc_one() to pair with p?d_free(), so that
+being a problem is surprising to me.
+
+Thanks,
+Mark.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
