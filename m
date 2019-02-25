@@ -2,74 +2,83 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BB86EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:39:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5FF83C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:49:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 89EF92087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:39:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 30AC620842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:49:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qOFQ9u1k"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89EF92087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N9TbsGIm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30AC620842
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DEJirYR17jjo9rq8lBjCV5Pyffta51aS7pkwbw5Uf3g=; b=qOFQ9u1k9BWhrm
-	5eqRH/MpUqzSYZ4lGNx3aJbUloUUQEE+PE7AjbSobR0b/GojVAfhkIwaz58dmw4TnOdWDqhpyLazd
-	G3aaV+/H98ePQ0140Tb293In3prBEUXb1Xo0wrhwwg3OHGBYIJ8+upyHqw/ji8GlsoxxXpTCX6khR
-	4VaRV/9myuRE85XMnJiPQlFnNS+MfSSBSMv4nNDHmf8rjycPtWJtiYIsSeNDL/4ZfM6aXIcK9UIxM
-	OSSkT3yVEPW8mlppsg3IngIyrW6DQAjybT0l9s2fjYjsiTbI20cJkn/CfJSfzx4jHU/YQCb4GsNoX
-	NddS3nBoFDc1ldG/d/qA==;
+	List-Owner; bh=MbkhKQr2yXqg6yMTsHAGuKQFeR09TgZRfzjrakjEJeU=; b=N9TbsGImeEbP83
+	sTzg/g9hY9N0h8BNWN04gb+3jgzVUpYL3srx+cssaRvs8WpC6H7TWTRkGl+oOK8HOmJYvbWMhhjNY
+	gRHaCDeWzNz1rbTI+ir2gwt2TykspjymNl5ThkeH/VkWC6u34oVSGDKiXOtIu38JRF6gS9sEM9M9H
+	kQDDPmuRHqIsvar1UUGAQrJ2gaqsjGaHCNAFiq+Fabc9zUUz7FgYQ+GRbwMqLlAoy22MkvvHsBoez
+	I38YNGRM98C06GFDIf7n7qk8M1bGQtWb5b5/Rt/VRHsJbmJJ8LVaRNyb6s8IiHI8i7X4NlrLrtnEM
+	Aap2JSPvKuTOUiKs9c0w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyGTQ-0001SC-KB; Mon, 25 Feb 2019 13:39:12 +0000
-Received: from mail-qt1-f196.google.com ([209.85.160.196])
+	id 1gyGdF-0004p5-E8; Mon, 25 Feb 2019 13:49:21 +0000
+Received: from mail-ot1-f66.google.com ([209.85.210.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyGTM-0001Rg-MI
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:39:10 +0000
-Received: by mail-qt1-f196.google.com with SMTP id z25so10374831qti.13
+ id 1gyGdB-0004oK-3E
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:49:19 +0000
+Received: by mail-ot1-f66.google.com with SMTP id i5so7813392oto.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 05:39:08 -0800 (PST)
+ Mon, 25 Feb 2019 05:49:16 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=qQa+wgPMesiTlKTvsul58fMBX/JX9ZGKjrHuNhwWwaE=;
- b=dZ4iGkyhixbuzFh8YNHfPd43BwY/G0mp1qdZr5b2A12ozJzOgZNKBWWEo2BZB/7fEh
- Ah7Ga3dB1bQJBUXitp5gdiqvc2otoXmpOTNv9cwYqGs+4X2Tt6yEhDmf71kEPj4IxtuB
- acQMsHiQcQxLuKilgOsRQc+oS3fqQPjtu0Ga6LupDlTm6zt6ti1R0ZDcyCTU/+0sCthl
- vzDwOE1tnEUyY05uj84ZAinra+gALa9g1Fv94jXHlRH5UWd4U+cFEO7KHYcWeJusXRkS
- tmUtBzqVQBuTM5+ZWBscL6qzYKtgvBJMT8rin7SUXnEdxOE1yBxjLxFjqWsyWMbHwY5x
- FMqQ==
-X-Gm-Message-State: AHQUAubtAguw9MMETm3tDUEdghjORKXCYMJnB2i5dY9tGLwVvB0CoymS
- CZT+P3Tsca+7m5HC7D0ZMjzKR8Q/Fs6xP1caWKE=
-X-Google-Smtp-Source: AHgI3Ia0H18NOVTeeQv3O4dtvQH0bnDl573OwqEPOJrarR2yrs4QFNav2eGJajGvCjfkGip/4HEkbKLCBWB4/EEEHDM=
-X-Received: by 2002:ac8:445a:: with SMTP id m26mr13488848qtn.212.1551101947115; 
- Mon, 25 Feb 2019 05:39:07 -0800 (PST)
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=3u0FVYgMT9kAuuRbpn0Afc5ACW25VbT1LoW1egvooZA=;
+ b=INKNkB3bo+Y0lPF4eUl39+tUaSIYPVpuUUte55ANyPccpzps7iJFVZhVr/ksdos0tv
+ TnL1sXn/M6Aoct35kt1U/udon3sPX7eZyy2RTZckj6BxVo/lMorUiWnk9JiEupd2QBhd
+ FXkY9JHckfydNs/ntlmb8Vph1KnpjTbck4KiaAmIsI6TPmsxHHLi1qm+3q41uq/f1U2S
+ BMUesIg+7ziwxvfXZHZ9xlIT7J8NZjPiyZu/uFIm92HdUczxj4VqvWbZkBoSYyiPhj1c
+ 0KtrwEb9QLbZ6h+v/974nrEIfe52Hl3kqoQzssePTpN3j2UV8ca27+kU91wqz9KPG7vD
+ oGyA==
+X-Gm-Message-State: AHQUAua5sBm2/5l24MLNhX70f8QxVqov+fzWhkFRnAs31Rp2F4fdg1QW
+ e2rX3kLawJwPJpKLSIgZ6w==
+X-Google-Smtp-Source: AHgI3IbXLoAK4YSGlf/1B6UdA6HMitLBYK78VSh/g/m3XlsuVjw+0yPxEU0xuFfO9visa0O1JjIU8Q==
+X-Received: by 2002:a05:6830:1258:: with SMTP id
+ s24mr11905593otp.364.1551102555329; 
+ Mon, 25 Feb 2019 05:49:15 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id i5sm4152714oia.46.2019.02.25.05.49.13
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 25 Feb 2019 05:49:13 -0800 (PST)
+Date: Mon, 25 Feb 2019 07:49:13 -0600
+From: Rob Herring <robh@kernel.org>
+To: Lukasz Luba <l.luba@partner.samsung.com>
+Subject: Re: [PATCH 4/8] dt-bindings: devfreq: add DMC device description
+Message-ID: <20190225134913.GA32033@bogus>
+References: <CGME20190128192153eucas1p2d7a796cb89e68c1789069562e91296be@eucas1p2.samsung.com>
+ <1548703299-15806-1-git-send-email-l.luba@partner.samsung.com>
+ <1548703299-15806-5-git-send-email-l.luba@partner.samsung.com>
+ <CAJKOXPd2g6rtZpK20emJ0tqHhq0D01=BWbU_9MP30313XHvPHg@mail.gmail.com>
+ <79cd56c4-2415-7db1-be6f-73c03c0902bc@partner.samsung.com>
 MIME-Version: 1.0
-References: <20190225123615.49bce7cd@canb.auug.org.au>
- <CAK8P3a3moJ12SDM3Ow-Hw3qBeTv9siswK+9pPiEA4JJ+7k4xvg@mail.gmail.com>
- <s5hr2bw2k7m.wl-tiwai@suse.de>
- <e2aaed45-0fb1-c9c8-76d4-3b97b36cada6@nvidia.com>
-In-Reply-To: <e2aaed45-0fb1-c9c8-76d4-3b97b36cada6@nvidia.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 25 Feb 2019 14:38:50 +0100
-Message-ID: <CAK8P3a2Q7OAAYCU01TNpHR2SM7N=YunyqZEihSESnQwxzL5=Vg@mail.gmail.com>
-Subject: Re: linux-next: manual merge of the sound tree with the arm-soc tree
-To: Sameer Pujar <spujar@nvidia.com>
+Content-Disposition: inline
+In-Reply-To: <79cd56c4-2415-7db1-be6f-73c03c0902bc@partner.samsung.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_053908_734009_B3631174 
-X-CRM114-Status: GOOD (  21.09  )
+X-CRM114-CacheID: sfid-20190225_054917_141923_527CEF1F 
+X-CRM114-Status: GOOD (  29.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,69 +90,194 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>, DTML <devicetree@vger.kernel.org>,
- Takashi Iwai <tiwai@suse.de>, Mark Brown <broonie@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
- Linux Next Mailing List <linux-next@vger.kernel.org>,
- Olof Johansson <olof@lixom.net>, Thierry Reding <treding@nvidia.com>,
- ARM <linux-arm-kernel@lists.infradead.org>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ "linux-samsung-soc@vger.kernel.org" <linux-samsung-soc@vger.kernel.org>,
+ =?utf-8?Q?Bart=C5=82omiej_=C5=BBo=C5=82nierkiewicz?=
+ <b.zolnierkie@samsung.com>, linux-pm@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Krzysztof Kozlowski <krzk@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>,
+ Kyungmin Park <kyungmin.park@samsung.com>, myungjoo.ham@samsung.com,
+ Kukjin Kim <kgene@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 25, 2019 at 12:24 PM Sameer Pujar <spujar@nvidia.com> wrote:
-> On 2/25/2019 4:44 PM, Takashi Iwai wrote:
-> > On Mon, 25 Feb 2019 10:19:15 +0100, Arnd Bergmann wrote:
-> >> On Mon, Feb 25, 2019 at 2:36 AM Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> >> I see this property being used in commit c0bde003a013 ("ALSA:
-> >> hda/tegra: sound card name from device tree"), which removes
-> >> a questionable use of the root compatible property, replacing
-> >> it with the new 'nvidia,model' property. We don't do this for any
-> >> other subsystem, so why does the sound subsystem export
-> >> information about the board as a string here?
-> > The sound subsystem exports merely some understandable name string
-> > for the given sound card object, and that was composed from the
-> > compatible string in the past, which turned out to be useless on some
-> > configs.
-> >
-> > But this kind of addition is an extremely bad manner, I'm fine to
-> > revert these (at best with a better alternative).  This isn't about
-> > any functionality but rather some readable information that isn't a
-> > part of API.
+On Tue, Jan 29, 2019 at 05:02:49PM +0100, Lukasz Luba wrote:
+> Hi Krzysztof,
+> 
+> On 1/29/19 3:47 PM, Krzysztof Kozlowski wrote:
+> > On Mon, 28 Jan 2019 at 20:21, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+> >>
+> >> The patch adds description for DT binding for a new Exynos5 Dynamic Memory
+> >> Controller device.
+> >> It also contains needed MAINTAINERS file updates.
+> >>
+> >> CC: MyungJoo Ham <myungjoo.ham@samsung.com>
+> >> CC: Kyungmin Park <kyungmin.park@samsung.com>
+> >> CC: Chanwoo Choi <cw00.choi@samsung.com>
+> >> CC: Rob Herring <robh+dt@kernel.org>
+> >> CC: Mark Rutland <mark.rutland@arm.com>
+> >> CC: Kukjin Kim <kgene@kernel.org>
+> >> CC: Krzysztof Kozlowski <krzk@kernel.org>
+> >> CC: linux-pm@vger.kernel.org
+> >> CC: linux-samsung-soc@vger.kernel.org
+> >> CC: devicetree@vger.kernel.org
+> >> CC: linux-arm-kernel@lists.infradead.org
+> >> CC: linux-kernel@vger.kernel.org
+> >> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> >> ---
+> >>   .../devicetree/bindings/devfreq/exynos5-dmc.txt    | 108 +++++++++++++++++++++
+> >>   MAINTAINERS                                        |   7 ++
+> >>   2 files changed, 115 insertions(+)
+> >>   create mode 100644 Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+> >> new file mode 100644
+> >> index 0000000..914bd85
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+> >> @@ -0,0 +1,108 @@
+> >> +* Exynos5 frequency and voltage scaling for Dynamic Memory Controller device
+> >> +
+> >> +The Samsung Exynos5 SoC has DMC (Dynamic Memory Controller) to which the DRAM
+> >> +memory chips are connected. The driver is to monitor the controller in runtime
+> >> +and switch frequency and voltage. To monitor the usage of the controller in
+> >> +runtime, the driver uses the PPMU (Platform Performance Monitoring Unit), which
+> >> +is able to measure the current load of the memory.
+> >> +When 'userspace' governor is used for the driver, an application is able to
+> >> +switch the DMC frequency.
+> >> +
+> >> +Required properties for DMC device for Exynos5422:
+> >> +- compatible: Should be "samsung,exynos5422-bus".
+> >> +- clock-names : the name of clock used by the bus, "bus".
+> >> +- clocks : phandles for clock specified in "clock-names" property.
+> >> +- devfreq-events : phandles for PPMU devices connected to this DMC.
+> >> +
+> >> +The example definition of a DMC and PPMU devices declared in DT is shown below:
+> >> +
+> >> +       ppmu_dmc0_0: ppmu_dmc0_0@10d00000 {
+> >> +               compatible = "samsung,exynos-ppmu";
+> >> +               reg = <0x10d00000 0x2000>;
+> >> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_0>;
+> >> +               clock-names = "ppmu";
+> >> +               status = "okay";
+> >> +               events {
+> >> +                       ppmu_event_dmc0_0: ppmu-event3-dmc0_0 {
+> >> +                               event-name = "ppmu-event3-dmc0_0";
+> >> +                       };
+> >> +               };
+> >> +       };
+> >> +
+> >> +
+> >> +       ppmu_dmc0_1: ppmu_dmc0_1@10d10000 {
+> >> +               compatible = "samsung,exynos-ppmu";
+> >> +               reg = <0x10d10000 0x2000>;
+> >> +               clocks = <&clock CLK_PCLK_PPMU_DREX0_1>;
+> >> +               clock-names = "ppmu";
+> >> +               status = "okay";
+> >> +               events {
+> >> +                       ppmu_event_dmc0_1: ppmu-event3-dmc0_1 {
+> >> +                               event-name = "ppmu-event3-dmc0_1";
+> >> +                       };
+> >> +               };
+> >> +       };
+> >> +
+> >> +       ppmu_dmc1_0: ppmu_dmc1_0@10d10000 {
+> >> +               compatible = "samsung,exynos-ppmu";
+> >> +               reg = <0x10d60000 0x2000>;
+> >> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_0>;
+> >> +               clock-names = "ppmu";
+> >> +               status = "okay";
+> >> +               events {
+> >> +                       ppmu_event_dmc1_0: ppmu-event3-dmc1_0 {
+> >> +                               event-name = "ppmu-event3-dmc1_0";
+> >> +                       };
+> >> +               };
+> >> +       };
+> >> +
+> >> +       ppmu_dmc1_1: ppmu_dmc1_1@10d70000 {
+> >> +               compatible = "samsung,exynos-ppmu";
+> >> +               reg = <0x10d70000 0x2000>;
+> >> +               clocks = <&clock CLK_PCLK_PPMU_DREX1_1>;
+> >> +               clock-names = "ppmu";
+> >> +               status = "okay";
+> >> +               events {
+> >> +                       ppmu_event_dmc1_1: ppmu-event3-dmc1_1 {
+> >> +                               event-name = "ppmu-event3-dmc1_1";
+> >> +                       };
+> >> +               };
+> >> +       };
+> >> +
+> >> +       dmc: dmc@10c20000 {
+> >> +               compatible = "samsung,exynos5422-dmc";
+> >> +               reg = <0x10c20000 0x10000>, <0x10c30000 0x10000>,
+> >> +                       <0x10030000 0x1000>, <0x10000000 0x1000>;
+> >> +               clocks =        <&clock CLK_FOUT_SPLL>,
+> >> +                               <&clock CLK_MOUT_SCLK_SPLL>,
+> >> +                               <&clock CLK_FF_DOUT_SPLL2>,
+> >> +                               <&clock CLK_FOUT_BPLL>,
+> >> +                               <&clock CLK_MOUT_BPLL>,
+> >> +                               <&clock CLK_SCLK_BPLL>,
+> >> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE>,
+> >> +                               <&clock CLK_MOUT_MX_MSPLL_CCORE_PHY>,
+> >> +                               <&clock CLK_MOUT_MCLK_CDREX>,
+> >> +                               <&clock CLK_DOUT_CLK2X_PHY0>,
+> >> +                               <&clock CLK_CLKM_PHY0>,
+> >> +                               <&clock CLK_CLKM_PHY1>
+> >> +                       ;
+> > 
+> > Join with previous line.
+> > 
+> >> +               clock-names =   "fout_spll",
+> >> +                               "mout_sclk_spll",
+> >> +                               "ff_dout_spll2",
+> >> +                               "fout_bpll",
+> >> +                               "mout_bpll",
+> >> +                               "sclk_bpll",
+> >> +                               "mout_mx_mspll_ccore",
+> >> +                               "mout_mx_mspll_ccore_phy",
+> >> +                               "mout_mclk_cdrex",
+> >> +                               "dout_clk2x_phy0",
+> >> +                               "clkm_phy0",
+> >> +                               "clkm_phy1"
+> >> +                               ;
+> > 
+> > Ditto.
+> OK, I will fix it.
+> > 
+> >> +
+> >> +               status = "okay";
+> >> +               devfreq-events = <&ppmu_dmc0_0>, <&ppmu_dmc0_1>,
+> >> +                               <&ppmu_dmc1_0>, <&ppmu_dmc1_1>;
+> >> +       };
+> >> +
+> >> +
+> >> diff --git a/MAINTAINERS b/MAINTAINERS
+> >> index 9f64f8d..3581807 100644
+> >> --- a/MAINTAINERS
+> >> +++ b/MAINTAINERS
+> >> @@ -3310,6 +3310,13 @@ S:       Maintained
+> >>   F:     drivers/devfreq/exynos-bus.c
+> >>   F:     Documentation/devicetree/bindings/devfreq/exynos-bus.txt
+> >>
+> >> +DMC FREQUENCY DRIVER FOR SAMSUNG EXYNOS5
+> >> +M:     Lukasz Luba <l.luba@partner.samsung.com>
+> >> +L:     linux-pm@vger.kernel.org
+> >> +L:     linux-samsung-soc@vger.kernel.org
+> >> +S:     Maintained
+> >> +F:     Documentation/devicetree/bindings/devfreq/exynos5-dmc.txt
+> > 
+> > Maintainers change should go with the next change, I think. It looks
+> > unusual to add an entry for driver... without the driver.
+> Thank you for the review. I will move the dt-bindings in the patch set
+> after the dmc driver file. Then the MAINTAINERS file will be updated
+> only by one entry.
 
-It is not extremely bad, but it is at the minimum surprising.
+No, bindings should come first. Just move this hunk to the driver patch 
+including the line here for the binding.
 
-> The motivation for adding custom sound card name is following,
-> 1. When for boards, multiple HDMI/DP ports are exposed, it is sometimes
->     necessary to know the default port or any customization for that matter.
->     Audio userspace can distinguish based on the sound card names.
-> 2. Multiple sound cards can coexist for a platform, the indication of
-> particular
->     audio path is useful.
-> 3. It can help to customize audio paths.
->     Generally people use "*,model" property in DT to name the sound complex.
->     Ex: "samsung,model" [sound/soc/samsung/snow.c]
->         "rockchip,model" [sound/soc/rockchip/rockchip_rt5645.c]
-
-I see, I had not noticed those before. They do seem a little unusual,
-and inconsistent, as the samsung sames are always names the board
-there, but rockchip doesn't: one board names it just "I2C", the other
-one uses "VEYRON-I2S", and the example in the documentation lists
-"ROCKCHIP-I2S" and "Analog audio output", each of them following
-different naming systems.
-
-In Documentation/devicetree/bindings/sound/qcom,apq8096.txt, a
-"qcom,model" property is listeds as "Obsolete", and replaced by
-a "model" property. This is in turn also used on amlogic, freescale,
-and some samsung platforms.
-
-My impression here is that the idea of passing a model name
-through DT is well established, but for new stuff, we probably
-want to standardize on plain "model" rather than "$vendor,model".
-
-       Arnd
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
