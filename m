@@ -2,64 +2,79 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2BEFDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 14:20:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3DA0EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 14:27:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EEE48213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 14:20:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F1E120842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 14:27:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QQ5EHbwG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EEE48213A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eEV3IBo+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F1E120842
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d/pWDxmciuBaDtMTM0jhXwxWhdxC8CmEYEw/xnZWWIU=; b=QQ5EHbwGSBmQ9m
-	kAfCXvDIK2e3VLhk+idXJVZAM5joC1x9ulXFnXMgVhFo78WZAblIVuu/V+pU1X5BoaNBsbbwKYAKG
-	A7bNn+1KZcm5l4QXAstkhC3uQQ0vpwj/rMMQsvne1MXx5PIWRHCUVxb9eql37UlmKUdkWCNREYxG0
-	WgZiGMB4Ide7OcBRnOBhuhjrlHM/EckeaNljj6b71tNQ2vg9qnxbspXEkVTKFUJnplEMR8j+Cz/TR
-	9mpnYBUDn9Y4Ce+NLIfR1NWIN2OWT7rUrO5ew4Clt5aQagA/wx7wqMKbuttQbuFAIzgD6eFIfcaEw
-	sNFVtLbvuPnipYNXPk1Q==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=5qXZsPXmSz3Gmo8eud3cE+JzXwzkMHvpLa0Kh2Olhxw=; b=eEV3IBo+gAUYRZ
+	aCUerLAjZc0IkZJiQy4xMvsBZGHUWljrRTpJTND6LRLUCnkV+6yjrONtty3UV2NOdAdPeAsvF4CUR
+	edYfEyIBOZbvenwApH6H6OOj+vPut+Lq2wSSbETGbbXLIA6YR/HEzON+SuP+7x8fsfVdZMGEE+KdJ
+	l79g+f2xdMp81WVqrZB717PK9Zr/ZJCtX8MY6yjcwGz4kM8E9WjWtlISb3zxiekaui3kiIKj46bz6
+	52TNB882CEuhOPdP3KRZ5nKQ6LuUYvgZy4h2khcZy8aUu6sh+Wxt4ApO7bMiRLcXAJJ9T/Ar+38N6
+	CPOQytmlqDXk5HKNH6Cw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyH7N-0000C6-9d; Mon, 25 Feb 2019 14:20:29 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyH7J-0008Ur-Od
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 14:20:27 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BCDA180D;
- Mon, 25 Feb 2019 06:20:24 -0800 (PST)
-Received: from [10.163.1.20] (unknown [10.163.1.20])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B755D3F575;
- Mon, 25 Feb 2019 06:20:21 -0800 (PST)
-Subject: Re: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
- stage-2 page tables
-To: Mark Rutland <mark.rutland@arm.com>
-References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
- <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
- <20190225110014.GB26236@lakrids.cambridge.arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
-Date: Mon, 25 Feb 2019 19:50:27 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gyHE4-0002Sk-C3; Mon, 25 Feb 2019 14:27:24 +0000
+Received: from mail-oi1-f193.google.com ([209.85.167.193])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyHE0-0002SQ-Hv
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 14:27:21 +0000
+Received: by mail-oi1-f193.google.com with SMTP id w66so7376910oia.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 25 Feb 2019 06:27:20 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=ihiU+3n7h/gaAsQlqiSrq+3amM5GIY0eWEX29/lDcjQ=;
+ b=U5Gju6o08XAXyJvl3rsYp5n8V3Mm9KCi2X3l4PqHIF9U4dGsiCPiznrZfbjt+iMUt9
+ lfkjJnL1KlmGsDYIbfDSsddWZ59Hl68t7Xl3HIzZk8OECZjtFx/Mt6H8pELug/ht4Tcw
+ mREUImQM7H2YZbmqlHoG0TKpivzRZmMUmrq/D/+StczJwRiKOvYfuf/Vu6sSDb01q2qs
+ xJiZjUtw7MB8g97NTf0RB6gCmIz+qzJjzsmdavH52OqLPud8YKnfgb1qKl6qMJJO3LpN
+ AR7jNOHRNLvDNjStwWSBYN3zQbL1tfadYmsbgaDKreVL5i9cBMAu0P87Pam21sXGyeuQ
+ j5Xg==
+X-Gm-Message-State: AHQUAuYOYaEFhr2Ybtgzp8OceBcPzmsB4pZLj9xzOVpLjqaJIJPAsIHj
+ 8Fs5Ce18iS3qUmgBIo82XA==
+X-Google-Smtp-Source: AHgI3IZ6apreZ78o4sLjGiIC8bpimsbT4Nk/ecvVgZFMtigSXkVkYd4tNgh+HzDxUvGtx6aZEV80Ng==
+X-Received: by 2002:aca:a90f:: with SMTP id s15mr11456206oie.42.1551104839108; 
+ Mon, 25 Feb 2019 06:27:19 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id 3sm1335113ots.75.2019.02.25.06.27.18
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 25 Feb 2019 06:27:18 -0800 (PST)
+Date: Mon, 25 Feb 2019 08:27:17 -0600
+From: Rob Herring <robh@kernel.org>
+To: Jernej Skrabec <jernej.skrabec@siol.net>
+Subject: Re: [PATCH 1/6] dt-bindings: media: cedrus: Add H6 compatible
+Message-ID: <20190225142717.GA27983@bogus>
+References: <20190128205504.11225-1-jernej.skrabec@siol.net>
+ <20190128205504.11225-2-jernej.skrabec@siol.net>
 MIME-Version: 1.0
-In-Reply-To: <20190225110014.GB26236@lakrids.cambridge.arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190128205504.11225-2-jernej.skrabec@siol.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_062025_808180_4960C82F 
-X-CRM114-Status: GOOD (  14.87  )
+X-CRM114-CacheID: sfid-20190225_062720_593258_93EB07D5 
+X-CRM114-Status: GOOD (  13.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,55 +86,26 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: yuzhao@google.com, Steve.Capper@arm.com, marc.zyngier@arm.com,
- Catalin.Marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
- james.morse@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org, maxime.ripard@bootlin.com,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org, wens@csie.org,
+ robh+dt@kernel.org, mchehab@kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 02/25/2019 04:30 PM, Mark Rutland wrote:
-> Hi Anshuman,
+On Mon, 28 Jan 2019 21:54:59 +0100, Jernej Skrabec wrote:
+> This adds a compatible for H6. H6 VPU supports 10-bit HEVC decoding and
+> additional AFBC output format for HEVC.
 > 
-> On Mon, Feb 25, 2019 at 10:33:54AM +0530, Anshuman Khandual wrote:
->> ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
->> constructs. Certain stage-2 page table allocations are multi order which
->> cannot be allocated through a generic pgtable function as it does not exist
->> right now. This prevents all pgtable allocations including multi order ones
->> in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
->> functions. Hence remove all generic pgtable allocation function dependency
->> from stage-2 page tables till there is one multi-order allocation function
->> available.
-> 
-> I'm a bit confused by this. Which allocations are multi-order?
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  Documentation/devicetree/bindings/media/cedrus.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 
-Stage-2 PGD.
-
-kvm_alloc_stage2_pgd -> alloc_pages_exact
-kvm_free_stage2_pgd -> free_pages_exact
- 
-> Why does that prevent other allcoations from using the regular routines?
-
-At present both stage-2 PGD (kvm_alloc_stage2_pgd -> alloc_pages_exact), PUD|PMD
-(mmu_memory_cache_alloc) allocates directly from buddy allocator but then while
-freeing back stage-2 PGD directly calls buddy allocator via free_pages_exact but
-PUD|PMD get freed with stage2_[pud|pmd]_free which calls pud|pmd_free instead
-of calling free_pages() directly.
-
-All of these worked fine because pud|pmd_free called free_pages() directly with
-out going through pgtable_page_dtor(). But now we are changing pud|pmd_free to
-use pgtable_page_dtor() both for user and host kernel page tables. This will
-break stage2 page table (bad page state errors) because the new free path which
-would call pgtable_page_dtor() where as alloc patch never called pgtable_page_ctor().
-
-To fix this situation either we move all stage-2 page table to use pte_alloc_one()
-and pte_free() which goes through pgtable_page_ctor/dtor cycle or just keep the
-virtualization page tables out of it (stage2/hyp) and remove the only dependency
-which breaks because of these changes. This series went with the second option. 
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
