@@ -2,23 +2,21 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E2FFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:08:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 23CB8C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:09:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 03CC420C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:08:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDC0B20C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:09:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MTcrPYKL";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=kernel-dk.20150623.gappssmtp.com header.i=@kernel-dk.20150623.gappssmtp.com header.b="0yeEVCrU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 03CC420C01
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kernel.dk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i8OCWVJh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDC0B20C01
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,75 +24,87 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V/PYpaiswUr7LWR9ZFAlNhZ8pZDmeylsL/zYbSb8xKY=; b=MTcrPYKLvnFWtS
-	DoyIZRYrUgepLbTdzJYRbYVo2MJWDJK40zz2nv0psBHrMcywD8csaxrvko5bL9pJs58oA8+Y0x8ig
-	kb+M/f04EUaX+qWQoMMbCCYcaHMOsUWTdulhnaku9x+kZ1rDitJJkfk9mN8vzR8Q0XidG2+Ft5yug
-	WDz/rM6vFEN0CCrOqUlJ7FndxXMXRRjR5CSXL+kDLliSpvhC4v9mLWA1piGZ2yX48TaW30EWVLTHI
-	wj+mvgIjabHDTcQPdTivAdmya+huN9mH3EGLPIs+asmdkCyTeVhpwS6Wyo12+mAOFlAkVsBMzk3CK
-	NuW8+Syv4VduQi6HPj+w==;
+	List-Owner; bh=dUZv8hsiKfxmS8U4Z12S6kclXuuyRfhTpfxrBp91Eoc=; b=i8OCWVJh/vFNx3
+	Tkh8EBtTX1sWblDbrJGTuuntqY4XvFP2rR3cuPI/dmsa0fDM4GiwNsltDrA5i5Z/U0RH4Q7QuSDwo
+	gaum7veUI0endHJ6IE0hYp7FK2ZOafDagW97gCMPibLmhrwNCt/gLQh5PFPkhFMeINwLXbyPaB+SJ
+	TitAaThjIgkWoh/zdV8dY3DC6iXPy+f8l0hlFgUEZwkeH/kNp5Tj8svOyE4E3Bzrc2VD3JIzWPyQv
+	zR3QOA81VaknAF3Cu5W/XQTK2iGZqICLJzuEf6zxJ6TgDYeV4jRwMCL7m5Sdn2uze1SZVSi81wxcf
+	kbCPTXefQxvws3CfFN+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyKgE-0008OT-L9; Mon, 25 Feb 2019 18:08:42 +0000
-Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyKg9-0008NU-PH
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 18:08:40 +0000
-Received: by mail-it1-x143.google.com with SMTP id z124so201086itc.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 10:08:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=kernel-dk.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=LuPrmiZn3Jzlwax8dphP4Ke/rqAVhfr7A6djLJF7N8U=;
- b=0yeEVCrUXwCCwnyAg6fEQtnUqEXilLkmBJ+FClhlMN7nr/r8yMhfy2NiTR6xpet1cG
- qtpKNE4S95cRAK/zU3TdlLs1VMxeM1WMNa4KaURM3h98psRaX7r4P4bMhp2UsBJbAFYn
- ruBSvRekcduqvemxKWT/4Dg+YrwqnghFU5kk6dj4IAYkwkVYCv1F5LgpFjKeC6Xd8vvM
- CxZJW5wiDJToV6cN8axLuOrIxq2CFNSD194DiLLTwO0r3kPvd8mozvVBkbAxEUQiiAgY
- j7nx5M1ym6Phwxk5pOGRfmfp0RX3ogazuvSBtHPdNxZHauHKHOqTZhP366PovyvTScCB
- OuMg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=LuPrmiZn3Jzlwax8dphP4Ke/rqAVhfr7A6djLJF7N8U=;
- b=FNAR3dsjfgDbu079uhtB5kx6joDxWShzdMr7AV8gqzgX+2kPxuTS7Etq1fveGMcwbU
- cf4iljDSkPOUntcJUsAsEidvjDturRilbvmnCNTJ+1tyb6+1Wkdx+7bgWmMoimDOuzg2
- 3Zj/+sEcRVgspgkxKUMuUottoTJQQ0tOxfxsLV66nMyndUMGmhv8s6HihOafkl9pfyTU
- j6qq1PStYuITwtpeqyJjMlEIiY1yr/QiDPsdNNNDF+uWmKgV+drKwwLJF01eogk6+yB4
- QlK4Dvxn8eZNyTMHr8hDUxOvMSak0MwFpxqb3XhDOCwe0gmWUtqyYnYr08JsWbHgwszC
- SCBA==
-X-Gm-Message-State: AHQUAubBugchjWMutBkgpCd4bSew2zU3oq6CTcc+A6ds29icET3siiTI
- YYQmXBnsttHRHabiB9Q6SIhdkA==
-X-Google-Smtp-Source: AHgI3IbBQhCvfL2ORtSpyhzVMuNflsynIaZvNjpfC/9T0I9+L59q+2e6+5WaEH8M8xDDDKxTFp1JxA==
-X-Received: by 2002:a05:660c:fcc:: with SMTP id m12mr54707itn.25.1551118116238; 
- Mon, 25 Feb 2019 10:08:36 -0800 (PST)
-Received: from [192.168.1.158] ([216.160.245.98])
- by smtp.gmail.com with ESMTPSA id r17sm5356978ita.31.2019.02.25.10.08.33
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 10:08:35 -0800 (PST)
-Subject: Re: [PATCH 2/5] ata: libahci_platform: Support per-port interrupts
-To: Hans de Goede <hdegoede@redhat.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>
-References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
- <20190222145356.23072-3-miquel.raynal@bootlin.com>
- <5040d4cf-7da1-eefa-a8a3-bc4054d528da@redhat.com>
- <20190222163114.0f4488fe@xps13>
- <c847985c-7117-6b31-ae78-4467871714c8@redhat.com>
- <20190222170348.12e45f42@xps13>
- <09a58952-ca34-cbfb-d0a9-d6c9f8afcb8b@redhat.com>
-From: Jens Axboe <axboe@kernel.dk>
-Message-ID: <cd592577-c807-7e8f-1b08-7b28947c62c3@kernel.dk>
-Date: Mon, 25 Feb 2019 11:08:32 -0700
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gyKhA-0000JJ-4c; Mon, 25 Feb 2019 18:09:40 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyKh6-0000IV-B8
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 18:09:38 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A3A8F374;
+ Mon, 25 Feb 2019 10:09:34 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ D87093F703; Mon, 25 Feb 2019 10:09:31 -0800 (PST)
+Subject: Re: [PATCH v6 1/6] arm64/kvm: preserve host HCR_EL2 value
+To: Mark Rutland <mark.rutland@arm.com>,
+ Amit Daniel Kachhap <amit.kachhap@arm.com>
+References: <1550568271-5319-1-git-send-email-amit.kachhap@arm.com>
+ <1550568271-5319-2-git-send-email-amit.kachhap@arm.com>
+ <20190221115034.GA33673@lakrids.cambridge.arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ mQINBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
+ g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
+ t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
+ ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
+ qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
+ 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
+ ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
+ t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
+ lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
+ DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABtCNNYXJjIFp5bmdp
+ ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPokCOwQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
+ AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
+ LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
+ 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
+ TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
+ 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
+ 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
+ UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
+ bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
+ LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
+ cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
+ 6ilrF8m5Ag0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
+ 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
+ w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
+ VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
+ w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
+ QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
+ hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
+ o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
+ AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
+ BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAGJAh8EGAEC
+ AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
+ mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
+ MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
+ 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
+ kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
+ 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
+ a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
+ qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
+ hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
+ yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
+Organization: ARM Ltd
+Message-ID: <01fc3209-1cc2-9ef8-be87-ea04bc44b89b@arm.com>
+Date: Mon, 25 Feb 2019 18:09:29 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-In-Reply-To: <09a58952-ca34-cbfb-d0a9-d6c9f8afcb8b@redhat.com>
+In-Reply-To: <20190221115034.GA33673@lakrids.cambridge.arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_100837_969834_5B7B7D72 
-X-CRM114-Status: GOOD (  22.93  )
+X-CRM114-CacheID: sfid-20190225_100936_387790_74403858 
+X-CRM114-Status: GOOD (  21.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,113 +116,101 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Marc Zyngier <marc.zyngier@arm.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Antoine Tenart <antoine.tenart@bootlin.com>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Andrew Jones <drjones@redhat.com>, linux-kernel@vger.kernel.org,
+ Julien Thierry <julien.thierry@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>,
+ Kristina Martsenko <kristina.martsenko@arm.com>, kvmarm@lists.cs.columbia.edu,
+ James Morse <james.morse@arm.com>,
+ Ramana Radhakrishnan <ramana.radhakrishnan@arm.com>,
+ Dave Martin <Dave.Martin@arm.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 2/22/19 9:10 AM, Hans de Goede wrote:
+On 21/02/2019 11:50, Mark Rutland wrote:
 > Hi,
 > 
-> On 2/22/19 5:03 PM, Miquel Raynal wrote:
->> Hi Hans,
+> On Tue, Feb 19, 2019 at 02:54:26PM +0530, Amit Daniel Kachhap wrote:
+>> From: Mark Rutland <mark.rutland@arm.com>
 >>
->> Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:52:55
->> +0100:
+>> When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
+>> is a constant value. This works today, as the host HCR_EL2 value is
+>> always the same, but this will get in the way of supporting extensions
+>> that require HCR_EL2 bits to be set conditionally for the host.
 >>
->>> Hi,
->>>
->>> On 2/22/19 4:31 PM, Miquel Raynal wrote:
->>>> Hi Hans,
->>>>
->>>> Hans de Goede <hdegoede@redhat.com> wrote on Fri, 22 Feb 2019 16:26:01
->>>> +0100:
->>>>    
->>>>> Hi,
->>>>>
->>>>> On 2/22/19 3:53 PM, Miquel Raynal wrote:
->>>>>> Right now the ATA core only allows IPs to use a single interrupt. Some
->>>>>> of them (for instance the Armada-CP110 one) actually has one interrupt
->>>>>> per port. Add some logic to support such situation.
->>>>>>
->>>>>> We consider that either there is one single interrupt declared in the
->>>>>> main IP node, or there are per-port interrupts, each of them being
->>>>>> declared in the port sub-nodes.
->>>>>>
->>>>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
->>>>>> ---
->>>>>>     drivers/ata/acard-ahci.c       |  2 +-
->>>>>>     drivers/ata/ahci.c             |  2 +-
->>>>>>     drivers/ata/ahci.h             |  3 +-
->>>>>>     drivers/ata/libahci.c          |  2 +-
->>>>>>     drivers/ata/libahci_platform.c | 66 ++++++++++++++++++++++++++++------
->>>>>>     drivers/ata/sata_highbank.c    |  2 +-
->>>>>>     6 files changed, 61 insertions(+), 16 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/ata/acard-ahci.c b/drivers/ata/acard-ahci.c
->>>>>> index 583e366be7e2..9414b81e994c 100644
->>>>>> --- a/drivers/ata/acard-ahci.c
->>>>>> +++ b/drivers/ata/acard-ahci.c
->>>>>> @@ -434,7 +434,7 @@ static int acard_ahci_init_one(struct pci_dev *pdev, const struct pci_device_id
->>>>>>     	if (!hpriv)
->>>>>>     		return -ENOMEM;
->>>>>>     > -	hpriv->irq = pdev->irq;
->>>>>> +	hpriv->irqs[0] = pdev->irq;
->>>>>>     	hpriv->flags |= (unsigned long)pi.private_data;
->>>>>>       >> What code-path is going to alloc hpriv->irqs for drivers using this code-path
->>>>> which are not using libahci_platform .c ?
->>>>
->>>> I don't understand the question (or the remark behind the question),
->>>> can you explain a little bit more what you have in mind?
->>>
->>> Sorry I got the code context wrong I meant to put that comment below this chunk:
->>>
->>>   > diff --git a/drivers/ata/ahci.c b/drivers/ata/ahci.c
->>>   > index 021ce46e2e57..18bce556d85f 100644
->>>   > --- a/drivers/ata/ahci.c
->>>   > +++ b/drivers/ata/ahci.c
->>>   > @@ -1817,7 +1817,7 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
->>>   >   		/* legacy intx interrupts */
->>>   >   		pci_intx(pdev, 1);
->>>   >   	}
->>>   > -	hpriv->irq = pci_irq_vector(pdev, 0);
->>>   > +	hpriv->irqs[0] = pci_irq_vector(pdev, 0);
->>>   >
->>>   >   	if (!(hpriv->cap & HOST_CAP_SSS) || ahci_ignore_sss)
->>>   >   		host->flags |= ATA_HOST_PARALLEL_SCAN;
->>>
->>>
->>> Which AFAIK is a common code-path also used by ahci drivers not using
->>> libahci_platform, and in that case hpriv->irqs will be NULL as nothing
->>> initializes it.
+>> To allow such features to work without KVM having to explicitly handle
+>> every possible host feature combination, this patch has KVM save/restore
+>> for the host HCR when switching to/from a guest HCR. The saving of the
+>> register is done once during cpu hypervisor initialization state and is
+>> just restored after switch from guest.
 >>
->> Oh I see. What do you prefer:
->> 1/
->> * I add "irqs" besides "irq" in the structure
->> * copy the value of irq in irqs[0]
->> * use irqs instead of irq in the libahci_platform ?
->> or
->> 2/
->> * Allocated one irq there if there is none ?
+>> For fetching HCR_EL2 during kvm initialisation, a hyp call is made using
+>> kvm_call_hyp and is helpful in NHVE case.
+>>
+>> For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
+>> to toggle the TGE bit with a RMW sequence, as we already do in
+>> __tlb_switch_to_guest_vhe().
+>>
+>> The value of hcr_el2 is now stored in struct kvm_cpu_context as both host
+>> and guest can now use this field in a common way.
+>>
+>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>> [Added __cpu_copy_hyp_conf, hcr_el2 field in struct kvm_cpu_context]
+>> Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: kvmarm@lists.cs.columbia.edu
 > 
-> I don't really have a preference, Jens what is your take on this?
+> [...]
+> 
+>> +/**
+>> + * __cpu_copy_hyp_conf - copy the boot hyp configuration registers
+>> + *
+>> + * It is called once per-cpu during CPU hyp initialisation.
+>> + */
+>> +static inline void __cpu_copy_hyp_conf(void)
+> 
+> I think this would be better named as something like:
+> 
+>   cpu_init_host_ctxt()
+> 
+> ... as that makes it a bit clearer as to what is being initialized.
+> 
+> [...]
+> 
+>> +/**
+>> + * __kvm_populate_host_regs - Stores host register values
+>> + *
+>> + * This function acts as a function handler parameter for kvm_call_hyp and
+>> + * may be called from EL1 exception level to fetch the register value.
+>> + */
+>> +void __hyp_text __kvm_populate_host_regs(void)
+>> +{
+>> +	struct kvm_cpu_context *host_ctxt;
+>> +
+>> +	if (has_vhe())
+>> +		host_ctxt = this_cpu_ptr(&kvm_host_cpu_state);
+>> +	else
+>> +		host_ctxt = __hyp_this_cpu_ptr(kvm_host_cpu_state);
+> 
+> Do we need the has_vhe() check here?
+> 
+> Can't we always do:
+> 
+> 	host_ctxt = __hyp_this_cpu_ptr(kvm_host_cpu_state);
+> 
+> ... regardless of VHE? Or is that broken for VHE somehow?
 
-Single array would be the cleanest, don't add an irqs[] beside the
-irq.
+The whole point of __hyp_this_cpu_ptr is that it is always valid...
+See 85478bab40917 for details.
 
+Thanks,
+
+	M.
 -- 
-Jens Axboe
-
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
