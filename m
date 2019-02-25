@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D27EC10F00
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:27 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3D121C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D03682087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 05BA92087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m/siBvJ+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D03682087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="afW4dmYC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05BA92087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,39 +26,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=6Ad4jmJZAX0i9FEysHYIB8WX8ieOkDK/jmc1uU0VWa4=; b=m/siBvJ+UBIliXJusVeh9K06af
-	imo1J9PvxuJMRkcbuofNDIpjVfUs8El3L7Y3Qt6PcDHycKr4crE0MdrUJUcALYm6puy9do/qkpJWT
-	C8MALUPkezP2ay915+Ng8hrIS2AbhifbAzrgauyp5G4h+dLnZQO2mm/i4GW4Lir3rnehEKmCTzZJa
-	Wm3+lBZyFUqAxIQExC+zC8QuzYDxtY+vNEETQJAE+MyqjGo1+6N08wEOWoFQNfCQYD44YFlx/ndSA
-	6/6APZfhsJywSMOeGy4kN+31HabA1HVuVTKqHRUCN1ss+i+YEUnsqj1fKT+020LsTh+EkNj6nZzwO
-	0PF0Baqw==;
+	bh=NTenXRt7wa/8I0Ah9I980mzxvytg39B+meIjO7iIAqg=; b=afW4dmYCFcUVisnHX+jAqoSS3c
+	ZnAihv2BxlPJvWs1kAX6RTwBbwllsdC2fyt5/ZD9JEYQ+E1Kz2VOMnn2ec17tSh91AQGIl5RNSQJ5
+	ZSpU0JWhhBYPwSH/wkFNmPMrxGseXJqAj6ijL1bFBnSLHkXcNhaKTNGBZl5WF+utgN8UxPPAlPNjT
+	l4U0FaCTsj2pPCtDWNcIV/e2pmJzLT4NMP6hWqRfLKo/ltq/CLbWSvtNhX61zLvp7kKRRaqizV5XI
+	KQTD7VSoYsJbdOgKOp1vDOuXD+nM6X9P+TRkMlitxj4ohQmgTvCbh9KaPZ+t1fTKmTP7x3HVudiU7
+	mqT5gVTQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy8R4-0006AA-3i; Mon, 25 Feb 2019 05:04:14 +0000
+	id 1gy8RZ-0006gS-AB; Mon, 25 Feb 2019 05:04:45 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy8R0-000698-4T
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:11 +0000
+ id 1gy8R1-00069k-OO
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:13 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F5C31596;
- Sun, 24 Feb 2019 21:04:06 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6391815AD;
+ Sun, 24 Feb 2019 21:04:09 -0800 (PST)
 Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
  [10.162.42.159])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 307A03F5C1;
- Sun, 24 Feb 2019 21:04:02 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 843233F5C1;
+ Sun, 24 Feb 2019 21:04:06 -0800 (PST)
 From: Anshuman Khandual <anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
- stage-2 page tables
-Date: Mon, 25 Feb 2019 10:33:54 +0530
-Message-Id: <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
+Subject: [PATCH V2 2/6] arm64/mm: Make pgd_pgtable_alloc() call
+ pte_alloc_one() always
+Date: Mon, 25 Feb 2019 10:33:55 +0530
+Message-Id: <1551071039-20192-3-git-send-email-anshuman.khandual@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
 References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_210410_174889_593D119B 
-X-CRM114-Status: GOOD (  11.40  )
+X-CRM114-CacheID: sfid-20190224_210411_791857_062D906E 
+X-CRM114-Status: GOOD (  14.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,64 +79,49 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
-constructs. Certain stage-2 page table allocations are multi order which
-cannot be allocated through a generic pgtable function as it does not exist
-right now. This prevents all pgtable allocations including multi order ones
-in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
-functions. Hence remove all generic pgtable allocation function dependency
-from stage-2 page tables till there is one multi-order allocation function
-available.
+pgd_pgtable_alloc() provides page allocation function while creating all
+levels of page table (PGD, PUD, CONT PMD etc) for various kernel mappings.
+It calls __get_free_page() and initializes page with pagetable_page_ctor().
+pte_alloc_one() already provides a standard interface for allocating a page
+table page and initializes it with pagetable_page_ctor(). This removes the
+redundancy and instead make it call pte_alloc_one() directly.
 
 Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 ---
- arch/arm/include/asm/stage2_pgtable.h   | 4 ++--
- arch/arm64/include/asm/stage2_pgtable.h | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/mm/mmu.c | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
-index de2089501b8b..417a3be00718 100644
---- a/arch/arm/include/asm/stage2_pgtable.h
-+++ b/arch/arm/include/asm/stage2_pgtable.h
-@@ -32,14 +32,14 @@
- #define stage2_pgd_present(kvm, pgd)		pgd_present(pgd)
- #define stage2_pgd_populate(kvm, pgd, pud)	pgd_populate(NULL, pgd, pud)
- #define stage2_pud_offset(kvm, pgd, address)	pud_offset(pgd, address)
--#define stage2_pud_free(kvm, pud)		pud_free(NULL, pud)
-+#define stage2_pud_free(kvm, pud)		free_page((unsigned long)pud)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index b6f5aa52ac67..2dbd72319152 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -372,13 +372,22 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
  
- #define stage2_pud_none(kvm, pud)		pud_none(pud)
- #define stage2_pud_clear(kvm, pud)		pud_clear(pud)
- #define stage2_pud_present(kvm, pud)		pud_present(pud)
- #define stage2_pud_populate(kvm, pud, pmd)	pud_populate(NULL, pud, pmd)
- #define stage2_pmd_offset(kvm, pud, address)	pmd_offset(pud, address)
--#define stage2_pmd_free(kvm, pmd)		pmd_free(NULL, pmd)
-+#define stage2_pmd_free(kvm, pmd)		free_page((unsigned long)pmd)
- 
- #define stage2_pud_huge(kvm, pud)		pud_huge(pud)
- 
-diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
-index 5412fa40825e..915809e4ac32 100644
---- a/arch/arm64/include/asm/stage2_pgtable.h
-+++ b/arch/arm64/include/asm/stage2_pgtable.h
-@@ -119,7 +119,7 @@ static inline pud_t *stage2_pud_offset(struct kvm *kvm,
- static inline void stage2_pud_free(struct kvm *kvm, pud_t *pud)
+ static phys_addr_t pgd_pgtable_alloc(void)
  {
- 	if (kvm_stage2_has_pud(kvm))
--		pud_free(NULL, pud);
-+		free_page((unsigned long)pud);
+-	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
+-	if (!ptr || !pgtable_page_ctor(virt_to_page(ptr)))
+-		BUG();
++
++	pgtable_t ptr;
++
++	/*
++	 * pgd_pgtable_alloc() is called while creating kernel mappings
++	 * through __create_pgd_mapping() might not install it through
++	 * swapper_pg_dir (&init_mm). Even then init_mm is passed here
++	 * just to indicate that the allocation is kernel specific not
++	 * for the user space page tables.
++	 */
++	ptr = pte_alloc_one(&init_mm);
++	BUG_ON(!ptr);
+ 
+ 	/* Ensure the zeroed page is visible to the page table walker */
+ 	dsb(ishst);
+-	return __pa(ptr);
++	return page_to_phys(ptr);
  }
  
- static inline bool stage2_pud_table_empty(struct kvm *kvm, pud_t *pudp)
-@@ -192,7 +192,7 @@ static inline pmd_t *stage2_pmd_offset(struct kvm *kvm,
- static inline void stage2_pmd_free(struct kvm *kvm, pmd_t *pmd)
- {
- 	if (kvm_stage2_has_pmd(kvm))
--		pmd_free(NULL, pmd);
-+		free_page((unsigned long)pmd);
- }
- 
- static inline bool stage2_pud_huge(struct kvm *kvm, pud_t pud)
+ /*
 -- 
 2.20.1
 
