@@ -2,83 +2,125 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F35BCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:03:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7ED20C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:11:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C41EC2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:03:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4A0B72087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:11:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kq+5oGkU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="XHlgJWUe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C41EC2087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BjEHWDzo";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="O436PpfP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4A0B72087C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tKAQMvpeQS2mXb6rkEuvOhdl01M2tQPbWQTkvv36UKc=; b=kq+5oGkUp5Hr+D
-	AtXQgYS2AyaefF599RUoqnJhIb+INdLRUFyg1VK1qnxHOdmY0TGKSLV9ZixRbsBVtDZslp+1gw4uv
-	kuutZmFivokOGwzbBdVj6qoElx5oZewQnr+tgHIoCE6yCLt9xD5dQZYBdbh/BLi2ol5HJC920BOIS
-	UoRQjwEg2qZJZ0+F2BXR7eT+5mYxuQl+WAM1Yg3FZtA2dJQo7T6x4vYNgI5eILrE3DysQuRVHRcIH
-	9XT6mDihwWgJsVvS78TZhTFhkXPGwwufGnTUdZNTz1tih8f/P3jvQCOzUTpKW8TzyJ+db1lSKkkJ8
-	YSYY8lOJ7a1kQsJoC/lw==;
+	List-Owner; bh=bVeqeASgqZgl3R+YeTbimraHKEeY/ZI8/pJaxG5qQYs=; b=BjEHWDzo8l1IDF
+	A0rGQHJV6BiodEDPJ4shMdjDUm+Ro4anbmTz1MlCkWJT74AUeprcpS7JBt+yFU11kHBPxoUSUrb1f
+	c9Uk+6hE0aBNvb0HA9/u2gslNVYmp+3pX5W3MWsDRd8/rK0T5P2wsWI4f1VSDxhbJ3DsYU5oh/dlj
+	FSkHiZIQO6k/BrPqWPci0cxkyFd+Y0ZLcpzbeOE36UplBys+kSJILypauhuqSryzA1ZhZYenHPtYX
+	PTWNw/kn8EeddE6w4hKXP5CI5U+bPKMeTys7DvxXW7nfvbiNWfyhMtUg6DBPsRA+WnS92UNzy+uqy
+	mahXi+Q2DozZXj8Ab8OQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyHms-0000sl-Dc; Mon, 25 Feb 2019 15:03:22 +0000
-Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
+	id 1gyHup-0004G4-LM; Mon, 25 Feb 2019 15:11:35 +0000
+Received: from mail-eopbgr30073.outbound.protection.outlook.com ([40.107.3.73]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyHmp-0000l4-8e
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 15:03:21 +0000
-Received: by mail-oi1-x243.google.com with SMTP id z14so7516985oid.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 07:03:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=JwnbB+HBTo5JOYnPid93hiHgo2MFCSC5v/rN5mqU928=;
- b=XHlgJWUeDDx6lbpgfLUpQ5yfIUQFGfn1m5PPc7WGIHxyFHF+3HA8RToeR0IuWQTMN/
- kYElrj1fN+IeqNdYbRmwAUaB69TMayM5wuJbTEp24VE214/mWT/xDQYPvVYUSWfRQwnl
- fFIUceO+1YK3XJ2mLjULUlLksCg2bDUakUQlebnlDuQrL8KoWT/ebZaWCIN28a/ZX14f
- 1k+xNyO59W4t8NvqK0KE5I1SiObcarSGLwfUlexah9T49wYpQMcpDFBnbY4Kvmw3FkUG
- rOYZg6DISvirJp/NrEBe7juXNrVkyxgfErqbej4PyY9Rhl/X1qK92yYxIAR+i25QecJ/
- n1MQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=JwnbB+HBTo5JOYnPid93hiHgo2MFCSC5v/rN5mqU928=;
- b=hiupVqZpaYFi/kZqJlsCRBYV7f8hXLx885dBalYgbD0W1RXxkr8ujOYnO7EotZAqst
- xjr/Nvx97uf2laBZyTtZzw1DnJUOb03NTBxHZaEZAgjjnfQcB6TOrOlMq6sf2BKaCAvD
- xxN1JXMi8WcEih6sswdxGsW557IwIrwrKdPxUF0T6AT0WOCL8zubleWR3N9wN+lPkCUN
- OV6/KURTd88AgDi1ByK/2jE7kutOaardwoTuw8s/lNFEc6sP2UWLjN9PlTSN89AVaDVO
- 7hjUbrUvVov4e3iA0cnQQrww0tW1tOwIk9hcJ/3PMPHKD192xox/6QsenVsd8X0qb23Z
- O+1A==
-X-Gm-Message-State: AHQUAuapYqtXNxs1pelgOrfLuam2KwbbOzRYLVqhJ4TjqzCs+Dk5dUB9
- uRIuwY2fDgLZXwtPuDlP00nxhMtd5djVGstb22u5VA==
-X-Google-Smtp-Source: AHgI3IakbtGYqM+ewKVAew/Zusknu3ALNnxN/Nf80/TGijJe/f7sNVo+lxNRjjn8bKcLJ2BEIUj2PsijmEUfhphmvns=
-X-Received: by 2002:aca:3806:: with SMTP id f6mr10857802oia.47.1551106993935; 
- Mon, 25 Feb 2019 07:03:13 -0800 (PST)
+ id 1gyHum-0004Fi-HR
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 15:11:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=YwnekPbXOp/yMDSDTxeiu5/js9kE3si1ADKfYaqYi3k=;
+ b=O436PpfPHWA6dVHZpM54OFwfiMrRkyUuWAnt4m0GO9YDbTMReAvV0gHIa8vBp5BHKYIGaoXanK+IamCn/9H+PTRfVvelOqjlAObGYZ8wrfWVT3biaF6+ZsjrF2mBi/tCi0p/TSL5QYhmtC3drLD5yVK3nMzvuWJH/6jizNrgMak=
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
+ AM0PR04MB5763.eurprd04.prod.outlook.com (20.178.117.75) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.18; Mon, 25 Feb 2019 15:11:28 +0000
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1643.019; Mon, 25 Feb 2019
+ 15:11:28 +0000
+From: Abel Vesa <abel.vesa@nxp.com>
+To: Carlo Caione <ccaione@baylibre.com>
+Subject: Re: [PATCH v2 0/2] Add and document the i.MX8MQ OTP controller
+Thread-Topic: [PATCH v2 0/2] Add and document the i.MX8MQ OTP controller
+Thread-Index: AQHUuwj2Cc/A///8P0qiGlZUchVYHKXwwq+A
+Date: Mon, 25 Feb 2019 15:11:28 +0000
+Message-ID: <20190225151127.elg2iuaxa4otdb46@fsr-ub1664-175>
+References: <20190202150638.13672-1-ccaione@baylibre.com>
+In-Reply-To: <20190202150638.13672-1-ccaione@baylibre.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=abel.vesa@nxp.com; 
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 2bdcfcce-9afa-47ab-6a48-08d69b33848f
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600127)(711020)(4605104)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB5763; 
+x-ms-traffictypediagnostic: AM0PR04MB5763:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; AM0PR04MB5763;
+ 23:C0FCtWm1llzVQOtq31pEm3BT66hspt3TlScHO7U+X?=
+ =?us-ascii?Q?xtPUnKhLIny+F5I5mGsUJt0xxY9xpcRsTCOYREdqMS1JKbD+AXwxZT7wWaRD?=
+ =?us-ascii?Q?serxRWoWXXfwalzjSKlHhT8LDivCT/TFziQ7JASBrWtUco1y+E8maPzz3zid?=
+ =?us-ascii?Q?Rh77mJkKxXYZE0TXf6GMD9waZkHXRXWrDUvPbdbVXp73eB1fV2VfycZ+ZZPC?=
+ =?us-ascii?Q?5uUX0Y/QCc6r6KEhMYfHGRmED1pguecxBtN7pzSczuoIP+c9atAZBZ4peHMB?=
+ =?us-ascii?Q?6i+R+Iz1WgBHIw+YKHJV2MvmFYOp8EKETQPCBFf8qMHouXvQfdJ3UU53Og8R?=
+ =?us-ascii?Q?C2rlOGK6dao7WwUxSuiLrLyTqu/tqKfUcDm6rqBHphX/owIgBv9d6yfa/PY3?=
+ =?us-ascii?Q?108dnQCGKXkkyVEOyPaeO/FfhRNLw0V+pn8HJLC4FFj8BpyKzezNDiW+jabg?=
+ =?us-ascii?Q?tt0POx+D7/cYc8yj8rIkAnss8owjEJDEIT2/ijsWwXWpqNevpC+iviAgHUAq?=
+ =?us-ascii?Q?VY/r4grl8F8RN4sK3nJtz7K+xHA5UJhxkglPZJktOAjRoNkYPp8x1es7Y+jf?=
+ =?us-ascii?Q?zuF9BlSZvYEFFT6xWJ8mCzY2sdeYk3cscyEyA7ucSi6NHr2NaDot2Jva3g5v?=
+ =?us-ascii?Q?oThjYgo53taPRqpgU9ieeL9A0pV7vjpdVWF92r3YCQickbWyqc7bvfnb2lbV?=
+ =?us-ascii?Q?09CNB+MFxRp4RNgyDIg0Twi4vFRVv3kt2P3DVC6vxecEn+mQHG2Ph5DjWtTy?=
+ =?us-ascii?Q?V9Ne1INMOJ8EWDeNesl54IAGtmWY2vrgv0HFE6v3A4YV82NL6Ti2mt7a0eqL?=
+ =?us-ascii?Q?j5N1aSUH5WLMnXGi39plDTPDVgSSojkaW1TvYzvTrnw0C6q5eBKn3fjOLsAJ?=
+ =?us-ascii?Q?7vdHeS9+APfge52xRtKGmbI5DL5aDkoLn4RKHbEdRkJqDg0JoXp3ByYx6lKd?=
+ =?us-ascii?Q?neMyHx7+tYVD3A8ESqhezCOapjFQ4NasXsfK4nVw7vk8Z+5yvfzFexsKg4zO?=
+ =?us-ascii?Q?KivT1mE4OsZvmTSiCEOea8RPWCnUAnG608PqOsDa7bYHggV/nEKus0+1uTdK?=
+ =?us-ascii?Q?WkcjtccsHyksPsIFyuAgkcVW9EfI5iJj3P0hIINRPbeqGirAebeqZUz424+m?=
+ =?us-ascii?Q?uZ1QZhZUTBXzxypb9AQXuorlJ/U36ytWUtx5b0Cav1RyXHIQe+ycHumLVKxb?=
+ =?us-ascii?Q?/vnA/7mZGDNgHpdy1VgMXrpvQorfqAMptmmlMPbd4ZfzS2KzeWzRiQgKNVoU?=
+ =?us-ascii?Q?YJMvb9vZDTMxNR9Ysx9dZ6eFZwctG8sS4/geOZoELHWbsbFN8P2nyy2dYnz2?=
+ =?us-ascii?B?Zz09?=
+x-microsoft-antispam-prvs: <AM0PR04MB5763B188BC2BA010FB1901CEF67A0@AM0PR04MB5763.eurprd04.prod.outlook.com>
+x-forefront-prvs: 095972DF2F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(7916004)(366004)(136003)(396003)(39860400002)(346002)(376002)(199004)(189003)(6512007)(305945005)(7736002)(9686003)(6436002)(68736007)(486006)(446003)(11346002)(476003)(44832011)(53936002)(4744005)(6246003)(6506007)(53546011)(7416002)(26005)(33716001)(102836004)(6486002)(478600001)(14454004)(186003)(229853002)(76176011)(86362001)(8676002)(99286004)(81166006)(81156014)(5660300002)(1076003)(8936002)(256004)(2906002)(25786009)(54906003)(71190400001)(71200400001)(4326008)(316002)(6916009)(105586002)(3846002)(6116002)(66066001)(106356001)(97736004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5763;
+ H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: Bnq+Ley7cSvuFB0tVNXoqOexGXd+ialzXN2cgPfAx2UCHGZFbEKg7P9i2ylTGq02MYXJD+JMwmLEgoCyfhk8R27NXmimVsll2362KQ0yPLsYKbEQJuhPBiZz9/Y8UJILd0rIoCdZZsfso7hc6W8OUpCUWjNiXPLSCD/tdDkhOIMuYdbahdMaVoSAqEutnk3UA80RFy76zNEoDg2t5CtH3Ji24R8oMKGgcgk9LJV3QrEYvnsnBodemLO1ZwGujGSlzFxcJwgoXxl5DVgdnX1egHhgrFgRw3W4v+N+HOowHYdQsEpxZApzyY4ytRZ+EWuzEm1dinJ5QpVdEgk6nB884H1KFtM+T0heOGCSpFS2Vx5u8hUNOzeH+XE39SIgisIeH0qhz7ARy7Bkrcmdle6jmcI2VJfMblACunazXXHIuZk=
+Content-ID: <6A27DF8094355A43B49DEEDA7B2D886E@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-References: <20190211163653.97742-1-jannh@google.com>
- <f89de711-d73b-96be-75b6-0e9054022708@gmail.com>
-In-Reply-To: <f89de711-d73b-96be-75b6-0e9054022708@gmail.com>
-From: Jann Horn <jannh@google.com>
-Date: Mon, 25 Feb 2019 16:02:48 +0100
-Message-ID: <CAG48ez2h6eavM9YWXYa69OLY7mFFKn1KN=roH2dZJCi7PSSmuQ@mail.gmail.com>
-Subject: Re: [PATCH] mmap.2: describe the 5level paging hack
-To: "Michael Kerrisk (man-pages)" <mtk.manpages@gmail.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 2bdcfcce-9afa-47ab-6a48-08d69b33848f
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Feb 2019 15:11:28.8582 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5763
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_070319_322420_480E91BC 
-X-CRM114-Status: GOOD (  36.02  )
+X-CRM114-CacheID: sfid-20190225_071132_579823_531F57C8 
+X-CRM114-Status: GOOD (  12.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,98 +132,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>,
- linux-man <linux-man@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>, Linux-MM <linux-mm@kvack.org>,
- Peter Zijlstra <peterz@infradead.org>,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>,
- Will Deacon <will.deacon@arm.com>, linuxppc-dev@lists.ozlabs.org,
- Andy Lutomirski <luto@amacapital.net>, Dave Hansen <dave.hansen@intel.com>,
- Paul Mackerras <paulus@samba.org>, linux-arm-kernel@lists.infradead.org,
- Michael Ellerman <mpe@ellerman.id.au>,
- Andrew Morton <akpm@linux-foundation.org>,
- Linux API <linux-api@vger.kernel.org>,
- Linus Torvalds <torvalds@linux-foundation.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 25, 2019 at 3:55 PM Michael Kerrisk (man-pages)
-<mtk.manpages@gmail.com> wrote:
-> On 2/11/19 5:36 PM, Jann Horn wrote:
-> > The manpage is missing information about the compatibility hack for
-> > 5-level paging that went in in 4.14, around commit ee00f4a32a76 ("x86/mm:
-> > Allow userspace have mappings above 47-bit"). Add some information about
-> > that.
-> >
-> > While I don't think any hardware supporting this is shipping yet (?), I
-> > think it's useful to try to write a manpage for this API, partly to
-> > figure out how usable that API actually is, and partly because when this
-> > hardware does ship, it'd be nice if distro manpages had information about
-> > how to use it.
-> >
-> > Signed-off-by: Jann Horn <jannh@google.com>
-> > ---
-> > This patch goes on top of the patch "[PATCH] mmap.2: fix description of
-> > treatment of the hint" that I just sent, but I'm not sending them in a
-> > series because I want the first one to go in, and I think this one might
-> > be a bit more controversial.
-> >
-> > It would be nice if the architecture maintainers and mm folks could have
-> > a look at this and check that what I wrote is right - I only looked at
-> > the source for this, I haven't tried it.
-> >
-> >  man2/mmap.2 | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> >
-> > diff --git a/man2/mmap.2 b/man2/mmap.2
-> > index 8556bbfeb..977782fa8 100644
-> > --- a/man2/mmap.2
-> > +++ b/man2/mmap.2
-> > @@ -67,6 +67,8 @@ is NULL,
-> >  then the kernel chooses the (page-aligned) address
-> >  at which to create the mapping;
-> >  this is the most portable method of creating a new mapping.
-> > +On Linux, in this case, the kernel may limit the maximum address that can be
-> > +used for allocations to a legacy limit for compatibility reasons.
-> >  If
-> >  .I addr
-> >  is not NULL,
-> > @@ -77,6 +79,19 @@ or equal to the value specified by
-> >  and attempt to create the mapping there.
-> >  If another mapping already exists there, the kernel picks a new
-> >  address, independent of the hint.
-> > +However, if a hint above the architecture's legacy address limit is provided
-> > +(on x86-64: above 0x7ffffffff000, on arm64: above 0x1000000000000, on ppc64 with
-> > +book3s: above 0x7fffffffffff or 0x3fffffffffff, depending on page size), the
-> > +kernel is permitted to allocate mappings beyond the architecture's legacy
-> > +address limit. The availability of such addresses is hardware-dependent.
-> > +Therefore, if you want to be able to use the full virtual address space of
-> > +hardware that supports addresses beyond the legacy range, you need to specify an
-> > +address above that limit; however, for security reasons, you should avoid
-> > +specifying a fixed valid address outside the compatibility range,
-> > +since that would reduce the value of userspace address space layout
-> > +randomization. Therefore, it is recommended to specify an address
-> > +.I beyond
-> > +the end of the userspace address space.
-> >  .\" Before Linux 2.6.24, the address was rounded up to the next page
-> >  .\" boundary; since 2.6.24, it is rounded down!
-> >  The address of the new mapping is returned as the result of the call.
-> >
->
-> Hi Jann,
->
-> A few comments came in on this patch. Is there anything from
-> those comments that should be rolled into the text?
+On 19-02-02 15:06:36, Carlo Caione wrote:
+> Add a new node to enable the On-Chip OTP controller and add the new 
+> binding in the documentation.
+> 
+> Carlo Caione (2):
+>   arm64: dts: imx8mq: Add on-chip OTP controller node
+>   dt-bindings: imx-ocotp: Add i.MX8MQ compatible
+> 
+>  Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 1 +
+>  arch/arm64/boot/dts/freescale/imx8mq.dtsi             | 8 ++++++++
+>  2 files changed, 9 insertions(+)
+> 
+> -- 
+> 2.19.1
+> 
 
-Hi!
+What's the status of this patchseries ?
 
-Yeah, I think all the feedback on the patch were good points, and I'll
-have to integrate that into my patch.
-
+It would help a lot if we would manage to get this in.
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
