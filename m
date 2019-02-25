@@ -2,68 +2,80 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D9599C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 11:33:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A1DF7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 11:54:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A7CD32083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 11:33:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7027F2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 11:54:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MvQFEPbn";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=agner.ch header.i=@agner.ch header.b="T+k6KT2l"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A7CD32083D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=agner.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cuzX4X7J";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="myvRVxl9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7027F2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=infradead.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-ID:References:In-Reply-To:
-	Subject:To:From:Date:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=USnb7Q3XibKCwwtFyfmmLul14MesrThPNqajktbuiy4=; b=MvQFEPbnGHkcPq
-	aC7NP/JR2LpmxCnQ73cTILh8oIfpq9R3ndbUgNmugf35vbTAmxowUnCLA1Jw54+BQCtWSxU6uOXRG
-	/nWJ1g436XreizyfQ1gbPE6O33qfZqPN+AWWTsrbPJjkdw9VIBGl9asc86qwnZjTg1jMgGdI6cE3m
-	+V45MNNoc2YXiE+jafV9eCAi/R9YzTVaqdr2qTSG827ao6x7MRIEk5+ABYpPUiHAUZ10SmDfVXKWb
-	UFkYrSq/kLA/g1J1xlZUs1U5EkDiIuWcjRnbpIr3OUKRucibXXm6mmOxK+EeFHjH3LiTXvMsBmKAe
-	ReSRnlQttXeWhMCBfRMQ==;
+	List-Owner; bh=n0obFEjBj3BGtPowzu+HyNQttjA7HosCxXIbXZffNdQ=; b=cuzX4X7JRaAv02
+	elJsux83bE5665751t4uQKDK2pxcaSFPAlimCcCT9PPR4SyAVHuXz1YYXckDqzBwqKxNB519UCDUp
+	9/sCM0MRfZSBkADJMKriWc+fHDwIm5CMQgiQGhWsnNGCLgRawa8Im1XhvyReZNm87Z6Fw7KtS4ken
+	yKFwHvTCheyKUficY0bsuFr/bGqqxAaXkarcaSz1LYkFP1syc6pffMp70/+YGiBYLqIjLEZQ5ltGN
+	WPwsEzYx77TjAQp6dJ3ubNvHHiG7gFpCwCy2PGxeJJvJ+B9ojlPEEVWBd0TGdAu24fJP4owzkR9Zw
+	s47zdwhFBtddsUmpXKkA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyEVX-0006Op-D6; Mon, 25 Feb 2019 11:33:15 +0000
-Received: from mail.kmu-office.ch ([2a02:418:6a02::a2])
+	id 1gyEpW-0003yF-V2; Mon, 25 Feb 2019 11:53:54 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyEVT-0006O8-O0
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 11:33:13 +0000
-Received: from webmail.kmu-office.ch (unknown [IPv6:2a02:418:6a02::a3])
- by mail.kmu-office.ch (Postfix) with ESMTPSA id 9C3795C04E3;
- Mon, 25 Feb 2019 12:33:07 +0100 (CET)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=agner.ch; s=dkim;
- t=1551094387;
- h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
- to:to:cc:cc:mime-version:mime-version:content-type:content-type:
- content-transfer-encoding:content-transfer-encoding:
- in-reply-to:in-reply-to:references:references;
- bh=+dXtA3SnEGQXp0dpt3sFZkAbUWsKZGhoPC1B5/rLMrA=;
- b=T+k6KT2lyKUrfsROqjOOunncdvxGQUeMn/H98+PJTBVoFQEd8TrrINLcadrJK/BzrMXJgF
- Cv2JlJI62Y6V1hjUNkjvp77EsJZREC3x32uyUAdQBy2RJu/ZyXqpTlIFmxH0maDfclkbfG
- CzzUQ9BKlXtXyzMy5AOzbtz+ecpF6+Y=
+ id 1gyEpV-0003y6-5r
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 25 Feb 2019 11:53:53 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=Mg7F+Gj7bABkuk+sVE0bvI/VnzutyyN+PvP4NL/YIsI=; b=myvRVxl9Bwv8g+ywa0fVOsNEE
+ ao92UMarOZllMdDNbG7JB7RK3r5bGiJd96lM7XWehPxITq3UE0jfhqPvvayo/+6w381RNqvcrJCBp
+ 8H1vQ6jqsT87CJRUeP4OZvRMHfgaQywL+quOcLzJFW/uFD0bd0vtvYob5Ddd+OWZ0yoFYx4OIiGep
+ lon51z/4JDYbjf95OVLSQYeL3P0xZjpadUQcJeoqCCigRsuFhHnt1zbcQETLHydWdYOHKvfo+5PPX
+ rPrmOcynnDCBsEDO/5TQGrCS/EtD5LuLCocfKAr0GVgRi0hbsaqJj1RO47je+OzgIJ9Km9MyWpynJ
+ K7kppV8Pw==;
+Received: from j217100.upc-j.chello.nl ([24.132.217.100]
+ helo=hirez.programming.kicks-ass.net)
+ by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyEpO-0006A1-TI; Mon, 25 Feb 2019 11:53:47 +0000
+Received: by hirez.programming.kicks-ass.net (Postfix, from userid 1000)
+ id 443BE2026BE91; Mon, 25 Feb 2019 12:53:44 +0100 (CET)
+Date: Mon, 25 Feb 2019 12:53:44 +0100
+From: Peter Zijlstra <peterz@infradead.org>
+To: Andy Lutomirski <luto@kernel.org>
+Subject: Re: [RFC][PATCH] objtool: STAC/CLAC validation
+Message-ID: <20190225115344.GA32534@hirez.programming.kicks-ass.net>
+References: <20190219090409.GW32494@hirez.programming.kicks-ass.net>
+ <20190219124808.GG8501@fuggles.cambridge.arm.com>
+ <f8e99706-4e3b-68ec-7a3e-6e6dd876ad2f@zytor.com>
+ <cb221e71-243d-fdbd-1d18-b175bc88979b@arm.com>
+ <alpine.DEB.2.21.1902212231490.1612@nanos.tec.linutronix.de>
+ <CAHk-=wh1B9eRG=gj7wsFVC5XNEedk8Edive-2cQok6T2dNq2aQ@mail.gmail.com>
+ <alpine.DEB.2.21.1902221853330.1666@nanos.tec.linutronix.de>
+ <20190222222635.GK14054@worktop.programming.kicks-ass.net>
+ <CALCETrV0XAv_tuw3WzQG+dx0iKEahw9V6DLACq4PtNQrkJBwhw@mail.gmail.com>
+ <20190225105144.GJ32477@hirez.programming.kicks-ass.net>
 MIME-Version: 1.0
-Date: Mon, 25 Feb 2019 12:33:07 +0100
-From: Stefan Agner <stefan@agner.ch>
-To: Abel Vesa <abel.vesa@nxp.com>
-Subject: Re: [PATCH] soc: imx: Add generic i.MX8 SoC driver
-In-Reply-To: <1549194583-7684-1-git-send-email-abel.vesa@nxp.com>
-References: <1549194583-7684-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <b070b5e1664623ab6c7d003b2f935d8d@agner.ch>
-X-Sender: stefan@agner.ch
-User-Agent: Roundcube Webmail/1.3.7
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_033312_226884_0D681B14 
-X-CRM114-Status: GOOD (  21.25  )
+Content-Disposition: inline
+In-Reply-To: <20190225105144.GJ32477@hirez.programming.kicks-ass.net>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,163 +87,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
- Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>, linux-arm-kernel@lists.infradead.org,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: Denys Vlasenko <dvlasenk@redhat.com>, Brian Gerst <brgerst@gmail.com>,
+ Julien Thierry <julien.thierry@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Josh Poimboeuf <jpoimboe@redhat.com>, Will Deacon <will.deacon@arm.com>,
+ Linux List Kernel Mailing <linux-kernel@vger.kernel.org>,
+ valentin.schneider@arm.com, Ingo Molnar <mingo@redhat.com>,
+ James Morse <james.morse@arm.com>, "H. Peter Anvin" <hpa@zytor.com>,
+ Borislav Petkov <bp@alien8.de>, Thomas Gleixner <tglx@linutronix.de>,
+ Linus Torvalds <torvalds@linux-foundation.org>, Ingo Molnar <mingo@kernel.org>,
+ "linux-alpha@vger.kernel.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 03.02.2019 12:49, Abel Vesa wrote:
-> Add generic i.MX8 SoC driver along with the i.MX8MQ SoC specific code.
+On Mon, Feb 25, 2019 at 11:51:44AM +0100, Peter Zijlstra wrote:
+> On Fri, Feb 22, 2019 at 03:55:25PM -0800, Andy Lutomirski wrote:
+> > I'm wondering if we can just change the code that does getreg() and
+> > load_gs_index() so it doesn't do it with AC set.  Also, what about
+> > paravirt kernels?  They'll call into PV code for load_gs_index() with
+> > AC set.
 > 
-> Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> ---
->  drivers/soc/imx/Makefile   |   1 +
->  drivers/soc/imx/soc-imx8.c | 108 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 109 insertions(+)
->  create mode 100644 drivers/soc/imx/soc-imx8.c
-> 
-> diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-> index 506a6f3..d6b529e0 100644
-> --- a/drivers/soc/imx/Makefile
-> +++ b/drivers/soc/imx/Makefile
-> @@ -1,2 +1,3 @@
->  obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
->  obj-$(CONFIG_IMX_GPCV2_PM_DOMAINS) += gpcv2.o
-> +obj-$(CONFIG_ARCH_MXC) += soc-imx8.o
-> diff --git a/drivers/soc/imx/soc-imx8.c b/drivers/soc/imx/soc-imx8.c
-> new file mode 100644
-> index 0000000..69fe04e
-> --- /dev/null
-> +++ b/drivers/soc/imx/soc-imx8.c
-> @@ -0,0 +1,108 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright 2019 NXP.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +#include <linux/sys_soc.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +
-> +#define ANADIG_DIGPROG		0x6c
-> +
-> +struct imx8_soc_data {
-> +	char *name;
-> +	u32 (*soc_revision)(void);
-> +};
-> +
-> +static u32 __init imx_init_revision_from_anatop(void)
-> +{
-> +	struct device_node *np;
-> +	void __iomem *anatop_base;
-> +	u32 digprog;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-anatop");
-> +	anatop_base = of_iomap(np, 0);
-> +	WARN_ON(!anatop_base);
-> +	digprog = readl_relaxed(anatop_base + ANADIG_DIGPROG);
-> +	iounmap(anatop_base);
-> +
-> +	/*
-> +	 * Bit[7:4] is the base layer revision,
-> +	 * Bit[3:0] is the metal layer revision
-> +	 * e.g. 0x10 stands for Tapeout 1.0
-> +	 */
-> +	return digprog & 0xff;
-> +}
-> +
-> +u32 imx8mq_soc_revision(void)
+> Paravirt can go bugger off. There's no sane way to fix that.
 
-Since imx_init_revision_from_anatop is __init, you should make this
-__init too.
+> I don't fully understand that code at all; I also have no clue why GS
+> has paravirt bits on but the other segments do not. 
 
-> +{
-> +	return imx_init_revision_from_anatop();
-> +}
-> +
-> +struct imx8_soc_data imx8mq_soc_data = {
-> +	.name = "i.MX8MQ",
-> +	.soc_revision = imx8mq_soc_revision,
-> +};
+*sigh* SWAPGS
 
-Can we make this const?
+> *thought*... we could delay the actual set_user_seg() thing until after
+> the get_user_catch(), would that work?
 
-> +
-> +static const struct of_device_id imx8_soc_match[] = {
-> +	{ .compatible = "fsl,imx8mq", .data = &imx8mq_soc_data, },
-> +	{ }
-> +};
-> +
-> +static int __init imx8_soc_init(void)
-> +{
-> +	struct soc_device_attribute *soc_dev_attr;
-> +	struct soc_device *soc_dev;
-> +	struct device_node *root;
-> +	const struct of_device_id *id;
-> +	u32 soc_rev = 0;
-> +	const struct imx8_soc_data *data;
-> +	int ret;
-> +
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr)
-> +		return -ENODEV;
-> +
-> +	soc_dev_attr->family = "Freescale i.MX";
-> +
-> +	root = of_find_node_by_path("/");
-> +	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-> +	if (ret)
-> +		goto free_soc;
-> +
-> +	id = of_match_node(imx8_soc_match, root);
-> +	if (!id)
-> +		goto free_soc;
 
-In this and the error case above you also need to make sure to call
-of_node_put.
+How horrible / broken is this?
 
---
-Stefan
+---
 
-> +
-> +	of_node_put(root);
-> +
-> +	data = id->data;
-> +	if (data) {
-> +		soc_dev_attr->soc_id = data->name;
-> +		if (data->soc_revision)
-> +			soc_rev = data->soc_revision();
-> +	}
-> +
-> +	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%d.%d",
-> +					   (soc_rev >> 4) & 0xf,
-> +					    soc_rev & 0xf);
-> +	if (!soc_dev_attr->revision)
-> +		goto free_soc;
-> +
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev))
-> +		goto free_rev;
-> +
-> +	return 0;
-> +
-> +free_rev:
-> +	kfree(soc_dev_attr->revision);
-> +free_soc:
-> +	kfree(soc_dev_attr);
-> +	return -ENODEV;
-> +}
-> +device_initcall(imx8_soc_init);
+diff --git a/arch/x86/ia32/ia32_signal.c b/arch/x86/ia32/ia32_signal.c
+index 321fe5f5d0e9..67c866943102 100644
+--- a/arch/x86/ia32/ia32_signal.c
++++ b/arch/x86/ia32/ia32_signal.c
+@@ -60,17 +60,21 @@
+ 	regs->seg = GET_SEG(seg) | 3;			\
+ } while (0)
+ 
+-#define RELOAD_SEG(seg)		{		\
+-	unsigned int pre = GET_SEG(seg);	\
+-	unsigned int cur = get_user_seg(seg);	\
+-	pre |= 3;				\
+-	if (pre != cur)				\
+-		set_user_seg(seg, pre);		\
++#define LOAD_SEG(seg)		{			\
++	pre_##seg = 3 | GET_SEG(seg);			\
++	cur_##seg = get_user_seg(seg);			\
++}
++
++#define RELOAD_SEG(seg)		{			\
++	if (pre_##seg != cur_##seg)			\
++		set_user_seg(seg, pre_##seg);		\
+ }
+ 
+ static int ia32_restore_sigcontext(struct pt_regs *regs,
+ 				   struct sigcontext_32 __user *sc)
+ {
++	u16 pre_gs, pre_fs, pre_ds, pre_es;
++	u16 cur_gs, cur_fs, cur_ds, cur_es;
+ 	unsigned int tmpflags, err = 0;
+ 	void __user *buf;
+ 	u32 tmp;
+@@ -85,10 +89,10 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
+ 		 * the handler, but does not clobber them at least in the
+ 		 * normal case.
+ 		 */
+-		RELOAD_SEG(gs);
+-		RELOAD_SEG(fs);
+-		RELOAD_SEG(ds);
+-		RELOAD_SEG(es);
++		LOAD_SEG(gs);
++		LOAD_SEG(fs);
++		LOAD_SEG(ds);
++		LOAD_SEG(es);
+ 
+ 		COPY(di); COPY(si); COPY(bp); COPY(sp); COPY(bx);
+ 		COPY(dx); COPY(cx); COPY(ip); COPY(ax);
+@@ -106,6 +110,11 @@ static int ia32_restore_sigcontext(struct pt_regs *regs,
+ 		buf = compat_ptr(tmp);
+ 	} get_user_catch(err);
+ 
++	RELOAD_SEG(gs);
++	RELOAD_SEG(fs);
++	RELOAD_SEG(ds);
++	RELOAD_SEG(es);
++
+ 	err |= fpu__restore_sig(buf, 1);
+ 
+ 	force_iret();
 
 _______________________________________________
 linux-arm-kernel mailing list
