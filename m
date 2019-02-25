@@ -2,60 +2,71 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D2317C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:04:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D4D3AC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:16:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 958DA20C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:04:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A40AF2147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:16:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rlDB0xfA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 958DA20C01
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=cs.utah.edu
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l1IR7tG3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NhSDF9YZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A40AF2147C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=9yCTvjF1xWWMTIu9Ktj+2GHe3+C7bGPx/8E7ODDlrzU=; b=rlD
-	B0xfAJ0pXQEYqGuHkCcPWeAzPmY0ZqUowFwYp2fmr9o2GsqaYgrN8NJdds7L9X8cwePDFXnHKtU3a
-	sLGck3Sd6vG623lXhKIIJDBO4EijRuqnbY7MVVYhh39isIt9rPK2oUCQXCVzTjAE2cyQbUKCAhDBx
-	DurEacTziSKDvoQ4+WJbkLcjG4fcjgGeNNqACK9SEgs2e58esoScqiTIOE/ogApgsKGAr0LJLtTzW
-	ieg42HgNHLmoDLCuZqRoU1/C0cZCm1gIK72o7b7OLw7LOuWP+bMY5iRKCFQS+Gs8LsBZGPFMnIt1j
-	idpwQPSxkgra8+zTjCEBO0/QoCUqGLg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bGT9gHFuMqtDkKw6xFjU2UNxOcaudZJ5+Nce6p/287E=; b=l1IR7tG3xjIYaa
+	VQE0gcde4G7x4MbeSGzluMQXnhQJHRRx8YI64z55HlaywEH3hEUjbTfpeUesGhsTUmPyNT2Si5liB
+	ZXGDDBgX+HrDdk98nF3Gfdd6LAdFTUcykz40oXEf35UZ84Yte5sj/Z3HnrltQP/ri4e84EhdDuAw5
+	6pPdfRrbBA4/fCmjNP37t6ckLjFt4wNduIwMSEtjqPaFfKrDWBbkKy7hXXyj4Ngmzlo8tpx3rhCFp
+	pjFUj5FSKHULYLLTaSP9ZKdSJafI3NJmhBy4H4sHnua9QUJIfSzJzJjq06HYHSPoZlLB/cOx5CwRV
+	KHOBSNTcnj0jdiUe7Gcw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyNQg-0006Mm-VH; Mon, 25 Feb 2019 21:04:50 +0000
-Received: from rio.cs.utah.edu ([155.98.64.241] helo=mail-svr1.cs.utah.edu)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyNQc-0006LT-Er; Mon, 25 Feb 2019 21:04:49 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail-svr1.cs.utah.edu (Postfix) with ESMTP id B1C236500BD;
- Mon, 25 Feb 2019 14:04:28 -0700 (MST)
-Received: from mail-svr1.cs.utah.edu ([127.0.0.1])
- by localhost (mail-svr1.cs.utah.edu [127.0.0.1]) (amavisd-new, port 10024)
- with ESMTP id o5yZK0jTgwzL; Mon, 25 Feb 2019 14:04:26 -0700 (MST)
-Received: from bench1.smackbench.smack.emulab.net (pc614.emulab.net
- [155.98.38.234])
- by smtps.cs.utah.edu (Postfix) with ESMTPSA id DAF966500B5;
- Mon, 25 Feb 2019 14:04:25 -0700 (MST)
-From: Shaobo He <shaobo@cs.utah.edu>
-To: linux-media@vger.kernel.org
-Subject: [PATCH] Remove deductively redundant NULL pointer checks
-Date: Mon, 25 Feb 2019 14:03:37 -0700
-Message-Id: <1551128631-19713-1-git-send-email-shaobo@cs.utah.edu>
-X-Mailer: git-send-email 1.9.1
+	id 1gyNbi-0003Eg-18; Mon, 25 Feb 2019 21:16:14 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyNbe-0003DX-Lf
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 21:16:12 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id EBB932173C;
+ Mon, 25 Feb 2019 21:16:06 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1551129367;
+ bh=Fd+6PAhI1F8F0fXUDgYRipZ511OB5IRD7NfnVeO2zYg=;
+ h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
+ b=NhSDF9YZPXBb5MPQH8pc5AETS/7E39IGJoBbpXhe+j1bKokv0iahnPa7IijSfFAtX
+ vMP1eb/uG7nsmWHTD7h6PomyVVuJwD500fdRFNLHB8bvNtnTxUOhCwDoi6D7TOXBll
+ JWnuh20Tpx2BI0IhErtmhrwb5HNF9HxVd8zeDdwk=
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH 4.14 01/71] ARM: 8834/1: Fix: kprobes: optimized kprobes
+ illegal instruction
+Date: Mon, 25 Feb 2019 22:11:03 +0100
+Message-Id: <20190225195034.671193830@linuxfoundation.org>
+X-Mailer: git-send-email 2.20.1
+In-Reply-To: <20190225195034.555044862@linuxfoundation.org>
+References: <20190225195034.555044862@linuxfoundation.org>
+User-Agent: quilt/0.65
+X-stable: review
+X-Patchwork-Hint: ignore
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_130446_795697_E5B9D153 
-X-CRM114-Status: GOOD (  14.13  )
+X-CRM114-CacheID: sfid-20190225_131610_724553_7F82B190 
+X-CRM114-Status: GOOD (  11.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,504 +78,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andrew-CT Chen <andrew-ct.chen@mediatek.com>,
- Heiko Stuebner <heiko@sntech.de>,
- Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>,
- "Gustavo A. R. Silva" <gustavo@embeddedor.com>, Kamil Debski <kamil@wypas.org>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Andrzej Hajda <a.hajda@samsung.com>, laurent.pinchart@ideasonboard.com,
- "open list:MEDIA DRIVERS FOR RENESAS - FDP1"
- <linux-renesas-soc@vger.kernel.org>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
- Rick Chang <rick.chang@mediatek.com>,
- "open list:ARM/Rockchip SoC support" <linux-rockchip@lists.infradead.org>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>,
- Hans Verkuil <hans.verkuil@cisco.com>, Bin Liu <bin.liu@mediatek.com>,
- Anton Leontiev <scileont@gmail.com>, Kees Cook <keescook@chromium.org>,
- Benoit Parrot <bparrot@ti.com>,
- "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
- Jacek Anaszewski <jacek.anaszewski@gmail.com>,
- Andrzej Pietrasiewicz <andrzej.p@samsung.com>,
- Tiffany Lin <tiffany.lin@mediatek.com>,
- Ezequiel Garcia <ezequiel@collabora.com>,
- "moderated list:ARM/Mediatek SoC support"
- <linux-arm-kernel@lists.infradead.org>,
- Jacob chen <jacob2.chen@rock-chips.com>,
- open list <linux-kernel@vger.kernel.org>, shaobo@cs.utah.edu,
- Kyungmin Park <kyungmin.park@samsung.com>,
- Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>,
- Philipp Zabel <p.zabel@pengutronix.de>
-MIME-Version: 1.0
+Cc: Kees Cook <keescook@chromium.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, stable@vger.kernel.org,
+ Russell King <rmk+kernel@armlinux.org.uk>,
+ Mathieu Desnoyers <mathieu.desnoyers@efficios.com>,
+ Masami Hiramatsu <mhiramat@kernel.org>,
+ Robert Berger <Robert.Berger@ReliableEmbeddedSystems.com>,
+ William Cohen <wcohen@redhat.com>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org, patches@armlinux.org.uk
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The fixes included in this commit essentially removes NULL pointer
-checks on the return values of function `get_queue_ctx` as well as
-`v4l2_m2m_get_vq` defined in file v4l2-mem2mem.c.
+4.14-stable review patch.  If anyone has any objections, please let me know.
 
-Function `get_queue_ctx` is very unlikely to return a NULL pointer
-because its return value is an address composed of the base address
-pointed by `m2m_ctx` and an offset of field `out_q_ctx` or `cap_q_ctx`.
-Since the offset of either field is not 0, for the return value to be
-NULL, pointer `m2m_ctx` must be a very large unsigned value such that
-its addition to the offset overflows to NULL which may be undefined
-according to this post:
-https://wdtz.org/catching-pointer-overflow-bugs.html. Moreover, even if
-`m2m_ctx` is NULL, the return value cannot be NULL, either. Therefore, I
-think it is reasonable to conclude that the return value of function
-`get_queue_ctx` cannot be NULL.
+------------------
 
-Given the return values of `get_queue_ctx` not being NULL, we can follow
-a similar reasoning to conclude that the return value of
-`v4l2_mem_get_vq` cannot be NULL since its return value is the same
-address as the return value of `get_queue_ctx`. Therefore, this patch
-also removes NULL pointer checks on the return values of
-`v4l2_mem_get_vq`.
+From: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
 
-Signed-off-by: Shaobo He <shaobo@cs.utah.edu>
+commit 0ac569bf6a7983c0c5747d6df8db9dc05bc92b6c upstream.
+
+commit e46daee53bb5 ("ARM: 8806/1: kprobes: Fix false positive with
+FORTIFY_SOURCE") introduced a regression in optimized kprobes. It
+triggers "invalid instruction" oopses when using kprobes instrumentation
+through lttng and perf. This commit was introduced in kernel v4.20, and
+has been backported to stable kernels 4.19 and 4.14.
+
+This crash was also reported by Hongzhi Song on the redhat bugzilla
+where the patch was originally introduced.
+
+Link: https://bugzilla.redhat.com/show_bug.cgi?id=1639397
+Link: https://bugs.lttng.org/issues/1174
+Link: https://lore.kernel.org/lkml/342740659.2887.1549307721609.JavaMail.zimbra@efficios.com
+
+Fixes: e46daee53bb5 ("ARM: 8806/1: kprobes: Fix false positive with FORTIFY_SOURCE")
+Signed-off-by: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Reported-by: Robert Berger <Robert.Berger@ReliableEmbeddedSystems.com>
+Tested-by: Robert Berger <Robert.Berger@ReliableEmbeddedSystems.com>
+Acked-by: Kees Cook <keescook@chromium.org>
+Cc: Robert Berger <Robert.Berger@ReliableEmbeddedSystems.com>
+Cc: Masami Hiramatsu <mhiramat@kernel.org>
+Cc: William Cohen <wcohen@redhat.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: <stable@vger.kernel.org> # v4.14+
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: patches@armlinux.org.uk
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
 ---
- drivers/media/platform/coda/coda-common.c          |  4 ----
- drivers/media/platform/imx-pxp.c                   |  7 -------
- drivers/media/platform/m2m-deinterlace.c           |  7 -------
- drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c    |  7 -------
- drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  7 -------
- drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c | 13 -------------
- drivers/media/platform/mx2_emmaprp.c               |  7 -------
- drivers/media/platform/rcar_fdp1.c                 |  3 ---
- drivers/media/platform/rcar_jpu.c                  |  8 --------
- drivers/media/platform/rockchip/rga/rga.c          |  4 ----
- drivers/media/platform/s5p-g2d/g2d.c               |  4 ----
- drivers/media/platform/s5p-jpeg/jpeg-core.c        |  7 -------
- drivers/media/platform/sh_veu.c                    |  2 --
- drivers/media/platform/ti-vpe/vpe.c                |  7 -------
- drivers/media/platform/vicodec/vicodec-core.c      |  5 -----
- drivers/media/platform/vim2m.c                     |  9 ---------
- drivers/media/v4l2-core/v4l2-mem2mem.c             |  4 ----
- 17 files changed, 105 deletions(-)
+ arch/arm/probes/kprobes/opt-arm.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/coda/coda-common.c b/drivers/media/platform/coda/coda-common.c
-index 7518f01..ee1e05b 100644
---- a/drivers/media/platform/coda/coda-common.c
-+++ b/drivers/media/platform/coda/coda-common.c
-@@ -696,8 +696,6 @@ static int coda_s_fmt(struct coda_ctx *ctx, struct v4l2_format *f,
- 	struct vb2_queue *vq;
+--- a/arch/arm/probes/kprobes/opt-arm.c
++++ b/arch/arm/probes/kprobes/opt-arm.c
+@@ -247,7 +247,7 @@ int arch_prepare_optimized_kprobe(struct
+ 	}
  
- 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
+ 	/* Copy arch-dep-instance from template. */
+-	memcpy(code, (unsigned char *)optprobe_template_entry,
++	memcpy(code, (unsigned long *)&optprobe_template_entry,
+ 			TMPL_END_IDX * sizeof(kprobe_opcode_t));
  
- 	q_data = get_q_data(ctx, f->type);
- 	if (!q_data)
-@@ -817,8 +815,6 @@ static int coda_s_fmt_vid_out(struct file *file, void *priv,
- 	ctx->quantization = f->fmt.pix.quantization;
- 
- 	dst_vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
--	if (!dst_vq)
--		return -EINVAL;
- 
- 	/*
- 	 * Setting the capture queue format is not possible while the capture
-diff --git a/drivers/media/platform/imx-pxp.c b/drivers/media/platform/imx-pxp.c
-index c1c2554..d079b3c 100644
---- a/drivers/media/platform/imx-pxp.c
-+++ b/drivers/media/platform/imx-pxp.c
-@@ -1071,13 +1071,8 @@ static int pxp_enum_fmt_vid_out(struct file *file, void *priv,
- 
- static int pxp_g_fmt(struct pxp_ctx *ctx, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct pxp_q_data *q_data;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 
- 	f->fmt.pix.width	= q_data->width;
-@@ -1220,8 +1215,6 @@ static int pxp_s_fmt(struct pxp_ctx *ctx, struct v4l2_format *f)
- 	struct vb2_queue *vq;
- 
- 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	q_data = get_q_data(ctx, f->type);
- 	if (!q_data)
-diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
-index c62e598..df03ffd 100644
---- a/drivers/media/platform/m2m-deinterlace.c
-+++ b/drivers/media/platform/m2m-deinterlace.c
-@@ -497,13 +497,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
- 
- static int vidioc_g_fmt(struct deinterlace_ctx *ctx, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct deinterlace_q_data *q_data;
- 
--	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(f->type);
- 
- 	f->fmt.pix.width	= q_data->width;
-@@ -598,8 +593,6 @@ static int vidioc_s_fmt(struct deinterlace_ctx *ctx, struct v4l2_format *f)
- 	struct vb2_queue *vq;
- 
- 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	q_data = get_q_data(f->type);
- 	if (!q_data)
-diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-index 2a5d500..2da90ae 100644
---- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-+++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
-@@ -271,17 +271,12 @@ static int mtk_jpeg_try_fmt_mplane(struct v4l2_format *f,
- static int mtk_jpeg_g_fmt_vid_mplane(struct file *file, void *priv,
- 				     struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct mtk_jpeg_q_data *q_data = NULL;
- 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
- 	struct mtk_jpeg_ctx *ctx = mtk_jpeg_fh_to_ctx(priv);
- 	struct mtk_jpeg_dev *jpeg = ctx->jpeg;
- 	int i;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = mtk_jpeg_get_q_data(ctx, f->type);
- 
- 	memset(pix_mp->reserved, 0, sizeof(pix_mp->reserved));
-@@ -372,8 +367,6 @@ static int mtk_jpeg_s_fmt_mplane(struct mtk_jpeg_ctx *ctx,
- 	int i;
- 
- 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	q_data = mtk_jpeg_get_q_data(ctx, f->type);
- 
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-index ba61964..d4006e5 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
-@@ -955,15 +955,8 @@ static int vidioc_vdec_g_fmt(struct file *file, void *priv,
- {
- 	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
- 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
--	struct vb2_queue *vq;
- 	struct mtk_q_data *q_data;
- 
--	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq) {
--		mtk_v4l2_err("no vb2 queue for type=%d", f->type);
--		return -EINVAL;
--	}
--
- 	q_data = mtk_vdec_get_q_data(ctx, f->type);
- 
- 	pix_mp->field = V4L2_FIELD_NONE;
-diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-index d1f1225..7c54690 100644
---- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-+++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
-@@ -430,10 +430,6 @@ static int vidioc_venc_s_fmt_cap(struct file *file, void *priv,
- 	struct mtk_video_fmt *fmt;
- 
- 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq) {
--		mtk_v4l2_err("fail to get vq");
--		return -EINVAL;
--	}
- 
- 	if (vb2_is_busy(vq)) {
- 		mtk_v4l2_err("queue busy");
-@@ -493,10 +489,6 @@ static int vidioc_venc_s_fmt_out(struct file *file, void *priv,
- 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
- 
- 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq) {
--		mtk_v4l2_err("fail to get vq");
--		return -EINVAL;
--	}
- 
- 	if (vb2_is_busy(vq)) {
- 		mtk_v4l2_err("queue busy");
-@@ -554,14 +546,9 @@ static int vidioc_venc_g_fmt(struct file *file, void *priv,
- {
- 	struct v4l2_pix_format_mplane *pix = &f->fmt.pix_mp;
- 	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
--	struct vb2_queue *vq;
- 	struct mtk_q_data *q_data;
- 	int i;
- 
--	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = mtk_venc_get_q_data(ctx, f->type);
- 
- 	pix->width = q_data->coded_width;
-diff --git a/drivers/media/platform/mx2_emmaprp.c b/drivers/media/platform/mx2_emmaprp.c
-index 27b078c..1366fde 100644
---- a/drivers/media/platform/mx2_emmaprp.c
-+++ b/drivers/media/platform/mx2_emmaprp.c
-@@ -436,13 +436,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
- 
- static int vidioc_g_fmt(struct emmaprp_ctx *ctx, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct emmaprp_q_data *q_data;
- 
--	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 
- 	f->fmt.pix.width	= q_data->width;
-@@ -545,8 +540,6 @@ static int vidioc_s_fmt(struct emmaprp_ctx *ctx, struct v4l2_format *f)
- 	int ret;
- 
- 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	q_data = get_q_data(ctx, f->type);
- 	if (!q_data)
-diff --git a/drivers/media/platform/rcar_fdp1.c b/drivers/media/platform/rcar_fdp1.c
-index 6bda1ee..ef747d3 100644
---- a/drivers/media/platform/rcar_fdp1.c
-+++ b/drivers/media/platform/rcar_fdp1.c
-@@ -1407,9 +1407,6 @@ static int fdp1_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	struct fdp1_q_data *q_data;
- 	struct fdp1_ctx *ctx = fh_to_ctx(priv);
- 
--	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 	f->fmt.pix_mp = q_data->format;
- 
-diff --git a/drivers/media/platform/rcar_jpu.c b/drivers/media/platform/rcar_jpu.c
-index 1dfd2eb..a91664c 100644
---- a/drivers/media/platform/rcar_jpu.c
-+++ b/drivers/media/platform/rcar_jpu.c
-@@ -839,9 +839,6 @@ static int jpu_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
- {
- 	struct jpu_ctx *ctx = fh_to_ctx(priv);
- 
--	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
--		return -EINVAL;
--
- 	return __jpu_try_fmt(ctx, NULL, &f->fmt.pix_mp, f->type);
- }
- 
-@@ -855,8 +852,6 @@ static int jpu_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	int ret;
- 
- 	vq = v4l2_m2m_get_vq(m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	if (vb2_is_busy(vq)) {
- 		v4l2_err(&ctx->jpu->v4l2_dev, "%s queue busy\n", __func__);
-@@ -880,9 +875,6 @@ static int jpu_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	struct jpu_q_data *q_data;
- 	struct jpu_ctx *ctx = fh_to_ctx(priv);
- 
--	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
--		return -EINVAL;
--
- 	q_data = jpu_get_q_data(ctx, f->type);
- 	f->fmt.pix_mp = q_data->format;
- 
-diff --git a/drivers/media/platform/rockchip/rga/rga.c b/drivers/media/platform/rockchip/rga/rga.c
-index 5c65328..74b8e9d 100644
---- a/drivers/media/platform/rockchip/rga/rga.c
-+++ b/drivers/media/platform/rockchip/rga/rga.c
-@@ -470,12 +470,8 @@ static int vidioc_enum_fmt(struct file *file, void *prv, struct v4l2_fmtdesc *f)
- static int vidioc_g_fmt(struct file *file, void *prv, struct v4l2_format *f)
- {
- 	struct rga_ctx *ctx = prv;
--	struct vb2_queue *vq;
- 	struct rga_frame *frm;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 	frm = rga_get_frame(ctx, f->type);
- 	if (IS_ERR(frm))
- 		return PTR_ERR(frm);
-diff --git a/drivers/media/platform/s5p-g2d/g2d.c b/drivers/media/platform/s5p-g2d/g2d.c
-index 57ab1d1..dda4159 100644
---- a/drivers/media/platform/s5p-g2d/g2d.c
-+++ b/drivers/media/platform/s5p-g2d/g2d.c
-@@ -319,12 +319,8 @@ static int vidioc_enum_fmt(struct file *file, void *prv, struct v4l2_fmtdesc *f)
- static int vidioc_g_fmt(struct file *file, void *prv, struct v4l2_format *f)
- {
- 	struct g2d_ctx *ctx = prv;
--	struct vb2_queue *vq;
- 	struct g2d_frame *frm;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 	frm = get_frame(ctx, f->type);
- 	if (IS_ERR(frm))
- 		return PTR_ERR(frm);
-diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-index 3f9000b..4884725 100644
---- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-+++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-@@ -1359,15 +1359,10 @@ static struct s5p_jpeg_q_data *get_q_data(struct s5p_jpeg_ctx *ctx,
- 
- static int s5p_jpeg_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct s5p_jpeg_q_data *q_data = NULL;
- 	struct v4l2_pix_format *pix = &f->fmt.pix;
- 	struct s5p_jpeg_ctx *ct = fh_to_ctx(priv);
- 
--	vq = v4l2_m2m_get_vq(ct->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE &&
- 	    ct->mode == S5P_JPEG_DECODE && !ct->hdr_parsed)
- 		return -EINVAL;
-@@ -1620,8 +1615,6 @@ static int s5p_jpeg_s_fmt(struct s5p_jpeg_ctx *ct, struct v4l2_format *f)
- 	unsigned int f_type;
- 
- 	vq = v4l2_m2m_get_vq(ct->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	q_data = get_q_data(ct, f->type);
- 	BUG_ON(q_data == NULL);
-diff --git a/drivers/media/platform/sh_veu.c b/drivers/media/platform/sh_veu.c
-index 09ae64a..6d59e16 100644
---- a/drivers/media/platform/sh_veu.c
-+++ b/drivers/media/platform/sh_veu.c
-@@ -554,8 +554,6 @@ static int sh_veu_s_fmt(struct sh_veu_file *veu_file, struct v4l2_format *f)
- 		return ret;
- 
- 	vq = v4l2_m2m_get_vq(veu->m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	if (vb2_is_busy(vq)) {
- 		v4l2_err(&veu_file->veu_dev->v4l2_dev, "%s queue busy\n", __func__);
-diff --git a/drivers/media/platform/ti-vpe/vpe.c b/drivers/media/platform/ti-vpe/vpe.c
-index d70871d0..1620168 100644
---- a/drivers/media/platform/ti-vpe/vpe.c
-+++ b/drivers/media/platform/ti-vpe/vpe.c
-@@ -1537,14 +1537,9 @@ static int vpe_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
- {
- 	struct v4l2_pix_format_mplane *pix = &f->fmt.pix_mp;
- 	struct vpe_ctx *ctx = file2ctx(file);
--	struct vb2_queue *vq;
- 	struct vpe_q_data *q_data;
- 	int i;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 
- 	pix->width = q_data->width;
-@@ -1714,8 +1709,6 @@ static int __vpe_s_fmt(struct vpe_ctx *ctx, struct v4l2_format *f)
- 	int i;
- 
- 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
- 
- 	if (vb2_is_busy(vq)) {
- 		vpe_err(ctx->dev, "queue busy\n");
-diff --git a/drivers/media/platform/vicodec/vicodec-core.c b/drivers/media/platform/vicodec/vicodec-core.c
-index 0d7876f..9a2ab8b 100644
---- a/drivers/media/platform/vicodec/vicodec-core.c
-+++ b/drivers/media/platform/vicodec/vicodec-core.c
-@@ -445,16 +445,11 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
- 
- static int vidioc_g_fmt(struct vicodec_ctx *ctx, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct vicodec_q_data *q_data;
- 	struct v4l2_pix_format_mplane *pix_mp;
- 	struct v4l2_pix_format *pix;
- 	const struct v4l2_fwht_pixfmt_info *info;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 	info = q_data->info;
- 
-diff --git a/drivers/media/platform/vim2m.c b/drivers/media/platform/vim2m.c
-index 89d9c4c..dae8af5 100644
---- a/drivers/media/platform/vim2m.c
-+++ b/drivers/media/platform/vim2m.c
-@@ -484,13 +484,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
- 
- static int vidioc_g_fmt(struct vim2m_ctx *ctx, struct v4l2_format *f)
- {
--	struct vb2_queue *vq;
- 	struct vim2m_q_data *q_data;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 
- 	f->fmt.pix.width	= q_data->width;
-@@ -594,10 +589,6 @@ static int vidioc_s_fmt(struct vim2m_ctx *ctx, struct v4l2_format *f)
- 	struct vim2m_q_data *q_data;
- 	struct vb2_queue *vq;
- 
--	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
--	if (!vq)
--		return -EINVAL;
--
- 	q_data = get_q_data(ctx, f->type);
- 	if (!q_data)
- 		return -EINVAL;
-diff --git a/drivers/media/v4l2-core/v4l2-mem2mem.c b/drivers/media/v4l2-core/v4l2-mem2mem.c
-index 5bbdec5..1bbf4b0 100644
---- a/drivers/media/v4l2-core/v4l2-mem2mem.c
-+++ b/drivers/media/v4l2-core/v4l2-mem2mem.c
-@@ -124,8 +124,6 @@ struct vb2_queue *v4l2_m2m_get_vq(struct v4l2_m2m_ctx *m2m_ctx,
- 	struct v4l2_m2m_queue_ctx *q_ctx;
- 
- 	q_ctx = get_queue_ctx(m2m_ctx, type);
--	if (!q_ctx)
--		return NULL;
- 
- 	return &q_ctx->q;
- }
-@@ -965,8 +963,6 @@ void v4l2_m2m_buf_queue(struct v4l2_m2m_ctx *m2m_ctx,
- 	unsigned long flags;
- 
- 	q_ctx = get_queue_ctx(m2m_ctx, vbuf->vb2_buf.vb2_queue->type);
--	if (!q_ctx)
--		return;
- 
- 	spin_lock_irqsave(&q_ctx->rdy_spinlock, flags);
- 	list_add_tail(&b->list, &q_ctx->rdy_queue);
--- 
-1.9.1
+ 	/* Adjust buffer according to instruction. */
+
 
 
 _______________________________________________
