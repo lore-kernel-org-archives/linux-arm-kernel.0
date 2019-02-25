@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 750B8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 03:33:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 33A52C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 03:33:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 17C3E2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 03:33:05 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 027352087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 03:33:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o0Nz/Ea/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 17C3E2087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J/U6QSyX"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 027352087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AWqv3MAX/rCEE7YYEIHg/yq4r/gBoWNpuZEUY8eYZ+k=; b=o0Nz/Ea/e4/2FP
-	qSQg8tNscvv0HfndeDLrNvxgFuechDjd/FdS8qQ8QtDTUqLMhHtKC11bxawwDw5f4NrRPOtH4R/YY
-	QqApFuye/R8AKgo/eUq8bxIbzeVJDwURtt5fSC9/maWV4bocqOodAoasUuhcZTj+1dXL7BVXJ0A7L
-	M9ZWLXhG/hOFYU7rnE4HqDvh4CaVCc6vkN1xe3I8AQzquydFA7scC36wO7GcU5nF5j6TFOi5PQddE
-	cm99xkfnWWp9WXg1/h7dQQF7Qy6ryifhKi4r1nws2gygNHZHqvdbRsoXqWywTMFdtKRQC2KcvAwpc
-	/1CUfSE971TqGXr3w9Iw==;
+	List-Owner; bh=HbIcZz1eUTN5q5Gj0BeU5OaL5Ch3yaUHvWZHNi+bD2o=; b=J/U6QSyXH9K5cl
+	lIqAun0te5mBPodkkmtPj0g36G1RAcpZffaSIekqUqW2YqZL668ExNGyJdjx+XTJ7J4DTkfrNvmHj
+	+Fa6psXsvl498b46r3TTHNlfL3zea+wxhCWEp89PyUHBSM+nxWYQSZy2W9elVXNqT3tts1+HW+7aL
+	c7AaaZBlWyjPSZhoxP2flCcN42KVlOcT1iG75vZTtqBabCdLJHWEQt6PIbYbQK4b+X4jeXEzGBisj
+	Zj64Vmjq9gIO7qpic+BfPDMA/itzCEZV4rAhygIF6ONhhIzVgywjQ0kHM+A4YiuqLhYqLS1FQqE3J
+	VHZ2SiGZ0FUeRSpXojkw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy70m-000178-Us; Mon, 25 Feb 2019 03:33:00 +0000
+	id 1gy70y-0001M5-Jd; Mon, 25 Feb 2019 03:33:12 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy6zG-0007d2-L6
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 03:31:29 +0000
+ id 1gy6zH-0007ak-BZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 03:31:30 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 72A536019C; Mon, 25 Feb 2019 11:31:16 +0800 (CST)
+ id 453B65FD69; Mon, 25 Feb 2019 11:31:16 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Lee Jones <lee.jones@linaro.org>, Sebastian Reichel <sre@kernel.org>
-Subject: [PATCH v2 9/9] ARM: dts: sun8i: a83t: Enable USB OTG controller on
- some boards
-Date: Mon, 25 Feb 2019 11:31:07 +0800
-Message-Id: <20190225033107.17326-10-wens@csie.org>
+Subject: [PATCH v2 3/9] power: supply: axp20x_usb_power: allow disabling input
+ current limiting
+Date: Mon, 25 Feb 2019 11:31:01 +0800
+Message-Id: <20190225033107.17326-4-wens@csie.org>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190225033107.17326-1-wens@csie.org>
 References: <20190225033107.17326-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_193127_080380_79C1032D 
-X-CRM114-Status: GOOD (  10.47  )
+X-CRM114-CacheID: sfid-20190224_193127_832505_D5B80AF3 
+X-CRM114-Status: GOOD (  10.14  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,67 +75,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Bananapi M3 and Cubietruck Plus both have USB OTG ports wired to the
-SoC and PMIC in the same way, with the N_VBUSEN pin on the PMIC
-controlling VBUS output, the PMIC's VBUS input for sensing VBUS, and
-PH11 on the SoC for sensing the ID pin.
+The AXP PMICs allow the user to disable current limiting on the VBUS
+input. While read-out of this setting was already supported by the
+driver, it did not allow the user to configure the PMIC to disable
+current limiting.
 
-Enable OTG on both boards.
+Add support for this.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts     | 12 ++++++++++++
- arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts | 12 ++++++++++++
- 2 files changed, 24 insertions(+)
+ drivers/power/supply/axp20x_usb_power.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 838be7b3715f..9d34eabba121 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -389,7 +389,19 @@
- 	};
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_id_det-gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index fcbec3d7ccd7..ea299d3d84d0 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -420,7 +420,19 @@
- 	};
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_id_det-gpios = <&pio 7 11 GPIO_ACTIVE_HIGH>; /* PH11 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
- 	status = "okay";
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+index cd9b90d79839..e2f353906bb1 100644
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -230,6 +230,11 @@ static int axp20x_usb_power_set_current_max(struct axp20x_usb_power *power,
+ 		return regmap_update_bits(power->regmap,
+ 					  AXP20X_VBUS_IPSOUT_MGMT,
+ 					  AXP20X_VBUS_CLIMIT_MASK, val);
++	case -1:
++		return regmap_update_bits(power->regmap,
++					  AXP20X_VBUS_IPSOUT_MGMT,
++					  AXP20X_VBUS_CLIMIT_MASK,
++					  AXP20X_VBUS_CLIMIT_NONE);
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 2.20.1
 
