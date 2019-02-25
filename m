@@ -2,63 +2,62 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F4B8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:13:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF82FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6130A20652
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:13:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AC3D82083D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D4dTa8WW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6130A20652
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=collabora.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CcH/bSZ1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AC3D82083D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V2Wjb18jCuhikD+RW1rMWVM+KykertrjvsPl/EPKZ14=; b=D4dTa8WWcF4AQ+
-	vqAxCz2WnV7zz5YgR4wvYRZ1zYG8eR1+3cVySdcEEKvPcMw+Jxekq4pIJR5kflJiHPP3YaPwj3GP9
-	k0CookLnkxnIKoGxZzRRdjw+8uMQbH+uAga5Phj3OAgf4kBQT6STyYSejEKiaJFgcBEMBJCOLh7CZ
-	DSl5QmJBQN1nBvPA/UIgNhYbz3DZmjbF3ZkjhtUYKfsdfCs+3MV0+ZEfvTrDu6+cyz/ycaOv29uy9
-	6V8Bz/B7XqCdsvA+cPhn3oKGd+Nz/HqTNX9gwYOS8XSN3Nk23Q6TJdYJhLKmgLxFWuRl/MDZfUnZW
-	dlXxd3pFU1PvkAzym9CA==;
+	List-Owner; bh=6jCSBD6vd6gqqRy3lCdwzIBWeYQsmFLSBm4j5GAhh7U=; b=CcH/bSZ1o88NZC
+	Fo8Uy3a+Lf+jVqoi0WGr12rvPyS1JN6Q1EsM4zv2a1wKLw3T1AGH9aTUqJ1H3GooF1zEONXblsRHf
+	SL8rAvQZxNfST4zpqC4Of3W3XapcA/rMXgUatVyBWhoE9RNxBUdDRodfxHXY7fI89wR503Bx24YKo
+	vc7WQUlSDY0OEn53ZU7k7BbEjDOcrb/YllVUUNi50bFuKPxwmN5buc4/XzQYjo15pIEKkXSXt0g2X
+	RskuYKodpQWEwKEpVa29B6pYaRtvqCqiE2J0JLyzTSQT+60+j9niLwFr5/6Vj8iSyP9oB99mi+/vW
+	jIX7K+r3rEmea8aODKRw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyIsu-0003K2-JY; Mon, 25 Feb 2019 16:13:40 +0000
-Received: from bhuna.collabora.co.uk ([2a00:1098:0:82:1000:25:2eeb:e3e3])
+	id 1gyItd-0003uL-6f; Mon, 25 Feb 2019 16:14:25 +0000
+Received: from relay4-d.mail.gandi.net ([217.70.183.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyIsq-0003JV-Kt; Mon, 25 Feb 2019 16:13:38 +0000
-Received: from localhost (unknown [IPv6:2a01:e0a:2c:6930:5cf4:84a1:2763:fe0d])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256
- bits)) (No client certificate requested)
- (Authenticated sender: bbrezillon)
- by bhuna.collabora.co.uk (Postfix) with ESMTPSA id 8B73528092C;
- Mon, 25 Feb 2019 16:13:33 +0000 (GMT)
-Date: Mon, 25 Feb 2019 17:13:30 +0100
-From: Boris Brezillon <boris.brezillon@collabora.com>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [RFC PATCH 20/27] mtd: nand: Let software ECC engines be
- retrieved from the NAND core
-Message-ID: <20190225171322.654189c8@kernel.org>
-In-Reply-To: <20190225164933.4b0e1489@xps13>
-References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
- <20190221125806.28875-8-miquel.raynal@bootlin.com>
- <20190222152957.737a8c5c@kernel.org>
- <20190225164933.4b0e1489@xps13>
-Organization: Collabora
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+ id 1gyIta-0003sm-A6
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 16:14:23 +0000
+X-Originating-IP: 90.88.23.190
+Received: from mc-bl-xps13.lan
+ (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
+ (Authenticated sender: maxime.chevallier@bootlin.com)
+ by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 9D69CE001B;
+ Mon, 25 Feb 2019 16:14:13 +0000 (UTC)
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+To: davem@davemloft.net
+Subject: [PATCH net-next 1/2] net: phy: marvell10g: Let
+ genphy_c45_pma_read_abilities set Aneg bit
+Date: Mon, 25 Feb 2019 17:14:06 +0100
+Message-Id: <20190225161407.19510-2-maxime.chevallier@bootlin.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20190225161407.19510-1-maxime.chevallier@bootlin.com>
+References: <20190225161407.19510-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_081336_950008_21682EBB 
-X-CRM114-Status: GOOD (  26.14  )
+X-CRM114-CacheID: sfid-20190225_081422_504556_AD759226 
+X-CRM114-Status: UNSURE (   9.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,98 +69,53 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
- Richard Weinberger <richard@nod.at>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Florian Fainelli <f.fainelli@gmail.com>,
+ Antoine Tenart <antoine.tenart@bootlin.com>, netdev@vger.kernel.org,
+ gregory.clement@bootlin.com, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ thomas.petazzoni@bootlin.com, miquel.raynal@bootlin.com,
+ Russell King <linux@armlinux.org.uk>, linux-arm-kernel@lists.infradead.org,
+ Heiner Kallweit <hkallweit1@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 25 Feb 2019 16:49:33 +0100
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+The genphy_c45_pma_read_abilities helper now sets the Autoneg ability
+in phydev->supported according to what the AN MMD reports.
 
-> Hi Boris,
-> 
-> Boris Brezillon <bbrezillon@kernel.org> wrote on Fri, 22 Feb 2019
-> 15:29:57 +0100:
-> 
-> > On Thu, 21 Feb 2019 13:57:59 +0100
-> > Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-> >   
-> > > Before making use of the ECC engines, we must retrieve them. Add the
-> > > boilerplate for the ones already available: software engines (Hamming
-> > > and BCH).
-> > > 
-> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
-> > > ---
-> > >  drivers/mtd/nand/ecc/engine.c              | 14 ++++++++++++++
-> > >  include/linux/mtd/nand-sw-bch-engine.h     |  3 +++
-> > >  include/linux/mtd/nand-sw-hamming-engine.h |  3 +++
-> > >  include/linux/mtd/nand.h                   |  3 +++
-> > >  4 files changed, 23 insertions(+)
-> > > 
-> > > diff --git a/drivers/mtd/nand/ecc/engine.c b/drivers/mtd/nand/ecc/engine.c
-> > > index 7dd3f9772698..318dbb2d56a2 100644
-> > > --- a/drivers/mtd/nand/ecc/engine.c
-> > > +++ b/drivers/mtd/nand/ecc/engine.c
-> > > @@ -286,6 +286,20 @@ bool nand_ecc_correction_is_enough(struct nand_device *nand)
-> > >  	return corr >= ds_corr && conf->strength >= reqs->strength;
-> > >  }
-> > >  
-> > > +struct nand_ecc_engine *nand_ecc_sw_get_engine(struct nand_device *nand)    
-> > 
-> > What if you want to instantiate SW ECC with a custom layout? Can't we
-> > instead have a function that create a new engine dynamically?
-> > 
-> > struct nand_ecc_engine *
-> > nand_ecc_create_sw_engine(struct nand_device* nand,
-> > 			  enum nand_ecc_algo algo,
-> > 			  struct mtd_ooblayout *layout);
-> > 
-> >   
-> 
-> Right now, for both sw engines, a default layout is applied if there is
-> none at engine initialization time.
-> 
-> Also, do we really need a "create" helper? I don't see what's created
-> there. Maybe you had something else in mind, and the
-> ecc_sw_xxx_get_engine() approach do not match what you expected, so
-> please tell me more about your idea, otherwise I don't see what a
-> nand_ecc_create_sw_engine() would bring.
+We therefore don't need to manually do that in mv3310_get_features().
 
-The layout is part of the ECC engine properties, which I why I suggest
-to create one engine instance per user and specify the layout to use
-at instance creation time.
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Suggested-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+ drivers/net/phy/marvell10g.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-> 
-> >   
-> > > +{
-> > > +	switch (nand->ecc.user_conf.algo) {    
-> > 
-> > Note that the conf is supposed to be passed afterwards, when the ctx is
-> > created, so you should check nand->ecc.user_conf directly here.  
-> 
-> I think this is what I do so I suspect the above sentence is not what
-> you actually meant?
+diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
+index 580e91deadbc..ab71da55c1e0 100644
+--- a/drivers/net/phy/marvell10g.c
++++ b/drivers/net/phy/marvell10g.c
+@@ -268,16 +268,6 @@ static int mv3310_get_features(struct phy_device *phydev)
+ {
+ 	int ret, val;
+ 
+-	if (phydev->c45_ids.devices_in_package & MDIO_DEVS_AN) {
+-		val = phy_read_mmd(phydev, MDIO_MMD_AN, MDIO_STAT1);
+-		if (val < 0)
+-			return val;
+-
+-		if (val & MDIO_AN_STAT1_ABLE)
+-			linkmode_set_bit(ETHTOOL_LINK_MODE_Autoneg_BIT,
+-					 phydev->supported);
+-	}
+-
+ 	ret = genphy_c45_pma_read_abilities(phydev);
+ 	if (ret)
+ 		return ret;
+-- 
+2.19.2
 
-Sorry, I meant "should not". My point is, the user_conf should only be
-passed at context creation time, and should not be modified in-place by
-the caller, unless proven necessary.
-
-There's really 2 different steps that I think need to be isolated:
-
-1/ retrieve/create an ECC engine instance (SW, HW-controller-side,
-   on-die)
-2/ ask this ECC engine instance to create a context out of a user conf
-
-Your user_conf seems 2 mix the 2 concepts: the engine to use, the
-strength/step-size you expect.
 
 _______________________________________________
 linux-arm-kernel mailing list
