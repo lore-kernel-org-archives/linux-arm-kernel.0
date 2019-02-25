@@ -2,57 +2,65 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB2E1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:28:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C41DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:29:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 75AB820842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:28:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4E2E720842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:29:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mTZNidq7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75AB820842
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WYI1ei2x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4E2E720842
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=sC6kjPl6EiObWr1vkA7suegpyG9Sh94Fd5kVmgPkPhc=; b=mTZNidq7eb+X5M
-	lo1Xk64L4RX8Fe/h2+5HPzGW9iGiGRPnFIdy140rpZ4wATR+q7P2r/CsjYzRPpW2hE5JhxlVkfu9N
-	SN441hzAg6RG0bQc7uuKQZ+4Zdq8QzewlNjcuQNq+G8rw2mI9kgaH6nQ0wHZ0akKNl7ysH4mSIlR5
-	/Sb+nj2dYSMY6iMjRd71v9I4aA3wXBZKvqR+eRrMf3RzJ0wfgwwUzJeHfHmQ1IZW255Cg2dIyo3+j
-	mNnPg27RmBT7Z9jiuHIL5qgwb/e6bGOW4Fqzhcq8dPF8Ik7fXjcp5AmqQKt8PqkSitbvgn4xIZxQT
-	WXGzHvZrhgv7c4/X0kJA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XvyRMCxcKVUFkt2koLASex73w+s1JGvUNi5kEVAjFjI=; b=WYI1ei2x9xg/qG
+	THpVFjAdQJxUjWk7RWY1NxyLFS8iznCbstDIKdeMd6EQRZhiIgTs2lUWuFzYp5NbqhWWeYkyIGnLl
+	mj5KXVlSKMdhPiMZ6x8ubCK+Ux3BX4u6+AxdVWFwKy6C6w+o+21yIwyNom44kEIDFxkm6DxYsJSLN
+	HKJn7++4+U3Cl9A2vAHq/CwleL+LxdbrCEX0Lmex140xvvvrAwuW46MJzunR1HrtPARAwJhmVR1Mj
+	0zYeVgp0vCq3+o1JEK0OIVGBPc389EUrOzSHOMsylLYGfKl2jXC1wP8BdaYWCCcfM35+lKCLzfrd1
+	HSqzCTkkK+qv8l+FTZEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyK35-0001Ia-6t; Mon, 25 Feb 2019 17:28:15 +0000
-Received: from relay10.mail.gandi.net ([217.70.178.230])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyK31-0001CD-8T
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 17:28:13 +0000
-Received: from localhost (alyon-652-1-170-85.w109-212.abo.wanadoo.fr
- [109.212.201.85])
- (Authenticated sender: alexandre.belloni@bootlin.com)
- by relay10.mail.gandi.net (Postfix) with ESMTPSA id 785A1240002;
- Mon, 25 Feb 2019 17:27:58 +0000 (UTC)
-From: Alexandre Belloni <alexandre.belloni@bootlin.com>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: [PATCH] clk: at91: fix programmable clock for sama5d2
-Date: Mon, 25 Feb 2019 18:27:50 +0100
-Message-Id: <20190225172750.25816-1-alexandre.belloni@bootlin.com>
-X-Mailer: git-send-email 2.20.1
+	id 1gyK43-0001nz-Aw; Mon, 25 Feb 2019 17:29:15 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyK3z-0001nL-OI
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 17:29:13 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id DFDA880D;
+ Mon, 25 Feb 2019 09:29:09 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CEF673F703;
+ Mon, 25 Feb 2019 09:29:08 -0800 (PST)
+Subject: Re: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
+To: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
+References: <8898674D84E3B24BA3A2D289B872026A6A311EAE@G01JPEXMBKW03>
+ <20190214155605.GC27547@lakrids.cambridge.arm.com>
+ <90347cf4-4d7b-d553-d4db-1bacd000ff75@arm.com>
+ <8898674D84E3B24BA3A2D289B872026A6A313313@G01JPEXMBKW03>
+ <8898674D84E3B24BA3A2D289B872026A6A319D26@G01JPEXMBKW03>
+From: James Morse <james.morse@arm.com>
+Message-ID: <d391d125-86a9-82e3-5add-10a15e578dd7@arm.com>
+Date: Mon, 25 Feb 2019 17:29:07 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
+In-Reply-To: <8898674D84E3B24BA3A2D289B872026A6A319D26@G01JPEXMBKW03>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_092811_752337_7A4DFE75 
-X-CRM114-Status: GOOD (  14.25  )
+X-CRM114-CacheID: sfid-20190225_092911_789109_E99A53FB 
+X-CRM114-Status: GOOD (  20.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -64,205 +72,82 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Matthias Wieloch <matthias.wieloch@few-bauer.de>,
- Michael Turquette <mturquette@baylibre.com>, linux-kernel@vger.kernel.org,
- Claudiu Beznea <claudiu.beznea@microchip.com>, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ 'Catalin Marinas' <catalin.marinas@arm.com>,
+ 'Will Deacon' <will.deacon@arm.com>,
+ "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
+ "'linux-arm-kernel@lists.infradead.org'"
+ <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="iso-2022-jp"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Matthias Wieloch <matthias.wieloch@few-bauer.de>
+Hi Zhang,
 
-The prescaler formula of the programmable clock has changed for sama5d2. Update
-the driver accordingly. A new compatibility string is needed for this driver,
-now.
+On 23/02/2019 13:06, Zhang, Lei wrote:
+> Zhang, Lei wrote:
+>> I think you mean it may be a problem to modify the KPTI trampoline because
+>> some patches about KPTI will be merged to mainline in the near future.
+>> I understood that.
+>> I should discuss with my colleagues whether we can set NFDx=0 all of time on
+>> A64FX.
+> 
+> The result of our investigation also supports your suggestion. 
+> We surely agree with you that your proposed method (never set NFDx=1 on A64FX)
+> is the best to resolve this erratum.
+> 	
+> For this erratum, James's patch should be merged to mainline
+> instead of my previous patches (v1 to v4).
+> Since KPTI fully covers the effect of NFD1 for A64FX, KPTI is
+> recommended to be used in conjunction with James’s patch.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-[nicolas.ferre@microchip.com: adapt the prescaler range,
-		fix clk_programmable_recalc_rate, split patch]
-Signed-off-by: Matthias Wieloch <matthias.wieloch@few-bauer.de>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
----
- drivers/clk/at91/clk-programmable.c | 57 ++++++++++++++++++++++-------
- drivers/clk/at91/pmc.h              |  2 +
- drivers/clk/at91/sama5d2.c          | 10 ++++-
- 3 files changed, 54 insertions(+), 15 deletions(-)
+>> And thanks for your patch.
+>> If we can set NFDx=0 all of time, I will review, test and report the result.
+> 
+> I have already tested James's patch on A64FX, and the result is no problem at all.
+> 
+> Tested-by:zhang.lei<zhang.lei@jp.fujitsu.com>
 
-diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
-index 5bc68b9c5498..c3174a6bbd48 100644
---- a/drivers/clk/at91/clk-programmable.c
-+++ b/drivers/clk/at91/clk-programmable.c
-@@ -20,8 +20,7 @@
- #define PROG_ID_MAX		7
- 
- #define PROG_STATUS_MASK(id)	(1 << ((id) + 8))
--#define PROG_PRES_MASK		0x7
--#define PROG_PRES(layout, pckr)	((pckr >> layout->pres_shift) & PROG_PRES_MASK)
-+#define PROG_PRES(layout, pckr)	((pckr >> layout->pres_shift) & layout->pres_mask)
- #define PROG_MAX_RM9200_CSS	3
- 
- struct clk_programmable {
-@@ -37,20 +36,29 @@ static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
- 						  unsigned long parent_rate)
- {
- 	struct clk_programmable *prog = to_clk_programmable(hw);
-+	const struct clk_programmable_layout *layout = prog->layout;
- 	unsigned int pckr;
-+	unsigned long rate;
- 
- 	regmap_read(prog->regmap, AT91_PMC_PCKR(prog->id), &pckr);
- 
--	return parent_rate >> PROG_PRES(prog->layout, pckr);
-+	if (layout->is_pres_direct)
-+		rate = parent_rate / (PROG_PRES(layout, pckr) + 1);
-+	else
-+		rate = parent_rate >> PROG_PRES(layout, pckr);
-+
-+	return rate;
- }
- 
- static int clk_programmable_determine_rate(struct clk_hw *hw,
- 					   struct clk_rate_request *req)
- {
-+	struct clk_programmable *prog = to_clk_programmable(hw);
-+	const struct clk_programmable_layout *layout = prog->layout;
- 	struct clk_hw *parent;
- 	long best_rate = -EINVAL;
- 	unsigned long parent_rate;
--	unsigned long tmp_rate;
-+	unsigned long tmp_rate = 0;
- 	int shift;
- 	int i;
- 
-@@ -60,10 +68,18 @@ static int clk_programmable_determine_rate(struct clk_hw *hw,
- 			continue;
- 
- 		parent_rate = clk_hw_get_rate(parent);
--		for (shift = 0; shift < PROG_PRES_MASK; shift++) {
--			tmp_rate = parent_rate >> shift;
--			if (tmp_rate <= req->rate)
--				break;
-+		if (layout->is_pres_direct) {
-+			for (shift = 0; shift <= layout->pres_mask; shift++) {
-+				tmp_rate = parent_rate / (shift + 1);
-+				if (tmp_rate <= req->rate)
-+					break;
-+			}
-+		} else {
-+			for (shift = 0; shift < layout->pres_mask; shift++) {
-+				tmp_rate = parent_rate >> shift;
-+				if (tmp_rate <= req->rate)
-+					break;
-+			}
- 		}
- 
- 		if (tmp_rate > req->rate)
-@@ -140,16 +156,23 @@ static int clk_programmable_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (!div)
- 		return -EINVAL;
- 
--	shift = fls(div) - 1;
-+	if (layout->is_pres_direct) {
-+		shift = div - 1;
- 
--	if (div != (1 << shift))
--		return -EINVAL;
-+		if (shift > layout->pres_mask)
-+			return -EINVAL;
-+	} else {
-+		shift = fls(div) - 1;
- 
--	if (shift >= PROG_PRES_MASK)
--		return -EINVAL;
-+		if (div != (1 << shift))
-+			return -EINVAL;
-+
-+		if (shift >= layout->pres_mask)
-+			return -EINVAL;
-+	}
- 
- 	regmap_update_bits(prog->regmap, AT91_PMC_PCKR(prog->id),
--			   PROG_PRES_MASK << layout->pres_shift,
-+			   layout->pres_mask << layout->pres_shift,
- 			   shift << layout->pres_shift);
- 
- 	return 0;
-@@ -205,19 +228,25 @@ at91_clk_register_programmable(struct regmap *regmap,
- }
- 
- const struct clk_programmable_layout at91rm9200_programmable_layout = {
-+	.pres_mask = 0x7,
- 	.pres_shift = 2,
- 	.css_mask = 0x3,
- 	.have_slck_mck = 0,
-+	.is_pres_direct = 0,
- };
- 
- const struct clk_programmable_layout at91sam9g45_programmable_layout = {
-+	.pres_mask = 0x7,
- 	.pres_shift = 2,
- 	.css_mask = 0x3,
- 	.have_slck_mck = 1,
-+	.is_pres_direct = 0,
- };
- 
- const struct clk_programmable_layout at91sam9x5_programmable_layout = {
-+	.pres_mask = 0x7,
- 	.pres_shift = 4,
- 	.css_mask = 0x7,
- 	.have_slck_mck = 0,
-+	.is_pres_direct = 0,
- };
-diff --git a/drivers/clk/at91/pmc.h b/drivers/clk/at91/pmc.h
-index 672a79bda88c..a0e5ce9c9b9e 100644
---- a/drivers/clk/at91/pmc.h
-+++ b/drivers/clk/at91/pmc.h
-@@ -71,9 +71,11 @@ struct clk_pll_characteristics {
- };
- 
- struct clk_programmable_layout {
-+	u8 pres_mask;
- 	u8 pres_shift;
- 	u8 css_mask;
- 	u8 have_slck_mck;
-+	u8 is_pres_direct;
- };
- 
- extern const struct clk_programmable_layout at91rm9200_programmable_layout;
-diff --git a/drivers/clk/at91/sama5d2.c b/drivers/clk/at91/sama5d2.c
-index d69ad96fe988..31d6226b297a 100644
---- a/drivers/clk/at91/sama5d2.c
-+++ b/drivers/clk/at91/sama5d2.c
-@@ -125,6 +125,14 @@ static const struct {
- 	  .pll = true },
- };
- 
-+static const struct clk_programmable_layout sama5d2_programmable_layout = {
-+	.pres_mask = 0xff,
-+	.pres_shift = 4,
-+	.css_mask = 0x7,
-+	.have_slck_mck = 0,
-+	.is_pres_direct = 1,
-+};
-+
- static void __init sama5d2_pmc_setup(struct device_node *np)
- {
- 	struct clk_range range = CLK_RANGE(0, 0);
-@@ -248,7 +256,7 @@ static void __init sama5d2_pmc_setup(struct device_node *np)
- 
- 		hw = at91_clk_register_programmable(regmap, name,
- 						    parent_names, 5, i,
--						    &at91sam9x5_programmable_layout);
-+						    &sama5d2_programmable_layout);
- 		if (IS_ERR(hw))
- 			goto err_free;
- 	}
--- 
-2.20.1
+Thanks, I'll post it properly with this tag.
 
+
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
+>> a4168d366127..b0b7f1c4e816 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -643,6 +643,25 @@ config QCOM_FALKOR_ERRATUM_E1041
+>>
+>>  	  If unsure, say Y.
+>>
+>> +config FUJITSU_ERRATUM_010001
+>> +	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur wrongly"
+>> +	default y
+>> +	help
+>> +	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
+>> +	  On some variants of the Fujitsu-A64FX cores version (1.0, 1.1), memory
+>> +	  accesses may cause undefined fault (Data abort, DFSC=0b111111).
+>> +	  This fault occurs under a specific hardware condition when a
+>> +	  load/store instruction performs an address translation using:
+>> +	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
+>> +	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
+>> +	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
+>> +	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
+>> +
+>> +	  The workaround is to ensure these bits are clear in TCR_ELx.
+>> +	  The workaround only affect the Fujitsu-A64FX.
+> 
+> I think it is better to add a notice here as follows:
+> 
+>   Recommend to enable KPTI (UNMAP_KERNEL_AT_EL0 = y).
+
+That unmap option is on by default, you can't turn it off without CONFIG_EXPERT. While I
+agree, I don't think we need to spell this out.
+
+
+Thanks,
+
+James
 
 _______________________________________________
 linux-arm-kernel mailing list
