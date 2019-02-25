@@ -2,70 +2,73 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1169EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:35:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 325FEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:43:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D19182087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:34:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EFE6920842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:43:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sf3ySJ4I"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D19182087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K15FPY6H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EFE6920842
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YJ8iaD4inuwLq9djX0VEGmVuTlHXOaWqVGPBFdnaMlg=; b=Sf3ySJ4IVtpzLs
-	IfA4L4R3sh/BVnSyEjdj03RUg2vcu1rsq78SQjEWfB7QwwWb9clf7MLHh9Cpy+tEFo72q6+lBS+30
-	VnqidmsoGJweROkgxGTASbKRyJw2Ar6kQEVFyGkXaOeECeVSJWHvVP9y9XejONN+85nJDFEn749lu
-	m9C2i8z/VJQRdsHBN6BFmgre1KddkZSgMmTLQpzJ57ovqsjYk2aFeJE/t9u4ejrHZBTlGqLatqmjC
-	2XCcFew5VE7OIB8jovKW6uB84/6fNQV72UjQajDkWj7jZEIwYF2KMvaQmaHKVrzZhutVVXEir12gk
-	+jF5U1w+Op1J/ag1Rt7Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=QME50esp7vDEaUk8aLzOlx4wTakupCdK46U/DvkZJt4=; b=K15FPY6HKHDWKZ
+	06hFbtnPAbpwLcBnBj+stDsGt3h6pS3jVvXugn+64PS070MvYrG2N/lArroQO+7S70zZcsgrMCbKM
+	/KZe5F8RXTDxuqPVE3nC4GCDhnTHGJqSouAfLQKLudF9h8OR8D7Tsh2QPI4mRwkEvoqTkTrmsyZWu
+	6IC5YOD/xpiXPDyWw2tyipkcG0BLp9Y/KanG1D+xcHlHugbHhtNTGPrhxulcb4z5ho9pmCYQl6M0L
+	TAZk+NicU9MIruDlrPfj8yUKErKPtr4jv0jVAjGCec+kEqiPYmwKusfakPZ1wT+DHV6tBQ8yVPODC
+	npzlYXV0kTDoFvCXZpTQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyDb2-0007b9-Mm; Mon, 25 Feb 2019 10:34:52 +0000
-Received: from mga05.intel.com ([192.55.52.43])
+	id 1gyDjN-0002US-Ri; Mon, 25 Feb 2019 10:43:29 +0000
+Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyDay-0007ao-US
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 10:34:50 +0000
-X-Amp-Result: UNKNOWN
-X-Amp-Original-Verdict: FILE UNKNOWN
-X-Amp-File-Uploaded: False
-Received: from orsmga008.jf.intel.com ([10.7.209.65])
- by fmsmga105.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 25 Feb 2019 02:34:48 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,411,1544515200"; d="scan'208";a="120580722"
-Received: from smile.fi.intel.com (HELO smile) ([10.237.72.86])
- by orsmga008.jf.intel.com with ESMTP; 25 Feb 2019 02:34:45 -0800
-Received: from andy by smile with local (Exim 4.92-RC6)
- (envelope-from <andriy.shevchenko@linux.intel.com>)
- id 1gyDau-00088v-2i; Mon, 25 Feb 2019 12:34:44 +0200
-Date: Mon, 25 Feb 2019 12:34:44 +0200
-From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-To: Ludovic Desroches <ludovic.desroches@microchip.com>
-Subject: Re: [PATCH v5 2/3] i2c: at91: split driver into core and master file
-Message-ID: <20190225103444.GR9224@smile.fi.intel.com>
-References: <20190222092522.4913-1-ludovic.desroches@microchip.com>
- <20190222092522.4913-3-ludovic.desroches@microchip.com>
+ id 1gyDjJ-0002Tm-6U
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 10:43:27 +0000
+Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1PAfrEv025933; Mon, 25 Feb 2019 11:43:15 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx07-00178001.pphosted.com with ESMTP id 2qtvtwsdeq-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Mon, 25 Feb 2019 11:43:15 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 10EAB34;
+ Mon, 25 Feb 2019 10:43:11 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag5node3.st.com [10.75.127.15])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id C85642842;
+ Mon, 25 Feb 2019 10:43:11 +0000 (GMT)
+Received: from localhost (10.75.127.45) by SFHDAG5NODE3.st.com (10.75.127.15)
+ with Microsoft SMTP Server (TLS) id 15.0.1347.2;
+ Mon, 25 Feb 2019 11:43:10 +0100
+From: Fabrice Gasnier <fabrice.gasnier@st.com>
+To: <jic23@kernel.org>, <robh+dt@kernel.org>, <alexandre.torgue@st.com>
+Subject: [PATCH 0/2] iio: counter: stm32-lptimer: add PM support
+Date: Mon, 25 Feb 2019 11:42:45 +0100
+Message-ID: <1551091367-21718-1-git-send-email-fabrice.gasnier@st.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190222092522.4913-3-ludovic.desroches@microchip.com>
-Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
-User-Agent: Mutt/1.10.1 (2018-07-13)
+X-Originating-IP: [10.75.127.45]
+X-ClientProxiedBy: SFHDAG1NODE3.st.com (10.75.127.3) To SFHDAG5NODE3.st.com
+ (10.75.127.15)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2019-02-25_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_023448_992931_1E9BD5C3 
-X-CRM114-Status: GOOD (  13.36  )
+X-CRM114-CacheID: sfid-20190225_024325_540303_D74B17B0 
+X-CRM114-Status: UNSURE (   8.20  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,115 +80,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alexandre.belloni@bootlin.com, wsa@the-dreams.de,
- linux-kernel@vger.kernel.org, me@jue.yt, linux-i2c@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ benjamin.gaignard@linaro.org, lars@metafoo.de, mcoquelin.stm32@gmail.com,
+ linux-iio@vger.kernel.org, arnaud.pouliquen@st.com,
+ linux-kernel@vger.kernel.org, pmeerw@pmeerw.net, knaack.h@gmx.de,
+ fabrice.gasnier@st.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 10:25:21AM +0100, Ludovic Desroches wrote:
-> From: Juergen Fitschen <me@jue.yt>
-> 
-> The single file i2c-at91.c has been split into core code (i2c-at91-core.c)
-> and master mode specific code (i2c-at91-master.c). This should enhance
-> maintainability and reduce ifdeffery for slave mode related code.
-> 
-> The code itself hasn't been touched. Shared functions only had to be made
-> non-static. Furthermore, includes have been cleaned up.
+This patch series adds power management support for STM32 LP Timer IIO
+counter dt-bindings and driver.
 
-Since it's a split of existing code, consider my comments as a way to improve
-it afterwards.
+Note: it's basically a resend of patches 3 & 4 as discussed in [1]
+[1] https://patchwork.kernel.org/patch/10797425/
 
-> +static struct at91_twi_pdata *at91_twi_get_driver_data(
-> +					struct platform_device *pdev)
-> +{
-> +	if (pdev->dev.of_node) {
-> +		const struct of_device_id *match;
-> +		match = of_match_node(atmel_twi_dt_ids, pdev->dev.of_node);
-> +		if (!match)
-> +			return NULL;
-> +		return (struct at91_twi_pdata *)match->data;
-> +	}
-> +	return (struct at91_twi_pdata *) platform_get_device_id(pdev)->driver_data;
+Fabrice Gasnier (2):
+  dt-bindings: iio: stm32-lptimer-counter: document pinctrl sleep state
+  iio: counter: stm32-lptimer: Add power management support
 
-
-
-One may do the following instead:
-	struct at91_twi_pdata *data;
-
-	data = device_get_match_data(&pdev->dev);
-	if (data)
-		return data;
-	return ...
-
-And if you ever will switch old platform to somelike unified interface for
-device properties, I would recommend to use device_property_* instead of
-of_property_* and so on.
-
-> +}
-
-> +#include <linux/clk.h>
-> +#include <linux/completion.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/dmaengine.h>
-> +#include <linux/i2c.h>
-> +#include <linux/platform_data/dma-atmel.h>
-> +#include <linux/platform_device.h>
-
-Are all those anyhow in use in this header file?
-
-> +#define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
-
-Wouldn't be better to use _MS here and call actual conversion whenever it's
-needed?
-
-> +#define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
-
-> +#define AUTOSUSPEND_TIMEOUT		2000
-
-_MS ?
-
-> +#define	AT91_TWI_SR		0x0020	/* Status Register */
-> +#define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
-> +#define	AT91_TWI_RXRDY		BIT(1)	/* Receive Holding Register Ready */
-> +#define	AT91_TWI_TXRDY		BIT(2)	/* Transmit Holding Register Ready */
-> +#define	AT91_TWI_OVRE		BIT(6)	/* Overrun Error */
-> +#define	AT91_TWI_UNRE		BIT(7)	/* Underrun Error */
-> +#define	AT91_TWI_NACK		BIT(8)	/* Not Acknowledged */
-> +#define	AT91_TWI_LOCK		BIT(23) /* TWI Lock due to Frame Errors */
-> +
-> +#define	AT91_TWI_INT_MASK \
-> +	(AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_NACK)
-> +
-> +#define	AT91_TWI_IER		0x0024	/* Interrupt Enable Register */
-> +#define	AT91_TWI_IDR		0x0028	/* Interrupt Disable Register */
-> +#define	AT91_TWI_IMR		0x002c	/* Interrupt Mask Register */
-> +#define	AT91_TWI_RHR		0x0030	/* Receive Holding Register */
-> +#define	AT91_TWI_THR		0x0034	/* Transmit Holding Register */
-> +
-> +#define	AT91_TWI_ACR		0x0040	/* Alternative Command Register */
-> +#define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
-> +#define	AT91_TWI_ACR_DIR	BIT(8)
-> +
-> +#define	AT91_TWI_FMR		0x0050	/* FIFO Mode Register */
-> +#define	AT91_TWI_FMR_TXRDYM(mode)	(((mode) & 0x3) << 0)
-
-> +#define	AT91_TWI_FMR_TXRDYM_MASK	(0x3 << 0)
-
-GENMASK() ?
-
-> +#define	AT91_TWI_FMR_RXRDYM(mode)	(((mode) & 0x3) << 4)
-
-> +#define	AT91_TWI_FMR_RXRDYM_MASK	(0x3 << 4)
-
-Ditto.
+ .../bindings/iio/counter/stm32-lptimer-cnt.txt     |  8 ++--
+ drivers/iio/counter/stm32-lptimer-cnt.c            | 55 ++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 3 deletions(-)
 
 -- 
-With Best Regards,
-Andy Shevchenko
-
+2.7.4
 
 
 _______________________________________________
