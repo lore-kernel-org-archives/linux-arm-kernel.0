@@ -2,23 +2,21 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D6D4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:31:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BB86EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:39:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2D278213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:31:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 89EF92087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:39:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gpnjf02Z";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="rt+n9xiG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D278213A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qOFQ9u1k"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 89EF92087C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,62 +24,52 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yV4OEUANC8mMLz0/TtPJLNrfs0tTTBSiYxok6tPmK0c=; b=gpnjf02ZDOFztM
-	S681Shi86nfEZIfAKkr9SJyubKVKoLw3HO2JS8OHOvDle1xGqSMgXGxcTX79PaZhUShz4XnI1Hcbn
-	PgOuh03rmGjvwvWL4+nbnvn68mF+CjjeOF1lHfEc/t+ZuIOVk822zJf0ZTECk3wgo9E1dnOkBIbzK
-	0DL4nOqujNqW75rOdZfZlL+1u7iv5ARcf+x6rJma+Yl5sNQ4xkrka1BK5BGjXvHDCN5FPw3IYPDqa
-	pXH+v0K3jYfaUITI4Qs7bYj/kslOX4gMFMvObDlET1WtRutbmup3LpMY6l1Nw75s8wDmbiy3nQtLl
-	0TiAjv1Hmxd7Nm/3GouA==;
+	List-Owner; bh=DEJirYR17jjo9rq8lBjCV5Pyffta51aS7pkwbw5Uf3g=; b=qOFQ9u1k9BWhrm
+	5eqRH/MpUqzSYZ4lGNx3aJbUloUUQEE+PE7AjbSobR0b/GojVAfhkIwaz58dmw4TnOdWDqhpyLazd
+	G3aaV+/H98ePQ0140Tb293In3prBEUXb1Xo0wrhwwg3OHGBYIJ8+upyHqw/ji8GlsoxxXpTCX6khR
+	4VaRV/9myuRE85XMnJiPQlFnNS+MfSSBSMv4nNDHmf8rjycPtWJtiYIsSeNDL/4ZfM6aXIcK9UIxM
+	OSSkT3yVEPW8mlppsg3IngIyrW6DQAjybT0l9s2fjYjsiTbI20cJkn/CfJSfzx4jHU/YQCb4GsNoX
+	NddS3nBoFDc1ldG/d/qA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyGMH-0007cF-UQ; Mon, 25 Feb 2019 13:31:49 +0000
-Received: from mail-ed1-x544.google.com ([2a00:1450:4864:20::544])
+	id 1gyGTQ-0001SC-KB; Mon, 25 Feb 2019 13:39:12 +0000
+Received: from mail-qt1-f196.google.com ([209.85.160.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyGME-0007bL-3T
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:31:47 +0000
-Received: by mail-ed1-x544.google.com with SMTP id m35so7527245ede.10
+ id 1gyGTM-0001Rg-MI
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:39:10 +0000
+Received: by mail-qt1-f196.google.com with SMTP id z25so10374831qti.13
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 05:31:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=57oQ2o4V5orS4cTes6nGMZZBv36lxjCx8o3Sf9yfq78=;
- b=rt+n9xiGzBU1qD2mExYcd8nvdtdLLUwrBScMh6pnrtB4o2gAUnomVw2iXH0CoLTY/S
- LteGFI4FMGru0KnJp6sMB2q9EC6Y/fCZUpT8OA/k8gUwBNF212AMmH4GfcKn0EgegFua
- Eh+86LjP3fJNEyG3ZkP2SvmVypkEJa1yaGb2eKYQ0HPYHgeiwko6XZji4QmEOkkB866k
- g6S4JxL7c3nA050+SwShC+OWIKmrzv2jEePqUy0KmC4I8Ns0cYt11AtKMBP8Uqa1fRpt
- g6QF4FhYMAy07HBlG5Bbkh/JaWfojwVOWHFaGnu+qPMg3/oTpkHaoPaFZNS/Kkm1bDOq
- fBRQ==
+ Mon, 25 Feb 2019 05:39:08 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=57oQ2o4V5orS4cTes6nGMZZBv36lxjCx8o3Sf9yfq78=;
- b=Mudxd93bjP4p5q50y0yLTATR+xXHQhsn3BztWCKjNFPGPfYf5Mhd1KoDMw566i7niT
- PwPHjn2MatO4xonL7ulEOuiHxvpZxUaMVnsRJjDIhy9GDQCnkl94KJPV9U0WtPh8I9Ts
- YeZv3scNN691vWQkgfjLV31E7lJ925nNr9VT/TSKQ11dmZf635hoktTZoiTjDjP/sd99
- RHWuuGeG0cC6usAhmcytpRfszPUkQf8RbTKZOAf97mS2+eYIdBUHWo0S4e4JLj7LSDok
- 78wnYnGtv1nBXabHvOupK0sM4uCg9Vyf+3TbLwCu6O2YMGuzl0itnuZsGuFViPhia9uz
- clUg==
-X-Gm-Message-State: AHQUAubzdidJ8jw6EuaRcbOapfef/6pBcatVTUk0p5XCGdtIXNlPBK1W
- B4zlsCe41dnQ1Nn1DMrmHqo7zG3Ky8GURwDUJ70=
-X-Google-Smtp-Source: AHgI3IY7bXbCLZIso2EcuMRIPiXC7nAYQg5j9xgV2vgIIoW8jpq6j31e++PDwfdvKVUentvVl1dOs0Pvhg2wLpqEgmo=
-X-Received: by 2002:a17:906:f1d8:: with SMTP id
- gx24mr13013720ejb.227.1551101503721; 
- Mon, 25 Feb 2019 05:31:43 -0800 (PST)
+ bh=qQa+wgPMesiTlKTvsul58fMBX/JX9ZGKjrHuNhwWwaE=;
+ b=dZ4iGkyhixbuzFh8YNHfPd43BwY/G0mp1qdZr5b2A12ozJzOgZNKBWWEo2BZB/7fEh
+ Ah7Ga3dB1bQJBUXitp5gdiqvc2otoXmpOTNv9cwYqGs+4X2Tt6yEhDmf71kEPj4IxtuB
+ acQMsHiQcQxLuKilgOsRQc+oS3fqQPjtu0Ga6LupDlTm6zt6ti1R0ZDcyCTU/+0sCthl
+ vzDwOE1tnEUyY05uj84ZAinra+gALa9g1Fv94jXHlRH5UWd4U+cFEO7KHYcWeJusXRkS
+ tmUtBzqVQBuTM5+ZWBscL6qzYKtgvBJMT8rin7SUXnEdxOE1yBxjLxFjqWsyWMbHwY5x
+ FMqQ==
+X-Gm-Message-State: AHQUAubtAguw9MMETm3tDUEdghjORKXCYMJnB2i5dY9tGLwVvB0CoymS
+ CZT+P3Tsca+7m5HC7D0ZMjzKR8Q/Fs6xP1caWKE=
+X-Google-Smtp-Source: AHgI3Ia0H18NOVTeeQv3O4dtvQH0bnDl573OwqEPOJrarR2yrs4QFNav2eGJajGvCjfkGip/4HEkbKLCBWB4/EEEHDM=
+X-Received: by 2002:ac8:445a:: with SMTP id m26mr13488848qtn.212.1551101947115; 
+ Mon, 25 Feb 2019 05:39:07 -0800 (PST)
 MIME-Version: 1.0
-References: <20190120023150.17138-1-angus@akkea.ca>
- <20190128160323.28170-1-angus@akkea.ca>
- <20190128160323.28170-3-angus@akkea.ca>
-In-Reply-To: <20190128160323.28170-3-angus@akkea.ca>
-From: Daniel Baluta <daniel.baluta@gmail.com>
-Date: Mon, 25 Feb 2019 15:31:32 +0200
-Message-ID: <CAEnQRZCPuSgfSWctDrLAXANVAjoN=4AHfoecj=K=2dsWJoVUTw@mail.gmail.com>
-Subject: Re: [PATCH v6 2/3] dmaengine: imx-sdma: add a test for imx8mq multi
- sdma devices
-To: "Angus Ainslie (Purism)" <angus@akkea.ca>
+References: <20190225123615.49bce7cd@canb.auug.org.au>
+ <CAK8P3a3moJ12SDM3Ow-Hw3qBeTv9siswK+9pPiEA4JJ+7k4xvg@mail.gmail.com>
+ <s5hr2bw2k7m.wl-tiwai@suse.de>
+ <e2aaed45-0fb1-c9c8-76d4-3b97b36cada6@nvidia.com>
+In-Reply-To: <e2aaed45-0fb1-c9c8-76d4-3b97b36cada6@nvidia.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 25 Feb 2019 14:38:50 +0100
+Message-ID: <CAK8P3a2Q7OAAYCU01TNpHR2SM7N=YunyqZEihSESnQwxzL5=Vg@mail.gmail.com>
+Subject: Re: linux-next: manual merge of the sound tree with the arm-soc tree
+To: Sameer Pujar <spujar@nvidia.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_053146_169771_67BE3437 
-X-CRM114-Status: GOOD (  18.93  )
+X-CRM114-CacheID: sfid-20190225_053908_734009_B3631174 
+X-CRM114-Status: GOOD (  21.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,82 +81,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- dmaengine@vger.kernel.org, Vinod Koul <vkoul@kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>, angus.ainslie@puri.sm,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Lucas Stach <l.stach@pengutronix.de>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>, DTML <devicetree@vger.kernel.org>,
+ Takashi Iwai <tiwai@suse.de>, Mark Brown <broonie@kernel.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Liam Girdwood <lgirdwood@gmail.com>,
+ Linux Next Mailing List <linux-next@vger.kernel.org>,
+ Olof Johansson <olof@lixom.net>, Thierry Reding <treding@nvidia.com>,
+ ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Jan 28, 2019 at 6:04 PM Angus Ainslie (Purism) <angus@akkea.ca> wrote:
->
-> On i.mx8mq, there are two sdma instances, and the common dma framework
-> will get a channel dynamically from any available sdma instance whether
-> it's the first sdma device or the second sdma device. Some IPs like
-> SAI only work with sdma2 not sdma1. To make sure the sdma channel is from
-> the correct sdma device, use the node pointer to match.
->
-> Signed-off-by: Angus Ainslie (Purism) <angus@akkea.ca>
-> Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+On Mon, Feb 25, 2019 at 12:24 PM Sameer Pujar <spujar@nvidia.com> wrote:
+> On 2/25/2019 4:44 PM, Takashi Iwai wrote:
+> > On Mon, 25 Feb 2019 10:19:15 +0100, Arnd Bergmann wrote:
+> >> On Mon, Feb 25, 2019 at 2:36 AM Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> >> I see this property being used in commit c0bde003a013 ("ALSA:
+> >> hda/tegra: sound card name from device tree"), which removes
+> >> a questionable use of the root compatible property, replacing
+> >> it with the new 'nvidia,model' property. We don't do this for any
+> >> other subsystem, so why does the sound subsystem export
+> >> information about the board as a string here?
+> > The sound subsystem exports merely some understandable name string
+> > for the given sound card object, and that was composed from the
+> > compatible string in the past, which turned out to be useless on some
+> > configs.
+> >
+> > But this kind of addition is an extremely bad manner, I'm fine to
+> > revert these (at best with a better alternative).  This isn't about
+> > any functionality but rather some readable information that isn't a
+> > part of API.
 
-Thanks Angus for the patch!
+It is not extremely bad, but it is at the minimum surprising.
 
-Tested-by: Daniel Baluta <daniel.baluta@nxp.com>
+> The motivation for adding custom sound card name is following,
+> 1. When for boards, multiple HDMI/DP ports are exposed, it is sometimes
+>     necessary to know the default port or any customization for that matter.
+>     Audio userspace can distinguish based on the sound card names.
+> 2. Multiple sound cards can coexist for a platform, the indication of
+> particular
+>     audio path is useful.
+> 3. It can help to customize audio paths.
+>     Generally people use "*,model" property in DT to name the sound complex.
+>     Ex: "samsung,model" [sound/soc/samsung/snow.c]
+>         "rockchip,model" [sound/soc/rockchip/rockchip_rt5645.c]
 
+I see, I had not noticed those before. They do seem a little unusual,
+and inconsistent, as the samsung sames are always names the board
+there, but rockchip doesn't: one board names it just "I2C", the other
+one uses "VEYRON-I2S", and the example in the documentation lists
+"ROCKCHIP-I2S" and "Analog audio output", each of them following
+different naming systems.
 
-> ---
->  drivers/dma/imx-sdma.c                | 6 ++++++
->  include/linux/platform_data/dma-imx.h | 1 +
->  2 files changed, 7 insertions(+)
->
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index 757fad2fbfae..d2fae53be689 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -1914,11 +1914,16 @@ static int sdma_init(struct sdma_engine *sdma)
->  static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
->  {
->         struct sdma_channel *sdmac = to_sdma_chan(chan);
-> +       struct sdma_engine *sdma = sdmac->sdma;
->         struct imx_dma_data *data = fn_param;
->
->         if (!imx_dma_is_general_purpose(chan))
->                 return false;
->
-> +       /* return false if it's not the right device */
-> +       if (sdma->dev->of_node != data->of_node)
-> +               return false;
-> +
->         sdmac->data = *data;
->         chan->private = &sdmac->data;
->
-> @@ -1946,6 +1951,7 @@ static struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
->          * be set to sdmac->event_id1.
->          */
->         data.dma_request2 = 0;
-> +       data.of_node = ofdma->of_node;
->
->         return dma_request_channel(mask, sdma_filter_fn, &data);
->  }
-> diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
-> index 7d964e787299..9daea8d42a10 100644
-> --- a/include/linux/platform_data/dma-imx.h
-> +++ b/include/linux/platform_data/dma-imx.h
-> @@ -55,6 +55,7 @@ struct imx_dma_data {
->         int dma_request2; /* secondary DMA request line */
->         enum sdma_peripheral_type peripheral_type;
->         int priority;
-> +       struct device_node *of_node;
->  };
->
->  static inline int imx_dma_is_ipu(struct dma_chan *chan)
-> --
-> 2.17.1
->
+In Documentation/devicetree/bindings/sound/qcom,apq8096.txt, a
+"qcom,model" property is listeds as "Obsolete", and replaced by
+a "model" property. This is in turn also used on amlogic, freescale,
+and some samsung platforms.
+
+My impression here is that the idea of passing a model name
+through DT is well established, but for new stuff, we probably
+want to standardize on plain "model" rather than "$vendor,model".
+
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
