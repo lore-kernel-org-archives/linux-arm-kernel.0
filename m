@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2E60EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:11:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0F4B4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:11:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF2EF20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:11:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CE07420989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:11:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TgiVLRpA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF2EF20989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fwPPetVU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CE07420989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RR8uSZgIk3+uLfyVI3DwRZWkHlgDtqTlet5cLdX9TzM=; b=TgiVLRpAJmk8BY
-	UDKWjhHiGJE8eNmsp9tcEOIk4cQ87Ck6A2CvRhFOMtNDK0tWKr1KUcsh2vMLZ+U5mhGsA03rGz6lM
-	wQOBU1/dNzH72uKK65Q/dOKtSQeDn3vghKltpg4OZ+CbyUGI9ShZnoFxLXWRjs9YiGUQ0mp6b48lg
-	J8YoQPYnJfGXP5tdmKtsSbEOt9L76HxqbcKP+cAfB/qjCtLxICY3AWEGZNidzzJuCtKxdmezVg393
-	EncdR7UK+qLi9RX/bgZIOKApctlPFVY00/Yt0aMkDCODDr20l+ICkwRbUJPi0shJhUBdGp+lMZ7ZK
-	OnUPFiDYeWWCRl6htDIQ==;
+	List-Owner; bh=u+Si36JxZcJhrPDZoLTr1G25fEFZqVAlGeYZ4J5fHz8=; b=fwPPetVUijueY5
+	W+BMwSM69cro1CQzCBBqoHFDnXYLHY7WmUlc74zPbk4wbjtPnh6sjpJWnKLCEmonKqCywxPLLhDr7
+	bCWObnUZdfLtfrBCNoPaeUxQeVy1LgYm/j2ozJABrePm4AsLOLgkFLAcsZitf04xHRCJuL+Ll38d1
+	PCzJxPk5RS4IfRXAP/zBPsOgI5i764o6qZM0NBx7lM42iF1J1lXal4D6KsQ9gL0nIL2zYkWnYDa3U
+	0XBHP89C8/1eu7ULASFTF49ZIoHb17PngT4z8unHI0chc50mdy0aNGaiS0fcA2Y32fC30ahZjcxeA
+	iqPb98dJmDP4Hehujevw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy5jh-0005kB-Vf; Mon, 25 Feb 2019 02:11:17 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gy5jt-00062N-4M; Mon, 25 Feb 2019 02:11:29 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy5ic-0003Mb-N6; Mon, 25 Feb 2019 02:10:14 +0000
-X-UUID: c6f7f9a223f24e6d80b0dffc48796550-20190224
-X-UUID: c6f7f9a223f24e6d80b0dffc48796550-20190224
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ id 1gy5if-0004DM-W3; Mon, 25 Feb 2019 02:10:17 +0000
+X-UUID: ecae3816bb764262a3a2b3e281db33a8-20190224
+X-UUID: ecae3816bb764262a3a2b3e281db33a8-20190224
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw02.mediatek.com
  (envelope-from <wangyan.wang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1521011183; Sun, 24 Feb 2019 18:09:30 -0800
+ with ESMTP id 122433343; Sun, 24 Feb 2019 18:09:44 -0800
 Received: from MTKMBS33DR.mediatek.inc (172.27.6.106) by
- MTKMBS62N1.mediatek.inc (172.29.193.41) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 24 Feb 2019 18:09:29 -0800
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 24 Feb 2019 18:09:42 -0800
 Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS33DR.mediatek.inc
  (172.27.6.106) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Mon, 25 Feb 2019 10:09:26 +0800
+ Mon, 25 Feb 2019 10:09:40 +0800
 Received: from mszsdaap41.mediatek.inc (172.27.4.253) by MTKCAS32.mediatek.inc
  (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 25 Feb 2019 10:09:25 +0800
+ Transport; Mon, 25 Feb 2019 10:09:39 +0800
 From: wangyan wang <wangyan.wang@mediatek.com>
 To: Michael Turquette <mturquette@baylibre.com>, Stephen Boyd
  <sboyd@kernel.org>, CK Hu <ck.hu@mediatek.com>
-Subject: [PATCH V6 2/8] drm/mediatek: move the setting of fixed divider
-Date: Mon, 25 Feb 2019 10:09:06 +0800
-Message-ID: <20190225020912.29120-3-wangyan.wang@mediatek.com>
+Subject: [PATCH V6 7/8] drm/mediatek: using new factor for tvdpll in MT2701
+Date: Mon, 25 Feb 2019 10:09:11 +0800
+Message-ID: <20190225020912.29120-8-wangyan.wang@mediatek.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20190225020912.29120-1-wangyan.wang@mediatek.com>
 References: <20190225020912.29120-1-wangyan.wang@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_181010_877192_B54FF3A0 
-X-CRM114-Status: UNSURE (   9.57  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190224_181014_274489_50A92193 
+X-CRM114-Status: GOOD (  10.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,63 +93,36 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-move the setting of fixed divider from enable/disable
-to the function of setting rate.
-
-the patch is for hdmi pll divider, the divder should
-be configured before clock calculation to ensure the
-clock is right.
+The factor depends on the divider of DPI in MT2701, therefore,
+we should fix this factor to the right and new one.
 
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 Signed-off-by: wangyan wang <wangyan.wang@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dpi.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-index b25c9dfc432a..b26fb7dbdb28 100644
---- a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-@@ -79,7 +79,6 @@ static int mtk_hdmi_pll_prepare(struct clk_hw *hw)
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
- 	usleep_range(80, 100);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
--	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
-@@ -94,7 +93,6 @@ static void mtk_hdmi_pll_unprepare(struct clk_hw *hw)
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
--	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
- 	usleep_range(80, 100);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
-@@ -123,6 +121,7 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+diff --git a/drivers/gpu/drm/mediatek/mtk_dpi.c b/drivers/gpu/drm/mediatek/mtk_dpi.c
+index 69c6e42dad6b..4a2f4a650494 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dpi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dpi.c
+@@ -662,13 +662,11 @@ static unsigned int mt8173_calculate_factor(int clock)
+ static unsigned int mt2701_calculate_factor(int clock)
+ {
+ 	if (clock <= 64000)
+-		return 16;
+-	else if (clock <= 128000)
+-		return 8;
+-	else if (clock <= 256000)
+ 		return 4;
+-	else
++	else if (clock <= 128000)
+ 		return 2;
++	else
++		return 1;
+ }
  
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_PREDIV_MASK);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON6, RG_HTPLL_POSDIV_MASK);
-+	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IC),
- 			  RG_HTPLL_IC_MASK);
- 	mtk_hdmi_phy_mask(hdmi_phy, HDMI_CON6, (0x1 << RG_HTPLL_IR),
-@@ -209,7 +208,6 @@ static void mtk_hdmi_phy_enable_tmds(struct mtk_hdmi_phy *hdmi_phy)
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
- 	usleep_range(80, 100);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
--	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
- 	mtk_hdmi_phy_set_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
-@@ -221,7 +219,6 @@ static void mtk_hdmi_phy_disable_tmds(struct mtk_hdmi_phy *hdmi_phy)
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_DRV_MASK);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_PRED_MASK);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SER_MASK);
--	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_EN_TX_POSDIV);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON2, RG_HDMITX_MBIAS_LPF_EN);
- 	usleep_range(80, 100);
- 	mtk_hdmi_phy_clear_bits(hdmi_phy, HDMI_CON0, RG_HDMITX_EN_SLDO_MASK);
+ static const struct mtk_dpi_conf mt8173_conf = {
 -- 
 2.14.1
 
