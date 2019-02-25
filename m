@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F6E8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:10:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E4AEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:10:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E0E3220989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:10:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2B56920989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 02:10:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XghFBez2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E0E3220989
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dyuehmnm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B56920989
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,48 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tXSvp+P+8MNJKcpQLtyR48IaGrHpmeLMIEW00Bc8tdI=; b=XghFBez2W7pGdn
-	sg/bX9c6/cg5rwKDsIkwo8MWZBlyujxP2YBsdVSjZNPJXu71dJ6NIc8oNPadcLrgE0+GzQJfBYHF4
-	jcBdKVpaNpgru6c+4lgj1puqsYfLVhcj/vWQv4ne+sLz4nfUXJcmuxGQGFSw2ZrquEwOaHQpo4y7U
-	SQttIbSWlH4co4WQfnSVq5dHpkmeLrV/Tpoqpsb+md/s1/FZEL1gTmTOkG4Y+VVVnXqhv0HNsH2Ou
-	E+darXlVTPxu+IgAgtmzFIBsACrUZ/Av/oJbTAiuEr0mELl0kOpy0vXmpQTohWyCyr62A6z/IOetp
-	gzS9ktVxXpqHLHLx1pZQ==;
+	List-Owner; bh=AMT/hcXd6nzCJVK1RU4YNM77hQpg53aNWD9Ax71BqdI=; b=dyuehmnmv9xWXN
+	sP5M0XEID4h8TkhJHCZWOx30E+v1ZR3Oqt+PFlrLbt0Jl0yxIABbP8tZw0XkkiPG6JJwKr9+iH0ek
+	EdjEUMVkgDkSAK1iXXllnmK/1jNHl9zLgEixzGFKbiyj2GPCpBdwfsyx9/fVcsBXI629J6wHBEzOW
+	HXcofvcjA++Rnk303VA2XZIZUNLu6XnHZPL+ubxIWodbEB1KFZGMuSNCYGoA2jnqtw/ejvyrW8fPD
+	73w4D1e/fSLPfr6RNnm8y7LzQHNQ0ui4gMD6qaRA4PTTmS66AmB6vylDnXO92ahDRverdjFuz4hBK
+	di9jrqz5gC0wWVQuzZFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy5ih-0004F5-5W; Mon, 25 Feb 2019 02:10:15 +0000
+	id 1gy5ip-0004Zq-T9; Mon, 25 Feb 2019 02:10:23 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy5iY-0003Mb-C4; Mon, 25 Feb 2019 02:10:08 +0000
-X-UUID: ca1025e52a2344cd98aa631994a68872-20190224
-X-UUID: ca1025e52a2344cd98aa631994a68872-20190224
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
+ id 1gy5iY-0003Ex-Bz; Mon, 25 Feb 2019 02:10:08 +0000
+X-UUID: a732d591615546bc8547be8b57c5b9dd-20190224
+X-UUID: a732d591615546bc8547be8b57c5b9dd-20190224
+Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
  (envelope-from <wangyan.wang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1959942124; Sun, 24 Feb 2019 18:09:47 -0800
-Received: from MTKMBS33N2.mediatek.inc (172.27.4.76) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Sun, 24 Feb 2019 18:09:46 -0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS33N2.mediatek.inc
- (172.27.4.76) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Mon, 25 Feb 2019 10:09:43 +0800
+ with ESMTP id 1518121534; Sun, 24 Feb 2019 18:09:39 -0800
+Received: from MTKMBS33DR.mediatek.inc (172.27.6.106) by
+ MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Sun, 24 Feb 2019 18:09:37 -0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS33DR.mediatek.inc
+ (172.27.6.106) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 25 Feb 2019 10:09:35 +0800
 Received: from mszsdaap41.mediatek.inc (172.27.4.253) by MTKCAS32.mediatek.inc
  (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 25 Feb 2019 10:09:43 +0800
+ Transport; Mon, 25 Feb 2019 10:09:34 +0800
 From: wangyan wang <wangyan.wang@mediatek.com>
 To: Michael Turquette <mturquette@baylibre.com>, Stephen Boyd
  <sboyd@kernel.org>, CK Hu <ck.hu@mediatek.com>
-Subject: [PATCH V6 8/8] drm/mediatek: fix the rate of parent for hdmi phy in
- MT2701
-Date: Mon, 25 Feb 2019 10:09:12 +0800
-Message-ID: <20190225020912.29120-9-wangyan.wang@mediatek.com>
+Subject: [PATCH V6 5/8] clk: mediatek: add MUX_GATE_FLAGS_2
+Date: Mon, 25 Feb 2019 10:09:09 +0800
+Message-ID: <20190225020912.29120-6-wangyan.wang@mediatek.com>
 X-Mailer: git-send-email 2.14.1
 In-Reply-To: <20190225020912.29120-1-wangyan.wang@mediatek.com>
 References: <20190225020912.29120-1-wangyan.wang@mediatek.com>
 MIME-Version: 1.0
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_181006_504179_FBA312AF 
-X-CRM114-Status: GOOD (  11.20  )
+X-CRM114-CacheID: sfid-20190224_181006_605371_747FAFA8 
+X-CRM114-Status: GOOD (  10.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,106 +93,72 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: chunhui dai <chunhui.dai@mediatek.com>
 
-We should not change the rate of parent for hdmi phy when
-doing round_rate for this clock. The parent clock of hdmi
-phy must be the same as it. We change it when doing set_rate
-only.
+Add MUX_GATE_FLAGS_2 for the clock which needs to set two falgs.
+Such as some mux need to set the flags of "CLK_MUX_ROUND_CLOSEST".
 
 Signed-off-by: chunhui dai <chunhui.dai@mediatek.com>
 Signed-off-by: wangyan wang <wangyan.wang@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_hdmi_phy.c        | 14 --------------
- drivers/gpu/drm/mediatek/mtk_hdmi_phy.h        |  3 ---
- drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c | 11 +++++++++++
- drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c | 14 ++++++++++++++
- 4 files changed, 25 insertions(+), 17 deletions(-)
+ drivers/clk/mediatek/clk-mtk.c |  2 +-
+ drivers/clk/mediatek/clk-mtk.h | 20 ++++++++++++++------
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-index 370309d684ec..ca8bc1489f37 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.c
-@@ -15,20 +15,6 @@ static const struct phy_ops mtk_hdmi_phy_dev_ops = {
- 	.owner = THIS_MODULE,
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 9c0ae4278a94..2ed996404804 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -167,7 +167,7 @@ struct clk *mtk_clk_register_composite(const struct mtk_composite *mc,
+ 		mux->mask = BIT(mc->mux_width) - 1;
+ 		mux->shift = mc->mux_shift;
+ 		mux->lock = lock;
+-
++		mux->flags = mc->mux_flags;
+ 		mux_hw = &mux->hw;
+ 		mux_ops = &clk_mux_ops;
+ 
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index f83c2bbb677e..4b88d196d52f 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -81,15 +81,13 @@ struct mtk_composite {
+ 	signed char divider_shift;
+ 	signed char divider_width;
+ 
++	u8 mux_flags;
++
+ 	signed char num_parents;
  };
  
--long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
--			     unsigned long *parent_rate)
--{
--	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
--
--	hdmi_phy->pll_rate = rate;
--	if (rate <= 74250000)
--		*parent_rate = rate;
--	else
--		*parent_rate = rate / 2;
--
--	return rate;
--}
--
- u32 mtk_hdmi_phy_read(struct mtk_hdmi_phy *hdmi_phy, u32 offset)
- {
- 	return readl(hdmi_phy->regs + offset);
-diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
-index 446e2acd1926..c6061ad15ff0 100644
---- a/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
-+++ b/drivers/gpu/drm/mediatek/mtk_hdmi_phy.h
-@@ -50,9 +50,6 @@ void mtk_hdmi_phy_set_bits(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
- void mtk_hdmi_phy_mask(struct mtk_hdmi_phy *hdmi_phy, u32 offset,
- 		       u32 val, u32 mask);
- struct mtk_hdmi_phy *to_mtk_hdmi_phy(struct clk_hw *hw);
--long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
--			     unsigned long *parent_rate);
--
- extern struct platform_driver mtk_hdmi_phy_driver;
- extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_8173_conf;
- extern struct mtk_hdmi_phy_conf mtk_hdmi_phy_2701_conf;
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-index 88dd9e812ca0..33893a180c2e 100644
---- a/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mt2701_hdmi_phy.c
-@@ -152,6 +152,17 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 			  RG_HDMITX_DRV_IBIAS_MASK);
- 	return 0;
- }
-+
-+static long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long *parent_rate)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
-+
-+	hdmi_phy->pll_rate = rate;
-+
-+	return rate;
-+}
-+
- static unsigned long mtk_hdmi_pll_recalc_rate(struct clk_hw *hw,
- 				       unsigned long parent_rate)
- {
-diff --git a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-index 63dde42521b8..3a339f516613 100644
---- a/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-+++ b/drivers/gpu/drm/mediatek/mtk_mt8173_hdmi_phy.c
-@@ -285,6 +285,20 @@ static int mtk_hdmi_pll_set_rate(struct clk_hw *hw, unsigned long rate,
- 	return 0;
- }
+-/*
+- * In case the rate change propagation to parent clocks is undesirable,
+- * this macro allows to specify the clock flags manually.
+- */
+-#define MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
+-			_gate, _flags) {				\
++#define MUX_GATE_FLAGS_2(_id, _name, _parents, _reg, _shift,		\
++				_width, _gate, _flags, _muxflags) {	\
+ 		.id = _id,						\
+ 		.name = _name,						\
+ 		.mux_reg = _reg,					\
+@@ -101,8 +99,18 @@ struct mtk_composite {
+ 		.parent_names = _parents,				\
+ 		.num_parents = ARRAY_SIZE(_parents),			\
+ 		.flags = _flags,					\
++		.mux_flags = _muxflags,					\
+ 	}
  
-+static long mtk_hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long *parent_rate)
-+{
-+	struct mtk_hdmi_phy *hdmi_phy = to_mtk_hdmi_phy(hw);
++/*
++ * In case the rate change propagation to parent clocks is undesirable,
++ * this macro allows to specify the clock flags manually.
++ */
++#define MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
++			_gate, _flags)					\
++		MUX_GATE_FLAGS_2(_id, _name, _parents, _reg,		\
++					_shift, _width, _gate, _flags, 0)
 +
-+	hdmi_phy->pll_rate = rate;
-+	if (rate <= 74250000)
-+		*parent_rate = rate;
-+	else
-+		*parent_rate = rate / 2;
-+
-+	return rate;
-+}
-+
- static unsigned long mtk_hdmi_pll_recalc_rate(struct clk_hw *hw,
- 				       unsigned long parent_rate)
- {
+ /*
+  * Unless necessary, all MUX_GATE clocks propagate rate changes to their
+  * parent clock by default.
 -- 
 2.14.1
 
