@@ -2,71 +2,127 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 01ECDC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 09:19:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 964FEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 09:31:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C166420842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 09:19:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6539B2087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 09:31:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f9Tf1yFx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C166420842
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qe0SCbMU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="dCR3J02Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6539B2087C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MjO3c1YUwxPMEnSZiGx1BZFEGXBs72LtFT5QKLjryfA=; b=f9Tf1yFxDYqGPq
-	IaFt9WsINlyPnuVO86jkzWowbTGPzk5c+fgPUTY7aCNoK8eFS89IJS1sCh60smsp293QQai7vGZiJ
-	MfQuQpIYiOFwXj3WxS50qvO8I1WrJND7sUDciMTWKCLAfQ/TV/oSEtdYUB4cSG9mMgBOKQJQ0laFw
-	2h4Kvpzd4388VRbLndcRZRavyg1Ng2wQZEPYWDvS5G/7Mam0G7IpUr8creCvPJC5OY0cjNyVKSvb0
-	aR/g0ITn08CQlZO2HL1thA7yqEcEE6okcomfXHNHyPRpQ57cWfiSg6YuM4JXjh/PD7W9cF33OJA/F
-	gHgtiTHS4/ICcSCf8lIQ==;
+	List-Owner; bh=fSbfQQ4ro8biA50M/a+TAairQBFaarfXl98q3E6f7Ug=; b=qe0SCbMUOs5flj
+	xOCD3vfeLSuzKTgZ92axAmtfiC8Y5Z8WzORDzTdoamTmwrq7WajPzOswf8Z5g4tmPOZQX5RbW4BK5
+	/rV+xXTme+N4WQoeX5YCPqWsefwVNACY4Dh7F+XXZSDGkhDU6wpIgzwWtQi2HYACci/7JqQg3sH95
+	WnTJIwW2dBb+DbgltFB22Or/v5XbEf0WH7RKd8d7tYIIY3g27krMj43jR0NtiXBjotYC8MvZeRJ8g
+	7noe1R2/hmUhJPrQxQwdxlvbmGYuagkPnlMo3Z96PhtYymqqSjDOnKbTlFUC9guhhVJWZCoKGBZvQ
+	T8a82+sydYBKUr+qDE8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyCQD-0003By-7k; Mon, 25 Feb 2019 09:19:37 +0000
-Received: from mail-qk1-f194.google.com ([209.85.222.194])
+	id 1gyCbY-0000Fr-IT; Mon, 25 Feb 2019 09:31:20 +0000
+Received: from mail-eopbgr00048.outbound.protection.outlook.com ([40.107.0.48]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyCQ9-0003BA-Db
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 09:19:34 +0000
-Received: by mail-qk1-f194.google.com with SMTP id x6so4846490qki.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 01:19:32 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=tl5z+HS6nWD0PvKbpb2FdFcWwLxwGMZEBWe8vjH+kyw=;
- b=E1v3dxCjEzNb5sDFHQW4YL4TGgGtYBN7P7+JHVwlwrBTQDLCn4Oc4KykbmtW6tc8XI
- axitIJeaaEgA99DYA/4S4/p0yOFG0IYlEWTCRly8VgcvB4Tb3CTipoRM0NDSJkellvsx
- ScGzpfsQ749xLIysHIJWHVmUOGTIZfoFiIIpzPdlHo5hASK+jZZMCdWNwO8YNx+s2BPo
- UfGKWCy5hqR8/IvtlVDYLiyxoHzDD5jWBzLqNiPgE5h7LnaaS5wrhlyG9mzu1MYyaEUv
- bIeyxbmyaQHt1gczw5h5LOPgTZ+gZV2QXDZwHv4Pq4C6cIiPzceLg5kLyi6L1OomliCr
- Rv1Q==
-X-Gm-Message-State: AHQUAuYbhBVBJwhn0L9i3OnXxYgXTwlPALHe8oxhnHcsf2EWovipVP80
- as2TQ9eWL/zjqUbMIrBwHCtUYOdaYsJqsultlpg=
-X-Google-Smtp-Source: AHgI3IbBPTOyNgEcGfm+bE8oq5rwobqvkL3vpRy+Olk4dW5SlNNEjaU1+ZFShX0UcKPIjoxDR+oY5UzN66Xw1wfI9uU=
-X-Received: by 2002:a37:d492:: with SMTP id s18mr11428837qks.343.1551086371433; 
- Mon, 25 Feb 2019 01:19:31 -0800 (PST)
+ id 1gyCbV-00008s-K9
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 09:31:19 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=IyU/YMSkZ6cKNpYrcvxajOFVGy76xbDViBzDKYg8/jc=;
+ b=dCR3J02QJPAcHNrYZzKzqxuHTgX/Og3efkKCrq5ac3fu3rY00d0WMK89gOEFDLRJiNtRHB7xWe7d7fm/fp7OnnipM7mYc9JmeEmC8sIVZ6eM5TjgEE3g3Hij0lvPiU2F8Mr7ANYnjmuRJTT4iFcU0bm5HL4kSDhhLd4u6Zyl3u4=
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
+ AM0PR04MB6034.eurprd04.prod.outlook.com (20.179.35.22) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Mon, 25 Feb 2019 09:31:11 +0000
+Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
+ ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1643.019; Mon, 25 Feb 2019
+ 09:31:11 +0000
+From: Abel Vesa <abel.vesa@nxp.com>
+To: Chris Spencer <spencercw@gmail.com>
+Subject: Re: [PATCH] soc: imx: Add generic i.MX8 SoC driver
+Thread-Topic: [PATCH] soc: imx: Add generic i.MX8 SoC driver
+Thread-Index: AQHUu7aVxVb7WzSFe0KD+xVLEa1s3KXwSAwAgAAaNQA=
+Date: Mon, 25 Feb 2019 09:31:11 +0000
+Message-ID: <20190225093110.xl2va6jfov3wxbyk@fsr-ub1664-175>
+References: <1549194583-7684-1-git-send-email-abel.vesa@nxp.com>
+ <CAGUNXRTY0yKnLH1hnxiv5ydnWG2VKNzpY_4rZ2yRhj8_Jq9rYQ@mail.gmail.com>
+In-Reply-To: <CAGUNXRTY0yKnLH1hnxiv5ydnWG2VKNzpY_4rZ2yRhj8_Jq9rYQ@mail.gmail.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=abel.vesa@nxp.com; 
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: a87c2515-7cbb-448f-367a-08d69b03faf2
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(5600110)(711020)(4605104)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB6034; 
+x-ms-traffictypediagnostic: AM0PR04MB6034:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; AM0PR04MB6034;
+ 23:9MrNZdTC9un6s/8IOKssohKBBAV2ZBKdQ6ujO1Ok0?=
+ =?us-ascii?Q?JeztyGedPnREi1y1HM5UjmfNFJ3KwNHzpaLZ3c5tk01DTtkcxIBHuLhdUI3F?=
+ =?us-ascii?Q?ypay5JR9kaqvVleHNgFs36dSHACaoMG+JkbeCeh1mltSzUonUYkIkB4769ym?=
+ =?us-ascii?Q?rocdkLjjrIR+VfP3brw6ccQGyt6HTKAsnleu0b60la8X0nwp7142LcB3u8BF?=
+ =?us-ascii?Q?GYngqabQuRQO4G3eti8+wj2kUnCh2afKEcJmFDnkhzJdhVmoyKdnvLOVTz1a?=
+ =?us-ascii?Q?/GPvnAQC6JQ0Mep+G6YregAfxyanDpBIJlfb2zvqx65bKtif+UeuMSz9s2ha?=
+ =?us-ascii?Q?yXMSMNgof7Ip/VayDNawhp9q3fxZ16Xkxs20zYo49D/OiFDoU+9eYvvZSFS0?=
+ =?us-ascii?Q?HE5KqE+cuyv+w0INxqS1GuhzpWyWGaw9YR/EZ2+FeIFcTbFAqTTxUnl59kMe?=
+ =?us-ascii?Q?fCxDAp6Ks4IQDVMhOLTIKvQ9g9hAEcfEq7hVWGtUHpd3tLBK7fPpaxBO3Wg4?=
+ =?us-ascii?Q?sU9PJUZ0bWw1x2CCfePBB8SBWUeeX6UG8TO1nkEbFvY1oW6EFt/u0M9npwDa?=
+ =?us-ascii?Q?iIEu2BETtBsbvvlOjzQ8EiuuBMyp+gFW4/zp+vK1QXdXV677n70g7W2JRkjP?=
+ =?us-ascii?Q?NwC7JL7asqM5cHfRChxzKC9MIHbRLm1uhpGU70IejRQgKv2V66LHLhK+Mugb?=
+ =?us-ascii?Q?Z0SZ3XjN8GyUnWRAShlCaMofw4OuDqwM9xWQXY7DiLygrGCk3l05K0288iR0?=
+ =?us-ascii?Q?aJ++Lh0FoUSLRDF4B6LuP5+ZNZJ7BhwczZTVfnlbnkhLEG7XdLnTuGec79Hl?=
+ =?us-ascii?Q?tJz9PSimkQJumTej6cOXawyPE/g2eNr7Sv5lBkndv15hHq8iyi1Hn2+9n0IQ?=
+ =?us-ascii?Q?NE1qMpbXiavlVI3nu4HOlagf+K2N2P+SGxiw7yaT5h1JrOGCzjJ0oH64ZgpA?=
+ =?us-ascii?Q?AiAmkKWodT0Mdj0dDcYbNHuFNknTw+sQ2JVR3K1F99b0PSOAHgHCsnNdkjAq?=
+ =?us-ascii?Q?yCExH8VcIJ/zXrN86sEBCMVJojoaEPLXRAK7Mwu09kclQxOMhf6//GN7WDMf?=
+ =?us-ascii?Q?gxDWZvXqvyOP+TfRLaLPUXvXeN3Uxwp6n/4JPyUHcKB2NroeORDVVNxKTUJa?=
+ =?us-ascii?Q?vIWJWMLzrHZ55KfcggmdUOiONzu58Njc9D3/c/D4R7P2sCFn+ybiG0WmQUgJ?=
+ =?us-ascii?Q?W6NsotTvGs/ykvEdam1TFRSgAm+lKYwbuxwb5OQ6Gygzm/mPII1gRDx56gg6?=
+ =?us-ascii?Q?ahJ28k1vo9dl0yIjnh2n9fJUVYesxfDZkrU+RYPM6xZ3BCusTqydzH/RuKpD?=
+ =?us-ascii?Q?9AMfdMrl/morT7CnOhdALo=3D?=
+x-microsoft-antispam-prvs: <AM0PR04MB6034F5AD56FCCED553082D6AF67A0@AM0PR04MB6034.eurprd04.prod.outlook.com>
+x-forefront-prvs: 095972DF2F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(7916004)(136003)(39860400002)(396003)(366004)(346002)(376002)(189003)(199004)(6506007)(53546011)(76176011)(102836004)(4326008)(66066001)(316002)(26005)(186003)(99286004)(33716001)(6436002)(6916009)(44832011)(54906003)(6486002)(305945005)(7736002)(256004)(105586002)(106356001)(81166006)(81156014)(486006)(2906002)(446003)(476003)(6246003)(5660300002)(229853002)(8676002)(25786009)(3846002)(6116002)(14454004)(86362001)(478600001)(8936002)(9686003)(6512007)(1076003)(68736007)(1411001)(53936002)(4744005)(11346002)(71190400001)(71200400001)(97736004)(41533002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB6034;
+ H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: IU2rrTyNniCU/6UD95KXyd19nuMS0fzbdC+I7vA7M6DUhA4eKILTTylunLkLD9O937sX2urj0g5rubo+/yDjJHwUK53m+sAvPvxX9244p3K50uGFpCG76xNJLB5HKDc8qhKuMZJEq4nUuONH9YRfjD62sk2X21Duc/C8APoI0OWqOf0WNhawNdxk5DL6GPz4axpnB0vamzVaGAc3mSHk8JCnAmKR8kbVWUdz8NuXQCISi2YGaKWICUcvnq2bBSRtnE+oDh8WFVRO2mQEZdszlMDbbajCf5uVF7RRTdJg1dbnh/ZaaHeolre954cNQdKnClbw0xO1JXTxcuOC8qZC+U//kDkn2WEoy74VLDTNYKR/wNuexO+yBhW4GK5R2F/LDTYYhH7oxZI7vQGi0tC6xmo7iY7G700VEFjzUjOSBfI=
+Content-ID: <5BB855CC1325D041A765D60313B91608@eurprd04.prod.outlook.com>
 MIME-Version: 1.0
-References: <20190225123615.49bce7cd@canb.auug.org.au>
-In-Reply-To: <20190225123615.49bce7cd@canb.auug.org.au>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Mon, 25 Feb 2019 10:19:15 +0100
-Message-ID: <CAK8P3a3moJ12SDM3Ow-Hw3qBeTv9siswK+9pPiEA4JJ+7k4xvg@mail.gmail.com>
-Subject: Re: linux-next: manual merge of the sound tree with the arm-soc tree
-To: Stephen Rothwell <sfr@canb.auug.org.au>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: a87c2515-7cbb-448f-367a-08d69b03faf2
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Feb 2019 09:31:11.6348 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB6034
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_011933_459925_ED901BCC 
-X-CRM114-Status: GOOD (  14.12  )
+X-CRM114-CacheID: sfid-20190225_013117_720250_DB23326B 
+X-CRM114-Status: GOOD (  13.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,61 +134,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Takashi Iwai <tiwai@suse.de>, Sameer Pujar <spujar@nvidia.com>,
+Cc: Rob Herring <robh@kernel.org>,
  Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Liam Girdwood <lgirdwood@gmail.com>,
- Linux Next Mailing List <linux-next@vger.kernel.org>,
- Mark Brown <broonie@kernel.org>, Olof Johansson <olof@lixom.net>,
- Thierry Reding <treding@nvidia.com>,
- ARM <linux-arm-kernel@lists.infradead.org>
+ Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
+ Shawn Guo <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Lucas Stach <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 25, 2019 at 2:36 AM Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->
-> Hi Takashi,
->
-> Today's linux-next merge of the sound tree got conflicts in:
->
->   arch/arm64/boot/dts/nvidia/tegra194-p2972-0000.dts
->   arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
->
-> between commits:
->
->   5eef17ee764d ("arm64: tegra: p2972: Sort nodes properly")
->   be4f0dd347ad ("arm64: tegra: p2597: Sort nodes by unit-address")
->
-> from the arm-soc tree and commit:
->
->   11ce4308307c ("arm64: tegra: custom name for hda sound card")
->
-> from the sound tree.
->
-> I fixed it up (see below - in tegra194-p2972-0000.dts. the line added
-> just needed to be moved up a few lines) and can carry the fix as
-> necessary. This is now fixed as far as linux-next is concerned, but any
-> non trivial conflicts should be mentioned to your upstream maintainer
-> when your tree is submitted for merging.  You may also want to consider
-> cooperating with the maintainer of the conflicting tree to minimise any
-> particularly complex conflicts.
+On 19-02-25 07:57:22, Chris Spencer wrote:
+> On Sun, 3 Feb 2019 at 11:50, Abel Vesa <abel.vesa@nxp.com> wrote:
+> > Add generic i.MX8 SoC driver along with the i.MX8MQ SoC specific code.
+> >
+> > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> 
+> Tested-by: Chris Spencer <christopher.spencer@sea.co.uk>
+> 
 
-The merge looks fine to me, but I wonder about that commit
-in the alsa tree, why does the sound card need a board specific
-name?
+I don't get it, in the RFC you said you didn't have the boards to test.
+How did you test it then ? 
 
-I see this property being used in commit c0bde003a013 ("ALSA:
-hda/tegra: sound card name from device tree"), which removes
-a questionable use of the root compatible property, replacing
-it with the new 'nvidia,model' property. We don't do this for any
-other subsystem, so why does the sound subsystem export
-information about the board as a string here?
+> My patch series which adds support for the i.MX8MQ to the CAAM driver
+> [1] needs the SoC driver, so it would be good to get this one in.
+> 
 
-(added ASoC maintainers to Cc for insight).
+The SoC driver needs a little bit of rework because of the way the
+revisions are detected. I'll resend this in the next couple of days.
 
-      Arnd
-
+> Thanks,
+> Chris
+> 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
