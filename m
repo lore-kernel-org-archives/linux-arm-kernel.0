@@ -2,83 +2,131 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 84AEBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:07:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C5F0EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:18:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4C3F420842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:07:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9244620652
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 13:18:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b0LoKps3";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="kC+wnk0p"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C3F420842
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ixiBk6d6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="JruCMLC4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9244620652
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4T0q2yE/eMiUHkqVEJ/3u8ufKSgyqIzRKF+tCivuYIc=; b=b0LoKps3WNfdAd
-	vjVXHVdAMwyoY+E6T/neaI2rh5m1MU8C6zvEInwKhlprUMZmqX0qjL4VqqcISd5EDRlTCciIMTu/M
-	Ue4H7If5FRlWZ0FMShOP1wShBGMUtnq83EuJF71ugukiCULK5XpnX93TdUWxiTAwj8Usgwhpi69Au
-	lSqR16O0PnedKbIvQRoeb0CHDnr20O/+P82R2RlqlFTjJRPs2D64VSRJ3novCRQxss/UfnrvE/lqK
-	BsgZSi8El91Y0yYbQQ5hqqsDgEjKmQjIRW/7hpVp4CCwvKHsRL6VGD7WBwX49gzdSsLXDdGBhKVJD
-	SCrmJY8/stz8af7oHO3w==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=7Su0V5ZFR7fpsWNzA0NoQPPIsIXdnZJpWI6FiWLErI0=; b=ixiBk6d6kzdb9P
+	QoDh4olKFlZOo9JGdM7+QVjg8KZTuSwhEzulry5DsRc7QqJc/y/Y73Z4/9/CcxsJ/B2cZAn/TZiJ5
+	SPp2dzEXIcNUpteC/GbMcmk2Ra0OK8vPFF5Xk80h53ThuzewYU+sx7glgvKuAB4qhnJ19n2BdQ4nj
+	rdfr0DrWBW+Wq9LrvYvZSNE8xe5yJjwIoLc/ig531q/Wf2h4rzh+MKAqx7X/2UrZex+vm4uQTYOZ9
+	jDWJ9Tqtf5d/MBxGRU6SWSz5mzjG/Frty4VdzRhHmGvRSKADmeFpuXQkF4qqBEwcG6rBw8tH3/xE/
+	16ArmWTTadVy/vu3M0og==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyFz0-0004bM-Sf; Mon, 25 Feb 2019 13:07:46 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
+	id 1gyG8t-0007kZ-36; Mon, 25 Feb 2019 13:17:59 +0000
+Received: from mail-he1eur04on0625.outbound.protection.outlook.com
+ ([2a01:111:f400:fe0d::625]
+ helo=EUR04-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyFyx-0004Xt-4G
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:07:45 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2019; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=lj1XbLyx0OJ0DenUOkZr9octk1KJ/43jnF3F89S50TY=; b=kC+wnk0pgfi/ypBLWC50T+6FJ
- XERQJLiDenJkbJr5kXEhriGWnM5ITI2bmhDflkrwUEQojknUotMf9qQBSorFYqLWYMH5gKJ0nWzoO
- BfpfOksXCKgLM8RZNeBA9pRIel++m2yzpIqUpSzoPs0vEV/f5VFrAnAAwyRJQo3PFXh7wHdkGJxi4
- bacxjA/XbX9xs63oL//ABt36OMUPHmjIIe40jBZFZzHaymKQr52tkhuUTvQq7ltx8jjdLmjuLToln
- 1oeCvEQk/ZCw+QkvPxHOHbf78R+DF98wOXulhS7NQgJ5M87qmSGAL233p2kVBxkuAhhUmkZdP2+lP
- RwZRj75Jw==;
-Received: from shell.armlinux.org.uk
- ([2002:4e20:1eda:1:5054:ff:fe00:4ec]:37074)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES256-GCM-SHA384:256) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gyFwU-0005No-TY; Mon, 25 Feb 2019 13:05:11 +0000
-Received: from linux by shell.armlinux.org.uk with local (Exim 4.89)
- (envelope-from <linux@shell.armlinux.org.uk>)
- id 1gyFwM-0004pO-9E; Mon, 25 Feb 2019 13:05:02 +0000
-Date: Mon, 25 Feb 2019 13:05:02 +0000
-From: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-To: Baruch Siach <baruch@tkos.co.il>, Jon Nettleton <jon@solid-run.com>,
- Rabeeh Khoury <rabeeh@solid-run.com>
-Subject: Re: [PATCH 4/5] arm64: dts: marvell: armada-8040-clearfog: Drop
- non-existent SATA port
-Message-ID: <20190225130502.om6y5q7cbe35fbyw@shell.armlinux.org.uk>
-References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
- <20190222145356.23072-5-miquel.raynal@bootlin.com>
- <87tvgt7o0q.fsf@tarshish> <20190225115826.5bc17f6d@xps13>
- <20190225121519.2quhgqcf24rutqn4@sapphire.tkos.co.il>
+ id 1gyG8o-0007j5-Ek
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 13:17:56 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=t/GJuXHT4XIx7pCYJY1Ujgy9cwKmpB+ZMhe29Tbs/Y4=;
+ b=JruCMLC4KNXoHXGAHSfekelsNC3G+qldf+Nb+5u048fi/qCUvpyq2/Jh3e/7sZzTfyChT7FoaWGRd28k6HiE7Sy0bHcxouCymQ9ZvryDGYN62IjioCALfjhDsl6dIXPc5n6y8Bg28iRk/9fzb160R0iBJjXCXzzaNpI4ZrbFDHU=
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
+ VI1PR0402MB2895.eurprd04.prod.outlook.com (10.175.24.9) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Mon, 25 Feb 2019 13:17:46 +0000
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced%2]) with mapi id 15.20.1643.019; Mon, 25 Feb 2019
+ 13:17:46 +0000
+From: Daniel Baluta <daniel.baluta@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>
+Subject: [PATCH 1/5] arm64: dts: imx8mq: Add SDMA nodes
+Thread-Topic: [PATCH 1/5] arm64: dts: imx8mq: Add SDMA nodes
+Thread-Index: AQHUzQx/QeEbizeFI0O2BFE6xP8gsg==
+Date: Mon, 25 Feb 2019 13:17:45 +0000
+Message-ID: <20190225131722.10253-1-daniel.baluta@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR08CA0202.eurprd08.prod.outlook.com
+ (2603:10a6:800:d2::32) To VI1PR0402MB3357.eurprd04.prod.outlook.com
+ (2603:10a6:803:2::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=daniel.baluta@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: fcff3d63-4afa-420f-6ef1-08d69b23a1a8
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB2895; 
+x-ms-traffictypediagnostic: VI1PR0402MB2895:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR0402MB2895;
+ 23:WEuoqekieaqWlJHKS0y6BH0CFvFhcy+IpF8oL?=
+ =?iso-8859-1?Q?sJpqAGiMrJGo71ZTcmZPOZb4PIqzOo1pMfyumKOVu92hAuEaQzrvferEPC?=
+ =?iso-8859-1?Q?BKa00vPAi96E2c1Sk1iJkn9WZ/IR6WhxQFU4cr61LCVm2jOCISv93rJGNy?=
+ =?iso-8859-1?Q?QlcVEnRK7ximCodABaQcHQ9xpcRDIOkpamRuSmA2JMlghqFtmWq3ojcFva?=
+ =?iso-8859-1?Q?BB6msLkTN4ocF4PIl08EpmWGu56Hq2GEDFyU1/KxADThP/Ppvh3hBoLa6s?=
+ =?iso-8859-1?Q?ijdlJijqj3l+iUki1YNIVMgogtPDdZSy3mU5R7WjVVzetUuqf2DRZny/do?=
+ =?iso-8859-1?Q?bui0wWM1ncHYJnVHd+d/q7gjjdpOsWtTQJCTdzG3KI10MY2+Mgjz1e3q2Z?=
+ =?iso-8859-1?Q?W+qICbzMxvuSyRYzOXvXkjiDTZbjbZyOW1NCvgYLzy+f5WR2ewYIvo0SLh?=
+ =?iso-8859-1?Q?9UzuC7KesPZrkvr9KqdO+Yxnt0UWG/UzT+mEBavLGYvHR2OY7ra0xKrnco?=
+ =?iso-8859-1?Q?90bpxoj8HhlDUER51BUfk2AnhZ8qdDykl+IeX8VcbvZHQlJV5oDHUY9rqi?=
+ =?iso-8859-1?Q?nPcP2T0onyQvTV8kt2PBcYWOQhLCbiibbEdKel5wNPgTGfqFsgPStyjT+B?=
+ =?iso-8859-1?Q?/kOKxuCAZj5Wi+DCmpyb7jFSfaCfEubrph4zwGJA82tExf9ygFTm7I49xD?=
+ =?iso-8859-1?Q?Pve1OP7EENNa8HY6W/Aqsqc1GDEZwyNAb8Q82xurTv5BiiJk2TI+vQzeA6?=
+ =?iso-8859-1?Q?JrMbmHr63auoSTjo/ZF6q28guBs6qyx8zERSeTjjGLMVg5ufpiD+rwnpz3?=
+ =?iso-8859-1?Q?0mq/ygMyxqaRPW8t/j5A2xvejgEr3wqknM19HZL/Ram0N6MW5yCwZ3rYFj?=
+ =?iso-8859-1?Q?AaNifeibxg8+BM7ZIhQ0pu/ZtXY80E3EzboE73uHy6OHVtfwinVw0k+hRk?=
+ =?iso-8859-1?Q?y2TiKp95WKGr3+bGqUV04Pc6QYoKMjyX17ADHoqBTwnGFn9+RlR7OS+4LJ?=
+ =?iso-8859-1?Q?+0zLi+hCndJ4KkGJfOQz+3xcSuSiEFEaff3nVusp93GAOmk6kkyKgWPVo3?=
+ =?iso-8859-1?Q?P0TScVIANfoPKYj1uRbw+phSKurP6fli9A12m1Jrd2NTvT8DP+sKGBvsbB?=
+ =?iso-8859-1?Q?ZHQY/S5P83XBVXdEq7rhITDzeyhs2hsFnuLDscwidjuqeJMH7lqaPEIP/e?=
+ =?iso-8859-1?Q?dcDf/9oSKVm2XCp5ccJqrGliBatIJLPfs/lmI0g5APERlWrQmC5LaFr36d?=
+ =?iso-8859-1?Q?rzyef0h0873ChqpJuJj3G79C8PMyMst8AysNu0CVtMYG+fBaFVnj6ZVqyV?=
+ =?iso-8859-1?Q?JX0+U2i5vkoDND7BMwZAULyNLLmVvpYvLEYURPxiA9Ck1SZWUKSs3IS0Kb?=
+ =?iso-8859-1?Q?anqIWFxw0Q=3D?=
+x-microsoft-antispam-prvs: <VI1PR0402MB2895DB597A02895DA5223497F97A0@VI1PR0402MB2895.eurprd04.prod.outlook.com>
+x-forefront-prvs: 095972DF2F
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(136003)(346002)(376002)(396003)(366004)(199004)(189003)(8676002)(81166006)(1730700003)(2351001)(81156014)(6486002)(6116002)(3846002)(2616005)(476003)(186003)(44832011)(36756003)(305945005)(486006)(7736002)(7416002)(106356001)(26005)(105586002)(14454004)(5640700003)(4326008)(6916009)(25786009)(256004)(14444005)(6512007)(97736004)(50226002)(2906002)(478600001)(386003)(8936002)(54906003)(102836004)(66066001)(71190400001)(71200400001)(316002)(1076003)(68736007)(6436002)(86362001)(99286004)(6506007)(5660300002)(52116002)(53936002)(2501003)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB2895;
+ H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: BYcFVVdl2ISW3T2hEpbHt/fu7RjniXDpVuUDVVljaV+j2GuMyN56O4uerHP2ksJp2gOE9Mf/2h4L17crLPEKbbBBmmXsv8TKCmR0tcmQpo2TDmF+VLCw2f6d8V3sYG8QdCDD3fPnhh7i2mo0Vkdy1gZNHrjLURSKeLY85mzY2B4YDV32TZvnI392eJFzmv/ZDY7vD+4ZFqAgLsvObtFQG/6F8XVKiOK2VFphQMjScmy0M+7vdjFRb01H/xmk4T3JUfyJaAEeL+zIkFPLvWefITKIeoFOx1gaVcR3y+tONiMJViEZxRMmrh9YaIz3yZf3izOANESije8lhI700CeZ55tdc3OPBDhuQZm7sKj+Ax56sL70R2MHO6MxcqT8vKIjC1x4+wUoo+1GfGiwGU+yYD4ioH96evWznJkfV9xvJ10=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190225121519.2quhgqcf24rutqn4@sapphire.tkos.co.il>
-User-Agent: NeoMutt/20170113 (1.7.2)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: fcff3d63-4afa-420f-6ef1-08d69b23a1a8
+X-MS-Exchange-CrossTenant-originalarrivaltime: 25 Feb 2019 13:17:44.9779 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB2895
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_050743_173683_F347E0D6 
-X-CRM114-Status: GOOD (  22.71  )
+X-CRM114-CacheID: sfid-20190225_051754_845407_B19E6652 
+X-CRM114-Status: UNSURE (   9.03  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,78 +138,80 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Marc Zyngier <marc.zyngier@arm.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Hans de Goede <hdegoede@redhat.com>,
- Rob Herring <robh+dt@kernel.org>, Antoine Tenart <antoine.tenart@bootlin.com>,
- Jens Axboe <axboe@kernel.dk>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, linux-ide@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "baruch@tkos.co.il" <baruch@tkos.co.il>, Abel Vesa <abel.vesa@nxp.com>,
+ Anson Huang <anson.huang@nxp.com>,
+ "ccaione@baylibre.com" <ccaione@baylibre.com>,
+ Daniel Baluta <daniel.baluta@nxp.com>, "S.j. Wang" <shengjiu.wang@nxp.com>,
+ "angus@akkea.ca" <angus@akkea.ca>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Aisheng Dong <aisheng.dong@nxp.com>, "agx@sigxcpu.org" <agx@sigxcpu.org>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 25, 2019 at 02:15:19PM +0200, Baruch Siach wrote:
-> Hi Miquel,
-> 
-> On Mon, Feb 25, 2019 at 11:58:26AM +0100, Miquel Raynal wrote:
-> > Baruch Siach <baruch@tkos.co.il> wrote on Sun, 24 Feb 2019 07:29:09
-> > +0200:
-> > 
-> > > On Fri, Feb 22 2019, Miquel Raynal wrote:
-> > > > There is no CP110 SATA port available on the 8040 Clearfog A8k, SATA
-> > > > may be used thanks to a mPCIe -> SATA extension board only. Hence, the
-> > > > cp1_sata0 node must be removed from the device tree.  
-> > > 
-> > > Not true. You can use the mini PCIe serdes as SATA directly if you
-> > > configure it as such. You only need to invert the serdes Rx pair
-> > > polarity. This is the default configuration for the Clearfog GT-8K CON3
-> > > mini-PCIe slot (CP1, lane #0) in current mainline U-Boot. I verified
-> > > that this setup works on Clearfog GT-8K.
-> > > 
-> > > This patch would break mini PCIe direct SATA.
-> > 
-> > Thanks for explaining, I am a little bit surprised that it actually
-> > uses the SATA host IP on CP110 but fine. So can you tell me which SATA
-> > port is used in this case? Because I will have to update the DT
-> > representation along with the CP110 changes.
-> 
-> According to the cp110_comphy_phy_mux_data[] array in U-Boot 
-> drivers/phy/marvell/comphy_cp110.c, serdes 0 of CP110 can only be SATA1 (i.e. 
-> the second port; first is SATA0).
+SDMA1 is part of AIPS-3 region and SDMA2 is part
+of AIPS-1 region.
 
-Adding folk from SolidRun...
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+[initial submit in i.MX internal tree]
+Signed-off-by: Daniel Baluta <daniel.baluta@nxp.com>
+[adaptation for linux-next]
+---
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-Why are the mPCIe connectors configured by default for mSATA cards?
-This sounds like it's going to cause confusion.  The published
-specification for the board at:
-
-https://developer.solid-run.com/products/clearfog-gt-8k/
-
-states that the board has "3 x mPCIe (USB 2.0 + PCIe)" and makes no
-mention of mSATA.
-
-mSATA is not compatible with mPCIe - mSATA cards expect the serdes
-lanes to be connected to a SATA interface, mPCIe cards expect a PCIe
-controller at the other end of the serdes lanes.
-
-Given that there is a lot of confusion about mSATA vs mPCIe out there,
-(caused by both being the same physical form factor and fitting into
-the same socket, yet being electrically different) I think it's
-important to have a coherent story on these connectors everywhere.
-
-Maybe we need a way to have these connectors configurable by the end
-user?
-
+diff --git a/arch/arm64/boot/dts/freescale/imx8mq.dtsi b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+index 9155bd4784eb..87839c5c8a7f 100644
+--- a/arch/arm64/boot/dts/freescale/imx8mq.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8mq.dtsi
+@@ -234,6 +234,17 @@
+ 				status = "disabled";
+ 			};
+ 
++			sdma2: sdma@302c0000 {
++				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
++				reg = <0x302c0000 0x10000>;
++				interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_SDMA2_ROOT>,
++					 <&clk IMX8MQ_CLK_SDMA2_ROOT>;
++				clock-names = "ipg", "ahb";
++				#dma-cells = <3>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
++			};
++
+ 			iomuxc: iomuxc@30330000 {
+ 				compatible = "fsl,imx8mq-iomuxc";
+ 				reg = <0x30330000 0x10000>;
+@@ -575,6 +586,17 @@
+ 				status = "disabled";
+ 			};
+ 
++			sdma1: sdma@30bd0000 {
++				compatible = "fsl,imx8mq-sdma", "fsl,imx7d-sdma";
++				reg = <0x30bd0000 0x10000>;
++				interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clk IMX8MQ_CLK_SDMA1_ROOT>,
++					 <&clk IMX8MQ_CLK_SDMA1_ROOT>;
++				clock-names = "ipg", "ahb";
++				#dma-cells = <3>;
++				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx7d.bin";
++			};
++
+ 			fec1: ethernet@30be0000 {
+ 				compatible = "fsl,imx8mq-fec", "fsl,imx6sx-fec";
+ 				reg = <0x30be0000 0x10000>;
 -- 
-RMK's Patch system: https://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
