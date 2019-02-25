@@ -2,20 +2,21 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_MUTT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6109CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:24:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1169EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:35:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 309A32147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:24:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D19182087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 10:34:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Yz3M4plr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 309A32147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sf3ySJ4I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D19182087C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,45 +25,47 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ZcZ6L60jSkzAzo/BBmUxOJlh8pJKoAvEmx7cOZj1+4o=; b=Yz3M4plrnz9lKQ
-	Vf0czm0Ukytio/qwraMAmkR3VU+Elww6U4Y8Rk0gVEzVnfVMp+OxrMd0d64Bslzy5D6n9CvVBKxg1
-	HvhkVDVhe9wniekLZFgWjTwvSAhfQw86sJmU0ru7M4goOtjPimOuSOMsk0iGruggOLbl8W0qzytSG
-	6xXCDj0EMQVqlBHoLdSLxaOarQ422qKPym+12zXTWiLlUMxPjLjFF/8xIiz1hN6spTEsDQ92m59HT
-	PaGEhf4iWcxBGqbtOFBY2U0UrMhGZEHS8gJzBWszBLBVh4uPOPwi4nv6TSOr1P9HDYN9tg/m/L4Bu
-	C54rqk6pepRbBbMzX6tg==;
+	List-Owner; bh=YJ8iaD4inuwLq9djX0VEGmVuTlHXOaWqVGPBFdnaMlg=; b=Sf3ySJ4IVtpzLs
+	IfA4L4R3sh/BVnSyEjdj03RUg2vcu1rsq78SQjEWfB7QwwWb9clf7MLHh9Cpy+tEFo72q6+lBS+30
+	VnqidmsoGJweROkgxGTASbKRyJw2Ar6kQEVFyGkXaOeECeVSJWHvVP9y9XejONN+85nJDFEn749lu
+	m9C2i8z/VJQRdsHBN6BFmgre1KddkZSgMmTLQpzJ57ovqsjYk2aFeJE/t9u4ejrHZBTlGqLatqmjC
+	2XCcFew5VE7OIB8jovKW6uB84/6fNQV72UjQajDkWj7jZEIwYF2KMvaQmaHKVrzZhutVVXEir12gk
+	+jF5U1w+Op1J/ag1Rt7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyDQp-0004Lu-2J; Mon, 25 Feb 2019 10:24:19 +0000
-Received: from mga09.intel.com ([134.134.136.24])
+	id 1gyDb2-0007b9-Mm; Mon, 25 Feb 2019 10:34:52 +0000
+Received: from mga05.intel.com ([192.55.52.43])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyDQl-0004L6-5A
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 10:24:16 +0000
-X-Amp-Result: UNSCANNABLE
+ id 1gyDay-0007ao-US
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 10:34:50 +0000
+X-Amp-Result: UNKNOWN
+X-Amp-Original-Verdict: FILE UNKNOWN
 X-Amp-File-Uploaded: False
-Received: from fmsmga007.fm.intel.com ([10.253.24.52])
- by orsmga102.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 25 Feb 2019 02:24:13 -0800
+Received: from orsmga008.jf.intel.com ([10.7.209.65])
+ by fmsmga105.fm.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 25 Feb 2019 02:34:48 -0800
 X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,411,1544515200"; d="scan'208";a="124990832"
+X-IronPort-AV: E=Sophos;i="5.58,411,1544515200"; d="scan'208";a="120580722"
 Received: from smile.fi.intel.com (HELO smile) ([10.237.72.86])
- by fmsmga007.fm.intel.com with ESMTP; 25 Feb 2019 02:24:10 -0800
+ by orsmga008.jf.intel.com with ESMTP; 25 Feb 2019 02:34:45 -0800
 Received: from andy by smile with local (Exim 4.92-RC6)
  (envelope-from <andriy.shevchenko@linux.intel.com>)
- id 1gyDQf-00081P-LS; Mon, 25 Feb 2019 12:24:09 +0200
-Date: Mon, 25 Feb 2019 12:24:09 +0200
+ id 1gyDau-00088v-2i; Mon, 25 Feb 2019 12:34:44 +0200
+Date: Mon, 25 Feb 2019 12:34:44 +0200
 From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 To: Ludovic Desroches <ludovic.desroches@microchip.com>
-Subject: Re: [PATCH v5 0/3] i2c: at91: slave mode support
-Message-ID: <20190225102409.GQ9224@smile.fi.intel.com>
+Subject: Re: [PATCH v5 2/3] i2c: at91: split driver into core and master file
+Message-ID: <20190225103444.GR9224@smile.fi.intel.com>
 References: <20190222092522.4913-1-ludovic.desroches@microchip.com>
+ <20190222092522.4913-3-ludovic.desroches@microchip.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190222092522.4913-1-ludovic.desroches@microchip.com>
+In-Reply-To: <20190222092522.4913-3-ludovic.desroches@microchip.com>
 Organization: Intel Finland Oy - BIC 0357606-4 - Westendinkatu 7, 02160 Espoo
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_022415_248125_E01A5A1E 
-X-CRM114-Status: GOOD (  18.19  )
+X-CRM114-CacheID: sfid-20190225_023448_992931_1E9BD5C3 
+X-CRM114-Status: GOOD (  13.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,84 +85,102 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 10:25:19AM +0100, Ludovic Desroches wrote:
-> [Ludovic Desroches: see Changes section]
+On Fri, Feb 22, 2019 at 10:25:21AM +0100, Ludovic Desroches wrote:
+> From: Juergen Fitschen <me@jue.yt>
 > 
-> Based on the discussion we had on the i2c-linux list [1], I wrote a patch for
-> AT91 hardware and tried to fulfill the Linux I2C slave interface description
-> [2] as good as possible. This enables aforementioned hardware to act as an I2C
-> slave that can be accessed by a remote I2C master.
+> The single file i2c-at91.c has been split into core code (i2c-at91-core.c)
+> and master mode specific code (i2c-at91-master.c). This should enhance
+> maintainability and reduce ifdeffery for slave mode related code.
 > 
-> I have tested this patchset successfully on an ATSAMA5D27.
-> 
->                                  ^  3.3V   ^  3.3V
->     +-----------------------+    |         |         +-----------------------+
->     | Slave: ATSAMA5D27     |   +-+       +-+        | Master: ATSAMA5D35    |
->     | with i2c-slave-eeprom |   | | 100k  | | 100k   | with i2cset           |
->     +-------------------+-+-+   +-+       +-+        +-+-+-------------------+
->                         | |      |         |           | |
->                         | +------+---------|---(SDA)---+ |
->                         +------------------+---(SCL)-----+
-> 
->     Schematic: Connection of slave and master with 100kOhm pullup resistors.
-> 
-> On the master the following BASH script has been used to stress the slave.
-> 
->         root@emblinux:~# cat ./stress.sh
+> The code itself hasn't been touched. Shared functions only had to be made
+> non-static. Furthermore, includes have been cleaned up.
 
->         #!/bin/bash
+Since it's a split of existing code, consider my comments as a way to improve
+it afterwards.
 
-Not everybody has bash in their environments. See below, how easily to switch
-to regular shell.
+> +static struct at91_twi_pdata *at91_twi_get_driver_data(
+> +					struct platform_device *pdev)
+> +{
+> +	if (pdev->dev.of_node) {
+> +		const struct of_device_id *match;
+> +		match = of_match_node(atmel_twi_dt_ids, pdev->dev.of_node);
+> +		if (!match)
+> +			return NULL;
+> +		return (struct at91_twi_pdata *)match->data;
+> +	}
+> +	return (struct at91_twi_pdata *) platform_get_device_id(pdev)->driver_data;
 
-#!/bin/sh
 
->         I=0
->         while true
->         do
->                 if i2cset -y -r 1 0x64 0 $I w | grep mismatch
->                 then
->                         echo "$(date): Error in transmission ${I}"
->                 fi
 
->                 ((I++))
+One may do the following instead:
+	struct at91_twi_pdata *data;
 
-I=$(($I+1))
+	data = device_get_match_data(&pdev->dev);
+	if (data)
+		return data;
+	return ...
 
->                 if [ $I -eq 65536 ]
->                 then
->                         I=0
->                         echo "$(date): Sent 65536 transmissions"
->                 fi
+And if you ever will switch old platform to somelike unified interface for
+device properties, I would recommend to use device_property_* instead of
+of_property_* and so on.
 
-This one can be optimized to
+> +}
 
-for I in $(seq 65536); do
-...
-done
+> +#include <linux/clk.h>
+> +#include <linux/completion.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/i2c.h>
+> +#include <linux/platform_data/dma-atmel.h>
+> +#include <linux/platform_device.h>
 
->         done
-> 
-> After running the script for some time I had the following output. To me this
-> looks promising :)
-> 
->         root@emblinux:~# ./stress.sh
->         Thu Nov  9 13:58:45 CTE 2017: Sent 65536 transmissions
->         Thu Nov  9 14:35:20 CTE 2017: Sent 65536 transmissions
->         Thu Nov  9 15:12:11 CTE 2017: Sent 65536 transmissions
->         Thu Nov  9 15:49:04 CTE 2017: Sent 65536 transmissions
->         Thu Nov  9 16:26:00 CTE 2017: Sent 65536 transmissions
->         Thu Nov  9 17:03:07 UTC 2017: Sent 65536 transmissions
->         Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
-> 
->         If you have some hardware with an at91-i2c interface included at hand, I really
->         would appreciate if you can run the test script on your hardware and test this
->         driver.
->         Thu Nov  9 17:40:15 UTC 2017: Sent 65536 transmissions
-> 
->         If you have some hardware with an at91-i2c interface included at hand, I really
->         would appreciate if you can run the test script on your hardware and test this
->         driver.
+Are all those anyhow in use in this header file?
+
+> +#define AT91_I2C_TIMEOUT	msecs_to_jiffies(100)	/* transfer timeout */
+
+Wouldn't be better to use _MS here and call actual conversion whenever it's
+needed?
+
+> +#define AT91_I2C_DMA_THRESHOLD	8			/* enable DMA if transfer size is bigger than this threshold */
+
+> +#define AUTOSUSPEND_TIMEOUT		2000
+
+_MS ?
+
+> +#define	AT91_TWI_SR		0x0020	/* Status Register */
+> +#define	AT91_TWI_TXCOMP		BIT(0)	/* Transmission Complete */
+> +#define	AT91_TWI_RXRDY		BIT(1)	/* Receive Holding Register Ready */
+> +#define	AT91_TWI_TXRDY		BIT(2)	/* Transmit Holding Register Ready */
+> +#define	AT91_TWI_OVRE		BIT(6)	/* Overrun Error */
+> +#define	AT91_TWI_UNRE		BIT(7)	/* Underrun Error */
+> +#define	AT91_TWI_NACK		BIT(8)	/* Not Acknowledged */
+> +#define	AT91_TWI_LOCK		BIT(23) /* TWI Lock due to Frame Errors */
+> +
+> +#define	AT91_TWI_INT_MASK \
+> +	(AT91_TWI_TXCOMP | AT91_TWI_RXRDY | AT91_TWI_TXRDY | AT91_TWI_NACK)
+> +
+> +#define	AT91_TWI_IER		0x0024	/* Interrupt Enable Register */
+> +#define	AT91_TWI_IDR		0x0028	/* Interrupt Disable Register */
+> +#define	AT91_TWI_IMR		0x002c	/* Interrupt Mask Register */
+> +#define	AT91_TWI_RHR		0x0030	/* Receive Holding Register */
+> +#define	AT91_TWI_THR		0x0034	/* Transmit Holding Register */
+> +
+> +#define	AT91_TWI_ACR		0x0040	/* Alternative Command Register */
+> +#define	AT91_TWI_ACR_DATAL(len)	((len) & 0xff)
+> +#define	AT91_TWI_ACR_DIR	BIT(8)
+> +
+> +#define	AT91_TWI_FMR		0x0050	/* FIFO Mode Register */
+> +#define	AT91_TWI_FMR_TXRDYM(mode)	(((mode) & 0x3) << 0)
+
+> +#define	AT91_TWI_FMR_TXRDYM_MASK	(0x3 << 0)
+
+GENMASK() ?
+
+> +#define	AT91_TWI_FMR_RXRDYM(mode)	(((mode) & 0x3) << 4)
+
+> +#define	AT91_TWI_FMR_RXRDYM_MASK	(0x3 << 4)
+
+Ditto.
 
 -- 
 With Best Regards,
