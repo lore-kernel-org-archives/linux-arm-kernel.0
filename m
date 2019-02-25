@@ -2,84 +2,66 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 47857C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:55:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D054DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:58:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1E6B22087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:55:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A246D2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:58:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gstn64fw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="dY/7NrM/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E6B22087C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kz4gu92G";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ySURJmiU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A246D2084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tcSVJ1sY7KrRQ8fAiqJ6UvfuimKnxSaUq8zrcmGBUkw=; b=Gstn64fw1+ivjI
-	c/fyfa49oQ13/S5uWt+sgTEJiaB+Cg0r5jB14THTSYlLaLd8USOJmOPI+1b5vKRHfeaqaE9wlPAdj
-	dqLGZ9ry7Ic3jw/be8RLUX57brHzSUsXP7mcihfUAa1B890epC2lJmnBXulVlW7HmW55bTKGmtr9v
-	plHVUFpiTiHMT/+06RBzxpTK3chAegN6SQOV4A0G9EMWoaSFFpIfgvCz694rCmkkolAeVA/5duIFO
-	fBsHtoLxNDRIS/aCfRB+qi9T0uNVxbtL7oDg9uJiiCOtoi9qF0Up96sASY+Q0gNnpN1tzrLzCwQtY
-	lA6sgOdEY54yL/vRifiA==;
+	List-Owner; bh=nE+l0J8DBdQ6dIWdqE2azY8A9GzkfcnCCni0aGRuaRs=; b=kz4gu92GorMSCH
+	qjRwGFx5Qd3OQLr0mZ1oP/pVBKoJMfWjnBzyzcMw/OlMuZNjS3cEKfGfzXZT18ZblGgrptZ0ciDYx
+	kWsXcTrm/sSvmZ45oYkR1Zn3Hz7g2lQCc2iAjkZJSIsBhIipASdhnh++JZXqNT0NZyOlMKvyXJgUA
+	c+gB/hvo1EsOdUyZhcLJ1zmICC7TZOlDlKFlswdRBNkecQ4vGZl4ERB64fJ6gzBuwIghMROgPo+yW
+	Io29vE7t3BBnv3/iS1MhwCR1DDMABO23WmsZcE730zs4RxTw/DffrsnoztEsl87z7A/luahkHTzqU
+	Jy5rm4sCLIua/6DRgqEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyLPf-0000PS-1T; Mon, 25 Feb 2019 18:55:39 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gyLSk-0000oY-Am; Mon, 25 Feb 2019 18:58:50 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyLPc-0000P4-4n
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 18:55:37 +0000
-Received: by mail-wr1-x442.google.com with SMTP id d17so11119338wre.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 10:55:35 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=giJy1kMzcY3WLSpkxWjWbbjfE7h0U68/r8WSJhwCy8k=;
- b=dY/7NrM/w6DytL8DulIXio+AbeNzxA9r+ww6UZx/fdLsN8IYWs/zX18pS2a4Gklci8
- NTfFjuI7MZyORcsHedWlvIzuV/SZZTA0EEJJIzxQ64WWoTblIu70Zut3BzbuwV96Lxn1
- ZKt/OepQ9YpSiC39PLYczSFTAGmwKYkAx4f5k243vLMTd306MiykSjXGI+45o4KxYpvr
- nSCe2gvPC1Objtz9sK6S3RI4M3q8G47dlJaCq99BgnC/4B70E6GU+bzkdM2upD3mUQfw
- VJKkj1SetVF7KNi3qyXR8Zbr3NklQ469kytKr3uMSn80Dhb95veKXLeNi/oGc7PArnfA
- i0IA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=giJy1kMzcY3WLSpkxWjWbbjfE7h0U68/r8WSJhwCy8k=;
- b=WuQiC5Xy7EnRpv0VrQ8/lawsVRVti8f690bgF/PaAq8DqaxYEVVDqGuUwyFS2AFWAe
- IVkz4d3Sd7ihf5HSRVqgwH8jps25pFYb6qvVNkqcJksyVVhfHPsYRVgVNRc3E5GRYRFD
- /HmbnBeS6H1O+8qU76RP3+xpoOtMQ3RmDvAhd+MKmXaKI/nqoEsM9k7Go+9ig8jp7R6W
- LSzTg3BzZ3uJnPQss35gEcv6v82oAvF9UVSl/CGVfewT0I4298GeIFuU/JKAWFtif4rz
- KPmS0oFWKB6Z+aa4l/1wjQmDomlCmC69jjiHgarMWeh1TuLe2tp27q7DbGE5It7/j3lB
- k6SA==
-X-Gm-Message-State: AHQUAuaC/0JJNb6Sy1iqvj38JMXnaI02taKwa1AHn79tNhx7bnwoJbKq
- Th6cTVbe8T6Y3+HrLyMo0tfN9z3PjzhpUyfMMzY=
-X-Google-Smtp-Source: AHgI3IY4tfdkdsQoqfagtHyOGx+7Hg5Cf+SOj48lsKY2D0fw2+ZFYIlNLYerItgeTvKcRexWc3z9u6Btu8lO3aXy5SI=
-X-Received: by 2002:adf:e5c5:: with SMTP id a5mr13504622wrn.13.1551120933952; 
- Mon, 25 Feb 2019 10:55:33 -0800 (PST)
+ id 1gyLSh-0000oC-Qq; Mon, 25 Feb 2019 18:58:49 +0000
+Received: from localhost (unknown [91.160.177.164])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id BE47C2084D;
+ Mon, 25 Feb 2019 18:58:44 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1551121127;
+ bh=6OwhA94VPuUzuGLlyDae0MNwBWGTKURwpr8z4WwA0sY=;
+ h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
+ b=ySURJmiUdEX1hQgB9Qe7BrCXJ7Blb1jm6cAn1v6jyaEevNiBxIP1DIPU+Ju5HPDW6
+ WxQTkz0YfeagzpAyAiEuy5ELqx2oWP9KMzEqGcvApLWNBf4BH5x4r4bhMIru8t6pHO
+ GJ0zc+un5ZOneZM8ZaCrrWbllJ/pYgX+/LLOtoqw=
+Date: Mon, 25 Feb 2019 19:55:43 +0100
+From: Boris Brezillon <bbrezillon@kernel.org>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [RFC PATCH 03/27] mtd: nand: Introduce the ECC engine abstraction
+Message-ID: <20190225195543.27799e77@kernel.org>
+In-Reply-To: <20190221100216.25255-4-miquel.raynal@bootlin.com>
+References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
+ <20190221100216.25255-4-miquel.raynal@bootlin.com>
+X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
 MIME-Version: 1.0
-References: <20190222122147.27132-1-andrey.z@gmail.com>
- <c4fce9a2-2d9c-ad0a-8389-cea795af9f74@kernel.org>
-In-Reply-To: <c4fce9a2-2d9c-ad0a-8389-cea795af9f74@kernel.org>
-From: Andrey Zhizhikin <andrey.z@gmail.com>
-Date: Mon, 25 Feb 2019 19:55:22 +0100
-Message-ID: <CAHtQpK4oCoMKKcfH0wNm_QMg5LaQT=GNSMzOz9FbzjBrEF8cAQ@mail.gmail.com>
-Subject: Re: [PATCH] ARM: socfpga_defconfig: enable support for large block
- devices
-To: Dinh Nguyen <dinguyen@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_105536_179920_1CBFFB8C 
-X-CRM114-Status: GOOD (  17.66  )
+X-CRM114-CacheID: sfid-20190225_105847_887792_CDAC97CF 
+X-CRM114-Status: GOOD (  13.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,56 +73,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org,
- linux-kernel@vger.kernel.org
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello Dinh,
+On Thu, 21 Feb 2019 11:01:52 +0100
+Miquel Raynal <miquel.raynal@bootlin.com> wrote:
 
-On Mon, Feb 25, 2019 at 5:35 PM Dinh Nguyen <dinguyen@kernel.org> wrote:
->
-> Hi Andrey,
->
-> On 2/22/19 6:21 AM, Andrey Zhizhikin wrote:
-> > Enable CONFIG_LBDAF, which is required by ext4 fs. This option could
-> > hanle both ext3 and ext4, and ex4 requires this option to be enabled,
-> > otherwise the filesystem is mounted RO mode.
-> >
-> > Signed-off-by: Andrey Zhizhikin <andrey.z@gmail.com>
-> > ---
-> >  arch/arm/configs/socfpga_defconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/configs/socfpga_defconfig b/arch/arm/configs/socfpga_defconfig
-> > index 08d1b3e11d68..b4b387486cd9 100644
-> > --- a/arch/arm/configs/socfpga_defconfig
-> > +++ b/arch/arm/configs/socfpga_defconfig
-> > @@ -21,7 +21,7 @@ CONFIG_NEON=y
-> >  CONFIG_OPROFILE=y
-> >  CONFIG_MODULES=y
-> >  CONFIG_MODULE_UNLOAD=y
-> > -# CONFIG_LBDAF is not set
->
-> CONFIG_LDBAF is turned on by default for 32-bit. So all you have to do
-> is remove this line.
+> +
+> +/**
+> + * struct nand_ecc_engine_ops - Generic ECC engine operations
+> + *
+> + * @init_ctx: given a desired user configuration for the pointed NAND device,
+> + *            requests the ECC engine driver to setup a configuration with
+> + *            values it supports.
+> + * @cleanup_ctx: clean the context initialized by @init_ctx.
+> + * @prepare_io_req: is called before reading/writing a page to prepare the I/O
+> + *                  request to be performed with ECC correction.
+> + * @finish_io_req: is called after reading/writing a page to terminate the I/O
+> + *                 request and ensure proper ECC correction.
+> + */
+> +struct nand_ecc_engine_ops {
 
-Thanks a lot for clarifications here! I suspected that it was the
-case, just needed a confirmation here.
-Is it possible we would have this config option enabled for
-socfpga_defconfig? If you would agree, then I prepare a separate patch
-to have the "CONFIG_LBDAF is not set" removed.
+We might want to add a
 
->
-> Thanks,
-> Dinh
+	void (*put_engine)(struct nand_ecc_engine *engine);
 
-Thanks a lot!
+here if we want the nanddev cleanup path to be generic.
+This hook would be implemented by drivers where the ECC engine object is
+refcounted (typically the case for HW ECC engines shared by the raw NAND
+controller and the SPI controller).
 
---
-Andrey.
+Alternatively, you can just add one nand_put_xxx_ecc_engine() func per
+engine class (SW, ondie and HW).
+
+> +	int (*init_ctx)(struct nand_device *nand);
+> +	void (*cleanup_ctx)(struct nand_device *nand);
+> +	int (*prepare_io_req)(struct nand_device *nand,
+> +			      struct nand_page_io_req *req,
+> +			      void *oobbuf);
+> +	int (*finish_io_req)(struct nand_device *nand,
+> +			     struct nand_page_io_req *req,
+> +			     void *oobbuf);
+> +};
 
 _______________________________________________
 linux-arm-kernel mailing list
