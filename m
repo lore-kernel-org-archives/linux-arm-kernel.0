@@ -2,113 +2,60 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EC71C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 20:59:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D2317C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:04:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5FE2D20842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 20:59:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 958DA20C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 21:04:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qjLrpOqX";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="DEyveKSv";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o9gjqnJJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FE2D20842
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rlDB0xfA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 958DA20C01
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=cs.utah.edu
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=FEusP9AdMcTM0mKUimSvTPV9qAPnsHEo6//+fgmj91E=; b=qjLrpOqX7Mz+ay75E0fPEfiMa
-	ji440mMNaRaU02F2vymfbkqlwV6DYyKyQXWV4pQJIPfJWp+IiivczImhfRJtUreK2uN3pXqC5S7hX
-	YKYDDWv9UWK3JkwekhSzkyeIEIPZdqyn6WKiRu0uNJOuOdGiJckIiWjTdmhXzBovntHIyNqOQZs2h
-	kcfx15NPGD9l4Qca4vYzuJ0hFQ0eZiHXTT5GCFMRVXKh3VMNJc2jOpjB5I4gaXI0whFb7CLSHd+cK
-	pH7D5cnS72vrxJHvdu7nZaiDONQy53OeNBJbvUekG8AS37d878Fk3OqRaghBNrZQ0IeE44TEMw5h3
-	YonMzKmog==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=9yCTvjF1xWWMTIu9Ktj+2GHe3+C7bGPx/8E7ODDlrzU=; b=rlD
+	B0xfAJ0pXQEYqGuHkCcPWeAzPmY0ZqUowFwYp2fmr9o2GsqaYgrN8NJdds7L9X8cwePDFXnHKtU3a
+	sLGck3Sd6vG623lXhKIIJDBO4EijRuqnbY7MVVYhh39isIt9rPK2oUCQXCVzTjAE2cyQbUKCAhDBx
+	DurEacTziSKDvoQ4+WJbkLcjG4fcjgGeNNqACK9SEgs2e58esoScqiTIOE/ogApgsKGAr0LJLtTzW
+	ieg42HgNHLmoDLCuZqRoU1/C0cZCm1gIK72o7b7OLw7LOuWP+bMY5iRKCFQS+Gs8LsBZGPFMnIt1j
+	idpwQPSxkgra8+zTjCEBO0/QoCUqGLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyNLA-0004ey-V6; Mon, 25 Feb 2019 20:59:08 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyNL9-0004er-4E
- for linux-arm-kernel@bombadil.infradead.org; Mon, 25 Feb 2019 20:59:07 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
- In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=; b=DEyveKSvyAF/BBL1rz/ZLfqzfE
- 1W27igPqV70DoIrOG60F6EALuQ9sjhik21JVUNLOsfWVBvmrZR+xDASm511r7wNVrxl67y10QdeOV
- taAljBaeB7yBryXAuAoTAaS1yafNjLlP3sB3AGIK1XXVRzfwQyZQ2lASJT+igPWkayT6xnvuiilRM
- 73zC4GDED6oI9/ZFF7LtY9aTt1ixLeUoXPvnilnJEhFPnvuUAHECrr7nYBXyPRl0i590gfHJblNpU
- xrMOohJsmgqpGSHpyEfAQWm9AXeqexDdPRYlP1Q2tg7gHXNxN9rwWjqPbrxViFQbSGgLsMdgHoXXO
- iutIADxg==;
-Received: from mail-wm1-x331.google.com ([2a00:1450:4864:20::331])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyN2d-0001xH-3G
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 20:40:00 +0000
-Received: by mail-wm1-x331.google.com with SMTP id n19so291666wmi.1
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 12:39:57 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=;
- b=o9gjqnJJZ7PyKFRd/AhbVmlk0ALQg6hynrw1/yZPSPoeUI/0ZgcIInuEWdt/Ws3stV
- IpXDfvus0eNTR20XuIJ0D1kS4a5QKEfcVua57JaAMNClSwUlheQsAIIPB8UrP5+e7zEu
- 6DgFn3Oc8Sa/gFKBIeCmku4UvtVXKxBVMc1aFhAz9eqPjpJ1qSKE6s5YoxCo1k3IiUMg
- Rmy62U77zPIICGnLkOcTks5jgYkaSFYDz/EyezLTbylcDij50GZ+iAjrFukRbPO3rSVL
- zoDQZ2xT/KXPDkK5YzHLaGEtnFFb3aAepxd3QDbLsA8asTAmf45Mr9GCo1N+iAXXUu+a
- 7NKg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=;
- b=BCRM6t+1hXbi4cGST7kQI9vSDQcimcGaZkCCZeoSJY4Yzpg1JAEGPPvtWENhTBzKKC
- dQ1wVGloSGmgy6eyGDeHv3nWW2/UYPRHwRLQp7whn75LYJqel0osWIc8BAG1F+7McY2M
- qO7V+ZZOymPn4h8n8UMel9cb+S9gJRiionlPtX9LGVaoE9BEc/MlxXgtYviEZaealUFs
- hXEf9tYsQzWb1wr3HhlPWvWwUX8ItCL7551/fUjZLYDBabLAdUAZ4fRnJZvpjw8/3z+g
- dDdn03z7a8r2i6yFeaDQ9HAvXrGoEjox+/h/+/d0nAI87ZL34ZUBBc5Fx9G2OItH0EIr
- 8eDw==
-X-Gm-Message-State: AHQUAuYIKFocfA/oWdarRe2kKh0PJ8kRIlxDKLv8rW1N18Pg4b8zdNsj
- W7qItRpJxeuY/Ot2dZmglIfzqtco
-X-Google-Smtp-Source: AHgI3Iat2Vez/Yw8eQjcbBw0HXd/LW7bK4USr5BGZCbAyMoNRDQPiRHrX4XxQBKhmocYaD3FGT4uqw==
-X-Received: by 2002:a1c:30b:: with SMTP id 11mr380532wmd.110.1551127077093;
- Mon, 25 Feb 2019 12:37:57 -0800 (PST)
-Received: from ?IPv6:2a02:810d:340:17ec::1b62? ([2a02:810d:340:17ec::1b62])
- by smtp.gmail.com with ESMTPSA id v6sm13268375wrd.88.2019.02.25.12.37.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 12:37:56 -0800 (PST)
-Subject: Re: Allwinner SID THS calibration data cell representation?
-To: Chen-Yu Tsai <wens@csie.org>, Maxime Ripard <maxime.ripard@bootlin.com>
-References: <20180830154518.29507-1-embed3d@gmail.com>
- <20180830154518.29507-28-embed3d@gmail.com>
- <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
- <55579dd6-625d-e71b-1482-4592dccac665@gmail.com>
- <20180906115114.inc6dhqhy47obo25@flea>
- <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
-From: Philipp Rossak <embed3d@gmail.com>
-Message-ID: <dfbe9a71-ccab-2415-fe5b-6944df721bff@gmail.com>
-Date: Mon, 25 Feb 2019 21:37:55 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.1
-MIME-Version: 1.0
-In-Reply-To: <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
-Content-Language: en-US
+	id 1gyNQg-0006Mm-VH; Mon, 25 Feb 2019 21:04:50 +0000
+Received: from rio.cs.utah.edu ([155.98.64.241] helo=mail-svr1.cs.utah.edu)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyNQc-0006LT-Er; Mon, 25 Feb 2019 21:04:49 +0000
+Received: from localhost (localhost [127.0.0.1])
+ by mail-svr1.cs.utah.edu (Postfix) with ESMTP id B1C236500BD;
+ Mon, 25 Feb 2019 14:04:28 -0700 (MST)
+Received: from mail-svr1.cs.utah.edu ([127.0.0.1])
+ by localhost (mail-svr1.cs.utah.edu [127.0.0.1]) (amavisd-new, port 10024)
+ with ESMTP id o5yZK0jTgwzL; Mon, 25 Feb 2019 14:04:26 -0700 (MST)
+Received: from bench1.smackbench.smack.emulab.net (pc614.emulab.net
+ [155.98.38.234])
+ by smtps.cs.utah.edu (Postfix) with ESMTPSA id DAF966500B5;
+ Mon, 25 Feb 2019 14:04:25 -0700 (MST)
+From: Shaobo He <shaobo@cs.utah.edu>
+To: linux-media@vger.kernel.org
+Subject: [PATCH] Remove deductively redundant NULL pointer checks
+Date: Mon, 25 Feb 2019 14:03:37 -0700
+Message-Id: <1551128631-19713-1-git-send-email-shaobo@cs.utah.edu>
+X-Mailer: git-send-email 1.9.1
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_203959_189381_6E28625B 
-X-CRM114-Status: GOOD (  24.95  )
+X-CRM114-CacheID: sfid-20190225_130446_795697_E5B9D153 
+X-CRM114-Status: GOOD (  14.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,65 +67,505 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Emmanuel Vadot <manu@bidouilliste.com>,
- Quentin Schulz <quentin.schulz@bootlin.com>, linux-iio@vger.kernel.org,
- linux-kernel <linux-kernel@vger.kernel.org>,
- linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Jonathan Cameron <jic23@kernel.org>, Icenowy Zheng <icenowy@aosc.io>
+Cc: Andrew-CT Chen <andrew-ct.chen@mediatek.com>,
+ Heiko Stuebner <heiko@sntech.de>,
+ Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>,
+ "Gustavo A. R. Silva" <gustavo@embeddedor.com>, Kamil Debski <kamil@wypas.org>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Andrzej Hajda <a.hajda@samsung.com>, laurent.pinchart@ideasonboard.com,
+ "open list:MEDIA DRIVERS FOR RENESAS - FDP1"
+ <linux-renesas-soc@vger.kernel.org>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Rick Chang <rick.chang@mediatek.com>,
+ "open list:ARM/Rockchip SoC support" <linux-rockchip@lists.infradead.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>,
+ Hans Verkuil <hans.verkuil@cisco.com>, Bin Liu <bin.liu@mediatek.com>,
+ Anton Leontiev <scileont@gmail.com>, Kees Cook <keescook@chromium.org>,
+ Benoit Parrot <bparrot@ti.com>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Jacek Anaszewski <jacek.anaszewski@gmail.com>,
+ Andrzej Pietrasiewicz <andrzej.p@samsung.com>,
+ Tiffany Lin <tiffany.lin@mediatek.com>,
+ Ezequiel Garcia <ezequiel@collabora.com>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-arm-kernel@lists.infradead.org>,
+ Jacob chen <jacob2.chen@rock-chips.com>,
+ open list <linux-kernel@vger.kernel.org>, shaobo@cs.utah.edu,
+ Kyungmin Park <kyungmin.park@samsung.com>,
+ Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>,
+ Philipp Zabel <p.zabel@pengutronix.de>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+The fixes included in this commit essentially removes NULL pointer
+checks on the return values of function `get_queue_ctx` as well as
+`v4l2_m2m_get_vq` defined in file v4l2-mem2mem.c.
 
+Function `get_queue_ctx` is very unlikely to return a NULL pointer
+because its return value is an address composed of the base address
+pointed by `m2m_ctx` and an offset of field `out_q_ctx` or `cap_q_ctx`.
+Since the offset of either field is not 0, for the return value to be
+NULL, pointer `m2m_ctx` must be a very large unsigned value such that
+its addition to the offset overflows to NULL which may be undefined
+according to this post:
+https://wdtz.org/catching-pointer-overflow-bugs.html. Moreover, even if
+`m2m_ctx` is NULL, the return value cannot be NULL, either. Therefore, I
+think it is reasonable to conclude that the return value of function
+`get_queue_ctx` cannot be NULL.
 
-On 19.02.19 08:54, Chen-Yu Tsai wrote:
-> Sorry for resurrecting an old discussion, but since someone posted patches
-> for H5 and H6, I thought we should resolve this. I'm working on patches to
-> fix / replace the big-endian issue.
-> 
-> On Thu, Sep 6, 2018 at 7:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->>
->> On Thu, Sep 06, 2018 at 01:47:47PM +0200, Philipp Rossak wrote:
->>> On 04.09.2018 18:46, Emmanuel Vadot wrote:
->>>>> +                 /* Data cells */
->>>>> +                 thermal_calibration: calib@234 {
->>>>> +                         reg = <0x234 0x8>;
->>>>> +                 };
->>>>    You are declaring 8 bytes of calibration data but to my knowledge it's
->>>> only 2 bytes per sensor, so 2 bytes for H3.
->>>>    Am I missing something ?
->>>>
->>>>    Thanks,
->>>
->>> Emmanuel you are right, it is 2 bytes per Sensor and should be 2 bytes for
->>> H3, but the thermal calibration data field is on all chips 64 bit wide - so
->>> 8 bytes. So I'm reading here the complete calibration data field.
->>
->> Having one cell per channel would make more sense I guess.
-> 
-> Would it? The 2 32-bit words directly map onto the registers 0x74 / 0x78 in
-> the THS. As far as the SID is concerned, their is just one consumer for this
-> data, the thermal sensor. How the thermal sensor uses that data is really not
-> its concern. And the thermal sensor is really just copying the data from the
-> e-fuses into its registers. Nothing more.
+Given the return values of `get_queue_ctx` not being NULL, we can follow
+a similar reasoning to conclude that the return value of
+`v4l2_mem_get_vq` cannot be NULL since its return value is the same
+address as the return value of `get_queue_ctx`. Therefore, this patch
+also removes NULL pointer checks on the return values of
+`v4l2_mem_get_vq`.
 
-Using 2 32-bit words for the THS would be also ok (from my perspective).
-> 
-> Furthermore, with the register access interface, the e-fuses are read/write
-> 32 bits at a time. Seems to me it would make more sense to enforce a 32-bit
-> word size, so cells should be multiples of 32 bits.
-> 
-For THS I'm ok with that.
+Signed-off-by: Shaobo He <shaobo@cs.utah.edu>
+---
+ drivers/media/platform/coda/coda-common.c          |  4 ----
+ drivers/media/platform/imx-pxp.c                   |  7 -------
+ drivers/media/platform/m2m-deinterlace.c           |  7 -------
+ drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c    |  7 -------
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c |  7 -------
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c | 13 -------------
+ drivers/media/platform/mx2_emmaprp.c               |  7 -------
+ drivers/media/platform/rcar_fdp1.c                 |  3 ---
+ drivers/media/platform/rcar_jpu.c                  |  8 --------
+ drivers/media/platform/rockchip/rga/rga.c          |  4 ----
+ drivers/media/platform/s5p-g2d/g2d.c               |  4 ----
+ drivers/media/platform/s5p-jpeg/jpeg-core.c        |  7 -------
+ drivers/media/platform/sh_veu.c                    |  2 --
+ drivers/media/platform/ti-vpe/vpe.c                |  7 -------
+ drivers/media/platform/vicodec/vicodec-core.c      |  5 -----
+ drivers/media/platform/vim2m.c                     |  9 ---------
+ drivers/media/v4l2-core/v4l2-mem2mem.c             |  4 ----
+ 17 files changed, 105 deletions(-)
 
-> Regards
-> ChenYu
-> 
-Regards,
-Philipp
+diff --git a/drivers/media/platform/coda/coda-common.c b/drivers/media/platform/coda/coda-common.c
+index 7518f01..ee1e05b 100644
+--- a/drivers/media/platform/coda/coda-common.c
++++ b/drivers/media/platform/coda/coda-common.c
+@@ -696,8 +696,6 @@ static int coda_s_fmt(struct coda_ctx *ctx, struct v4l2_format *f,
+ 	struct vb2_queue *vq;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = get_q_data(ctx, f->type);
+ 	if (!q_data)
+@@ -817,8 +815,6 @@ static int coda_s_fmt_vid_out(struct file *file, void *priv,
+ 	ctx->quantization = f->fmt.pix.quantization;
+ 
+ 	dst_vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, V4L2_BUF_TYPE_VIDEO_CAPTURE);
+-	if (!dst_vq)
+-		return -EINVAL;
+ 
+ 	/*
+ 	 * Setting the capture queue format is not possible while the capture
+diff --git a/drivers/media/platform/imx-pxp.c b/drivers/media/platform/imx-pxp.c
+index c1c2554..d079b3c 100644
+--- a/drivers/media/platform/imx-pxp.c
++++ b/drivers/media/platform/imx-pxp.c
+@@ -1071,13 +1071,8 @@ static int pxp_enum_fmt_vid_out(struct file *file, void *priv,
+ 
+ static int pxp_g_fmt(struct pxp_ctx *ctx, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct pxp_q_data *q_data;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 
+ 	f->fmt.pix.width	= q_data->width;
+@@ -1220,8 +1215,6 @@ static int pxp_s_fmt(struct pxp_ctx *ctx, struct v4l2_format *f)
+ 	struct vb2_queue *vq;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = get_q_data(ctx, f->type);
+ 	if (!q_data)
+diff --git a/drivers/media/platform/m2m-deinterlace.c b/drivers/media/platform/m2m-deinterlace.c
+index c62e598..df03ffd 100644
+--- a/drivers/media/platform/m2m-deinterlace.c
++++ b/drivers/media/platform/m2m-deinterlace.c
+@@ -497,13 +497,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
+ 
+ static int vidioc_g_fmt(struct deinterlace_ctx *ctx, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct deinterlace_q_data *q_data;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(f->type);
+ 
+ 	f->fmt.pix.width	= q_data->width;
+@@ -598,8 +593,6 @@ static int vidioc_s_fmt(struct deinterlace_ctx *ctx, struct v4l2_format *f)
+ 	struct vb2_queue *vq;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = get_q_data(f->type);
+ 	if (!q_data)
+diff --git a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+index 2a5d500..2da90ae 100644
+--- a/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
++++ b/drivers/media/platform/mtk-jpeg/mtk_jpeg_core.c
+@@ -271,17 +271,12 @@ static int mtk_jpeg_try_fmt_mplane(struct v4l2_format *f,
+ static int mtk_jpeg_g_fmt_vid_mplane(struct file *file, void *priv,
+ 				     struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct mtk_jpeg_q_data *q_data = NULL;
+ 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+ 	struct mtk_jpeg_ctx *ctx = mtk_jpeg_fh_to_ctx(priv);
+ 	struct mtk_jpeg_dev *jpeg = ctx->jpeg;
+ 	int i;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = mtk_jpeg_get_q_data(ctx, f->type);
+ 
+ 	memset(pix_mp->reserved, 0, sizeof(pix_mp->reserved));
+@@ -372,8 +367,6 @@ static int mtk_jpeg_s_fmt_mplane(struct mtk_jpeg_ctx *ctx,
+ 	int i;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = mtk_jpeg_get_q_data(ctx, f->type);
+ 
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+index ba61964..d4006e5 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_dec.c
+@@ -955,15 +955,8 @@ static int vidioc_vdec_g_fmt(struct file *file, void *priv,
+ {
+ 	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+ 	struct v4l2_pix_format_mplane *pix_mp = &f->fmt.pix_mp;
+-	struct vb2_queue *vq;
+ 	struct mtk_q_data *q_data;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq) {
+-		mtk_v4l2_err("no vb2 queue for type=%d", f->type);
+-		return -EINVAL;
+-	}
+-
+ 	q_data = mtk_vdec_get_q_data(ctx, f->type);
+ 
+ 	pix_mp->field = V4L2_FIELD_NONE;
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
+index d1f1225..7c54690 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_enc.c
+@@ -430,10 +430,6 @@ static int vidioc_venc_s_fmt_cap(struct file *file, void *priv,
+ 	struct mtk_video_fmt *fmt;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq) {
+-		mtk_v4l2_err("fail to get vq");
+-		return -EINVAL;
+-	}
+ 
+ 	if (vb2_is_busy(vq)) {
+ 		mtk_v4l2_err("queue busy");
+@@ -493,10 +489,6 @@ static int vidioc_venc_s_fmt_out(struct file *file, void *priv,
+ 	struct v4l2_pix_format_mplane *pix_fmt_mp = &f->fmt.pix_mp;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq) {
+-		mtk_v4l2_err("fail to get vq");
+-		return -EINVAL;
+-	}
+ 
+ 	if (vb2_is_busy(vq)) {
+ 		mtk_v4l2_err("queue busy");
+@@ -554,14 +546,9 @@ static int vidioc_venc_g_fmt(struct file *file, void *priv,
+ {
+ 	struct v4l2_pix_format_mplane *pix = &f->fmt.pix_mp;
+ 	struct mtk_vcodec_ctx *ctx = fh_to_ctx(priv);
+-	struct vb2_queue *vq;
+ 	struct mtk_q_data *q_data;
+ 	int i;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = mtk_venc_get_q_data(ctx, f->type);
+ 
+ 	pix->width = q_data->coded_width;
+diff --git a/drivers/media/platform/mx2_emmaprp.c b/drivers/media/platform/mx2_emmaprp.c
+index 27b078c..1366fde 100644
+--- a/drivers/media/platform/mx2_emmaprp.c
++++ b/drivers/media/platform/mx2_emmaprp.c
+@@ -436,13 +436,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
+ 
+ static int vidioc_g_fmt(struct emmaprp_ctx *ctx, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct emmaprp_q_data *q_data;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 
+ 	f->fmt.pix.width	= q_data->width;
+@@ -545,8 +540,6 @@ static int vidioc_s_fmt(struct emmaprp_ctx *ctx, struct v4l2_format *f)
+ 	int ret;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = get_q_data(ctx, f->type);
+ 	if (!q_data)
+diff --git a/drivers/media/platform/rcar_fdp1.c b/drivers/media/platform/rcar_fdp1.c
+index 6bda1ee..ef747d3 100644
+--- a/drivers/media/platform/rcar_fdp1.c
++++ b/drivers/media/platform/rcar_fdp1.c
+@@ -1407,9 +1407,6 @@ static int fdp1_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	struct fdp1_q_data *q_data;
+ 	struct fdp1_ctx *ctx = fh_to_ctx(priv);
+ 
+-	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 	f->fmt.pix_mp = q_data->format;
+ 
+diff --git a/drivers/media/platform/rcar_jpu.c b/drivers/media/platform/rcar_jpu.c
+index 1dfd2eb..a91664c 100644
+--- a/drivers/media/platform/rcar_jpu.c
++++ b/drivers/media/platform/rcar_jpu.c
+@@ -839,9 +839,6 @@ static int jpu_try_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ {
+ 	struct jpu_ctx *ctx = fh_to_ctx(priv);
+ 
+-	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
+-		return -EINVAL;
+-
+ 	return __jpu_try_fmt(ctx, NULL, &f->fmt.pix_mp, f->type);
+ }
+ 
+@@ -855,8 +852,6 @@ static int jpu_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	int ret;
+ 
+ 	vq = v4l2_m2m_get_vq(m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	if (vb2_is_busy(vq)) {
+ 		v4l2_err(&ctx->jpu->v4l2_dev, "%s queue busy\n", __func__);
+@@ -880,9 +875,6 @@ static int jpu_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	struct jpu_q_data *q_data;
+ 	struct jpu_ctx *ctx = fh_to_ctx(priv);
+ 
+-	if (!v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type))
+-		return -EINVAL;
+-
+ 	q_data = jpu_get_q_data(ctx, f->type);
+ 	f->fmt.pix_mp = q_data->format;
+ 
+diff --git a/drivers/media/platform/rockchip/rga/rga.c b/drivers/media/platform/rockchip/rga/rga.c
+index 5c65328..74b8e9d 100644
+--- a/drivers/media/platform/rockchip/rga/rga.c
++++ b/drivers/media/platform/rockchip/rga/rga.c
+@@ -470,12 +470,8 @@ static int vidioc_enum_fmt(struct file *file, void *prv, struct v4l2_fmtdesc *f)
+ static int vidioc_g_fmt(struct file *file, void *prv, struct v4l2_format *f)
+ {
+ 	struct rga_ctx *ctx = prv;
+-	struct vb2_queue *vq;
+ 	struct rga_frame *frm;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 	frm = rga_get_frame(ctx, f->type);
+ 	if (IS_ERR(frm))
+ 		return PTR_ERR(frm);
+diff --git a/drivers/media/platform/s5p-g2d/g2d.c b/drivers/media/platform/s5p-g2d/g2d.c
+index 57ab1d1..dda4159 100644
+--- a/drivers/media/platform/s5p-g2d/g2d.c
++++ b/drivers/media/platform/s5p-g2d/g2d.c
+@@ -319,12 +319,8 @@ static int vidioc_enum_fmt(struct file *file, void *prv, struct v4l2_fmtdesc *f)
+ static int vidioc_g_fmt(struct file *file, void *prv, struct v4l2_format *f)
+ {
+ 	struct g2d_ctx *ctx = prv;
+-	struct vb2_queue *vq;
+ 	struct g2d_frame *frm;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 	frm = get_frame(ctx, f->type);
+ 	if (IS_ERR(frm))
+ 		return PTR_ERR(frm);
+diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+index 3f9000b..4884725 100644
+--- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
++++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+@@ -1359,15 +1359,10 @@ static struct s5p_jpeg_q_data *get_q_data(struct s5p_jpeg_ctx *ctx,
+ 
+ static int s5p_jpeg_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct s5p_jpeg_q_data *q_data = NULL;
+ 	struct v4l2_pix_format *pix = &f->fmt.pix;
+ 	struct s5p_jpeg_ctx *ct = fh_to_ctx(priv);
+ 
+-	vq = v4l2_m2m_get_vq(ct->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	if (f->type == V4L2_BUF_TYPE_VIDEO_CAPTURE &&
+ 	    ct->mode == S5P_JPEG_DECODE && !ct->hdr_parsed)
+ 		return -EINVAL;
+@@ -1620,8 +1615,6 @@ static int s5p_jpeg_s_fmt(struct s5p_jpeg_ctx *ct, struct v4l2_format *f)
+ 	unsigned int f_type;
+ 
+ 	vq = v4l2_m2m_get_vq(ct->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	q_data = get_q_data(ct, f->type);
+ 	BUG_ON(q_data == NULL);
+diff --git a/drivers/media/platform/sh_veu.c b/drivers/media/platform/sh_veu.c
+index 09ae64a..6d59e16 100644
+--- a/drivers/media/platform/sh_veu.c
++++ b/drivers/media/platform/sh_veu.c
+@@ -554,8 +554,6 @@ static int sh_veu_s_fmt(struct sh_veu_file *veu_file, struct v4l2_format *f)
+ 		return ret;
+ 
+ 	vq = v4l2_m2m_get_vq(veu->m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	if (vb2_is_busy(vq)) {
+ 		v4l2_err(&veu_file->veu_dev->v4l2_dev, "%s queue busy\n", __func__);
+diff --git a/drivers/media/platform/ti-vpe/vpe.c b/drivers/media/platform/ti-vpe/vpe.c
+index d70871d0..1620168 100644
+--- a/drivers/media/platform/ti-vpe/vpe.c
++++ b/drivers/media/platform/ti-vpe/vpe.c
+@@ -1537,14 +1537,9 @@ static int vpe_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ {
+ 	struct v4l2_pix_format_mplane *pix = &f->fmt.pix_mp;
+ 	struct vpe_ctx *ctx = file2ctx(file);
+-	struct vb2_queue *vq;
+ 	struct vpe_q_data *q_data;
+ 	int i;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 
+ 	pix->width = q_data->width;
+@@ -1714,8 +1709,6 @@ static int __vpe_s_fmt(struct vpe_ctx *ctx, struct v4l2_format *f)
+ 	int i;
+ 
+ 	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+ 
+ 	if (vb2_is_busy(vq)) {
+ 		vpe_err(ctx->dev, "queue busy\n");
+diff --git a/drivers/media/platform/vicodec/vicodec-core.c b/drivers/media/platform/vicodec/vicodec-core.c
+index 0d7876f..9a2ab8b 100644
+--- a/drivers/media/platform/vicodec/vicodec-core.c
++++ b/drivers/media/platform/vicodec/vicodec-core.c
+@@ -445,16 +445,11 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
+ 
+ static int vidioc_g_fmt(struct vicodec_ctx *ctx, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct vicodec_q_data *q_data;
+ 	struct v4l2_pix_format_mplane *pix_mp;
+ 	struct v4l2_pix_format *pix;
+ 	const struct v4l2_fwht_pixfmt_info *info;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 	info = q_data->info;
+ 
+diff --git a/drivers/media/platform/vim2m.c b/drivers/media/platform/vim2m.c
+index 89d9c4c..dae8af5 100644
+--- a/drivers/media/platform/vim2m.c
++++ b/drivers/media/platform/vim2m.c
+@@ -484,13 +484,8 @@ static int vidioc_enum_fmt_vid_out(struct file *file, void *priv,
+ 
+ static int vidioc_g_fmt(struct vim2m_ctx *ctx, struct v4l2_format *f)
+ {
+-	struct vb2_queue *vq;
+ 	struct vim2m_q_data *q_data;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 
+ 	f->fmt.pix.width	= q_data->width;
+@@ -594,10 +589,6 @@ static int vidioc_s_fmt(struct vim2m_ctx *ctx, struct v4l2_format *f)
+ 	struct vim2m_q_data *q_data;
+ 	struct vb2_queue *vq;
+ 
+-	vq = v4l2_m2m_get_vq(ctx->fh.m2m_ctx, f->type);
+-	if (!vq)
+-		return -EINVAL;
+-
+ 	q_data = get_q_data(ctx, f->type);
+ 	if (!q_data)
+ 		return -EINVAL;
+diff --git a/drivers/media/v4l2-core/v4l2-mem2mem.c b/drivers/media/v4l2-core/v4l2-mem2mem.c
+index 5bbdec5..1bbf4b0 100644
+--- a/drivers/media/v4l2-core/v4l2-mem2mem.c
++++ b/drivers/media/v4l2-core/v4l2-mem2mem.c
+@@ -124,8 +124,6 @@ struct vb2_queue *v4l2_m2m_get_vq(struct v4l2_m2m_ctx *m2m_ctx,
+ 	struct v4l2_m2m_queue_ctx *q_ctx;
+ 
+ 	q_ctx = get_queue_ctx(m2m_ctx, type);
+-	if (!q_ctx)
+-		return NULL;
+ 
+ 	return &q_ctx->q;
+ }
+@@ -965,8 +963,6 @@ void v4l2_m2m_buf_queue(struct v4l2_m2m_ctx *m2m_ctx,
+ 	unsigned long flags;
+ 
+ 	q_ctx = get_queue_ctx(m2m_ctx, vbuf->vb2_buf.vb2_queue->type);
+-	if (!q_ctx)
+-		return;
+ 
+ 	spin_lock_irqsave(&q_ctx->rdy_spinlock, flags);
+ 	list_add_tail(&b->list, &q_ctx->rdy_queue);
+-- 
+1.9.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
