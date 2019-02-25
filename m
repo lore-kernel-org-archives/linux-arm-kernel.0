@@ -2,89 +2,95 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D85E4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:54:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF83EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:55:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A5FA020645
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:54:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B1C2720645
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 17:55:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E3kqdzFO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="rF9oQLhP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A5FA020645
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S/CtKJG5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="umJ51yCk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1C2720645
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=0wZ9nMq+NgluLmbP4LDyF+88PKBL5nYN63IgzYPDmbQ=; b=E3kqdzFOpB4G+z0PlHvpcXT/Rx
-	CjGIH9QPTAwGTzoPPsULT9sGVp1GZx6pboyuy5MWr2Tc168w/+o7QsxLqD2ujT2jrOVtsYAlN0GQr
-	AtuOEzXrm2tqHr2SMbozOET5ChCliafz4Coi5AHwPQBKp27e7cy6pGUva1k7XGS5owh+ohO9IsmeA
-	EPJMLczMl88s+lgM0WxSvrYVbgbnNMM1iIZS+pQdubaKj02KMMzQpP4MmgOFzMeYFBjXSnKUFU13s
-	sW84+E3kyE3vrQ7GRGMtRP9hDth9f2C5WS3i7CzcWA5kHJJ9NRaS2TYyuxm2Vt39R9WvGYs3+naOu
-	iRu4CW8g==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+W0l3a/djYdXAJp6dlp7W3VxUMH0KhdQx6nMBe0fZo4=; b=S/CtKJG5asoJ14
+	cIx5aPCXByV7mo/W9eBhbtnmAAv8M8VbtviK/N6zaUnq6Izq3hMktvKnfs+mPAUDI8f8wkUXptfmF
+	i4uzChgJNgRSAvFaxIq5JM4mOSDpHcDOtAS+cAeJcZBPbXbz8vycQ4ROsWAvpHEo7obDjMAQ2IJvo
+	8SOi3h+xHlPGJ5fjvB+ish534tqvXpr/q6tieeBr/7Itv3LvG+7tymuHVruPT3WuMHgSSdRwx7TB7
+	cijaAk9Ead1ld0VPaFA69gJdNRypIKkk/sDBHEyQNk1DEFRvFuaBUk5j5KBarARiFC9bpp7YP6XnK
+	N/KsKj40Gv+kaNX2DowQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyKSK-0001ia-It; Mon, 25 Feb 2019 17:54:20 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gyKTJ-0003LC-PD; Mon, 25 Feb 2019 17:55:21 +0000
+Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyKS4-0001RU-U9
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 17:54:07 +0000
-Received: by mail-pl1-x644.google.com with SMTP id s1so4822262plp.9
+ id 1gyKTC-0003KP-Ip
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 17:55:19 +0000
+Received: by mail-pl1-x641.google.com with SMTP id bj4so4826356plb.7
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 09:54:04 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=gzq6vfQHzGWyeLb0TiRQKsKtzM247mh6zsfOdLM3MNQ=;
- b=rF9oQLhP90GEfr0vq+e2lst76ilKM4iL70dyP4NE/mU02+65uDyhTG1zCQrQZ2zmkT
- NwZsYlRyyQOQlYc5s7mRl+QiCWLDmdlHlwMJoF/Pmf4oTcadKD92+IKQVvn2BMmtoZtv
- jU06q14WYfnx5nMPV5SxACUIkNyYjQzCtEYL0TIceTGKWA7KD00ZuHH/1emCl7K+6cVc
- OSc35Uv2lSqnsVIcoMC3imDQbKNwuCqRxq0Cq9O7q+p7yfqS6ViTvd25N/iS1zPcQGPl
- GJv/SYtdOaA15QUrX6ykUznfniHVpes/xoUixAuQizPV5C/svM/RSh9zoYk8iysbhGvv
- ia/A==
+ Mon, 25 Feb 2019 09:55:14 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=YN0OlnVQYJBntNqmwDAzD0fL0Qo/FWo9DZeANwyOEYY=;
+ b=umJ51yCkHoVGcS5UNZdohDiLlGiioruKwcmo/gpz8JNCBvFLUNr1lCMkCDJe15Wbfl
+ t+JXzuDCZCw/Ii3RGDnm0iCom1eg99rHWs9VjYvtnOsVKngRMwji9a4+5x1dy12SDGbb
+ 9zeeEh/HLVnIb6C7ijrr9VSi4D4PTVn0Y6DdXiPZFJ/jhWnNayCLLtZRkgQiCa6BHdd6
+ m08rMFPsm06mBC/C3ePmoLZ8fhp00D6SBJa48JmFzzASeSBUO/UTKgJ1dX8qb1WGJy6E
+ nB7gMJufigHYMNaRhCqNUQ6HSNBQ8zd4ocfkEKUqjDmYbpZI34HFdKkwcXfSarRmN8d+
+ zWww==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=gzq6vfQHzGWyeLb0TiRQKsKtzM247mh6zsfOdLM3MNQ=;
- b=O04+bE8shEC4WttxERB0swUzW5wvcCj7gtTX3uwn1+fGxZquARAK05WevLKbWCIB+p
- EDz6rOzx7jfmf2OeLD048KJmBpB6WJCcbGRkTFnSxzHuLsRSU6KM2+/zL/Bdo0sTGx14
- Xp0ao/qFUOOloICSCrQiUuRZSN2V190Qnpx64JHgJPjTkyi8uwF7Y2iI8vaJgMpbrA6H
- wipECT047D/jG79hCR1GxXL9LlrwA88OKhIOzbdXXAJKaT3obrrjyWavKJH+HFtd4CkR
- P5DbMenHd03wAZJX3toM8rWUROfOxB0NU/rjnis/sE7Yf8um2SHj8OXN8mljAGVD2GiZ
- hVLw==
-X-Gm-Message-State: AHQUAuZot69V2tr5M4iTv0YvBfWvtwdWX5q0Szmc4qWYYZWHxn58PKpl
- SJvIbLGC8gdY0pausIW53Az20g==
-X-Google-Smtp-Source: AHgI3IbvDJnWJuN+Q/1tM5cJoSVVT18nUiZ/7O1aGknZJ8SorMPp2XwcLlm0GbpdqWxi07yuIkj8bQ==
-X-Received: by 2002:a17:902:850a:: with SMTP id
- bj10mr21421508plb.91.1551117244186; 
- Mon, 25 Feb 2019 09:54:04 -0800 (PST)
-Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
- [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id v9sm15398997pfg.144.2019.02.25.09.54.03
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=YN0OlnVQYJBntNqmwDAzD0fL0Qo/FWo9DZeANwyOEYY=;
+ b=mfXDICPoABkmIfh4pF8JBCk82m0DuDGlJoEIp/zvkKutKK3Ik2uutgOJnWJmeejYjV
+ wBYh9mssyIp6U5CG+1EtL7C+P3hzaWzYNWRCpUTihcmzmBNVDBPaLrq9CcbL4oSZntku
+ m3j0sdio4B5OLd+TvI/Q2pBgmDIgfGDZnmflCGH/GEoY7vYAAoR+k3Qi8iHllANIj4D5
+ aPLCMuhf+kF9X5nkdKGW4GUlpPJwR44kYOwnuEwOBqqX+E99jOh9EjTSmwu7wols1BGU
+ +es9TA3brsmL3bfWDRZA7e4C3NdgNIsUbt1NH9rJeQDU6/ntU7rU5kIDJ0lcOSHcw9y+
+ 6iQA==
+X-Gm-Message-State: AHQUAuZSq/gsw9eIB2pw49l2Fs8nnrLFmdhPDjYPpNDeKLd/oob2N0oT
+ M2J81867/D0IFePl/Ryj3WM=
+X-Google-Smtp-Source: AHgI3IaR7jlSeYRjfhqiVbXGysPfM6w8rNSpq0ul/maepRX4Bet+UD4pSpOSmzEcnUTMMh7J7I8Dxw==
+X-Received: by 2002:a17:902:24e7:: with SMTP id
+ l36mr21770505plg.61.1551117313958; 
+ Mon, 25 Feb 2019 09:55:13 -0800 (PST)
+Received: from [192.168.2.145] (ppp91-79-175-49.pppoe.mtu-net.ru.
+ [91.79.175.49]) by smtp.googlemail.com with ESMTPSA id
+ h126sm7861299pfc.135.2019.02.25.09.55.08
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 09:54:03 -0800 (PST)
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-To: gregkh@linuxfoundation.org
-Subject: [PATCH 1/1] coresight: etm4x: Add support to enable ETMv4.2
-Date: Mon, 25 Feb 2019 10:54:01 -0700
-Message-Id: <20190225175401.26467-2-mathieu.poirier@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190225175401.26467-1-mathieu.poirier@linaro.org>
-References: <20190225175401.26467-1-mathieu.poirier@linaro.org>
+ Mon, 25 Feb 2019 09:55:13 -0800 (PST)
+Subject: Re: [PATCH v6 0/7] Support Trusted Foundations firmware on Tegra30
+To: Robert Yang <decatf@gmail.com>
+References: <20190222193426.10747-1-digetx@gmail.com>
+ <20190225040232.GA2242@qmqm.qmqm.pl> <20190225082155.1163ed85@dimatab>
+ <20190225165836.GA12933@r>
+From: Dmitry Osipenko <digetx@gmail.com>
+Message-ID: <684c1196-b2c3-f381-7cb0-0ffa3f071378@gmail.com>
+Date: Mon, 25 Feb 2019 20:55:05 +0300
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
+MIME-Version: 1.0
+In-Reply-To: <20190225165836.GA12933@r>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_095404_969586_6CC068FE 
-X-CRM114-Status: GOOD (  15.48  )
+X-CRM114-CacheID: sfid-20190225_095518_144996_5DC11878 
+X-CRM114-Status: GOOD (  15.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,72 +102,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
+ =?UTF-8?B?TWljaGHFgiBNaXJvc8WCYXc=?= <mirq-linux@rere.qmqm.pl>,
+ Thierry Reding <thierry.reding@gmail.com>, linux-tegra@vger.kernel.org,
+ Jonathan Hunter <jonathanh@nvidia.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-
-SDM845 has ETMv4.2 and can use the existing etm4x driver.
-But the current etm driver checks only for ETMv4.0 and
-errors out for other etm4x versions. This patch adds this
-missing support to enable SoC's with ETMv4x to use same
-driver by checking only the ETM architecture major version
-number.
-
-Without this change, we get below error during etm probe:
-
-/ # dmesg | grep etm
-[    6.660093] coresight-etm4x: probe of 7040000.etm failed with error -22
-[    6.666902] coresight-etm4x: probe of 7140000.etm failed with error -22
-[    6.673708] coresight-etm4x: probe of 7240000.etm failed with error -22
-[    6.680511] coresight-etm4x: probe of 7340000.etm failed with error -22
-[    6.687313] coresight-etm4x: probe of 7440000.etm failed with error -22
-[    6.694113] coresight-etm4x: probe of 7540000.etm failed with error -22
-[    6.700914] coresight-etm4x: probe of 7640000.etm failed with error -22
-[    6.707717] coresight-etm4x: probe of 7740000.etm failed with error -22
-
-With this change, etm probe is successful:
-
-/ # dmesg | grep etm
-[    6.659198] coresight-etm4x 7040000.etm: CPU0: ETM v4.2 initialized
-[    6.665848] coresight-etm4x 7140000.etm: CPU1: ETM v4.2 initialized
-[    6.672493] coresight-etm4x 7240000.etm: CPU2: ETM v4.2 initialized
-[    6.679129] coresight-etm4x 7340000.etm: CPU3: ETM v4.2 initialized
-[    6.685770] coresight-etm4x 7440000.etm: CPU4: ETM v4.2 initialized
-[    6.692403] coresight-etm4x 7540000.etm: CPU5: ETM v4.2 initialized
-[    6.699024] coresight-etm4x 7640000.etm: CPU6: ETM v4.2 initialized
-[    6.705646] coresight-etm4x 7740000.etm: CPU7: ETM v4.2 initialized
-
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 53e2fb6e86f6..fe76b176974a 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -55,7 +55,8 @@ static void etm4_os_unlock(struct etmv4_drvdata *drvdata)
- 
- static bool etm4_arch_supported(u8 arch)
- {
--	switch (arch) {
-+	/* Mask out the minor version number */
-+	switch (arch & 0xf0) {
- 	case ETM_ARCH_V4:
- 		break;
- 	default:
--- 
-2.17.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+MjUuMDIuMjAxOSAxOTo1OCwgUm9iZXJ0IFlhbmcg0L/QuNGI0LXRgjoKPiBPbiBNb24sIEZlYiAy
+NSwgMjAxOSBhdCAwODoyMTo1NUFNICswMzAwLCBEbWl0cnkgT3NpcGVua28gd3JvdGU6Cj4+INCS
+IE1vbiwgMjUgRmViIDIwMTkgMDU6MDI6MzMgKzAxMDAKPj4gTWljaGHFgiBNaXJvc8WCYXcgPG1p
+cnEtbGludXhAcmVyZS5xbXFtLnBsPiDQv9C40YjQtdGCOgo+Pgo+Pj4gT24gRnJpLCBGZWIgMjIs
+IDIwMTkgYXQgMTA6MzQ6MTlQTSArMDMwMCwgRG1pdHJ5IE9zaXBlbmtvIHdyb3RlOgo+Pj4+IEhl
+bGxvLAo+Pj4+Cj4+Pj4gVGhpcyBwYXRjaHNldCBhZGRzIHN1cHBvcnQgZm9yIHRoZSBUcnVzdGVk
+IEZvdW5kYXRpb25zIGZpcm13YXJlIG9uCj4+Pj4gTlZJRElBIFRlZ3JhMzAuIFByZXR0eSBtdWNo
+IGFsbCBvZiBUZWdyYTMwIGNvbnN1bWVyIGRldmljZXMgaGF2ZQo+Pj4+IHRoYXQgZmlybXdhcmUg
+YW5kIHVwc3RyZWFtIGtlcm5lbCBjYW4ndCBib290IG9uIHRob3NlIGRldmljZXMKPj4+PiB3aXRo
+b3V0IHRoZSBmaXJtd2FyZSBzdXBwb3J0LiAgCj4+Pgo+Pj4gSGkgRG1pdHJ5Cj4+Pgo+Pj4gSSd2
+ZSBhcHBsaWVkIGFuZCB0ZXN0ZWQgdGhpcyBwYXRjaHNldCBvbiBteSBURjMwMFQuIEJvb3RzIGFu
+ZAo+Pj4gc3VzcGVuZHMvd2FrZXMgdXNpbmcgJ3J0Y3dha2UgLW0gbWVtIC1zIDEgLWQgL2Rldi9y
+dGMxJyBhcyB0aGUgdGVzdC4KPj4+IGRtZXNnIGF0dGFjaGVkLgo+Pj4KPj4+IFRoZSBleGFjdCB0
+cmVlIHVzZWQ6Cj4+PiAJZ2l0Oi8vcmVyZS5xbXFtLnBsL2xpbnV4IHRmMzAwdAo+Pj4KPj4+IEZl
+ZWwgZnJlZSB0byBhZGQgbXkgVGVzdGVkLWJ5IGFuZCBTaWduZWQtb2ZmLWJ5IG9uIHRoZSBwYXRj
+aGVzIHdoZXJlCj4+PiBhcHJvcHJpYXRlLCBhbmQgdGhhbmtzIGZvciB5b3VyIHdvcmshCj4+Cj4+
+IEF3ZXNvbWUsIHRoYW5rIHlvdSB2ZXJ5IG11Y2ghCj4+Cj4+IFJvYmVydCwgY291bGQgeW91IHBs
+ZWFzZSBjb25maXJtIHRoYXQgdjYgd29ya3MgZm9yIHlvdSB0b28/Cj4+Cj4gCj4gWWVzLCB2NiB3
+b3JrcyBvbiBPdXlhLgo+IAo+IExQMS9MUDIgc3VzcGVuZCB0ZXN0ZWQgd2l0aCAncnRjd2FrZSAt
+bSBtZW0gLXMgNScKPiBjcHVpZGxlIExQMiB0ZXN0ZWQgd2l0aCAnZWNobyAwIHwgdGVlIC9zeXMv
+ZGV2aWNlcy9zeXN0ZW0vY3B1L2NwdVsxLTNdL29ubGluZScKPiBUZXN0ZWQgd2l0aCBDT05GSUdf
+U01QIGRpc2FibGVkIHRvby4KPiAKPiBZb3UgY2FuIGFkZCBteSBUZXN0ZWQtYnkgdG8gdGhpcyBw
+YXRjaCBzZXQuCgpHcmVhdCwgdGhhbmsgeW91IQoKX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgt
+YXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3Jn
+L21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
