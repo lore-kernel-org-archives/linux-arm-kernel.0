@@ -2,59 +2,61 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 32327C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 528DEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D1A3B2083D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1E18B2083D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 16:14:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A3sl9ttt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1A3B2083D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r680hz/X"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1E18B2083D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=R8sTTbwzfhs/GkYrnZdCThEMIoSfQ+Wing4n0iMxv9M=; b=A3sl9ttt8I4nR5
-	rLq0W80kmBManEM06K8AA/oZwxDFTnjHhhusrwsnGQphlO40vaTVlmdItjqfQCSBqitpyUOiaFXon
-	HrF17LN05BWCcsWD6N/45f8+N/Ct+g46ZI0+1SzxIXP6A04nTES1nW6rvyKbXEFoQ68ohnmv5kQaT
-	yOZy2O5Hl9tG/d9WokiRa5CKL6MElxOwyfhJ5UFfvrWLfWkX1z0n67wVBuVq1WjFa57n7eEHegtVU
-	stErTbFVj/iAZNFIVRtXRga3mlpTdypIaOYWJgMgtEA+xCp4xPJVbJtWxusA97hpgCB0h/F3hVDgI
-	E+cMrrcgli0Iof5fsBTw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LgkeAV/LG4nNWMsJblImfjMjYGVgBFQun2p3ulKQYN8=; b=r680hz/XB4epoF
+	RrnbC8zGOREefy4pV0ZhO+v1Of9WdnjFy7YT5hMBA/U3oS2sByAQcQwmTfoxUdJP2AlMDiQyFp0/O
+	nQr7AWORvHgqGDCpJQZfbs/knWB5DE//oqIwgJIuG4zg4z+kLOcIBFDo5wUy3lJFhzakYhMDVb/KL
+	d8nRzFQaqr+l4cxLnXWc5V0nOgV5aSfd8BLDTQX8jqkvpEPDfObJhqWujSJvUv7iKOSl8StZDGus2
+	6KRTbxvVTPGXwyg/rJpCcQVw873FEQgC5KeVVhjKU4HwEPQSfgHqpcOVyqx9k1PrTlnneF5yNMmQU
+	MPZG/gYauHGO4ijctDTg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyItj-00041z-W6; Mon, 25 Feb 2019 16:14:32 +0000
+	id 1gyItu-0004JG-WF; Mon, 25 Feb 2019 16:14:43 +0000
 Received: from relay4-d.mail.gandi.net ([217.70.183.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyIta-0003sk-9x
+ id 1gyIta-0003sl-9X
  for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 16:14:24 +0000
 X-Originating-IP: 90.88.23.190
 Received: from mc-bl-xps13.lan
  (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr [90.88.23.190])
  (Authenticated sender: maxime.chevallier@bootlin.com)
- by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id 57AD8E000D;
- Mon, 25 Feb 2019 16:14:10 +0000 (UTC)
+ by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id B4019E0008;
+ Mon, 25 Feb 2019 16:14:15 +0000 (UTC)
 From: Maxime Chevallier <maxime.chevallier@bootlin.com>
 To: davem@davemloft.net
-Subject: [PATCH net-next 0/2] net: phy: marvell10g: Clean .get_features by
- using C45 helpers
-Date: Mon, 25 Feb 2019 17:14:05 +0100
-Message-Id: <20190225161407.19510-1-maxime.chevallier@bootlin.com>
+Subject: [PATCH net-next 2/2] net: phy: marvell10g: Use the generic C45 helper
+ to read the 2110 features
+Date: Mon, 25 Feb 2019 17:14:07 +0100
+Message-Id: <20190225161407.19510-3-maxime.chevallier@bootlin.com>
 X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20190225161407.19510-1-maxime.chevallier@bootlin.com>
+References: <20190225161407.19510-1-maxime.chevallier@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_081422_506805_F6F6F6AF 
-X-CRM114-Status: UNSURE (   8.26  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190225_081422_475976_DE4C6631 
+X-CRM114-Status: GOOD (  11.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,23 +80,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Recent work on C45 helpers by Heiner made the
-genphy_c45_pma_read_abilities function generic enough to use as a
-default .get_featutes implementation.
+Contrary to the 3310, the 2110 PHY correctly reports it's 2.5G/5G
+abilities. We can therefore use the genphy_c45_pma_read_abilities helper
+to build the list of features.
 
-This series removes the remaining redundant code in
-mv3310_get_features(), and makes the 2110 PHY use
-genphy_c45_pma_read_abilities() directly, since it doesn't have the
-issue with the wrong abilities being reported.
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+---
+ drivers/net/phy/marvell10g.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Maxime Chevallier (2):
-  net: phy: marvell10g: Let genphy_c45_pma_read_abilities set Aneg bit
-  net: phy: marvell10g: Use the generic C45 helper to read the 2110
-    features
-
- drivers/net/phy/marvell10g.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
-
+diff --git a/drivers/net/phy/marvell10g.c b/drivers/net/phy/marvell10g.c
+index ab71da55c1e0..79106e70010f 100644
+--- a/drivers/net/phy/marvell10g.c
++++ b/drivers/net/phy/marvell10g.c
+@@ -472,7 +472,7 @@ static struct phy_driver mv3310_drivers[] = {
+ 		.phy_id		= MARVELL_PHY_ID_88E2110,
+ 		.phy_id_mask	= MARVELL_PHY_ID_MASK,
+ 		.name		= "mv88x2110",
+-		.features	= PHY_10GBIT_FEATURES,
++		.get_features	= genphy_c45_pma_read_abilities,
+ 		.probe		= mv3310_probe,
+ 		.soft_reset	= gen10g_no_soft_reset,
+ 		.config_init	= mv3310_config_init,
 -- 
 2.19.2
 
