@@ -2,65 +2,62 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8546BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95A44C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 54FEE20651
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63FAF20651
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 15:49:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ln53/Mdb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54FEE20651
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H1NUK1Hy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63FAF20651
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jEMMPjkVEhqTiqWBz3WrBcHiqDbA2/AU5qhmK9k7GUc=; b=Ln53/MdbTEzIE1
-	fym3I5JdF5MQ9vHmxWK3Z+zE/9JpTSwI8yFdUOsWrU3Qs79pfB256Hub1bAAnJkVh7q8loPMuk+7j
-	nWGcLX3/XcJzjqqEBvyb3cezf/f/eg0BoVLGUnIrGSTv4voTVplbW2luHswDCJWUr3g9Mpi4bZ3/3
-	C75J1UYDZreJ1AGCBPc8ua1cZzq/rCYK2wfGdKFIpcM25xx7dX3vg3/8VYHYmqjf5RQPGqLVbLU2E
-	BWRWZe7xr3LA2b40pToqoijNzb2Jnvx+X39S2gY2kJmd1rOoFRpb5nNmrCpoonqvNrjx4fjbl/XW5
-	tMiB9dEiO/onsbWS0Bjg==;
+	List-Owner; bh=JWjMS2/ilIzmrt5tvK5e9rw1ggs9QjZadFsRH1+tVnw=; b=H1NUK1HyQ9lqVQ
+	nh9R2HAwEqfE+QvJRcwFr7MeYb0hduNtKrr2/sU0LQ3OZfq0MDxvj+f5kKEkqCnfszdvRrZUvgq8e
+	Q5mhn3ogYFhMRXOzGh4Mrhya2L0W89qCy+OKOLwUmj7Lv0X1dt64lzY58Y2u7VahDpos3t500VSVX
+	XNNpoLAmit36xaoBfZ/EBsk71BSa2BoNm3uLSKe34093lSclnx7q0lCFX+3PgZpPPid+CShUe2Mhs
+	m06oC1v01l5P+LiSMjO4VBsVihKs2t9PUw7arSGoiJ2Q1Hkvi5ky3vcla6FfU8gojAzs1J8JZPDNm
+	FAyB2Exns46IavhYgHqg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyIVW-00010R-Fl; Mon, 25 Feb 2019 15:49:30 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyIVT-0000zo-3f
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 15:49:28 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ABBE380D;
- Mon, 25 Feb 2019 07:49:26 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0D5CD3F703;
- Mon, 25 Feb 2019 07:49:24 -0800 (PST)
-Date: Mon, 25 Feb 2019 15:49:22 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Anshuman Khandual <anshuman.khandual@arm.com>
-Subject: Re: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
- stage-2 page tables
-Message-ID: <20190225154922.GJ26236@lakrids.cambridge.arm.com>
-References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
- <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
- <20190225110014.GB26236@lakrids.cambridge.arm.com>
- <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
+	id 1gyIVs-0001GQ-Ea; Mon, 25 Feb 2019 15:49:52 +0000
+Received: from relay7-d.mail.gandi.net ([217.70.183.200])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyIVo-0001Fa-Hc; Mon, 25 Feb 2019 15:49:50 +0000
+X-Originating-IP: 90.88.23.190
+Received: from xps13 (aaubervilliers-681-1-81-190.w90-88.abo.wanadoo.fr
+ [90.88.23.190]) (Authenticated sender: miquel.raynal@bootlin.com)
+ by relay7-d.mail.gandi.net (Postfix) with ESMTPSA id 65E0320011;
+ Mon, 25 Feb 2019 15:49:34 +0000 (UTC)
+Date: Mon, 25 Feb 2019 16:49:33 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Boris Brezillon <bbrezillon@kernel.org>
+Subject: Re: [RFC PATCH 20/27] mtd: nand: Let software ECC engines be
+ retrieved from the NAND core
+Message-ID: <20190225164933.4b0e1489@xps13>
+In-Reply-To: <20190222152957.737a8c5c@kernel.org>
+References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
+ <20190221125806.28875-8-miquel.raynal@bootlin.com>
+ <20190222152957.737a8c5c@kernel.org>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
-User-Agent: Mutt/1.11.1+11 (2f07cb52) (2018-12-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_074927_156678_817823FB 
-X-CRM114-Status: GOOD (  18.57  )
+X-CRM114-CacheID: sfid-20190225_074948_879404_AFBC5563 
+X-CRM114-Status: GOOD (  21.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,80 +69,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: yuzhao@google.com, Steve.Capper@arm.com, marc.zyngier@arm.com,
- Catalin.Marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
- james.morse@arm.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
+ Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
+ Richard Weinberger <richard@nod.at>,
+ Schrempf Frieder <frieder.schrempf@kontron.de>,
+ Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Brian Norris <computersforpeace@gmail.com>,
+ David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Feb 25, 2019 at 07:50:27PM +0530, Anshuman Khandual wrote:
-> 
-> 
-> On 02/25/2019 04:30 PM, Mark Rutland wrote:
-> > Hi Anshuman,
-> > 
-> > On Mon, Feb 25, 2019 at 10:33:54AM +0530, Anshuman Khandual wrote:
-> >> ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
-> >> constructs. Certain stage-2 page table allocations are multi order which
-> >> cannot be allocated through a generic pgtable function as it does not exist
-> >> right now. This prevents all pgtable allocations including multi order ones
-> >> in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
-> >> functions. Hence remove all generic pgtable allocation function dependency
-> >> from stage-2 page tables till there is one multi-order allocation function
-> >> available.
-> > 
-> > I'm a bit confused by this. Which allocations are multi-order?
-> > 
-> 
-> Stage-2 PGD.
-> 
-> kvm_alloc_stage2_pgd -> alloc_pages_exact
-> kvm_free_stage2_pgd -> free_pages_exact
->  
-> > Why does that prevent other allcoations from using the regular routines?
-> 
-> At present both stage-2 PGD (kvm_alloc_stage2_pgd -> alloc_pages_exact), PUD|PMD
-> (mmu_memory_cache_alloc) allocates directly from buddy allocator but then while
-> freeing back stage-2 PGD directly calls buddy allocator via free_pages_exact but
-> PUD|PMD get freed with stage2_[pud|pmd]_free which calls pud|pmd_free instead
-> of calling free_pages() directly.
-
-If we allocate/free the stage-2 PGD with {alloc,free}_pages_exact(),
-then the PGD level is balanced today.
-
-I don't see what that has to do with the other levels of table.
-
-> All of these worked fine because pud|pmd_free called free_pages() directly with
-> out going through pgtable_page_dtor(). But now we are changing pud|pmd_free to
-> use pgtable_page_dtor() both for user and host kernel page tables. This will
-> break stage2 page table (bad page state errors) because the new free path which
-> would call pgtable_page_dtor() where as alloc patch never called pgtable_page_ctor().
-
-I'm lost as to how that relates to the alloc/free of the PGD. AFAICT,
-that's unrelated to the problem at hand.
-
-What subtlety am I missing?
-
-> To fix this situation either we move all stage-2 page table to use pte_alloc_one()
-> and pte_free() which goes through pgtable_page_ctor/dtor cycle or just keep the
-> virtualization page tables out of it (stage2/hyp) and remove the only dependency
-> which breaks because of these changes. This series went with the second option. 
-
-It sounds to me like this is just a mismatch between the alloc/free
-paths for the PUD and PMD levels of table.
-
-IIUC, we allocate those with {pmd,pud}_alloc_one(), and free them with
-stage2_{pud,pmd}_free(), which call {pud,pmd}_free().
-
-I would naively expect p?d_alloc_one() to pair with p?d_free(), so that
-being a problem is surprising to me.
-
-Thanks,
-Mark.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgQm9yaXMsCgpCb3JpcyBCcmV6aWxsb24gPGJicmV6aWxsb25Aa2VybmVsLm9yZz4gd3JvdGUg
+b24gRnJpLCAyMiBGZWIgMjAxOQoxNToyOTo1NyArMDEwMDoKCj4gT24gVGh1LCAyMSBGZWIgMjAx
+OSAxMzo1Nzo1OSArMDEwMAo+IE1pcXVlbCBSYXluYWwgPG1pcXVlbC5yYXluYWxAYm9vdGxpbi5j
+b20+IHdyb3RlOgo+IAo+ID4gQmVmb3JlIG1ha2luZyB1c2Ugb2YgdGhlIEVDQyBlbmdpbmVzLCB3
+ZSBtdXN0IHJldHJpZXZlIHRoZW0uIEFkZCB0aGUKPiA+IGJvaWxlcnBsYXRlIGZvciB0aGUgb25l
+cyBhbHJlYWR5IGF2YWlsYWJsZTogc29mdHdhcmUgZW5naW5lcyAoSGFtbWluZwo+ID4gYW5kIEJD
+SCkuCj4gPiAKPiA+IFNpZ25lZC1vZmYtYnk6IE1pcXVlbCBSYXluYWwgPG1pcXVlbC5yYXluYWxA
+Ym9vdGxpbi5jb20+Cj4gPiAtLS0KPiA+ICBkcml2ZXJzL210ZC9uYW5kL2VjYy9lbmdpbmUuYyAg
+ICAgICAgICAgICAgfCAxNCArKysrKysrKysrKysrKwo+ID4gIGluY2x1ZGUvbGludXgvbXRkL25h
+bmQtc3ctYmNoLWVuZ2luZS5oICAgICB8ICAzICsrKwo+ID4gIGluY2x1ZGUvbGludXgvbXRkL25h
+bmQtc3ctaGFtbWluZy1lbmdpbmUuaCB8ICAzICsrKwo+ID4gIGluY2x1ZGUvbGludXgvbXRkL25h
+bmQuaCAgICAgICAgICAgICAgICAgICB8ICAzICsrKwo+ID4gIDQgZmlsZXMgY2hhbmdlZCwgMjMg
+aW5zZXJ0aW9ucygrKQo+ID4gCj4gPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy9tdGQvbmFuZC9lY2Mv
+ZW5naW5lLmMgYi9kcml2ZXJzL210ZC9uYW5kL2VjYy9lbmdpbmUuYwo+ID4gaW5kZXggN2RkM2Y5
+NzcyNjk4Li4zMThkYmIyZDU2YTIgMTAwNjQ0Cj4gPiAtLS0gYS9kcml2ZXJzL210ZC9uYW5kL2Vj
+Yy9lbmdpbmUuYwo+ID4gKysrIGIvZHJpdmVycy9tdGQvbmFuZC9lY2MvZW5naW5lLmMKPiA+IEBA
+IC0yODYsNiArMjg2LDIwIEBAIGJvb2wgbmFuZF9lY2NfY29ycmVjdGlvbl9pc19lbm91Z2goc3Ry
+dWN0IG5hbmRfZGV2aWNlICpuYW5kKQo+ID4gIAlyZXR1cm4gY29yciA+PSBkc19jb3JyICYmIGNv
+bmYtPnN0cmVuZ3RoID49IHJlcXMtPnN0cmVuZ3RoOwo+ID4gIH0KPiA+ICAKPiA+ICtzdHJ1Y3Qg
+bmFuZF9lY2NfZW5naW5lICpuYW5kX2VjY19zd19nZXRfZW5naW5lKHN0cnVjdCBuYW5kX2Rldmlj
+ZSAqbmFuZCkgIAo+IAo+IFdoYXQgaWYgeW91IHdhbnQgdG8gaW5zdGFudGlhdGUgU1cgRUNDIHdp
+dGggYSBjdXN0b20gbGF5b3V0PyBDYW4ndCB3ZQo+IGluc3RlYWQgaGF2ZSBhIGZ1bmN0aW9uIHRo
+YXQgY3JlYXRlIGEgbmV3IGVuZ2luZSBkeW5hbWljYWxseT8KPiAKPiBzdHJ1Y3QgbmFuZF9lY2Nf
+ZW5naW5lICoKPiBuYW5kX2VjY19jcmVhdGVfc3dfZW5naW5lKHN0cnVjdCBuYW5kX2RldmljZSog
+bmFuZCwKPiAJCQkgIGVudW0gbmFuZF9lY2NfYWxnbyBhbGdvLAo+IAkJCSAgc3RydWN0IG10ZF9v
+b2JsYXlvdXQgKmxheW91dCk7Cj4gCj4gCgpSaWdodCBub3csIGZvciBib3RoIHN3IGVuZ2luZXMs
+IGEgZGVmYXVsdCBsYXlvdXQgaXMgYXBwbGllZCBpZiB0aGVyZSBpcwpub25lIGF0IGVuZ2luZSBp
+bml0aWFsaXphdGlvbiB0aW1lLgoKQWxzbywgZG8gd2UgcmVhbGx5IG5lZWQgYSAiY3JlYXRlIiBo
+ZWxwZXI/IEkgZG9uJ3Qgc2VlIHdoYXQncyBjcmVhdGVkCnRoZXJlLiBNYXliZSB5b3UgaGFkIHNv
+bWV0aGluZyBlbHNlIGluIG1pbmQsIGFuZCB0aGUKZWNjX3N3X3h4eF9nZXRfZW5naW5lKCkgYXBw
+cm9hY2ggZG8gbm90IG1hdGNoIHdoYXQgeW91IGV4cGVjdGVkLCBzbwpwbGVhc2UgdGVsbCBtZSBt
+b3JlIGFib3V0IHlvdXIgaWRlYSwgb3RoZXJ3aXNlIEkgZG9uJ3Qgc2VlIHdoYXQgYQpuYW5kX2Vj
+Y19jcmVhdGVfc3dfZW5naW5lKCkgd291bGQgYnJpbmcuCgo+IAo+ID4gK3sKPiA+ICsJc3dpdGNo
+IChuYW5kLT5lY2MudXNlcl9jb25mLmFsZ28pIHsgIAo+IAo+IE5vdGUgdGhhdCB0aGUgY29uZiBp
+cyBzdXBwb3NlZCB0byBiZSBwYXNzZWQgYWZ0ZXJ3YXJkcywgd2hlbiB0aGUgY3R4IGlzCj4gY3Jl
+YXRlZCwgc28geW91IHNob3VsZCBjaGVjayBuYW5kLT5lY2MudXNlcl9jb25mIGRpcmVjdGx5IGhl
+cmUuCgpJIHRoaW5rIHRoaXMgaXMgd2hhdCBJIGRvIHNvIEkgc3VzcGVjdCB0aGUgYWJvdmUgc2Vu
+dGVuY2UgaXMgbm90IHdoYXQKeW91IGFjdHVhbGx5IG1lYW50PwoKPiAKPiA+ICsJY2FzZSBOQU5E
+X0VDQ19IQU1NSU5HOgo+ID4gKwkJcmV0dXJuIGVjY19zd19oYW1taW5nX2dldF9lbmdpbmUoKTsK
+PiA+ICsJY2FzZSBOQU5EX0VDQ19CQ0g6Cj4gPiArCQlyZXR1cm4gZWNjX3N3X2JjaF9nZXRfZW5n
+aW5lKCk7Cj4gPiArCWRlZmF1bHQ6Cj4gPiArCQlicmVhazsKPiA+ICsJfQo+ID4gKwo+ID4gKwly
+ZXR1cm4gTlVMTDsKPiA+ICt9Cj4gPiArCj4gPiAgTU9EVUxFX0xJQ0VOU0UoIkdQTCB2MiIpOwo+
+ID4gIE1PRFVMRV9BVVRIT1IoIk1pcXVlbCBSYXluYWwgPG1pcXVlbC5yYXluYWxAYm9vdGxpbi5j
+b20+Iik7Cj4gPiAgTU9EVUxFX0RFU0NSSVBUSU9OKCJHZW5lcmljIEVDQyBlbmdpbmUiKTsKPiA+
+IGRpZmYgLS1naXQgYS9pbmNsdWRlL2xpbnV4L210ZC9uYW5kLXN3LWJjaC1lbmdpbmUuaCBiL2lu
+Y2x1ZGUvbGludXgvbXRkL25hbmQtc3ctYmNoLWVuZ2luZS5oCj4gPiBpbmRleCBlNDA2YWE1M2Vj
+NGUuLjM4Y2RhZDExN2ZlYSAxMDA2NDQKPiA+IC0tLSBhL2luY2x1ZGUvbGludXgvbXRkL25hbmQt
+c3ctYmNoLWVuZ2luZS5oCj4gPiArKysgYi9pbmNsdWRlL2xpbnV4L210ZC9uYW5kLXN3LWJjaC1l
+bmdpbmUuaAo+ID4gQEAgLTExLDYgKzExLDkgQEAKPiA+ICAjaW5jbHVkZSA8bGludXgvbXRkL25h
+bmQuaD4KPiA+ICAjaW5jbHVkZSA8bGludXgvYmNoLmg+Cj4gPiAgCj4gPiArLyogTmVlZGVkIGZv
+ciBjcm9zcyBpbmNsdXNpb24gd2l0aCBuYW5kLmggKi8KPiA+ICtzdHJ1Y3QgbmFuZF9kZXZpY2U7
+Cj4gPiArCj4gPiAgLyoqCj4gPiAgICogc3RydWN0IGVjY19zd19iY2hfY29uZiAtIHByaXZhdGUg
+c29mdHdhcmUgQkNIIEVDQyBlbmdpbmUgc3RydWN0dXJlCj4gPiAgICogQHJlcW9vYmxlbjogU2F2
+ZSB0aGUgYWN0dWFsIHVzZXIgT09CIGxlbmd0aCByZXF1ZXN0ZWQgYmVmb3JlIG92ZXJ3cml0aW5n
+IGl0Cj4gPiBkaWZmIC0tZ2l0IGEvaW5jbHVkZS9saW51eC9tdGQvbmFuZC1zdy1oYW1taW5nLWVu
+Z2luZS5oIGIvaW5jbHVkZS9saW51eC9tdGQvbmFuZC1zdy1oYW1taW5nLWVuZ2luZS5oCj4gPiBp
+bmRleCA4ZGYzNmQxODk0ODIuLjUxYzVhMmFjZWU0MiAxMDA2NDQKPiA+IC0tLSBhL2luY2x1ZGUv
+bGludXgvbXRkL25hbmQtc3ctaGFtbWluZy1lbmdpbmUuaAo+ID4gKysrIGIvaW5jbHVkZS9saW51
+eC9tdGQvbmFuZC1zdy1oYW1taW5nLWVuZ2luZS5oCj4gPiBAQCAtMTIsNiArMTIsOSBAQAo+ID4g
+IAo+ID4gICNpbmNsdWRlIDxsaW51eC9tdGQvbmFuZC5oPgo+ID4gIAo+ID4gKy8qIE5lZWRlZCBm
+b3IgY3Jvc3MgaW5jbHVzaW9uIHdpdGggbmFuZC5oICovCj4gPiArc3RydWN0IG5hbmRfZGV2aWNl
+Owo+ID4gKwo+ID4gIC8qKgo+ID4gICAqIHN0cnVjdCBlY2Nfc3dfaGFtbWluZ19jb25mIC0gcHJp
+dmF0ZSBzb2Z0d2FyZSBIYW1taW5nIEVDQyBlbmdpbmUgc3RydWN0dXJlCj4gPiAgICogQHJlcW9v
+YmxlbjogU2F2ZSB0aGUgYWN0dWFsIHVzZXIgT09CIGxlbmd0aCByZXF1ZXN0ZWQgYmVmb3JlIG92
+ZXJ3cml0aW5nIGl0Cj4gPiBkaWZmIC0tZ2l0IGEvaW5jbHVkZS9saW51eC9tdGQvbmFuZC5oIGIv
+aW5jbHVkZS9saW51eC9tdGQvbmFuZC5oCj4gPiBpbmRleCA0NDgyZWIyYmJmZDQuLjNhYmUxMTNl
+NGYwNiAxMDA2NDQKPiA+IC0tLSBhL2luY2x1ZGUvbGludXgvbXRkL25hbmQuaAo+ID4gKysrIGIv
+aW5jbHVkZS9saW51eC9tdGQvbmFuZC5oCj4gPiBAQCAtMTEsNiArMTEsOCBAQAo+ID4gICNkZWZp
+bmUgX19MSU5VWF9NVERfTkFORF9ICj4gPiAgCj4gPiAgI2luY2x1ZGUgPGxpbnV4L210ZC9tdGQu
+aD4KPiA+ICsjaW5jbHVkZSA8bGludXgvbXRkL25hbmQtc3ctaGFtbWluZy1lbmdpbmUuaD4KPiA+
+ICsjaW5jbHVkZSA8bGludXgvbXRkL25hbmQtc3ctYmNoLWVuZ2luZS5oPgo+ID4gIAo+ID4gIHN0
+cnVjdCBuYW5kX2RldmljZTsKPiA+ICAKPiA+IEBAIC0yNTMsNiArMjU1LDcgQEAgc3RydWN0IG5h
+bmRfZWNjX2VuZ2luZSB7Cj4gPiAgfTsKPiA+ICAKPiA+ICB2b2lkIG5hbmRfZWNjX3JlYWRfdXNl
+cl9jb25mKHN0cnVjdCBuYW5kX2RldmljZSAqbmFuZCk7Cj4gPiArc3RydWN0IG5hbmRfZWNjX2Vu
+Z2luZSAqbmFuZF9lY2Nfc3dfZ2V0X2VuZ2luZShzdHJ1Y3QgbmFuZF9kZXZpY2UgKm5hbmQpOwo+
+ID4gIGludCBuYW5kX2VjY19pbml0X2N0eChzdHJ1Y3QgbmFuZF9kZXZpY2UgKm5hbmQpOwo+ID4g
+IHZvaWQgbmFuZF9lY2NfY2xlYW51cF9jdHgoc3RydWN0IG5hbmRfZGV2aWNlICpuYW5kKTsKPiA+
+ICBpbnQgbmFuZF9lY2NfcHJlcGFyZV9pb19yZXEoc3RydWN0IG5hbmRfZGV2aWNlICpuYW5kLCAg
+Cj4gCgoKCgpUaGFua3MsCk1pcXXDqGwKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1r
+ZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWls
+bWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
