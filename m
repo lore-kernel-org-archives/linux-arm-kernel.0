@@ -2,58 +2,63 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.1 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5A45C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D27EC10F00
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 80C8E2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D03682087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 05:04:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="guvwnYGU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80C8E2087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m/siBvJ+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D03682087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=XfY7mkEcmQ5j+fH2tstsblb+XPrg6ff11jOtONYkjE0=; b=guv
-	wnYGU3wiZam2K1jis4aJZTN15DAeTSqi5knQ7PcgJGaQfW50HkdvGyjmxINfMg/A9JReC8EhI/iL3
-	NZAUNPcbWZu8jp4rGWqoHw9xyoagPfNbmm93vC1n7W1Yc9X+J3q+sULgfpkmlWfIa8p1heYm2PQwl
-	8CS3jrN1gJxv1zf9mkNwClSufSnH8kOY9YAfrSgCLKhyzmUKem1mZjDil1Hk1lx+JonAv+/J2FVIL
-	AfRe143hK/Bh6B8NfpKhSBYZXF9Yjgj8AsqJeJFSsj7qVP7iHMC/lKsZmY+HfG7Xjpu3aMWhabnPZ
-	6PfVoIgK+q1b4AjkFw3AFDfkRPaiqNQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=6Ad4jmJZAX0i9FEysHYIB8WX8ieOkDK/jmc1uU0VWa4=; b=m/siBvJ+UBIliXJusVeh9K06af
+	imo1J9PvxuJMRkcbuofNDIpjVfUs8El3L7Y3Qt6PcDHycKr4crE0MdrUJUcALYm6puy9do/qkpJWT
+	C8MALUPkezP2ay915+Ng8hrIS2AbhifbAzrgauyp5G4h+dLnZQO2mm/i4GW4Lir3rnehEKmCTzZJa
+	Wm3+lBZyFUqAxIQExC+zC8QuzYDxtY+vNEETQJAE+MyqjGo1+6N08wEOWoFQNfCQYD44YFlx/ndSA
+	6/6APZfhsJywSMOeGy4kN+31HabA1HVuVTKqHRUCN1ss+i+YEUnsqj1fKT+020LsTh+EkNj6nZzwO
+	0PF0Baqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gy8RA-0006I7-LQ; Mon, 25 Feb 2019 05:04:20 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gy8R4-0006AA-3i; Mon, 25 Feb 2019 05:04:14 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gy8R0-000692-3w
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:12 +0000
+ id 1gy8R0-000698-4T
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 05:04:11 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B016F80D;
- Sun, 24 Feb 2019 21:04:02 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0F5C31596;
+ Sun, 24 Feb 2019 21:04:06 -0800 (PST)
 Received: from p8cg001049571a15.blr.arm.com (p8cg001049571a15.blr.arm.com
  [10.162.42.159])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D0B9A3F5C1;
- Sun, 24 Feb 2019 21:03:59 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 307A03F5C1;
+ Sun, 24 Feb 2019 21:04:02 -0800 (PST)
 From: Anshuman Khandual <anshuman.khandual@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH V2 0/6] arm64/mm: Enable accounting for page table pages
-Date: Mon, 25 Feb 2019 10:33:53 +0530
-Message-Id: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
+Subject: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
+ stage-2 page tables
+Date: Mon, 25 Feb 2019 10:33:54 +0530
+Message-Id: <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
+References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190224_210410_166781_B58F63A4 
-X-CRM114-Status: UNSURE (   9.93  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190224_210410_174889_593D119B 
+X-CRM114-Status: GOOD (  11.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,56 +79,64 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently page table page allocation and release has multiple combinations
-for user space and kernel mapping page tables. Not only this is vulnerable
-for bad page state errors it also prevents accurate accounting for those
-pages through NR_PAGETABLE. This patch series attempts to standardize all
-(except PGD slab cache 'pdg_cache') page table page allocation and release
-through pte_alloc_one()/pte_free() which in turn guarantees that all these
-pages will go trough pgtable_page_[ctor|dtor] constructs. It also takes
-care of some of the pages who might have been allocated early via memblock.
+ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
+constructs. Certain stage-2 page table allocations are multi order which
+cannot be allocated through a generic pgtable function as it does not exist
+right now. This prevents all pgtable allocations including multi order ones
+in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
+functions. Hence remove all generic pgtable allocation function dependency
+from stage-2 page tables till there is one multi-order allocation function
+available.
 
-This enables memcg based accounting for user process page table pages via
-__GFP_ACCOUNT. For now this also removes standard ptable page allocators
-usage from KVM stage-2 as some of them use multi order allocation which is
-not supported in a generic way.
+Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
+---
+ arch/arm/include/asm/stage2_pgtable.h   | 4 ++--
+ arch/arm64/include/asm/stage2_pgtable.h | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-While here, enable ARCH_ENABLE_SPLIT_PMD_PTLOCK which can improve memory
-scalability on larger systems. This enablement was first proposed [1] by
-Yu Zhao using generic pgtable_pmd_page_ctor() which does not take zone stat
-and page state into account. Hence the current proposal tries to merge both
-through an arm64 specific helper pgtable_pmd_page_ctor_workaround() which
-should eventually be dropped once we fix generic functions.
-
-[1] https://patchwork.kernel.org/patch/10813793/
-
-Changes in V2:
-
-- Created temporary page structures in __[pmd|pud]_free_tlb per Will
-- Incorporated efi_mm while determining pgtable allocation flag per Will
-- Dropped parts of commit message from patch 'arm64/mm: Make all page table pages'
-- Dropped patch 'arm64/mm: Ensure PGD kmem cache object is actually allocated'
-- Added new patch 'arm64/mm: Enable ARCH_ENABLE_SPLIT_PMD_PTLOCK'
-
-V1: https://www.spinics.net/lists/arm-kernel/msg701954.html
-
-Anshuman Khandual (6):
-  KVM: ARM: Remove pgtable standard functions from stage-2 page tables
-  arm64/mm: Make pgd_pgtable_alloc() call pte_alloc_one() always
-  arm64/mm: Make all page table pages cycles through standard constructs
-  arm64/mm: Call pgtable_page_dtor() for both PMD and PUD page table pages
-  arm64/mm: Enable page table page accounting for user space
-  arm64/mm: Enable ARCH_ENABLE_SPLIT_PMD_PTLOCK
-
- arch/arm/include/asm/stage2_pgtable.h   |  4 +-
- arch/arm64/Kconfig                      |  4 ++
- arch/arm64/include/asm/pgalloc.h        | 95 ++++++++++++++++++++++---
- arch/arm64/include/asm/stage2_pgtable.h |  4 +-
- arch/arm64/include/asm/tlb.h            |  6 ++
- arch/arm64/mm/mmu.c                     | 17 +++--
- arch/arm64/mm/pgd.c                     |  4 +-
- 7 files changed, 115 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
+index de2089501b8b..417a3be00718 100644
+--- a/arch/arm/include/asm/stage2_pgtable.h
++++ b/arch/arm/include/asm/stage2_pgtable.h
+@@ -32,14 +32,14 @@
+ #define stage2_pgd_present(kvm, pgd)		pgd_present(pgd)
+ #define stage2_pgd_populate(kvm, pgd, pud)	pgd_populate(NULL, pgd, pud)
+ #define stage2_pud_offset(kvm, pgd, address)	pud_offset(pgd, address)
+-#define stage2_pud_free(kvm, pud)		pud_free(NULL, pud)
++#define stage2_pud_free(kvm, pud)		free_page((unsigned long)pud)
+ 
+ #define stage2_pud_none(kvm, pud)		pud_none(pud)
+ #define stage2_pud_clear(kvm, pud)		pud_clear(pud)
+ #define stage2_pud_present(kvm, pud)		pud_present(pud)
+ #define stage2_pud_populate(kvm, pud, pmd)	pud_populate(NULL, pud, pmd)
+ #define stage2_pmd_offset(kvm, pud, address)	pmd_offset(pud, address)
+-#define stage2_pmd_free(kvm, pmd)		pmd_free(NULL, pmd)
++#define stage2_pmd_free(kvm, pmd)		free_page((unsigned long)pmd)
+ 
+ #define stage2_pud_huge(kvm, pud)		pud_huge(pud)
+ 
+diff --git a/arch/arm64/include/asm/stage2_pgtable.h b/arch/arm64/include/asm/stage2_pgtable.h
+index 5412fa40825e..915809e4ac32 100644
+--- a/arch/arm64/include/asm/stage2_pgtable.h
++++ b/arch/arm64/include/asm/stage2_pgtable.h
+@@ -119,7 +119,7 @@ static inline pud_t *stage2_pud_offset(struct kvm *kvm,
+ static inline void stage2_pud_free(struct kvm *kvm, pud_t *pud)
+ {
+ 	if (kvm_stage2_has_pud(kvm))
+-		pud_free(NULL, pud);
++		free_page((unsigned long)pud);
+ }
+ 
+ static inline bool stage2_pud_table_empty(struct kvm *kvm, pud_t *pudp)
+@@ -192,7 +192,7 @@ static inline pmd_t *stage2_pmd_offset(struct kvm *kvm,
+ static inline void stage2_pmd_free(struct kvm *kvm, pmd_t *pmd)
+ {
+ 	if (kvm_stage2_has_pmd(kvm))
+-		pmd_free(NULL, pmd);
++		free_page((unsigned long)pmd);
+ }
+ 
+ static inline bool stage2_pud_huge(struct kvm *kvm, pud_t pud)
 -- 
 2.20.1
 
