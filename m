@@ -2,69 +2,113 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 69453C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 19:46:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EC71C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 20:59:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 41CE72084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 19:46:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5FE2D20842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 20:59:10 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nbNaKpv6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vqwvKaDJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41CE72084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qjLrpOqX";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="DEyveKSv";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="o9gjqnJJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5FE2D20842
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Message-ID:Subject:To:From:
-	References:In-Reply-To:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aquAd8CvRRhugOmzt5qb1OK6r5UQzH5HwIspEA6QyiA=; b=nbNaKpv6opgb7L
-	foA+GFN+BNDdYpsPPLJBhgQ74MBTJCLPJYhHtpp3utkejK7T+EI+aezmCD/Phc0yzAgyHOhA8maeH
-	2o725a6yGHhF7y2NY9B0E7XHO15Dsr3n32dTWYOP52aPo7YPvj1JPMbIrxe6oT+sudVcXQPPJBm4E
-	mGvAqw5II7r8x3+at5d75MCmvxVdHtDQPI5AS+VTEkhj0fz+J1H91bUBN8i+YvOgbVmUEmGGbQU6O
-	MmTKtq08Y0jEOtHUG5OHcxOSX3c4K25JJvhgSXA0p9mTlNnFgXoFPBb8UwRsRQPTHz45PXMLWkq/E
-	a3zXxfklIiLhBLfdSIEQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=FEusP9AdMcTM0mKUimSvTPV9qAPnsHEo6//+fgmj91E=; b=qjLrpOqX7Mz+ay75E0fPEfiMa
+	ji440mMNaRaU02F2vymfbkqlwV6DYyKyQXWV4pQJIPfJWp+IiivczImhfRJtUreK2uN3pXqC5S7hX
+	YKYDDWv9UWK3JkwekhSzkyeIEIPZdqyn6WKiRu0uNJOuOdGiJckIiWjTdmhXzBovntHIyNqOQZs2h
+	kcfx15NPGD9l4Qca4vYzuJ0hFQ0eZiHXTT5GCFMRVXKh3VMNJc2jOpjB5I4gaXI0whFb7CLSHd+cK
+	pH7D5cnS72vrxJHvdu7nZaiDONQy53OeNBJbvUekG8AS37d878Fk3OqRaghBNrZQ0IeE44TEMw5h3
+	YonMzKmog==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyMCh-0001WH-GF; Mon, 25 Feb 2019 19:46:19 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gyNLA-0004ey-V6; Mon, 25 Feb 2019 20:59:08 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyMCe-0001Vv-1F
- for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 19:46:17 +0000
-Received: from localhost (unknown [104.132.1.66])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8F60F2084D;
- Mon, 25 Feb 2019 19:46:15 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1551123975;
- bh=SA2AA7ySpjPhChgWVLUp5vYKkEeRYksJa+vUzVxiNME=;
- h=In-Reply-To:References:Cc:From:To:Subject:Date:From;
- b=vqwvKaDJ0Zt/nv+Nn4xNHUUF4NpdlmpyOZdyv0zXDaVS8UO9H7SRtZgpZJSh7zaN0
- cZID4WIEfAsQZV1OM/ERrGtWDqyixgt8Q7iGUwSVRoK/nI4Euvizw4pdWLdYXyzENJ
- byzrCfKwBkuGWT4dE9KyEF3m0IT8Y844YOmiAD1c=
+ id 1gyNL9-0004er-4E
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 25 Feb 2019 20:59:07 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ In-Reply-To:MIME-Version:Date:Message-ID:From:References:Cc:To:Subject:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=; b=DEyveKSvyAF/BBL1rz/ZLfqzfE
+ 1W27igPqV70DoIrOG60F6EALuQ9sjhik21JVUNLOsfWVBvmrZR+xDASm511r7wNVrxl67y10QdeOV
+ taAljBaeB7yBryXAuAoTAaS1yafNjLlP3sB3AGIK1XXVRzfwQyZQ2lASJT+igPWkayT6xnvuiilRM
+ 73zC4GDED6oI9/ZFF7LtY9aTt1ixLeUoXPvnilnJEhFPnvuUAHECrr7nYBXyPRl0i590gfHJblNpU
+ xrMOohJsmgqpGSHpyEfAQWm9AXeqexDdPRYlP1Q2tg7gHXNxN9rwWjqPbrxViFQbSGgLsMdgHoXXO
+ iutIADxg==;
+Received: from mail-wm1-x331.google.com ([2a00:1450:4864:20::331])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyN2d-0001xH-3G
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 20:40:00 +0000
+Received: by mail-wm1-x331.google.com with SMTP id n19so291666wmi.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 25 Feb 2019 12:39:57 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=;
+ b=o9gjqnJJZ7PyKFRd/AhbVmlk0ALQg6hynrw1/yZPSPoeUI/0ZgcIInuEWdt/Ws3stV
+ IpXDfvus0eNTR20XuIJ0D1kS4a5QKEfcVua57JaAMNClSwUlheQsAIIPB8UrP5+e7zEu
+ 6DgFn3Oc8Sa/gFKBIeCmku4UvtVXKxBVMc1aFhAz9eqPjpJ1qSKE6s5YoxCo1k3IiUMg
+ Rmy62U77zPIICGnLkOcTks5jgYkaSFYDz/EyezLTbylcDij50GZ+iAjrFukRbPO3rSVL
+ zoDQZ2xT/KXPDkK5YzHLaGEtnFFb3aAepxd3QDbLsA8asTAmf45Mr9GCo1N+iAXXUu+a
+ 7NKg==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=OlMfOERKozt0qCMopgmfdQ2h0YOTELN011HcmqzEV9s=;
+ b=BCRM6t+1hXbi4cGST7kQI9vSDQcimcGaZkCCZeoSJY4Yzpg1JAEGPPvtWENhTBzKKC
+ dQ1wVGloSGmgy6eyGDeHv3nWW2/UYPRHwRLQp7whn75LYJqel0osWIc8BAG1F+7McY2M
+ qO7V+ZZOymPn4h8n8UMel9cb+S9gJRiionlPtX9LGVaoE9BEc/MlxXgtYviEZaealUFs
+ hXEf9tYsQzWb1wr3HhlPWvWwUX8ItCL7551/fUjZLYDBabLAdUAZ4fRnJZvpjw8/3z+g
+ dDdn03z7a8r2i6yFeaDQ9HAvXrGoEjox+/h/+/d0nAI87ZL34ZUBBc5Fx9G2OItH0EIr
+ 8eDw==
+X-Gm-Message-State: AHQUAuYIKFocfA/oWdarRe2kKh0PJ8kRIlxDKLv8rW1N18Pg4b8zdNsj
+ W7qItRpJxeuY/Ot2dZmglIfzqtco
+X-Google-Smtp-Source: AHgI3Iat2Vez/Yw8eQjcbBw0HXd/LW7bK4USr5BGZCbAyMoNRDQPiRHrX4XxQBKhmocYaD3FGT4uqw==
+X-Received: by 2002:a1c:30b:: with SMTP id 11mr380532wmd.110.1551127077093;
+ Mon, 25 Feb 2019 12:37:57 -0800 (PST)
+Received: from ?IPv6:2a02:810d:340:17ec::1b62? ([2a02:810d:340:17ec::1b62])
+ by smtp.gmail.com with ESMTPSA id v6sm13268375wrd.88.2019.02.25.12.37.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 25 Feb 2019 12:37:56 -0800 (PST)
+Subject: Re: Allwinner SID THS calibration data cell representation?
+To: Chen-Yu Tsai <wens@csie.org>, Maxime Ripard <maxime.ripard@bootlin.com>
+References: <20180830154518.29507-1-embed3d@gmail.com>
+ <20180830154518.29507-28-embed3d@gmail.com>
+ <20180904184623.e4386b8e6b657b1b25e90c09@bidouilliste.com>
+ <55579dd6-625d-e71b-1482-4592dccac665@gmail.com>
+ <20180906115114.inc6dhqhy47obo25@flea>
+ <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
+From: Philipp Rossak <embed3d@gmail.com>
+Message-ID: <dfbe9a71-ccab-2415-fe5b-6944df721bff@gmail.com>
+Date: Mon, 25 Feb 2019 21:37:55 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
 MIME-Version: 1.0
-In-Reply-To: <1550771836-10014-3-git-send-email-aisheng.dong@nxp.com>
-User-Agent: alot/0.8
-References: <1550771836-10014-1-git-send-email-aisheng.dong@nxp.com>
- <1550771836-10014-3-git-send-email-aisheng.dong@nxp.com>
-From: Stephen Boyd <sboyd@kernel.org>
-To: "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- Aisheng Dong <aisheng.dong@nxp.com>
-Subject: Re: [PATCH 2/4] dt-bindings: clock: imx-lpcg: add support to parse
- clocks from device tree
-Message-ID: <155112397472.191923.18309287020361500256@swboyd.mtv.corp.google.com>
-Date: Mon, 25 Feb 2019 11:46:14 -0800
+In-Reply-To: <CAGb2v65p0G83BVODsxxnXmiSCwuuwPFtY2k2ZV1F5xoFKrJjWQ@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_114616_110224_E0FC4BC8 
-X-CRM114-Status: GOOD (  17.95  )
+X-CRM114-CacheID: sfid-20190225_203959_189381_6E28625B 
+X-CRM114-Status: GOOD (  24.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,68 +120,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Aisheng Dong <aisheng.dong@nxp.com>, Rob Herring <robh@kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Emmanuel Vadot <manu@bidouilliste.com>,
+ Quentin Schulz <quentin.schulz@bootlin.com>, linux-iio@vger.kernel.org,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ linux-sunxi <linux-sunxi@googlegroups.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Jonathan Cameron <jic23@kernel.org>, Icenowy Zheng <icenowy@aosc.io>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Aisheng Dong (2019-02-21 10:03:47)
-> MX8QM and MX8QXP LPCG Clocks are mostly the same except they may reside
-> in different subsystems across CPUs and also vary a bit on the availability.
+
+
+On 19.02.19 08:54, Chen-Yu Tsai wrote:
+> Sorry for resurrecting an old discussion, but since someone posted patches
+> for H5 and H6, I thought we should resolve this. I'm working on patches to
+> fix / replace the big-endian issue.
 > 
-> Same as SCU clock, we want to move the clock definition into device tree
-> which can fully decouple the dependency of Clock ID definition from device
-> tree. And no frequent changes required in clock driver any more to handle
-> the difference.
+> On Thu, Sep 6, 2018 at 7:51 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>>
+>> On Thu, Sep 06, 2018 at 01:47:47PM +0200, Philipp Rossak wrote:
+>>> On 04.09.2018 18:46, Emmanuel Vadot wrote:
+>>>>> +                 /* Data cells */
+>>>>> +                 thermal_calibration: calib@234 {
+>>>>> +                         reg = <0x234 0x8>;
+>>>>> +                 };
+>>>>    You are declaring 8 bytes of calibration data but to my knowledge it's
+>>>> only 2 bytes per sensor, so 2 bytes for H3.
+>>>>    Am I missing something ?
+>>>>
+>>>>    Thanks,
+>>>
+>>> Emmanuel you are right, it is 2 bytes per Sensor and should be 2 bytes for
+>>> H3, but the thermal calibration data field is on all chips 64 bit wide - so
+>>> 8 bytes. So I'm reading here the complete calibration data field.
+>>
+>> Having one cell per channel would make more sense I guess.
 > 
-> We can use the existence of clock nodes in device tree to address the
-> device and clock availability differences across different SoCs.
+> Would it? The 2 32-bit words directly map onto the registers 0x74 / 0x78 in
+> the THS. As far as the SID is concerned, their is just one consumer for this
+> data, the thermal sensor. How the thermal sensor uses that data is really not
+> its concern. And the thermal sensor is really just copying the data from the
+> e-fuses into its registers. Nothing more.
 
-This sounds similar to what TI folks are doing with their new firmware.
-It leads to problems where we don't know what in the clk tree needs to
-be registered, debugfs is not super helpful in that case, and late init
-only turns off clks that are found during probe (so nothing then?).
-
+Using 2 32-bit words for the THS would be also ok (from my perspective).
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt b/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
-> index 965cfa4..a317844 100644
-> --- a/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
-> +++ b/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
-> @@ -11,6 +11,20 @@ enabled by these control bits, it might still not be running based
->  on the base resource.
->  
->  Required properties:
-> +- compatible:          Should be one of:
-> +                         "fsl,imx8qxp-lpcg"
-> +                         "fsl,imx8qm-lpcg" followed by "fsl,imx8qxp-lpcg".
-> +- reg:                 Address and length of the register set.
-> +- #clock-cells:                Should be 1. One LPCG supports multiple clocks.
-> +- clocks:              Input parent clocks phandle array for each clock.
-> +- bit-offset:          An integer array indicating the bit offset for each clock.
-> +- hw-autogate:         Boolean array indicating whether supports HW autogate for
-> +                       each clock.
+> Furthermore, with the register access interface, the e-fuses are read/write
+> 32 bits at a time. Seems to me it would make more sense to enforce a 32-bit
+> word size, so cells should be multiples of 32 bits.
+> 
+For THS I'm ok with that.
 
-This looks like one clk per node style of bindings which is a direction
-we don't want DT bindings to go in. It leads to a bunch of time parsing
-DT to generate clks and in general doesn't represent the clock
-controller hardware that is there. Basically, anything with 'bit-offset'
-in the binding is not going to be acceptable.
-
-> +- clock-output-names:  Shall be the corresponding names of the outputs.
-> +                       NOTE this property must be specified in the same order
-> +                       as the clock bit-offset and hw-autogate property.
-> +
-> +Legacy binding (DEPRECATED):
->  - compatible:  Should be one of:
->                   "fsl,imx8qxp-lpcg-adma",
+> Regards
+> ChenYu
+> 
+Regards,
+Philipp
 
 _______________________________________________
 linux-arm-kernel mailing list
