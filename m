@@ -2,66 +2,61 @@ Return-Path: <SRS0=iy7m=RA=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D054DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:58:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C966FC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 19:02:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A246D2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 18:58:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C5C520C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon, 25 Feb 2019 19:02:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kz4gu92G";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ySURJmiU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A246D2084D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oX/Tuyxw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C5C520C01
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nE+l0J8DBdQ6dIWdqE2azY8A9GzkfcnCCni0aGRuaRs=; b=kz4gu92GorMSCH
-	qjRwGFx5Qd3OQLr0mZ1oP/pVBKoJMfWjnBzyzcMw/OlMuZNjS3cEKfGfzXZT18ZblGgrptZ0ciDYx
-	kWsXcTrm/sSvmZ45oYkR1Zn3Hz7g2lQCc2iAjkZJSIsBhIipASdhnh++JZXqNT0NZyOlMKvyXJgUA
-	c+gB/hvo1EsOdUyZhcLJ1zmICC7TZOlDlKFlswdRBNkecQ4vGZl4ERB64fJ6gzBuwIghMROgPo+yW
-	Io29vE7t3BBnv3/iS1MhwCR1DDMABO23WmsZcE730zs4RxTw/DffrsnoztEsl87z7A/luahkHTzqU
-	Jy5rm4sCLIua/6DRgqEg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=aJLsiDfCaIwVagakKpY968wpg9YUfnM0JifRBD2RBuA=; b=oX/
+	Tuyxw6QTimnbxYaTqh2e8Uv2ByOZ2R2HdZIqa1Tvv82QIKNxce6986P5pjX1rhf7+9Ez3H7zLUrsN
+	iivlddzaFHpSbe9ygVu4rHlwYnmACDTSkmwbGZ0+AMutmAM9qEriTI9kGxpqW6zyZ7EeS9tcXlsA4
+	/DWIVy+FZP762r0Y0VhHwO9Z9wsx/0F0m4deabdMVFAba5O8D9oJTG40/KDx/THOUJm8GbgC+Ls0Y
+	B4xGLnHBP168/n8BTeXWzX2NqvIIfhG16+otgKMpybEg0rI0GRFhBOUN1K0mgebQOiEqIfST2/UCM
+	d8ZAkvSVw65u/VO2BEG4UdXiOPpk6jA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyLSk-0000oY-Am; Mon, 25 Feb 2019 18:58:50 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gyLWR-00039M-Md; Mon, 25 Feb 2019 19:02:39 +0000
+Received: from mga07.intel.com ([134.134.136.100])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyLSh-0000oC-Qq; Mon, 25 Feb 2019 18:58:49 +0000
-Received: from localhost (unknown [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id BE47C2084D;
- Mon, 25 Feb 2019 18:58:44 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1551121127;
- bh=6OwhA94VPuUzuGLlyDae0MNwBWGTKURwpr8z4WwA0sY=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=ySURJmiUdEX1hQgB9Qe7BrCXJ7Blb1jm6cAn1v6jyaEevNiBxIP1DIPU+Ju5HPDW6
- WxQTkz0YfeagzpAyAiEuy5ELqx2oWP9KMzEqGcvApLWNBf4BH5x4r4bhMIru8t6pHO
- GJ0zc+un5ZOneZM8ZaCrrWbllJ/pYgX+/LLOtoqw=
-Date: Mon, 25 Feb 2019 19:55:43 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [RFC PATCH 03/27] mtd: nand: Introduce the ECC engine abstraction
-Message-ID: <20190225195543.27799e77@kernel.org>
-In-Reply-To: <20190221100216.25255-4-miquel.raynal@bootlin.com>
-References: <20190221100216.25255-1-miquel.raynal@bootlin.com>
- <20190221100216.25255-4-miquel.raynal@bootlin.com>
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
-MIME-Version: 1.0
+ id 1gyLWO-000384-1J
+ for linux-arm-kernel@lists.infradead.org; Mon, 25 Feb 2019 19:02:37 +0000
+X-Amp-Result: SKIPPED(no attachment in message)
+X-Amp-File-Uploaded: False
+Received: from fmsmga008.fm.intel.com ([10.253.24.58])
+ by orsmga105.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
+ 25 Feb 2019 11:02:35 -0800
+X-ExtLoop1: 1
+X-IronPort-AV: E=Sophos;i="5.58,412,1544515200"; d="scan'208";a="127150058"
+Received: from tthayer-hp-z620.an.intel.com ([10.122.105.146])
+ by fmsmga008.fm.intel.com with ESMTP; 25 Feb 2019 11:02:33 -0800
+From: thor.thayer@linux.intel.com
+To: bp@alien8.de, dinguyen@kernel.org, linux@armlinux.org.uk,
+ mchehab@kernel.org, james.morse@arm.com
+Subject: [PATCHv2 0/2] Independent SOCFPGA SDRAM EDAC config
+Date: Mon, 25 Feb 2019 12:56:44 -0600
+Message-Id: <1551121006-4657-1-git-send-email-thor.thayer@linux.intel.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_105847_887792_CDAC97CF 
-X-CRM114-Status: GOOD (  13.72  )
+X-CRM114-CacheID: sfid-20190225_110236_130323_FA94BAC6 
+X-CRM114-Status: UNSURE (   7.27  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,58 +68,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
- Richard Weinberger <richard@nod.at>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Cc: thor.thayer@linux.intel.com, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 21 Feb 2019 11:01:52 +0100
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+From: Thor Thayer <thor.thayer@linux.intel.com>
 
-> +
-> +/**
-> + * struct nand_ecc_engine_ops - Generic ECC engine operations
-> + *
-> + * @init_ctx: given a desired user configuration for the pointed NAND device,
-> + *            requests the ECC engine driver to setup a configuration with
-> + *            values it supports.
-> + * @cleanup_ctx: clean the context initialized by @init_ctx.
-> + * @prepare_io_req: is called before reading/writing a page to prepare the I/O
-> + *                  request to be performed with ECC correction.
-> + * @finish_io_req: is called after reading/writing a page to terminate the I/O
-> + *                 request and ensure proper ECC correction.
-> + */
-> +struct nand_ecc_engine_ops {
+Most users want EDAC support so make it the default.
 
-We might want to add a
+SOCFPGA SDRAM EDAC reporting was enabled by the parent EDAC
+config (CONFIG_ALTERA_EDAC) since initial customers always
+wanted SDRAM EDAC enabled.
+There are cases where the SDRAM needs to be disabled while
+the other block EDACs remain enabled.
+This patch set 1) splits out the SDRAM EDAC into a separate
+config and 2) enables all the EDAC blocks by default for
+32 bit SOCFPGA.
 
-	void (*put_engine)(struct nand_ecc_engine *engine);
+V2 Changes
+  Rebase socfpga_defconfig against arm-soc/arm/defconfig
 
-here if we want the nanddev cleanup path to be generic.
-This hook would be implemented by drivers where the ECC engine object is
-refcounted (typically the case for HW ECC engines shared by the raw NAND
-controller and the SPI controller).
+Thor Thayer (2):
+  EDAC, altera: Add separate SDRAM EDAC config
+  ARM: socfpga_defconfig: enable EDAC by default
 
-Alternatively, you can just add one nand_put_xxx_ecc_engine() func per
-engine class (SW, ondie and HW).
+ arch/arm/configs/socfpga_defconfig | 12 +++++++
+ drivers/edac/Kconfig               | 14 ++++++--
+ drivers/edac/altera_edac.c         | 67 ++++++++++++++++++++------------------
+ 3 files changed, 59 insertions(+), 34 deletions(-)
 
-> +	int (*init_ctx)(struct nand_device *nand);
-> +	void (*cleanup_ctx)(struct nand_device *nand);
-> +	int (*prepare_io_req)(struct nand_device *nand,
-> +			      struct nand_page_io_req *req,
-> +			      void *oobbuf);
-> +	int (*finish_io_req)(struct nand_device *nand,
-> +			     struct nand_page_io_req *req,
-> +			     void *oobbuf);
-> +};
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
