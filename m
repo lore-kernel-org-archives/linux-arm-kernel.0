@@ -2,71 +2,64 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F20F8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 16:27:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A93EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 16:32:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B9E7D20C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 16:27:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 156472184D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 16:32:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LdMbzBHh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=sirena.org.uk header.i=@sirena.org.uk header.b="qQunmxXt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B9E7D20C01
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WAoi+7GU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 156472184D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Date:Message-Id:
-	In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	References:List-Owner; bh=o00pvSucyp5/VBa78n79uvHyGmtJICng1/tgeeUklBU=; b=LdM
-	bzBHhLfq37gBEL0a3uRUa34vbF8ETxjYUD93RB9VzEdvFdXrSRLAgLTK2U7wCrGBXddwj6Vlwd401
-	uWp24Zf6xmWc+Uk/iVqDhPsM4BZBNTA4uYjZU+ZK20k5sfZxbNTrnFIS17F0OR4jGWXazCo41uvPg
-	4ecBHlk4RhJpr7kMBVub2kNjDWGk8XNs2n19s2YXVWnolHNNMkeq8mdo27lTNl5OMxsMfrhCbKSA4
-	NzhNIUrb4fJfQgT13dH73vtH4qrZpOi+QcVWsjrlksoHqbpAmJ+Pduc6GYDE7Emk40HecWvos1Z9J
-	P2p8c3pl/IS31fJy/WDKDqbiEA8g8Sw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=/nQ5tS/BPYzVZaredljQRr54ht0vaAJUyeai8cPwn9U=; b=WAoi+7GUrZL69WvSikFb4T95n
+	yJ0gUH/q/SAenv1oqP7CWh5ImQMy4IHulHOe0xJC/zqUHLtIYoGfRuZdrZ6xPDw70WU0UjMj2HZJ9
+	2XoP6Uoq9vctowQ2Zw3P334YcDurbfSaJj+HE2xpwsRNtphEW1uLdGXSFn8tY9mCVjIJ1vH/xRqMB
+	uioosy308MmyHoywrD+wY/M3b9+eXr4mWebj8buoQu9EDX1cyyYlLLfVvktfDyDtl+YJL7As0rT8s
+	sZ4jmJEQFm02qGsQd4Uqz8WwNiSpd28NY2KLsbBr1upxr3vMKJXtHwslH6+ycl08ZzVkCt5P7D/uk
+	fXmH3fiaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyfZl-0003fm-O0; Tue, 26 Feb 2019 16:27:25 +0000
-Received: from heliosphere.sirena.org.uk ([2a01:7e01::f03c:91ff:fed4:a3b6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyfVA-0000YQ-9X
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 16:22:43 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=sirena.org.uk; s=20170815-heliosphere; h=Date:Message-Id:In-Reply-To:
- Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:References:
- List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:
- List-Archive; bh=4Nc9a0wJGEbR1iazYPACCFVA5P0adEytR2EU2ufxVok=; b=qQunmxXtET52
- XYcY2FJPyUhX+SIouM4HFaYwZTTc4V+gqxini3pT8k0HYEzrs+jUp2/2WgUtHdW7hc5HvTiI9fNpO
- QH1+IxJK/AtjXz0s/ZW/mh+UG1SD7xo2QJKBkrp5U/mFDRJrsJLQTaLemG1cK1iojieYKTWcKVgPj
- teO+Q=;
-Received: from cpc102320-sgyl38-2-0-cust46.18-2.cable.virginm.net
- ([82.37.168.47] helo=debutante.sirena.org.uk)
- by heliosphere.sirena.org.uk with esmtpa (Exim 4.89)
- (envelope-from <broonie@sirena.org.uk>)
- id 1gyfV6-00009l-NO; Tue, 26 Feb 2019 16:22:36 +0000
-Received: by debutante.sirena.org.uk (Postfix, from userid 1000)
- id 3FB7D1121A0A; Tue, 26 Feb 2019 16:22:36 +0000 (GMT)
-From: Mark Brown <broonie@kernel.org>
-To: Olivier Moysan <olivier.moysan@st.com>
-Subject: Applied "ASoC: stm32: i2s: fix IRQ clearing" to the asoc tree
-In-Reply-To: <1551189070-15469-2-git-send-email-olivier.moysan@st.com>
-X-Patchwork-Hint: ignore
-Message-Id: <20190226162236.3FB7D1121A0A@debutante.sirena.org.uk>
-Date: Tue, 26 Feb 2019 16:22:36 +0000 (GMT)
-X-Bad-Reply: In-Reply-To but no 'Re:' in Subject.
+	id 1gyfen-0005lT-RZ; Tue, 26 Feb 2019 16:32:37 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyfek-0005kw-K0
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 16:32:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 135BD80D;
+ Tue, 26 Feb 2019 08:32:34 -0800 (PST)
+Received: from [10.1.196.50] (e108454-lin.cambridge.arm.com [10.1.196.50])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id D212D3F738;
+ Tue, 26 Feb 2019 08:32:31 -0800 (PST)
+Subject: Re: [PATCH v5 13/26] KVM: arm64/sve: System register context switch
+ and access support
+To: Dave Martin <Dave.Martin@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-14-git-send-email-Dave.Martin@arm.com>
+From: Julien Grall <julien.grall@arm.com>
+Message-ID: <8a0e6089-b77b-151b-eacd-34ad13f39ac6@arm.com>
+Date: Tue, 26 Feb 2019 16:32:30 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
+MIME-Version: 1.0
+In-Reply-To: <1550519559-15915-14-git-send-email-Dave.Martin@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_082240_663703_D9D734C9 
-X-CRM114-Status: GOOD (  13.16  )
+X-CRM114-CacheID: sfid-20190226_083234_664725_500CE2F1 
+X-CRM114-Status: GOOD (  17.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -78,108 +71,128 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: alsa-devel@alsa-project.org, olivier.moysan@st.com, alexandre.torgue@st.com,
- linux-kernel@vger.kernel.org, arnaud.pouliquen@st.com, tiwai@suse.com,
- lgirdwood@gmail.com, broonie@kernel.org, mcoquelin.stm32@gmail.com,
- perex@perex.cz, linux-stm32@st-md-mailman.stormreply.com,
- linux-arm-kernel@lists.infradead.org, benjamin.gaignard@st.com
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
+Cc: Peter Maydell <peter.maydell@linaro.org>,
+ Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ =?UTF-8?Q?Alex_Benn=c3=a9e?= <alex.bennee@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The patch
+Hi Dave,
 
-   ASoC: stm32: i2s: fix IRQ clearing
+On 18/02/2019 19:52, Dave Martin wrote:
+> @@ -1091,6 +1088,95 @@ static int reg_from_user(u64 *val, const void __user *uaddr, u64 id);
+>   static int reg_to_user(void __user *uaddr, const u64 *val, u64 id);
+>   static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
+>   
+> +static unsigned int sve_restrictions(const struct kvm_vcpu *vcpu,
+> +				     const struct sys_reg_desc *rd)
+> +{
+> +	return vcpu_has_sve(vcpu) ? 0 : REG_NO_USER | REG_NO_GUEST;
+> +}
+> +
+> +static unsigned int sve_id_restrictions(const struct kvm_vcpu *vcpu,
+> +					const struct sys_reg_desc *rd)
+> +{
+> +	return vcpu_has_sve(vcpu) ? 0 : REG_NO_USER;
+> +}
+> +
+> +static int get_zcr_el1(struct kvm_vcpu *vcpu,
+> +		       const struct sys_reg_desc *rd,
+> +		       const struct kvm_one_reg *reg, void __user *uaddr)
+> +{
+> +	if (WARN_ON(!vcpu_has_sve(vcpu)))
+> +		return -ENOENT;
+> +
+> +	return reg_to_user(uaddr, &vcpu->arch.ctxt.sys_regs[ZCR_EL1],
+> +			   reg->id);
+> +}
+> +
+> +static int set_zcr_el1(struct kvm_vcpu *vcpu,
+> +		       const struct sys_reg_desc *rd,
+> +		       const struct kvm_one_reg *reg, void __user *uaddr)
+> +{
+> +	if (WARN_ON(!vcpu_has_sve(vcpu)))
+> +		return -ENOENT;
+> +
+> +	return reg_from_user(&vcpu->arch.ctxt.sys_regs[ZCR_EL1], uaddr,
+> +			     reg->id);
+> +}
+> +
+> +/* Generate the emulated ID_AA64ZFR0_EL1 value exposed to the guest */
+> +static u64 guest_id_aa64zfr0_el1(const struct kvm_vcpu *vcpu)
+> +{
+> +	if (!vcpu_has_sve(vcpu))
+> +		return 0;
+> +
+> +	return read_sanitised_ftr_reg(SYS_ID_AA64ZFR0_EL1);
+> +}
+> +
+> +static bool access_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> +				   struct sys_reg_params *p,
+> +				   const struct sys_reg_desc *rd)
+> +{
+> +	if (p->is_write)
+> +		return write_to_read_only(vcpu, p, rd);
+> +
+> +	p->regval = guest_id_aa64zfr0_el1(vcpu);
+> +	return true;
+> +}
+> +
+> +static int get_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> +		const struct sys_reg_desc *rd,
+> +		const struct kvm_one_reg *reg, void __user *uaddr)
+> +{
+> +	u64 val;
+> +
+> +	if (!vcpu_has_sve(vcpu))
+> +		return -ENOENT;
+> +
+> +	val = guest_id_aa64zfr0_el1(vcpu);
+> +	return reg_to_user(uaddr, &val, reg->id);
+> +}
+> +
+> +static int set_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> +		const struct sys_reg_desc *rd,
+> +		const struct kvm_one_reg *reg, void __user *uaddr)
+> +{
+> +	const u64 id = sys_reg_to_index(rd);
+> +	int err;
+> +	u64 val;
+> +
+> +	if (!vcpu_has_sve(vcpu))
+> +		return -ENOENT;
+> +
+> +	err = reg_from_user(&val, uaddr, id);
+> +	if (err)
+> +		return err;
+> +
+> +	/* This is what we mean by invariant: you can't change it. */
+> +	if (val != guest_id_aa64zfr0_el1(vcpu))
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
 
-has been applied to the asoc tree at
+We seem to already have code for handling invariant registers as well as reading 
+ID register. I guess the only reason you can't use them is because of the check 
+the vcpu is using SVE.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+However, AFAICT the restrictions callback would prevent you to enter the {get, 
+set}_id if the vCPU does not support SVE. So the check should not be reachable.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Did I miss anything?
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+Cheers,
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
-From 8ba3c5215d69c09f5c39783ff3b78347769822ad Mon Sep 17 00:00:00 2001
-From: Olivier Moysan <olivier.moysan@st.com>
-Date: Tue, 26 Feb 2019 14:51:04 +0100
-Subject: [PATCH] ASoC: stm32: i2s: fix IRQ clearing
-
-Because of regmap cache, interrupts may not be cleared
-as expected.
-Declare IFCR register as write only and make writings
-to IFCR register unconditional.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_i2s.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_i2s.c b/sound/soc/stm/stm32_i2s.c
-index a25919d32187..339cd4715b2e 100644
---- a/sound/soc/stm/stm32_i2s.c
-+++ b/sound/soc/stm/stm32_i2s.c
-@@ -247,8 +247,8 @@ static irqreturn_t stm32_i2s_isr(int irq, void *devid)
- 		return IRQ_NONE;
- 	}
- 
--	regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
--			   I2S_IFCR_MASK, flags);
-+	regmap_write_bits(i2s->regmap, STM32_I2S_IFCR_REG,
-+			  I2S_IFCR_MASK, flags);
- 
- 	if (flags & I2S_SR_OVR) {
- 		dev_dbg(&pdev->dev, "Overrun\n");
-@@ -277,7 +277,6 @@ static bool stm32_i2s_readable_reg(struct device *dev, unsigned int reg)
- 	case STM32_I2S_CFG2_REG:
- 	case STM32_I2S_IER_REG:
- 	case STM32_I2S_SR_REG:
--	case STM32_I2S_IFCR_REG:
- 	case STM32_I2S_TXDR_REG:
- 	case STM32_I2S_RXDR_REG:
- 	case STM32_I2S_CGFR_REG:
-@@ -559,8 +558,8 @@ static int stm32_i2s_startup(struct snd_pcm_substream *substream,
- 	i2s->refcount++;
- 	spin_unlock(&i2s->lock_fd);
- 
--	return regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
--				  I2S_IFCR_MASK, I2S_IFCR_MASK);
-+	return regmap_write_bits(i2s->regmap, STM32_I2S_IFCR_REG,
-+				 I2S_IFCR_MASK, I2S_IFCR_MASK);
- }
- 
- static int stm32_i2s_hw_params(struct snd_pcm_substream *substream,
-@@ -611,8 +610,8 @@ static int stm32_i2s_trigger(struct snd_pcm_substream *substream, int cmd,
- 			return ret;
- 		}
- 
--		regmap_update_bits(i2s->regmap, STM32_I2S_IFCR_REG,
--				   I2S_IFCR_MASK, I2S_IFCR_MASK);
-+		regmap_write_bits(i2s->regmap, STM32_I2S_IFCR_REG,
-+				  I2S_IFCR_MASK, I2S_IFCR_MASK);
- 
- 		if (playback_flg) {
- 			ier = I2S_IER_UDRIE;
 -- 
-2.20.1
-
+Julien Grall
 
 _______________________________________________
 linux-arm-kernel mailing list
