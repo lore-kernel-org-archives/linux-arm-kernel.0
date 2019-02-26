@@ -2,88 +2,84 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B907FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 20:24:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D23D9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 20:45:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8372A20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 20:24:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9DAC221850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 20:45:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XtG94GSs";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="hucB6Zuv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8372A20863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GHpLhA/h";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="G5UP1RTL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9DAC221850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=bagWTDm2icnDmfOjdgKqxTUzRdZha/3wydTxBVuZB2c=; b=XtG
-	94GSsZoSQ3H5vzjt6gbE9vDnCzXs2t7qGJCrSpAs5qsZxXAYEgTzGQX2kmNBiGerGmHbcjAD3DSqB
-	+hMg9IUNTfoe34iiNOmkUWByFh1HNVOBqGujHkwBe9MOP6AazmMvDo3fQfnFBUlONVYlhEcdDhbmn
-	bOjenangUb4nX1tbRiN/pfNbTeHfcVfORPCa8u0AqZsrItFRQ1q1gDRvo5Wns2X/FRPS55H55Rhwp
-	LWgUhtSvwWrC6kjgVapsL2SQDlTbZlZ2Y2EArt1dQoICQt+hN+VAJTQynQSLIDgBIMyMXdNKsM/4W
-	Mp49VDo4ZhGrgexA4PDNCSFbVXcA1Ew==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=6lPYNavv3wX0FkXUB4BSNAP2vzneloXL/6KeVSEvarQ=; b=GHpLhA/hpgmwT9
+	9nqSYZ+6K0qPKmCqc2DiL9T+RY/TPHWfpdno8QNVM4NTI9zyaC9bAhIztxZkMprZ2aqUkn1oE7IxE
+	zAhnIkAElf+MNKh0ix3llJH5XEGIYQ5eCfu1YY4keYuTfdqC7opnuXOXgtwek95I7EyOO1isyLr1K
+	9QuYak5rBiruPK3a/0h68kJC/adRcW3+deVMtnfBxUG/FTyNfd4XMg8LbgoR0LRrnziKQfca4Ondq
+	j3NS7I9AXJvUGrDa9DDF6cgN/eX10ngGygY5+zW+eYrhOnRhkEYDtEbegqhH71ze2qec/uGCxiyQW
+	Or9YuqULm9vAEIbmUcKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyjGn-0006ic-I6; Tue, 26 Feb 2019 20:24:05 +0000
+	id 1gyjb6-0005sP-D2; Tue, 26 Feb 2019 20:45:04 +0000
 Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyjGl-0006iJ-7o
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 20:24:04 +0000
-Received: by mail-pl1-x641.google.com with SMTP id y10so6793107plp.0
+ id 1gyjb2-0005ZO-1l
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 20:45:01 +0000
+Received: by mail-pl1-x641.google.com with SMTP id p19so6803764plo.2
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 12:24:02 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=LHcV9KuFyIJphllsynnPnDHUrB3QRBV9lgjkjWwozRg=;
- b=hucB6ZuvoWE9TEWY2htIei8RkTzM2hmLBhHSw0+HB0nfK6vUAVOovNLWtg7WtRWL4U
- +CWVJKszW7INsKyLM2guejrQ6EiuPVBYaXVrLrzrRMAljLid6bsdVXmIPlG/CvRSOoPJ
- Igm2xYMpWa5+Fx1FOjwENpVYuhULjKb3hB2935HCXThpDE5FO1IT7klmQ/LbkvSChOnV
- fayzqbFcvyLbow1u0cquI7U4zXxrSifAGx1UAXjp1/7pvWfwitA+4hpBQ08/LVjX8nRB
- D+7Wy+/AhNiPPr9wPaEKYZKlzALBaSlZ1qyupPQltTikxKbCIZWZUipWR12K/BDpDYIj
- oBxg==
+ Tue, 26 Feb 2019 12:44:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=0X8cSYKGmFW0u9F0JjUTNH83/4979FA9fPZEq9ViBiY=;
+ b=G5UP1RTLPOXQAR+BvC3a+DybgKcQ6vRPqihPWCSDwt6QQecjUSMXeDyXQ8pdYEBWV6
+ kSKe2u73y5ysD5TfJ31iUQBIbngmTJfV3E+/a6yDHVKWBsZ9lOnZH5r+DGh7Oeczfag6
+ vXsSyH7DuzTJz1rCShkBQ0G9Vmy70IEpLa9Ls/lyYotXZm8QMpuSiKI18XDjdBB9D0Cq
+ BEGrBJHo7kNwc/PlioQ1ZN2XBdDjKzuTdRFMPsQNcRGS9EX3cqX2BV7iL93jN/XwV/TS
+ C+t/jLVEjQM2BF5KDPbTlwt5CIu9u6EzhdjQ2Bwyf3fNwlcxmvG3dfIwWPxzbfueB4zT
+ IGYg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=LHcV9KuFyIJphllsynnPnDHUrB3QRBV9lgjkjWwozRg=;
- b=Ye1aUQo14OexP9UiDTUzpXwS/L+tsRpGxcqxMTxeZzDAfMOdAQGIedAg2nF5CyoFVp
- 42tRYpQ3vB69oXCdQijE1DWCRBjU6aXMuQOzUJwprf+PhG8FaFCpkx5gI633FsGufD2/
- nD/21Z/E83I2u3zocnKGjY1cM6ur3OUsnAdqb6NxA823pow8Q5yZin7GSXQR+QliNyp1
- 0xyEa1MVR32oJgTf4XOIsFlO7vg5GXtHKxT39OEUCIT7DtPrPK//mFX4HItxAm9iUcGa
- kacn1mKhxgL8YynquSS7LpeC5IamnfgSbUL98Vrnox184HkkyfqbwempJbzYe94otW9h
- MIow==
-X-Gm-Message-State: AHQUAubO4qVDqmiGzmOXQCh9ooPY8/o+5ULwh0sf488YRZKsPKq9vzLx
- nthZ7mmYM7OFmutPfvCGnXc=
-X-Google-Smtp-Source: AHgI3IZ3++oASqlaSmz7L1lvzECC+qTYDnoPN+pBRQ3likXjsPclEKW4se6zSk9ZBGyuOEpHZxt+3A==
-X-Received: by 2002:a17:902:20c3:: with SMTP id
- v3mr7475180plg.268.1551212642071; 
- Tue, 26 Feb 2019 12:24:02 -0800 (PST)
-Received: from Asurada-Nvidia.nvidia.com (thunderhill.nvidia.com.
- [216.228.112.22])
- by smtp.gmail.com with ESMTPSA id v186sm294240pfv.184.2019.02.26.12.24.01
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 12:24:01 -0800 (PST)
-From: Nicolin Chen <nicoleotsuka@gmail.com>
-To: hch@lst.de, m.szyprowski@samsung.com, robin.murphy@arm.com,
- tony@atomide.com
-Subject: [PATCH] Revert "dma-contiguous: do not allocate a single page from
- CMA area"
-Date: Tue, 26 Feb 2019 12:23:27 -0800
-Message-Id: <20190226202327.5349-1-nicoleotsuka@gmail.com>
-X-Mailer: git-send-email 2.17.1
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=0X8cSYKGmFW0u9F0JjUTNH83/4979FA9fPZEq9ViBiY=;
+ b=ryoQfAnkM8zLFvUKkid949IcxdNuzraxCLOqnMIZYhW646bsT/QGTdG+KPlOcDUnUU
+ Q5O+i7OGnGSGlO7Hy5GJjGZ2y49jzqGDg4EYvb/aukHuNN2f7r+xFs/VOe1CNW1jWr77
+ /Qu1lbxU7IgKrnh4jS1PBswfb1pWxFVM3aUlxyMQndFTWhSG3W8IDdAZ3tYEfYOfuU4E
+ Ud/rqXOfegigcZk8yoA2zrTKiavXSSZQpcCy4Kg8X1V/pMJFrurMJHyOCEII1LlH6K5e
+ xmoOJrUPOGXuXW/USDSX2XuJwGrAcvjEyuY8WFx08c1D67mFxfjWDX0xq+QoQof7eNAP
+ 8hMA==
+X-Gm-Message-State: AHQUAuYotbwqpyQLldFpiKs9gL5US7FQy69fTq0UCBbq8lZa0lA2AKJ3
+ Kf7sd2QqgIPUiaqr8ivbBogG8GebhkhA8xYpM9+52w==
+X-Google-Smtp-Source: AHgI3Ib3KLull6qPH/TbFZUvMpO7HReopqC+gm/Txs9vUuqy65YewyPIeJ9h1evXEkY7vAgEDPJZfaUFk9kk2kqPe3A=
+X-Received: by 2002:a17:902:bb89:: with SMTP id
+ m9mr27853522pls.320.1551213895133; 
+ Tue, 26 Feb 2019 12:44:55 -0800 (PST)
+MIME-Version: 1.0
+References: <20190226040345.202047-1-ndesaulniers@google.com>
+ <CAKv+Gu-5DvWZL6ogLVNDEvgKe6TENX+5sF1U7QxiyYC8Wx0nXw@mail.gmail.com>
+In-Reply-To: <CAKv+Gu-5DvWZL6ogLVNDEvgKe6TENX+5sF1U7QxiyYC8Wx0nXw@mail.gmail.com>
+From: Nick Desaulniers <ndesaulniers@google.com>
+Date: Tue, 26 Feb 2019 12:44:44 -0800
+Message-ID: <CAKwvOdmzb1WF6NU5LYWGXK_O2cbqwMjbWGAa5xk5x+EMz7A1yw@mail.gmail.com>
+Subject: Re: [PATCH] lib/raid6: use vdupq_n_u8 to avoid endianness warnings
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_122403_304738_A546ADDE 
-X-CRM114-Status: GOOD (  11.11  )
+X-CRM114-CacheID: sfid-20190226_124500_094117_6F0BC83F 
+X-CRM114-Status: GOOD (  17.79  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,77 +91,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, iommu@lists.linux-foundation.org,
- dri-devel@lists.freedesktop.org, sre@kernel.org, tomi.valkeinen@ti.com,
- laurent.pinchart@ideasonboard.com, linux-omap@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Mark Brown <broonie@kernel.org>, Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This reverts commit d222e42e88168fd67e6d131984b86477af1fc256.
+On Mon, Feb 25, 2019 at 11:19 PM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> On Tue, 26 Feb 2019 at 05:03, <ndesaulniers@google.com> wrote:
+> >
+> > Clang warns: vector initializers are not compatible with NEON intrinsics
+> > in big endian mode [-Wnonportable-vector-initialization]
+> >
+> > While this is usually the case, it's not an issue for this case since
+> > we're initializing the uint8x16_t (16x uint8_t's) with the same value.
+> >
+> > Instead, use vdupq_n_u8 which both compilers lower into a single movi
+> > instruction: https://godbolt.org/z/vBrgzt
+> >
+> > This avoids the static storage for a constant value.
+> >
+> > Link: https://github.com/ClangBuiltLinux/linux/issues/214
+> > Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
+> > Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+>
+> Much better, thanks,
+>
+> Did you double check that the intrinsic exists on 32-bit ARM as well?
+> I assume it does, but please make sure if you haven't yet.
 
-The original change breaks omap dss:
-    omapdss_dispc 58001000.dispc:
-        dispc_errata_i734_wa_init: dma_alloc_writecombine failed
+Thanks for the review!
+Looking through Clang's generated arm_neon.h, vdupq_n_u8 seems to have
+2 definitions predicated on __LITTLE_ENDIAN__ (not __arch64__ or
+__ARM_ARCH >= 8 like some of the other types and functions).
 
-Let's revert it first and then find a safer solution instead.
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Nicolin Chen <nicoleotsuka@gmail.com>
----
-Tony,
-	
-Would you please test and verify? Thanks!
-
- kernel/dma/contiguous.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
-
-diff --git a/kernel/dma/contiguous.c b/kernel/dma/contiguous.c
-index 09074bd04793..b2a87905846d 100644
---- a/kernel/dma/contiguous.c
-+++ b/kernel/dma/contiguous.c
-@@ -186,32 +186,16 @@ int __init dma_contiguous_reserve_area(phys_addr_t size, phys_addr_t base,
-  *
-  * This function allocates memory buffer for specified device. It uses
-  * device specific contiguous memory area if available or the default
-- * global one.
-- *
-- * However, it skips one-page size of allocations from the global area.
-- * As the addresses within one page are always contiguous, so there is
-- * no need to waste CMA pages for that kind; it also helps reduce the
-- * fragmentations in the CMA area. So a caller should be the rebounder
-- * in such case to allocate a normal page upon NULL return value.
-- *
-- * Requires architecture specific dev_get_cma_area() helper function.
-+ * global one. Requires architecture specific dev_get_cma_area() helper
-+ * function.
-  */
- struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
- 				       unsigned int align, bool no_warn)
- {
--	struct cma *cma;
--
- 	if (align > CONFIG_CMA_ALIGNMENT)
- 		align = CONFIG_CMA_ALIGNMENT;
- 
--	if (dev && dev->cma_area)
--		cma = dev->cma_area;
--	else if (count > 1)
--		cma = dma_contiguous_default_area;
--	else
--		return NULL;
--
--	return cma_alloc(cma, count, align, no_warn);
-+	return cma_alloc(dev_get_cma_area(dev), count, align, no_warn);
- }
- 
- /**
+So NEON got some additions in v8?  Is there a doc that lists them?
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0491g/BABDBBJB.html
+is where I found vdupq_n_u8, but it doesn't seem to mention
+compatibility (so I assume it's been around since the introduction of
+NEON?).
 -- 
-2.17.1
-
+Thanks,
+~Nick Desaulniers
 
 _______________________________________________
 linux-arm-kernel mailing list
