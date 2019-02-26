@@ -2,85 +2,89 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7414EC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:54:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7DE9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:55:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3033220C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:54:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74D4720C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:55:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dbieR72G";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="yEhuYlCn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3033220C01
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I3gWaKCh";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="kfhQSPA9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74D4720C01
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=+kRL+eMGUCRJTJyX5WXdDXs4p//TTiNqEdEb7J7T+/0=; b=dbi
-	eR72GhEO7IMw/C58miS5jlBHtup92DQSKUGp/bCdJCQKENDoGuRc4XC+lVxl60DCUU5if38DQ4eOq
-	aVyMFwAskBEBo+PC32PfcyB58eVLxi0X7tnW6KcywAViD/4272TrYf1iE8sgQxgWeCx4Qu/jLjUel
-	ozMxUIqkeV7uukLB+B61MxJKUa5LYBKZNEYLnVIGvJERl+KrD3J3pVFi8uo78YNpse6F3PsYeQrKF
-	MpKuMCtloGe85W4FB/bKvjK1Ml4DC8uefO1thDA8QvF65MfmgIyBFCRrtK1ysRgNA1xpVC5MmYP8R
-	MGcq8J+xh9qhZ36Cf6Rg1YcYwx5kFUA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=B1Dpm1PAh8KonVOLj2lyEeghbEaIvkx09hwu1/gGsa8=; b=I3gWaKChIC48UkwELb/tl6dB6/
+	IiixiGlceDfihSXYtJh8YzIpRVSYmCg2d4YDQBqVDa4bNqu81cMsqeti1ggRScv6wpT07tkG7kkaw
+	uvOsNmUnsyjneI3ewuDz7ybboacEGFlfox2PWL2Ae9qIsCRDGgEcokZKuPX1Arr+sO9rXFV3oi5xH
+	gmp9RD08sARIaGGLzDP4tQLm8nABKy2KWB95QsRlmKCHtEVv0ydVNiccRt0jKJZIlhWkPH+WWLAVG
+	l7IkHVG/LsP7HF4fAP3gVmPYkdcQhcNchktwxQlQ57Bin6svKiZtCe1yKoh4mtbwsy5eLwNF4l+Zh
+	tu6sYlpw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gye88-0005Yl-Fk; Tue, 26 Feb 2019 14:54:48 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gye8e-0007Ce-4O; Tue, 26 Feb 2019 14:55:20 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gye7v-0005Ne-Rd
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:54:37 +0000
-Received: by mail-lj1-x244.google.com with SMTP id d24so10750123ljc.12
+ id 1gye7z-0005Os-HD
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:54:42 +0000
+Received: by mail-lf1-x143.google.com with SMTP id a8so4044072lfi.7
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 06:54:33 -0800 (PST)
+ Tue, 26 Feb 2019 06:54:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=bAWEQtmf+fggjn633EQ0gBHasaIotZNQ6JNtd1TnYlY=;
- b=yEhuYlCnoHOeoTTeypOCSSGycNr6eghlJAYY/0Qk/w47J4Xm7zDOZWXf3VzOryDoFH
- JUK9D/277P9gzy0yI1MPay9RVdBQBSrIIqwFVv/mnGXNTCWa3O84uGSBtMAt5Rbp8/sU
- QhhjCK7dXpC+PmeW5EF7+3YKj7RZyPEHoZEtKbuHv0dA8+Zk6uaoqmEnUu9XdBrRd657
- Qp6OrgrPjz4PBgXbIowa4MZAZIYLGSiRyKtuL9sXs+yMInHRPT+XHbXSJXLLn44zr/n2
- HppDP59Xbtzej/fU50ecScZMDnuAVHKTTjw79ZYu9ACC36wh7VFAtudJ4Dq8a2eivgkc
- uidQ==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=CizRMe2YmHoMDQUcJ8913XbNFEFzGgJHDQtzao5WKiM=;
+ b=kfhQSPA9AMik5mPi+zuWznWRU+Lb20kx5Yl1pd6vQyrPRfnG2ZYWVm4Hs9i5AjRK0b
+ GnRrB3iYlXym2YsokbhWJCIunemOZzuO9vuqHFOLcbCrDm3wSn0ZApSiB3kPmMZT4ZVe
+ dmDlZ3gGNBUQRE0rvOZn3OW2DWmlz6edcGX8vVCXxzAE2yqcdM3MZffJJb7PJBdYLj5l
+ 5oQcGO+AlfUyq47Vsk9LJnj3r6W/fZpU73n4kFJDER7GNwbFFwflAQ8+q7a+UCe6ax7Z
+ 8ZJPmf7ugZk/AuUGSuMdngYkcUPATcadWzlgy7bJo/HoChaXuWSMnkbwXRIT90W6tXrv
+ Rugg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=bAWEQtmf+fggjn633EQ0gBHasaIotZNQ6JNtd1TnYlY=;
- b=R1wpIz6nfh6SL6ZdvQYL0WUssnkTGiqu+vu3wpc3wTEEInIaKA+/OdNxxveCh9ePwW
- 3H/heMGXKt9Py3GTDcSrp4fWcqUOvPKb8F6W7jjGXt/2DV342TKCbRWQSc4yy0PfJtSM
- v2kYdOwATPDv6fxd71sIf2njdwrQtl8mLm1UF/H84qahW0keIYJvA6RsJP7Rc+HvIhKF
- +U84OqZDmijl6gXW6PNPM9Lfix+tKd3Jb4XN8bvsxzhuYs/8FA/dQ/0AUii0l7APUC8k
- IvkZ8uvBVuRnC1q0Ax0DkJsRcWaPNIHm7KC987OOuEZKYm85AVYfRwntHN8NSkOygHCI
- gezA==
-X-Gm-Message-State: AHQUAuap5ZNcV8GUgvHc5Ty9zQBtT7L6whBurvMncMq7h9q9UHrYuVlc
- 3CHRtlk5qNGSyIPnmnyecooTLQ==
-X-Google-Smtp-Source: AHgI3IY7Fh/iJB1rM3CbMbsCZao4labBAhvTuxuXpfkMpQyUIWovpYBREFulbYA+w07Ewxce5yxHLA==
-X-Received: by 2002:a2e:964b:: with SMTP id z11mr12327938ljh.138.1551192871604; 
- Tue, 26 Feb 2019 06:54:31 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=CizRMe2YmHoMDQUcJ8913XbNFEFzGgJHDQtzao5WKiM=;
+ b=X/8oTbMNHddgExo/VKBaWpKCd1GZISI/DXJO5s0mXADLDiaMuAQnVx+UZzREojP3R+
+ fZkiPOLZtNpqweODqdCtCwZr8iwok5TzzN84Fp/d55Vl8IuCeeJaqup0ohsYvk14Ve7o
+ f4ARcTg7rIjCOoZ+i6BCiRb/aml8tocDvqJhlkX4eZzFRPQJP9GByZGUBLK0z/MNoD95
+ 9hvtDTsA7CUYdM3K0TBf7veU4mwF+WZAddVrapV8CpYPqM3nm9+hFZDAfNH5+VT2VYyq
+ 1l5vH2nqxiYExvx0KACgv0y3SYrMkl/9Gy9f5EM1Mni/7Io+FYFmf5Pniu8JvEnx4J5Y
+ 4v0w==
+X-Gm-Message-State: AHQUAuaNWJxT03yYHmy8Hgy1k9jEWILB0Ik/OaR4wh6VcTQLv1RWsZvq
+ /1Tnz/3uYxYj/r0tAGY3YKRB+A==
+X-Google-Smtp-Source: AHgI3Iaxn87jYxFUqbmB5XhLkCIJqJ/F1RTwFyjp9WrstSdbqh+lc5QmyHlpoFkyjdolp9R2+2X54Q==
+X-Received: by 2002:ac2:4154:: with SMTP id c20mr1623972lfi.74.1551192877411; 
+ Tue, 26 Feb 2019 06:54:37 -0800 (PST)
 Received: from uffe-XPS-13-9360.ideon.se ([85.235.10.227])
- by smtp.gmail.com with ESMTPSA id t11sm2206554ljj.92.2019.02.26.06.54.30
+ by smtp.gmail.com with ESMTPSA id t11sm2206554ljj.92.2019.02.26.06.54.36
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 06:54:30 -0800 (PST)
+ Tue, 26 Feb 2019 06:54:36 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
 	linux-pm@vger.kernel.org
-Subject: [PATCH v11 0/8] PM / Domains: Support hierarchical CPU arrangement
- (PSCI/ARM)
-Date: Tue, 26 Feb 2019 15:54:07 +0100
-Message-Id: <20190226145415.19411-1-ulf.hansson@linaro.org>
+Subject: [PATCH v11 4/8] cpuidle: menu: Convert to
+ tick_nohz_get_next_timer|hrtimer()
+Date: Tue, 26 Feb 2019 15:54:11 +0100
+Message-Id: <20190226145415.19411-5-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190226145415.19411-1-ulf.hansson@linaro.org>
+References: <20190226145415.19411-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_065436_017301_5F8B1289 
-X-CRM114-Status: GOOD (  21.67  )
+X-CRM114-CacheID: sfid-20190226_065439_836377_3AF41373 
+X-CRM114-Status: GOOD (  16.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,104 +114,58 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+From: Daniel Lezcano <daniel.lezcano@linaro.org>
+
+Rather than using tick_nohz_get_sleep_length(), let's convert to use the
+more flexible tick_nohz_get_next_timer|hrtimer() APIs. This should have no
+functional change, but allows following changes to later drop the
+tick_nohz_get_sleep_length() API.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+[Ulf: Clarified information in changelog]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
 Changes in v11:
- - This version contains only the infrastructure changes that is needed for
-deployment. The PSCI/ARM changes have also been updated and tested, but I will
-post them separately. Still, to provide completeness, I have published a branch
-containing everything to a git tree [1], feel free to have a look and test.
- - The v10 series contained a patch, "timer: Export next wakeup time of a CPU",
-which has been replaced by a couple of new patches, whom reworks the existing
-tick_nohz_get_sleep_length() function, to provide the next timer expiration
-instead of the duration.
- - More changelogs are available per patch.
+	- New patch.
 
-Changes in v10:
- - Quite significant changes have been to the PSCI driver deployment. According
-   to an agreement with Lorenzo, the hierarchical CPU layout for PSCI should be
-   orthogonal to whether the PSCI FW supports OSI or not. This has been taken
-   care of in this version.
- - Drop the generic attach/detach helpers of CPUs to genpd, instead make that
-   related code internal to PSCI, for now.
- - Fix "BUG: sleeping for invalid context" for hotplug, as reported by Raju.
- - Addressed various comments from version 8 and 9.
- - Clarified changelogs and re-wrote the cover-letter to better explain the
-   motivations behind these changes.
+---
+ drivers/cpuidle/governors/menu.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-Background:
-
-For ARM64/ARM based platforms CPUs are often arranged in a hierarchical manner.
-From a CPU idle state perspective, this means some states may be shared among a
-group of CPUs (aka CPU cluster).
-
-To deal with idle management of a group of CPUs, sometimes the kernel needs to
-be involved to manage the last-man standing algorithm, simply because it can't
-rely solely on power management FWs to deal with this. Depending on the
-platform, of course.
-
-There are a couple of typical scenarios for when the kernel needs to be in
-control, dealing with synchronization of when the last CPU in a cluster is about
-to enter a deep idle state.
-
-1)
-The kernel needs to carry out so called last-man activities before the
-CPU cluster can enter a deep idle state. This may for example involve to
-configure external logics for wakeups, as the GIC may no longer be functional
-once a deep cluster idle state have been entered. Likewise, these operations
-may need to be restored, when the first CPU wakes up.
-
-2)
-Other more generic I/O devices, such as an MMC controller for example, may be a
-part of the same power domain as the CPU cluster, due to a shared power-rail.
-For these scenarios, when the MMC controller is in use dealing with an MMC
-request, a deeper idle state of the CPU cluster may needs to be temporarily
-disabled. This is needed to retain the MMC controller in a functional state,
-else it may loose its register-context in the middle of serving a request.
-
-In this series, we are extending the generic PM domain (aka genpd) to be used
-for also CPU devices. Hence the goal is to re-use much of its current code to
-help us manage the last-man standing synchronization. Moreover, as we already
-use genpd to model power domains for generic I/O devices, both 1) and 2) can be
-address with its help.
-
-Moreover, to address these problems for ARM64 DT based platforms, we are
-deploying support for genpd and runtime PM to the PSCI FW driver - and finally
-we make some updates to two ARM64 DTBs, as to deploy the new PSCI CPU topology
-layout.
-
-The series has been tested on a Qcom 410c dragonboard and on a Hisilicon Hikey
-board. The first one uses PSCI OS-initiated mode, while the second uses the PSCI
-Platform-Coordinated mode.
-
-Kind regards
-Ulf Hansson
-
-[1]
-git.linaro.org/people/ulf.hansson/linux-pm.git next_v11
-
-Daniel Lezcano (4):
-  time: tick-sched: Provide helpers to get the next timer expiration
-  cpuidle: menu: Convert to tick_nohz_get_next_timer|hrtimer()
-  cpuidle: teo: Convert to tick_nohz_get_next_timer()
-  time: tick-sched: Remove tick_nohz_get_sleep_length()
-
-Ulf Hansson (4):
-  PM / Domains: Add a generic data pointer to the genpd_power_state
-    struct
-  PM / Domains: Add support for CPU devices to genpd
-  cpuidle: Pre-store next timer/tick before selecting an idle state
-  PM / Domains: Add genpd governor for CPUs
-
- drivers/base/power/domain.c          | 78 ++++++++++++++++++++++++++--
- drivers/base/power/domain_governor.c | 62 +++++++++++++++++++++-
- drivers/cpuidle/cpuidle.c            |  2 +
- drivers/cpuidle/governors/menu.c     | 14 ++++-
- drivers/cpuidle/governors/teo.c      |  4 +-
- include/linux/cpuidle.h              |  2 +
- include/linux/pm_domain.h            | 20 ++++++-
- include/linux/tick.h                 | 11 ++--
- kernel/time/tick-sched.c             | 71 +++++++++++++++++--------
- 9 files changed, 229 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/cpuidle/governors/menu.c b/drivers/cpuidle/governors/menu.c
+index 61316fc51548..95e9122d6047 100644
+--- a/drivers/cpuidle/governors/menu.c
++++ b/drivers/cpuidle/governors/menu.c
+@@ -286,14 +286,26 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
+ 	unsigned int predicted_us;
+ 	unsigned long nr_iowaiters;
+ 	ktime_t delta_next;
++	ktime_t now = ktime_get();
++	ktime_t next_hrtimer = tick_nohz_get_next_hrtimer();
++	ktime_t next_timer = tick_nohz_get_next_timer();
+ 
+ 	if (data->needs_update) {
+ 		menu_update(drv, dev);
+ 		data->needs_update = 0;
+ 	}
+ 
+-	/* determine the expected residency time, round up */
+-	data->next_timer_us = ktime_to_us(tick_nohz_get_sleep_length(&delta_next));
++	/*
++	 * Compute the duration before the next timer, whatever the origin
++	 */
++	delta_next = ktime_sub(next_timer, now);
++	data->next_timer_us = ktime_to_us(delta_next);
++
++	/*
++	 * Compute the duration before next hrtimer which is the tick
++	 * or an earliest hrtimer
++	 */
++	delta_next = ktime_sub(next_hrtimer, now);
+ 
+ 	nr_iowaiters = nr_iowait_cpu(dev->cpu);
+ 	data->bucket = which_bucket(data->next_timer_us, nr_iowaiters);
 -- 
 2.17.1
 
