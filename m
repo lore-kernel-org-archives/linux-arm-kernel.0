@@ -2,89 +2,80 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 57224C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:03:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 17EC5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:11:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25981213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:03:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC377213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:11:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VNjXqPNG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="C3FGAZLP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25981213A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pNy/yUNu";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="NpNyNyfW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC377213A2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aXwgvBHy+TT2bhCJm8HUiHB/uZg0r0Yfym7SU/nBUAU=; b=VNjXqPNGMlFSw8
-	njpBotFPv720M4OIFsZ68m6bvJQZMeH3jbzPndYwpcMV4TMrNzOPy1CaJLRxwsSGQb3NSMrIx7+u/
-	GWCK16doTVFjZjV5vV+sTrGjoWS4kCSOhGXA/lA0MURtWwr3gG6DO8O9nxKqYC0sZU+N3VYrJnCUL
-	L/cqX6sWiZenIUyk7zy7k7dP7O1tMxIOJVTf9IMCQKLU3oYrnFSYqHb1VcqxBB25Om4jKtB+qqFN4
-	ujAwTCcKeOMC6b1wsBZsS56a1J7EKlzqKG2jN8TeO/E18ZG/27GCWy9OmO73V0I7TByoc9PsYFDbE
-	SaUHT7bjjqviFHB5i8BQ==;
+	List-Owner; bh=zQHWOha6kvStbJxJEN2Ejibu2lv4pHG/Y9x4fnYH/PY=; b=pNy/yUNubNlGcw
+	80sEdpvQJf+qFrc5JeAAb7wrsEzPm+W0EzuJZV9MkZFvPq0kN2X3wP76KBkWs8W3dx/JVA/Wf0Uw/
+	vxxlK286ZpKEMNf6gKYSkodlTAYUm9AjRwMzIhDottuJgLvO9/XROG9hIc4NEBVJtafiLGyKm7MUb
+	IFyP32VEG3VZkmc9SNUTVLhjIdhvMvssJLL2plHtSRMwsKFfhp6ZnEFmSBd2epREaREC8XpadrrDy
+	lRHGGfIw4kY3+j7CiAdBuOU/T1UT4ozuuckIeKuaW/pXeSKjdnJ6gxgLkinPTJGU0QWaKRUPiKLeZ
+	N6Sl8c+OHzkD3foOXm8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyVpf-0002jc-JL; Tue, 26 Feb 2019 06:03:11 +0000
-Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
+	id 1gyVxw-0006GH-6C; Tue, 26 Feb 2019 06:11:44 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyVpV-0002XG-Kb
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 06:03:05 +0000
-Received: by mail-pl1-x643.google.com with SMTP id q3so5696277pll.4
+ id 1gyVxs-0006FT-9r
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 06:11:41 +0000
+Received: by mail-it1-x141.google.com with SMTP id e24so2307466itl.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 22:03:01 -0800 (PST)
+ Mon, 25 Feb 2019 22:11:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=AoctKyKOJPjwr3EAkL6gWK5ijQTvzyYNQS64venG094=;
- b=C3FGAZLPzmAjF1ZcQOyqCoWyAcb6dBdTeYSzX/AAqbkxy2Sdc7JcovaXc0w4ClNSjC
- ACfBpypzdAHiD9j/AFoRIlymqdwtBqZwO9M9IMcG5EKJTDG2iyLNlfkD/QeF857ojckO
- cEA/LSlDvtOUAMvnwyRuu8o2yWBEpICJs5tws=
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=6/FjzLVkfWc1Fpambna4iPYL8u1WjShUMfs1JzjB/L4=;
+ b=NpNyNyfWgZBUJy9cgBSxcs/cSiKgU7JyLKClM/fo+yXZoxFP6Rdlr+pkSAOKeZ37PR
+ EpqCQpPs560kd24GAMaxx9BMAaxCDswGJu1qFn8EeYah87dh0DoYY3ix64JyvQtmijiF
+ 9S6o6xPfFft9QN7rJoroLyM2j+8PDMsZjm79c=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=AoctKyKOJPjwr3EAkL6gWK5ijQTvzyYNQS64venG094=;
- b=pLiq+9c1hyAkMJm+U8Ymjzevgx+BRtcZ0q2wFGs/zRPLAoo53jqpvQqVR2l53SDT7v
- Ua1W252REcL4jH0/2YuxKNAZGHeUD27+A9yyJlFMHiHW3uIz2X1lBt3U4omfX1YR+gnX
- BZ6Wlc5mFfRZX66DE0jrJI+CTE2tH/tu4W82ZMBzTWz7ruQQ7M5KLljtbisit/NKiAKN
- 2tLslf9Pm28KYUHAN9fTHf4hDm/DWZgsr5BLm3smU5RSw2mG1SvOehxEP8WJ42SQHGyT
- RDagSTRC7Yqyw3DEhnx8WcPlLmj7JYFaAnhvsUi//mnhmdYIMo/wuWCeA27vKpsjz1F0
- oU2A==
-X-Gm-Message-State: AHQUAuZT/JE2gx/d2TEgj4upkp8UwJdA8BEK+W13AOHdlnCxn/OqHiUU
- 1yyDV5+L3foP9G88xCTBOHkBoQ==
-X-Google-Smtp-Source: AHgI3IZmbI+ZRwN2agqDLCvvlLp3XMhd2DbP985ztD4qjH2c2Ceu0PgTtEPBLlEMuJiQ8Uip/LcDuQ==
-X-Received: by 2002:a17:902:7e49:: with SMTP id
- a9mr23212416pln.303.1551160980968; 
- Mon, 25 Feb 2019 22:03:00 -0800 (PST)
-Received: from localhost.localdomain ([115.97.184.151])
- by smtp.gmail.com with ESMTPSA id v15sm18976940pfa.75.2019.02.25.22.02.57
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 22:03:00 -0800 (PST)
-From: Jagan Teki <jagan@amarulasolutions.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 2/2] arm64: allwinner: a64: Add Oceanic A64-5inMFD initial
- support
-Date: Tue, 26 Feb 2019 11:32:40 +0530
-Message-Id: <20190226060240.8783-2-jagan@amarulasolutions.com>
-X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
-In-Reply-To: <20190226060240.8783-1-jagan@amarulasolutions.com>
-References: <20190226060240.8783-1-jagan@amarulasolutions.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=6/FjzLVkfWc1Fpambna4iPYL8u1WjShUMfs1JzjB/L4=;
+ b=kTILSnrT6bBZz+cxgkTjRW+5TsovTR1GeT+X2JPIRDBrqZis46jItrbkNHOW5BSaYo
+ eoQMOveISokUoknTbYpzteU5p4QohewqJx37c0CgOGailQQD7QN79nP1+Z2fTvA/HwOS
+ M30jbt5v78Rz4XzPsLBVTAAMyDE3hAhGYxEovHXq81h4RgNZ9jsFWD6NAny41norXSqH
+ TJO81tyHvLfe1KkZhxFs31Y/G+wCh2Fs51ryBk06ZPnLlZLuzihoLBit879JPF6piKWm
+ Kqmekov4zTKBn+EpneCNO6HPCq3JDKg1TZWa142ydxSed3ZCx+0hzGY86o3q7lRfRzFt
+ GN8Q==
+X-Gm-Message-State: AHQUAubmPtEez7aHne3kodx9wKD2Z24O+w4zZcen6o7nx2zpVfx/cSsL
+ eLD/ULutXRXoLkxlYTV4z0apA9G52pyCx99zjFu5jA==
+X-Google-Smtp-Source: AHgI3IZgMtrSTKoRB4M+UCROfckcl5fwwa2duCJh7qRfl6zO/NUQGFMaqf4teYSgYBcZS1RidDk5IFw4l90YjK/RP9g=
+X-Received: by 2002:a02:b5e4:: with SMTP id y33mr12427774jaj.85.1551161498760; 
+ Mon, 25 Feb 2019 22:11:38 -0800 (PST)
 MIME-Version: 1.0
+References: <20190212115232.4532-1-jagan@amarulasolutions.com>
+In-Reply-To: <20190212115232.4532-1-jagan@amarulasolutions.com>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Tue, 26 Feb 2019 11:41:27 +0530
+Message-ID: <CAMty3ZCdYiWPstFh8JAwLSWwC6sE3Un+-QmKDaEWwmmWF5MQ4g@mail.gmail.com>
+Subject: Re: [PATCH] dt-bindings: Add vendor prefix for feiyang
+To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>, 
+ Thierry Reding <thierry.reding@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_220301_935880_C7AC9649 
-X-CRM114-Status: GOOD (  14.95  )
+X-CRM114-CacheID: sfid-20190225_221140_346417_77A39BBE 
+X-CRM114-Status: GOOD (  14.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,106 +87,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Ryan Pannell <ryan@osukl.com>,
- linux-kernel@vger.kernel.org, Jagan Teki <jagan@amarulasolutions.com>,
- Michael Trimarchi <michael@amarulasolutions.com>,
- linux-amarula@amarulasolutions.com, linux-arm-kernel@lists.infradead.org
+Cc: devicetree <devicetree@vger.kernel.org>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Oceanic A64-5inMFD is a 5 inch Multi function display baseboard
-designed to mount SoPine SOM.
+Hi Rob,
 
-Key features:
-- Allwinner A64 Cortex-A53
-- Mali-400MP2 GPU
-- AXP803 PMIC
-- 2GB DDR3 RAM
-- SD Slot
-- SPI-NOR flash
-- EMAC, RTL8211E
-- MCP2515 CAN
-- MIPI-DSI
-- Goodix 911 CTP
-- USB Host
-- 12V DC power supply
+On Tue, Feb 12, 2019 at 5:22 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
+>
+> Add vendor prefix for feiyang, known as
+> Shenzhen Fly Young Technology Co.,LTD. a known producer for LCD modules.
+>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> ---
+> Note: notation about using 'feiyang' is based on the datasheet
+> http://files.pine64.org/doc/datasheet/pine64/FY07024DI26A30-D_feiyang_LCD_panel.pdf
+>
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index a5ad57eaee20..f42e12eb9d64 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -140,6 +140,7 @@ fairphone   Fairphone B.V.
+>  faraday        Faraday Technology Corporation
+>  fastrax        Fastrax Oy
+>  fcs    Fairchild Semiconductor
+> +feiyang        Shenzhen Fly Young Technology Co.,LTD.
+>  firefly        Firefly
+>  focaltech      FocalTech Systems Co.,Ltd
+>  friendlyarm    Guangzhou FriendlyARM Computer Tech Co., Ltd
+> --
+> 2.18.0.321.gffc6fa0e3
+>
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- arch/arm64/boot/dts/allwinner/Makefile        |  1 +
- .../allwinner/sun50i-a64-oceanic-5inmfd.dts   | 46 +++++++++++++++++++
- 2 files changed, 47 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-oceanic-5inmfd.dts
-
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index a5fb1eaa8acf..ec39fe856117 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -2,6 +2,7 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-amarula-relic.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb sun50i-a64-bananapi-m64-icn6211.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-oceanic-5inmfd.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-lts.dtb
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-oceanic-5inmfd.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-oceanic-5inmfd.dts
-new file mode 100644
-index 000000000000..d73d1f55acb9
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-oceanic-5inmfd.dts
-@@ -0,0 +1,46 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (C) 2019 Oceanic Systems (UK) Ltd.
-+ * Copyright (C) 2019 Amarula Solutions B.V.
-+ * Author: Jagan Teki <jagan@amarulasolutions.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "sun50i-a64-sopine.dtsi"
-+
-+/ {
-+	model = "Oceanic A64-5inMFD";
-+	compatible = "oceanic,a64-5inmfd", "allwinner,sun50i-a64";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&ohci0 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pb_pins>;
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	status = "okay";
-+};
--- 
-2.18.0.321.gffc6fa0e3
-
+Any comments?
 
 _______________________________________________
 linux-arm-kernel mailing list
