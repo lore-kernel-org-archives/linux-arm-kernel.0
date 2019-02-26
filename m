@@ -2,66 +2,81 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3C68C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 277E8C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 83BD821852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CFF6C2186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HQO1ZqWy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83BD821852
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fqV4+e/l";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="Ih3NfUSF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFF6C2186A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ir8sEWvNVOwjd1A8+SmrqETYLSvewxiHt//JCJYsylQ=; b=HQO1ZqWyuAl9mw
-	nAmQqdPCOh4zQNBooLT5PfqOfVK5O6TJQ26r6aJmSFHaTUk1BpwjfpvkDk14M7RFOF/hD0yjMd/7L
-	VAg/2w9/swukpmWi1yYXaAiBWucJWz1GAQouXA2vFtXq1FPP5c72nD5duvB1eBwAzzXYk2w4l3lsu
-	6Go4gco3H+5zaWyI935KeHPg2u4X9WXGcZ1tN3TxPR65qgV6WG+Sgu9EJ2JBp8Z7g+Ia+prNamRpq
-	55mR50ADm87y71fo7fGs0dUiP+usQzCfysDcGvLhQhp/9Al9XIe5mxShs15g8OPEne/cLTc1s1r3p
-	b8Ap/Rz5hic9zuXx7cig==;
+	List-Owner; bh=AvCIFW6+F3jKrhmJQJQGCgeILWuB/HcDSGyiEFmtC8c=; b=fqV4+e/legpBam
+	95jkMe4InScCW1iHKQbbAEp5jBT/Mb/+b0AzfqSceh6hMw0I42xqY8Px+mfpBrM0JqoqPAPj6U3J4
+	vXTfi0GlX395hRVKlOGrnQW2EDe6i/8cXlGgxfCxuTOgN3xO9eskmVqak3Pj1wvZ5zuVNc/V4FQh9
+	aK9ASGSKuQfuJ07u5P7IrcWwBx3/ndDazLGfRiZw4C/ehH+PAeo5RlxKBvDaE+a9mjX5fmjuGTgXN
+	ueR9jg8uJw0yvmH/8fU/dBqVuIqblS9vuuZQzNdyci2b5uC8uS3mRBNGHKqMdxUmBsFaeO3cybSV1
+	0EiWalm/H/Zo6fsRUNAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybVL-0000HX-00; Tue, 26 Feb 2019 12:06:35 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybV7-00009l-G2
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D106F80D;
- Tue, 26 Feb 2019 04:06:20 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 0FC343F71D;
- Tue, 26 Feb 2019 04:06:18 -0800 (PST)
-Date: Tue, 26 Feb 2019 12:06:16 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Mark Rutland <mark.rutland@arm.com>
-Subject: Re: [PATCH v5 05/26] KVM: arm64: Add missing #include of
- <linux/bitmap.h> to kvm_host.h
-Message-ID: <20190226120616.GG3567@e103592.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-6-git-send-email-Dave.Martin@arm.com>
- <20190220152349.GE4763@lakrids.cambridge.arm.com>
+	id 1gybVS-0000Qz-7c; Tue, 26 Feb 2019 12:06:42 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gybVE-0000Ej-I6
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:30 +0000
+Received: by mail-it1-x144.google.com with SMTP id v2so3438670ith.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 26 Feb 2019 04:06:26 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=g5Ov+RxKwl/mKZYYxN4XrdesfyZ+XBCP+/DRAcMvDBk=;
+ b=Ih3NfUSFo3kJvGozOKt3/XFrX/Ys15EcmTGZJWiclYvBcXRkLDaOmfHljoCVRTePqr
+ RoFq3ma1iNasuxa7/ExGCZWxVxb1AloMRBV/u4YddyATmo1anFvh6sbQpeVEOO440rpW
+ bzZvyyVAy6qYa4sWU7B+5YFopUx8ccwhuwydQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=g5Ov+RxKwl/mKZYYxN4XrdesfyZ+XBCP+/DRAcMvDBk=;
+ b=BVwa/M8FbScRNMr6R/t0p8q2Dx/SlxfoPG9yFqLf/ROF7dOjjJWwXPpeNxWKiA2J4k
+ ItK4LX5dPyAc5hK5Dc1IsR56IXxyvrXcxbcubqr7X5BVniO8ROQpJsbDwnc/dBSLpGJ9
+ 6ehn+VuGT+7uHLc5iLOfMzL/UR4uvFqb5vSNXZMPaVyX7g6qSiqfRcw62Ww3Rk7ewWsd
+ o/tDSsV6PH6u1DvfaHxFv4x/e7rKlI0bKoR23rNzhTk8J8gdm/pP2/nZzobW1MzscRQ4
+ L1E9vESn67dT8aUDJ2A4qgP61DVy1skt9GcZzA0ABpKVKjE5cUJ4tWfy8HbFOzoEfX6x
+ lNMQ==
+X-Gm-Message-State: AHQUAuZR9AeM82pzPT8eJnP2Erjf5SOopox3s4xprrmWucDCNCSK9aKb
+ Vj7Crsxn8iqpTtLvITCBmavGOe5NxwK2ZGcGAHueOg==
+X-Google-Smtp-Source: AHgI3IbRgruUICrNp06lvsUlwbjyV/pJTH9wUMVQUzidn105nq31ExX0LnywuLcDnXdcppTs93Et3mU66K2VBgsnRWQ=
+X-Received: by 2002:a24:7412:: with SMTP id o18mr2143337itc.117.1551182786028; 
+ Tue, 26 Feb 2019 04:06:26 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20190220152349.GE4763@lakrids.cambridge.arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+References: <1550953697-7288-1-git-send-email-hyun.kwon@xilinx.com>
+ <1550953697-7288-2-git-send-email-hyun.kwon@xilinx.com>
+ <20190226115311.GA4094@kroah.com>
+In-Reply-To: <20190226115311.GA4094@kroah.com>
+From: Daniel Vetter <daniel@ffwll.ch>
+Date: Tue, 26 Feb 2019 13:06:13 +0100
+Message-ID: <CAKMK7uE=dSyo5vdjtQf=k1rdoegiBgSozCOotXLSW2VAkz2Ldw@mail.gmail.com>
+Subject: Re: [PATCH RFC 1/1] uio: Add dma-buf import ioctls
+To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_040621_817827_88AC1BAB 
-X-CRM114-Status: GOOD (  19.59  )
+X-CRM114-CacheID: sfid-20190226_040628_676985_20BBA7D0 
+X-CRM114-Status: GOOD (  25.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,75 +88,156 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Stefano Stabellini <stefanos@xilinx.com>, Hyun Kwon <hyun.kwon@xilinx.com>,
+ Sonal Santan <sonals@xilinx.com>, Cyril Chemparathy <cyrilc@xilinx.com>,
+ Jiaying Liang <jliang@xilinx.com>, dri-devel <dri-devel@lists.freedesktop.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "moderated list:DMA BUFFER SHARING FRAMEWORK" <linaro-mm-sig@lists.linaro.org>,
+ Michal Simek <michal.simek@xilinx.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ "open list:DMA BUFFER SHARING FRAMEWORK" <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 03:23:50PM +0000, Mark Rutland wrote:
-> On Mon, Feb 18, 2019 at 07:52:18PM +0000, Dave Martin wrote:
-> > kvm_host.h uses DECLARE_BITMAP() to declare the features member of
-> > struct vcpu_arch, but the corresponding #include for this is
-> > missing.
-> > =
-
-> > This patch adds a suitable #include for <linux/bitmap.h>.  Although
-> > the header builds without it today, this should help to avoid
-> > future surprises.
-> > =
-
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reviewed-by: Alex Benn=E9e <alex.bennee@linaro.org>
+On Tue, Feb 26, 2019 at 12:53 PM Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+>
+> On Sat, Feb 23, 2019 at 12:28:17PM -0800, Hyun Kwon wrote:
+> > Add the dmabuf map / unmap interfaces. This allows the user driver
+> > to be able to import the external dmabuf and use it from user space.
+> >
+> > Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
 > > ---
-> >  arch/arm64/include/asm/kvm_host.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> > =
+> >  drivers/uio/Makefile         |   2 +-
+> >  drivers/uio/uio.c            |  43 +++++++++
+> >  drivers/uio/uio_dmabuf.c     | 210 +++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/uio/uio_dmabuf.h     |  26 ++++++
+> >  include/uapi/linux/uio/uio.h |  33 +++++++
+> >  5 files changed, 313 insertions(+), 1 deletion(-)
+> >  create mode 100644 drivers/uio/uio_dmabuf.c
+> >  create mode 100644 drivers/uio/uio_dmabuf.h
+> >  create mode 100644 include/uapi/linux/uio/uio.h
+> >
+> > diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
+> > index c285dd2..5da16c7 100644
+> > --- a/drivers/uio/Makefile
+> > +++ b/drivers/uio/Makefile
+> > @@ -1,5 +1,5 @@
+> >  # SPDX-License-Identifier: GPL-2.0
+> > -obj-$(CONFIG_UIO)    += uio.o
+> > +obj-$(CONFIG_UIO)    += uio.o uio_dmabuf.o
+> >  obj-$(CONFIG_UIO_CIF)        += uio_cif.o
+> >  obj-$(CONFIG_UIO_PDRV_GENIRQ)        += uio_pdrv_genirq.o
+> >  obj-$(CONFIG_UIO_DMEM_GENIRQ)        += uio_dmem_genirq.o
+> > diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+> > index 1313422..6841f98 100644
+> > --- a/drivers/uio/uio.c
+> > +++ b/drivers/uio/uio.c
+> > @@ -24,6 +24,12 @@
+> >  #include <linux/kobject.h>
+> >  #include <linux/cdev.h>
+> >  #include <linux/uio_driver.h>
+> > +#include <linux/list.h>
+> > +#include <linux/mutex.h>
+> > +
+> > +#include <uapi/linux/uio/uio.h>
+> > +
+> > +#include "uio_dmabuf.h"
+> >
+> >  #define UIO_MAX_DEVICES              (1U << MINORBITS)
+> >
+> > @@ -454,6 +460,8 @@ static irqreturn_t uio_interrupt(int irq, void *dev_id)
+> >  struct uio_listener {
+> >       struct uio_device *dev;
+> >       s32 event_count;
+> > +     struct list_head dbufs;
+> > +     struct mutex dbufs_lock; /* protect @dbufs */
+> >  };
+> >
+> >  static int uio_open(struct inode *inode, struct file *filep)
+> > @@ -500,6 +508,9 @@ static int uio_open(struct inode *inode, struct file *filep)
+> >       if (ret)
+> >               goto err_infoopen;
+> >
+> > +     INIT_LIST_HEAD(&listener->dbufs);
+> > +     mutex_init(&listener->dbufs_lock);
+> > +
+> >       return 0;
+> >
+> >  err_infoopen:
+> > @@ -529,6 +540,10 @@ static int uio_release(struct inode *inode, struct file *filep)
+> >       struct uio_listener *listener = filep->private_data;
+> >       struct uio_device *idev = listener->dev;
+> >
+> > +     ret = uio_dmabuf_cleanup(idev, &listener->dbufs, &listener->dbufs_lock);
+> > +     if (ret)
+> > +             dev_err(&idev->dev, "failed to clean up the dma bufs\n");
+> > +
+> >       mutex_lock(&idev->info_lock);
+> >       if (idev->info && idev->info->release)
+> >               ret = idev->info->release(idev->info, inode);
+> > @@ -652,6 +667,33 @@ static ssize_t uio_write(struct file *filep, const char __user *buf,
+> >       return retval ? retval : sizeof(s32);
+> >  }
+> >
+> > +static long uio_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
+>
+> We have resisted adding a uio ioctl for a long time, can't you do this
+> through sysfs somehow?
+>
+> A meta-comment about your ioctl structure:
+>
+> > +#define UIO_DMABUF_DIR_BIDIR 1
+> > +#define UIO_DMABUF_DIR_TO_DEV        2
+> > +#define UIO_DMABUF_DIR_FROM_DEV      3
+> > +#define UIO_DMABUF_DIR_NONE  4
+>
+> enumerated type?
+>
+> > +
+> > +struct uio_dmabuf_args {
+> > +     __s32   dbuf_fd;
+> > +     __u64   dma_addr;
+> > +     __u64   size;
+> > +     __u32   dir;
+>
+> Why the odd alignment?  Are you sure this is the best packing for such a
+> structure?
+>
+> Why is dbuf_fd __s32?  dir can be __u8, right?
+>
+> I don't know that dma layer very well, it would be good to get some
+> review from others to see if this really is even a viable thing to do.
+> The fd handling seems a bit "odd" here, but maybe I just do not
+> understand it.
 
-> > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm=
-/kvm_host.h
-> > index 7732d0b..84056a4 100644
-> > --- a/arch/arm64/include/asm/kvm_host.h
-> > +++ b/arch/arm64/include/asm/kvm_host.h
-> > @@ -22,6 +22,7 @@
-> >  #ifndef __ARM64_KVM_HOST_H__
-> >  #define __ARM64_KVM_HOST_H__
-> >  =
+Frankly looks like a ploy to sidestep review by graphics folks. We'd
+ask for the userspace first :-)
 
-> > +#include <linux/bitmap.h>
-> >  #include <linux/types.h>
-> >  #include <linux/kvm_types.h>
-> >  #include <asm/cpufeature.h>
-> =
+Also, exporting dma_addr to userspace is considered a very bad idea.
+If you want to do this properly, you need a minimal in-kernel memory
+manager, and those tend to be based on top of drm_gem.c and merged
+through the gpu tree. The last place where we accidentally leaked a
+dma addr for gpu buffers was in the fbdev code, and we plugged that
+one with
 
-> From a quick scan of the file, we're also missing:
-> =
+commit 4be9bd10e22dfc7fc101c5cf5969ef2d3a042d8a (tag:
+drm-misc-next-fixes-2018-10-03)
+Author: Neil Armstrong <narmstrong@baylibre.com>
+Date:   Fri Sep 28 14:05:55 2018 +0200
 
-> #include <asm/barrier.h>
+    drm/fb_helper: Allow leaking fbdev smem_start
 
-[...]
+Together with cuse the above patch should be enough to implement a drm
+driver entirely in userspace at least.
 
-> #include <linux/jump_label.h>
-> #include <linux/percpu.h>
-
-Done for those three.
-
-
-> #include <linux/thread_info.h>
-
-Since commit e6b673b741ea ("KVM: arm64: Optimise FPSIMD handling to
-reduce guest/host thrashing", we do have <asm/thread_info.h>.
-
-Since this header is not generic, this seems reasonable.  Is there
-something from <linux/thread_info.h> used here that I'm missing?
-
-Cheers
----Dave
+Cheers, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
 
 _______________________________________________
 linux-arm-kernel mailing list
