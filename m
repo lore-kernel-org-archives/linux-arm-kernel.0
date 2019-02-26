@@ -2,65 +2,87 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A45EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 86E77C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1BD8C2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 57A5F2087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZdEPN1Kz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BD8C2087C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PJVu/jK4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="w7xlvvSH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57A5F2087C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/x+HwCW0K/PilkPrSfXgqmVkmjZxj29dcs0UdiWUbvk=; b=ZdEPN1KzRGktZZ
-	NX+oEOD7HyJ5+VY6+aUs1D4sRTdsFbvoXG1aP9pdIxBWWBOqlEbDy8fyBsUDd40BqheAiDZkRJZUM
-	Hf5u56oDWLnGPPFFlSyaCxM9vXvOMztADv5Yid6dxQRr7GSsrhrFDedUNROZ2/IxoBeAnMKSsILU2
-	grvKam8klczqazfwC/rpIHpkFCm5OoW3/S63G8pCojxhovNMmxUNTToj0zi+hUlNdV00cNlJqc4LK
-	1vD81AUivgP5Y6dDjgLPoDP8eEnIO5NYYJeTrYvPuBzymRkLw5UjwB9heuUJwEa9kzoGi/YtMsY0G
-	2/DVvCv/AszhUADcI9EQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=80zSxrrp/39129ga25mS8ghU5u0hwylWeCXPJjtnWDQ=; b=PJVu/jK4/0pcJW
+	YEAjbtFDe0v2/ASHYre7M4wVFDJ57mFhTTPINWYWgZ8WRHALz6HwxiVpl1ueaeFVHlJEBOkMhQyCf
+	boBhKBS05PiY8XMTeZbrKIfs3pvW4We42BiMGIz1bMl0SnVq5tajQ+W+tokpXBpmd1dYZv9De5c8b
+	IV5p/Qv9oNzSlKTKs4N6pzcUFuKBG2XfRYd5otFjqGkHOhq79zFeE3GGiT/O5NytzW/+0MyWDGlLC
+	y/y7UwtLU5goSYvBkzwoijBRWVoNoYqNIQBGe452gd6hbz4jEIpcxaWe2ChingIFz72lxIUW15x2j
+	8/QDJgGCIT14Xr56f5Yg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybd9-00007r-Dl; Tue, 26 Feb 2019 12:14:39 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybcV-0007yE-RQ
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:14:08 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 881CF80D;
- Tue, 26 Feb 2019 04:13:59 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BB59F3F5C1;
- Tue, 26 Feb 2019 04:13:57 -0800 (PST)
-Date: Tue, 26 Feb 2019 12:13:55 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v5 23/26] KVM: arm64/sve: Allow userspace to enable SVE
- for vcpus
-Message-ID: <20190226121355.GU3567@e103592.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-24-git-send-email-Dave.Martin@arm.com>
- <88f7a00d-019a-5ed3-5a80-6032775dc5c5@arm.com>
+	id 1gybdK-0000OI-MN; Tue, 26 Feb 2019 12:14:50 +0000
+Received: from mail-wm1-x333.google.com ([2a00:1450:4864:20::333])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gybcZ-000802-NM
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:14:10 +0000
+Received: by mail-wm1-x333.google.com with SMTP id g20so1329097wmh.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 26 Feb 2019 04:14:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=/Nyp+XvU8Iwf2Gbpf50+YAlGUNo21rB3BtmQX93H+/8=;
+ b=w7xlvvSHT+D9QXGWcVXmjqjo+lNl3F30O/fXb4+IWjIQUl4oleryc0fqngzfVrHqhK
+ gNk5UEr3iEtxHd7qL9WYnb4PQ8zV2E0HvpRVpYNN+96mAKn7tdTP16GZyG7hrBeVCq/0
+ CjftkpijTpqRuw8Xava+zVwuImh8zN7kESwNsiU5zTkg/E0LJuFNvfKu4CvyAY3pHEmO
+ Qygv7crr8TWv/S1ZOoxgpRWCqIJfInWSVMgbJTRKQHjXtVHsDPRpG4QVsdYGx/pChmFB
+ Gh9mivo+DCx8cXGm7feOUBd0z+9O4BOQqQQSFMMV4q+WnCIG0D1y02PVag38WSFXHBvb
+ 6z9g==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=/Nyp+XvU8Iwf2Gbpf50+YAlGUNo21rB3BtmQX93H+/8=;
+ b=lV80VuBJZd2JKZ6Xsx1CjvOqJd9/IRmIenlKCxz5ZaG/av2LQ7K9UgGEJIh4BeR6zm
+ fbTiUaDrgzdHuehv5qrnED2gYaiZVdXV1y3XWv4OFuT4cN2fofPJeC8uXjuXIygWjXFv
+ Z2QDI1xUXCHN8hwngCWuobonOBNFIEmj2wghyU6VuBiB6n3M8XVNIlrMV/LhApV7uEL1
+ SxIJY6stgjAE1qPcgLKZPEN/wzaZgKvfqwrcHITpXz3HVJrjSyubsxQwD2hgnvXF4ZX0
+ yOqu2C7XJLgxqljOfwipjE7oh+qGhUX6OogaKnslfSNZGYbUn27/xbDCCgOtk445bOAX
+ cVzg==
+X-Gm-Message-State: AHQUAuYMMplkYqrGrf9u9oiITwvrd4Xb4RSyaJ2Df9jqYng03NpVAG2r
+ VV35F7BX6pGDOtI29p+LLI9Row==
+X-Google-Smtp-Source: AHgI3IZXdoAIAsseBMfkRAKIZI4SRXn8yZHH9eDUwV7R58aPu16CWGLwavGRfzK0LHMsvm+QRPae8w==
+X-Received: by 2002:a7b:c752:: with SMTP id w18mr2534264wmk.97.1551183241738; 
+ Tue, 26 Feb 2019 04:14:01 -0800 (PST)
+Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
+ by smtp.gmail.com with ESMTPSA id p1sm11401877wrx.50.2019.02.26.04.14.00
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 26 Feb 2019 04:14:01 -0800 (PST)
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, David Lechner <david@lechnology.com>
+Subject: [PATCH 0/2] ARM: make DaVinci part of the ARM v5 multiplatform build
+Date: Tue, 26 Feb 2019 13:13:51 +0100
+Message-Id: <20190226121353.19413-1-brgl@bgdev.pl>
+X-Mailer: git-send-email 2.20.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <88f7a00d-019a-5ed3-5a80-6032775dc5c5@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_041400_246790_B422C2F2 
-X-CRM114-Status: GOOD (  23.19  )
+X-CRM114-CacheID: sfid-20190226_041403_871765_3C1E75BC 
+X-CRM114-Status: GOOD (  11.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,83 +94,40 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 09:05:16AM +0000, Julien Thierry wrote:
-> Hi Dave,
-> 
-> On 18/02/2019 19:52, Dave Martin wrote:
-> > Now that all the pieces are in place, this patch offers a new flag
-> > KVM_ARM_VCPU_SVE that userspace can pass to KVM_ARM_VCPU_INIT to
-> > turn on SVE for the guest, on a per-vcpu basis.
-> > 
-> > As part of this, support for initialisation and reset of the SVE
-> > vector length set and registers is added in the appropriate places.
-> > Allocation SVE registers is deferred until kvm_arm_vcpu_finalize(),
-> > by which time the size of the registers is known.
-> > 
-> > Setting the vector lengths supported by the vcpu is considered
-> > configuration of the emulated hardware rather than runtime
-> > configuration, so no support is offered for changing the vector
-> > lengths of an existing vcpu across reset.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > ---
-> > 
-> > Changes since v4:
-> > 
-> >  * Pull out vcpu_sve_state_size(), for use earlier in the series.
-> > 
-> >  * Remove unnecessary vcpu->arch.sve_vqs[], and clamp maximum guest
-> >    vector length to 256 bytes for forwards compatibility.
-> > 
-> >    (See "KVM: arm64/sve: Add pseudo-register for the guest's vector
-> >    lengths".)
-> > 
-> >  * Minor tidyups to make some checks less verbose.
-> > ---
-> >  arch/arm64/include/asm/kvm_host.h |  2 +-
-> >  arch/arm64/include/uapi/asm/kvm.h |  1 +
-> >  arch/arm64/kvm/reset.c            | 70 ++++++++++++++++++++++++++++++++++++++-
-> >  3 files changed, 71 insertions(+), 2 deletions(-)
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-[...]
+This series depends on the interrupts support overhaul and the cpufreq
+fix that are queued for v5.1 and on the clocksource rework that's been
+posted to LKML[1].
 
-> > diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+The first one adds necessary bits and pieces for davinci to support
+multiplatform build and the second one actually adds all davinci boards
+to multi_v5_defconfig.
 
-[...]
+[1] https://lkml.org/lkml/2019/2/26/363
 
-> >  int kvm_arm_vcpu_finalize(struct kvm_vcpu *vcpu)
-> >  {
-> >  	if (likely(kvm_arm_vcpu_finalized(vcpu)))
-> >  		return 0;
-> >  
-> > +	if (vcpu_has_sve(vcpu)) {
-> > +		size_t size = vcpu_sve_state_size(vcpu);
-> > +
-> > +		if (!size)
-> > +			return -EINVAL;
-> > +
-> > +		vcpu->arch.sve_state = kzalloc(size, GFP_KERNEL);
-> 
-> We should probably free this in kvm_arch_vcpu_free().
+Bartosz Golaszewski (2):
+  ARM: davinci: support multiplatform build for ARM v5
+  ARM: multi_v5_defconfig: make DaVinci part of the ARM v5 multiplatform
+    build
 
-Hmmm, good spot!
+ arch/arm/Kconfig                       | 21 ---------------------
+ arch/arm/configs/davinci_all_defconfig |  5 +++++
+ arch/arm/configs/multi_v5_defconfig    | 12 ++++++++++++
+ arch/arm/mach-davinci/Kconfig          | 16 ++++++++++++----
+ arch/arm/mach-davinci/Makefile         |  2 ++
+ 5 files changed, 31 insertions(+), 25 deletions(-)
 
-Looks like I lost that during a previous rebase.
+-- 
+2.20.1
 
-Cheers
----Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
