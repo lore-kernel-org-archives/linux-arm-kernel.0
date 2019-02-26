@@ -2,81 +2,64 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 277E8C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 36CAAC4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CFF6C2186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:06:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B35321852
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fqV4+e/l";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="Ih3NfUSF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CFF6C2186A
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M/IC6Pfu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B35321852
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AvCIFW6+F3jKrhmJQJQGCgeILWuB/HcDSGyiEFmtC8c=; b=fqV4+e/legpBam
-	95jkMe4InScCW1iHKQbbAEp5jBT/Mb/+b0AzfqSceh6hMw0I42xqY8Px+mfpBrM0JqoqPAPj6U3J4
-	vXTfi0GlX395hRVKlOGrnQW2EDe6i/8cXlGgxfCxuTOgN3xO9eskmVqak3Pj1wvZ5zuVNc/V4FQh9
-	aK9ASGSKuQfuJ07u5P7IrcWwBx3/ndDazLGfRiZw4C/ehH+PAeo5RlxKBvDaE+a9mjX5fmjuGTgXN
-	ueR9jg8uJw0yvmH/8fU/dBqVuIqblS9vuuZQzNdyci2b5uC8uS3mRBNGHKqMdxUmBsFaeO3cybSV1
-	0EiWalm/H/Zo6fsRUNAg==;
+	List-Owner; bh=q84jMpRZCxSi0mCn6KwLtcNvRKSYLZrQno1noo/XKdA=; b=M/IC6Pfujni94q
+	hf2yKuZARgRmuNUu7rwXTz35QSCGBueOFwRH6+0Erd3kXhABiwCVa219gv1PSQ/kxzMgf9/b0B+pX
+	SmN5wjGKcI68JC0A8hecBPsOxMnuDei1kGf+rHUxnv5OTMTMh4/FxAM37VYSaXlFiUonI6cTOvlZk
+	OhulV+a732Hk4E7oYdaFq41d2Iny/kzCgr4x6u7WB/FyIVBx6T4yoqHIdHFpE/1xiILJ/vngPTV4b
+	uLm+5QI6ccS5cF6DstBdYcrp70zeFptDRg/qXxMrewawSQur+g2MQUDLkpsDkvfVdxBQLy1G95n5S
+	rG81K/tTdIhF0JOHE94g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybVS-0000Qz-7c; Tue, 26 Feb 2019 12:06:42 +0000
-Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybVE-0000Ej-I6
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:30 +0000
-Received: by mail-it1-x144.google.com with SMTP id v2so3438670ith.3
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 04:06:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=g5Ov+RxKwl/mKZYYxN4XrdesfyZ+XBCP+/DRAcMvDBk=;
- b=Ih3NfUSFo3kJvGozOKt3/XFrX/Ys15EcmTGZJWiclYvBcXRkLDaOmfHljoCVRTePqr
- RoFq3ma1iNasuxa7/ExGCZWxVxb1AloMRBV/u4YddyATmo1anFvh6sbQpeVEOO440rpW
- bzZvyyVAy6qYa4sWU7B+5YFopUx8ccwhuwydQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=g5Ov+RxKwl/mKZYYxN4XrdesfyZ+XBCP+/DRAcMvDBk=;
- b=BVwa/M8FbScRNMr6R/t0p8q2Dx/SlxfoPG9yFqLf/ROF7dOjjJWwXPpeNxWKiA2J4k
- ItK4LX5dPyAc5hK5Dc1IsR56IXxyvrXcxbcubqr7X5BVniO8ROQpJsbDwnc/dBSLpGJ9
- 6ehn+VuGT+7uHLc5iLOfMzL/UR4uvFqb5vSNXZMPaVyX7g6qSiqfRcw62Ww3Rk7ewWsd
- o/tDSsV6PH6u1DvfaHxFv4x/e7rKlI0bKoR23rNzhTk8J8gdm/pP2/nZzobW1MzscRQ4
- L1E9vESn67dT8aUDJ2A4qgP61DVy1skt9GcZzA0ABpKVKjE5cUJ4tWfy8HbFOzoEfX6x
- lNMQ==
-X-Gm-Message-State: AHQUAuZR9AeM82pzPT8eJnP2Erjf5SOopox3s4xprrmWucDCNCSK9aKb
- Vj7Crsxn8iqpTtLvITCBmavGOe5NxwK2ZGcGAHueOg==
-X-Google-Smtp-Source: AHgI3IbRgruUICrNp06lvsUlwbjyV/pJTH9wUMVQUzidn105nq31ExX0LnywuLcDnXdcppTs93Et3mU66K2VBgsnRWQ=
-X-Received: by 2002:a24:7412:: with SMTP id o18mr2143337itc.117.1551182786028; 
- Tue, 26 Feb 2019 04:06:26 -0800 (PST)
+	id 1gybVv-0000rO-ST; Tue, 26 Feb 2019 12:07:11 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gybVL-0000I5-Bh
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:42 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ADE5480D;
+ Tue, 26 Feb 2019 04:06:34 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E12303F71D;
+ Tue, 26 Feb 2019 04:06:32 -0800 (PST)
+Date: Tue, 26 Feb 2019 12:06:30 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Julien Thierry <julien.thierry@arm.com>
+Subject: Re: [PATCH v5 06/26] arm64/sve: Check SVE virtualisability
+Message-ID: <20190226120630.GH3567@e103592.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-7-git-send-email-Dave.Martin@arm.com>
+ <64764e35-c243-e642-a868-5b9e221813c7@arm.com>
 MIME-Version: 1.0
-References: <1550953697-7288-1-git-send-email-hyun.kwon@xilinx.com>
- <1550953697-7288-2-git-send-email-hyun.kwon@xilinx.com>
- <20190226115311.GA4094@kroah.com>
-In-Reply-To: <20190226115311.GA4094@kroah.com>
-From: Daniel Vetter <daniel@ffwll.ch>
-Date: Tue, 26 Feb 2019 13:06:13 +0100
-Message-ID: <CAKMK7uE=dSyo5vdjtQf=k1rdoegiBgSozCOotXLSW2VAkz2Ldw@mail.gmail.com>
-Subject: Re: [PATCH RFC 1/1] uio: Add dma-buf import ioctls
-To: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Content-Disposition: inline
+In-Reply-To: <64764e35-c243-e642-a868-5b9e221813c7@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_040628_676985_20BBA7D0 
-X-CRM114-Status: GOOD (  25.94  )
+X-CRM114-CacheID: sfid-20190226_040635_580961_62033E6F 
+X-CRM114-Status: GOOD (  31.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,156 +71,219 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefano Stabellini <stefanos@xilinx.com>, Hyun Kwon <hyun.kwon@xilinx.com>,
- Sonal Santan <sonals@xilinx.com>, Cyril Chemparathy <cyrilc@xilinx.com>,
- Jiaying Liang <jliang@xilinx.com>, dri-devel <dri-devel@lists.freedesktop.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- "moderated list:DMA BUFFER SHARING FRAMEWORK" <linaro-mm-sig@lists.linaro.org>,
- Michal Simek <michal.simek@xilinx.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- "open list:DMA BUFFER SHARING FRAMEWORK" <linux-media@vger.kernel.org>
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 26, 2019 at 12:53 PM Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
->
-> On Sat, Feb 23, 2019 at 12:28:17PM -0800, Hyun Kwon wrote:
-> > Add the dmabuf map / unmap interfaces. This allows the user driver
-> > to be able to import the external dmabuf and use it from user space.
-> >
-> > Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
+On Wed, Feb 20, 2019 at 11:12:49AM +0000, Julien Thierry wrote:
+> Hi Dave,
+> 
+> On 18/02/2019 19:52, Dave Martin wrote:
+> > Due to the way the effective SVE vector length is controlled and
+> > trapped at different exception levels, certain mismatches in the
+> > sets of vector lengths supported by different physical CPUs in the
+> > system may prevent straightforward virtualisation of SVE at parity
+> > with the host.
+> > 
+> > This patch analyses the extent to which SVE can be virtualised
+> > safely without interfering with migration of vcpus between physical
+> > CPUs, and rejects late secondary CPUs that would erode the
+> > situation further.
+> > 
+> > It is left up to KVM to decide what to do with this information.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > > ---
-> >  drivers/uio/Makefile         |   2 +-
-> >  drivers/uio/uio.c            |  43 +++++++++
-> >  drivers/uio/uio_dmabuf.c     | 210 +++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/uio/uio_dmabuf.h     |  26 ++++++
-> >  include/uapi/linux/uio/uio.h |  33 +++++++
-> >  5 files changed, 313 insertions(+), 1 deletion(-)
-> >  create mode 100644 drivers/uio/uio_dmabuf.c
-> >  create mode 100644 drivers/uio/uio_dmabuf.h
-> >  create mode 100644 include/uapi/linux/uio/uio.h
-> >
-> > diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
-> > index c285dd2..5da16c7 100644
-> > --- a/drivers/uio/Makefile
-> > +++ b/drivers/uio/Makefile
-> > @@ -1,5 +1,5 @@
-> >  # SPDX-License-Identifier: GPL-2.0
-> > -obj-$(CONFIG_UIO)    += uio.o
-> > +obj-$(CONFIG_UIO)    += uio.o uio_dmabuf.o
-> >  obj-$(CONFIG_UIO_CIF)        += uio_cif.o
-> >  obj-$(CONFIG_UIO_PDRV_GENIRQ)        += uio_pdrv_genirq.o
-> >  obj-$(CONFIG_UIO_DMEM_GENIRQ)        += uio_dmem_genirq.o
-> > diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
-> > index 1313422..6841f98 100644
-> > --- a/drivers/uio/uio.c
-> > +++ b/drivers/uio/uio.c
-> > @@ -24,6 +24,12 @@
-> >  #include <linux/kobject.h>
-> >  #include <linux/cdev.h>
-> >  #include <linux/uio_driver.h>
-> > +#include <linux/list.h>
-> > +#include <linux/mutex.h>
-> > +
-> > +#include <uapi/linux/uio/uio.h>
-> > +
-> > +#include "uio_dmabuf.h"
-> >
-> >  #define UIO_MAX_DEVICES              (1U << MINORBITS)
-> >
-> > @@ -454,6 +460,8 @@ static irqreturn_t uio_interrupt(int irq, void *dev_id)
-> >  struct uio_listener {
-> >       struct uio_device *dev;
-> >       s32 event_count;
-> > +     struct list_head dbufs;
-> > +     struct mutex dbufs_lock; /* protect @dbufs */
-> >  };
-> >
-> >  static int uio_open(struct inode *inode, struct file *filep)
-> > @@ -500,6 +508,9 @@ static int uio_open(struct inode *inode, struct file *filep)
-> >       if (ret)
-> >               goto err_infoopen;
-> >
-> > +     INIT_LIST_HEAD(&listener->dbufs);
-> > +     mutex_init(&listener->dbufs_lock);
-> > +
-> >       return 0;
-> >
-> >  err_infoopen:
-> > @@ -529,6 +540,10 @@ static int uio_release(struct inode *inode, struct file *filep)
-> >       struct uio_listener *listener = filep->private_data;
-> >       struct uio_device *idev = listener->dev;
-> >
-> > +     ret = uio_dmabuf_cleanup(idev, &listener->dbufs, &listener->dbufs_lock);
-> > +     if (ret)
-> > +             dev_err(&idev->dev, "failed to clean up the dma bufs\n");
-> > +
-> >       mutex_lock(&idev->info_lock);
-> >       if (idev->info && idev->info->release)
-> >               ret = idev->info->release(idev->info, inode);
-> > @@ -652,6 +667,33 @@ static ssize_t uio_write(struct file *filep, const char __user *buf,
-> >       return retval ? retval : sizeof(s32);
+> >  arch/arm64/include/asm/fpsimd.h |  1 +
+> >  arch/arm64/kernel/cpufeature.c  |  2 +-
+> >  arch/arm64/kernel/fpsimd.c      | 86 ++++++++++++++++++++++++++++++++++-------
+> >  3 files changed, 73 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> > index dd1ad39..964adc9 100644
+> > --- a/arch/arm64/include/asm/fpsimd.h
+> > +++ b/arch/arm64/include/asm/fpsimd.h
+> > @@ -87,6 +87,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
+> >  extern u64 read_zcr_features(void);
+> >  
+> >  extern int __ro_after_init sve_max_vl;
+> > +extern int __ro_after_init sve_max_virtualisable_vl;
+> >  
+> >  #ifdef CONFIG_ARM64_SVE
+> >  
+> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> > index f6d84e2..5eaacb4 100644
+> > --- a/arch/arm64/kernel/cpufeature.c
+> > +++ b/arch/arm64/kernel/cpufeature.c
+> > @@ -1825,7 +1825,7 @@ static void verify_sve_features(void)
+> >  	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
+> >  
+> >  	if (len < safe_len || sve_verify_vq_map()) {
+> > -		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
+> > +		pr_crit("CPU%d: SVE: vector length support mismatch\n",
+> >  			smp_processor_id());
+> >  		cpu_die_early();
+> >  	}
+> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> > index 62c37f0..64729e2 100644
+> > --- a/arch/arm64/kernel/fpsimd.c
+> > +++ b/arch/arm64/kernel/fpsimd.c
+> > @@ -18,6 +18,7 @@
+> >   */
+> >  
+> >  #include <linux/bitmap.h>
+> > +#include <linux/bitops.h>
+> >  #include <linux/bottom_half.h>
+> >  #include <linux/bug.h>
+> >  #include <linux/cache.h>
+> > @@ -48,6 +49,7 @@
+> >  #include <asm/sigcontext.h>
+> >  #include <asm/sysreg.h>
+> >  #include <asm/traps.h>
+> > +#include <asm/virt.h>
+> >  
+> >  #define FPEXC_IOF	(1 << 0)
+> >  #define FPEXC_DZF	(1 << 1)
+> > @@ -130,14 +132,18 @@ static int sve_default_vl = -1;
+> >  
+> >  /* Maximum supported vector length across all CPUs (initially poisoned) */
+> >  int __ro_after_init sve_max_vl = SVE_VL_MIN;
+> > +int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
+> >  /* Set of available vector lengths, as vq_to_bit(vq): */
+> >  static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+> > +/* Set of vector lengths present on at least one cpu: */
+> > +static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
+> >  static void __percpu *efi_sve_state;
+> >  
+> >  #else /* ! CONFIG_ARM64_SVE */
+> >  
+> >  /* Dummy declaration for code that will be optimised out: */
+> >  extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+> > +extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
+> >  extern void __percpu *efi_sve_state;
+> >  
+> >  #endif /* ! CONFIG_ARM64_SVE */
+> > @@ -623,12 +629,6 @@ int sve_get_current_vl(void)
+> >  	return sve_prctl_status(0);
 > >  }
-> >
-> > +static long uio_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
->
-> We have resisted adding a uio ioctl for a long time, can't you do this
-> through sysfs somehow?
->
-> A meta-comment about your ioctl structure:
->
-> > +#define UIO_DMABUF_DIR_BIDIR 1
-> > +#define UIO_DMABUF_DIR_TO_DEV        2
-> > +#define UIO_DMABUF_DIR_FROM_DEV      3
-> > +#define UIO_DMABUF_DIR_NONE  4
->
-> enumerated type?
->
+> >  
+> > -/*
+> > - * Bitmap for temporary storage of the per-CPU set of supported vector lengths
+> > - * during secondary boot.
+> > - */
+> > -static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
+> > -
+> >  static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+> >  {
+> >  	unsigned int vq, vl;
+> > @@ -650,6 +650,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+> >  void __init sve_init_vq_map(void)
+> >  {
+> >  	sve_probe_vqs(sve_vq_map);
+> > +	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
+> >  }
+> >  
+> >  /*
+> > @@ -658,25 +659,58 @@ void __init sve_init_vq_map(void)
+> >   */
+> >  void sve_update_vq_map(void)
+> >  {
+> > -	sve_probe_vqs(sve_secondary_vq_map);
+> > -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
+> > +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
 > > +
-> > +struct uio_dmabuf_args {
-> > +     __s32   dbuf_fd;
-> > +     __u64   dma_addr;
-> > +     __u64   size;
-> > +     __u32   dir;
->
-> Why the odd alignment?  Are you sure this is the best packing for such a
-> structure?
->
-> Why is dbuf_fd __s32?  dir can be __u8, right?
->
-> I don't know that dma layer very well, it would be good to get some
-> review from others to see if this really is even a viable thing to do.
-> The fd handling seems a bit "odd" here, but maybe I just do not
-> understand it.
+> > +	sve_probe_vqs(tmp_map);
+> > +	bitmap_and(sve_vq_map, sve_vq_map, tmp_map, SVE_VQ_MAX);
+> > +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, tmp_map, SVE_VQ_MAX);
+> >  }
+> >  
+> >  /* Check whether the current CPU supports all VQs in the committed set */
+> >  int sve_verify_vq_map(void)
+> >  {
+> > -	int ret = 0;
+> > +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
+> > +	unsigned long b;
+> >  
+> > -	sve_probe_vqs(sve_secondary_vq_map);
+> > -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
+> > -		      SVE_VQ_MAX);
+> > -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
+> > +	sve_probe_vqs(tmp_map);
+> > +
+> > +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
+> > +	if (bitmap_intersects(tmp_map, sve_vq_map, SVE_VQ_MAX)) {
+> >  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
+> >  			smp_processor_id());
+> > -		ret = -EINVAL;
+> > +		return -EINVAL;
+> >  	}
+> >  
+> > -	return ret;
+> > +	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
+> > +		return 0;
+> > +
+> > +	/*
+> > +	 * For KVM, it is necessary to ensure that this CPU doesn't
+> > +	 * support any vector length that guests may have probed as
+> > +	 * unsupported.
+> > +	 */
+> > +
+> > +	/* Recover the set of supported VQs: */
+> > +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
+> > +	/* Find VQs supported that are not globally supported: */
+> > +	bitmap_andnot(tmp_map, tmp_map, sve_vq_map, SVE_VQ_MAX);
+> > +
+> > +	/* Find the lowest such VQ, if any: */
+> > +	b = find_last_bit(tmp_map, SVE_VQ_MAX);
+> > +	if (b >= SVE_VQ_MAX)
+> > +		return 0; /* no mismatches */
+> > +
+> > +	/*
+> > +	 * Mismatches above sve_max_virtualisable_vl are fine, since
+> > +	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
+> > +	 */
+> > +	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
+> > +		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
+> 
+> Nit: might be good to specify that the vector length is unsupported for
+> virtualisation.
+> 
+> Also, since KVM is the one deciding what to do with the information,
+> should we have a warning here? But I can understand that knowing which
+> CPUs are introducing unsupported vector length, maybe using pr_devel()
+> instead of pr_warn()
 
-Frankly looks like a ploy to sidestep review by graphics folks. We'd
-ask for the userspace first :-)
+These warnings are really for consumption by SoC vendors, not users:
+my aim is to flag up systems that we consider broken (or at least,
+unsuitable for running KVM).
 
-Also, exporting dma_addr to userspace is considered a very bad idea.
-If you want to do this properly, you need a minimal in-kernel memory
-manager, and those tend to be based on top of drm_gem.c and merged
-through the gpu tree. The last place where we accidentally leaked a
-dma addr for gpu buffers was in the fbdev code, and we plugged that
-one with
+So I prefer to make this noisy and limit the amount of "useful"
+information people might be tempted to programmatically scrape from
+dmesg.
 
-commit 4be9bd10e22dfc7fc101c5cf5969ef2d3a042d8a (tag:
-drm-misc-next-fixes-2018-10-03)
-Author: Neil Armstrong <narmstrong@baylibre.com>
-Date:   Fri Sep 28 14:05:55 2018 +0200
+cpufeatures uses pr_warn("SANITY CHECK: [...]") here.  Maybe I should
+stick "SANITY CHECK" in here too?  I will also try to make the commit
+message more explicit and/or add comments to make the intent of the code
+clearer.
 
-    drm/fb_helper: Allow leaking fbdev smem_start
+It may also make sense to make this noise even if KVM isn't enabled
+(which is a rare case anyhow).
 
-Together with cuse the above patch should be enough to implement a drm
-driver entirely in userspace at least.
+Thoughts?
 
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> In any case, the logic looks good to me:
+> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+Thanks
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
