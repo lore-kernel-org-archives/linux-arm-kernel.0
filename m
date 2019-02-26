@@ -4,82 +4,183 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE55EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:54:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1040CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:00:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BEF6A2173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:54:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CDD8C2087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:59:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z5tZ342m";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="m6hbdVXk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BEF6A2173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qfxo6Npz";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Ym+07D4S"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CDD8C2087C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DwjvZHtEtRyclEsCyA+nJQhRSxsAAbrXcFyFKtMltUo=; b=Z5tZ342m0wWJFI
-	NtBjtxmztppVxbcD0XYkmI9BrR6ROJZAxvi7lntsNuiOFomWAaz27vU3hqa4dYYza/id7DItgxqhw
-	hEoKZRPcMUtuzDfmfJI5XKIIPx0IpL3EcZ6xtV0oHpjFy2wfMB1h9TtuWIcoNyH1ZHWAgvfmcJikr
-	6CE9FjUP0htytryHeZS2ZPE/JWiuR5yvL7WNHpmwApT60aMOcFd3ae5xj813sQfQZJioAZsSMrR10
-	5J/emqYkszKW1/8rbqPHzUyYISPKKfBeNHx9g8Z7TcQml3l2S072VOaDooCuSVtLXaU3HOfUMZEDJ
-	1yuQfgGgmZQ4Tz7qYGJQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Cct73UC5wBpE1Z7Dwa7egAc+KtodgbW9B/Kq8H4dhqg=; b=Qfxo6NpzNN+/uH
+	KzZIQSaQZXQKq0QJjHzw+gLmM37DhgF1H+J388ApqkbHVqBsimybhIgoTA0qDS2BjDI/nHdWcZsYX
+	Ti65Actgb/SfTDIikPJVNP41Q4gun0r/UfYhaXBcTTVw+f7cwBXcm42HFMAH4SpDFPkZYwPub5/c8
+	9mHeGfY7dHYYEAPyfDHHaTiqAODE4rezqP6KshoOeGm76F9cNmrZ1IHQvPRJh1heuW57P6FBBE1sO
+	YpUILugUxeItnwwiKR+t5FgpVwSXZyEQrSEOAb+ENPGo6DBrP98NHnvjPkHiiUVt4yQGKJVyX0E4Q
+	z3eLurgHre2bOOA4J4Kg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gycFu-0001P0-SL; Tue, 26 Feb 2019 12:54:42 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
+	id 1gycKv-0003ni-V9; Tue, 26 Feb 2019 12:59:53 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gycFr-0001Od-1P
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:54:40 +0000
-Received: by mail-ot1-x343.google.com with SMTP id z19so10994464otm.2
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 04:54:38 -0800 (PST)
+ id 1gycKr-0003j2-Py; Tue, 26 Feb 2019 12:59:51 +0000
+Received: by mail-ed1-x541.google.com with SMTP id m35so10607204ede.10;
+ Tue, 26 Feb 2019 04:59:47 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=KfGzKP/OLXFBdjiuVCs3RGt0v2kXfo/dPlY5xcAlpsY=;
- b=m6hbdVXkG9ZxucmX1mzVB7b51wIhJgICWRNbXc6Nua2Fnp4ot427x+gms/YlDuWRkX
- yaU2RVsCpReESSwy5hqRrpm+d8pA2B0wMuNGayihWd80QCF7mIz3r9ckVTPbSz6DptGj
- SQYUiNM9ccDu9u4LuMxZLDN5rF4txNH/IxJ2s/CzZc6MtsaQyAO4Pd1APC8tSQ6yG+0V
- Z5FurLuLgQJLqa4ZFTqQ6gCweFGTCiSH2jiR8wg1zHeMCpJVarrG3GiJ74DXLI+ovDu2
- IG9vkqdVnCICLoZqYqn6L+xGVqzsfcNlQS0+y8y5jXwu9f2VhIak7YxUc+luGG+lFfAd
- x68w==
+ h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=AVLvJ4lp3f6rtULD55+9vdorc40ZbBM2Q0QN5dVM9yk=;
+ b=Ym+07D4Swj+p5Md/sPGOlr/n94JngQpgIOUvaMrSWjYVSnt5pDtk6DXCXVzQgA/1ui
+ aIkXKaE9AvUgcTVqDXk/KoGS5owqlPR/J4IF7BNxupr+3uA8OO3E2vgYiUqDkUM7BEW0
+ BK5CqPiBp6zUW8neIPLbWOWpiNOIOEJSe99I5u+RFwN24hgytBmuu+fWOKr0zFMhYH3c
+ MijIFnHKLi25cOnca3K6h9J5x1KXZ03Jvo7YxHPZbJW0doaZOW24VeXbGMPnYj/xeMm7
+ oGO37CF0lTPwyP792mRqpS9n06y+Bs5yW7R1GAgn7IQOUYtEhwyHoLyix1kPtjh5FevG
+ Xzeg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=KfGzKP/OLXFBdjiuVCs3RGt0v2kXfo/dPlY5xcAlpsY=;
- b=Dm424bQbfZkwsFV67KLigFyzdZHIPi8DjFO5M2gHt1Nump0zmfa1rBOwbShJ0OfDY8
- MTvoemU75WhngDrmjw2nZgq94NAR/GVoyqNSdjnEAkkChBEQ75oqw+6/2/jz4464/brU
- TUtcYEK1L5ijDs/xfNX8ZDaJRtuAWIX4bQn0Sw2yTn3X2bV0Y/rnHdjLlZM2Xcw//Wdg
- myZoKxCxtW5B/inY1SFTKbRGgiTFuJ3Bw99QXwX6J3XIWNfHhEggIm7oEeMETOAcrVdJ
- ad0W0Bh5veNLne9qTMiphMZVxAu0Ew7OzRPXCLnP3FHUIC59W9G62glXJ0P49K/G8HUI
- buWw==
-X-Gm-Message-State: AHQUAuZQMGICZK7q5kCErGNyrLM+NB1dlwarLjkjXp8PzeDCrZr62n8c
- gxQT+Vnu2mRG0lc7wz7xqKvO6ggDH3+n9JIYsi8=
-X-Google-Smtp-Source: AHgI3IaSYAQqg6JF8aKCdphdBJRlWfYUmGrsWTG0Xua+jMIdFKm0WEXRHRaYN6ZcBy7kK/DqmUfyhvikcf1YuomGo3c=
-X-Received: by 2002:a9d:7645:: with SMTP id o5mr15927777otl.225.1551185677777; 
- Tue, 26 Feb 2019 04:54:37 -0800 (PST)
+ h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ :message-id:date:user-agent:mime-version:in-reply-to
+ :content-language:content-transfer-encoding;
+ bh=AVLvJ4lp3f6rtULD55+9vdorc40ZbBM2Q0QN5dVM9yk=;
+ b=szXrM78+wLs3OYnTeBIIJLF7BVRhMZ61b1tNgBgO+z8NaoLiieGuzsmGGYeaBAWPAK
+ 8CGP50ytb4y3+ysSJK7363qXQVszKrh8QUexNVUDDUhymQtQeFKSqIfK9jV5fMkBO3U/
+ pRRMnOZkqUEDaAQrn97/e2tn79uHr+Uc46D9CyTCK0t3FAAb+MEiTMySkKyMULSN51W9
+ +PUc6rXwDAKRiseV/RlTgbpiFmngHaif3y0U68Qw+rSl5kS7MGQXvKRik7RskM0m/Zob
+ jhaLh2RuuC9rIDbIcxzdRMX/14m699CqK2z0n+WB3nc99o0iSYGVc+XLZeGlyhhn/S4v
+ MkBA==
+X-Gm-Message-State: AHQUAuZevHgT0doXJUennut05jt0YX0p1FFIB3i9kT2QKrzWR4BcW9AP
+ gKR0Mv8/XhX+fVuzCZ2R0A0=
+X-Google-Smtp-Source: AHgI3IZvzRgLnd42grpWPKjOE3Y0GTbSHgpJDzasKu7ZVyJO8VD+pt/uZmABIvSw5iFQVkKN++PCNg==
+X-Received: by 2002:a50:94d6:: with SMTP id t22mr19081350eda.232.1551185986453; 
+ Tue, 26 Feb 2019 04:59:46 -0800 (PST)
+Received: from ziggy.stardust ([37.223.147.22])
+ by smtp.gmail.com with ESMTPSA id w24sm2480231edb.72.2019.02.26.04.59.45
+ (version=TLS1_3 cipher=AEAD-AES128-GCM-SHA256 bits=128/128);
+ Tue, 26 Feb 2019 04:59:45 -0800 (PST)
+Subject: Re: [PATCH v4 0/3] Mark clocks as critical for MT6797
+To: matthias.bgg@kernel.org, mturquette@baylibre.com, sboyd@kernel.org,
+ kevin-cw.chen@mediatek.com, mars.cheng@mediatek.com
+References: <20190214163026.26073-1-matthias.bgg@kernel.org>
+From: Matthias Brugger <matthias.bgg@gmail.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
+ 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
+ jrHWeQEI2ucSKsNa8FllDmG/fQ==
+Message-ID: <f7ed0750-665a-76bc-df1a-95af39fef8ec@gmail.com>
+Date: Tue, 26 Feb 2019 13:59:44 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
-References: <20190226070742.30551-1-daniel.baluta@nxp.com>
- <20190226070742.30551-3-daniel.baluta@nxp.com>
-In-Reply-To: <20190226070742.30551-3-daniel.baluta@nxp.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Tue, 26 Feb 2019 09:54:27 -0300
-Message-ID: <CAOMZO5AzUzyr_xixDcntoNt1KNSRih_2ZRFnzQHcg6pZmHsYig@mail.gmail.com>
-Subject: Re: [PATCH v3 2/5] arm64: dts: imx8mq: Add SAI2 node
-To: Daniel Baluta <daniel.baluta@nxp.com>
+In-Reply-To: <20190214163026.26073-1-matthias.bgg@kernel.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_045439_089670_07683823 
-X-CRM114-Status: UNSURE (   9.02  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190226_045950_089092_AD9EEE02 
+X-CRM114-Status: GOOD (  21.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,34 +192,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "baruch@tkos.co.il" <baruch@tkos.co.il>, Abel Vesa <abel.vesa@nxp.com>,
- "kuninori.morimoto.gx@renesas.com" <kuninori.morimoto.gx@renesas.com>,
- "ccaione@baylibre.com" <ccaione@baylibre.com>,
- "S.j. Wang" <shengjiu.wang@nxp.com>, "angus@akkea.ca" <angus@akkea.ca>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Aisheng Dong <aisheng.dong@nxp.com>, "agx@sigxcpu.org" <agx@sigxcpu.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: Matthias Brugger <mbrugger@suse.com>, sean.wang@mediatek.com,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ jasu@njomotys.info, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 26, 2019 at 4:08 AM Daniel Baluta <daniel.baluta@nxp.com> wrote:
->
-> SAI2 is part of AIPS-3 memory region and it's the DAI through
-> which the wm8524 codec gets its data.
 
-Please do not mention wm8524 in a SoC dtsi file commit message.
 
-It is the imx8mq-evk board that uses this codec and this information
-is not SoC related.
+On 14/02/2019 17:30, matthias.bgg@kernel.org wrote:
+> From: Matthias Brugger <mbrugger@suse.com>
+> 
+> Jasper send this series some month ago. As there was no reaction from
+> his side, I'll do a friendly take-over.
+> I tested the patches on my Helios X20 boards and they fix the issue.
+> I didn't add a Tested-by tag as I added my Signed-off-by.
+> 
+> Changes since v3:
+> - add comments explaining why the clock muxer and gates are marked
+>   as critical
+> 
+> Changes since v2 (https://patchwork.kernel.org/patch/10686759/):
+> - axi_sel is not needed, drop CLK_IS_CRITICAL for it.
+> - update commit message
+> - add Acked-by from Mars
+> 
+> Changes since v1:
+> - add a fixes tag.
+> 
+
+Steven, Mike any comments on this?
+
+Regards,
+Matthias
+
+> ---
+> 
+> Currently, DRAM-related clocks and the axi_sel MUX are not marked with
+> CLK_IS_CRITICAL for MT6797. This causes memory corruption when the
+> system is booted without clk_ignore_unused.
+> 
+> This patchset
+> 
+> 1. Makes it possible to mark outputs of MUXes as critical by introducing
+>    a new macro, MUX_FLAGS,
+> 2. Makes it possible to mark gates as critical by adding flags to
+>    mtk_gate, and
+> 3. Marks axi_sel, ddrphycfg_sel, infra_dramc_f26m and infra_dramc_b_f26m
+>    as critical.
+> 
+> The addition of flags to mtk_gate also exists in the patch series "Add
+> basic and clock support for Mediatek MT8183 SoC" [1].  The type of
+> flags is unsigned int in that series, but the real type is unsigned
+> long, so my patch differs from that patch.
+> 
+> [1] https://patchwork.kernel.org/patch/10549953/
+> 
+> Jasper Mattsson (3):
+>   clk: mediatek: Add MUX_FLAGS macro
+>   clk: mediatek: Add flags to mtk_gate
+>   clk: mediatek: Mark bus and DRAM related clocks as critical
+> 
+>  drivers/clk/mediatek/clk-gate.c   |  4 +-
+>  drivers/clk/mediatek/clk-gate.h   |  3 +-
+>  drivers/clk/mediatek/clk-mt6797.c | 68 +++++++++++++++++++------------
+>  drivers/clk/mediatek/clk-mtk.c    |  2 +-
+>  drivers/clk/mediatek/clk-mtk.h    |  9 +++-
+>  5 files changed, 56 insertions(+), 30 deletions(-)
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
