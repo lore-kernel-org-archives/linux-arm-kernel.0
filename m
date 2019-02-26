@@ -2,134 +2,82 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EE8DAC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:12:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06310C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:19:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B3F52217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:12:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7875217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:19:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FU45pxS9";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="un81j+8B"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3F52217F5
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="erVEC/2J";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="u5ASO6gl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7875217F9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2G7j9bBYMfsVvqhcecMlf5nWE8pd84ByClDlGjh3paw=; b=FU45pxS9QQB+Eu
-	pbQJ0x9LVj7w3d679LCQlVUD2v4jOLAPBJUz1hkH0DM4QfJF4mtVwP3B4p1VPOZlIfs7HSzDRIg71
-	0td5oJymwSFvKxfgte0s9EaNQ9/IIt28aN8DyNZ7LeuAYpY5Fr32sdYYw8zKMXNjg1ABiDj1qdnm2
-	afLreaafMhzckGMWfgyqJFX5a7AArHLp8jgMZSCDmlRPGcWlIK0wLWV8JkW+pk8zJs4gED9KkNCBO
-	w47TTpnjiAdzYVBcm4YnGKuJJXWunPiJNgBNxz8rPW4JYQsJ9mMptLoU7ecuu6xlG0bUNbKoBiYHf
-	SLA7bj6pJ0xH17Fy3d5g==;
+	List-Owner; bh=rTVEA1ZoJGhf8daxeuGYrY1RpGSJ9YDuUQayeZYMop4=; b=erVEC/2JuIte1q
+	TqZrdKcgO9qMbkZfv/uiU7ZvPPB1Yqn4Yfftl2k0OQ6fBtfWZmdXo11/s3b2YIqi/YDEOS5EwceHQ
+	WdADy5dsYZL1pNFKQ0G+UDA8YDhKHSTK9AzbogBTaC0Rm1SL8A1fVmEtp1qbXFYU2puQRuCIX6d46
+	fwpKeAyawoUzNI2Pw2s6ug3X07/FmqG1cTw90NYiKNZNln8ZcYgId+ihMWhdYb+vHXIV/3IYhI7xL
+	C76fhE9aroFkdriMXruLOwywHhLOgsKMWKEn/tJDBfQvZfO3Wp0CLsQlLFXq8IPwdlOb/EqO8FJ4T
+	zqC64tunjQSiEQhEFj+A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyWuz-0002CY-2u; Tue, 26 Feb 2019 07:12:45 +0000
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
+	id 1gyX1Q-00047C-IN; Tue, 26 Feb 2019 07:19:24 +0000
+Received: from mail-it1-x143.google.com ([2607:f8b0:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyWuv-0002By-0O
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 07:12:43 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20190226071237euoutp01287ef028dac98c59a06d4ea7743ecff6~G2H4cRxkT2002520025euoutp01Y
+ id 1gyX1M-00046n-Lj
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 07:19:22 +0000
+Received: by mail-it1-x143.google.com with SMTP id r11so2473314itc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 07:12:37 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20190226071237euoutp01287ef028dac98c59a06d4ea7743ecff6~G2H4cRxkT2002520025euoutp01Y
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1551165157;
- bh=SAu7VJe1aXwnuMdOxwPiVQ8Dlt2emoJsCuoglsL++tY=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=un81j+8B32u74bEnUNc4Phvc7FCX1p5tdFp1bH7wqB6Rorg18RQ4ZHSU+ISpswgkK
- ny/EcVMdhbPM4YCfjEzjEZhINzxCJiGmk87P2N94rXDlfLeld6usojB70f67e3pyi0
- ox4mCpz1MIUQeBTbC8hgQ17D9J56OjLpMSV2YEyk=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20190226071236eucas1p16092bfd7f541cf6dba3a21974f80002d~G2H3VFMCt1688616886eucas1p1K;
- Tue, 26 Feb 2019 07:12:36 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 65.64.04294.4E6E47C5; Tue, 26
- Feb 2019 07:12:36 +0000 (GMT)
-Received: from eusmtrp2.samsung.com (unknown [182.198.249.139]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20190226071235eucas1p209889ba789253f901c1c7ef1f42a7f17~G2H2Vw7oP0757107571eucas1p24;
- Tue, 26 Feb 2019 07:12:35 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp2.samsung.com (KnoxPortal) with ESMTP id
- 20190226071235eusmtrp2479ef274cb28095b4c54ccaab7b5358a~G2H2Gltvq1587615876eusmtrp27;
- Tue, 26 Feb 2019 07:12:35 +0000 (GMT)
-X-AuditID: cbfec7f4-c77a99c0000010c6-9a-5c74e6e4a1fe
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id F8.BC.04284.3E6E47C5; Tue, 26
- Feb 2019 07:12:35 +0000 (GMT)
-Received: from [106.120.43.17] (unknown [106.120.43.17]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20190226071234eusmtip25b9a4c429502753021ec48a0e114af6b~G2H1auUfl2989829898eusmtip2O;
- Tue, 26 Feb 2019 07:12:34 +0000 (GMT)
-Subject: Re: [PATCH v3 05/11] drm/bridge: Add Analogix anx6345 support
-To: Vasily Khoruzhick <anarsoul@gmail.com>
-From: Andrzej Hajda <a.hajda@samsung.com>
-Message-ID: <8f0e5932-7dba-e7a8-9adc-d15e67ffde46@samsung.com>
-Date: Tue, 26 Feb 2019 08:12:32 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+ Mon, 25 Feb 2019 23:19:18 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=fCBZlZLPWeHLZ5F3g2a87xSjmvBhiV4yB8X31OqkpwU=;
+ b=u5ASO6glvVBsZL+CvTpLfi8IWW6luXmt2UOqNFZ4IQImZdRL9BHKAM1YcuW7UHYp2w
+ tW+/YnzH+ZUJB9//aU1LOc0iKPCE+cG0qw9ifA5IsGsXpebraCaaAP4xk6CEw8mEBCWb
+ sxc9uP8bJ3MG3pwwalTQadSzRmSxLS3QAcuYZhEUCB6nW1Dj7YjwUxQ7BiWDL4+GDCOK
+ bRdtdciJrHV1seCSq1bDDMN2DVU2RZCZ452rEr7abbdV9jy1jI4/PIUYGxZ18kJrFEce
+ Cgp5e1ylu+xjmfxwA9ZFl3YIlOFft4peDt4osdGDt0H3THJrVZF+dbu5FpAug3+t6tp6
+ Hfxw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=fCBZlZLPWeHLZ5F3g2a87xSjmvBhiV4yB8X31OqkpwU=;
+ b=nZMtMwB2VWjaBXVBMSrxESTOvWHOPEaUo8ARYlMkuOgUYWvjMg2OhrW528d4ESpisO
+ 6sES6b4gBQiDH/hnCuRVe7bqLuycMfkqIhlQfQ3XbwdiI+vx34xGEnXzIpjC5DUDgXuM
+ 9BDOLaig14R2TeDjajGiidEUVqVE5M70CRF51wapIQhZoBCS5CFadf4sjp24fAS2afyk
+ QpLsN20i/gGkpne4MU3NUXz3OkEfN8ojqP6tPdMEWzWB11zTQuEdRzv32iorjgkgZKiq
+ Usef8hdH/kUIyaD73u2x7BP/Z5M3zxmsEdJNcpWPhgsHtLURpM6fkR2OxLWdTRVRXv49
+ uRjQ==
+X-Gm-Message-State: AHQUAuZspcBduJIRTBFv3stQox249G0uYbpDO0kn7d+fQg1QwnweQitG
+ sY8NiT5mdRnNE1pwVIPWalLi4wEIax/xS9HUcyMLhA==
+X-Google-Smtp-Source: AHgI3IYxI2rFSkFoQOtQNcr8IzscYtnYVIsusaEeCBs54o5c2TQeimLKI7oOr8D1A4op50Kay1dVwvWBDBwgnSr3+uI=
+X-Received: by 2002:a05:6638:2a1:: with SMTP id d1mr3150266jaq.2.1551165557148; 
+ Mon, 25 Feb 2019 23:19:17 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <CA+E=qVe1UOxprkG+zm1OX87f9vOPyHom=hxhnzGxidBA54WxkA@mail.gmail.com>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA02Sf0yMcRzH+z7Pc8891xzfTrnP0pibNjLCjO+WNWL2GBv+a7mNo0eiX7vn
- QpoVye4QZZSu9IP8GG0SrsSNnZRDJRJaqVVqzIOtK7VSuudh+u/1/bzfnx/v7cvROisbyMUm
- WARzginOwPoyjrqRpsW9fRbj0lxbAMlqdFMks64PkWNWSUUmHDk0Ka5tVJGWwR8sGSj9RBFb
- TpmaVPa0qshod52aXH3fTJGuL48RyXTWqklHRQMiIzVFDBlxNVFrMH9lZJziy4vKEV9UnsoX
- pDcz/NszWRRf0X1LxTuHShj+gb1DzT/KcbN8gTVfxVfetLF81VCXiu88VU/xd8vS+IHKOVtn
- RPmujhbiYg8I5tDwnb57bWeG2aTRBYccp1vodFQx5yTScIBXQHHTUeok8uV0+AaCt+fPs15B
- hz0IMlpCFGEAQabkVv3r+OCuRYpwHUFfSRejPCQEDa5TjNc1E2+A8WuXZPbHIfDsyRjrNdG4
- n4HfL6rkUSxeCL/vfpT3aXE41D6UZGZwMBReaJM5AEfC06zvSPH4gTu/Vx6qwdvg58RP2UPj
- uVAlFdIK66Gtt1gOBLiagzcFTla5ez1kN774yzPha/09tcJBMPHA2+DlNDiW30IrzVYEz69c
- /9sQBk/rmyev5iY3LITbNaFKeS24OzxyGfB0+CD5KTdMh3OOPFopa8F6Qqe450Fnw31aYT1c
- fT3IZiODfUoy+5Q09ilp7P/3liDmJtILyWJ8jCAuTxAOLhFN8WJyQsyS3YnxlWjyf74cr/dU
- o5qxXS6EOWSYpn3eKRp1KtMBMSXehYCjDf7aMJfFqNNGm1IOC+bEHebkOEF0odkcY9BrU326
- tutwjMki7BeEJMH8T6U4TWA6QkceFW9oz3bMv5ezyn7xVe+ad+s3/sqLWlYhlV12Re7WxkZE
- RAc5/XNJp/54hN9w9ViYpnXzkFB6NnjLtIHBUGmfSEIv9Gsa7kSNz+pZvi5An3HjfbvWXtK6
- 0xPkXDk4z7jIbCTBWd+sUtuelRM7Pq9weqJsll2rfNpnr92UUWo2MOJe07IQ2iya/gC8YtcJ
- mwMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA02SfyyUcRzH932e55476ng6zHe2sFsoq+PxI1/FyT/2aKtV2ipp3HiG5e50
- z51FW0nTODHX1h+ODkN/YE3o/ErpErOGOZJsZEiTCVNidxF3tfnvtc9erz8+21uAi8p5HoJ0
- hZpVKWQZYtKR+LDdP31ibkGdEFi+JETFQwMYyu9bACivYJmHdow6HFX2DvHQ2K8VEq1XT2Oo
- UFfLR81z4zxkme3jo7pPIxiaWXwDUH53Lx9NNQ0CtNVpINCWaRg7QzE1W9sY02hoBIyh8Q5T
- njtCMKMlxRjTNNvAY7o3qgimQz/FZ17pBkimvKCMxzTXF5JM28YMj/lS1I8xLbX3mPVmzwvO
- 8ZIIlVKjZr3TlJw6UnydRkESOhxJgkLCJXRw2I1TQaHiAGlECpuRnsWqAqRJkrTCkk0y03L0
- tvHRGJ4Lmjy1wEEAqRA4MdAL9lhE1QHY8Vhgv7vDrspl3M4u0DquJbXAcddZAlBn/mELXKgY
- uP3sKbHHrpQ/fN9jtUk4tUjAaqsVsxcvMTj78bfNIqlj8E/LZ3KPhZQU9nYt25igfGDFk0kb
- u1FX4drX15jdOQQHyuZtrQN1Ea7urNocnPKDVoMZt7MXbFuu+MfucHK+EisFIv2+XL8v0e9L
- 9PuSKkDUA1dWw8lT5Rwt4WRyTqNIlSQr5c1gdxjGvq2WdmB+EWcClACIDwq9Z7kEEU+WxWXL
- TQAKcLGr8LRJnSASpsiyc1iVMlGlyWA5EwjdfU6He7glK3dnplAn0qF0GAqnw4LDgk8isbtw
- ODA7XkSlytTsTZbNZFX/O0zg4JEL5LID2rOeCe2W+bhky+hInAZPLJrxdbp/hMy9NsXfcS5Y
- yFhbvFW6gvVXxuZFN1rNPc+/q6XfLsV0eeUcl7geHgxv8Il5GLvteffdaHSUcf1ckqBz0/98
- yeU+p9bumqQHQVm0s5ulY8zPoyZqQtFanWOMlGp3hq4Yfvq/HYaFvmKCS5PR/riKk/0FbItU
- LC4DAAA=
-X-CMS-MailID: 20190226071235eucas1p209889ba789253f901c1c7ef1f42a7f17
-X-Msg-Generator: CA
-X-RootMTR: 20190215051043epcas5p37cd953f0a76fb34e819b45c330dc6368
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20190215051043epcas5p37cd953f0a76fb34e819b45c330dc6368
-References: <20190215050957.20755-1-anarsoul@gmail.com>
- <CGME20190215051043epcas5p37cd953f0a76fb34e819b45c330dc6368@epcas5p3.samsung.com>
- <20190215050957.20755-6-anarsoul@gmail.com>
- <7d71654e-7169-2682-5655-0a9a9ea91c6d@samsung.com>
- <CA+E=qVe1UOxprkG+zm1OX87f9vOPyHom=hxhnzGxidBA54WxkA@mail.gmail.com>
+References: <20190226040345.202047-1-ndesaulniers@google.com>
+In-Reply-To: <20190226040345.202047-1-ndesaulniers@google.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 26 Feb 2019 08:19:05 +0100
+Message-ID: <CAKv+Gu-5DvWZL6ogLVNDEvgKe6TENX+5sF1U7QxiyYC8Wx0nXw@mail.gmail.com>
+Subject: Re: [PATCH] lib/raid6: use vdupq_n_u8 to avoid endianness warnings
+To: Nick Desaulniers <ndesaulniers@google.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_231241_348598_F4C55640 
-X-CRM114-Status: GOOD (  31.03  )
+X-CRM114-CacheID: sfid-20190225_231920_717216_CE3CAA05 
+X-CRM114-Status: GOOD (  20.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -141,168 +89,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Archit Taneja <architt@codeaurora.org>, David Airlie <airlied@linux.ie>,
- linux-sunxi <linux-sunxi@googlegroups.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Chen-Yu Tsai <wens@csie.org>,
- Rob Herring <robh+dt@kernel.org>, Thierry Reding <thierry.reding@gmail.com>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Daniel Vetter <daniel@ffwll.ch>, Sean Paul <seanpaul@chromium.org>,
- arm-linux <linux-arm-kernel@lists.infradead.org>,
- Icenowy Zheng <icenowy@aosc.io>
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Russell King <linux@armlinux.org.uk>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Mark Brown <broonie@kernel.org>, Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 15.02.2019 20:36, Vasily Khoruzhick wrote:
-> On Fri, Feb 15, 2019 at 1:13 AM Andrzej Hajda <a.hajda@samsung.com> wrote:
+On Tue, 26 Feb 2019 at 05:03, <ndesaulniers@google.com> wrote:
 >
-> Hi Andrzej,
+> Clang warns: vector initializers are not compatible with NEON intrinsics
+> in big endian mode [-Wnonportable-vector-initialization]
 >
-> Thanks for review!
+> While this is usually the case, it's not an issue for this case since
+> we're initializing the uint8x16_t (16x uint8_t's) with the same value.
 >
->>> +#include <linux/of_gpio.h>
->> Do you need this header?
-> I'll drop it.
+> Instead, use vdupq_n_u8 which both compilers lower into a single movi
+> instruction: https://godbolt.org/z/vBrgzt
 >
->>> +#include <drm/drmP.h>
->> drmP.h is/should be deprecated.
-> Same here
+> This avoids the static storage for a constant value.
 >
->>> +struct anx6345_platform_data {
->>> +     struct regulator *dvdd12;
->>> +     struct regulator *dvdd25;
->>> +     struct gpio_desc *gpiod_reset;
->>> +};
->> Why do you need this struct, why just do not embed it's fields directly
->> into struct anx6345 ?
-> OK, I'll embed it into struct anx6345
+> Link: https://github.com/ClangBuiltLinux/linux/issues/214
+> Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
+> Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+
+Much better, thanks,
+
+Did you double check that the intrinsic exists on 32-bit ARM as well?
+I assume it does, but please make sure if you haven't yet.
+
+If so,
+
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> ---
+>  lib/raid6/neon.uc            | 5 ++---
+>  lib/raid6/recov_neon_inner.c | 7 ++-----
+>  2 files changed, 4 insertions(+), 8 deletions(-)
 >
->>> +     if (WARN_ON(anx6345->powered))
->>> +             return;
->> It should not happen, you can remove this warn.
-> OK
+> diff --git a/lib/raid6/neon.uc b/lib/raid6/neon.uc
+> index d5242f544551..b7c68030da4f 100644
+> --- a/lib/raid6/neon.uc
+> +++ b/lib/raid6/neon.uc
+> @@ -28,7 +28,6 @@
 >
->>> +     if (pdata->dvdd12) {
->> If regulators are required this will be never null.
-> Right, and regulator subsystem will return dummy regulator if it's
-> missing in dts.
-> I'll remove redundant checks.
+>  typedef uint8x16_t unative_t;
 >
->>> +
->>> +     if (pdata->dvdd25) {
->> ditto
-> OK
+> -#define NBYTES(x) ((unative_t){x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x})
+>  #define NSIZE  sizeof(unative_t)
 >
->>> +
->>> +     if (anx6345->panel)
->>> +             drm_panel_prepare(anx6345->panel);
->> again, here and below: panel is never null, check can be removed.
-> That's not true, panel is optional. It can be DP connector, not a panel.
+>  /*
+> @@ -61,7 +60,7 @@ void raid6_neon$#_gen_syndrome_real(int disks, unsigned long bytes, void **ptrs)
+>         int d, z, z0;
 >
->>> +
->>> +     gpiod_set_value_cansleep(pdata->gpiod_reset, 0);
->>> +     usleep_range(1000, 2000);
->>> +
->>> +     gpiod_set_value_cansleep(pdata->gpiod_reset, 1);
->>
->> Start/stop sequence seems odd regarding reset gpio:
->>
->> 1. In probe reset is set to low, in poweroff to high - incosistent.
->>
->> 2. If in case of disabled device reset should be 0, there is no point to
->> set it again to 0 three lines above.
->>
->> 3. I suspect in dts reset gpio should be declared as active_low, and the
->> logic in the driver should be reverted, in power off it should be set to
->> high, in power on it should be lowered (logically).
-> OK, I'll look into it.
+>         register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
+> -       const unative_t x1d = NBYTES(0x1d);
+> +       const unative_t x1d = vdupq_n_u8(0x1d);
 >
->>> +err_poweroff:
->>> +     DRM_ERROR("Failed DisplayPort transmitter initialization: %d\n", err);
->> redundant message
-> OK, will drop.
+>         z0 = disks - 3;         /* Highest data disk */
+>         p = dptr[z0+1];         /* XOR parity */
+> @@ -92,7 +91,7 @@ void raid6_neon$#_xor_syndrome_real(int disks, int start, int stop,
+>         int d, z, z0;
 >
->>> +             DRM_ERROR("Get sink count failed %d\n", err);
->> The rule of thumb I heard is that if you start message capitalized you
->> should end with dot. Since I do not know if it is enforced in kernel I
->> leave the decision up to you.
-> I grepped DRM_ERROR in driver/gpu/drm and they do exactly the same as here.
-> So I'll just keep it as is for consistency.
+>         register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
+> -       const unative_t x1d = NBYTES(0x1d);
+> +       const unative_t x1d = vdupq_n_u8(0x1d);
 >
->>> +static bool anx6345_bridge_mode_fixup(struct drm_bridge *bridge,
->>> +                                   const struct drm_display_mode *mode,
->>> +                                   struct drm_display_mode *adjusted_mode)
->>> +{
->>> +     if (mode->flags & DRM_MODE_FLAG_INTERLACE)
->>> +             return false;
->>> +
->>> +     /* Max 1200p at 5.4 Ghz, one lane */
->>> +     if (mode->clock > 154000)
->>> +             return false;
->> These checks should be in mode_valid callback.
-> OK
+>         z0 = stop;              /* P/Q right side optimization */
+>         p = dptr[disks-2];      /* XOR parity */
+> diff --git a/lib/raid6/recov_neon_inner.c b/lib/raid6/recov_neon_inner.c
+> index 8cd20c9f834a..7d00c31a6547 100644
+> --- a/lib/raid6/recov_neon_inner.c
+> +++ b/lib/raid6/recov_neon_inner.c
+> @@ -10,11 +10,6 @@
 >
->>> +     /* Map slave addresses of ANX6345 */
->>> +     for (i = 0; i < I2C_NUM_ADDRESSES; i++) {
->>> +             if (anx6345_i2c_addresses[i] >> 1 != client->addr)
->>> +                     anx6345->i2c_clients[i] = i2c_new_dummy(client->adapter,
->>> +                                             anx6345_i2c_addresses[i] >> 1);
->>> +             else
->>> +                     anx6345->i2c_clients[i] = client;
->>
->> I see this contredanse is copy/pasted from anx78*, but it looks quite
->> complicated. As I understand there are two i2c addresses, why we cannot
->> assume one address is for control interfaces and another  is dummy? It would
->> simplify the code here and in other places.
-> Sorry, I don't get you, could you elaborate? Note that anx6345 uses
-> both addresses,
-> i2c_new_dummy() just registers new i2c device bound to a dummy driver and it's
-> supposed to be used for devices that consume more than one i2c address.
-
-
-My idea was to assume that ANALOGIX_I2C_DPTX is the main address, ie.
-address which should be set in dts in device node reg property.
-
-Other addresses should be registered as dummy devices during probe -
-simple loop without conditionals, without redundant fields in anx6345
-context - i2c_clients, client.
-
-I do not insist on this change but I suggest as it should simplify the code.
-
-And moreover, you can consider removing direction bit from i2c
-addresses, it could be also confusing and against i2c kernel api.
-
+>  #include <arm_neon.h>
 >
->>> +     if (!found) {
->>> +             DRM_ERROR("ANX%x (ver. %d) not supported by this driver\n",
->>> +                       anx6345->chipid, version);
->>> +             err = -ENODEV;
->>> +             goto err_poweroff;
->>> +     }
->>
->> As I see chip becomes powered forever, is it OK? Usually it should be
->> powered only when pipeline starts, and powered-off after pipeline stops.
-> I'll look into how hard it would be to implement but personally I
-> think it's OK for now.
-> We can add more sophisticated power management once this driver is merged.
-
-
-But the rule is every resource allocated/set during lifetime of the
-driver should be dropped on driver removal, so please do it at least in
-remove callback.
-
-
-Regards
-
-Andrzej
-
-
-
-
+> -static const uint8x16_t x0f = {
+> -       0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f,
+> -       0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f,
+> -};
+> -
+>  #ifdef CONFIG_ARM
+>  /*
+>   * AArch32 does not provide this intrinsic natively because it does not
+> @@ -41,6 +36,7 @@ void __raid6_2data_recov_neon(int bytes, uint8_t *p, uint8_t *q, uint8_t *dp,
+>         uint8x16_t pm1 = vld1q_u8(pbmul + 16);
+>         uint8x16_t qm0 = vld1q_u8(qmul);
+>         uint8x16_t qm1 = vld1q_u8(qmul + 16);
+> +       uint8x16_t x0f = vdupq_n_u8(0x0f);
+>
+>         /*
+>          * while ( bytes-- ) {
+> @@ -87,6 +83,7 @@ void __raid6_datap_recov_neon(int bytes, uint8_t *p, uint8_t *q, uint8_t *dq,
+>  {
+>         uint8x16_t qm0 = vld1q_u8(qmul);
+>         uint8x16_t qm1 = vld1q_u8(qmul + 16);
+> +       uint8x16_t x0f = vdupq_n_u8(0x0f);
+>
+>         /*
+>          * while (bytes--) {
+> --
+> 2.21.0.rc2.261.ga7da99ff1b-goog
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
