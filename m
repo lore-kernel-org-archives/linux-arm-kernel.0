@@ -2,66 +2,140 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 19A19C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:06:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 89E59C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:17:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA1C42147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:06:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5322A213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:17:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2FhL0qf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA1C42147C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kiNNHeQb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lV4tPH4e"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5322A213A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Fywd0/9zJYw3YkHLVc/+JcgCVQSwxY/rqcMLhe/+C9Q=; b=m2FhL0qf+d5Leb
-	H6DzG5r1bwKRrDd3WfhPY/lhQPbcgGCfgFT69Yutgf5bYXekuMZhWmIC8JE964uSvpXIMzS0/Xwg8
-	j3847wa6idaeXmvIawxi7lcu8rD3khWdkdg9vxTK+mJPCRmIcAJ08wv5ApWHQwg3QD16BxM/yByyt
-	r6NwJk/X9cPyQy4lQZEh2B6NPCcXbh3caWLf6g61OAqkjo7nTLPzifqHocGAZpQ+AApA0ixDkXuD3
-	PPrl21ONEtIRxrYsuHZRab+BHKx7XgefEKlcFLEL7+8zk9nXKZzjA1ZEBg3JJDZlcXz3HNSbSwSzm
-	phGCfl6FNIFrtGr0WFlQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=nw2bLPVZFa+qlIhiBKtDtdK9E5RxikFnxWR3K2sFrkk=; b=kiNNHeQbS8wqjt
+	Yt7XKXm3jEBQb4XU5st3LbJXvxD33iwLQ2Ls4Ns5mHShb1DpS5g8C7nJNzWP3Nt8xxWIvEG2jfHjU
+	ctMtYciW9cAufBc5gELg1tllsIxbN0YRT+wUaufYccB5sri+2L8W6WjIfIKgwSuQawJfbgfM7IKaU
+	ON4suMPGKetBExJebL1XQ/6vCz92JbsFmwKa/Cuo4zCX4v6CclNRGHyD/A71qJ4wn8zxFGdW+pnIg
+	PizKYu3BLCI3QTHWfRHDjevll6Aie0DSjMY9YUNpmQws3le556EFpx6/oXMLdvIztyZeoZC7FG3pa
+	25nOtHhoO5a+Qml3swUg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyUwU-0002S5-KA; Tue, 26 Feb 2019 05:06:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyUwO-0002RT-Mh
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 05:06:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8321DA78;
- Mon, 25 Feb 2019 21:05:58 -0800 (PST)
-Received: from [10.162.40.137] (p8cg001049571a15.blr.arm.com [10.162.40.137])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- EB06A3F71D; Mon, 25 Feb 2019 21:05:55 -0800 (PST)
-Subject: Re: [PATCH V2 5/6] arm64/mm: Enable page table page accounting for
- user space
-To: Mark Rutland <mark.rutland@arm.com>
-References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
- <1551071039-20192-6-git-send-email-anshuman.khandual@arm.com>
- <20190225111108.GD26236@lakrids.cambridge.arm.com>
- <d6c62e0d-f890-a60d-517c-c0ba1e56e48c@arm.com>
- <20190225153553.GI26236@lakrids.cambridge.arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <27de9775-1ff9-01a1-6bf4-b6a912fc2440@arm.com>
-Date: Tue, 26 Feb 2019 10:36:02 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
-MIME-Version: 1.0
-In-Reply-To: <20190225153553.GI26236@lakrids.cambridge.arm.com>
+	id 1gyV7f-0005Pn-EB; Tue, 26 Feb 2019 05:17:43 +0000
+Received: from mail-eopbgr60065.outbound.protection.outlook.com ([40.107.6.65]
+ helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyV7c-0005PJ-1l
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 05:17:41 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=kD7wqpx2+ZsSaSB6C4jsjF+MZN8GpZOBM5yy35QdDAI=;
+ b=lV4tPH4eCnv52og8EF7LusDwjrCWSnEcZ6Yq5q7/9M3YCpCo2IXonPc0UqC4BowZ6HYdqMoM1HUbkhxIL7qAm3qKKQkBKZ5KUiL4mdGp6+yijB4rJCMS6Ru581NpBMGpudGOMdPlpa/fOMU3LFqgOqBhrL0iDuMzx3AcNFE6dgE=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3849.eurprd04.prod.outlook.com (52.134.71.16) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.18; Tue, 26 Feb 2019 05:17:31 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::1cb4:3e1c:fc85:7ed7]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::1cb4:3e1c:fc85:7ed7%2]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
+ 05:17:31 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>, "sboyd@kernel.org"
+ <sboyd@kernel.org>, Aisheng Dong <aisheng.dong@nxp.com>, Daniel Baluta
+ <daniel.baluta@nxp.com>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>
+Subject: [PATCH V7 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Topic: [PATCH V7 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
+Thread-Index: AQHUzZKTh0f7Vnjj2USCuQHnsmV9dw==
+Date: Tue, 26 Feb 2019 05:17:31 +0000
+Message-ID: <1551157967-30925-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
 Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR0302CA0006.apcprd03.prod.outlook.com
+ (2603:1096:202::16) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: e754e663-9e6f-4183-cdbc-08d69ba9b55c
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3849; 
+x-ms-traffictypediagnostic: DB3PR0402MB3849:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3849;
+ 23:MawrSe7Fxma6l3NR8hhek90bDYKgqPLMQrIfy?=
+ =?iso-8859-1?Q?3whE/r6IFWBSk+pirls0EKFMDjaTbJIOwps9y1MAOQ/vRsH9fRWxmKKtgp?=
+ =?iso-8859-1?Q?myn9Mo25XDunNIj03YBttHB6/gdjIAyG/eaPeewV4hbJWXsl321rgy6065?=
+ =?iso-8859-1?Q?Q1dUWAgGmndn3A93BT5feD+0ki8eNBX87XSG9wBxgNU3tFZW1pdNr7jhNu?=
+ =?iso-8859-1?Q?rzAcFYQLQwcMiI3+AQBhkltp/6d8UdvFMuHkHPKTPsCkaLVkzJJM0hu1Q3?=
+ =?iso-8859-1?Q?vlxxySxhgOOVJlLqDIZGPJSPpVRshO6NQvyArvnk4ejga1SBPwqsD95dXS?=
+ =?iso-8859-1?Q?tHBbgV0BtV41F3g9jhnjHUSKvetcuWfFtM2ZOkK0HmzJ9QVqqDC+9mGTHx?=
+ =?iso-8859-1?Q?Sj648MOdg71vw6//5NHTPurNbg494wfJ6yMWEhDKyEGn/ALpHL1qNKWCeN?=
+ =?iso-8859-1?Q?kXydUIw4Q+omBIwyJcFtjEw9yntVI24rSViUzEKRvraMrBLQLf/yi/qG8o?=
+ =?iso-8859-1?Q?P+Bzj9H1QWHmIfYBWTgMmJLb1QNU+2IDdf+cmSHVrXNyg5coL/KErsOQcn?=
+ =?iso-8859-1?Q?/8JTfPv/Zc8aEtTRQPjYeHA5vgoe1r7rCePHTgqgvayj90bYZ5bbJRtbc9?=
+ =?iso-8859-1?Q?KLzErgQMlq5/8CsDGbjlAD2FSo3zjlS+ofulBhr2st2WJetOnpZgKWIqpq?=
+ =?iso-8859-1?Q?V+ahwveKcMxRG+Z9Avk2Rue/o0wcXWeFu1F1LKEZPH2s6VN8eusRq7edzb?=
+ =?iso-8859-1?Q?mjxply/Y0rspqG/6G5GkzU/eUUN1ETI2jez0n5XtZyLjBHCM4VXu8hPzmF?=
+ =?iso-8859-1?Q?JFCc1w/LBlZ7RdwAKeSibnviL08+aXAabxRVvboWbck2gQCIeewswHyPnq?=
+ =?iso-8859-1?Q?EBlfQTiedw6fDMJaBbNesvTh9MBYtQQzuNG6OP8DBNGROJvUw1MaMS9JZ1?=
+ =?iso-8859-1?Q?ckc66/WK8MtiQ5LFYf/AHCqgXuOdNPdXH6WG8Zt50BONfbjSoie0LS+pmX?=
+ =?iso-8859-1?Q?Vu4bhQLMxr3thknX5MMtrutIPHHpzvsXt84BlqxU8BvhrLjs/lIdUPb5+y?=
+ =?iso-8859-1?Q?m/++c6SqEvbYb0JvjBCz6LKrtalpsI/s7L5dyGywiF10RgTJkz3V9pVYgz?=
+ =?iso-8859-1?Q?8qx8pcOrDWWzd6wTpIpzkdhwgI8zVbfXe2mlX2LHJKxfBCXSMnXzASNvkH?=
+ =?iso-8859-1?Q?/NTjBIZywzUksd6Rdnnv4O8XUnL5A4shjtsOIQ46kadrJ2r3VjEroom6d/?=
+ =?iso-8859-1?Q?vvlzlD0QLhCZUQLFJRFKoSPvF5y5aA8aovfmi73fanBsV03HkvlweaJXp6?=
+ =?iso-8859-1?Q?1fKu/SmbZ6sXw5P/MChXOO9PR/2Qk8+qn0OzEg1Nuq1xRK38kv0LwdtHbe?=
+ =?iso-8859-1?Q?Rkv20I+k0jFjPdzLkE5F+TuNQdznse4?=
+x-microsoft-antispam-prvs: <DB3PR0402MB38491B6266E84CA777057F18F57B0@DB3PR0402MB3849.eurprd04.prod.outlook.com>
+x-forefront-prvs: 096029FF66
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(136003)(346002)(376002)(396003)(39860400002)(366004)(199004)(189003)(6512007)(476003)(6486002)(186003)(2616005)(102836004)(26005)(52116002)(4326008)(2501003)(86362001)(14454004)(81166006)(6436002)(8676002)(81156014)(305945005)(2201001)(5660300002)(106356001)(97736004)(71200400001)(71190400001)(7736002)(105586002)(8936002)(486006)(7416002)(110136005)(99286004)(50226002)(36756003)(66066001)(68736007)(386003)(6506007)(478600001)(3846002)(6116002)(53936002)(14444005)(256004)(316002)(25786009)(2906002)(32563001)(921003)(1121003)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3849;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:3; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: wB2kLxqhvJJWzZAhstvGe+MrSpwtHkuADF8uoMkWpYXaVpp9a3qqRqqn5o0dmhy8mjODKqiMf9qr/g3y17MbL30xpw03L9tp67Je5uhki+YrICsyzTL5u4MUwT2myf56iMlP9AA4lFjUy0Eq+bL1esxliZbT3x0I1c4JNhlL9UYf/wDrcvVNQ+6GQPx1aGngro/W65mDMq+6ej0Je8LyA9xZ+QIuf/h4kzNiBOqq1vsIYZbybJj+TzwJC1W9mZmbAUl9KrdL1oLf37g5xuJ07ZIuj29g6z3q0gFS6OL8gg7KNWAq9/ZwC0jGrKHSlCPSLfJKBqomqBsnj9UUS2vB9xNpnqaHqHu5jG/gyqEkzmCaN7Qd6cDmoPCDgmMqE8K67AO9c256Q5Pc0iYbuqKbGKVyh4p33Q9fd4E8dMRAOxc=
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: e754e663-9e6f-4183-cdbc-08d69ba9b55c
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 05:17:26.7608 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3849
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_210604_748628_0639BF50 
-X-CRM114-Status: GOOD (  18.00  )
+X-CRM114-CacheID: sfid-20190225_211740_165875_11A8FC1D 
+X-CRM114-Status: UNSURE (   9.48  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,105 +147,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: yuzhao@google.com, Steve.Capper@arm.com, marc.zyngier@arm.com,
- Catalin.Marinas@arm.com, suzuki.poulose@arm.com, will.deacon@arm.com,
- james.morse@arm.com, linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Add i.MX8QXP CPU opp table to support cpufreq.
 
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+No changes since V6.
+---
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-On 02/25/2019 09:05 PM, Mark Rutland wrote:
-> On Mon, Feb 25, 2019 at 08:19:53PM +0530, Anshuman Khandual wrote:
->>
->>
->> On 02/25/2019 04:41 PM, Mark Rutland wrote:
->>> On Mon, Feb 25, 2019 at 10:33:58AM +0530, Anshuman Khandual wrote:
->>>> Page table pages created for user space processes must be accounted against
->>>> their memory control groups if initialized. This just introduces a helper
->>>> function pgtable_gfp_flags() which returns PGALLOC_GFP for all kernel page
->>>> table page allocations but adds __GFP_ACCOUNT for user page table pages.
->>>
->>> Can't we have pte_alloc_one_kernel() and pte_alloc_one() explicitly pass
->>> the GFP flags down to a __pte_alloc_one() helper, and consistently use
->>> pte_alloc_one_kernel() for kernel mappings?
->>>
->>> That would seem less surprising than hiding that detail in another
->>> function.
->>
->> Yes that will work as well. But its better to have this mm_struct based GFP switch
->> which is used in other archs as well to create generic MM helper functions going
->> forward.
-> 
-> I don't follow -- if we can make pte_alloc_one() generic, then we can
-> *also* make pte_alloc_one_kernel() generic.
+diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+index 4c3dd95..41bf0ce 100644
+--- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
++++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+@@ -34,6 +34,9 @@
+ 			reg = <0x0 0x0>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			clocks = <&clk IMX_A35_CLK>;
++			operating-points-v2 = <&a35_0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		A35_1: cpu@1 {
+@@ -42,6 +45,9 @@
+ 			reg = <0x0 0x1>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			clocks = <&clk IMX_A35_CLK>;
++			operating-points-v2 = <&a35_0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		A35_2: cpu@2 {
+@@ -50,6 +56,9 @@
+ 			reg = <0x0 0x2>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			clocks = <&clk IMX_A35_CLK>;
++			operating-points-v2 = <&a35_0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		A35_3: cpu@3 {
+@@ -58,6 +67,9 @@
+ 			reg = <0x0 0x3>;
+ 			enable-method = "psci";
+ 			next-level-cache = <&A35_L2>;
++			clocks = <&clk IMX_A35_CLK>;
++			operating-points-v2 = <&a35_0_opp_table>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		A35_L2: l2-cache0 {
+@@ -65,6 +77,24 @@
+ 		};
+ 	};
+ 
++	a35_0_opp_table: opp-table {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp-900000000 {
++			opp-hz = /bits/ 64 <900000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <150000>;
++		};
++
++		opp-1200000000 {
++			opp-hz = /bits/ 64 <1200000000>;
++			opp-microvolt = <1100000>;
++			clock-latency-ns = <150000>;
++			opp-suspend;
++		};
++	};
++
+ 	gic: interrupt-controller@51a00000 {
+ 		compatible = "arm,gic-v3";
+ 		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
+-- 
+2.7.4
 
-Right but when we do mm_struct can be used to decide applicable GFP for
-the allocation. The way your proposal defers is that it wants to have
-the GFP flag unique for both pte_alloc_one and pte_alloc_one_kernel
-without looking into mm_struct which will work as well.
-
-> 
-> Looking at x86, I see:
-> 
-> pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
-> {
->         return (pte_t *)__get_free_page(PGALLOC_GFP & ~__GFP_ACCOUNT);
-> }
-> 
-> ... which arhitectures do you see which look at the mm struct to decide
-> the flags?
-> 
-
-On powerpc its an explicit helper function
-
-arch/powerpc/include/asm/pgalloc.h (pgtable_gfp_flags)
-
-On X86 its not an explicit helper function but we can see
-
-arch/x86/include/asm/pgalloc.h
-
-static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
-{
-        struct page *page;
-        gfp_t gfp = GFP_KERNEL_ACCOUNT | __GFP_ZERO;
-
-        if (mm == &init_mm)
-                gfp &= ~__GFP_ACCOUNT;
-        page = alloc_pages(gfp, 0);
-        if (!page)
-                return NULL;
-        if (!pgtable_pmd_page_ctor(page)) {
-                __free_pages(page, 0);
-                return NULL;
-        }
-        return (pmd_t *)page_address(page);
-}
-
-static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
-{
-        gfp_t gfp = GFP_KERNEL_ACCOUNT;
-
-        if (mm == &init_mm)
-                gfp &= ~__GFP_ACCOUNT;
-        return (pud_t *)get_zeroed_page(gfp);
-}
-
-static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
-{
-        gfp_t gfp = GFP_KERNEL_ACCOUNT;
-
-        if (mm == &init_mm)
-                gfp &= ~__GFP_ACCOUNT;
-        return (p4d_t *)get_zeroed_page(gfp);
-}
-
-There are some more places on powerpc and x86 where it does the switch. But you
-are right, pte_alloc_one_kernel() does not go through ctor functions on other
-archs. But it should and this series changes it. Do you see any concerns in
-doing so ?
 
 _______________________________________________
 linux-arm-kernel mailing list
