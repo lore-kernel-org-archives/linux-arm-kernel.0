@@ -2,82 +2,149 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 256E2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:19:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B8D0C10F0B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:34:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E81BF213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:19:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 660A52173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:34:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mcgyZ/vy";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="r1QwKEFx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E81BF213A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DuPvqrmN";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="pZOxzGQI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 660A52173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YhqzXn8e6don67XK9IjnUaJQgiuGN9WXtEUA6KKCcXI=; b=mcgyZ/vyj+Mjc0
-	VGVpWeQ9pQaybmr3GcT8eg8V/6um0ishddAWdMSEuznnjGF4wnuS3hJHal2yOPNQ1JhUZQFhHNPHQ
-	f9eDmb44QbOuy16yUwKySSty1ryRMmi1byy4U3Lq79Yikcfv1QH+4OojQb3oCBmSJKOkMMfkzSAgJ
-	qJPtdY6YSa+bEVyc/bkzMzqdjGgF2DAgCBXG7M2i278gD1BcKp7vu1Zj2PUig2wg48CUezrqux/gK
-	7uvsd9fuU+c3T0sed7mpzO2F71/uCujDBFwV/9Avkcwgb/bfCop7tX/ehZseGd07/06iWNNBEnkhM
-	Es+8QJvn3CGC/wCLknRA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=X8Wv2cvJaA1MENKo1kIj0BpqPI3ClxhxFuhzG5y+FCI=; b=DuPvqrmNUAnS99
+	wdF9qIySqMMRCp4UXyyHAgR9954vTeDLySNhj4Y3SmrPHE9gSdSQvzw7kL4syKK3Pxfpc6MoiVRy8
+	3ZuR13TX4e+ywovWGrAIoUz38umufzpeMPVLmAmvCCzxQLwBDz8DuW9cbs7MYeWSb5BU9IOstsxDw
+	dX8i7OBaXCYnEenehPMeuSC3/ocdjMqAPSJVqfMIAqkHBPv41/9IGCVvOkbc2mGiZ02UEnqB9VMgV
+	jVr5++lhSf2/JW80JK/IcXJjnTy8CI1KWD4Xo1+YLoD5Q063Y3U7SpirF3VoJtkpp8/XcejOYo3r/
+	9LShbgEpoOOfxisl1n7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyXx4-0004rS-Uk; Tue, 26 Feb 2019 08:18:58 +0000
-Received: from mail-ua1-x942.google.com ([2607:f8b0:4864:20::942])
+	id 1gyYCD-0002ZN-An; Tue, 26 Feb 2019 08:34:37 +0000
+Received: from mail-am5eur02on062d.outbound.protection.outlook.com
+ ([2a01:111:f400:fe07::62d]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyXx1-0004pW-Lk
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 08:18:57 +0000
-Received: by mail-ua1-x942.google.com with SMTP id r21so3869128uan.11
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 00:18:55 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=rpQJJvJhMEcukqYqLZ4ss2G6uwgx5UKMxTfBDTBRky8=;
- b=r1QwKEFxFlB9R/xD8FQjRicovSpncKn4df5RdZeMjV8BLKrmFuhqjTnjl43eDv3bky
- +V/UyyhG6HBNcAxVR6rYfUEKHkGI+e3HrQsLCSVhhjjy16dNvbDmT+um3ZU4hKXld3Dz
- sv13Y+zUp9X/1YOnNhDuqblnoIpXQB0ieHk23eI3PM2xlhqp9RcjKe8RKGOStvbbIJfQ
- SU07Zf3NDE9f1lXajemhf0k8OnfYdLYZ95Fy53Q20XDJBAqiYwvsQgxDePOLiwmRA9/l
- F9Hk6zMvTvd5La8T6hw4aUwQ/Z8na5PFtMN+6wIMWu3BKNbiuut8vdkW9BPR6a9E/N2+
- nPww==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=rpQJJvJhMEcukqYqLZ4ss2G6uwgx5UKMxTfBDTBRky8=;
- b=ZyAh6QnBBQOQQU9el0APb1RmqR4eZ+SB36dUBrl+6AwK72yaTwZKlxbLBqK2UABUvJ
- 4KBYpGX2YBmcUIAg+rkmYOcpzXqTI0DYBXZqyv80HFblbrbMY8WLwFnIGoJZ5+bEC7m/
- /pYvNMh+tFYRX6+dMvDCuT4zjYkL+dCh5RwZEvTcoechnW16L3EWbGLBsoyMm4/dqyf2
- u2BY8AhM2gwh7whE31kbCDQFS1vnxL998q9cczudadpSSkhCghivQTUWc4Jge8fzRFw/
- BbIzdhRi41szUKWiyMkGaUkIf8Cy4Kavv4LVvvAIsa1oj8PsuUdBn8jz1ssEni2HF06R
- OLsg==
-X-Gm-Message-State: AHQUAuYQx2rK6M6dPtG7EPYJkSB1i0vzp/iiF2JaRbQxxYhRRnWH/gDI
- cJJmrRB1Ru5W156qWFG8T/MQ+8wdS3L/5oNv10AbPg==
-X-Google-Smtp-Source: AHgI3Iav/ubVoPHwX2M1qfj2G0MCq62TAIsLFAhr+5uBYU7lkLeKs8c5PSAqS+SSu299Zvfc/HZyRAQ5BBe1Tb+fAVE=
-X-Received: by 2002:ab0:3484:: with SMTP id c4mr11323250uar.39.1551169133226; 
- Tue, 26 Feb 2019 00:18:53 -0800 (PST)
+ id 1gyYC8-0002Xs-UU
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 08:34:34 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=e7aI4QmtKuT1UFvH1OsoPAFh58Tw4TT19iR3rLotEHk=;
+ b=pZOxzGQIdcfiodBX5XmSMP143wYgYpTWUh/BO3yUDNj1ZTLloU2aQrzMCXsA9RJcOsHBkdUotzKBvRUC+Y2yb+OlxptyfTSOpEA8EC7e/7C7CUCXWHw66FU1vsRInOv8zn3MWFZSfhGntNk82YZL3Pd/BkQsuydyOT/AcrM6Qyk=
+Received: from VI1PR04MB4800.eurprd04.prod.outlook.com (20.177.48.221) by
+ VI1PR04MB5645.eurprd04.prod.outlook.com (20.178.125.218) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.15; Tue, 26 Feb 2019 08:34:24 +0000
+Received: from VI1PR04MB4800.eurprd04.prod.outlook.com
+ ([fe80::7437:2195:ffd3:a33a]) by VI1PR04MB4800.eurprd04.prod.outlook.com
+ ([fe80::7437:2195:ffd3:a33a%5]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
+ 08:34:24 +0000
+From: Vabhav Sharma <vabhav.sharma@nxp.com>
+To: "sudeep.holla@arm.com" <sudeep.holla@arm.com>, "oss@buserror.net"
+ <oss@buserror.net>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "robh+dt@kernel.org" <robh+dt@kernel.org>,
+ "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "mturquette@baylibre.com"
+ <mturquette@baylibre.com>, "sboyd@kernel.org" <sboyd@kernel.org>,
+ "rjw@rjwysocki.net" <rjw@rjwysocki.net>, "viresh.kumar@linaro.org"
+ <viresh.kumar@linaro.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>, "linux-pm@vger.kernel.org"
+ <linux-pm@vger.kernel.org>, "linux-kernel-owner@vger.kernel.org"
+ <linux-kernel-owner@vger.kernel.org>, "catalin.marinas@arm.com"
+ <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>,
+ "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>, "arnd@arndb.de"
+ <arnd@arndb.de>, "kstewart@linuxfoundation.org"
+ <kstewart@linuxfoundation.org>, "yamada.masahiro@socionext.com"
+ <yamada.masahiro@socionext.com>, Leo Li <leoyang.li@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>
+Subject: [PATCH 0/4] arm64: dts: NXP: add basic dts file for LX2160A SoC
+Thread-Topic: [PATCH 0/4] arm64: dts: NXP: add basic dts file for LX2160A SoC
+Thread-Index: AQHUza4TOTc711rzQESpWziL6V1yEw==
+Date: Tue, 26 Feb 2019 08:34:24 +0000
+Message-ID: <1551126463-5341-1-git-send-email-vabhav.sharma@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: BMXPR01CA0013.INDPRD01.PROD.OUTLOOK.COM
+ (2603:1096:b00:d::23) To VI1PR04MB4800.eurprd04.prod.outlook.com
+ (2603:10a6:803:53::29)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=vabhav.sharma@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 1.9.1
+x-originating-ip: [92.120.1.65]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 1d8e6be2-106d-4395-4cf4-08d69bc5360a
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB5645; 
+x-ms-traffictypediagnostic: VI1PR04MB5645:
+x-ms-exchange-purlcount: 1
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR04MB5645;
+ 23:JQwkxwDpdiJ7YKUnterg8q9tRDyFw+6Y4lvJLQg?=
+ =?iso-8859-1?Q?sPpuqdMEZW6/ZIP8AuB9W1t7kt1A5dFNS2QuAS4dcgDWrWlQ7Qi0USbpUD?=
+ =?iso-8859-1?Q?W8wbvB3yTF1lFSx816vtS/2MAs2pgc+2g8WpnDMjlKywgL/6zqgt0QgeTX?=
+ =?iso-8859-1?Q?fsHErxZT0gCBQxQFWi1f9hwc7eLvs2xVGgfSYRnVS6EtepzQxzmPdFwunj?=
+ =?iso-8859-1?Q?fN8UlO2BXRnqFWlSw9Br7dvBVmaaasMTGQCeN75VeBFi6O03fuf93l0t/I?=
+ =?iso-8859-1?Q?e79O03u8/ETnYkurDS0CKHea65TVgmmZAIew6ZZ+hFYIwfyIauGwhGKCxu?=
+ =?iso-8859-1?Q?sZUGursdP1y7LwxZwoAnURwJuxjT6rMQmUTSUsiRMdtl2uxV5ljGxhAkw5?=
+ =?iso-8859-1?Q?W+EO8SmBG6zs3n+DAt4ElXe+JH37nsXlJVTvje32yGu3YFYFwi0yZ3TOt8?=
+ =?iso-8859-1?Q?8fdJVE5TqQdqlUtj7HivkgTmdHpBz88/ye3vlzu7W3nxn45oNwZqO76Nr7?=
+ =?iso-8859-1?Q?SEdTTZlKC8yz4njRYfk4ElQTmC+0dCTcohef4YqFkSSgHitOVeOecJXml/?=
+ =?iso-8859-1?Q?gc/jbbEQsS04l+icQDV9Q9J9fG1o/MmrCQrJFhmMbuHPXEr3u3V4qnJbJ6?=
+ =?iso-8859-1?Q?RTOecyF/7VayTGoRyDlpWsjjfjgpRh+2LHEOx6Bcp5UJtVptk50A4PmZxj?=
+ =?iso-8859-1?Q?OkMLxE7T4zLw21dvrM4SLzU77xqOdIPGqfTRhPafqmw9w46wywCLNGk/eX?=
+ =?iso-8859-1?Q?Rt4qEaZmcSY58nZoIDUKGFVeBkwzRBCfHe8IMFAiVXGSNBxD5EVo5Yjim8?=
+ =?iso-8859-1?Q?jDlAi7pOk88uJEZ7xvbJv5sOBghkYRwSqMvI1+WWHUTJZN3/RiqjvoG0Lt?=
+ =?iso-8859-1?Q?K+RMRcJjK/PZ9iFuFv3cM62Lz/pYEpQih0khZMLmCY8uoH2cO1Hip4qNxa?=
+ =?iso-8859-1?Q?OgrRUaNQUutOF9NOYJDTsxNmyjAWoYbaRyGKw/wDkgVOOJcGvX0lmonz/q?=
+ =?iso-8859-1?Q?9c8QjXSOPa4c1j+BMDzNsL0Eq19fsbYj/m2b3P60UjNbTuab45OJNf7gnE?=
+ =?iso-8859-1?Q?YUdBgiYzVCJhA5ySRbkYPZf3cCC/mWHQhKeV2ntY11hz1z6YbduaAII0/R?=
+ =?iso-8859-1?Q?A8ADJcJhiG1J33oGNGXMbcd4QIQSPoPDAOh1ddwdN/Do1zkD6PMnJyXIwf?=
+ =?iso-8859-1?Q?dM2Kop4Lj86InkKznw4DdKUr7Td4WPder7j0PK4+8Mru3sdKRXcbvPgwJu?=
+ =?iso-8859-1?Q?C6NG46UrOhLc0e9FozimlJiw30hn2XZGsNQTGCkP6yCKtd6N6pzsUscgpR?=
+ =?iso-8859-1?Q?K2cbJWAN3EMEBCbetY8Vbsc618eafk97VegSZgIBjH0Jw=3D=3D?=
+x-microsoft-antispam-prvs: <VI1PR04MB5645A0662BD35B0917C58518F37B0@VI1PR04MB5645.eurprd04.prod.outlook.com>
+x-forefront-prvs: 096029FF66
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(366004)(396003)(136003)(39860400002)(376002)(199004)(189003)(66066001)(966005)(71200400001)(71190400001)(6306002)(2906002)(478600001)(97736004)(6512007)(50226002)(8936002)(5660300002)(54906003)(6506007)(99286004)(386003)(102836004)(2501003)(53936002)(110136005)(2201001)(52116002)(86362001)(68736007)(4744005)(316002)(6436002)(2616005)(476003)(486006)(7416002)(7736002)(44832011)(186003)(81166006)(8676002)(81156014)(3846002)(6116002)(6486002)(4326008)(25786009)(256004)(106356001)(36756003)(305945005)(26005)(105586002)(14454004)(921003)(1121003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB5645;
+ H:VI1PR04MB4800.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: KgnfgoM/dfNzKGpTEfLeRX+T+b6CQfXd4tcf31BAhac0GBrw1cnnxs5XfcEuJVbCBRlEDIJbbIF283oCceo4aCLUWcoA6upPH7e904CNhdNqFQq9I6ebtkGwgYfdJvvx/YKkIibkek4w41xCIzGh7Y9BEVv1wxl1vG7ZkY/vwJiyX1jiI3e6AMnmnjnM8kRmtoLQgfsHY1WsKpvnNpCanTlK2wDqazZ/3yao9Z5GxQ6NBPrjgWC1cYHF9or1sNHby07p6Dy4lDiFpNUmrrd+SXzu5/RfwOGi/FdYqqJhRxa1Mj+kXHXnWHiQPPlYr4m/n0/7voSF7HiYdrIP9/u/ByPrpBL0i61IkA3ZBRAousNH3rSApa2Qf6CsA/IYMOodKZGPfdZO/wi8pR8AueasklJx8wpbNizlKDJK+7WHdws=
 MIME-Version: 1.0
-References: <1550210375-32270-1-git-send-email-chaotian.jing@mediatek.com>
- <1550210375-32270-2-git-send-email-chaotian.jing@mediatek.com>
-In-Reply-To: <1550210375-32270-2-git-send-email-chaotian.jing@mediatek.com>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Tue, 26 Feb 2019 09:18:16 +0100
-Message-ID: <CAPDyKFq8FQLhbuDYsuV3nJ9pgLYFwaE3smPgkBO3VPsrAQF7cQ@mail.gmail.com>
-Subject: Re: [PATCH v2 1/2] mmc: core: do not retry CMD6 in __mmc_switch()
-To: Chaotian Jing <chaotian.jing@mediatek.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 1d8e6be2-106d-4395-4cf4-08d69bc5360a
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 08:34:18.8336 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB5645
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_001855_708197_88C116EC 
-X-CRM114-Status: GOOD (  14.92  )
+X-CRM114-CacheID: sfid-20190226_003432_985491_0F288C41 
+X-CRM114-Status: GOOD (  10.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,56 +156,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: srv_heupstream <srv_heupstream@mediatek.com>,
- Shawn Lin <shawn.lin@rock-chips.com>,
- "linux-mmc@vger.kernel.org" <linux-mmc@vger.kernel.org>,
- Adrian Hunter <adrian.hunter@intel.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Avri Altman <avri.altman@wdc.com>, linux-mediatek@lists.infradead.org,
- Hongjie Fang <hongjiefang@asrmicro.com>,
- Matthias Brugger <matthias.bgg@gmail.com>,
- Simon Horman <horms+renesas@verge.net.au>,
- Kyle Roeschley <kyle.roeschley@ni.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
+ Vabhav Sharma <vabhav.sharma@nxp.com>,
+ "adrian.hunter@intel.com" <adrian.hunter@intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 15 Feb 2019 at 06:59, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
->
-> the response type of CMD6 is R1B, when the first CMD6 gets response
-> CRC error, do retry may get timeout error due to card may still in
-> busy state, which cause this retry make no sense.
->
-> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-
-Applied for next, thanks!
-
-Kind regards
-Uffe
+These patches were reviewed and acked but dropped during merge window.
+Patchwork link was https://lore.kernel.org/patchwork/cover/1004155/
 
 
-> ---
->  drivers/mmc/core/mmc_ops.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/core/mmc_ops.c b/drivers/mmc/core/mmc_ops.c
-> index 9054329..c5208fb 100644
-> --- a/drivers/mmc/core/mmc_ops.c
-> +++ b/drivers/mmc/core/mmc_ops.c
-> @@ -562,7 +562,7 @@ int __mmc_switch(struct mmc_card *card, u8 set, u8 index, u8 value,
->         if (index == EXT_CSD_SANITIZE_START)
->                 cmd.sanitize_busy = true;
->
-> -       err = mmc_wait_for_cmd(host, &cmd, MMC_CMD_RETRIES);
-> +       err = mmc_wait_for_cmd(host, &cmd, 0);
->         if (err)
->                 goto out;
->
-> --
-> 1.8.1.1.dirty
->
+Vabhav Sharma (2):
+  dt-bindings: arm64: add compatible for LX2160A
+  soc/fsl/guts: Add definition for LX2160A
+
+Yogesh Gaur (2):
+  clk: qoriq: increase array size of cmux_to_group
+  clk: qoriq: Add clockgen support for lx2160a
+
+ .../bindings/arm/freescale/fsl,layerscape-dcfg.txt       |  2 +-
+ Documentation/devicetree/bindings/arm/fsl.txt            | 12 ++++++++++++
+ Documentation/devicetree/bindings/clock/qoriq-clock.txt  |  1 +
+ drivers/clk/clk-qoriq.c                                  | 16 ++++++++++++++--
+ drivers/cpufreq/qoriq-cpufreq.c                          |  1 +
+ drivers/soc/fsl/guts.c                                   |  6 ++++++
+ 6 files changed, 35 insertions(+), 3 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
