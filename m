@@ -2,70 +2,73 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D8524C10F0B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:46:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9704FC10F0B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:47:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A96A321852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:46:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68C6D2173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:47:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N+YVaAxy";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="M/PdYZw1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A96A321852
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AqJw7fJd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=alien8.de header.i=@alien8.de header.b="WhM26Nli"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68C6D2173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alien8.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:In-Reply-To:From:Subject:
-	Message-ID:References:To:MIME-Version:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yBNntDCU1vEtqtmGtZE6nSD21XOVoV9eW7JlIibechg=; b=N+YVaAxy/1haMU
-	esfGe9BcPq/RwnKi/bEcZFYgBtyne07o+XW0P4gNvrMiDDhWdLVMUwacOMw+TwU++p4GZjahEcEo8
-	69ol9/F9srTY8yPMKH+oaCnbfooYiRyKQzrglU6j72qP4HvNYIvf5czH9+k6b88Hnh5/cf/CFdydz
-	KL4kqH0flsf2mx5STrHNdRjhhTEqYqZCt4rRJ/cUzSA7oVz8rkHxmLIUfx18h5w9lgnw+LsMiCj5R
-	VBz2n9huGtiV3Vj53/BP017dv+ACrxw9sA12jnb2uiXo/nYa17j2g8HVG8eyPrGGA95OSbMpqyFIc
-	1q8tHpuZAcC66CgnmqGg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=u40ZAIBu4JShTblHoLsORpjsGQ7X4pmm6fjNcPici/4=; b=AqJw7fJdVeHL/V
+	65bbzBGGRdB7bwlxImThASYIBbhI3HAHUFs2HXwpk92OMHVcEPYrolmL7tTSLnzm7WTai8jsj+Puz
+	MJUGZYUDRsvaBkTX6YDPvKzNmgt5Yhm0lZLzWqcxD7UWf3TqQfjUgMdYMga0aSq9qbJ4yRDOM5BqZ
+	vzBrpnLmXDKDy3RvCDRc5GIe5XTJcOvIawbrdeY6wWstylpAWGCkn3sK7Qonui4FYaogJMyuAPe3l
+	QSnfUi7Mzq0X8kaBKNKRv3F+/ANrUXiwQINvW425lYd7xyRCNOgr2MqeIkpug8abgcEfi6GaAqPmw
+	QzW/HmMkYQGnbSVQqj4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gygnn-00014k-3H; Tue, 26 Feb 2019 17:45:59 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gygpB-0001cl-8a; Tue, 26 Feb 2019 17:47:25 +0000
+Received: from mail.skyhub.de ([2a01:4f8:190:11c2::b:1457])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gygnk-00014O-I3; Tue, 26 Feb 2019 17:45:57 +0000
-Received: from localhost (unknown [104.132.0.74])
+ id 1gygp7-0001W8-AA
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 17:47:23 +0000
+Received: from zn.tnic (p200300EC2BCDB200F19C36A0CFFF8AC0.dip0.t-ipconnect.de
+ [IPv6:2003:ec:2bcd:b200:f19c:36a0:cfff:8ac0])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 716162184D;
- Tue, 26 Feb 2019 17:45:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1551203155;
- bh=c2z4jtwehHe3TphH0an2gBgC1jwH9c+EUAZ8n2yejXg=;
- h=To:References:Cc:Subject:From:In-Reply-To:Date:From;
- b=M/PdYZw1E4fFGr2llB9KDjWf/mWEVOkmQ1+z3iUitWRDwd4atQx1zu2MEpnP3KXMd
- niwA/w1GoB1Q5/aG0YE88d+zZTYlOfwjr15BMoXXc4j765TfNzGijU/qHWL2QxT+pc
- NR68QCuB01MobEzpPkcRlLNrG97dFCTtwEnUhJII=
+ by mail.skyhub.de (SuperMail on ZX Spectrum 128k) with ESMTPSA id 3611B1EC0354;
+ Tue, 26 Feb 2019 18:47:13 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alien8.de; s=dkim;
+ t=1551203233;
+ h=from:from:reply-to:subject:subject:date:date:message-id:message-id:
+ to:to:cc:cc:mime-version:mime-version:content-type:content-type:
+ content-transfer-encoding:in-reply-to:in-reply-to:  references:references;
+ bh=yECRnf9xHA+bF8UOcSdNEYGxwopzM0d+sVOWkJpRWKM=;
+ b=WhM26NliI79ALDctbwpTCK4XPu1Mgs8ha9YfOQDpFPBAPiqZJd+FbfehLbYvY9WpOUtAOH
+ VqucDrxVnmGI0BXFsUVv1kHvi0/Cd+de37AUFziUIPvq5o7fv1ga5Tm20nGTiLKOl99zaG
+ Gf0X/fvpS4ZIXSCe27mnLpNb2TM2dpA=
+Date: Tue, 26 Feb 2019 18:47:05 +0100
+From: Borislav Petkov <bp@alien8.de>
+To: Dinh Nguyen <dinguyen@kernel.org>
+Subject: Re: [PATCHv2 0/2] Independent SOCFPGA SDRAM EDAC config
+Message-ID: <20190226174705.GF14836@zn.tnic>
+References: <1551121006-4657-1-git-send-email-thor.thayer@linux.intel.com>
+ <20190225204244.GJ26145@zn.tnic>
+ <17733148-82fd-e119-3525-c2d580fabc99@kernel.org>
 MIME-Version: 1.0
-To: Weiyi Lu <weiyi.lu@mediatek.com>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-2-weiyi.lu@mediatek.com>
- <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
- <b7abe484-71c1-5ec0-796c-544f1ac5d6f5@gmail.com>
- <155082168901.77512.12893153125579041936@swboyd.mtv.corp.google.com>
- <1551153650.1047.4.camel@mtksdaap41>
-Message-ID: <155120315465.260864.9490825097795511702@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.8
-Subject: Re: [PATCH v4 00/12] Mediatek MT8183 clock and scpsys support
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1551153650.1047.4.camel@mtksdaap41>
-Date: Tue, 26 Feb 2019 09:45:54 -0800
+Content-Disposition: inline
+In-Reply-To: <17733148-82fd-e119-3525-c2d580fabc99@kernel.org>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_094556_615817_395CA3CB 
-X-CRM114-Status: GOOD (  16.91  )
+X-CRM114-CacheID: sfid-20190226_094721_509776_00C06E00 
+X-CRM114-Status: UNSURE (   7.61  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,52 +80,24 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
- srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: thor.thayer@linux.intel.com, linux@armlinux.org.uk,
+ linux-kernel@vger.kernel.org, james.morse@arm.com, mchehab@kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-edac@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Weiyi Lu (2019-02-25 20:00:50)
-> On Thu, 2019-02-21 at 23:48 -0800, Stephen Boyd wrote:
-> > Quoting Matthias Brugger (2019-02-21 00:36:24)
-> > > 
-> > > 
-> > > On 20/02/2019 20:18, Stephen Boyd wrote:
-> > > > 
-> > > > What's the merge plan here? Do you want me to apply these patches to clk
-> > > > tree? Will someone be sending me a pull request for mediatek clk changes
-> > > > this cycle? It's getting pretty late for much of anything making this
-> > > > upcoming merge window.
-> > > > 
-> > > 
-> > > As far as I can see, the clock patches are independent, so I think it is OK to
-> > > take them. SCPSYS patches will go through my tree once they are in shape.
-> > 
-> > Ok great. When patches for clks are interspersed throughout the patch
-> > series it makes me think that something later in the series depends on
-> > something that isn't a clk patch so then I can't apply it.
-> > 
-> 
-> Hi Stephen,
-> 
-> Sorry for making such complex dependencies between the clk patches and
-> others in this series. And just like Matthias mentioned, the clock
-> patches are independent from others. I could resend a clock-only series
-> right away if each clock patch in v4 is qualified to merge into
-> clk-next.
-> If there still some provide need to be fixed, please let me know. I'll
-> fix them and send v5 only for clock.
+On Tue, Feb 26, 2019 at 08:59:43AM -0600, Dinh Nguyen wrote:
+> If you don't mind, I'll take the defconfig patch to avoid any conflicts.
 
-It looks like Matthias has some comments on the first patch that need to
-be addressed. I looked over the rest of the clk patches and they look ok
-at a quick glance. If you resend just the clk patches without the rest
-then I can probably apply them for the upcoming merge window.
+Ok, thanks. Applied the first one.
+
+-- 
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
 
 _______________________________________________
 linux-arm-kernel mailing list
