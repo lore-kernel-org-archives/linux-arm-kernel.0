@@ -2,22 +2,22 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C57FC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:09:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A07C5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:09:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 30C0B217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:09:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6E53321855
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:09:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Xq2xNYNw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="S+vHbVDO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30C0B217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BldUhEnU";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="Yg55H5xx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E53321855
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3UWM2cFsc9bdcRA3IScaPzxk6ewoGBT5ukvPrL0lU78=; b=Xq2xNYNwm5BSit
-	eCqr0D79XE/j7A2EV5PooQcd2qQgK6o5yuOmcuy27qlK6TAhC6lLJDKq8vSf7QoU4aWTMxO1YEDiv
-	+X37NtKNbY4/sG1FqFBCy4gGg9ykU1RCttkBEo1lIkYtgzanrZc0LLru56/dSwTN5ntJvR53yZJYl
-	GHiWXoGx88DfOec13YxcjbGfH+I6DD+SGJaGAcw08j+yZ7kyV/aXfWMe16fnWwT49tsIPZPBaSI3n
-	T3lLJIRRneeTgplaFPqoSlbhTJhNBa9QIugBW8sJPYdSTwfJULyU+XCfPjTGWikkaPAnRlxvHRrz0
-	RKZEpENHyuMw1fX7BckQ==;
+	List-Owner; bh=q/SwaPUNeWPtwsGIH3jOe21HbPgl8Feur8fiTmMpSUw=; b=BldUhEnU52O1os
+	XtHHA7u9Wr7frvx8X9uQnP2xG5k05x7q11x17+tRc3MMeh50gQXrBoByIY9Px1kKeDbxE2jbOhTet
+	QBgDzqMgGmMfIgSodwLyJF9TUyxLRsQlhsiBtC1Kw+VNTPmj8ufzWPmhviODXbUcIsbdxds1hRYTU
+	OQ/B1LkIJF0OAs54lVU87QyGafs5mvWSFi6yLzw7svVxx3B6JbSJXhqr4ngCMmXy8eGQ1SQFqbBoX
+	9O6evftGuui7DTYlc3TZeWDkU6rQBoMU5S9Y+EGINFte/e7otk8WZN+7Ct4uWrxMfFrjcLDFmgynr
+	5I0yEorn2ZyQ7AMu9IxA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybXt-00030l-OB; Tue, 26 Feb 2019 12:09:13 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gybY4-0003FK-A6; Tue, 26 Feb 2019 12:09:24 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybWH-0001Kr-03
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:08:04 +0000
-Received: by mail-wr1-x441.google.com with SMTP id w6so10406979wrs.4
+ id 1gybWM-0001Sk-6E
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:08:06 +0000
+Received: by mail-wm1-x343.google.com with SMTP id j125so2022028wmj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 04:07:32 -0800 (PST)
+ Tue, 26 Feb 2019 04:07:37 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=iHrc2ddoBPEP6xxqXcWwCwzyM1sZp9vXBiqkZPKiwQo=;
- b=S+vHbVDOuFYCE2PWopFGAlroeeh9EEZ0q3HfHmkkO4IEN3W+zvj8oX4Hl45rri8kFD
- Z1wYSDrQ1NIv3rWancGtZ+ZvxYlxzWddurTOrGZ4SF5d5nuc8JbAXHzYrVeNdZ83/3pN
- zr/J5cH4SCMZPc5JMtBEhFOaky+yLFzz0ew5nMgIAerAdOQeFAQ7bg5HTTd5pbK7fO4l
- xS3W+xCAsnCwVjUZ3XWMEK2sMIYnDTkJo4vV12KN8HG/0THKiT6WVLT9/vtlNnYypulK
- eBfKF/IAt/nZAdFNsZ9V21gGyxee5SybxdXE6Uu9226i1Flmeok6TL4Kd/iAGjtHDsKA
- l47w==
+ bh=Mq3iJZVLpItIL4L4rsuKEvbRZu3sCHkA9qXDRFfgXBE=;
+ b=Yg55H5xx5YhjgY3MfNPO+LrSNNTTZe9spRoCWEuDDgCXcmCYPjbT0h3VGDjtat+iUG
+ 4A5Cvw/bHkYhRHtER3sjJpxQZBZGZrFgIjjRhxx+r8Os+mUHvI4iH9WZ/A9xjCJaCv9d
+ 8RG5z75917QcFe46Dbq8tvLKck2y9tt55AyErLSt8bb37h20e7xlSgf2DT+8z7Fl2hHs
+ 86TiFkZhWOIHtmjL8YKjU1YJK1W1AK4CoYiEpTuBFBYhLbGwXLr/QYf1uZutP+pbzOkc
+ fQp2jaQEdM/c81XSixW/0KxOb64dsefGr41o7STJc88syVwtBPX1wLy5zSbRe1q64whr
+ 0kUQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=iHrc2ddoBPEP6xxqXcWwCwzyM1sZp9vXBiqkZPKiwQo=;
- b=aYnYKIMOxy3Z0WlhWfR7lOVjlJ6QlMHPH9/6y9dCM644LAWjnhBw7Wa54wnaYjXdXx
- 8nEX/zlNCVwwNVvUfDABerTzcDQLMRdJb+B3rOrqiYXcp/pQQsz5jbqcbZcZ8ygz4hSc
- EPI7ZX+2uwvIQ1m4mMEtyjZurF7vOwfrJhY4+6xmjMV0g5cLgDfR31rz9GIGhQ7RTC0g
- lkNFfONcjXHlz2fBT0+i2Z6vO43yyDBHeLr1jbO6FJR+fk0BGUOhnvb6PdU1EFzNVoBV
- yBBrU1NTqxt3SW4gZX7ccAOkbWAR+zXJ1jf+1+q/5ZudwT69OlbYigv6ohd2QT7S0WTK
- lB4g==
-X-Gm-Message-State: AHQUAuYSLSREZz9et9Fa2FSaCVIn52XrF/5ANgLs2UZAeStCSWLcdEKB
- 2jVp8ZzwSJH+Mn4BijG/N54RAg==
-X-Google-Smtp-Source: AHgI3Ia2oWJ5+16bJhpEdMgw3VMP08ZOaO83us7E2olXfnFYHLSdmLiQ/7GTbdOXGvym913Z4owE7g==
-X-Received: by 2002:adf:f543:: with SMTP id j3mr15607740wrp.220.1551182850910; 
- Tue, 26 Feb 2019 04:07:30 -0800 (PST)
+ bh=Mq3iJZVLpItIL4L4rsuKEvbRZu3sCHkA9qXDRFfgXBE=;
+ b=PZA64Fxb3CypS/GSInPO85/4T2JMhKmHyI9iC6PR5vOWyWD8c8tuVp46fLRN7Nc6ji
+ HkbmU78S8jZdUT2ap0H/u9qRQFe8F7r+Pm20g5bC2IoxTvx+tlTAKxjO+SwRutl819kQ
+ FOmmtU/DVp88pO4N/frYLlSqr2PL0uFwkdkqho8K/oDdo7OG+CRWcbo1rkm4g6iP5YW4
+ kCwVUmgNmUnrqGdQN5d917qoekZb+wmPeAXiUKA2xuxbMiD9RaVPd1MM/3lccSfRnrdq
+ POMzvuaRhucwBVp6GzJFa0oW8a3yNJj4xLrC0R9PfKRhs5VSPDFiBqTf4HSMYyqqzNzc
+ i/sg==
+X-Gm-Message-State: AHQUAuYiP8VyXRFv8m44SbL/482/xjQPferrr9gqcIpVLWCiH2Ooews9
+ og3Z/2TCIPYuHIE/sWE1C30oZw==
+X-Google-Smtp-Source: AHgI3IZUcWsjuYo/IPBUeCdntXwza4VrBzjGns5krnzXtz/df3rr37lXiqUAPUaw/1vNsd0omCJ7iA==
+X-Received: by 2002:a1c:a98b:: with SMTP id s133mr2291528wme.129.1551182856266; 
+ Tue, 26 Feb 2019 04:07:36 -0800 (PST)
 Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id a8sm12642158wmh.26.2019.02.26.04.07.29
+ by smtp.gmail.com with ESMTPSA id a8sm12642158wmh.26.2019.02.26.04.07.34
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 04:07:30 -0800 (PST)
+ Tue, 26 Feb 2019 04:07:35 -0800 (PST)
 From: Bartosz Golaszewski <brgl@bgdev.pl>
 To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
  Daniel Lezcano <daniel.lezcano@linaro.org>,
  Thomas Gleixner <tglx@linutronix.de>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 01/11] clocksource: davinci-timer: new driver
-Date: Tue, 26 Feb 2019 13:06:23 +0100
-Message-Id: <20190226120633.18200-2-brgl@bgdev.pl>
+Subject: [PATCH v3 05/11] ARM: davinci: da830: switch to using the clocksource
+ driver
+Date: Tue, 26 Feb 2019 13:06:27 +0100
+Message-Id: <20190226120633.18200-6-brgl@bgdev.pl>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190226120633.18200-1-brgl@bgdev.pl>
 References: <20190226120633.18200-1-brgl@bgdev.pl>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_040733_709356_AEA66F81 
-X-CRM114-Status: GOOD (  20.38  )
+X-CRM114-CacheID: sfid-20190226_040738_701022_DB2BBA70 
+X-CRM114-Status: GOOD (  15.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -108,551 +109,94 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Currently the clocksource and clockevent support for davinci platforms
-lives in mach-davinci. It hard-codes many things, uses global variables,
-implements functionalities unused by any platform and has code fragments
-scattered across many (often unrelated) files.
-
-Implement a new, modern and simplified timer driver and put it into
-drivers/clocksource. We still need to support legacy board files so
-export a config structure and a function that allows machine code to
-register the timer.
-
-We don't bother freeing resources on errors in davinci_timer_register()
-as the system won't boot without a timer anyway.
+We now have a proper clocksource driver for davinci. Switch the da830
+platform to using it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/clocksource/Kconfig         |   5 +
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/timer-davinci.c | 438 ++++++++++++++++++++++++++++
- include/clocksource/timer-davinci.h |  44 +++
- 4 files changed, 488 insertions(+)
- create mode 100644 drivers/clocksource/timer-davinci.c
- create mode 100644 include/clocksource/timer-davinci.h
+ arch/arm/mach-davinci/da830.c | 36 ++++++++++++-----------------------
+ 1 file changed, 12 insertions(+), 24 deletions(-)
 
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index a9e26f6a81a1..36d222c3fa4a 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -42,6 +42,11 @@ config BCM_KONA_TIMER
- 	help
- 	  Enables the support for the BCM Kona mobile timer driver.
- 
-+config DAVINCI_TIMER
-+	bool "Texas Instruments DaVinci timer driver"
-+	help
-+	  Enables the support for the TI DaVinci timer driver.
-+
- config DIGICOLOR_TIMER
- 	bool "Digicolor timer driver" if COMPILE_TEST
- 	select CLKSRC_MMIO
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index cdd210ff89ea..1be97aa7a699 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
-+obj-$(CONFIG_DAVINCI_TIMER)	+= timer-davinci.o
- obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
- obj-$(CONFIG_OMAP_DM_TIMER)	+= timer-ti-dm.o
- obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
-diff --git a/drivers/clocksource/timer-davinci.c b/drivers/clocksource/timer-davinci.c
-new file mode 100644
-index 000000000000..ba2b21c94c2f
---- /dev/null
-+++ b/drivers/clocksource/timer-davinci.c
-@@ -0,0 +1,438 @@
-+// SPDX-License-Identifier: GPL-2.0-only
-+//
-+// TI DaVinci clocksource driver
-+//
-+// Copyright (C) 2019 Texas Instruments
-+// Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-+// (with some parts adopted from code by Kevin Hilman <khilman@baylibre.com>)
-+
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/clocksource.h>
-+#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index d242ce06f7e5..1dd4c7273bd7 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -20,7 +20,8 @@
+ #include <mach/common.h>
+ #include <mach/cputype.h>
+ #include <mach/da8xx.h>
+-#include <mach/time.h>
 +
 +#include <clocksource/timer-davinci.h>
-+
-+#undef pr_fmt
-+#define pr_fmt(fmt) "%s: " fmt "\n", __func__
-+
-+#define DAVINCI_TIMER_REG_TIM12			0x10
-+#define DAVINCI_TIMER_REG_TIM34			0x14
-+#define DAVINCI_TIMER_REG_PRD12			0x18
-+#define DAVINCI_TIMER_REG_PRD34			0x1c
-+#define DAVINCI_TIMER_REG_TCR			0x20
-+#define DAVINCI_TIMER_REG_TGCR			0x24
-+
-+#define DAVINCI_TIMER_TIMMODE_MASK		GENMASK(3, 2)
-+#define DAVINCI_TIMER_RESET_MASK		GENMASK(1, 0)
-+#define DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED	BIT(2)
-+#define DAVINCI_TIMER_UNRESET			GENMASK(1, 0)
-+
-+/* Shift depends on timer. */
-+#define DAVINCI_TIMER_ENAMODE_MASK		GENMASK(1, 0)
-+#define DAVINCI_TIMER_ENAMODE_DISABLED		0x00
-+#define DAVINCI_TIMER_ENAMODE_ONESHOT		BIT(0)
-+#define DAVINCI_TIMER_ENAMODE_PERIODIC		BIT(1)
-+
-+#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM12	6
-+#define DAVINCI_TIMER_ENAMODE_SHIFT_TIM34	22
-+
-+#define DAVINCI_TIMER_MIN_DELTA			0x01
-+#define DAVINCI_TIMER_MAX_DELTA			0xfffffffe
-+
-+#define DAVINCI_TIMER_CLKSRC_BITS		32
-+
-+#define DAVINCI_TIMER_TGCR_DEFAULT \
-+		(DAVINCI_TIMER_TIMMODE_32BIT_UNCHAINED | DAVINCI_TIMER_UNRESET)
-+
-+enum {
-+	DAVINCI_TIMER_MODE_DISABLED = 0,
-+	DAVINCI_TIMER_MODE_ONESHOT,
-+	DAVINCI_TIMER_MODE_PERIODIC,
-+};
-+
-+struct davinci_timer_data;
-+
-+typedef void (*davinci_timer_set_period_func)(struct davinci_timer_data *,
-+					      unsigned int period);
-+
-+/**
-+ * struct davinci_timer_regs - timer-specific register offsets
-+ *
-+ * tim_off - timer counter register
-+ * prd_off - timer period register
-+ * enamode_shift - left bit-shift of the enable register associated
-+ *                 with this timer in the TCR register
-+ */
-+struct davinci_timer_regs {
-+	unsigned int tim_off;
-+	unsigned int prd_off;
-+	unsigned int enamode_shift;
-+};
-+
-+struct davinci_timer_data {
-+	void __iomem *base;
-+	const struct davinci_timer_regs *regs;
-+	unsigned int mode;
-+	davinci_timer_set_period_func set_period;
-+	unsigned int cmp_off;
-+};
-+
-+struct davinci_timer_clockevent {
-+	struct clock_event_device dev;
-+	unsigned int tick_rate;
-+	struct davinci_timer_data timer;
-+};
-+
-+struct davinci_timer_clocksource {
-+	struct clocksource dev;
-+	struct davinci_timer_data timer;
-+};
-+
-+static const struct davinci_timer_regs davinci_timer_tim12_regs = {
-+	.tim_off		= DAVINCI_TIMER_REG_TIM12,
-+	.prd_off		= DAVINCI_TIMER_REG_PRD12,
-+	.enamode_shift		= DAVINCI_TIMER_ENAMODE_SHIFT_TIM12,
-+};
-+
-+static const struct davinci_timer_regs davinci_timer_tim34_regs = {
-+	.tim_off		= DAVINCI_TIMER_REG_TIM34,
-+	.prd_off		= DAVINCI_TIMER_REG_PRD34,
-+	.enamode_shift		= DAVINCI_TIMER_ENAMODE_SHIFT_TIM34,
-+};
-+
-+/* Must be global for davinci_timer_read_sched_clock(). */
-+static struct davinci_timer_data *davinci_timer_clksrc_timer;
-+
-+static struct davinci_timer_clockevent *
-+to_davinci_timer_clockevent(struct clock_event_device *clockevent)
-+{
-+	return container_of(clockevent, struct davinci_timer_clockevent, dev);
-+}
-+
-+static struct davinci_timer_clocksource *
-+to_davinci_timer_clocksource(struct clocksource *clocksource)
-+{
-+	return container_of(clocksource, struct davinci_timer_clocksource, dev);
-+}
-+
-+static unsigned int davinci_timer_read(struct davinci_timer_data *timer,
-+				       unsigned int reg)
-+{
-+	return readl_relaxed(timer->base + reg);
-+}
-+
-+static void davinci_timer_write(struct davinci_timer_data *timer,
-+				unsigned int reg, unsigned int val)
-+{
-+	writel_relaxed(val, timer->base + reg);
-+}
-+
-+static void davinci_timer_update(struct davinci_timer_data *timer,
-+				 unsigned int reg, unsigned int mask,
-+				 unsigned int val)
-+{
-+	unsigned int new, orig;
-+
-+	orig = davinci_timer_read(timer, reg);
-+	new = orig & ~mask;
-+	new |= val & mask;
-+
-+	davinci_timer_write(timer, reg, new);
-+}
-+
-+static void davinci_timer_set_period(struct davinci_timer_data *timer,
-+				     unsigned int period)
-+{
-+	timer->set_period(timer, period);
-+}
-+
-+static void davinci_timer_set_period_std(struct davinci_timer_data *timer,
-+					 unsigned int period)
-+{
-+	const struct davinci_timer_regs *regs = timer->regs;
-+	unsigned int enamode;
-+
-+	enamode = davinci_timer_read(timer, DAVINCI_TIMER_REG_TCR);
-+
-+	davinci_timer_update(timer, DAVINCI_TIMER_REG_TCR,
-+			DAVINCI_TIMER_ENAMODE_MASK << regs->enamode_shift,
-+			DAVINCI_TIMER_ENAMODE_DISABLED << regs->enamode_shift);
-+
-+	davinci_timer_write(timer, regs->tim_off, 0x0);
-+	davinci_timer_write(timer, regs->prd_off, period);
-+
-+	if (timer->mode == DAVINCI_TIMER_MODE_ONESHOT)
-+		enamode = DAVINCI_TIMER_ENAMODE_ONESHOT;
-+	else if (timer->mode == DAVINCI_TIMER_MODE_PERIODIC)
-+		enamode = DAVINCI_TIMER_ENAMODE_PERIODIC;
-+
-+	davinci_timer_update(timer, DAVINCI_TIMER_REG_TCR,
-+			     DAVINCI_TIMER_ENAMODE_MASK << regs->enamode_shift,
-+			     enamode << regs->enamode_shift);
-+}
-+
-+static void davinci_timer_set_period_cmp(struct davinci_timer_data *timer,
-+					 unsigned int period)
-+{
-+	const struct davinci_timer_regs *regs = timer->regs;
-+	unsigned int curr_time;
-+
-+	curr_time = davinci_timer_read(timer, regs->tim_off);
-+	davinci_timer_write(timer, timer->cmp_off, curr_time + period);
-+}
-+
-+static irqreturn_t davinci_timer_irq_timer(int irq, void *data)
-+{
-+	struct davinci_timer_clockevent *clockevent = data;
-+
-+	clockevent->dev.event_handler(&clockevent->dev);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t davinci_timer_irq_freerun(int irq, void *data)
-+{
-+	return IRQ_HANDLED;
-+}
-+
-+static u64 notrace davinci_timer_read_sched_clock(void)
-+{
-+	struct davinci_timer_data *timer;
-+	unsigned int val;
-+
-+	timer = davinci_timer_clksrc_timer;
-+	val = davinci_timer_read(timer, timer->regs->tim_off);
-+
-+	return val;
-+}
-+
-+static u64 davinci_timer_clksrc_read(struct clocksource *dev)
-+{
-+	struct davinci_timer_clocksource *clocksource;
-+	const struct davinci_timer_regs *regs;
-+	unsigned int val;
-+
-+	clocksource = to_davinci_timer_clocksource(dev);
-+	regs = clocksource->timer.regs;
-+
-+	val = davinci_timer_read(&clocksource->timer, regs->tim_off);
-+
-+	return val;
-+}
-+
-+static int davinci_timer_set_next_event(unsigned long cycles,
-+					struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	davinci_timer_set_period(&clockevent->timer, cycles);
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_shutdown(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_DISABLED;
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_periodic(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+	unsigned int period;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	period = clockevent->tick_rate / HZ;
-+
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_PERIODIC;
-+	davinci_timer_set_period(&clockevent->timer, period);
-+
-+	return 0;
-+}
-+
-+static int davinci_timer_set_state_oneshot(struct clock_event_device *dev)
-+{
-+	struct davinci_timer_clockevent *clockevent;
-+
-+	clockevent = to_davinci_timer_clockevent(dev);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_ONESHOT;
-+
-+	return 0;
-+}
-+
-+static void davinci_timer_init(void __iomem *base)
-+{
-+	/* Set clock to internal mode and disable it. */
-+	writel_relaxed(0x0, base + DAVINCI_TIMER_REG_TCR);
-+	/*
-+	 * Reset both 32-bit timers, set no prescaler for timer 34, set the
-+	 * timer to dual 32-bit unchained mode, unreset both 32-bit timers.
-+	 */
-+	writel_relaxed(DAVINCI_TIMER_TGCR_DEFAULT,
-+		       base + DAVINCI_TIMER_REG_TGCR);
-+	/* Init both counters to zero. */
-+	writel_relaxed(0x0, base + DAVINCI_TIMER_REG_TIM12);
-+	writel_relaxed(0x0, base + DAVINCI_TIMER_REG_TIM34);
-+}
-+
-+int __init davinci_timer_register(struct clk *clk,
-+				  const struct davinci_timer_cfg *timer_cfg)
-+{
-+	struct davinci_timer_clocksource *clocksource;
-+	struct davinci_timer_clockevent *clockevent;
-+	void __iomem *base;
+ 
+ #include "irqs.h"
+ #include "mux.h"
+@@ -675,32 +676,18 @@ int __init da830_register_gpio(void)
+ 	return da8xx_register_gpio(&da830_gpio_platform_data);
+ }
+ 
+-static struct davinci_timer_instance da830_timer_instance[2] = {
+-	{
+-		.base		= DA8XX_TIMER64P0_BASE,
+-		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_0),
+-		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_0),
+-		.cmp_off	= DA830_CMP12_0,
+-		.cmp_irq	= DAVINCI_INTC_IRQ(IRQ_DA830_T12CMPINT0_0),
+-	},
+-	{
+-		.base		= DA8XX_TIMER64P1_BASE,
+-		.bottom_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_1),
+-		.top_irq	= DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT34_1),
+-		.cmp_off	= DA830_CMP12_0,
+-		.cmp_irq	= DAVINCI_INTC_IRQ(IRQ_DA830_T12CMPINT0_1),
+-	},
+-};
+-
+ /*
+  * T0_BOT: Timer 0, bottom		: Used for clock_event & clocksource
+  * T0_TOP: Timer 0, top			: Used by DSP
+  * T1_BOT, T1_TOP: Timer 1, bottom & top: Used for watchdog timer
+  */
+-static struct davinci_timer_info da830_timer_info = {
+-	.timers		= da830_timer_instance,
+-	.clockevent_id	= T0_BOT,
+-	.clocksource_id	= T0_BOT,
++static const struct davinci_timer_cfg da830_timer_cfg = {
++	.reg = DEFINE_RES_IO(DA8XX_TIMER64P0_BASE, SZ_4K),
++	.irq = {
++		DEFINE_RES_IRQ(DAVINCI_INTC_IRQ(IRQ_DA830_T12CMPINT0_0)),
++		DEFINE_RES_IRQ(DAVINCI_INTC_IRQ(IRQ_DA8XX_TINT12_0)),
++	},
++	.cmp_off = DA830_CMP12_0,
+ };
+ 
+ static const struct davinci_soc_info davinci_soc_info_da830 = {
+@@ -712,7 +699,6 @@ static const struct davinci_soc_info davinci_soc_info_da830 = {
+ 	.pinmux_base		= DA8XX_SYSCFG0_BASE + 0x120,
+ 	.pinmux_pins		= da830_pins,
+ 	.pinmux_pins_num	= ARRAY_SIZE(da830_pins),
+-	.timer_info		= &da830_timer_info,
+ 	.emac_pdata		= &da8xx_emac_pdata,
+ };
+ 
+@@ -742,6 +728,7 @@ void __init da830_init_time(void)
+ {
+ 	void __iomem *pll;
+ 	struct clk *clk;
 +	int rv;
-+
-+	rv = clk_prepare_enable(clk);
-+	if (rv) {
-+		pr_err("Unable to prepare and enable the timer clock\n");
-+		return rv;
-+	}
-+
-+	base = request_mem_region(timer_cfg->reg.start,
-+				  resource_size(&timer_cfg->reg),
-+				  "davinci-timer");
-+	if (!base) {
-+		pr_err("Unable to request memory region\n");
-+		return -EBUSY;
-+	}
-+
-+	base = ioremap(timer_cfg->reg.start, resource_size(&timer_cfg->reg));
-+	if (!base) {
-+		pr_err("Unable to map the register range\n");
-+		return -ENOMEM;
-+	}
-+
-+	davinci_timer_init(base);
-+
-+	clockevent = kzalloc(sizeof(*clockevent), GFP_KERNEL);
-+	if (!clockevent) {
-+		pr_err("Error allocating memory for clockevent data\n");
-+		return -ENOMEM;
-+	}
-+
-+	clockevent->dev.name = "tim12";
-+	clockevent->dev.features = CLOCK_EVT_FEAT_ONESHOT;
-+	clockevent->dev.set_next_event = davinci_timer_set_next_event;
-+	clockevent->dev.set_state_shutdown = davinci_timer_set_state_shutdown;
-+	clockevent->dev.set_state_periodic = davinci_timer_set_state_periodic;
-+	clockevent->dev.set_state_oneshot = davinci_timer_set_state_oneshot;
-+	clockevent->dev.cpumask = cpumask_of(0);
-+	clockevent->tick_rate = clk_get_rate(clk);
-+	clockevent->timer.mode = DAVINCI_TIMER_MODE_DISABLED;
-+	clockevent->timer.base = base;
-+	clockevent->timer.regs = &davinci_timer_tim12_regs;
-+
-+	if (timer_cfg->cmp_off) {
-+		clockevent->timer.cmp_off = timer_cfg->cmp_off;
-+		clockevent->timer.set_period = davinci_timer_set_period_cmp;
-+	} else {
-+		clockevent->dev.features |= CLOCK_EVT_FEAT_PERIODIC;
-+		clockevent->timer.set_period = davinci_timer_set_period_std;
-+	}
-+
-+	rv = request_irq(timer_cfg->irq[DAVINCI_TIMER_CLOCKEVENT_IRQ].start,
-+			 davinci_timer_irq_timer, IRQF_TIMER,
-+			 "clockevent", clockevent);
-+	if (rv) {
-+		pr_err("Unable to request the clockevent interrupt\n");
-+		return rv;
-+	}
-+
-+	clockevents_config_and_register(&clockevent->dev,
-+					clockevent->tick_rate,
-+					DAVINCI_TIMER_MIN_DELTA,
-+					DAVINCI_TIMER_MAX_DELTA);
-+
-+	clocksource = kzalloc(sizeof(*clocksource), GFP_KERNEL);
-+	if (!clocksource) {
-+		pr_err("Error allocating memory for clocksource data\n");
-+		return -ENOMEM;
-+	}
-+
-+	clocksource->dev.rating = 300;
-+	clocksource->dev.read = davinci_timer_clksrc_read;
-+	clocksource->dev.mask = CLOCKSOURCE_MASK(DAVINCI_TIMER_CLKSRC_BITS);
-+	clocksource->dev.flags = CLOCK_SOURCE_IS_CONTINUOUS;
-+	clocksource->timer.set_period = davinci_timer_set_period_std;
-+	clocksource->timer.mode = DAVINCI_TIMER_MODE_PERIODIC;
-+	clocksource->timer.base = base;
-+
-+	if (timer_cfg->cmp_off) {
-+		clocksource->timer.regs = &davinci_timer_tim12_regs;
-+		clocksource->dev.name = "tim12";
-+	} else {
-+		clocksource->timer.regs = &davinci_timer_tim34_regs;
-+		clocksource->dev.name = "tim34";
-+	}
-+
-+	rv = request_irq(timer_cfg->irq[DAVINCI_TIMER_CLOCKSOURCE_IRQ].start,
-+			 davinci_timer_irq_freerun, IRQF_TIMER,
-+			 "free-run counter", clocksource);
-+	if (rv) {
-+		pr_err("Unable to request the clocksource interrupt\n");
-+		return rv;
-+	}
-+
-+	rv = clocksource_register_hz(&clocksource->dev, clockevent->tick_rate);
-+	if (rv) {
-+		pr_err("Unable to register clocksource\n");
-+		return rv;
-+	}
-+
-+	davinci_timer_clksrc_timer = &clocksource->timer;
-+
-+	sched_clock_register(davinci_timer_read_sched_clock,
-+			     DAVINCI_TIMER_CLKSRC_BITS,
-+			     clockevent->tick_rate);
-+
-+	davinci_timer_set_period(&clockevent->timer,
-+				 clockevent->tick_rate / HZ);
-+	davinci_timer_set_period(&clocksource->timer, UINT_MAX);
-+
-+	return 0;
-+}
-+
-+static int __init of_davinci_timer_register(struct device_node *np)
-+{
-+	struct davinci_timer_cfg timer_cfg = { };
-+	struct clk *clk;
-+	int rv;
-+
-+	rv = of_address_to_resource(np, 0, &timer_cfg.reg);
-+	if (rv) {
-+		pr_err("Unable to get the register range for timer\n");
-+		return rv;
-+	}
-+
-+	rv = of_irq_to_resource_table(np, timer_cfg.irq,
-+				      DAVINCI_TIMER_NUM_IRQS);
-+	if (rv != DAVINCI_TIMER_NUM_IRQS) {
-+		pr_err("Unable to get the interrupts for timer\n");
-+		return rv;
-+	}
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		pr_err("Unable to get the timer clock\n");
-+		return PTR_ERR(clk);
-+	}
-+
-+	rv = davinci_timer_register(clk, &timer_cfg);
-+	if (rv)
-+		clk_put(clk);
-+
-+	return rv;
-+}
-+TIMER_OF_DECLARE(davinci_timer, "ti,da830-timer", of_davinci_timer_register);
-diff --git a/include/clocksource/timer-davinci.h b/include/clocksource/timer-davinci.h
-new file mode 100644
-index 000000000000..1dcc1333fbc8
---- /dev/null
-+++ b/include/clocksource/timer-davinci.h
-@@ -0,0 +1,44 @@
-+/* SPDX-License-Identifier: GPL-2.0-only */
-+/*
-+ * TI DaVinci clocksource driver
-+ *
-+ * Copyright (C) 2019 Texas Instruments
-+ * Author: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-+ */
-+
-+#ifndef __TIMER_DAVINCI_H__
-+#define __TIMER_DAVINCI_H__
-+
-+#include <linux/clk.h>
-+#include <linux/ioport.h>
-+
-+enum {
-+	DAVINCI_TIMER_CLOCKEVENT_IRQ,
-+	DAVINCI_TIMER_CLOCKSOURCE_IRQ,
-+	DAVINCI_TIMER_NUM_IRQS,
-+};
-+
-+/**
-+ * struct davinci_timer_cfg - davinci clocksource driver configuration struct
-+ * @reg:        register range resource
-+ * @irq:        clockevent and clocksource interrupt resources
-+ * @cmp_off:    if set - it specifies the compare register used for clockevent
-+ *
-+ * Note: if the compare register is specified, the driver will use the bottom
-+ * clock half for both clocksource and clockevent and the compare register
-+ * to generate event irqs. The user must supply the correct compare register
-+ * interrupt number.
-+ *
-+ * This is only used by da830 the DSP of which uses the top half. The timer
-+ * driver still configures the top half to run in free-run mode.
-+ */
-+struct davinci_timer_cfg {
-+	struct resource reg;
-+	struct resource irq[DAVINCI_TIMER_NUM_IRQS];
-+	unsigned int cmp_off;
-+};
-+
-+int __init davinci_timer_register(struct clk *clk,
-+				  const struct davinci_timer_cfg *data);
-+
-+#endif /* __TIMER_DAVINCI_H__ */
+ 
+ 	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DA830_REF_FREQ);
+ 
+@@ -755,7 +742,8 @@ void __init da830_init_time(void)
+ 		return;
+ 	}
+ 
+-	davinci_timer_init(clk);
++	rv = davinci_timer_register(clk, &da830_timer_cfg);
++	WARN(rv, "Unable to register the timer: %d\n", rv);
+ }
+ 
+ static struct resource da830_psc0_resources[] = {
 -- 
 2.20.1
 
