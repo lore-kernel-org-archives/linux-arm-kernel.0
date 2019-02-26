@@ -2,20 +2,21 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79A92C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3BE8EC10F0B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 481682087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0B0752173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:14:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TI8kSMZN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 481682087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iJNwCMLA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B0752173C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,43 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QRUYh+fSTdGPjxEOgRKBibxTcvS0L3OcEko8ZsxY9Z0=; b=TI8kSMZNz5SOKc
-	XNU0qPvdN3noV7bpu0t1Ihm9Uf3gjr1PwCLRYh0Cn0VXjHTt8mwq/RdCZ3p8ieVJtg6bnSmR0Spo+
-	M5fheAcDTyPLyiGU67WvBP0X38MUtvW3/RKafQXkjG5PvInMkAlXA8g7Loi6pPfJfCNrwCHVM7uSd
-	6YyrpSYS38CckiliuBNG+qjQAFkkbMHLsJnW2djj0my0nkKZIFhGLc9UQxEZepyYgKKAxNOKOHXiV
-	6GEMDgQnGpO7DvSyTxRL/M9fcC93H2dXLj0E88Q8015EhjvE0gbaX/ylM4RVKUpmxuXvuIMfjgHbR
-	FwNa6j8KTDl6qI9WabyA==;
+	List-Owner; bh=zvRgiXhEETM9wySbV+M28GXFtBEV1cfZ4CJuODqBWmw=; b=iJNwCMLA+V6iGZ
+	naGgz5/nNI1NTMoI1QNNl31X5EnJTOw7GsbutF5uVjbWdrn0XSIPxokaA8XGtF84p/8arrMdo9hQ8
+	aTImdNLrAk5BvfsXJF+69qjoDP6CYriHX/ffVSOGSBSGXQ1U7g4p1E38O5VddiqgSgx0ImSmKCXWD
+	fmJJkHR05s7r8XmUbd4fnb8CD7UG3pvIWmbTsAB1QXRKMhSiHQnmug/5yKE0IpYlGvd2ay/aqvvvn
+	/yzw9OXbZdqBUfoMe7GkmbCt/n5kSafZJTjV6CvcgmUvCQicMxwS3sMbnoDchMq/OoCciBZQQQxxE
+	3uaMHjrU9ZVjZzgeLjaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybcq-000879-2V; Tue, 26 Feb 2019 12:14:20 +0000
+	id 1gybcy-0008HY-OL; Tue, 26 Feb 2019 12:14:28 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybcD-0007XY-7N
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:13:58 +0000
+ id 1gybcO-0007oI-A2
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:14:04 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0DA7D80D;
- Tue, 26 Feb 2019 04:13:41 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1EA24A78;
+ Tue, 26 Feb 2019 04:13:52 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 411C13F5C1;
- Tue, 26 Feb 2019 04:13:39 -0800 (PST)
-Date: Tue, 26 Feb 2019 12:13:36 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 51E143F5C1;
+ Tue, 26 Feb 2019 04:13:50 -0800 (PST)
+Date: Tue, 26 Feb 2019 12:13:47 +0000
 From: Dave Martin <Dave.Martin@arm.com>
 To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v5 18/26] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-Message-ID: <20190226121336.GS3567@e103592.cambridge.arm.com>
+Subject: Re: [PATCH v5 22/26] KVM: arm64/sve: Add pseudo-register for the
+ guest's vector lengths
+Message-ID: <20190226121347.GT3567@e103592.cambridge.arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-19-git-send-email-Dave.Martin@arm.com>
- <f6d9f731-e9f8-a54d-1165-2b188e22b4df@arm.com>
+ <1550519559-15915-23-git-send-email-Dave.Martin@arm.com>
+ <34b7691f-7acb-c9aa-6e53-2857e429f148@arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <f6d9f731-e9f8-a54d-1165-2b188e22b4df@arm.com>
+In-Reply-To: <34b7691f-7acb-c9aa-6e53-2857e429f148@arm.com>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_041341_693734_D07CE9E7 
-X-CRM114-Status: GOOD (  40.08  )
+X-CRM114-CacheID: sfid-20190226_041352_731444_499ECE4C 
+X-CRM114-Status: GOOD (  37.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -83,39 +84,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Feb 21, 2019 at 03:23:37PM +0000, Julien Thierry wrote:
+On Thu, Feb 21, 2019 at 05:48:59PM +0000, Julien Thierry wrote:
 > Hi Dave,
 > 
 > On 18/02/2019 19:52, Dave Martin wrote:
-> > This patch adds the following registers for access via the
-> > KVM_{GET,SET}_ONE_REG interface:
+> > This patch adds a new pseudo-register KVM_REG_ARM64_SVE_VLS to
+> > allow userspace to set and query the set of vector lengths visible
+> > to the guest, along with corresponding storage in struct
+> > kvm_vcpu_arch.
 > > 
-> >  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
-> >  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
-> >  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
+> > In the future, multiple register slices per SVE register may be
+> > visible through the ioctl interface.  Once the set of slices has
+> > been determined we would not be able to allow the vector length set
+> > to be changed any more, in order to avoid userspace seeing
+> > inconsistent sets of registers.  For this reason, this patch adds
+> > support to track vcpu finalization explicitly, and enforce proper
+> > sequencing of ioctls.
 > > 
-> > In order to adapt gracefully to future architectural extensions,
-> > the registers are logically divided up into slices as noted above:
-> > the i parameter denotes the slice index.
-> > 
-> > This allows us to reserve space in the ABI for future expansion of
-> > these registers.  However, as of today the architecture does not
-> > permit registers to be larger than a single slice, so no code is
-> > needed in the kernel to expose additional slices, for now.  The
-> > code can be extended later as needed to expose them up to a maximum
-> > of 32 slices (as carved out in the architecture itself) if they
-> > really exist someday.
-> > 
-> > The registers are only visible for vcpus that have SVE enabled.
-> > They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
-> > have SVE.
-> > 
-> > Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
-> > allowed for SVE-enabled vcpus: SVE-aware userspace can use the
-> > KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
-> > register state.  This avoids some complex and pointless emulation
-> > in the kernel to convert between the two views of these aliased
-> > registers.
+> > The new pseudo-register is not exposed yet.  Subsequent patches
+> > will allow SVE to be turned on for guest vcpus, making it visible.
 > > 
 > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > > 
@@ -123,127 +110,211 @@ On Thu, Feb 21, 2019 at 03:23:37PM +0000, Julien Thierry wrote:
 > > 
 > > Changes since v4:
 > > 
-> >  * Add "BASE" #defines for the Z-reg and P-reg ranges in the KVM
-> >    register ID space, to make the 0x400 magic number a little less
-> >    cryptic.
+> >  * Add a UAPI header comment indicating the pseudo-register status of
+> >    KVM_REG_ARM64_SVE_VLS.
 > > 
-> >  * Pull KVM_SVE_{Z,P}REG_SIZE defines from "KVM: arm64: Enumerate SVE
-> >    register indices for KVM_GET_REG_LIST", since we now use them here.
+> >  * Get rid of the sve_vqs[] array from struct kvm_vcpu_arch.  This
+> >    array is pointless, because its contents must match the host's
+> >    internal sve_vq_map anyway, up to vcpu->arch.sve_max_vl.
 > > 
-> >  * Simplify sve_reg_region(), and give up on the attempt to make
-> >    kreg_region a general thing: nothing else will use it for now,
-> >    anyway, so let's keep it as simple as possible.
+> >    The ioctl register accessors are slow-path code, so we can decode
+> >    or reconstruct sve_vqs[] on demand instead, for exchange with
+> >    userspace.
 > > 
-> >  * Drop support for multiple slices per register.  This functionality
-> >    can be added back in later if needed, without ABI breaks.
+> >  * For compatibility with potential future architecture extensions,
+> >    enabling vector lengths above 256 bytes for the guest is explicitly
+> >    disallowed now (because the code for exposing additional bits
+> >    through ioctl is currently missing).  This can be addressed later
+> >    if/when needed.
 > > 
-> >  * Pull vcpu_sve_state_size() into kvm_host.h, from "KVM: arm64/sve:
-> >    Allow userspace to enable SVE for vcpus".  This is needed for use
-> >    with array_index_nospec() to determine the applicable buffer bounds.
-> >    To avoid circular header deependency issues, the function is also
-> >    converted into a macro, but is otherwise equivalent to the original
-> >    version.
+> > Note:
 > > 
-> >  * Guard sve_state base offset in kernel memory with
-> >    array_index_nospec(), since it is generated from user data that can
-> >    put it out of range.
+> >  * I defensively pass an array by pointer here, to help avoid
+> >    accidentally breaking assumptions during future maintenance.
 > > 
-> >    (sve_state will get allocated with the corresponding size later in
-> >    the series.  For now, this code is dormant since no means is
-> >    provided for userspace to create SVE-enabled vcpus yet.)
+> >    Due to (over?)zealous constification, this causes the following
+> >    sparse warning.  I think this is sparse getting confused: I am not
+> >    relying on any kernel-specific semantics here, and GCC generates no
+> >    warning.
+> > 
+> > +arch/arm64/kvm/guest.c:33: warning: incorrect type in argument 1 (different modifiers)
+> > +arch/arm64/kvm/guest.c:33:    expected unsigned long long const [usertype] ( *const vqs )[8]
+> > +arch/arm64/kvm/guest.c:33:    got unsigned long long [usertype] ( * )[8]
+> > 
 > > ---
-> >  arch/arm64/include/asm/kvm_host.h |  14 ++++
-> >  arch/arm64/include/uapi/asm/kvm.h |  17 +++++
-> >  arch/arm64/kvm/guest.c            | 138 ++++++++++++++++++++++++++++++++++----
-> >  3 files changed, 157 insertions(+), 12 deletions(-)
-> > 
+
+[...]
+
+> > diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+
+[...]
+
+> > +static int get_sve_vls(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> > +{
+> > +	unsigned int max_vq, vq;
+> > +	u64 vqs[DIV_ROUND_UP(SVE_VQ_MAX - SVE_VQ_MIN + 1, 64)];
+> > +
+> > +	if (WARN_ON(!sve_vl_valid(vcpu->arch.sve_max_vl)))
+> > +		return -EINVAL;
+> > +
+> > +	memset(vqs, 0, sizeof(vqs));
+> > +
+> > +	max_vq = sve_vq_from_vl(vcpu->arch.sve_max_vl);
+> > +	for (vq = SVE_VQ_MIN; vq <= max_vq; ++vq)
+> > +		if (sve_vq_available(vq))
+> > +			vqs[vq_word(vq)] |= vq_mask(vq);
+> > +
+> > +	BUILD_BUG_ON(sizeof(vqs) != KVM_REG_SIZE(reg->id));
 > 
-> [...]
+> reg->id is not know at build time. From my understanding of
+> BUILD_BUG_ON(), things actually ends up evaluated at runtime but I'm not
+> sure what happens when doing sizeof(char[1- 2*0]) at runtime.
+>
+> Anyway, I don't think this is intended.
+
+There's no runtime check: BUILD_BUG_ON() will cause compilation to fail
+if the required condition doesn't fall out from optimisation.
+
+Because of the way this function is called, reg->id is always
+KVM_REG_ARM64_SVE_VLS, so inlining and constant propagation will make
+this check pass (and compile to nothing).
+
+We can assume a certain amount of inlining: the kernel officially can't
+be built without optimisation.  But the precise build configuration can
+sometimes have an effect here -- so it may not be better to rely on this
+working for this slow-path code.
+
+I'll convert these to if (WARN_ON()) return -EIO or something, or drop
+them if I can get rid of them in other refactoring.
+
+The fact that struct kvm_one_reg lacks any "size" field is rather
+unfortunate, since it provides no explicit way for userspace to tell us
+the size of its buffer.
+
+> > +	if (copy_to_user((void __user *)reg->addr, vqs, sizeof(vqs)))
+> > +		return -EFAULT;
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int set_sve_vls(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> > +{
+> > +	unsigned int max_vq, vq;
+> > +	u64 vqs[DIV_ROUND_UP(SVE_VQ_MAX - SVE_VQ_MIN + 1, 64)];
+> > +
+> > +	if (kvm_arm_vcpu_finalized(vcpu))
+> > +		return -EPERM; /* too late! */
+> > +
+> > +	if (WARN_ON(vcpu->arch.sve_state))
+> > +		return -EINVAL;
+> > +
+> > +	BUILD_BUG_ON(sizeof(vqs) != KVM_REG_SIZE(reg->id));
 > 
-> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> > index f491456..8cfa889 100644
-> > --- a/arch/arm64/kvm/guest.c
-> > +++ b/arch/arm64/kvm/guest.c
+> Same as above.
 > 
-> [...]
-> 
-> > @@ -211,6 +217,114 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >  	return err;
-> >  }
+> > +	if (copy_from_user(vqs, (const void __user *)reg->addr, sizeof(vqs)))
+> > +		return -EFAULT;
+> > +
+> > +	max_vq = 0;
+> > +	for (vq = SVE_VQ_MIN; vq <= SVE_VQ_MAX; ++vq)
+> > +		if (vq_present(&vqs, vq))
+> > +			max_vq = vq;
+> > +
+> > +	/*
+> > +	 * The get_sve_reg()/set_sve_reg() ioctl interface will need
+> > +	 * to be extended with multiple register slice support in
+> > +	 * order to support vector lengths greater than
+> > +	 * SVE_VL_ARCH_MAX:
+> > +	 */
+> > +	if (WARN_ONCE(sve_vl_from_vq(max_vq) > SVE_VL_ARCH_MAX,
+> > +		      "KVM: Requested vector length not supported yet\n"))
+> > +		return -EINVAL;
+> > +
+> > +	for (vq = SVE_VQ_MIN; vq <= max_vq; ++vq)
+> > +		if (vq_present(&vqs, vq) != sve_vq_available(vq))
+> > +			return -EINVAL;
+> > +
+> > +	/* Can't run with no vector lengths at all: */
+> > +	if (max_vq < SVE_VQ_MIN)
+> > +		return -EINVAL;
+> > +
+> > +	vcpu->arch.sve_max_vl = sve_vl_from_vq(max_vq);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  #define SVE_REG_SLICE_SHIFT	0
+> >  #define SVE_REG_SLICE_BITS	5
+> >  #define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
+> > @@ -297,9 +372,21 @@ static int sve_reg_region(struct sve_state_region *region,
+> >  static int get_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >  {
+> >  	struct sve_state_region region;
+> > +	int ret;
+> >  	char __user *uptr = (char __user *)reg->addr;
 > >  
-> > +#define SVE_REG_SLICE_SHIFT	0
-> > +#define SVE_REG_SLICE_BITS	5
-> > +#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
-> > +#define SVE_REG_ID_BITS		5
+> > -	if (!vcpu_has_sve(vcpu) || sve_reg_region(&region, vcpu, reg))
+> > +	if (!vcpu_has_sve(vcpu))
+> > +		return -ENOENT;
 > > +
-> > +#define SVE_REG_SLICE_MASK					\
-> > +	GENMASK(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS - 1,	\
-> > +		SVE_REG_SLICE_SHIFT)
-> > +#define SVE_REG_ID_MASK							\
-> > +	GENMASK(SVE_REG_ID_SHIFT + SVE_REG_ID_BITS - 1, SVE_REG_ID_SHIFT)
+> > +	if (reg->id == KVM_REG_ARM64_SVE_VLS)
+> > +		return get_sve_vls(vcpu, reg);
 > > +
-> > +#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
-> > +
-> > +#define KVM_SVE_ZREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0))
-> > +#define KVM_SVE_PREG_SIZE KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0))
-> > +
-> > +struct sve_state_region {
+> > +	/* Finalize the number of slices per SVE register: */
+> > +	ret = kvm_arm_vcpu_finalize(vcpu);
 > 
-> This sve_state_region feels a bit too generic too me.
-> 
-> So far it is only used to access a single (slice of a) register at a
-> time. Is there a plan to use it for more?
+> Having this here feels a bit random...
 
-It's there as a way to factor out security-sensitive range computations
-that we otherwise have to do twice -- I'd rather have the (potential)
-bugs in one place.  sve_state is particularly awkward because it is
-heterogeneous, with variably sized members for which no C declaration
-is avaiable (or possible).
+I'll have another think about this.
 
-Previously it was used in four places, because I tried to emulate the
-VFP get/set functions for SVE vcpus.  Now that functionality has been
-dropped I agree that this function looks like a bit like overkill.  But
-I didn't come up with a good way to split it without duplicating an
-undesirable amount of fiddly logic.
+KVM_REG_ARM64_SVE_VLS certainly has nothing to do with anything except
+SVE, and putting it in the SVE coproc space allows us to demux SVE-
+related stuff from everything else neatly.
 
-"sve_state" in the name comes from the naming of the kernel field(s)
-that this computes ranges on: vcpu->arch.sve_state (and thread->
-sve_state, which we don't operate on here, but which has the same
-format).
+The whole "coprocessor" concept is nonsense for arm64 anyway except
+for the sysregs (where the reg ID encodings map directly onto the
+architecture and also align with AArch32).  So, the copro number is
+pretty meaningless except as a demux key for related groups of
+registers, which is how I use it here.
 
-So, this struct describes a slice of "sve_state", hence the name.  But
-you're right, it is only ever supposed to span a single SVE register
-within there.
+There's also no well-defined distinction between real and fake
+registers, and no natural home for miscellaneous fakes -- all existing
+blocks are for specific purposes such as recording the state of emulated
+firmware APIs etc.  The SVE registers as exposed here already have no
+direct equivalent in the architecture either, due to the padding up to
+2048 bits, and the presentation of FFR as addressable P-register etc.
 
-> Otherwise I'd suggest at least naming it something like sve_reg_region,
-> sve_reg_mem_region or sve_reg_mem_desc.
+> I'd suggest considering the pseudo-register outside of the SVE co-proc,
+> as part of a set of registers that do not finalize a vcpu when accessed.
 
-It used to be called struct kreg_region.  The name "sve_state_region"
-was an attempt to make it look less generic, which doesn't appear to
-have worked too well.
+(Also, the dependency is not one-way:  _SVE_VLS is not independent
+of finalization: quite the reverse -- it can only be written _before_
+finalization.)
 
-Maybe "sve_state_reg_region" would narrow the apparent scope of this a
-little further.
+> All other registers (even non-sve ones) would finalize the vcpu when
+> accessed from userland.
+
+So, we could consider register to be in two classes as you suggest:
+
+ * early registers
+ * regular registers (i.e., everything else)
+
+where early registers can only be written until the first access to a
+regular register, or the first KVM_GET_REG_LIST or KVM_RUN.
+
+This is a stricter rule than I have today: i.e., _SVE_VLS would really
+need to be written before touching anything else.  But that may be a
+good thing for avoiding future ABI drift.
+
+This may be premature factoring though.  It's not clear whether many new
+registers like KVM_REG_ARM64_SVE_VLS will exist, or that they would have
+compatible sequencing requirements.
 
 Thoughts?
 
-I'll take a look, and at least add a comment explaining what this
-struct is supposed to represent.
 
-> 
-> 
-> > +	unsigned int koffset;	/* offset into sve_state in kernel memory */
-> > +	unsigned int klen;	/* length in kernel memory */
-> > +	unsigned int upad;	/* extra trailing padding in user memory */
-> > +};
-> > +
-> > +/* Get sanitised bounds for user/kernel SVE register copy */
-> > +static int sve_reg_region(struct sve_state_region *region,
-> 
-> I feel that sve_reg_to_region or sve_reg_get_region would be a clearer name.
-
-..._reg_to_region() seems a good name.  I'll pick that up, modulo other
-changes.
+Independently of this, I'll have a look at whether there's
+a straightforward way to simplify the code flow.
 
 Cheers
 ---Dave
