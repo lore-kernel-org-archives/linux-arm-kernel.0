@@ -2,130 +2,87 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B72E2C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 10:53:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 50A1CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 10:59:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E632217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 10:53:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 193CB20842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 10:59:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I5Ui4+RV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="ljE4mucP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E632217F9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="euv5c2Oh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="kjwlFYNI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 193CB20842
+Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=d7m54pjLxPOHJ/4v/vDnklzWjsk2o9nXOPzG45fv4YM=; b=I5Ui4+RVmsMj+Y
-	AC7lQc2yrYtnVxHitCCXyoOWg5hkNe7sq0pnep5ffMHerAPZ52/DhzovS7fX4EH9McWJEIS2e8wjl
-	7b4NFT1bYQtPRzG83SVtHbw82oP5umCL3zp/ugieB0VBluk+qfO+r/R66AYVmbq1xr+LDEin4JCKU
-	0sHkt0F1wpW7YDXxux2kOfW2M/h3sZcdvZTD1Upnl+NyM+oOkjmfwMCaDkKdi582PPzwmBTQnqeA8
-	kE6lEsd9H7DnxX4sJyW8ICPrMXGJz3AGp4S2KvOnx7j2EDgwJtI4Lbwsu9vqjXB55/cx6TQ2VjRm/
-	Cv7xakYRgUbE2iEM03LA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=czEOyXw3Eceh+/W9i3TBiXW9sjS84ZIgJ1SD0UPC6+8=; b=euv5c2OhxZp9L7
+	NHlZOrGgSuZqE9RgrpZi9rY6GkG0Ln2mUxUPxcNFzYli2UFBA2WMOqTauDzZpQ3ffMzpgeO63E6KB
+	4X6NFmi2QVrONFmkgS7cBcAdvMd7pMSrzMHuivL/CnhFzlVDkYjjheDWW5ltpSiJoTTeo+e0JxWHw
+	3rmavoQO4NUICCI88wzZYqfrXUukYr/wOUnmFMdX7etr4rqYl6xtmQs3+HsjvMwoTZOZjfcpVRpRX
+	rEiiAd0g6BWcsgF2QwjJ8dOgsJzLwPmijxLHKe5aQ2vm91kLJtlRlDsXfS3x0UhCZcssBeb/9HuVi
+	yw91M6Bnh92X7fJyft3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyaMm-0001Kl-EC; Tue, 26 Feb 2019 10:53:40 +0000
-Received: from mail-am5eur03on0614.outbound.protection.outlook.com
- ([2a01:111:f400:fe08::614]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gyaSk-0003Rg-Vm; Tue, 26 Feb 2019 10:59:50 +0000
+Received: from fllv0015.ext.ti.com ([198.47.19.141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyaMi-0001K1-FM
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 10:53:38 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=tZpziB1cdnScQ2sTd5HNk7xXpgrLoJqOnGewX0Xv8Ms=;
- b=ljE4mucPbhDUXxE48wf0AovveB97wqtkarRTOcb7mx5kzS9jdeV97+9csGFuocoZkMCOSnQZIe4sE5NuE7qn0sg90VhPLUGcA3WkfQ5k/OX4dZ0BTJm/hW3MaR6/FTFcWn4izeWXZXSiHcaShWQWKPMo02T1UkmsHgMGIno5yJI=
-Received: from AM0PR04MB5779.eurprd04.prod.outlook.com (20.178.202.151) by
- AM0PR04MB5233.eurprd04.prod.outlook.com (20.177.40.155) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.21; Tue, 26 Feb 2019 10:53:28 +0000
-Received: from AM0PR04MB5779.eurprd04.prod.outlook.com
- ([fe80::ec4e:4756:a9dc:914c]) by AM0PR04MB5779.eurprd04.prod.outlook.com
- ([fe80::ec4e:4756:a9dc:914c%3]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
- 10:53:27 +0000
-From: Abel Vesa <abel.vesa@nxp.com>
-To: Shawn Guo <shawnguo@kernel.org>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Stefan Agner <stefan@agner.ch>, Chris
- Spencer <spencercw@gmail.com>, Lucas Stach <l.stach@pengutronix.de>, Rob
- Herring <robh@kernel.org>, Abel Vesa <abelvesa@linux.com>
-Subject: [PATCH v2] soc: imx: Add generic i.MX8 SoC driver
-Thread-Topic: [PATCH v2] soc: imx: Add generic i.MX8 SoC driver
-Thread-Index: AQHUzcGB6LodUxnT8UyD0+K7eGuy3g==
-Date: Tue, 26 Feb 2019 10:53:27 +0000
-Message-ID: <1551178385-14572-1-git-send-email-abel.vesa@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: AM5PR04CA0005.eurprd04.prod.outlook.com
- (2603:10a6:206:1::18) To AM0PR04MB5779.eurprd04.prod.outlook.com
- (2603:10a6:208:131::23)
-x-originating-ip: [95.76.156.53]
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=abel.vesa@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-mailer: git-send-email 2.7.4
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: f58e806c-7906-4e69-f0a3-08d69bd8a360
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:AM0PR04MB5233; 
-x-ms-traffictypediagnostic: AM0PR04MB5233:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; AM0PR04MB5233;
- 23:KGx72z1r/1ooPLR1BkxwjcLofHhCTv1WhHzFv5t?=
- =?iso-8859-1?Q?JK3JNUs8Yvg3jZwUlpGPw6ZJ8nqNv8CIwvJWZ/5pnVMxuEQWFqwchWadjv?=
- =?iso-8859-1?Q?N7krpYEyIDgKnpaJqcSuN4MbU/zme2gM9INGwmigrKXa6BQAKWh5oe9XC7?=
- =?iso-8859-1?Q?JZQMVl3J9aLbASiDa7bvMWQ8BFSa4MDE8guHY3EuZSSIdfAbod0WAQe+eH?=
- =?iso-8859-1?Q?Wd9pIIjo+oloYOCYsYAPL+6n+5WN1CrF4Eu0s9k3ezzToxj5TNQ3X6n6NN?=
- =?iso-8859-1?Q?s1xfbThcXAo79Pi7Jdjw57tUVwyWOx4TIDQcPqIMAo248kscVVdNwF21Da?=
- =?iso-8859-1?Q?k5Qwv3NMVRvAO6AndkYzDioo4f/wL+YuWsAoHm8jGJob1Y+QckIzLWfs4l?=
- =?iso-8859-1?Q?fLAoQa2ZIKYbdZwu6bHU+Ppn+T7u/TPLDY0Ng+FL27RQjTFixQyI83I1s6?=
- =?iso-8859-1?Q?0uJ334dhEI3O3vmCoT9DQZk0eYhGdex9F7wLQTnSV4y5i8S0g9NHar43Om?=
- =?iso-8859-1?Q?wvAuHDxfiKAyoqGZnSpcmArH/X7sVj21DSolS+90MZhlyPFoko39z9z0jt?=
- =?iso-8859-1?Q?RWTNDEkeEDiYc2AI/AOErGsfec2R4q8Dt+QpdDmn3b9D+lhzQ7FCz7W6+/?=
- =?iso-8859-1?Q?3zCTo4Yz/n8YX6bu/kKHQTYLptil7Tqf+HcNHJgY9GeHHWpqGRyhopDv0P?=
- =?iso-8859-1?Q?D6gS+Vf9kgZuUha3fl408Mhyu2dUUxzXppwHw0cMr6wQHJvVbgTgvL8ZnC?=
- =?iso-8859-1?Q?Tg3ZMqBHMOOUx6J2Upo7Y3teh3DJR8yfHkzrMD72JO4Z3Kifr48InIoqrJ?=
- =?iso-8859-1?Q?lksU28Q1mgsd6+y2+OykKttKwwiTgED3ToinoJW1TWkoGPylFECh22MFyV?=
- =?iso-8859-1?Q?dfCRWx1+OXw9HySgnXdvFrPhrGPbnyMx8jzw/J0nosnjTiVu5Z8G4DvdWp?=
- =?iso-8859-1?Q?WN0BDj5wh1avtq9S9MRkC2TKOx4DAPAfgU6cP8dqHf9K5+SVJt8JnPUMZJ?=
- =?iso-8859-1?Q?+pK2E9lB5BL2vtxKWA52FhevwVJxBSh+O/mNDQW5PAqPRiDkxPAtwbyaBW?=
- =?iso-8859-1?Q?o70MTHy6caVJHOQWDdUWFMMoWhyamiPGDZN1PytYYQJo2LfSuSWVtH3KMp?=
- =?iso-8859-1?Q?V9/4t5ZQzcFL54Re5i5zZlTimTnl4SkmoraIJOiIRgWkW6+sJk7eNYA8Jw?=
- =?iso-8859-1?Q?1icuWYJ/pSKH2cpx930ceCwrdpLb9T1ui4w/7WZACxEZ6jAzbgiOv8=3D?=
-x-microsoft-antispam-prvs: <AM0PR04MB52330B63D62B4302D31EE1AFF67B0@AM0PR04MB5233.eurprd04.prod.outlook.com>
-x-forefront-prvs: 096029FF66
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(346002)(39860400002)(376002)(136003)(366004)(199004)(189003)(66066001)(5660300002)(52116002)(99286004)(6506007)(386003)(106356001)(71190400001)(71200400001)(256004)(14454004)(102836004)(14444005)(50226002)(478600001)(6116002)(4326008)(6486002)(3846002)(25786009)(86362001)(36756003)(105586002)(305945005)(68736007)(2616005)(110136005)(53936002)(476003)(6512007)(81156014)(486006)(8936002)(8676002)(7736002)(81166006)(6436002)(97736004)(186003)(26005)(54906003)(2906002)(316002)(44832011)(41533002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB5233;
- H:AM0PR04MB5779.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: rJmY7FgsPZq2a1RezvB2yxWn5Gl4wGdwB2ZPbn0x4Gi4JFD6jLBrCq7bwiSueCC4NnYMwT+T1/b3YQUeQKzzWCoZc1fbz4zs3gQOl8yHH+XoKffmIHJnjSSbZ60T3UBUBFi/h7LADurfalIlqC1Jp3WtdpJPslzWTudYN59UZWkBA4vGtd0qgrXg6qAJswySvDgF12aUIVYZFICKDpP7mIOGsxUJTWjnstfSN5A25xC01wiJzHiUnkA4S8c5Mz2tg1xb8ptab0XqMAojlsFyjui/YargYqIXU4R4Y60/7JBD4twOH+hAM8tk5aZHSWB6VrvqPmm6bacJCS38mjjW0tjtGjCzN9Trlse5HXStTTFLgQLGa3WhERRpVinlGlCqEzSGuB4zF4b/1ZNXXE/mdzo+0qWGmVfADr97ICl7TAk=
+ id 1gyaSZ-0003Ie-QK; Tue, 26 Feb 2019 10:59:42 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by fllv0015.ext.ti.com (8.15.2/8.15.2) with ESMTP id x1QAxThK114173;
+ Tue, 26 Feb 2019 04:59:29 -0600
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
+ s=ti-com-17Q1; t=1551178769;
+ bh=xu8wrs2N42x599628JA5mvXzDvF/M2T/HAGD+1mUjL8=;
+ h=Subject:To:CC:References:From:Date:In-Reply-To;
+ b=kjwlFYNI+r0QLt9Es4I7p8ObYC0sK6tKBfeluNOApobJos/8X2Wa0kxbaL6AawOyi
+ HVCqwLRL+yrP8r3mLuIDBi1TGAMjrAuV/bHi8PfhIHNwpT6yRuKIWOgkZEXyOTw9Rx
+ G1Z5OyniDFDCN1jFgeaLDDUmbSJ1V3o/d+RmnUy8=
+Received: from DLEE109.ent.ti.com (dlee109.ent.ti.com [157.170.170.41])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id x1QAxT8T118117
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Tue, 26 Feb 2019 04:59:29 -0600
+Received: from DLEE105.ent.ti.com (157.170.170.35) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Tue, 26
+ Feb 2019 04:59:29 -0600
+Received: from dlep33.itg.ti.com (157.170.170.75) by DLEE105.ent.ti.com
+ (157.170.170.35) with Microsoft SMTP Server (version=TLS1_0,
+ cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
+ Tue, 26 Feb 2019 04:59:29 -0600
+Received: from [172.24.190.89] (ileax41-snat.itg.ti.com [10.172.224.153])
+ by dlep33.itg.ti.com (8.14.3/8.13.8) with ESMTP id x1QAxO3M005249;
+ Tue, 26 Feb 2019 04:59:25 -0600
+Subject: Re: [RFC PATCH 3/5] mtd: Add support for Hyperbus memory devices
+To: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>, David Woodhouse
+ <dwmw2@infradead.org>, Brian Norris <computersforpeace@gmail.com>, Boris
+ Brezillon <bbrezillon@kernel.org>, Marek Vasut <marek.vasut@gmail.com>,
+ Richard Weinberger <richard@nod.at>, Rob Herring <robh+dt@kernel.org>
+References: <20190219063607.29949-1-vigneshr@ti.com>
+ <20190219063607.29949-4-vigneshr@ti.com>
+ <42d0fd7b-42e0-605c-70ee-6e308908fc90@cogentembedded.com>
+From: Vignesh R <vigneshr@ti.com>
+Message-ID: <b7e93ab0-8db1-f990-ed51-adb1123df4c4@ti.com>
+Date: Tue, 26 Feb 2019 16:30:25 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: f58e806c-7906-4e69-f0a3-08d69bd8a360
-X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 10:53:26.9920 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB5233
+In-Reply-To: <42d0fd7b-42e0-605c-70ee-6e308908fc90@cogentembedded.com>
+Content-Language: en-US
+X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_025336_518617_BDAA96F3 
-X-CRM114-Status: GOOD (  17.37  )
+X-CRM114-CacheID: sfid-20190226_025939_939219_46090E15 
+X-CRM114-Status: GOOD (  32.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -137,168 +94,290 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Abel Vesa <abel.vesa@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>,
+ "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>, "Nori,
+ Sekhar" <nsekhar@ti.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add generic i.MX8 SoC driver along with the i.MX8MQ SoC specific code.
-For now, only i.MX8MQ revision B1 is supported. For any other, i.MX8MQ
-revision it will print 'unknown'.
 
-Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
----
 
-Changes since v1:                                                            
- * added the of_node_put on free_soc failure as suggested by Stefan Agner.
- * made imx8mq_soc_data const as suggested by Stefan Agner.
- * also made the imx8mq_soc_data static
- * marked imx8mq_soc_revision as __init
- * changed the revision read-out from anatop to ocotp since the rev B1
-   is specified in there. For now, for i.MX8MQ only revision B1 is supported.
-   For any other revision, it will print the revision as unknown.
+On 24/02/19 1:49 AM, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 02/19/2019 09:36 AM, Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>) wrote:
+> 
+>> Cypress HyperBus is Low Signal Count, High Performance Double Data Rate Bus
+>> interface between a host system master and one or more slave interfaces.
+>> HyperBus is used to connect microprocessor, microcontroller, or ASIC
+>> devices with random access NOR flash memory(called HyperFlash) or
+> 
+>   Need space before (.
+> 
+>> self refresh DRAM(called HyperRAM).
+>>
+>> Its a 8-bit data bus (DQ[7:0]) with  Read-Write Data Strobe (RWDS)
+>> signal and either Single-ended clock(3.0V parts) or Differential clock
+>> (1.8V parts). It uses ChipSelect lines to select b/w multiple slaves.
+>> At bus level, it follows a separate protocol described in HyperBus
+>> specification[1].
+>>
+>> HyperFlash follows CFI AMD/Fujitsu Extended Command Set (0x0002) similar
+>> to that of existing parallel NORs. Since Hyperbus is x8 DDR bus,
+>> its equivalent to x16 parallel NOR flash wrt bits per clk. But Hyperbus
+>> operates at >166MHz frequencies.
+>> HyperRAM provides direct random read/write access to flash memory
+>> array.
+>>
+>> But, Hyperbus memory controllers seem to abstract implementation details
+>> and expose a simple MMIO interface to access connected flash.
+>>
+>> Add support for registering HyperFlash devices with MTD framework. MTD
+>> maps framework along with CFI chip support framework are used to support
+>> communicate with flash.
+> 
+>    Communicating.
+> 
+>> Framework is modelled along the lines of spi-nor framework. HyperBus
+>> memory controller(HBMC) drivers call hb_register_device() to register a
+> 
+>    Again, space needed before (.
+> 
+>> single HyperFlash device. HyperFlash core parses MMIO access
+>> information from DT, sets up the map_info struct, probes CFI flash and
+>> registers it with MTD framework.
+>>
+>> Some HBMC masters need calibration/training sequence[3] to be carried
+>> out, in order for DLL inside the controller to lock, by reading a known
+>> string/pattern. This is done by repeatedly reading CFI Query
+>> Identification String. Calibration needs to be done before try to detect
+> 
+>    Trying.
+> 
+>> flash as part of CFI flash probe.
+>>
+>> HyperRAM is not supported atm.
+> 
+>    ATM?
+> 
+>> HyperBus specification can be found at[1]
+>> HyperFlash datasheet can be found at[2]
+>>
+>> [1] https://www.cypress.com/file/213356/download
+>> [2] https://www.cypress.com/file/213346/download
+>> [3] http://www.ti.com/lit/ug/spruid7b/spruid7b.pdf
+>>     Table 12-5741. HyperFlash Access Sequence
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> [...]
+>> diff --git a/drivers/mtd/hyperbus/Kconfig b/drivers/mtd/hyperbus/Kconfig
+>> new file mode 100644
+>> index 000000000000..02c38afc5c50
+>> --- /dev/null
+>> +++ b/drivers/mtd/hyperbus/Kconfig
+>> @@ -0,0 +1,23 @@
+>> +menuconfig MTD_HYPERBUS
+>> +	tristate "Hyperbus support"
+>> +	select MTD_CFI
+>> +	select MTD_MAP_BANK_WIDTH_2
+>> +	select MTD_CFI_AMDSTD
+>> +	select MTD_COMPLEX_MAPPINGS
+>> +	help
+>> +	  This is the framework for the Hyperbus which can be used by
+>> +	  the Hyperbus Controller driver to commmunicate with
+>                                               ^^^
+>   Too many m's. :-)
+> 
+>> +	  Hyperflash. See Cypress Hyperbus specification for more
+>> +	  details
+>> +
+>> +
+>> +if MTD_HYPERBUS
+>> +
+>> +config HBMC_AM654
+>> +	tristate "Hyperbus controller driver for AM65x SoC"
+>> +	help
+>> +	 This is the driver for Hyperbus controller on TI's AM65x and
+>> +	 other SoCs
+>> +
+>> +endif # MTD_HYPERBUS
+> 
+>   The above clearly belongs to patch #5.
+> 
+>> +
+> 
+>    No empty lines at end of file, please...
+> 
+>> diff --git a/drivers/mtd/hyperbus/Makefile b/drivers/mtd/hyperbus/Makefile
+>> new file mode 100644
+>> index 000000000000..64e377d7f636
+>> --- /dev/null
+>> +++ b/drivers/mtd/hyperbus/Makefile
+>> @@ -0,0 +1,4 @@
+>> +# SPDX-License-Identifier: GPL-2.0
+>> +
+>> +obj-$(CONFIG_MTD_HYPERBUS)	+= core.o
+>> +obj-$(CONFIG_HBMC_AM654)	+= hbmc_am654.o
+> 
+>    The above line clearly belongs to patch #5 as well...
+> 
+>> diff --git a/drivers/mtd/hyperbus/core.c b/drivers/mtd/hyperbus/core.c
+>> new file mode 100644
+>> index 000000000000..d3d44aab7503
+>> --- /dev/null
+>> +++ b/drivers/mtd/hyperbus/core.c
+>> @@ -0,0 +1,167 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
+>> +// Author: Vignesh R <vigneshr@ti.com>
+>> +
+>> +#include <linux/err.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/mtd/hyperbus.h>
+>> +#include <linux/mtd/map.h>
+>> +#include <linux/mtd/mtd.h>
+>> +#include <linux/mtd/cfi.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/types.h>
+>> +
+>> +#define HB_CALIB_COUNT 25
+> 
+>    Isn't this controller specific?
+> 
 
- drivers/soc/imx/Makefile   |   1 +
- drivers/soc/imx/soc-imx8.c | 115 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 116 insertions(+)
- create mode 100644 drivers/soc/imx/soc-imx8.c
 
-diff --git a/drivers/soc/imx/Makefile b/drivers/soc/imx/Makefile
-index 506a6f3..d6b529e0 100644
---- a/drivers/soc/imx/Makefile
-+++ b/drivers/soc/imx/Makefile
-@@ -1,2 +1,3 @@
- obj-$(CONFIG_HAVE_IMX_GPC) += gpc.o
- obj-$(CONFIG_IMX_GPCV2_PM_DOMAINS) += gpcv2.o
-+obj-$(CONFIG_ARCH_MXC) += soc-imx8.o
-diff --git a/drivers/soc/imx/soc-imx8.c b/drivers/soc/imx/soc-imx8.c
-new file mode 100644
-index 0000000..fc6429f
---- /dev/null
-+++ b/drivers/soc/imx/soc-imx8.c
-@@ -0,0 +1,115 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright 2019 NXP.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/sys_soc.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+
-+#define REV_B1				0x21
-+
-+#define IMX8MQ_SW_INFO_B1		0x40
-+#define IMX8MQ_SW_MAGIC_B1		0xff0055aa
-+
-+struct imx8_soc_data {
-+	char *name;
-+	u32 (*soc_revision)(void);
-+};
-+
-+static u32 __init imx8mq_soc_revision(void)
-+{
-+	struct device_node *np;
-+	void __iomem *ocotp_base;
-+	u32 magic;
-+	u32 rev = 0;
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,imx8mq-ocotp");
-+	if (!np)
-+		goto out;
-+
-+	ocotp_base = of_iomap(np, 0);
-+	WARN_ON(!ocotp_base);
-+
-+	magic = readl_relaxed(ocotp_base + IMX8MQ_SW_INFO_B1);
-+	if (magic == IMX8MQ_SW_MAGIC_B1)
-+		rev = REV_B1;
-+
-+	iounmap(ocotp_base);
-+
-+out:
-+	of_node_put(np);
-+	return rev;
-+}
-+
-+static const struct imx8_soc_data imx8mq_soc_data = {
-+	.name = "i.MX8MQ",
-+	.soc_revision = imx8mq_soc_revision,
-+};
-+
-+static const struct of_device_id imx8_soc_match[] = {
-+	{ .compatible = "fsl,imx8mq", .data = &imx8mq_soc_data, },
-+	{ }
-+};
-+
-+#define imx8_revision(soc_rev) \
-+	soc_rev ? \
-+	kasprintf(GFP_KERNEL, "%d.%d", (soc_rev >> 4) & 0xf,  soc_rev & 0xf) : \
-+	"unknown"
-+
-+static int __init imx8_soc_init(void)
-+{
-+	struct soc_device_attribute *soc_dev_attr;
-+	struct soc_device *soc_dev;
-+	struct device_node *root;
-+	const struct of_device_id *id;
-+	u32 soc_rev = 0;
-+	const struct imx8_soc_data *data;
-+	int ret;
-+
-+	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-+	if (!soc_dev_attr)
-+		return -ENODEV;
-+
-+	soc_dev_attr->family = "Freescale i.MX";
-+
-+	root = of_find_node_by_path("/");
-+	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-+	if (ret)
-+		goto free_soc;
-+
-+	id = of_match_node(imx8_soc_match, root);
-+	if (!id)
-+		goto free_soc;
-+
-+	of_node_put(root);
-+
-+	data = id->data;
-+	if (data) {
-+		soc_dev_attr->soc_id = data->name;
-+		if (data->soc_revision)
-+			soc_rev = data->soc_revision();
-+	}
-+
-+	soc_dev_attr->revision = imx8_revision(soc_rev);
-+	if (!soc_dev_attr->revision)
-+		goto free_soc;
-+
-+	soc_dev = soc_device_register(soc_dev_attr);
-+	if (IS_ERR(soc_dev))
-+		goto free_rev;
-+
-+	return 0;
-+
-+free_rev:
-+	kfree(soc_dev_attr->revision);
-+free_soc:
-+	kfree(soc_dev_attr);
-+	of_node_put(root);
-+	return -ENODEV;
-+}
-+device_initcall(imx8_soc_init);
+I can convert this to be a field in hb_device struct that controller
+driver can populate. But, I believe above count can still serve as
+conservative default.
+
+> [...]
+>> +/* Calibrate HBMC by repeatedly reading "QRY" string from CFI space */
+>> +static int hb_calibrate(struct hb_device *hbdev)
+> 
+>    s/int/bool/, perhaps?
+> 
+> [...]
+>> +int hb_register_device(struct hb_device *hbdev)
+>> +{
+>> +	struct resource res;
+>> +	struct device *dev;
+>> +	struct device_node *np;
+>> +	struct map_info *map;
+>> +	struct hb_ops *ops;
+>> +	int err;
+>> +
+>> +	if (!hbdev || !hbdev->dev || !hbdev->np) {
+>> +		pr_err("hyperbus: please fill all the necessary fields!\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>> +	np = hbdev->np;
+>> +	if (!of_device_is_compatible(np, "cypress,hyperflash"))
+>> +		return -ENODEV;
+>> +
+>> +	hbdev->memtype = HYPERFLASH;
+>> +
+>> +	if (of_address_to_resource(np, 0, &res))
+> 
+>     Isn't the direct mapping property of the HF controller, not of HyperFlash
+> itself?
+> 
+>> +		return -EINVAL;
+>> +
+>> +	dev = hbdev->dev;
+>> +	map = &hbdev->map;
+>> +	map->size = resource_size(&res);
+>> +	map->virt = devm_ioremap_resource(dev, &res);
+>> +	if (IS_ERR(map->virt))
+>> +		return PTR_ERR(map->virt);
+>> +
+>> +	map->name = dev_name(dev);
+>> +	map->bankwidth = 2;
+>> +
+>> +	simple_map_init(map);
+> 
+>    It's not that simple, I'm afraid -- e.g. Renesas RPC-IF has read and write
+> mappings in the separate memory resources.
+> 
+> [...]
+>> +	if (hbdev->needs_calib) {
+>> +		err = hb_calibrate(hbdev);
+>> +		if (!err) {
+> 
+>    Why call this variable 'err' when it indicates successful calibration?
+> 
+>> +			dev_err(hbdev->dev, "Calibration failed\n");
+>> +			return -ENODEV;
+>> +		}
+>> +	}
+>> +
+>> +	hbdev->mtd = do_map_probe("cfi_probe", map);
+>> +	if (!hbdev->mtd) {
+>> +		dev_err(hbdev->dev, "probing failed\n");
+> 
+>    "map probe", perhaps?
+> 
+>> +		return -ENXIO;
+>> +	}
+>> +
+>> +	hbdev->mtd->dev.parent = hbdev->dev;
+>> +	mtd_set_of_node(hbdev->mtd, np);
+>> +
+>> +	err = mtd_device_register(hbdev->mtd, NULL, 0);
+>> +	if (err) {
+>> +		dev_err(hbdev->dev, "failed to register mtd device\n");
+>> +		goto err_destroy;
+>> +	}
+>> +	hbdev->registered = true;
+>> +
+>> +	return 0;
+>> +
+>> +err_destroy:
+> 
+>    The label and the code below doesn't seem necessary. Just do it above
+> instead of *goto*.
+> 
+>> +	map_destroy(hbdev->mtd);
+>> +	return err;
+>> +}
+> [...]
+>> diff --git a/include/linux/mtd/hyperbus.h b/include/linux/mtd/hyperbus.h
+>> new file mode 100644
+>> index 000000000000..0aa11458c424
+>> --- /dev/null
+>> +++ b/include/linux/mtd/hyperbus.h
+>> @@ -0,0 +1,73 @@
+>> +/* SPDX-License-Identifier: GPL-2.0
+>> + *
+>> + * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
+>> + */
+>> +
+>> +#ifndef __LINUX_MTD_HYPERBUS_H__
+>> +#define __LINUX_MTD_HYPERBUS_H__
+>> +
+>> +#include <linux/mtd/map.h>
+>> +
+>> +enum hb_memtype {
+> 
+>    I'm for the full hyperbus_ prefixes, it's not that long and seems clearer.
+> 
+> [...]
+> 
+> MBR, Sergei
+> 
+
 -- 
-2.7.4
-
+Regards
+Vignesh
 
 _______________________________________________
 linux-arm-kernel mailing list
