@@ -2,70 +2,97 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1036C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:25:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44A62C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:47:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E1DA2173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:25:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 129EF213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:47:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pzqtbopT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E1DA2173C
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.intel.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bzyJ9aSb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 129EF213A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=buserror.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Subject:Mime-Version:References:
+	In-Reply-To:Date:To:From:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DYjRmNGxwyUqHom88JXH6yMBzu5eu0mmxVoJkRLq8Ss=; b=pzqtbopT3nIPMc
-	aAIVdYFsrbja0r7ngOVolRWNJKwhdfH9dx1pIUen+ddJl6TFUqkHeeuvRE20j2CEeuoqAO7fz94j/
-	1suAx44D139Nzku0T8BrUEf2Nz4UMSY/YzW2Lbl6Kfbe1JGJW0+qTsstUc38XYn2i9kU43yXjjB9P
-	Zd6odsi+YHwfdtZMvVp+/U5dm4GWDgEkNUwaLlWjl1uV+wyl1Pk2bDIBeHg3w2WvtvUyuMRRWqKJV
-	PtF7z+cxXAzS9XdrvgmMCUlPAhk1yhVafGkngPdEqh3eNZLwkrDa36aNU9nL22YW23ZdD24hJNp7z
-	z/gdiWIw9Lv/qRooLElA==;
+	List-Owner; bh=PSEfAIxHobB1HVb336Hx5LvbwzNWwsvu/fsvWbgxQJ0=; b=bzyJ9aSbd46ozm
+	EZedIq6Dfnjkll9y/2U/ZRgLPlEBKLmcZq72wUqLh+Q/mc8KlikgHEjE3hwUpY7V9mx8IVJ4yxd+v
+	3pWcKG1sM48+lnd1GLxISKPb4GEJWDDfOWEV7gT9hFJqgYD2LXiUjm0aq7AoTBp3kWC5hEahxgIE7
+	GKSYDvlaYaUDKZGJzFa2CTG2KYThXSFFu8ZasO8SOeY7Wrb6Jz3bHboeK9UQ0BZpU3zdCyMUKDD/W
+	gmM8T2ILFQ0xMMYV0Q4P44x4XePsRSPKfW4d5xJOma8xm7w+73C1Q6UAkYsO07vTRkq0BdvDsDNFV
+	UT/bTQaeoDWVI37hQLdw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyYzW-0000Oq-0j; Tue, 26 Feb 2019 09:25:34 +0000
-Received: from mga18.intel.com ([134.134.136.126])
+	id 1gyZKt-0000e7-IB; Tue, 26 Feb 2019 09:47:39 +0000
+Received: from baldur.buserror.net ([165.227.176.147])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyYys-0006vt-CW
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 09:24:55 +0000
-X-Amp-Result: SKIPPED(no attachment in message)
-X-Amp-File-Uploaded: False
-Received: from orsmga001.jf.intel.com ([10.7.209.18])
- by orsmga106.jf.intel.com with ESMTP/TLS/DHE-RSA-AES256-GCM-SHA384;
- 26 Feb 2019 01:24:45 -0800
-X-ExtLoop1: 1
-X-IronPort-AV: E=Sophos;i="5.58,415,1544515200"; d="scan'208";a="141701946"
-Received: from black.fi.intel.com ([10.237.72.28])
- by orsmga001.jf.intel.com with ESMTP; 26 Feb 2019 01:24:42 -0800
-Received: by black.fi.intel.com (Postfix, from userid 1003)
- id DB4F154A; Tue, 26 Feb 2019 11:24:41 +0200 (EET)
-From: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- devicetree@vger.kernel.org, Daniel Mack <daniel@zonque.org>,
- Haojian Zhuang <haojian.zhuang@gmail.com>,
- Robert Jarzmik <robert.jarzmik@free.fr>,
- linux-arm-kernel@lists.infradead.org, Mark Brown <broonie@kernel.org>,
- linux-spi@vger.kernel.org, Jarkko Nikula <jarkko.nikula@linux.intel.com>
-Subject: [PATCH v1 3/3] spi: pxa2xx: Debug print DMA burst and threshold
-Date: Tue, 26 Feb 2019 12:24:41 +0300
-Message-Id: <20190226092441.49198-3-andriy.shevchenko@linux.intel.com>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190226092441.49198-1-andriy.shevchenko@linux.intel.com>
-References: <20190226092441.49198-1-andriy.shevchenko@linux.intel.com>
-MIME-Version: 1.0
+ id 1gyZKp-0000db-IJ
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 09:47:36 +0000
+Received: from [2601:449:8400:7293:12bf:48ff:fe84:c9a0]
+ by baldur.buserror.net with esmtpsa (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256)
+ (Exim 4.89) (envelope-from <oss@buserror.net>)
+ id 1gyZIX-0005qT-C1; Tue, 26 Feb 2019 03:45:13 -0600
+Message-ID: <07441256501ad8bd45b187cf6e25338b028bc9ac.camel@buserror.net>
+From: Scott Wood <oss@buserror.net>
+To: Vabhav Sharma <vabhav.sharma@nxp.com>, "sudeep.holla@arm.com"
+ <sudeep.holla@arm.com>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "robh+dt@kernel.org" <robh+dt@kernel.org>, 
+ "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "linuxppc-dev@lists.ozlabs.org"
+ <linuxppc-dev@lists.ozlabs.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "mturquette@baylibre.com"
+ <mturquette@baylibre.com>, "sboyd@kernel.org" <sboyd@kernel.org>, 
+ "rjw@rjwysocki.net"
+ <rjw@rjwysocki.net>, "viresh.kumar@linaro.org" <viresh.kumar@linaro.org>, 
+ "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>, "linux-pm@vger.kernel.org"
+ <linux-pm@vger.kernel.org>, "linux-kernel-owner@vger.kernel.org"
+ <linux-kernel-owner@vger.kernel.org>, "catalin.marinas@arm.com"
+ <catalin.marinas@arm.com>, "will.deacon@arm.com" <will.deacon@arm.com>, 
+ "gregkh@linuxfoundation.org"
+ <gregkh@linuxfoundation.org>, "arnd@arndb.de" <arnd@arndb.de>, 
+ "kstewart@linuxfoundation.org"
+ <kstewart@linuxfoundation.org>, "yamada.masahiro@socionext.com"
+ <yamada.masahiro@socionext.com>, Leo Li <leoyang.li@nxp.com>, 
+ "shawnguo@kernel.org" <shawnguo@kernel.org>
+Date: Tue, 26 Feb 2019 03:45:11 -0600
+In-Reply-To: <1551126463-5341-5-git-send-email-vabhav.sharma@nxp.com>
+References: <1551126463-5341-1-git-send-email-vabhav.sharma@nxp.com>
+ <1551126463-5341-5-git-send-email-vabhav.sharma@nxp.com>
+Organization: Red Hat
+X-Mailer: Evolution 3.28.5-0ubuntu0.18.04.1 
+Mime-Version: 1.0
+X-SA-Exim-Connect-IP: 2601:449:8400:7293:12bf:48ff:fe84:c9a0
+X-SA-Exim-Rcpt-To: vabhav.sharma@nxp.com, sudeep.holla@arm.com,
+ linux-kernel@vger.kernel.org, devicetree@vger.kernel.org, robh+dt@kernel.org,
+ mark.rutland@arm.com, linuxppc-dev@lists.ozlabs.org,
+ linux-arm-kernel@lists.infradead.org, mturquette@baylibre.com,
+ sboyd@kernel.org, rjw@rjwysocki.net, viresh.kumar@linaro.org,
+ linux-clk@vger.kernel.org, linux-pm@vger.kernel.org,
+ linux-kernel-owner@vger.kernel.org, catalin.marinas@arm.com,
+ will.deacon@arm.com, gregkh@linuxfoundation.org, arnd@arndb.de,
+ kstewart@linuxfoundation.org, yamada.masahiro@socionext.com,
+ leoyang.li@nxp.com, shawnguo@kernel.org, linux@armlinux.org.uk,
+ adrian.hunter@intel.com, ulf.hansson@linaro.org, yogeshnarayan.gaur@nxp.com,
+ andy.tang@nxp.com
+X-SA-Exim-Mail-From: oss@buserror.net
+Subject: Re: [PATCH 4/4] clk: qoriq: Add clockgen support for lx2160a
+X-SA-Exim-Version: 4.2.1 (built Tue, 02 Aug 2016 21:08:31 +0000)
+X-SA-Exim-Scanned: Yes (on baldur.buserror.net)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_012454_470311_17A01811 
-X-CRM114-Status: GOOD (  13.48  )
+X-CRM114-CacheID: sfid-20190226_014735_671210_BF53FB9E 
+X-CRM114-Status: UNSURE (   8.33  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,35 +104,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: "ulf.hansson@linaro.org" <ulf.hansson@linaro.org>,
+ Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
+ Andy Tang <andy.tang@nxp.com>, "linux@armlinux.org.uk" <linux@armlinux.org.uk>,
+ "adrian.hunter@intel.com" <adrian.hunter@intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-It's useful during debug to see what DMA burst and threshold sizes are.
+On Tue, 2019-02-26 at 08:34 +0000, Vabhav Sharma wrote:
+> @@ -1435,6 +1446,7 @@ CLK_OF_DECLARE(qoriq_clockgen_t1023, "fsl,t1023-
+> clockgen", clockgen_init);
+>  CLK_OF_DECLARE(qoriq_clockgen_t1040, "fsl,t1040-clockgen", clockgen_init);
+>  CLK_OF_DECLARE(qoriq_clockgen_t2080, "fsl,t2080-clockgen", clockgen_init);
+>  CLK_OF_DECLARE(qoriq_clockgen_t4240, "fsl,t4240-clockgen", clockgen_init);
+> +CLK_OF_DECLARE(qoriq_clockgen_lx2160a, "fsl,lx2160a-clockgen",
+> clockgen_init);
 
-Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
- drivers/spi/spi-pxa2xx.c | 3 +++
- 1 file changed, 3 insertions(+)
+The chips were previously in alphabetical order...
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 393e020c757a..534460a29432 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1339,6 +1339,9 @@ static int setup(struct spi_device *spi)
- 			dev_warn(&spi->dev,
- 				 "in setup: DMA burst size reduced to match bits_per_word\n");
- 		}
-+		dev_dbg(&spi->dev,
-+			"in setup: DMA burst and threshold set to %u, %u\n",
-+			chip->dma_burst_size, chip->dma_threshold);
- 	}
- 
- 	switch (drv_data->ssp_type) {
--- 
-2.20.1
+-Scott
+
 
 
 _______________________________________________
