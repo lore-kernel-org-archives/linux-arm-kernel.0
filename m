@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-7.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7629EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:58:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7B649C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:59:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 41079217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:58:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 43B22217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:59:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kcGI8qDO";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Synaptics.onmicrosoft.com header.i=@Synaptics.onmicrosoft.com header.b="jwo5Pdbc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41079217F5
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cAWxZovW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=Synaptics.onmicrosoft.com header.i=@Synaptics.onmicrosoft.com header.b="xQ4qJYt4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43B22217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=synaptics.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,33 +26,33 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
 	References:Message-ID:Date:Subject:To:From:Reply-To:Cc:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hchVaLN55yfml9sJYohZGVIBoHS9FYCIu5f8HzV2y3Y=; b=kcGI8qDOFlHfhy
-	ZsgEivGEWhlSqPb7AsPZDtoWj6rzuU7ESUHIsnCaH5ruQp3Z49Ld3qwtUgyXDECYHuAGknLC2exze
-	QOIgVPy1Ph5zXa2tNCyDSsjuPRPHNj0RcvLX35RVKbCf34fBMMb9NbIqaDfyTjURJDsHHDqG6g0HR
-	mfc+PzsXxcBKryOa+KsgVZ0Ef7MlTNXf1YaYlH9caOxv9gt4Y8OQsTjs2HBQzMZmm8Q2mkPu73sRk
-	jN5W/GI66vFNfNW8MYx+PFBlHGUv67HSb4gG6hYmiMr5WKLJEbo/wWDNxXq2/f9NE+XtEhzjDf8Rw
-	tOMn2WeqzeAnBNakNGlQ==;
+	List-Owner; bh=aHXf9yFRTJK1snwd/j3WDOp6JHuv6qVefUrw4HC88nQ=; b=cAWxZovWZE58X4
+	OLDX0kgvVRn/wiZSS0qH8QDkRUzWc9gLzO0fbx2s7JMvoCF83beFfMsoCdz6qsVpG7qGJwJpzSw/L
+	sltR4zXvdqkXI4ZDj6nW7p/YxJFQqueC/gOplj/H5h8+m8/Uezn+RLVYoNcJ1Ou8GDTXPr5iJjM9R
+	VWCPwT9+sqzAK9rChDPqd8WEu2MwngXkTqCBfRHzBuPZTA5JA34FVxGjfTHpTTZcpS5oYiUl4PMah
+	8Yv5Ov7AkxNd770GYHfEyyKztE6Ek9NbZPXN9fcIvzpg93ezQFUtA3MFcHf9GzWusLuSpm7jMFnkN
+	qUFSdnFGANaj6eIcWmvQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybNY-0003OE-TC; Tue, 26 Feb 2019 11:58:32 +0000
-Received: from mail-eopbgr710073.outbound.protection.outlook.com
- ([40.107.71.73] helo=NAM05-BY2-obe.outbound.protection.outlook.com)
+	id 1gybOM-0003g4-TN; Tue, 26 Feb 2019 11:59:22 +0000
+Received: from mail-eopbgr810059.outbound.protection.outlook.com
+ ([40.107.81.59] helo=NAM01-BY2-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybNV-0003Ng-4Q
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 11:58:30 +0000
+ id 1gybOJ-0003fW-BT
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 11:59:20 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=Synaptics.onmicrosoft.com; s=selector1-synaptics-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=kCIAgyc0dyZXGWnEL+YP+rbIulW9e2ZVM0504mRNcjk=;
- b=jwo5PdbcESNEStlwO4OnsaqD8HkF5xP9VzLBYtSQkfrcHKow0fomIT/HUdYpC2rB37H8iLd3ph/VL9aTU88aGjkhB4PiaoRreLHYGr5MDGmLENkjkMxN4NR6U3ZOMSa0zwwcDg1JP3ANliyHzw2f2tprEu+NLGi7P3pA59yX2ac=
+ bh=HDfJa/5peeKUsjb5cZhVZj4vd75dEAlF9WieijY3ECo=;
+ b=xQ4qJYt4HQeiGd7lOeC6um69IPp2lrAx/l3bGYFGzZ+tKe6D7x2iP4nKUFG8sTjWV2VFxh1MzlLTzD/lv9qWGf0i+iMyYrQkmDsfLF4DU6f+3MjodGo5rscxM0nrHElMiwkEgub+s8UA8WuQPKv/7zi9Sua1kp/+C83cXgReeAs=
 Received: from BYAPR03MB4773.namprd03.prod.outlook.com (20.179.92.152) by
  BYAPR03MB3989.namprd03.prod.outlook.com (20.177.126.210) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Tue, 26 Feb 2019 11:58:26 +0000
+ 15.20.1643.14; Tue, 26 Feb 2019 11:59:17 +0000
 Received: from BYAPR03MB4773.namprd03.prod.outlook.com
  ([fe80::1cca:e5f5:d31d:1e5c]) by BYAPR03MB4773.namprd03.prod.outlook.com
  ([fe80::1cca:e5f5:d31d:1e5c%5]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
- 11:58:26 +0000
+ 11:59:17 +0000
 From: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 To: Jingoo Han <jingoohan1@gmail.com>, Gustavo Pimentel
  <gustavo.pimentel@synopsys.com>, Lorenzo Pieralisi
@@ -60,13 +60,11 @@ To: Jingoo Han <jingoohan1@gmail.com>, Gustavo Pimentel
  "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
  "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
  "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH 4/5] PCI: dwc: use devm_pci_alloc_host_bridge() to simplify
- the code
-Thread-Topic: [PATCH 4/5] PCI: dwc: use devm_pci_alloc_host_bridge() to
- simplify the code
-Thread-Index: AQHUzcqUjIgD4+38S0qkh/9pYJbfpg==
-Date: Tue, 26 Feb 2019 11:58:26 +0000
-Message-ID: <20190226195127.72dd45e0@xhacker.debian>
+Subject: [PATCH 5/5] PCI: dwc: save root bus for driver remove
+Thread-Topic: [PATCH 5/5] PCI: dwc: save root bus for driver remove
+Thread-Index: AQHUzcqyCHKOtYOyCkSTO+UrI8JSHA==
+Date: Tue, 26 Feb 2019 11:59:16 +0000
+Message-ID: <20190226195211.7ac4926e@xhacker.debian>
 References: <20190226194806.34fc23b5@xhacker.debian>
 In-Reply-To: <20190226194806.34fc23b5@xhacker.debian>
 Accept-Language: en-US
@@ -74,65 +72,65 @@ Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
 x-originating-ip: [199.33.119.15]
-x-clientproxiedby: TY2PR02CA0024.apcprd02.prod.outlook.com
- (2603:1096:404:56::36) To BYAPR03MB4773.namprd03.prod.outlook.com
+x-clientproxiedby: TYAPR01CA0045.jpnprd01.prod.outlook.com
+ (2603:1096:404:28::33) To BYAPR03MB4773.namprd03.prod.outlook.com
  (2603:10b6:a03:134::24)
 authentication-results: spf=none (sender IP is )
  smtp.mailfrom=Jisheng.Zhang@synaptics.com; 
 x-ms-exchange-messagesentrepresentingtype: 1
 x-mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 6d1780f7-b5fe-43e5-5e9a-08d69be1b730
+x-ms-office365-filtering-correlation-id: ce042779-c1fc-4253-cb62-08d69be1d522
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(2017052603328)(7153060)(7193020);
  SRVR:BYAPR03MB3989; 
 x-ms-traffictypediagnostic: BYAPR03MB3989:
 x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; BYAPR03MB3989;
- 23:Ql5tN9+MGTHqOPqyzLsb92BXHVjKS/tfVWbOTu/eA?=
- =?us-ascii?Q?Q1vvdjGqyfPzLWxQZc7I8dGxpT73FmoWDzT1EPNNcILJkn7dYpXcPX+FSBzl?=
- =?us-ascii?Q?d7HdFrLg7OwD9lSrDSZwPfZP7kYDHvq6Ogf46ATNwZtVHjIFNs++Lh+qkW77?=
- =?us-ascii?Q?GMfQlcG8EYeJeaXEbCtCOfEtdr+XHfQ3XNoF+AYsQ1YhudH/sNrAakp/j0HY?=
- =?us-ascii?Q?8Zl8EGA06SqktQG7Ov+MjyQiX2RfA76/y5UUwBH55cP19mdOIqX6U7lw5o72?=
- =?us-ascii?Q?7oOS9TamFagqmfteHwrwikilH4LjBdb+uAb4ozv9j6TJjylN6x0LHZ3UgpBX?=
- =?us-ascii?Q?DBBmWsKWRpvfaaSoqC92SOglppmjPXdb+/tHYkQw7FrisYJbPbk0F9SCQMHq?=
- =?us-ascii?Q?oOL6izJ6+jgo+v0SraN2Lv9kw11FHprJU/DR9GbXdSxYph8E0IYkXfnv43vh?=
- =?us-ascii?Q?OhknRPVz+0KYi91RFAXuWV4ulC4plv4qBWb2J0A4ItcvcTCXcIOgRHyFWHVd?=
- =?us-ascii?Q?AmuCJ3ZotmiljNP61iEAPPXci4c8AwX8g1kbfdwWr1L6RHCbsHEmqrnbKvUl?=
- =?us-ascii?Q?YDe3bd9W1zI38ajaGzyjrEJFlit1/oNAPe068Nj5FQQv4O9CH8ACxVXmLuTH?=
- =?us-ascii?Q?1l4jEsme1KAPgdxzRmClA2fFFOi4PIj0Hc+AOnv2h6O+e9v+GBhWAshw4yvH?=
- =?us-ascii?Q?SYAire0xDy5Ts23hnqogOjaft38/P99lice7XLmfQaWo2WWF8Kg1TYdkEWZP?=
- =?us-ascii?Q?/vSUKx2yG64naLtOvMWQjfzsYNO7pvByh1OPS83FHycK4VFmgMCBxRE5Us0A?=
- =?us-ascii?Q?zoR5nTbgx595kAfUrzoVONHjpnp0x0Ke9mPNhsKYcIZJ0WJQglcuKluQ2y1+?=
- =?us-ascii?Q?nXr8McZ1W+Fbe67cqFR6VtLRFhSqOKI3xLiL0WDfg3/eecv3AqfNeHZbCjkF?=
- =?us-ascii?Q?nij5sdpQ837RMH2bpKQ2+XsQKA+TcmpADkQtrbNHnExrqDrhzBbL5zLNJoBe?=
- =?us-ascii?Q?OkeRFDa5SYALcNu7Yni7i2FrwJ40xDssTctuqWb2kixORyODh0CxsLLNcCYJ?=
- =?us-ascii?Q?t4ot0qnCMrORJj6WRFVA8jdkOaxwk77igI0/FLUy9F9EqIZrn00ZO/pma7j0?=
- =?us-ascii?Q?Bay7IXetOssG+4zjHYJ0NDHMftMVJ+15fNjwyftBgv5KWDoWiBE2mhM9m1za?=
- =?us-ascii?Q?JNDhIu45ZteM29oWNynuaAXW/gwAhFEOFHnwypZgVXBAH9OhYPxVWJWqoZNR?=
- =?us-ascii?Q?ar2ubdA3D/vJqrDu8w=3D?=
-x-microsoft-antispam-prvs: <BYAPR03MB398970A6A7AEE82FD25ED766ED7B0@BYAPR03MB3989.namprd03.prod.outlook.com>
+ 23:oTiW0FNun+NO3PDOujGHNTeElKmtUGXwXmHSN7HLw?=
+ =?us-ascii?Q?GJWXEKOyCihK62q10JL7D+5R6TM11oUk3p2ucRWa2lvMcX7e+b54JAEWS2rj?=
+ =?us-ascii?Q?x4mgBy2vXgYrRLZiE50FzYvoo1wsccZ/UGlMG01Fk3c6pLq8gR6pAQklT1Nb?=
+ =?us-ascii?Q?26AOaiSTXSU3mwekJu3IHFjNWviAVeo8VWxr6/EKi+Bqnq6B0v7ZIaLJoP0D?=
+ =?us-ascii?Q?8GohvhOY4L49hKRP+smjvVxe1GiSL40p4XfGWaT4xZG22hU8tG+7maWdMw2L?=
+ =?us-ascii?Q?6qUed9Cg6JAK3l6u9XiDFk65F5dVnjbdPZ53TZ0lEljzUDulPDHdfQgHLOio?=
+ =?us-ascii?Q?FqcglHt+5ruuoCRo7Zdlgn7fj+6SHT4t7aWWQqtXkLdkg5kT0jnrda8t+YuN?=
+ =?us-ascii?Q?qQ67NKXyp/vdUYY52Rik8UtZlRJ4XH4UYPu2aL5/xoIq/GOZU2KVZ5bZ0TjT?=
+ =?us-ascii?Q?esHj5oFVmGHmFA0zfn62bTnk+CMAeWszpP0R3RhViu0d7cSI3b3esp1KO5Wf?=
+ =?us-ascii?Q?taEk7hCn3KJqAw13GamevZu2/rsfzrOzX/GndbVhmPa7oBHTEWyH4cufiAz4?=
+ =?us-ascii?Q?LqW4apfM9PK2orGOS0W3DJBjuMzh8llhWMU3QQgRjW8TUcozJjJay0dACEG2?=
+ =?us-ascii?Q?bMqMzgj1MzSI4uIgT0j7DRasQWt2lBPBurU7D+mpmAPUCCabW2XZ39ZkRIXo?=
+ =?us-ascii?Q?VOBG5ns0n4qx0uC1K5WIMOh9kKxGGG9a32cxD94Th4kZUMZ3v3L88gVNosDs?=
+ =?us-ascii?Q?HAZgoQeKrQ0jKLLLlBGobRib45sDC485iT7V2umWIoSYmNdGG8m8gOE5rbjF?=
+ =?us-ascii?Q?ijbbtNa17ueEbDTLFEvCXIsHapFltQ6gbBkBupLyvRgB9Wz8Ja4ON+6gK62n?=
+ =?us-ascii?Q?UlHPvZ+0y9xupxn+UrJQECN7tha0fR+WAuT7Yv/4Qs9l9O+tZOJh5AJJ/0Qo?=
+ =?us-ascii?Q?A+6K9CqmQUqXpKkhSG4uUKm97Jn6qK/N9gU2t9ePAgMERcQgoyl7fyEMW1+B?=
+ =?us-ascii?Q?KvMV9hQU9vZCMi0lri2yerCcmIb41VYLlzMCzirGmvgBQ+I1OhTwx3shj8i5?=
+ =?us-ascii?Q?zmF3N+a3ogNx/eeFWojw1gYKUC3xQHqGdr4uricClAQVdWamriqtxMEVEM6a?=
+ =?us-ascii?Q?B3DI9lqBbyCsKYgSAwP565uyZmn6gyMIeKclNrtW/CGjOXPZMAqdQFCr51Q6?=
+ =?us-ascii?Q?pPfKBsMlqt4qig/TP3uYTRMZAFaWdUoEYGLP83vMA6EpgiX8Xcn5PO1TQ=3D?=
+ =?us-ascii?Q?=3D?=
+x-microsoft-antispam-prvs: <BYAPR03MB39890D9E7EC0D75682DA723EED7B0@BYAPR03MB3989.namprd03.prod.outlook.com>
 x-forefront-prvs: 096029FF66
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(136003)(346002)(376002)(366004)(396003)(39860400002)(199004)(189003)(1076003)(72206003)(26005)(6436002)(6486002)(316002)(2501003)(52116002)(6116002)(3846002)(486006)(25786009)(102836004)(76176011)(186003)(476003)(2906002)(11346002)(5660300002)(105586002)(446003)(256004)(14444005)(106356001)(6512007)(9686003)(68736007)(71200400001)(71190400001)(7736002)(305945005)(86362001)(8936002)(2201001)(478600001)(81156014)(81166006)(50226002)(8676002)(99286004)(6506007)(66066001)(110136005)(386003)(53936002)(14454004)(97736004)(39210200001);
+ SFS:(10009020)(136003)(346002)(376002)(366004)(396003)(39860400002)(199004)(189003)(1076003)(72206003)(26005)(6436002)(6486002)(316002)(2501003)(52116002)(6116002)(3846002)(486006)(25786009)(102836004)(76176011)(186003)(476003)(2906002)(11346002)(5660300002)(105586002)(446003)(256004)(106356001)(6512007)(9686003)(68736007)(71200400001)(71190400001)(7736002)(305945005)(86362001)(8936002)(2201001)(478600001)(81156014)(81166006)(50226002)(8676002)(99286004)(6506007)(66066001)(110136005)(386003)(53936002)(14454004)(97736004)(39210200001);
  DIR:OUT; SFP:1101; SCL:1; SRVR:BYAPR03MB3989;
  H:BYAPR03MB4773.namprd03.prod.outlook.com; FPR:; SPF:None; LANG:en;
  PTR:InfoNoRecords; A:0; MX:1; 
 received-spf: None (protection.outlook.com: synaptics.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: CDF2Eb3t5XEfjMfBj38gDfJwblxdU6dA3ZynGw+181JZ/92Y1+lAGJULyrN2IrceuYfAeRdVr0aabkdsTWk9KezZF3susuMA8AqU5fKkxNdJ6Ik/+FRT+jJalTzvPRaHwC6AYYoRPoU4G9Pc5N5DbthEePR6SG+uLjRp0fdi8vffIZZNcEau8Tx47tIuTSQoZh2FpzB5R2ro0L8hL+VE6xOMK3+v53RR98w7Iw/nnGxVUY9rlmtirTixhRXE4xe/kJ5OlPoaF9NeghgwGpirShl5nS0k1Q0pZhOcOUxR3TIbb1QDscyqN8QAUNnwnOY7Kj34nAbntM5d6qaT9SwBYrcw1WOw0yvuzFaX2qiiH/K/do96LJcWJheG1MmCc7tVU4oVShyV4MZENAQtnTyl6vIa1qhrpJbBAOwarpzXHqo=
-Content-ID: <E8F88C8FB909F3439873255CBA026ACF@namprd03.prod.outlook.com>
+x-microsoft-antispam-message-info: NfK6GxQXBzNQQrVYGuQDC+SdunPlFnf9Y7Bju7gw84aQYGfVI0lql7WLvqyDbuudgrYUfrPKe9N/kJC/DhAQzBEubpIpBv54M6H2DYXPVgjP5SCWQfqAwYs0nMdkWPWtl1W+Di+7fkjoa4eXgb/qqyYVtQMDcnfX0lv6UnF6Tdj2OGTZSPYsR4IHWfH5vZVATGDhLUoOu2oHlJJ9vfGHEONopJLXcilx8XmBbkYl+6BhAIzFhF4pPKk2/25ONYRYk5nrHwZOA2NTalBBft6tM8K4dBbadHv4IVN0FxBY0H8mlB4YyuNzZzaJHCNqQtgSDMW/wQNFLkNa0IJrcgXf/px1dTe3k2XLbHHvNBRAd9L9ONvwAt27e3tAM3cpIaqww68lDIySBXTkuMHmYLoTdJ20zst0f4IasgXbiANCSEA=
+Content-ID: <E8E641FDD4F96D41B8A69E9E3E27C7D5@namprd03.prod.outlook.com>
 MIME-Version: 1.0
 X-OriginatorOrg: synaptics.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 6d1780f7-b5fe-43e5-5e9a-08d69be1b730
-X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 11:58:23.8473 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: ce042779-c1fc-4253-cb62-08d69be1d522
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 11:59:13.7848 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 335d1fbc-2124-4173-9863-17e7051a2a0e
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: BYAPR03MB3989
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_035829_178373_90C6370F 
-X-CRM114-Status: GOOD (  12.14  )
+X-CRM114-CacheID: sfid-20190226_035919_397585_47E97E7B 
+X-CRM114-Status: GOOD (  10.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -149,100 +147,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use devm_pci_alloc_host_bridge() to simplify the error code path.
+Currently dwc host doesn't support the remove, but nothing prevent us
+from supporting it. Save the root bus for clean up work in driver
+remove code path.
+
+After this patch, the dwc host users could implement its remove as:
+
+static int foo_pcie_remove(struct platform_device *pdev)
+{
+	...
+	pci_stop_root_bus(pp->root_bus);
+	pci_remove_root_bus(pp->root_bus);
+	dw_pcie_free_msi(pp);
+	...
+}
 
 Signed-off-by: Jisheng Zhang <Jisheng.Zhang@synaptics.com>
 ---
- .../pci/controller/dwc/pcie-designware-host.c | 21 +++++++------------
- 1 file changed, 8 insertions(+), 13 deletions(-)
+ drivers/pci/controller/dwc/pcie-designware-host.c | 1 +
+ drivers/pci/controller/dwc/pcie-designware.h      | 1 +
+ 2 files changed, 2 insertions(+)
 
 diff --git a/drivers/pci/controller/dwc/pcie-designware-host.c b/drivers/pci/controller/dwc/pcie-designware-host.c
-index 66569d0f3ab9..4831c12fee93 100644
+index 4831c12fee93..ca45a4471ca0 100644
 --- a/drivers/pci/controller/dwc/pcie-designware-host.c
 +++ b/drivers/pci/controller/dwc/pcie-designware-host.c
-@@ -357,7 +357,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		dev_err(dev, "Missing *config* reg space\n");
- 	}
+@@ -496,6 +496,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		goto err_free_msi;
  
--	bridge = pci_alloc_host_bridge(0);
-+	bridge = devm_pci_alloc_host_bridge(dev, 0);
- 	if (!bridge)
- 		return -ENOMEM;
+ 	bus = bridge->bus;
++	pp->root_bus = bus;
  
-@@ -368,7 +368,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 
- 	ret = devm_request_pci_bus_resources(dev, &bridge->windows);
- 	if (ret)
--		goto error;
-+		return ret;
- 
- 	/* Get the I/O and memory ranges from DT */
- 	resource_list_for_each_entry_safe(win, tmp, &bridge->windows) {
-@@ -412,8 +412,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 						resource_size(pp->cfg));
- 		if (!pci->dbi_base) {
- 			dev_err(dev, "Error with ioremap\n");
--			ret = -ENOMEM;
--			goto error;
-+			return -ENOMEM;
- 		}
- 	}
- 
-@@ -424,8 +423,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 					pp->cfg0_base, pp->cfg0_size);
- 		if (!pp->va_cfg0_base) {
- 			dev_err(dev, "Error with ioremap in function\n");
--			ret = -ENOMEM;
--			goto error;
-+			return -ENOMEM;
- 		}
- 	}
- 
-@@ -435,8 +433,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 						pp->cfg1_size);
- 		if (!pp->va_cfg1_base) {
- 			dev_err(dev, "Error with ioremap\n");
--			ret = -ENOMEM;
--			goto error;
-+			return -ENOMEM;
- 		}
- 	}
- 
-@@ -459,14 +456,14 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 			    pp->num_vectors == 0) {
- 				dev_err(dev,
- 					"Invalid number of vectors\n");
--				goto error;
-+				return -EINVAL;
- 			}
- 		}
- 
- 		if (!pp->ops->msi_host_init) {
- 			ret = dw_pcie_allocate_domains(pp);
- 			if (ret)
--				goto error;
-+				return ret;
- 
- 			if (pp->msi_irq)
- 				irq_set_chained_handler_and_data(pp->msi_irq,
-@@ -475,7 +472,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		} else {
- 			ret = pp->ops->msi_host_init(pp);
- 			if (ret < 0)
--				goto error;
-+				return ret;
- 		}
- 	}
- 
-@@ -515,8 +512,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- err_free_msi:
- 	if (IS_ENABLED(CONFIG_PCI_MSI) && !pp->ops->msi_host_init)
- 		dw_pcie_free_msi(pp);
--error:
--	pci_free_host_bridge(bridge);
- 	return ret;
- }
- 
+ 	if (pp->ops->scan_bus)
+ 		pp->ops->scan_bus(pp);
+diff --git a/drivers/pci/controller/dwc/pcie-designware.h b/drivers/pci/controller/dwc/pcie-designware.h
+index 3be7ca9f1fc3..cd92ded606c6 100644
+--- a/drivers/pci/controller/dwc/pcie-designware.h
++++ b/drivers/pci/controller/dwc/pcie-designware.h
+@@ -182,6 +182,7 @@ struct pcie_port {
+ 	struct page		*msi_page;
+ 	u32			num_vectors;
+ 	u32			irq_mask[MAX_MSI_CTRLS];
++	struct pci_bus		*root_bus;
+ 	raw_spinlock_t		lock;
+ 	DECLARE_BITMAP(msi_irq_in_use, MAX_MSI_IRQS);
+ };
 -- 
 2.20.1
 
