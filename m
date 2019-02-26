@@ -2,136 +2,148 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B894DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:24:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BE433C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:35:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 818C3217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:24:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8D8162173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:35:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MtDAYyWS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 818C3217F9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=embeddedor.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bFgEXHy6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=microchiptechnology.onmicrosoft.com header.i=@microchiptechnology.onmicrosoft.com header.b="X5qneY4I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8D8162173C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=microchip.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aupWYynV/aNbrjqOm+ZvLVORusuRz9S9WU2cA/zc5Vw=; b=MtDAYyWSDZf383
-	6KPa5WNY9oM+K3Zn3VDu1ey3o4KFZUio0oaRQ1aLG4FBmJ0bqgk3juLm8zoP5lo0x1tsF4DuLEseT
-	RF7sOGGNnyHZ148DzRzARRe7VEbzmWJWtHCLWpc5EZijK2kSOQSqA/jDJXL33MgZ325Bioomm1dB5
-	Sy9TTlq0g9zkuOt8jy+kfJ6dOgdPMfMbUWMinHWJyz9E2x/pwXoEDOeXTPMG+0cLq4WcXmjjrXH+L
-	0QZD+5jX9ASZzr8IzWR1UCVn7JcO1komewR/z/exufu2jVvjGn0G5VPP0wEkYRbBrIo212/SOjkuj
-	YWBGvvwQ597CYV78udYA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
+	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Or9t7fr2SG5Cd3nNjMXMrGOJG70kB4JCoEhmlj6W+S0=; b=bFgEXHy6OmN0Ed
+	5/NcscgliCVbWfB6L1HHwkPbbSlX/GcyGlZcri3xHJp+yDeNKO7Abh3gAGekn7etHbc5YzK4WqvhP
+	lCFVGtH20IXeWJC/6rWDiwpj8qZ783MjJ5tcKo8VnkcxQWezbPIIicLLA2FjBqUMF1+MqYEcHVuQw
+	sz9+GQso+cpw9gFe/vF7450xkUIkEJU+S7PBtNIkimOBRWZr8R3AZeuizuRN71GS8G00GnxFDKRrk
+	7EXzNHaRhnlKvnP6J0Qj+/6WLPTwj5/LjNOsv2U01DHvuT9DR1PzEd1d4H1tLU68q9Zunhvzu3S39
+	TTavu6/aasOY221f52zg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyeao-0001lX-Mj; Tue, 26 Feb 2019 15:24:26 +0000
-Received: from gateway24.websitewelcome.com ([192.185.51.196])
+	id 1gyelG-0006XD-T8; Tue, 26 Feb 2019 15:35:14 +0000
+Received: from esa3.microchip.iphmx.com ([68.232.153.233])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyeak-0001l2-Gz
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 15:24:24 +0000
-Received: from cm13.websitewelcome.com (cm13.websitewelcome.com [100.42.49.6])
- by gateway24.websitewelcome.com (Postfix) with ESMTP id 436264B5205
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 09:24:07 -0600 (CST)
-Received: from gator4166.hostgator.com ([108.167.133.22]) by cmsmtp with SMTP
- id yeaVgfddsYTGMyeaVgwhiA; Tue, 26 Feb 2019 09:24:07 -0600
-X-Authority-Reason: nr=8
-Received: from [189.250.127.169] (port=51554 helo=[192.168.1.76])
- by gator4166.hostgator.com with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.91)
- (envelope-from <gustavo@embeddedor.com>)
- id 1gyeaU-001gAx-LT; Tue, 26 Feb 2019 09:24:06 -0600
-Subject: Re: [PATCH] can: mark expected switch fall-throughs
-To: Marc Kleine-Budde <mkl@pengutronix.de>,
- Wolfgang Grandegger <wg@grandegger.com>,
- "David S. Miller" <davem@davemloft.net>,
- Nicolas Ferre <nicolas.ferre@microchip.com>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Ludovic Desroches <ludovic.desroches@microchip.com>
-References: <20190129180612.GA28650@embeddedor>
- <31d206cd-65f2-66be-ed79-583210a88d57@pengutronix.de>
-From: "Gustavo A. R. Silva" <gustavo@embeddedor.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=gustavo@embeddedor.com; keydata=
- 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
- VtSixD1uOgytAP7RWS474w==
-Message-ID: <a28b3d4f-e489-50be-0a96-766566e3f046@embeddedor.com>
-Date: Tue, 26 Feb 2019 09:24:05 -0600
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <31d206cd-65f2-66be-ed79-583210a88d57@pengutronix.de>
+ id 1gyelD-0006WS-BH
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 15:35:13 +0000
+X-IronPort-AV: E=Sophos;i="5.58,416,1544511600"; d="scan'208";a="27300043"
+Received: from smtpout.microchip.com (HELO email.microchip.com)
+ ([198.175.253.82])
+ by esa3.microchip.iphmx.com with ESMTP/TLS/DHE-RSA-AES256-SHA;
+ 26 Feb 2019 08:35:06 -0700
+Received: from NAM04-BN3-obe.outbound.protection.outlook.com (10.10.215.89) by
+ email.microchip.com (10.10.76.105) with Microsoft SMTP Server (TLS)
+ id 14.3.352.0; Tue, 26 Feb 2019 08:35:05 -0700
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=microchiptechnology.onmicrosoft.com;
+ s=selector1-microchiptechnology-onmicrosoft-com;
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=oHQpaNM2kvPVnk6hhJgvs5k6Iu2hoel+5jEri3rSmhk=;
+ b=X5qneY4INUfiOaXEDS0m7C7iHe7LuiY45F4LX9gxj6cdOuK5XVOZv7cPcBBdAdS1sH6nPe9iR6OjnhZkLU7qQv/B6Qo2RxCDosBFIvwbscVWJToXyg1ecKW7UZBF1YgP+TOgvVdvyHJK08g9HlGY22tKDeXm76lpWmFTg8WJ4jg=
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com (10.172.55.15) by
+ MWHPR11MB1678.namprd11.prod.outlook.com (10.172.55.19) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.16; Tue, 26 Feb 2019 15:35:03 +0000
+Received: from MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887]) by MWHPR11MB1662.namprd11.prod.outlook.com
+ ([fe80::b92e:f982:af32:2887%5]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
+ 15:35:03 +0000
+From: <Nicolas.Ferre@microchip.com>
+To: <alexandre.belloni@bootlin.com>, <b.zolnierkie@samsung.com>
+Subject: Re: [PATCH] video: fbdev: atmel_lcdfb: drop AVR and platform_data
+ support
+Thread-Topic: [PATCH] video: fbdev: atmel_lcdfb: drop AVR and platform_data
+ support
+Thread-Index: AQHUzejX6yx8KGhkR06beat/0UNjKg==
+Date: Tue, 26 Feb 2019 15:35:03 +0000
+Message-ID: <1e2f49a6-f966-16ad-e212-c785ed93df00@microchip.com>
+References: <20190225212533.26432-1-alexandre.belloni@bootlin.com>
+In-Reply-To: <20190225212533.26432-1-alexandre.belloni@bootlin.com>
+Accept-Language: en-US
 Content-Language: en-US
-X-AntiAbuse: This header was added to track abuse,
- please include it with any abuse report
-X-AntiAbuse: Primary Hostname - gator4166.hostgator.com
-X-AntiAbuse: Original Domain - lists.infradead.org
-X-AntiAbuse: Originator/Caller UID/GID - [47 12] / [47 12]
-X-AntiAbuse: Sender Address Domain - embeddedor.com
-X-BWhitelist: no
-X-Source-IP: 189.250.127.169
-X-Source-L: No
-X-Exim-ID: 1gyeaU-001gAx-LT
-X-Source: 
-X-Source-Args: 
-X-Source-Dir: 
-X-Source-Sender: ([192.168.1.76]) [189.250.127.169]:51554
-X-Source-Auth: gustavo@embeddedor.com
-X-Email-Count: 9
-X-Source-Cap: Z3V6aWRpbmU7Z3V6aWRpbmU7Z2F0b3I0MTY2Lmhvc3RnYXRvci5jb20=
-X-Local-Domain: yes
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: LNXP123CA0015.GBRP123.PROD.OUTLOOK.COM
+ (2603:10a6:600:d2::27) To MWHPR11MB1662.namprd11.prod.outlook.com
+ (2603:10b6:301:e::15)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=Nicolas.Ferre@microchip.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [195.6.168.232]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: ff8c0a6f-9f31-460e-2827-08d69bfff9ef
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(2017052603328)(7153060)(7193020);
+ SRVR:MWHPR11MB1678; 
+x-ms-traffictypediagnostic: MWHPR11MB1678:
+x-ms-exchange-purlcount: 1
+x-microsoft-exchange-diagnostics: =?utf-8?B?MTtNV0hQUjExTUIxNjc4OzIzOlBiUjJHa3QwamgyRGU5eFArbkFVc3U2TE9R?=
+ =?utf-8?B?S0h4eEZlUUFtS3ZISllHQ3dKb1pmNXNNN1hhKzJBL1pGUjZtajBXcmhoZ21U?=
+ =?utf-8?B?Ny8yM3dDRkpTRE5KVlRPSnNpWWExdWVmL0NhdjZWSFgvU0tNa29tQkpheTlJ?=
+ =?utf-8?B?V2Z1QkRvSlozSW9XN2tkcGVTMStOMzdkbkljekVMWkpPMG10WXFha0tiK3RM?=
+ =?utf-8?B?Q1VsUHpsRWtwYUt4NjZqd0J4anh1eEtBSllOeHBvZDZ0RnM0cWtNOXZkS3Bj?=
+ =?utf-8?B?NEdaL05EVW8xM2t1WGJBdUM4RjhweEFGLzVkRVRjV203WkhjeUxVSWdPUjJ3?=
+ =?utf-8?B?SVZiS3RNZGc2bC8yYVA5YjU0RDVYTnlYazNzMWZ0bEt2dXZKR0hjdmtSUElr?=
+ =?utf-8?B?cU1zSklacmRmczhLbDhyRWc2SDlYdmkzZVI3N3FNVzNyN3VqNGM5Z0xLL1Qx?=
+ =?utf-8?B?WkJJQTMzRExtVEg0SDluWE45S3Y3a3JQZlJPTGZzRndidUZkSmp5Q0ZxL0Jx?=
+ =?utf-8?B?cTRaUkpwSEJxcWNTYjdnS2RZUXg5dUZoYUgrOHVMSFBKOElWeHo0NWVSUGd4?=
+ =?utf-8?B?VldMUnVyZW16dGh4STVuU3VvK05iWU5UaTZtRWFTUXJVR1dUejI2Q3hpbVF4?=
+ =?utf-8?B?SHBDazJUMTF1Q0hpRzF0cEdGcmN0NnlUbytZdjBjbVBaeGE0bHgvdEh0eHU3?=
+ =?utf-8?B?T0VmcEVWRlltMFF3V1grQXBSckZ1ZExKNzRYdEIzcmZaejB0ZEZqWDJ3NVhk?=
+ =?utf-8?B?eFYzN3VldWk4OGMya0ViMVBnbDM3VDhjN3ljNENYNnN3bmtoR3JGYnBtK0pH?=
+ =?utf-8?B?QVVLOXFpOEhRcUJRV3dMS2RzOENGOUNCdG9UZ2FRLzdyRlc5VFYrT3F5SnBJ?=
+ =?utf-8?B?YVlDZ3NEakx6ZFJmVGlGYUt1ZDVZSHRNaWo5ZUwyWlNsQ3JTQ0hibHhRbmt6?=
+ =?utf-8?B?TG5mbjZiVHpDS1RXY0pHbXlZRTZKTEtaOXRQRVkvb3FnVDkvem1LMXBJWTM5?=
+ =?utf-8?B?QisvR2xpTkhFbjVnSk9xYkZhdTgyTEhRVzJyclhpOFdsSTNqOGJ5RStxYXZm?=
+ =?utf-8?B?M2paOEN5YXFUNzVrTGJLWXBRMDFveGV6V0t3OGxlUWlGNEtBWTNnd0MwcWxx?=
+ =?utf-8?B?V1VRS0tIV3VRZURFOWFvbG5ESVRKMVg2a0FWVHh3WmhrNDNjendmV2FTaDJU?=
+ =?utf-8?B?QXlmMWRYdStFUlY1ODdTc09md2lTRjJMdXhRZzVyR3NxYXdMZDRoNTk1SkRY?=
+ =?utf-8?B?VzhKOEE5bVJBd1IzTWlNakJFa0tCY1owYXNvVGptZFFaWTNMVEtBekhPbzdn?=
+ =?utf-8?B?TkM0bTl2K0VWaGhlZG1vQ25jOVhIZkJPNzVWK2g2UTJCS254dTU5UnVGV044?=
+ =?utf-8?B?UlorMmM4NDNCeFdiWGh6RFltOFlBcC9lNDFIQ0VqN3hQRmI5dHZUblgrM1Vw?=
+ =?utf-8?B?c1pjczJCQ1FzWnY2ZHZWMEluZzllNENaQjhCUlFCQXpDV3ptR0Uva1RGSFZJ?=
+ =?utf-8?B?M1JSWkhyVGV1ODVJWVp6dzdtQXVtclByKzlvTUl3dTREWXc1dm84SDhPUC9Y?=
+ =?utf-8?B?WFBsZU5YLzk4MThBRVRBTXV1RmZWeWU2L1Y2RkJTdHR2UXgzc0lIa2lCcVBk?=
+ =?utf-8?B?ajg3RmJEN0lzWDVjaFJ0NHpzanlhdExNcHZBdGFocGFDUnhtckxNVmRNQmNQ?=
+ =?utf-8?B?bVowSXpFMnpxRHlBWGxtV1o1Tk9Cd1BXMCtVY2diT3MxM1JlYzh5d3NuK3R2?=
+ =?utf-8?B?NXhBdFROQnJ3M3hjWWl3Z054S1paWTF0dDdHdkc3ZnMxaHBlQ0RXYTRLcFVz?=
+ =?utf-8?Q?AvRdaaadvI3RJ?=
+x-microsoft-antispam-prvs: <MWHPR11MB167856C99901D50E701A537EE07B0@MWHPR11MB1678.namprd11.prod.outlook.com>
+x-forefront-prvs: 096029FF66
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(396003)(39860400002)(366004)(376002)(346002)(189003)(199004)(68736007)(97736004)(5660300002)(105586002)(106356001)(36756003)(14444005)(256004)(110136005)(54906003)(99286004)(31696002)(52116002)(316002)(86362001)(76176011)(66066001)(446003)(2616005)(476003)(53546011)(6512007)(6506007)(11346002)(72206003)(31686004)(229853002)(14454004)(6116002)(478600001)(8676002)(81166006)(81156014)(486006)(8936002)(53936002)(3846002)(386003)(6486002)(6306002)(305945005)(6436002)(71200400001)(71190400001)(25786009)(102836004)(186003)(4326008)(26005)(6246003)(7736002)(2906002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:MWHPR11MB1678;
+ H:MWHPR11MB1662.namprd11.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: microchip.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: fxWQwKOAigcDr4/3EWEdrEq25eqmDaQgwIEAaTI1tFy/mYCXwAxZ//z85GZ48t3nHpJAjMCrOjMvXrUbKQIc1Lru2X1V5phjjcYwFyEuVBG5Yv1f44c7W+B5Zi3a/kqjhfTSWLVj6rT55ok2V3IJ0ObEdcvHHwZCVz381ozUb0rSDO84oPorKZsQv7BqG8+KyQ3UBsXO1rgmbfuQNMdry4ztT/N0yBhn2lTOBwMMdpAbyqDJV5hJUKHcM79SyIvE9lBDcxVXzugmWToTxqaC4IJ+i33KNJW1NMBN0E94NrSGOjWX0WVgQndxYpIcWyYq4U3jsFQVeumz1e6OLlZCAvO6KjtsNmx2fcsZOKWBPKNlVVh/9JGg8/Vj+S1127/VyM6UhYOWnX82XX8b7jBH+SiBXOrL/xx8j16tRnkkfdY=
+Content-ID: <AA74AA90104B674EBF33E5F961367DAA@namprd11.prod.outlook.com>
+MIME-Version: 1.0
+X-MS-Exchange-CrossTenant-Network-Message-Id: ff8c0a6f-9f31-460e-2827-08d69bfff9ef
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 15:35:01.3054 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 3f4057f3-b418-4d4e-ba84-d55b4e897d88
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: MWHPR11MB1678
+X-OriginatorOrg: microchip.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_072422_648512_A17900A9 
-X-CRM114-Status: UNSURE (   9.85  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190226_073511_592123_930E033B 
+X-CRM114-Status: GOOD (  18.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -143,43 +155,253 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-can@vger.kernel.org
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: linux-arm-kernel@lists.infradead.org, linux-fbdev@vger.kernel.org,
+ sam@ravnborg.org, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-CgpPbiAyLzI2LzE5IDI6MDIgQU0sIE1hcmMgS2xlaW5lLUJ1ZGRlIHdyb3RlOgo+IE9uIDEvMjkv
-MTkgNzowNiBQTSwgR3VzdGF2byBBLiBSLiBTaWx2YSB3cm90ZToKPj4gSW4gcHJlcGFyYXRpb24g
-dG8gZW5hYmxpbmcgLVdpbXBsaWNpdC1mYWxsdGhyb3VnaCwgbWFyayBzd2l0Y2ggY2FzZXMKPj4g
-d2hlcmUgd2UgYXJlIGV4cGVjdGluZyB0byBmYWxsIHRocm91Z2guCj4+Cj4+IFRoaXMgcGF0Y2gg
-Zml4ZXMgdGhlIGZvbGxvd2luZyB3YXJuaW5nczoKPj4KPj4gZHJpdmVycy9uZXQvY2FuL3BlYWtf
-Y2FuZmQvcGVha19wY2llZmRfbWFpbi5jOjY2ODozOiB3YXJuaW5nOiB0aGlzIHN0YXRlbWVudCBt
-YXkgZmFsbCB0aHJvdWdoIFstV2ltcGxpY2l0LWZhbGx0aHJvdWdoPV0KPj4gZHJpdmVycy9uZXQv
-Y2FuL3NwaS9tY3AyNTF4LmM6ODc1Ojc6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBmYWxs
-IHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQo+PiBkcml2ZXJzL25ldC9jYW4vdXNi
-L3BlYWtfdXNiL3BjYW5fdXNiLmM6NDIyOjY6IHdhcm5pbmc6IHRoaXMgc3RhdGVtZW50IG1heSBm
-YWxsIHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQo+PiBkcml2ZXJzL25ldC9jYW4v
-YXQ5MV9jYW4uYzo4OTU6Njogd2FybmluZzogdGhpcyBzdGF0ZW1lbnQgbWF5IGZhbGwgdGhyb3Vn
-aCBbLVdpbXBsaWNpdC1mYWxsdGhyb3VnaD1dCj4+IGRyaXZlcnMvbmV0L2Nhbi9hdDkxX2Nhbi5j
-Ojk1MzoxNTogd2FybmluZzogdGhpcyBzdGF0ZW1lbnQgbWF5IGZhbGwgdGhyb3VnaCBbLVdpbXBs
-aWNpdC1mYWxsdGhyb3VnaD1dCj4+IGRyaXZlcnMvbmV0L2Nhbi91c2IvcGVha191c2IvcGNhbl91
-c2IuYzogSW4gZnVuY3Rpb24g4oCYcGNhbl91c2JfZGVjb2RlX2Vycm9y4oCZOgo+PiBkcml2ZXJz
-L25ldC9jYW4vdXNiL3BlYWtfdXNiL3BjYW5fdXNiLmM6NDIyOjY6IHdhcm5pbmc6IHRoaXMgc3Rh
-dGVtZW50IG1heSBmYWxsIHRocm91Z2ggWy1XaW1wbGljaXQtZmFsbHRocm91Z2g9XQo+PiAgICBp
-ZiAobiAmIFBDQU5fVVNCX0VSUk9SX0JVU19MSUdIVCkgewo+PiAgICAgICBeCj4+IGRyaXZlcnMv
-bmV0L2Nhbi91c2IvcGVha191c2IvcGNhbl91c2IuYzo0Mjg6Mjogbm90ZTogaGVyZQo+PiAgIGNh
-c2UgQ0FOX1NUQVRFX0VSUk9SX1dBUk5JTkc6Cj4+ICAgXn5+fgo+Pgo+PiBXYXJuaW5nIGxldmVs
-IDMgd2FzIHVzZWQ6IC1XaW1wbGljaXQtZmFsbHRocm91Z2g9Mwo+Pgo+PiBUaGlzIHBhdGNoIGlz
-IHBhcnQgb2YgdGhlIG9uZ29pbmcgZWZmb3J0cyB0byBlbmFibGluZwo+PiAtV2ltcGxpY2l0LWZh
-bGx0aHJvdWdoLgo+Pgo+PiBOb3RpY2UgdGhhdCBpbiBzb21lIGNhc2VzIHNwZWxsaW5nIG1pc3Rh
-a2VzIHdlcmUgZml4ZWQuCj4+IEluIG90aGVyIGNhc2VzLCB0aGUgLyogZmFsbCB0aHJvdWdoICov
-IGNvbW1lbnQgaXMgcGxhY2VkCj4+IGF0IHRoZSBib3R0b20gb2YgdGhlIGNhc2Ugc3RhdGVtZW50
-LCB3aGljaCBpcyB3aGF0IEdDQwo+PiBpcyBleHBlY3RpbmcgdG8gZmluZC4KPj4KPj4gU2lnbmVk
-LW9mZi1ieTogR3VzdGF2byBBLiBSLiBTaWx2YSA8Z3VzdGF2b0BlbWJlZGRlZG9yLmNvbT4KPiAK
-PiBBZGRlZCB0byBsaW51eC1jYW4tbmV4dC4KPiAKClRoYW5rcywgTWFyYy4KCi0tCkd1c3Rhdm8K
-Cl9fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFy
-bS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9y
-ZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1r
-ZXJuZWwK
+On 25/02/2019 at 22:25, Alexandre Belloni wrote:
+> Make the driver OF only as since AVR32 has been removed from the kernel,
+> there are only OF enabled platform using it.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+
+It looks good to me:
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
+Thanks Alexandre.
+Best regards,
+   Nicolas
+
+> ---
+>   drivers/video/fbdev/Kconfig       |   6 +-
+>   drivers/video/fbdev/atmel_lcdfb.c | 114 ++----------------------------
+>   2 files changed, 7 insertions(+), 113 deletions(-)
+> 
+> diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+> index ae7712c9687a..f0f07d02af88 100644
+> --- a/drivers/video/fbdev/Kconfig
+> +++ b/drivers/video/fbdev/Kconfig
+> @@ -866,8 +866,8 @@ config FB_S1D13XXX
+>   	  <http://vdc.epson.com/>
+>   
+>   config FB_ATMEL
+> -	tristate "AT91/AT32 LCD Controller support"
+> -	depends on FB && HAVE_FB_ATMEL
+> +	tristate "AT91 LCD Controller support"
+> +	depends on FB && OF && HAVE_FB_ATMEL
+>   	select FB_BACKLIGHT
+>   	select FB_CFB_FILLRECT
+>   	select FB_CFB_COPYAREA
+> @@ -875,7 +875,7 @@ config FB_ATMEL
+>   	select FB_MODE_HELPERS
+>   	select VIDEOMODE_HELPERS
+>   	help
+> -	  This enables support for the AT91/AT32 LCD Controller.
+> +	  This enables support for the AT91 LCD Controller.
+>   
+>   config FB_NVIDIA
+>   	tristate "nVidia Framebuffer Support"
+> diff --git a/drivers/video/fbdev/atmel_lcdfb.c b/drivers/video/fbdev/atmel_lcdfb.c
+> index 4ed55e6bbb84..b8786ff62b87 100644
+> --- a/drivers/video/fbdev/atmel_lcdfb.c
+> +++ b/drivers/video/fbdev/atmel_lcdfb.c
+> @@ -1,5 +1,5 @@
+>   /*
+> - *  Driver for AT91/AT32 LCD Controller
+> + *  Driver for AT91 LCD Controller
+>    *
+>    *  Copyright (C) 2007 Atmel Corporation
+>    *
+> @@ -99,86 +99,6 @@ static struct atmel_lcdfb_config at91sam9rl_config = {
+>   	.have_intensity_bit	= true,
+>   };
+>   
+> -static struct atmel_lcdfb_config at32ap_config = {
+> -	.have_hozval		= true,
+> -};
+> -
+> -static const struct platform_device_id atmel_lcdfb_devtypes[] = {
+> -	{
+> -		.name = "at91sam9261-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9261_config,
+> -	}, {
+> -		.name = "at91sam9263-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9263_config,
+> -	}, {
+> -		.name = "at91sam9g10-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9g10_config,
+> -	}, {
+> -		.name = "at91sam9g45-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9g45_config,
+> -	}, {
+> -		.name = "at91sam9g45es-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9g45es_config,
+> -	}, {
+> -		.name = "at91sam9rl-lcdfb",
+> -		.driver_data = (unsigned long)&at91sam9rl_config,
+> -	}, {
+> -		.name = "at32ap-lcdfb",
+> -		.driver_data = (unsigned long)&at32ap_config,
+> -	}, {
+> -		/* terminator */
+> -	}
+> -};
+> -MODULE_DEVICE_TABLE(platform, atmel_lcdfb_devtypes);
+> -
+> -static struct atmel_lcdfb_config *
+> -atmel_lcdfb_get_config(struct platform_device *pdev)
+> -{
+> -	unsigned long data;
+> -
+> -	data = platform_get_device_id(pdev)->driver_data;
+> -
+> -	return (struct atmel_lcdfb_config *)data;
+> -}
+> -
+> -#if defined(CONFIG_ARCH_AT91)
+> -#define	ATMEL_LCDFB_FBINFO_DEFAULT	(FBINFO_DEFAULT \
+> -					 | FBINFO_PARTIAL_PAN_OK \
+> -					 | FBINFO_HWACCEL_YPAN)
+> -
+> -static inline void atmel_lcdfb_update_dma2d(struct atmel_lcdfb_info *sinfo,
+> -					struct fb_var_screeninfo *var,
+> -					struct fb_info *info)
+> -{
+> -
+> -}
+> -#elif defined(CONFIG_AVR32)
+> -#define	ATMEL_LCDFB_FBINFO_DEFAULT	(FBINFO_DEFAULT \
+> -					| FBINFO_PARTIAL_PAN_OK \
+> -					| FBINFO_HWACCEL_XPAN \
+> -					| FBINFO_HWACCEL_YPAN)
+> -
+> -static void atmel_lcdfb_update_dma2d(struct atmel_lcdfb_info *sinfo,
+> -				     struct fb_var_screeninfo *var,
+> -				     struct fb_info *info)
+> -{
+> -	u32 dma2dcfg;
+> -	u32 pixeloff;
+> -
+> -	pixeloff = (var->xoffset * info->var.bits_per_pixel) & 0x1f;
+> -
+> -	dma2dcfg = (info->var.xres_virtual - info->var.xres)
+> -		 * info->var.bits_per_pixel / 8;
+> -	dma2dcfg |= pixeloff << ATMEL_LCDC_PIXELOFF_OFFSET;
+> -	lcdc_writel(sinfo, ATMEL_LCDC_DMA2DCFG, dma2dcfg);
+> -
+> -	/* Update configuration */
+> -	lcdc_writel(sinfo, ATMEL_LCDC_DMACON,
+> -		    lcdc_readl(sinfo, ATMEL_LCDC_DMACON)
+> -		    | ATMEL_LCDC_DMAUPDT);
+> -}
+> -#endif
+> -
+>   static u32 contrast_ctr = ATMEL_LCDC_PS_DIV8
+>   		| ATMEL_LCDC_POL_POSITIVE
+>   		| ATMEL_LCDC_ENA_PWMENABLE;
+> @@ -404,8 +324,6 @@ static void atmel_lcdfb_update_dma(struct fb_info *info,
+>   
+>   	/* Set framebuffer DMA base address and pixel offset */
+>   	lcdc_writel(sinfo, ATMEL_LCDC_DMABADDR1, dma_addr);
+> -
+> -	atmel_lcdfb_update_dma2d(sinfo, var, info);
+>   }
+>   
+>   static inline void atmel_lcdfb_free_video_memory(struct atmel_lcdfb_info *sinfo)
+> @@ -978,7 +896,6 @@ static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
+>   	clk_disable_unprepare(sinfo->lcdc_clk);
+>   }
+>   
+> -#ifdef CONFIG_OF
+>   static const struct of_device_id atmel_lcdfb_dt_ids[] = {
+>   	{ .compatible = "atmel,at91sam9261-lcdc" , .data = &at91sam9261_config, },
+>   	{ .compatible = "atmel,at91sam9263-lcdc" , .data = &at91sam9263_config, },
+> @@ -986,7 +903,6 @@ static const struct of_device_id atmel_lcdfb_dt_ids[] = {
+>   	{ .compatible = "atmel,at91sam9g45-lcdc" , .data = &at91sam9g45_config, },
+>   	{ .compatible = "atmel,at91sam9g45es-lcdc" , .data = &at91sam9g45es_config, },
+>   	{ .compatible = "atmel,at91sam9rl-lcdc" , .data = &at91sam9rl_config, },
+> -	{ .compatible = "atmel,at32ap-lcdc" , .data = &at32ap_config, },
+>   	{ /* sentinel */ }
+>   };
+>   
+> @@ -1122,19 +1038,12 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+>   	of_node_put(display_np);
+>   	return ret;
+>   }
+> -#else
+> -static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+> -{
+> -	return 0;
+> -}
+> -#endif
+>   
+>   static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>   {
+>   	struct device *dev = &pdev->dev;
+>   	struct fb_info *info;
+>   	struct atmel_lcdfb_info *sinfo;
+> -	struct atmel_lcdfb_pdata *pdata = NULL;
+>   	struct resource *regs = NULL;
+>   	struct resource *map = NULL;
+>   	struct fb_modelist *modelist;
+> @@ -1159,21 +1068,6 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>   		ret = atmel_lcdfb_of_init(sinfo);
+>   		if (ret)
+>   			goto free_info;
+> -	} else if (dev_get_platdata(dev)) {
+> -		struct fb_monspecs *monspecs;
+> -		int i;
+> -
+> -		pdata = dev_get_platdata(dev);
+> -		monspecs = pdata->default_monspecs;
+> -		sinfo->pdata = *pdata;
+> -
+> -		for (i = 0; i < monspecs->modedb_len; i++)
+> -			fb_add_videomode(&monspecs->modedb[i], &info->modelist);
+> -
+> -		sinfo->config = atmel_lcdfb_get_config(pdev);
+> -
+> -		info->var.bits_per_pixel = pdata->default_bpp ? pdata->default_bpp : 16;
+> -		memcpy(&info->monspecs, pdata->default_monspecs, sizeof(info->monspecs));
+>   	} else {
+>   		dev_err(dev, "cannot get default configuration\n");
+>   		goto free_info;
+> @@ -1186,7 +1080,8 @@ static int __init atmel_lcdfb_probe(struct platform_device *pdev)
+>   	if (IS_ERR(sinfo->reg_lcd))
+>   		sinfo->reg_lcd = NULL;
+>   
+> -	info->flags = ATMEL_LCDFB_FBINFO_DEFAULT;
+> +	info->flags = FBINFO_DEFAULT | FBINFO_PARTIAL_PAN_OK |
+> +		      FBINFO_HWACCEL_YPAN;
+>   	info->pseudo_palette = sinfo->pseudo_palette;
+>   	info->fbops = &atmel_lcdfb_ops;
+>   
+> @@ -1435,7 +1330,6 @@ static struct platform_driver atmel_lcdfb_driver = {
+>   	.remove		= __exit_p(atmel_lcdfb_remove),
+>   	.suspend	= atmel_lcdfb_suspend,
+>   	.resume		= atmel_lcdfb_resume,
+> -	.id_table	= atmel_lcdfb_devtypes,
+>   	.driver		= {
+>   		.name	= "atmel_lcdfb",
+>   		.of_match_table	= of_match_ptr(atmel_lcdfb_dt_ids),
+> @@ -1444,6 +1338,6 @@ static struct platform_driver atmel_lcdfb_driver = {
+>   
+>   module_platform_driver_probe(atmel_lcdfb_driver, atmel_lcdfb_probe);
+>   
+> -MODULE_DESCRIPTION("AT91/AT32 LCD Controller framebuffer driver");
+> +MODULE_DESCRIPTION("AT91 LCD Controller framebuffer driver");
+>   MODULE_AUTHOR("Nicolas Ferre <nicolas.ferre@atmel.com>");
+>   MODULE_LICENSE("GPL");
+> 
+
+
+-- 
+Nicolas Ferre
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
