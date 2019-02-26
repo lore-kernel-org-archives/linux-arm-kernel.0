@@ -2,86 +2,65 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5B4CFC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:00:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D60EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:01:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2AE6820C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:00:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 58F822173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:01:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GviBuViU";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="TKhusmiY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2AE6820C01
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cAhRIWxJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 58F822173C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7bRY2xRiF6ZqTEcuQ5/vaeHxdDM2n/Q8MDAPBJY5/dY=; b=GviBuViUCT/IAV
-	gHc2Eo63oXqXonlyztqO9geUIH+zHDJTL3KRa+Kpv4L3VL5B9bE4AdXz0KzrVl++vosmYHGZ+1Alx
-	q41dE6uIq7oOeNS7l4FLyEjrO6ZcZJzYFz876cALUJUX+PhU2KRzBhrvGI6uye+K2cr8+3PjX9smP
-	GNwlbYfUShvcESohueoYkcQZoCoqddBeikIcmXIkPwZ/c4aWZIZ3RBCAwn1vufjs1luAU3wgfUVly
-	kPXQPxjBDmTC/+IFv/PmuzOKUofiadhiFQ4dTGQqdeCGxYIZeWwy7VX5/02fNY4+1efa7xvvQfw0w
-	4QYfRGKJnXhtzzJll0Dg==;
+	List-Owner; bh=jFVF1x/flEIYXD0Kqc1VuGc3JxX+JJKUq3APeFqeufQ=; b=cAhRIWxJwSX59O
+	w/dmZBcKo4G8mzKS/Nib4oFT9AqLDB678LA+M76NMUYn3RNuL4OujPhhZsOrjuDyahrs4B03172XY
+	81J5g3Xe2T1fB/fbDIew4ubSoFY5ry4Y/UfURVwx2td0IGJ6oxNyuzmsiw25XY6nWNO8EkiuJJYnv
+	Rop/MUY7WfRKycmpFyr+qYA/XsvyLKAcPbJ+7rMktNBGH8FixQYzMa0/PFNvy6KXsBCxfm92h6O4i
+	g4jPhTeTF6qCdIzzxjyUEmgVMJBd4dUKZS8Lm9b8hejb3DSx0p4AWaXyOYmN4MpAp6GP/9wzNln/m
+	wqWjdhGBNHLQCvu8f53A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyg5q-0007pc-JA; Tue, 26 Feb 2019 17:00:34 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyg5n-0007pF-35
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 17:00:33 +0000
-Received: by mail-pl1-x641.google.com with SMTP id c4so6502886pls.11
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 09:00:30 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+dlwH5mhQa9AGOo/L/0pHUnERl1xupoKAAdgQEuEs4o=;
- b=TKhusmiYgp/r/qYrAihKQnLxpnkSF9gVjEAmYDzz/PC1SlpVJK5w6qzCKSLFvpz8Xu
- rKEKwm1dwsKZhAKWLlqcCR2Jz5zQU1CTYYd4BY759+nuGE70ovO9ZgV0qxY6Mx3jG0tb
- CjxnxDd8NnMbTcqWq81L1IU/A7l372p+mBgWFr+1vvX8ojRCnIuPwYOWFFrKC19NnWCc
- fu1VUiIHs4m5DhexG7MgwodYUTISDjwqERkPT2zhmRFtv5IpfBlYmcIi+ACwGyBQDNOI
- c7+1sqWCg2gny5CbD5AsF1nFyYjaA/4gXzTN9haMtWeYNdtCbmy9GnfEBf7y6Mzs4NVk
- TneQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=+dlwH5mhQa9AGOo/L/0pHUnERl1xupoKAAdgQEuEs4o=;
- b=Ys1T4loOeEFL/JDF2ErBj+sBBGTsV73HLAdQyRC32iuoiTwQbFxFr+pwd4rf8MkeFw
- geYcBmt1k8+9eWwTV00tHiqWwguyJe16OQjqS5IPQUJq6EtbkzyYCRVGyu1L9xD/YGBs
- ZBuUPI7UBpbZCZyaNmaUU0B542j8isvz/LCjPDpaICjcMZE6nm6kGtKb41HB7ag3Lhgb
- J+jquFj/EAyKB2MO1Cr273jj8SkjCU9TOIGkvjsPNOVsrPxv0vdrbW8mxI/mNHfT4F6n
- 5L0kyikhEGrJuKK80sgSR6MDnf3l1PnQubiKhGSDf1WQS5GXNgqaDMeDbPauso8/KToD
- 8Jsg==
-X-Gm-Message-State: AHQUAuatzVjUnxTMr/W7zF/e+SGSp+M0f0Y6K32sqOFbiK6fz4bWJBOB
- 4LMNG33S2ZszVTwm5mVNxobPwx+5sLIxnCTFrhtm2g==
-X-Google-Smtp-Source: AHgI3IZN1u3daoyBMzsmk5B7rJJGPUG92+iDsiQMh3vRso6YV3aDYejN/KFxUnPEQqZrzQv/qz0XzLbqBA8Ck1FyBz0=
-X-Received: by 2002:a17:902:1122:: with SMTP id
- d31mr27061375pla.246.1551200429919; 
- Tue, 26 Feb 2019 09:00:29 -0800 (PST)
+	id 1gyg6W-00088Q-Ja; Tue, 26 Feb 2019 17:01:16 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyg6Q-00087w-Sj
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 17:01:15 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 25F8F80D;
+ Tue, 26 Feb 2019 09:01:10 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5882C3F738;
+ Tue, 26 Feb 2019 09:01:08 -0800 (PST)
+Date: Tue, 26 Feb 2019 17:01:05 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Julien Grall <julien.grall@arm.com>
+Subject: Re: [PATCH v5 13/26] KVM: arm64/sve: System register context switch
+ and access support
+Message-ID: <20190226170105.GB3567@e103592.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-14-git-send-email-Dave.Martin@arm.com>
+ <8a0e6089-b77b-151b-eacd-34ad13f39ac6@arm.com>
 MIME-Version: 1.0
-References: <cover.1550839937.git.andreyknvl@google.com>
- <464111f3-e255-ad45-8964-58462d889e6f@arm.com>
- <CAAeHK+wCZK7F7T1k+Kg_HkK47J8R9ugtH1g1ciLYH_KJ22ZVjg@mail.gmail.com>
- <96d1086c-ca82-d6d7-24c3-f6686d98d47a@arm.com>
-In-Reply-To: <96d1086c-ca82-d6d7-24c3-f6686d98d47a@arm.com>
-From: Andrey Konovalov <andreyknvl@google.com>
-Date: Tue, 26 Feb 2019 18:00:18 +0100
-Message-ID: <CAAeHK+z65WjTWp8h4RrLpqopAk3o7S6VqC3XL-iXbbp9rQuQsA@mail.gmail.com>
-Subject: Re: [PATCH v10 00/12] arm64: untag user pointers passed to the kernel
-To: Szabolcs Nagy <Szabolcs.Nagy@arm.com>
+Content-Disposition: inline
+In-Reply-To: <8a0e6089-b77b-151b-eacd-34ad13f39ac6@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_090031_161476_BB5D218C 
-X-CRM114-Status: GOOD (  35.58  )
+X-CRM114-CacheID: sfid-20190226_090110_939913_F86D3E96 
+X-CRM114-Status: GOOD (  19.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,266 +72,136 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>,
- "linux-doc@vger.kernel.org" <linux-doc@vger.kernel.org>,
- Catalin Marinas <Catalin.Marinas@arm.com>, Will Deacon <Will.Deacon@arm.com>,
- "linux-mm@kvack.org" <linux-mm@kvack.org>,
- "linux-kselftest@vger.kernel.org" <linux-kselftest@vger.kernel.org>,
- Chintan Pandya <cpandya@codeaurora.org>,
- Vincenzo Frascino <Vincenzo.Frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
- Ingo Molnar <mingo@kernel.org>,
- "linux-arch@vger.kernel.org" <linux-arch@vger.kernel.org>,
- Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
- Dave P Martin <Dave.Martin@arm.com>, Evgeniy Stepanov <eugenis@google.com>,
- Kevin Brodsky <Kevin.Brodsky@arm.com>, Kees Cook <keescook@chromium.org>,
- Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>, nd <nd@arm.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Kostya Serebryany <kcc@google.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
- Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
- Robin Murphy <Robin.Murphy@arm.com>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Feb 22, 2019 at 5:10 PM Szabolcs Nagy <Szabolcs.Nagy@arm.com> wrote:
->
-> On 22/02/2019 15:40, Andrey Konovalov wrote:
-> > On Fri, Feb 22, 2019 at 4:35 PM Szabolcs Nagy <Szabolcs.Nagy@arm.com> wrote:
-> >>
-> >> On 22/02/2019 12:53, Andrey Konovalov wrote:
-> >>> This patchset is meant to be merged together with "arm64 relaxed ABI" [1].
-> >>>
-> >>> arm64 has a feature called Top Byte Ignore, which allows to embed pointer
-> >>> tags into the top byte of each pointer. Userspace programs (such as
-> >>> HWASan, a memory debugging tool [2]) might use this feature and pass
-> >>> tagged user pointers to the kernel through syscalls or other interfaces.
-> >>>
-> >>> Right now the kernel is already able to handle user faults with tagged
-> >>> pointers, due to these patches:
-> >>>
-> >>> 1. 81cddd65 ("arm64: traps: fix userspace cache maintenance emulation on a
-> >>>              tagged pointer")
-> >>> 2. 7dcd9dd8 ("arm64: hw_breakpoint: fix watchpoint matching for tagged
-> >>>             pointers")
-> >>> 3. 276e9327 ("arm64: entry: improve data abort handling of tagged
-> >>>             pointers")
-> >>>
-> >>> This patchset extends tagged pointer support to syscall arguments.
-> >>>
-> >>> For non-memory syscalls this is done by untaging user pointers when the
-> >>> kernel performs pointer checking to find out whether the pointer comes
-> >>> from userspace (most notably in access_ok). The untagging is done only
-> >>> when the pointer is being checked, the tag is preserved as the pointer
-> >>> makes its way through the kernel.
-> >>>
-> >>> Since memory syscalls (mmap, mprotect, etc.) don't do memory accesses but
-> >>> rather deal with memory ranges, untagged pointers are better suited to
-> >>> describe memory ranges internally. Thus for memory syscalls we untag
-> >>> pointers completely when they enter the kernel.
-> >>
-> >> i think the same is true when user pointers are compared.
-> >>
-> >> e.g. i suspect there may be issues with tagged robust mutex
-> >> list pointers because the kernel does
-> >>
-> >> futex.c:3541:   while (entry != &head->list) {
-> >>
-> >> where entry is a user pointer that may be tagged, and
-> >> &head->list is probably not tagged.
-> >
-> > You're right. I'll expand the cover letter in the next version to
-> > describe this more accurately. The patchset however contains "mm,
-> > arm64: untag user pointers in mm/gup.c" that should take care of futex
-> > pointers.
->
-> the robust mutex list pointer is not a futex pointer,
-> i'm not sure how the mm/gup.c patch helps.
+On Tue, Feb 26, 2019 at 04:32:30PM +0000, Julien Grall wrote:
+> Hi Dave,
+> 
+> On 18/02/2019 19:52, Dave Martin wrote:
+> >@@ -1091,6 +1088,95 @@ static int reg_from_user(u64 *val, const void __user *uaddr, u64 id);
+> >  static int reg_to_user(void __user *uaddr, const u64 *val, u64 id);
+> >  static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
+> >+static unsigned int sve_restrictions(const struct kvm_vcpu *vcpu,
+> >+				     const struct sys_reg_desc *rd)
+> >+{
+> >+	return vcpu_has_sve(vcpu) ? 0 : REG_NO_USER | REG_NO_GUEST;
+> >+}
+> >+
+> >+static unsigned int sve_id_restrictions(const struct kvm_vcpu *vcpu,
+> >+					const struct sys_reg_desc *rd)
+> >+{
+> >+	return vcpu_has_sve(vcpu) ? 0 : REG_NO_USER;
+> >+}
+> >+
+> >+static int get_zcr_el1(struct kvm_vcpu *vcpu,
+> >+		       const struct sys_reg_desc *rd,
+> >+		       const struct kvm_one_reg *reg, void __user *uaddr)
+> >+{
+> >+	if (WARN_ON(!vcpu_has_sve(vcpu)))
+> >+		return -ENOENT;
+> >+
+> >+	return reg_to_user(uaddr, &vcpu->arch.ctxt.sys_regs[ZCR_EL1],
+> >+			   reg->id);
+> >+}
+> >+
+> >+static int set_zcr_el1(struct kvm_vcpu *vcpu,
+> >+		       const struct sys_reg_desc *rd,
+> >+		       const struct kvm_one_reg *reg, void __user *uaddr)
+> >+{
+> >+	if (WARN_ON(!vcpu_has_sve(vcpu)))
+> >+		return -ENOENT;
+> >+
+> >+	return reg_from_user(&vcpu->arch.ctxt.sys_regs[ZCR_EL1], uaddr,
+> >+			     reg->id);
+> >+}
+> >+
+> >+/* Generate the emulated ID_AA64ZFR0_EL1 value exposed to the guest */
+> >+static u64 guest_id_aa64zfr0_el1(const struct kvm_vcpu *vcpu)
+> >+{
+> >+	if (!vcpu_has_sve(vcpu))
+> >+		return 0;
+> >+
+> >+	return read_sanitised_ftr_reg(SYS_ID_AA64ZFR0_EL1);
+> >+}
+> >+
+> >+static bool access_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> >+				   struct sys_reg_params *p,
+> >+				   const struct sys_reg_desc *rd)
+> >+{
+> >+	if (p->is_write)
+> >+		return write_to_read_only(vcpu, p, rd);
+> >+
+> >+	p->regval = guest_id_aa64zfr0_el1(vcpu);
+> >+	return true;
+> >+}
+> >+
+> >+static int get_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> >+		const struct sys_reg_desc *rd,
+> >+		const struct kvm_one_reg *reg, void __user *uaddr)
+> >+{
+> >+	u64 val;
+> >+
+> >+	if (!vcpu_has_sve(vcpu))
+> >+		return -ENOENT;
+> >+
+> >+	val = guest_id_aa64zfr0_el1(vcpu);
+> >+	return reg_to_user(uaddr, &val, reg->id);
+> >+}
+> >+
+> >+static int set_id_aa64zfr0_el1(struct kvm_vcpu *vcpu,
+> >+		const struct sys_reg_desc *rd,
+> >+		const struct kvm_one_reg *reg, void __user *uaddr)
+> >+{
+> >+	const u64 id = sys_reg_to_index(rd);
+> >+	int err;
+> >+	u64 val;
+> >+
+> >+	if (!vcpu_has_sve(vcpu))
+> >+		return -ENOENT;
+> >+
+> >+	err = reg_from_user(&val, uaddr, id);
+> >+	if (err)
+> >+		return err;
+> >+
+> >+	/* This is what we mean by invariant: you can't change it. */
+> >+	if (val != guest_id_aa64zfr0_el1(vcpu))
+> >+		return -EINVAL;
+> >+
+> >+	return 0;
+> >+}
+> 
+> We seem to already have code for handling invariant registers as well as
+> reading ID register. I guess the only reason you can't use them is because
+> of the check the vcpu is using SVE.
+> 
+> However, AFAICT the restrictions callback would prevent you to enter the
+> {get, set}_id if the vCPU does not support SVE. So the check should not be
+> reachable.
 
-Oh, I've misinterpreted what you said, sorry.
+Hmmm, those checks were inherited from before this refactoring.
 
-I've looked at the robust futex list implementation, and I'm not sure
-if we need to add untagging here.
+You're right: the checks are now done a common place, so the checks in
+the actual accessors should be redundant.
 
-> >> futex.c:3541:   while (entry != &head->list) {
+I could demote them to WARN(), but it may make sense simply to delete
+them.
 
-Here head has whatever value user has set via the set_robust_list
-syscall and it might be tagged. AFAIU this loop iterates over the
-robust list stored in userspace, until it encounters the head pointer
-again, at which point the kernel decides that it has iterated over the
-whole list and stops. The question is whether we want the user to use
-the same tag for the pointer that is passed to the set_robust_list
-syscall and the pointer that is used to mark the end of the robust
-list.
+The access_id_aa64zfr0_el1() should still be reachable, since we don't
+have REG_NO_GUEST for this.
 
-Catalin, what do you think?
+Does that make sense?
 
->
-> >>
-> >>> One of the alternative approaches to untagging that was considered is to
-> >>> completely strip the pointer tag as the pointer enters the kernel with
-> >>> some kind of a syscall wrapper, but that won't work with the countless
-> >>> number of different ioctl calls. With this approach we would need a custom
-> >>> wrapper for each ioctl variation, which doesn't seem practical.
-> >>>
-> >>> The following testing approaches has been taken to find potential issues
-> >>> with user pointer untagging:
-> >>>
-> >>> 1. Static testing (with sparse [3] and separately with a custom static
-> >>>    analyzer based on Clang) to track casts of __user pointers to integer
-> >>>    types to find places where untagging needs to be done.
-> >>>
-> >>> 2. Static testing with grep to find parts of the kernel that call
-> >>>    find_vma() (and other similar functions) or directly compare against
-> >>>    vm_start/vm_end fields of vma.
-> >>>
-> >>> 3. Static testing with grep to find parts of the kernel that compare
-> >>>    user pointers with TASK_SIZE or other similar consts and macros.
-> >>>
-> >>> 4. Dynamic testing: adding BUG_ON(has_tag(addr)) to find_vma() and running
-> >>>    a modified syzkaller version that passes tagged pointers to the kernel.
-> >>>
-> >>> Based on the results of the testing the requried patches have been added
-> >>> to the patchset.
-> >>>
-> >>> This patchset has been merged into the Pixel 2 kernel tree and is now
-> >>> being used to enable testing of Pixel 2 phones with HWASan.
-> >>>
-> >>> This patchset is a prerequisite for ARM's memory tagging hardware feature
-> >>> support [4].
-> >>>
-> >>> Thanks!
-> >>>
-> >>> [1] https://lkml.org/lkml/2018/12/10/402
-> >>>
-> >>> [2] http://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
-> >>>
-> >>> [3] https://github.com/lucvoo/sparse-dev/commit/5f960cb10f56ec2017c128ef9d16060e0145f292
-> >>>
-> >>> [4] https://community.arm.com/processors/b/blog/posts/arm-a-profile-architecture-2018-developments-armv85a
-> >>>
-> >>> Changes in v10:
-> >>> - Added "mm, arm64: untag user pointers passed to memory syscalls" back.
-> >>> - New patch "fs, arm64: untag user pointers in fs/userfaultfd.c".
-> >>> - New patch "net, arm64: untag user pointers in tcp_zerocopy_receive".
-> >>> - New patch "kernel, arm64: untag user pointers in prctl_set_mm*".
-> >>> - New patch "tracing, arm64: untag user pointers in seq_print_user_ip".
-> >>>
-> >>> Changes in v9:
-> >>> - Rebased onto 4.20-rc6.
-> >>> - Used u64 instead of __u64 in type casts in the untagged_addr macro for
-> >>>   arm64.
-> >>> - Added braces around (addr) in the untagged_addr macro for other arches.
-> >>>
-> >>> Changes in v8:
-> >>> - Rebased onto 65102238 (4.20-rc1).
-> >>> - Added a note to the cover letter on why syscall wrappers/shims that untag
-> >>>   user pointers won't work.
-> >>> - Added a note to the cover letter that this patchset has been merged into
-> >>>   the Pixel 2 kernel tree.
-> >>> - Documentation fixes, in particular added a list of syscalls that don't
-> >>>   support tagged user pointers.
-> >>>
-> >>> Changes in v7:
-> >>> - Rebased onto 17b57b18 (4.19-rc6).
-> >>> - Dropped the "arm64: untag user address in __do_user_fault" patch, since
-> >>>   the existing patches already handle user faults properly.
-> >>> - Dropped the "usb, arm64: untag user addresses in devio" patch, since the
-> >>>   passed pointer must come from a vma and therefore be untagged.
-> >>> - Dropped the "arm64: annotate user pointers casts detected by sparse"
-> >>>   patch (see the discussion to the replies of the v6 of this patchset).
-> >>> - Added more context to the cover letter.
-> >>> - Updated Documentation/arm64/tagged-pointers.txt.
-> >>>
-> >>> Changes in v6:
-> >>> - Added annotations for user pointer casts found by sparse.
-> >>> - Rebased onto 050cdc6c (4.19-rc1+).
-> >>>
-> >>> Changes in v5:
-> >>> - Added 3 new patches that add untagging to places found with static
-> >>>   analysis.
-> >>> - Rebased onto 44c929e1 (4.18-rc8).
-> >>>
-> >>> Changes in v4:
-> >>> - Added a selftest for checking that passing tagged pointers to the
-> >>>   kernel succeeds.
-> >>> - Rebased onto 81e97f013 (4.18-rc1+).
-> >>>
-> >>> Changes in v3:
-> >>> - Rebased onto e5c51f30 (4.17-rc6+).
-> >>> - Added linux-arch@ to the list of recipients.
-> >>>
-> >>> Changes in v2:
-> >>> - Rebased onto 2d618bdf (4.17-rc3+).
-> >>> - Removed excessive untagging in gup.c.
-> >>> - Removed untagging pointers returned from __uaccess_mask_ptr.
-> >>>
-> >>> Changes in v1:
-> >>> - Rebased onto 4.17-rc1.
-> >>>
-> >>> Changes in RFC v2:
-> >>> - Added "#ifndef untagged_addr..." fallback in linux/uaccess.h instead of
-> >>>   defining it for each arch individually.
-> >>> - Updated Documentation/arm64/tagged-pointers.txt.
-> >>> - Dropped "mm, arm64: untag user addresses in memory syscalls".
-> >>> - Rebased onto 3eb2ce82 (4.16-rc7).
-> >>>
-> >>> Reviewed-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
-> >>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> >>>
-> >>> Andrey Konovalov (12):
-> >>>   uaccess: add untagged_addr definition for other arches
-> >>>   arm64: untag user pointers in access_ok and __uaccess_mask_ptr
-> >>>   lib, arm64: untag user pointers in strn*_user
-> >>>   mm, arm64: untag user pointers passed to memory syscalls
-> >>>   mm, arm64: untag user pointers in mm/gup.c
-> >>>   fs, arm64: untag user pointers in copy_mount_options
-> >>>   fs, arm64: untag user pointers in fs/userfaultfd.c
-> >>>   net, arm64: untag user pointers in tcp_zerocopy_receive
-> >>>   kernel, arm64: untag user pointers in prctl_set_mm*
-> >>>   tracing, arm64: untag user pointers in seq_print_user_ip
-> >>>   arm64: update Documentation/arm64/tagged-pointers.txt
-> >>>   selftests, arm64: add a selftest for passing tagged pointers to kernel
-> >>>
-> >>>  Documentation/arm64/tagged-pointers.txt       | 25 +++++++++++--------
-> >>>  arch/arm64/include/asm/uaccess.h              | 10 +++++---
-> >>>  fs/namespace.c                                |  2 +-
-> >>>  fs/userfaultfd.c                              |  5 ++++
-> >>>  include/linux/memory.h                        |  4 +++
-> >>>  ipc/shm.c                                     |  2 ++
-> >>>  kernel/sys.c                                  | 14 +++++++++++
-> >>>  kernel/trace/trace_output.c                   |  2 +-
-> >>>  lib/strncpy_from_user.c                       |  2 ++
-> >>>  lib/strnlen_user.c                            |  2 ++
-> >>>  mm/gup.c                                      |  4 +++
-> >>>  mm/madvise.c                                  |  2 ++
-> >>>  mm/mempolicy.c                                |  5 ++++
-> >>>  mm/migrate.c                                  |  1 +
-> >>>  mm/mincore.c                                  |  2 ++
-> >>>  mm/mlock.c                                    |  5 ++++
-> >>>  mm/mmap.c                                     |  7 ++++++
-> >>>  mm/mprotect.c                                 |  2 ++
-> >>>  mm/mremap.c                                   |  2 ++
-> >>>  mm/msync.c                                    |  2 ++
-> >>>  net/ipv4/tcp.c                                |  2 ++
-> >>>  tools/testing/selftests/arm64/.gitignore      |  1 +
-> >>>  tools/testing/selftests/arm64/Makefile        | 11 ++++++++
-> >>>  .../testing/selftests/arm64/run_tags_test.sh  | 12 +++++++++
-> >>>  tools/testing/selftests/arm64/tags_test.c     | 19 ++++++++++++++
-> >>>  25 files changed, 129 insertions(+), 16 deletions(-)
-> >>>  create mode 100644 tools/testing/selftests/arm64/.gitignore
-> >>>  create mode 100644 tools/testing/selftests/arm64/Makefile
-> >>>  create mode 100755 tools/testing/selftests/arm64/run_tags_test.sh
-> >>>  create mode 100644 tools/testing/selftests/arm64/tags_test.c
-> >>>
-> >>
->
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
