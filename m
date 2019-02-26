@@ -2,72 +2,74 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FCE9C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 02:34:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53EF7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:01:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57A8A217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 02:34:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1DC53217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:01:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oj6mZBli"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57A8A217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.panasonic.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KOuDaN79"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DC53217F5
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3Oe7JT6AG6ij7pFlmvKQPPXhbmwrGh9kba0aH7tzbis=; b=Oj6mZBligBjtGO
-	5okO1mir4FzIiJmK59zfwwu1fqHlMJu2qKofQI22NTddMKxPTEsYXJkL3BDDoPpT5LDzOlsq/UnT2
-	JuzcxhY5ltA1yDmPU31qHikaqlLa2QSt4Ofe+WBaCP7AMIG4gFxOQHVT3j6ystULAkaKCD2STL+zS
-	qMwiDCClh1TKa2BUSK2qyjMH4cTXwTBbf87ur18Jl4CNcdJTwuys+LmF1O7JILbjIe5wRWtLg6OqE
-	ioek06T1tKSFj1bdH0E9KPRTOgyTUyyYUWY/AUv1gD4iYMk8FT5jDASAYgn+2OnPRcACrb7Vz4v7z
-	2gXgnf4gFf/zvddGBlCQ==;
+	List-Owner; bh=HT5DaVwplsM5VMO1Yx1YUpPyQvW1IoTbCIxy4p/M7w8=; b=KOuDaN79H403e0
+	37q9wVZ1haPFrVkDhR5/A+ELDxxF7hsAZQkT0jMhfitg0JYMotyZJiE3ZdKZ7n0no1EoGMDAF8fGc
+	8AEIj9q14WYYnkd7np21q9OMDi61fGLsnl474itsOC+0P+ZhpTlvyLnshtsqguEX3qQ0XZOyXf9Vx
+	HN0v9xppNVesPG1skTvWdBI694QdXR9lGfqtLoddOnngK1skA9/HzrF/lnNUa6v9goGG+uSKk1hah
+	Qte+V6+1kcrQqC1FBKT+JrKdp6UOBjh7Jrwf8p0baeUh9RbYDPLOhfSLZ0M+pwtc0eONJN4HzZ9vY
+	Zj27X7uhN3vtE08Uk90w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gySZo-0007dA-PP; Tue, 26 Feb 2019 02:34:36 +0000
-Received: from smtp.mei.co.jp ([133.183.100.20])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gySZl-0007cf-27
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 02:34:34 +0000
-Received: from mail-gw.jp.panasonic.com ([157.8.1.157])
- by smtp.mei.co.jp (8.14.4/8.14.4/lvzy11) with ESMTP id x1Q2YU1l022883;
- Tue, 26 Feb 2019 11:34:30 +0900
-Received: from epochmail.jp.panasonic.com ([157.8.1.130])
- by mail.jp.panasonic.com (8.11.6p2/3.7W/kc-maili17) with ESMTP id x1Q2YTR21973;
- Tue, 26 Feb 2019 11:34:29 +0900
-Received: by epochmail.jp.panasonic.com (8.12.11.20060308/3.7W/pml-send1) id
- x1Q2YT33023435; Tue, 26 Feb 2019 11:34:29 +0900
-Received: from jpa000secmn21.palet.jp.panasonic.com [10.74.216.56] 
- by JPA000SGWMN04.palet.jp.panasonic.com with ESMTP id MAA26627;
- Tue, 26 Feb 2019 11:34:29 +0900
-Received: from localhost.localdomain (10.74.216.181) by
- JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56) with Microsoft SMTP
- Server (TLS) id 15.0.1076.9; Tue, 26 Feb 2019 11:34:29 +0900
-From: Kohji Okuno <okuno.kohji@jp.panasonic.com>
-To: <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH v3] ARM: imx6q: cpuidle: fix bug that CPU might not wake up at
- expected time
-Date: Tue, 26 Feb 2019 11:34:13 +0900
-Message-ID: <20190226023413.19531-1-okuno.kohji@jp.panasonic.com>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190222.174953.431124434951497467.okuno.kohji@jp.panasonic.com>
-References: <20190222.174953.431124434951497467.okuno.kohji@jp.panasonic.com>
+	id 1gyTvm-0007pQ-UT; Tue, 26 Feb 2019 04:01:22 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyTvj-0007oc-EH; Tue, 26 Feb 2019 04:01:21 +0000
+X-UUID: 105e51b9f4b64f90961539867408fec3-20190225
+X-UUID: 105e51b9f4b64f90961539867408fec3-20190225
+Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
+ (envelope-from <weiyi.lu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 878107950; Mon, 25 Feb 2019 20:01:00 -0800
+Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 25 Feb 2019 20:00:58 -0800
+Received: from mtkcas07.mediatek.inc (172.21.101.84) by
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 26 Feb 2019 12:00:50 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Tue, 26 Feb 2019 12:00:50 +0800
+Message-ID: <1551153650.1047.4.camel@mtksdaap41>
+Subject: Re: [PATCH v4 00/12] Mediatek MT8183 clock and scpsys support
+From: Weiyi Lu <weiyi.lu@mediatek.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Date: Tue, 26 Feb 2019 12:00:50 +0800
+In-Reply-To: <155082168901.77512.12893153125579041936@swboyd.mtv.corp.google.com>
+References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
+ <20190201083016.25856-2-weiyi.lu@mediatek.com>
+ <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
+ <b7abe484-71c1-5ec0-796c-544f1ac5d6f5@gmail.com>
+ <155082168901.77512.12893153125579041936@swboyd.mtv.corp.google.com>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
-X-Originating-IP: [10.74.216.181]
-X-ClientProxiedBy: JPA000SECMN26.palet.jp.panasonic.com (10.74.216.63) To
- JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56)
+X-TM-SNTS-SMTP: 2566077B6750DF2BE7912EE4D2CBC442DA67555DC3CF1235DF24BEF0A4BC65E02000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_183433_356475_09CAF158 
-X-CRM114-Status: GOOD (  13.24  )
+X-CRM114-CacheID: sfid-20190225_200119_489766_2E7F5B77 
+X-CRM114-Status: GOOD (  20.34  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,88 +81,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>,
- Kohji Okuno <okuno.kohji@jp.panasonic.com>, NXP Linux Team <linux-imx@nxp.com>,
- Pengutronix Kernel Team <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>
+Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
- In the current cpuidle implementation for i.MX6q, the CPU that sets
-'WAIT_UNCLOCKED' and the CPU that returns to 'WAIT_CLOCKED' are always
-the same. While the CPU that sets 'WAIT_UNCLOCKED' is in IDLE state of
-"WAIT", if the other CPU wakes up and enters IDLE state of "WFI"
-istead of "WAIT", this CPU can not wake up at expired time.
- Because, in the case of "WFI", the CPU must be waked up by the local
-timer interrupt. But, while 'WAIT_UNCLOCKED' is set, the local timer
-is stopped, when all CPUs execute "wfi" instruction. As a result, the
-local timer interrupt is not fired.
- In this situation, this CPU will wake up by IRQ different from local
-timer. (e.g. broacast tiemr)
+On Thu, 2019-02-21 at 23:48 -0800, Stephen Boyd wrote:
+> Quoting Matthias Brugger (2019-02-21 00:36:24)
+> > 
+> > 
+> > On 20/02/2019 20:18, Stephen Boyd wrote:
+> > > 
+> > > What's the merge plan here? Do you want me to apply these patches to clk
+> > > tree? Will someone be sending me a pull request for mediatek clk changes
+> > > this cycle? It's getting pretty late for much of anything making this
+> > > upcoming merge window.
+> > > 
+> > 
+> > As far as I can see, the clock patches are independent, so I think it is OK to
+> > take them. SCPSYS patches will go through my tree once they are in shape.
+> 
+> Ok great. When patches for clks are interspersed throughout the patch
+> series it makes me think that something later in the series depends on
+> something that isn't a clk patch so then I can't apply it.
+> 
 
-So, this fix changes CPU to return to 'WAIT_CLOCKED'.
+Hi Stephen,
 
-Signed-off-by: Kohji Okuno <okuno.kohji@jp.panasonic.com>
----
+Sorry for making such complex dependencies between the clk patches and
+others in this series. And just like Matthias mentioned, the clock
+patches are independent from others. I could resend a clock-only series
+right away if each clock patch in v4 is qualified to merge into
+clk-next.
+If there still some provide need to be fixed, please let me know. I'll
+fix them and send v5 only for clock.
 
-Changes for v3:
- - remove the braces for a single statement inside the if block.
+> > 
+> > Do you prefer to get pull requests for clock patches? I wasn't aware of that.
+> > But if you prefer that, we can find someone who prepares every merge window a
+> > pull request.
+> > 
+> 
+> I don't really care one way or the other about pull requests vs.
+> manually applying patches. It helps if someone wants to pick the patches
+> up and send them along when there are complex dependencies between the
+> clk patches and dts bits or something like that. It also helps if
+> there's someone else with knowledge of the particular SoC saying "these
+> are good, please pull these patches". Subsystem maintainers obviously
+> aren't experts in all SoCs and their various quirks, plus datasheets
+> aren't always so widely available, so sharing the load with SoC
+> maintainers who are familiar with the hardware usually makes a lot of
+> sense.
+> 
+> Otherwise, if you just want to put your "Reviewed-by" tag on any patches
+> that look good and are sane then I'll quickly understand that these
+> patches are good and that I should pick them up into the clk tree from
+> the list. Just please communicate one way or the other about patches
+> that you care about because it helps to know if they've gotten attention
+> or not.
+> 
 
-Changes for v2:
- - change "master" variable name.
-
- arch/arm/mach-imx/cpuidle-imx6q.c | 27 ++++++++++-----------------
- 1 file changed, 10 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index bfeb25aaf9a2..326e870d7123 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -16,30 +16,23 @@
- #include "cpuidle.h"
- #include "hardware.h"
- 
--static atomic_t master = ATOMIC_INIT(0);
--static DEFINE_SPINLOCK(master_lock);
-+static int num_idle_cpus = 0;
-+static DEFINE_SPINLOCK(cpuidle_lock);
- 
- static int imx6q_enter_wait(struct cpuidle_device *dev,
- 			    struct cpuidle_driver *drv, int index)
- {
--	if (atomic_inc_return(&master) == num_online_cpus()) {
--		/*
--		 * With this lock, we prevent other cpu to exit and enter
--		 * this function again and become the master.
--		 */
--		if (!spin_trylock(&master_lock))
--			goto idle;
-+	spin_lock(&cpuidle_lock);
-+	if (++num_idle_cpus == num_online_cpus())
- 		imx6_set_lpm(WAIT_UNCLOCKED);
--		cpu_do_idle();
--		imx6_set_lpm(WAIT_CLOCKED);
--		spin_unlock(&master_lock);
--		goto done;
--	}
-+	spin_unlock(&cpuidle_lock);
- 
--idle:
- 	cpu_do_idle();
--done:
--	atomic_dec(&master);
-+
-+	spin_lock(&cpuidle_lock);
-+	if (num_idle_cpus-- == num_online_cpus())
-+		imx6_set_lpm(WAIT_CLOCKED);
-+	spin_unlock(&cpuidle_lock);
- 
- 	return index;
- }
--- 
-2.17.1
 
 
 _______________________________________________
