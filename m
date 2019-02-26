@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 35824C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:15:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 19A19C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:06:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F272A206B8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:15:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DA1C42147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:06:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CsZsg29i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F272A206B8
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m2FhL0qf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA1C42147C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,45 +24,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=kC+X6VJ7uwqzbNdHdA8WtPcyc7LXKciGKFxDQz7aspI=; b=CsZsg29iJ4lu4D
-	1laSn2YlLXTy0ciqjQkB8GV05vzz3XDLOqTVoISTvbw28/vvjB8JcI2YJIKrCvybmPG9Stm3+TxeW
-	gQLIL/PT5BYhADhIPc+rm655ZLb1EMQiDVqkuZPY2nEJ8lorreAfr3/gD5RYaTKiWxD8lrUvH2awO
-	/3U1maxFotEoDMwsJcCXIdx9SF5RkOMjjOWiyYAvEkEAqAzhI3HDdqNISdf4AKBJcZyEgnQAnYQ1N
-	pT9YMa6zyxcIAoU0VAuhXlRZPkovndnTGqwNmj680rTcD2ZiJCbs5uCWhRqOF1yUfuHk+bEXUHg3M
-	k6fku2W8JoPvv61N3zuw==;
+	List-Owner; bh=Fywd0/9zJYw3YkHLVc/+JcgCVQSwxY/rqcMLhe/+C9Q=; b=m2FhL0qf+d5Leb
+	H6DzG5r1bwKRrDd3WfhPY/lhQPbcgGCfgFT69Yutgf5bYXekuMZhWmIC8JE964uSvpXIMzS0/Xwg8
+	j3847wa6idaeXmvIawxi7lcu8rD3khWdkdg9vxTK+mJPCRmIcAJ08wv5ApWHQwg3QD16BxM/yByyt
+	r6NwJk/X9cPyQy4lQZEh2B6NPCcXbh3caWLf6g61OAqkjo7nTLPzifqHocGAZpQ+AApA0ixDkXuD3
+	PPrl21ONEtIRxrYsuHZRab+BHKx7XgefEKlcFLEL7+8zk9nXKZzjA1ZEBg3JJDZlcXz3HNSbSwSzm
+	phGCfl6FNIFrtGr0WFlQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyU9B-0003xy-DY; Tue, 26 Feb 2019 04:15:13 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gyUwU-0002S5-KA; Tue, 26 Feb 2019 05:06:10 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyU97-0002wc-Hc
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 04:15:11 +0000
+ id 1gyUwO-0002RT-Mh
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 05:06:06 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C3A17A78;
- Mon, 25 Feb 2019 20:15:02 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8321DA78;
+ Mon, 25 Feb 2019 21:05:58 -0800 (PST)
 Received: from [10.162.40.137] (p8cg001049571a15.blr.arm.com [10.162.40.137])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- EEEEC3F71D; Mon, 25 Feb 2019 20:14:59 -0800 (PST)
-Subject: Re: [PATCH V2 1/6] KVM: ARM: Remove pgtable standard functions from
- stage-2 page tables
+ EB06A3F71D; Mon, 25 Feb 2019 21:05:55 -0800 (PST)
+Subject: Re: [PATCH V2 5/6] arm64/mm: Enable page table page accounting for
+ user space
 To: Mark Rutland <mark.rutland@arm.com>
 References: <1551071039-20192-1-git-send-email-anshuman.khandual@arm.com>
- <1551071039-20192-2-git-send-email-anshuman.khandual@arm.com>
- <20190225110014.GB26236@lakrids.cambridge.arm.com>
- <7bf0d18e-9714-4da9-a340-10aae5fa9f38@arm.com>
- <20190225154922.GJ26236@lakrids.cambridge.arm.com>
+ <1551071039-20192-6-git-send-email-anshuman.khandual@arm.com>
+ <20190225111108.GD26236@lakrids.cambridge.arm.com>
+ <d6c62e0d-f890-a60d-517c-c0ba1e56e48c@arm.com>
+ <20190225153553.GI26236@lakrids.cambridge.arm.com>
 From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <d5ccc1ae-b97a-5e01-78c7-a2f377b3024f@arm.com>
-Date: Tue, 26 Feb 2019 09:45:05 +0530
+Message-ID: <27de9775-1ff9-01a1-6bf4-b6a912fc2440@arm.com>
+Date: Tue, 26 Feb 2019 10:36:02 +0530
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
  Thunderbird/52.9.1
 MIME-Version: 1.0
-In-Reply-To: <20190225154922.GJ26236@lakrids.cambridge.arm.com>
+In-Reply-To: <20190225153553.GI26236@lakrids.cambridge.arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_201509_595936_7F18FCE0 
-X-CRM114-Status: GOOD (  26.15  )
+X-CRM114-CacheID: sfid-20190225_210604_748628_0639BF50 
+X-CRM114-Status: GOOD (  18.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,100 +83,95 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 02/25/2019 09:19 PM, Mark Rutland wrote:
-> On Mon, Feb 25, 2019 at 07:50:27PM +0530, Anshuman Khandual wrote:
+On 02/25/2019 09:05 PM, Mark Rutland wrote:
+> On Mon, Feb 25, 2019 at 08:19:53PM +0530, Anshuman Khandual wrote:
 >>
 >>
->> On 02/25/2019 04:30 PM, Mark Rutland wrote:
->>> Hi Anshuman,
+>> On 02/25/2019 04:41 PM, Mark Rutland wrote:
+>>> On Mon, Feb 25, 2019 at 10:33:58AM +0530, Anshuman Khandual wrote:
+>>>> Page table pages created for user space processes must be accounted against
+>>>> their memory control groups if initialized. This just introduces a helper
+>>>> function pgtable_gfp_flags() which returns PGALLOC_GFP for all kernel page
+>>>> table page allocations but adds __GFP_ACCOUNT for user page table pages.
 >>>
->>> On Mon, Feb 25, 2019 at 10:33:54AM +0530, Anshuman Khandual wrote:
->>>> ARM64 standard pgtable functions are going to use pgtable_page_[ctor|dtor]
->>>> constructs. Certain stage-2 page table allocations are multi order which
->>>> cannot be allocated through a generic pgtable function as it does not exist
->>>> right now. This prevents all pgtable allocations including multi order ones
->>>> in stage-2 from moving into new ARM64 (pgtable_page_[ctor|dtor]) pgtable
->>>> functions. Hence remove all generic pgtable allocation function dependency
->>>> from stage-2 page tables till there is one multi-order allocation function
->>>> available.
+>>> Can't we have pte_alloc_one_kernel() and pte_alloc_one() explicitly pass
+>>> the GFP flags down to a __pte_alloc_one() helper, and consistently use
+>>> pte_alloc_one_kernel() for kernel mappings?
 >>>
->>> I'm a bit confused by this. Which allocations are multi-order?
->>>
+>>> That would seem less surprising than hiding that detail in another
+>>> function.
 >>
->> Stage-2 PGD.
->>
->> kvm_alloc_stage2_pgd -> alloc_pages_exact
->> kvm_free_stage2_pgd -> free_pages_exact
->>  
->>> Why does that prevent other allcoations from using the regular routines?
->>
->> At present both stage-2 PGD (kvm_alloc_stage2_pgd -> alloc_pages_exact), PUD|PMD
->> (mmu_memory_cache_alloc) allocates directly from buddy allocator but then while
->> freeing back stage-2 PGD directly calls buddy allocator via free_pages_exact but
->> PUD|PMD get freed with stage2_[pud|pmd]_free which calls pud|pmd_free instead
->> of calling free_pages() directly.
+>> Yes that will work as well. But its better to have this mm_struct based GFP switch
+>> which is used in other archs as well to create generic MM helper functions going
+>> forward.
 > 
-> If we allocate/free the stage-2 PGD with {alloc,free}_pages_exact(),
-> then the PGD level is balanced today.
-> 
-> I don't see what that has to do with the other levels of table.
+> I don't follow -- if we can make pte_alloc_one() generic, then we can
+> *also* make pte_alloc_one_kernel() generic.
 
-The idea is either all page table levels pages go through ctor/dtor constructs
-or none of them do. Not only this makes sense logically but also prevents getting
-into bad page state errors when freeing without calling dtor. For other non-KVM
-use cases like kernel linear or vmmap it helps while tearing down the page table
-for memory hot-remove cases.
+Right but when we do mm_struct can be used to decide applicable GFP for
+the allocation. The way your proposal defers is that it wants to have
+the GFP flag unique for both pte_alloc_one and pte_alloc_one_kernel
+without looking into mm_struct which will work as well.
 
 > 
->> All of these worked fine because pud|pmd_free called free_pages() directly with
->> out going through pgtable_page_dtor(). But now we are changing pud|pmd_free to
->> use pgtable_page_dtor() both for user and host kernel page tables. This will
->> break stage2 page table (bad page state errors) because the new free path which
->> would call pgtable_page_dtor() where as alloc patch never called pgtable_page_ctor().
+> Looking at x86, I see:
 > 
-> I'm lost as to how that relates to the alloc/free of the PGD. AFAICT,
-> that's unrelated to the problem at hand.
-
-As mentioned above either all page table use ctor/dtor based allocation/free or
-none of them do.
-
+> pte_t *pte_alloc_one_kernel(struct mm_struct *mm)
+> {
+>         return (pte_t *)__get_free_page(PGALLOC_GFP & ~__GFP_ACCOUNT);
+> }
 > 
-> What subtlety am I missing?
-
-pmd|pud_free() will call dtor() after the series hence they cannot be used by
-stage2_pmd|pud_free because stage2_pud|pmd get allocated from pre-allocated
-mmu_memory_cache_alloc which builds with __get_free_page(PGALLOC_GFP). Is not
-that right ? 
-
+> ... which arhitectures do you see which look at the mm struct to decide
+> the flags?
 > 
->> To fix this situation either we move all stage-2 page table to use pte_alloc_one()
->> and pte_free() which goes through pgtable_page_ctor/dtor cycle or just keep the
->> virtualization page tables out of it (stage2/hyp) and remove the only dependency
->> which breaks because of these changes. This series went with the second option. 
-> 
-> It sounds to me like this is just a mismatch between the alloc/free
-> paths for the PUD and PMD levels of table.
-> 
-> IIUC, we allocate those with {pmd,pud}_alloc_one(), and free them with
-> stage2_{pud,pmd}_free(), which call {pud,pmd}_free().
 
-AFAICS they get allocated from mmu_memory_cache_alloc instead. pud|pmd_alloc_one()
-get used only for the _hyp_ mappings not for the stage2 table.
+On powerpc its an explicit helper function
 
-kvm_handle_guest_abort
-	user_mem_abort
-		stage2_set_pud_huge -> stage2_get_pud -> mmu_memory_cache_alloc
-		stage2_set_pmd_huge -> stage2_get_pmd -> mmu_memory_cache_alloc
-		stage2_set_pte -> mmu_memory_cache_alloc
+arch/powerpc/include/asm/pgalloc.h (pgtable_gfp_flags)
 
-Am I missing something here.
+On X86 its not an explicit helper function but we can see
 
-> 
-> I would naively expect p?d_alloc_one() to pair with p?d_free(), so that
-> being a problem is surprising to me.
+arch/x86/include/asm/pgalloc.h
 
-They work absolutely fine. But thats not the case here. stage2_pud|pmd_free()
-calls pud|pmd_free() for pages not allocated with pud|pmd_alloc_one().
+static inline pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+        struct page *page;
+        gfp_t gfp = GFP_KERNEL_ACCOUNT | __GFP_ZERO;
+
+        if (mm == &init_mm)
+                gfp &= ~__GFP_ACCOUNT;
+        page = alloc_pages(gfp, 0);
+        if (!page)
+                return NULL;
+        if (!pgtable_pmd_page_ctor(page)) {
+                __free_pages(page, 0);
+                return NULL;
+        }
+        return (pmd_t *)page_address(page);
+}
+
+static inline pud_t *pud_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+        gfp_t gfp = GFP_KERNEL_ACCOUNT;
+
+        if (mm == &init_mm)
+                gfp &= ~__GFP_ACCOUNT;
+        return (pud_t *)get_zeroed_page(gfp);
+}
+
+static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+        gfp_t gfp = GFP_KERNEL_ACCOUNT;
+
+        if (mm == &init_mm)
+                gfp &= ~__GFP_ACCOUNT;
+        return (p4d_t *)get_zeroed_page(gfp);
+}
+
+There are some more places on powerpc and x86 where it does the switch. But you
+are right, pte_alloc_one_kernel() does not go through ctor functions on other
+archs. But it should and this series changes it. Do you see any concerns in
+doing so ?
 
 _______________________________________________
 linux-arm-kernel mailing list
