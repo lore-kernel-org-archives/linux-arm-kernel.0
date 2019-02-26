@@ -4,54 +4,54 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89E59C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:17:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9659DC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:18:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5322A213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:17:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6329F213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 05:18:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kiNNHeQb";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lV4tPH4e"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5322A213A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OMis4AF1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Bm2bgd4f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6329F213A2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=nw2bLPVZFa+qlIhiBKtDtdK9E5RxikFnxWR3K2sFrkk=; b=kiNNHeQbS8wqjt
-	Yt7XKXm3jEBQb4XU5st3LbJXvxD33iwLQ2Ls4Ns5mHShb1DpS5g8C7nJNzWP3Nt8xxWIvEG2jfHjU
-	ctMtYciW9cAufBc5gELg1tllsIxbN0YRT+wUaufYccB5sri+2L8W6WjIfIKgwSuQawJfbgfM7IKaU
-	ON4suMPGKetBExJebL1XQ/6vCz92JbsFmwKa/Cuo4zCX4v6CclNRGHyD/A71qJ4wn8zxFGdW+pnIg
-	PizKYu3BLCI3QTHWfRHDjevll6Aie0DSjMY9YUNpmQws3le556EFpx6/oXMLdvIztyZeoZC7FG3pa
-	25nOtHhoO5a+Qml3swUg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=V9fnVtyD1hpxb8ZhTEAaKMe7x6oG7/dRz8DnWwEGvYU=; b=OMis4AF1evuiM6
+	wNkaCMJALBNq+dsDpon1TNSIf0hacgkGDOJ7J0fFUyR65RO986N6ERw50Z/QfBhoRseZMdtQGHlMT
+	5zFsIbyzsL3PlV6oxnH7f0svJwaw2xaaQzWuuIXsvTN2fJsgpwhU61ZDxvA1x3g2BmCaybYQkUhQ7
+	M2BG77o2VSp4EpJmtrnq4j/tnkWxoNU6Nr8P0g8Q1Ol81D9Zf7tHvpS/h9do4r1Tf6a//7UA2DRR7
+	zLVaO0s3i4PR4c6sNAXy13Ei3aQKfzd9ccJB1HuWtU/CKRVffSkylMK9BwMqIycwBgR7p2aXuRzHF
+	NTOIC6/8oQ5jDFVb+i/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyV7f-0005Pn-EB; Tue, 26 Feb 2019 05:17:43 +0000
+	id 1gyV7o-0005bL-Sv; Tue, 26 Feb 2019 05:17:52 +0000
 Received: from mail-eopbgr60065.outbound.protection.outlook.com ([40.107.6.65]
  helo=EUR04-DB3-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyV7c-0005PJ-1l
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 05:17:41 +0000
+ id 1gyV7e-0005PJ-5A
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 05:17:43 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=kD7wqpx2+ZsSaSB6C4jsjF+MZN8GpZOBM5yy35QdDAI=;
- b=lV4tPH4eCnv52og8EF7LusDwjrCWSnEcZ6Yq5q7/9M3YCpCo2IXonPc0UqC4BowZ6HYdqMoM1HUbkhxIL7qAm3qKKQkBKZ5KUiL4mdGp6+yijB4rJCMS6Ru581NpBMGpudGOMdPlpa/fOMU3LFqgOqBhrL0iDuMzx3AcNFE6dgE=
+ bh=kdG4fpdIqcF7kNKFaEbKoo9Qzhi8tF1AwxgmkSX7Wj0=;
+ b=Bm2bgd4fgJX9LbTUKd0CayzevDSPwYZ854JsufOqLsq++S2f5b01+X8HkZfs3u9vXKRbg7iVJgTlBDX52FlKgcnlURzjMVRamASRo3kB/DCuYAtk0T1JwST6wAt84iNYTnJNeBzsTBGdgD+aJ7+EZAul860z15EwTKcitWjUPfo=
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
  DB3PR0402MB3849.eurprd04.prod.outlook.com (52.134.71.16) with Microsoft SMTP
  Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.18; Tue, 26 Feb 2019 05:17:31 +0000
+ 15.20.1643.18; Tue, 26 Feb 2019 05:17:36 +0000
 Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::1cb4:3e1c:fc85:7ed7]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
  ([fe80::1cb4:3e1c:fc85:7ed7%2]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
- 05:17:31 +0000
+ 05:17:36 +0000
 From: Anson Huang <anson.huang@nxp.com>
 To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
@@ -64,11 +64,13 @@ To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
  <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
  <linux-kernel@vger.kernel.org>, "linux-clk@vger.kernel.org"
  <linux-clk@vger.kernel.org>
-Subject: [PATCH V7 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Topic: [PATCH V7 1/2] arm64: dts: freescale: imx8qxp: add cpu opp table
-Thread-Index: AQHUzZKTh0f7Vnjj2USCuQHnsmV9dw==
-Date: Tue, 26 Feb 2019 05:17:31 +0000
-Message-ID: <1551157967-30925-1-git-send-email-Anson.Huang@nxp.com>
+Subject: [PATCH V7 2/2] clk: imx: scu: add cpu frequency scaling support
+Thread-Topic: [PATCH V7 2/2] clk: imx: scu: add cpu frequency scaling support
+Thread-Index: AQHUzZKWDxpx7VRUrEmeH+eTWwjydA==
+Date: Tue, 26 Feb 2019 05:17:36 +0000
+Message-ID: <1551157967-30925-2-git-send-email-Anson.Huang@nxp.com>
+References: <1551157967-30925-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1551157967-30925-1-git-send-email-Anson.Huang@nxp.com>
 Accept-Language: en-US
 Content-Language: en-US
 X-MS-Has-Attach: 
@@ -82,60 +84,58 @@ authentication-results: spf=none (sender IP is )
 x-ms-exchange-messagesentrepresentingtype: 1
 x-originating-ip: [119.31.174.66]
 x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: e754e663-9e6f-4183-cdbc-08d69ba9b55c
+x-ms-office365-filtering-correlation-id: fce1026b-800d-4c4f-cff1-08d69ba9b86b
 x-ms-office365-filtering-ht: Tenant
 x-microsoft-antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
  SRVR:DB3PR0402MB3849; 
 x-ms-traffictypediagnostic: DB3PR0402MB3849:
 x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3849;
- 23:MawrSe7Fxma6l3NR8hhek90bDYKgqPLMQrIfy?=
- =?iso-8859-1?Q?3whE/r6IFWBSk+pirls0EKFMDjaTbJIOwps9y1MAOQ/vRsH9fRWxmKKtgp?=
- =?iso-8859-1?Q?myn9Mo25XDunNIj03YBttHB6/gdjIAyG/eaPeewV4hbJWXsl321rgy6065?=
- =?iso-8859-1?Q?Q1dUWAgGmndn3A93BT5feD+0ki8eNBX87XSG9wBxgNU3tFZW1pdNr7jhNu?=
- =?iso-8859-1?Q?rzAcFYQLQwcMiI3+AQBhkltp/6d8UdvFMuHkHPKTPsCkaLVkzJJM0hu1Q3?=
- =?iso-8859-1?Q?vlxxySxhgOOVJlLqDIZGPJSPpVRshO6NQvyArvnk4ejga1SBPwqsD95dXS?=
- =?iso-8859-1?Q?tHBbgV0BtV41F3g9jhnjHUSKvetcuWfFtM2ZOkK0HmzJ9QVqqDC+9mGTHx?=
- =?iso-8859-1?Q?Sj648MOdg71vw6//5NHTPurNbg494wfJ6yMWEhDKyEGn/ALpHL1qNKWCeN?=
- =?iso-8859-1?Q?kXydUIw4Q+omBIwyJcFtjEw9yntVI24rSViUzEKRvraMrBLQLf/yi/qG8o?=
- =?iso-8859-1?Q?P+Bzj9H1QWHmIfYBWTgMmJLb1QNU+2IDdf+cmSHVrXNyg5coL/KErsOQcn?=
- =?iso-8859-1?Q?/8JTfPv/Zc8aEtTRQPjYeHA5vgoe1r7rCePHTgqgvayj90bYZ5bbJRtbc9?=
- =?iso-8859-1?Q?KLzErgQMlq5/8CsDGbjlAD2FSo3zjlS+ofulBhr2st2WJetOnpZgKWIqpq?=
- =?iso-8859-1?Q?V+ahwveKcMxRG+Z9Avk2Rue/o0wcXWeFu1F1LKEZPH2s6VN8eusRq7edzb?=
- =?iso-8859-1?Q?mjxply/Y0rspqG/6G5GkzU/eUUN1ETI2jez0n5XtZyLjBHCM4VXu8hPzmF?=
- =?iso-8859-1?Q?JFCc1w/LBlZ7RdwAKeSibnviL08+aXAabxRVvboWbck2gQCIeewswHyPnq?=
- =?iso-8859-1?Q?EBlfQTiedw6fDMJaBbNesvTh9MBYtQQzuNG6OP8DBNGROJvUw1MaMS9JZ1?=
- =?iso-8859-1?Q?ckc66/WK8MtiQ5LFYf/AHCqgXuOdNPdXH6WG8Zt50BONfbjSoie0LS+pmX?=
- =?iso-8859-1?Q?Vu4bhQLMxr3thknX5MMtrutIPHHpzvsXt84BlqxU8BvhrLjs/lIdUPb5+y?=
- =?iso-8859-1?Q?m/++c6SqEvbYb0JvjBCz6LKrtalpsI/s7L5dyGywiF10RgTJkz3V9pVYgz?=
- =?iso-8859-1?Q?8qx8pcOrDWWzd6wTpIpzkdhwgI8zVbfXe2mlX2LHJKxfBCXSMnXzASNvkH?=
- =?iso-8859-1?Q?/NTjBIZywzUksd6Rdnnv4O8XUnL5A4shjtsOIQ46kadrJ2r3VjEroom6d/?=
- =?iso-8859-1?Q?vvlzlD0QLhCZUQLFJRFKoSPvF5y5aA8aovfmi73fanBsV03HkvlweaJXp6?=
- =?iso-8859-1?Q?1fKu/SmbZ6sXw5P/MChXOO9PR/2Qk8+qn0OzEg1Nuq1xRK38kv0LwdtHbe?=
- =?iso-8859-1?Q?Rkv20I+k0jFjPdzLkE5F+TuNQdznse4?=
-x-microsoft-antispam-prvs: <DB3PR0402MB38491B6266E84CA777057F18F57B0@DB3PR0402MB3849.eurprd04.prod.outlook.com>
+ 23:C3GI9+8qGDAvbm1dRcPq13fUD4xJypsmsym1l?=
+ =?iso-8859-1?Q?Dgs4O3iLfbEvUL0fjRLQbcmmFV2VTusIsg7dsbwT/D9WMLZB0/kVqzM7gu?=
+ =?iso-8859-1?Q?AcPMUqyM5u7qZHSqnGEvB7VJGnXnzvUps90hFrAFENSWp0MrSSfnw4ThHh?=
+ =?iso-8859-1?Q?qRTkS29VjX157KDq8xPYjjSc3HxabGgFAXCxwpgWo7AisN2oWYdNLwMg90?=
+ =?iso-8859-1?Q?aBtY3EXGr3nxfnpGDRgXngJmPTabGqZ7Ch4vTk4nIqdihrxP7IVFNZPTDs?=
+ =?iso-8859-1?Q?9ygRaHVk+wMUQZVUDtNeJor0seGG7kNLuSequwzxq8taPD0EvQfkAeUsS0?=
+ =?iso-8859-1?Q?bXSnCdcuo886ynvKUkQfdoN/TFNI4JupacOVeLLx/NoP1FUV2LAhiY6/NZ?=
+ =?iso-8859-1?Q?VIqOwRTBztemQOnDafGV9+7NsumLn7TMj1N+HImGz5hwt4k6Qcdvj9HOzi?=
+ =?iso-8859-1?Q?3LcOPx0ryiPGo53NJlNRyLV1x/x4u2+FF3GlBIR83pThW2jNtItekm4waP?=
+ =?iso-8859-1?Q?1wv4J1svlzubsNZhZJDXIUhrpL/m6I1+IoQe2LaBsWP6M32jfpUxbnEgHB?=
+ =?iso-8859-1?Q?rDrCFC5cR+Kq+rKcRn/hNeDouJYTIIcsVYzKgsUCqXCekdtCO3CudWvGPx?=
+ =?iso-8859-1?Q?BbnalpZYGHStHFKOggRuB72AvD6IAJOlKyVIwfM0nRqHomtCjB6ucOHlDl?=
+ =?iso-8859-1?Q?UMXkIgexGFIEdMV5aLhpfhyYX1GkXZjETEvRcOp/vaf8AqmdLt52Qosy66?=
+ =?iso-8859-1?Q?ZVIdwbXAnngU4X+qAW6KnbkiTdAEf1JgupGqKKXr3APyqwkOhMYzTmy1Om?=
+ =?iso-8859-1?Q?P0kVEfnjJTIPxIkP0rxXszJPZgYLA5J38LmrbbJQtQ0nEx/R21uuv7p/A6?=
+ =?iso-8859-1?Q?NFHby+UQgZsmET2YYzT4tDMfkDXm7Y/sKuabfjANR7ca4y3ETVV2hU3HsV?=
+ =?iso-8859-1?Q?PKZqj2HX3IKSwyJP7dKcTyEBpBeJK0KHHXfhWV2yFCXAAnjG4sq+GlEeOa?=
+ =?iso-8859-1?Q?xjiedWByWaBUpG3FodFhRB4b8K3Da7fIcghXAuAD5u2m7Cv8kFAh1s2jtm?=
+ =?iso-8859-1?Q?OK8f41xyFmHvJs67ST3OJRXtN8s7L59m/3tBCCvMGpzuQ5lEVOdZ8Db2MZ?=
+ =?iso-8859-1?Q?atNpyos/jBWcbB/YGnvO8WLirM6xDage0BN0DPbAk8exgM33Dvjac7GogE?=
+ =?iso-8859-1?Q?tELFrkHMWFbJ0uEEoD7HfuiEId6IDK6b8VSff6vlK8UQv08XAstWux4PSd?=
+ =?iso-8859-1?Q?ZSfWMGVcZedy15xHsVJdBL6hvZ0C+w9t/k1YDqT1VrVzQq760KA0OcKz00?=
+ =?iso-8859-1?Q?oSjkORWq4NXLlbqqSj/aEtPuu?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3849109879177DCF0FF55511F57B0@DB3PR0402MB3849.eurprd04.prod.outlook.com>
 x-forefront-prvs: 096029FF66
 x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(979002)(136003)(346002)(376002)(396003)(39860400002)(366004)(199004)(189003)(6512007)(476003)(6486002)(186003)(2616005)(102836004)(26005)(52116002)(4326008)(2501003)(86362001)(14454004)(81166006)(6436002)(8676002)(81156014)(305945005)(2201001)(5660300002)(106356001)(97736004)(71200400001)(71190400001)(7736002)(105586002)(8936002)(486006)(7416002)(110136005)(99286004)(50226002)(36756003)(66066001)(68736007)(386003)(6506007)(478600001)(3846002)(6116002)(53936002)(14444005)(256004)(316002)(25786009)(2906002)(32563001)(921003)(1121003)(969003)(989001)(999001)(1009001)(1019001);
+ SFS:(10009020)(136003)(346002)(376002)(396003)(39860400002)(366004)(199004)(189003)(6512007)(476003)(6486002)(186003)(2616005)(102836004)(26005)(76176011)(52116002)(4326008)(446003)(2501003)(86362001)(14454004)(11346002)(81166006)(6436002)(8676002)(81156014)(305945005)(2201001)(5660300002)(106356001)(97736004)(71200400001)(71190400001)(7736002)(105586002)(8936002)(486006)(7416002)(110136005)(99286004)(50226002)(36756003)(66066001)(68736007)(386003)(6506007)(478600001)(3846002)(6116002)(53936002)(14444005)(256004)(316002)(25786009)(2906002)(921003)(1121003);
  DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3849;
  H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:3; 
+ PTR:InfoNoRecords; A:1; MX:1; 
 received-spf: None (protection.outlook.com: nxp.com does not designate
  permitted sender hosts)
 x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: wB2kLxqhvJJWzZAhstvGe+MrSpwtHkuADF8uoMkWpYXaVpp9a3qqRqqn5o0dmhy8mjODKqiMf9qr/g3y17MbL30xpw03L9tp67Je5uhki+YrICsyzTL5u4MUwT2myf56iMlP9AA4lFjUy0Eq+bL1esxliZbT3x0I1c4JNhlL9UYf/wDrcvVNQ+6GQPx1aGngro/W65mDMq+6ej0Je8LyA9xZ+QIuf/h4kzNiBOqq1vsIYZbybJj+TzwJC1W9mZmbAUl9KrdL1oLf37g5xuJ07ZIuj29g6z3q0gFS6OL8gg7KNWAq9/ZwC0jGrKHSlCPSLfJKBqomqBsnj9UUS2vB9xNpnqaHqHu5jG/gyqEkzmCaN7Qd6cDmoPCDgmMqE8K67AO9c256Q5Pc0iYbuqKbGKVyh4p33Q9fd4E8dMRAOxc=
+x-microsoft-antispam-message-info: jRhZHiVdPNmhKA1SNHTxRjsb70N4mhuC3cOqDZUuWsHfsP+lhru6F6Z7jYp+2KKU/3P+BAfRwC+TlT/CeQ9IaTUZd2YNBjZ1p/CnOWq2iZHOamhBrr9ijUEGIaR+BfVYPb5Zl+agm8Ziq6b0q5m00enjM79qMDhhu3rjdJJVP/TcZ3xHt1kYq7b7P5PZLYjjqx7amxXtpDFGK3hNkDKcF6nhd2Ih+eZUSntl5xmF6xCY41FfZ+0+h4uD+Ml9QTZL4I3ZH2pVLvqCLFgOY0+O4K179xI5guSJdVPPchzBQfQqQ8chmdzwC/fRU0CCx4VnfPe9o8JmUIZ6bKCaJLwgSz77JL6b6XV1fARUsWJLp4PejeLEq/XbcRBRVME0QEXkUelWjfw5CNK+23LkgjJ+4ZGahh9z0sIDExot+MxyCUo=
 MIME-Version: 1.0
 X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: e754e663-9e6f-4183-cdbc-08d69ba9b55c
-X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 05:17:26.7608 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: fce1026b-800d-4c4f-cff1-08d69ba9b86b
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 05:17:31.9544 (UTC)
 X-MS-Exchange-CrossTenant-fromentityheader: Hosted
 X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
 X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
 X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3849
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_211740_165875_11A8FC1D 
-X-CRM114-Status: UNSURE (   9.48  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190225_211742_194870_764A91A7 
+X-CRM114-Status: GOOD (  14.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -153,85 +153,99 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add i.MX8QXP CPU opp table to support cpufreq.
+On NXP's i.MX SoCs with system controller inside, CPU frequency
+scaling can ONLY be done by system controller firmware, and it
+can ONLY be requested from secure mode, so Linux kernel has to
+call ARM SMC to trap to ARM-Trusted-Firmware to request system
+controller firmware to do CPU frequency scaling.
+
+This patch adds i.MX system controller CPU frequency scaling support,
+it reuses cpufreq-dt driver and implement the CPU frequency scaling
+inside SCU clock driver.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
-No changes since V6.
+Changes since V6:
+	- add return fail to clk_scu_atf_set_cpu_rate() when the resource ID
+	  is NOT expected, this is to avoid warning of uninitialized data usage.
 ---
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/clk/imx/clk-scu.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 4c3dd95..41bf0ce 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -34,6 +34,9 @@
- 			reg = <0x0 0x0>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
+diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c
+index f460526..fbef740 100644
+--- a/drivers/clk/imx/clk-scu.c
++++ b/drivers/clk/imx/clk-scu.c
+@@ -4,12 +4,17 @@
+  *   Dong Aisheng <aisheng.dong@nxp.com>
+  */
  
- 		A35_1: cpu@1 {
-@@ -42,6 +45,9 @@
- 			reg = <0x0 0x1>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
++#include <dt-bindings/firmware/imx/rsrc.h>
++#include <linux/arm-smccc.h>
+ #include <linux/clk-provider.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
  
- 		A35_2: cpu@2 {
-@@ -50,6 +56,9 @@
- 			reg = <0x0 0x2>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
+ #include "clk-scu.h"
  
- 		A35_3: cpu@3 {
-@@ -58,6 +67,9 @@
- 			reg = <0x0 0x3>;
- 			enable-method = "psci";
- 			next-level-cache = <&A35_L2>;
-+			clocks = <&clk IMX_A35_CLK>;
-+			operating-points-v2 = <&a35_0_opp_table>;
-+			#cooling-cells = <2>;
- 		};
- 
- 		A35_L2: l2-cache0 {
-@@ -65,6 +77,24 @@
- 		};
- 	};
- 
-+	a35_0_opp_table: opp-table {
-+		compatible = "operating-points-v2";
-+		opp-shared;
++#define IMX_SIP_CPUFREQ			0xC2000001
++#define IMX_SIP_SET_CPUFREQ		0x00
 +
-+		opp-900000000 {
-+			opp-hz = /bits/ 64 <900000000>;
-+			opp-microvolt = <1000000>;
-+			clock-latency-ns = <150000>;
-+		};
+ static struct imx_sc_ipc *ccm_ipc_handle;
+ 
+ /*
+@@ -180,6 +185,25 @@ static long clk_scu_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return rate;
+ }
+ 
++static int clk_scu_atf_set_cpu_rate(struct clk_hw *hw, unsigned long rate,
++				    unsigned long parent_rate)
++{
++	struct clk_scu *clk = to_clk_scu(hw);
++	struct arm_smccc_res res;
++	unsigned long cluster_id;
 +
-+		opp-1200000000 {
-+			opp-hz = /bits/ 64 <1200000000>;
-+			opp-microvolt = <1100000>;
-+			clock-latency-ns = <150000>;
-+			opp-suspend;
-+		};
-+	};
++	if (clk->rsrc_id == IMX_SC_R_A35)
++		cluster_id = 0;
++	else
++		return -EINVAL;
 +
- 	gic: interrupt-controller@51a00000 {
- 		compatible = "arm,gic-v3";
- 		reg = <0x0 0x51a00000 0 0x10000>, /* GIC Dist */
++	/* CPU frequency scaling can ONLY be done by ARM-Trusted-Firmware */
++	arm_smccc_smc(IMX_SIP_CPUFREQ, IMX_SIP_SET_CPUFREQ,
++		      cluster_id, rate, 0, 0, 0, 0, &res);
++
++	return 0;
++}
++
+ /*
+  * clk_scu_set_rate - Set rate for a SCU clock
+  * @hw: clock to change rate for
+@@ -312,6 +336,14 @@ static const struct clk_ops clk_scu_ops = {
+ 	.unprepare = clk_scu_unprepare,
+ };
+ 
++static const struct clk_ops clk_scu_cpu_ops = {
++	.recalc_rate = clk_scu_recalc_rate,
++	.round_rate = clk_scu_round_rate,
++	.set_rate = clk_scu_atf_set_cpu_rate,
++	.prepare = clk_scu_prepare,
++	.unprepare = clk_scu_unprepare,
++};
++
+ struct clk_hw *__imx_clk_scu(const char *name, const char * const *parents,
+ 			     int num_parents, u32 rsrc_id, u8 clk_type)
+ {
+@@ -329,6 +361,10 @@ struct clk_hw *__imx_clk_scu(const char *name, const char * const *parents,
+ 
+ 	init.name = name;
+ 	init.ops = &clk_scu_ops;
++	if (rsrc_id == IMX_SC_R_A35)
++		init.ops = &clk_scu_cpu_ops;
++	else
++		init.ops = &clk_scu_ops;
+ 	init.parent_names = parents;
+ 	init.num_parents = num_parents;
+ 
 -- 
 2.7.4
 
