@@ -2,63 +2,67 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B396C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:55:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DF9D3C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:58:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C308520C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:55:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A726A217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 15:58:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SAqQ+ySB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C308520C01
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LiA0y/Wl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A726A217F9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=m93USAUwDjrr0CKrVQnENAWUCyA1ChHTcvjgdpFToso=; b=SAqQ+ySBJpP4U8
-	Pp6MOsCPfGky/Iqk13N4JgCvuphAEhrTiY3k17Jtxdve/Kwd64iBPCWFWHvcs8UazIgI0mzD0A47W
-	aY447ZsU3KQRiEexEobvaf7qA2IouZDSG/FmiDthE4sYZd8qCzI9HXRNJXnNrJqaf27Vgl6LujtNG
-	gM0UI3BxNBw5lxxBTXcB+30W3j5sm8WgAD2rn6mzkaUGwmhG7h/sJaXBbkdk/mr5Jcr2Aw/pBfOUL
-	UrYMTQD0C563OeCVrRJTy3hdlxW+QnIA4Pvgf2I+/MFOuCXGhkZc2dxCYm61P2EFuR1lOLp0dcLOQ
-	yp+kHWpqh5x1ICqCevew==;
+	List-Owner; bh=tmsCTGmTp3KUWTdLy72F72crrYEoTROcGXrhLCGEAbk=; b=LiA0y/WlSE2zl8
+	y+kAXTSNqXbraWRDV4uluigAWgFOLPMzvp8CGVDfShXLeUCRt8u5OWZU68ErdYBPIuIjmk9L+/0Se
+	hwZXl+TnK/SkzAaLhrKVkVheWLnjDswDv3ZYMyvvl7uRLhzxjvW1nWpEWO8X7Uj3AIYGRYihhKo8B
+	ePFGrZCitXGV1inb4+WMQdzAHyiEMI1G7PVL97+EZLGgLaNotIW95wH8q42xkJ9/HZ83btXcVBQ+3
+	nrnHAyNQaaFOL8/8Uj2UbEKkiEqPZrrepzrzRF9AKfvuGi5acrfefUIDkfS0s7JYqvcqnvqginpBM
+	5wa1peY5qWUsBlRT+GDQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyf4X-0005n9-93; Tue, 26 Feb 2019 15:55:09 +0000
-Received: from relay6-d.mail.gandi.net ([217.70.183.198])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyf4S-0004aL-D0; Tue, 26 Feb 2019 15:55:07 +0000
-X-Originating-IP: 90.88.147.150
-Received: from xps13 (aaubervilliers-681-1-27-150.w90-88.abo.wanadoo.fr
- [90.88.147.150]) (Authenticated sender: miquel.raynal@bootlin.com)
- by relay6-d.mail.gandi.net (Postfix) with ESMTPSA id A503FC0005;
- Tue, 26 Feb 2019 15:54:43 +0000 (UTC)
-Date: Tue, 26 Feb 2019 16:54:42 +0100
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Boris Brezillon <boris.brezillon@collabora.com>
-Subject: Re: [RFC PATCH 20/27] mtd: nand: Let software ECC engines be
- retrieved from the NAND core
-Message-ID: <20190226165442.7ca9415d@xps13>
-In-Reply-To: <20190225171322.654189c8@kernel.org>
-References: <20190221125806.28875-1-miquel.raynal@bootlin.com>
- <20190221125806.28875-8-miquel.raynal@bootlin.com>
- <20190222152957.737a8c5c@kernel.org>
- <20190225164933.4b0e1489@xps13>
- <20190225171322.654189c8@kernel.org>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gyf7f-0006h4-OB; Tue, 26 Feb 2019 15:58:23 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyf7c-0006gk-QH
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 15:58:22 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0D10D80D;
+ Tue, 26 Feb 2019 07:58:20 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 403073F575;
+ Tue, 26 Feb 2019 07:58:18 -0800 (PST)
+Date: Tue, 26 Feb 2019 15:58:15 +0000
+From: Dave Martin <Dave.Martin@arm.com>
+To: Julien Grall <julien.grall@arm.com>
+Subject: Re: [PATCH v5 08/26] arm64/sve: Enable SVE state tracking for
+ non-task contexts
+Message-ID: <20190226155815.GZ3567@e103592.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-9-git-send-email-Dave.Martin@arm.com>
+ <dc379691-ab3a-79a6-b760-59a02aa40717@arm.com>
+ <20190226120713.GL3567@e103592.cambridge.arm.com>
+ <b1d64e84-1c59-d1a6-7893-212b5cd3a7ac@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <b1d64e84-1c59-d1a6-7893-212b5cd3a7ac@arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_075504_597674_0F4AA194 
-X-CRM114-Status: GOOD (  16.79  )
+X-CRM114-CacheID: sfid-20190226_075820_854192_4997097A 
+X-CRM114-Status: GOOD (  16.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,58 +74,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mason Yang <masonccyang@mxic.com.tw>, Vignesh R <vigneshr@ti.com>,
- Tudor Ambarus <Tudor.Ambarus@microchip.com>, Julien Su <juliensu@mxic.com.tw>,
- Richard Weinberger <richard@nod.at>,
- Schrempf Frieder <frieder.schrempf@kontron.de>,
- Marek Vasut <marek.vasut@gmail.com>, linux-mtd@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>, linux-arm-kernel@lists.infradead.org
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Boris,
-
-Boris Brezillon <boris.brezillon@collabora.com> wrote on Mon, 25 Feb
-2019 17:13:30 +0100:
-
-> > > > +{
-> > > > +	switch (nand->ecc.user_conf.algo) {      
-> > > 
-> > > Note that the conf is supposed to be passed afterwards, when the ctx is
-> > > created, so you should check nand->ecc.user_conf directly here.    
-> > 
-> > I think this is what I do so I suspect the above sentence is not what
-> > you actually meant?  
+On Tue, Feb 26, 2019 at 03:49:00PM +0000, Julien Grall wrote:
+> Hi Dave,
 > 
-> Sorry, I meant "should not". My point is, the user_conf should only be
-> passed at context creation time, and should not be modified in-place by
-> the caller, unless proven necessary.
+> On 26/02/2019 12:07, Dave Martin wrote:
+> >On Fri, Feb 22, 2019 at 03:26:51PM +0000, Julien Grall wrote:
+> >>Hi Dave,
+> >>
+> >>On 18/02/2019 19:52, Dave Martin wrote:
+> >>>The current FPSIMD/SVE context handling support for non-task (i.e.,
+> >>>KVM vcpu) contexts does not take SVE into account.  This means that
+> >>
+> >>NIT: Double-space before "This".
+> >
+> >See patch 2...
+> >
+> >[...]
+> >
+> >Does the code look reasonable to you?  This interacts with FPSIMD/SVE
+> >context switch in the host, so it would be good to have your view on it.
 > 
-> There's really 2 different steps that I think need to be isolated:
-> 
-> 1/ retrieve/create an ECC engine instance (SW, HW-controller-side,
->    on-die)
-> 2/ ask this ECC engine instance to create a context out of a user conf
-> 
-> Your user_conf seems 2 mix the 2 concepts: the engine to use, the
-> strength/step-size you expect.
+> I wanted to look at the rest before giving my reviewed-by tag.
+> FWIW, this patch looks reasonable to me.
 
-No, I am not mixing things: the user might want a specific engine and a
-strength/step-size. All of this is what the user requests.
+OK, does that amount to a Reviewed-by, or do you have other comments?
 
-In the ECC logic, I need to make a choice: I really need to check
-what the user request is in order to choose the provider. I am not
-changing anything here, just reading.
-
-Later the chosen ECC engine will be prompted to create a context with
-the rest of the user configuration.
-
-I don't think it is relevant here to split this structure.
-
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
