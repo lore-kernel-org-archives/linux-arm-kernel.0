@@ -2,74 +2,81 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 53EF7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:01:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F38B9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:03:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1DC53217F5
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:01:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C60762087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 04:03:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KOuDaN79"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1DC53217F5
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="N2H/wOxj";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="OlYw8H/B"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C60762087C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HT5DaVwplsM5VMO1Yx1YUpPyQvW1IoTbCIxy4p/M7w8=; b=KOuDaN79H403e0
-	37q9wVZ1haPFrVkDhR5/A+ELDxxF7hsAZQkT0jMhfitg0JYMotyZJiE3ZdKZ7n0no1EoGMDAF8fGc
-	8AEIj9q14WYYnkd7np21q9OMDi61fGLsnl474itsOC+0P+ZhpTlvyLnshtsqguEX3qQ0XZOyXf9Vx
-	HN0v9xppNVesPG1skTvWdBI694QdXR9lGfqtLoddOnngK1skA9/HzrF/lnNUa6v9goGG+uSKk1hah
-	Qte+V6+1kcrQqC1FBKT+JrKdp6UOBjh7Jrwf8p0baeUh9RbYDPLOhfSLZ0M+pwtc0eONJN4HzZ9vY
-	Zj27X7uhN3vtE08Uk90w==;
+	List-Archive:List-Unsubscribe:List-Id:To:From:Subject:Mime-Version:Message-Id
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=myH9OWAqgbb7S8VbQBo9ctpOQuCfn/BXWlrQGcpAp8A=; b=N2H/wOxj+kPgPb
+	3vT8QfQZ39o83xOgYSN2C8pF3zCkFPHgARK5EtbZcsidRbkJr6yg+0+zGXRGm4TB+oPPBXpbthMd3
+	RXDAdfG1UCZrlQDji+F3aVP0lLa3WRxYBvSBG52JUURorKqcKw0wn9pzSTZgqlk+MgkUIdTy4QHAw
+	Ad2IZNJrZrzfCCFvsXDVQMrfUAfWCE4f7cR1JD+S7jt5pURXnJSKa3cujaFlfZfhwoUqcxMftaLY/
+	sZQu5WAkwsJRv3NLfV2STQFHcuyKjzkcTZtBeD77nkoQOieE0Wjsub2AiPS7vJBLmv1a1av0Gbkl5
+	KZhuvbcEOniRVhk2t3BQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyTvm-0007pQ-UT; Tue, 26 Feb 2019 04:01:22 +0000
-Received: from mailgw02.mediatek.com ([216.200.240.185])
+	id 1gyTyG-0008AA-9A; Tue, 26 Feb 2019 04:03:56 +0000
+Received: from mail-pg1-x54a.google.com ([2607:f8b0:4864:20::54a])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyTvj-0007oc-EH; Tue, 26 Feb 2019 04:01:21 +0000
-X-UUID: 105e51b9f4b64f90961539867408fec3-20190225
-X-UUID: 105e51b9f4b64f90961539867408fec3-20190225
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw02.mediatek.com
- (envelope-from <weiyi.lu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 878107950; Mon, 25 Feb 2019 20:01:00 -0800
-Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 25 Feb 2019 20:00:58 -0800
-Received: from mtkcas07.mediatek.inc (172.21.101.84) by
- mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 26 Feb 2019 12:00:50 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas07.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 26 Feb 2019 12:00:50 +0800
-Message-ID: <1551153650.1047.4.camel@mtksdaap41>
-Subject: Re: [PATCH v4 00/12] Mediatek MT8183 clock and scpsys support
-From: Weiyi Lu <weiyi.lu@mediatek.com>
-To: Stephen Boyd <sboyd@kernel.org>
-Date: Tue, 26 Feb 2019 12:00:50 +0800
-In-Reply-To: <155082168901.77512.12893153125579041936@swboyd.mtv.corp.google.com>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-2-weiyi.lu@mediatek.com>
- <155069033021.77512.14493210110678229730@swboyd.mtv.corp.google.com>
- <b7abe484-71c1-5ec0-796c-544f1ac5d6f5@gmail.com>
- <155082168901.77512.12893153125579041936@swboyd.mtv.corp.google.com>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
-MIME-Version: 1.0
-X-TM-SNTS-SMTP: 2566077B6750DF2BE7912EE4D2CBC442DA67555DC3CF1235DF24BEF0A4BC65E02000:8
-X-MTK: N
+ id 1gyTyC-00089W-CN
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 04:03:54 +0000
+Received: by mail-pg1-x54a.google.com with SMTP id b12so8636433pgj.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 25 Feb 2019 20:03:50 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=date:message-id:mime-version:subject:from:to:cc;
+ bh=x10LJfG0C5xfpCC8UWS+z2MD3Rfq8aeRGOdkTRz2fqU=;
+ b=OlYw8H/BR6j2EDgWfSe/Hr1VsX55ESIbzvAfgkeXRMiw4Wg51BqQ10SM1vYHBr19xZ
+ Qf8Fl1Kyq/bXhXCcPUcImdALPwyXfj7yodQrTI1+d3/NzTGyNjyYUK35A7z3oLcRFJjT
+ RS0Omv0bHrpRPC7EcApYYxQwKIE5stEZl1N53eLA7jkjWpT1B0EcitWiOokrryv55KUD
+ XsjxNHed9Tu/bgZaQAC5KLW1zfQZNf+9PRivel+kVddOpn7K992OTpx7rSXvEPWFx1ev
+ CkVxvntjcfUhLlSwDhho5zHb11gqqloRBZdCB3N2lvp3HkfJI61BM7NcPpoisC2A59RM
+ ZrBQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:message-id:mime-version:subject:from:to:cc;
+ bh=x10LJfG0C5xfpCC8UWS+z2MD3Rfq8aeRGOdkTRz2fqU=;
+ b=Ps7e8jY+faAWIRET6rqJvFds/DmcP1tuXryeg5n1ordlXN5ECyk8RCwFLShuoYsMXz
+ eZ30MXEwBqHHQBSCzRF/xCm4HVxCkn9X02VljqfeVFFyEHfW0+/Fk+U4+P/uQhPw80w8
+ fGdkIF6yssr23e3SHIcU6zVulWJYsOd9UHl87qQUiKEgyWi9mllDgLpQe23O/DY8HvTt
+ htDr6F1CeEWIz/8zGYm0TvBQaZazXh8As+r6BwteeUM3a/YxLVp48Y9bMp6DyO3xRrDc
+ cZESIHA9PYyiRagVIsHdDnKgO8c0roVGmrauS5TP3b7zpU0g58gZeFUU9zaphwbx+UAp
+ 3JtA==
+X-Gm-Message-State: AHQUAuY3wH51mt7TpDzfDMuQBZ7VRW4sZSYpllnnTb6XahQK9KB7vA9t
+ uPMpNhPJm9S4BwKh51EE8I+Tip5mCrlWbGgsh54=
+X-Google-Smtp-Source: AHgI3IZsHLuu1XGqP7tlD952DdIbitearB3b++EW1AFbC2NdsHx7dmTXVU/ZjAy5mSot130kfjI6TmLAkG/B47ljgmQ=
+X-Received: by 2002:a63:d151:: with SMTP id c17mr1594737pgj.87.1551153829952; 
+ Mon, 25 Feb 2019 20:03:49 -0800 (PST)
+Date: Mon, 25 Feb 2019 20:03:42 -0800
+Message-Id: <20190226040345.202047-1-ndesaulniers@google.com>
+Mime-Version: 1.0
+X-Mailer: git-send-email 2.21.0.rc2.261.ga7da99ff1b-goog
+Subject: [PATCH] lib/raid6: use vdupq_n_u8 to avoid endianness warnings
+From: ndesaulniers@google.com
+To: catalin.marinas@arm.com, will.deacon@arm.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_200119_489766_2E7F5B77 
-X-CRM114-Status: GOOD (  20.34  )
+X-CRM114-CacheID: sfid-20190225_200352_504402_D96469A6 
+X-CRM114-Status: GOOD (  12.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,72 +88,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
- srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: arnd@arndb.de, ard.biesheuvel@linaro.org,
+ Nick Desaulniers <ndesaulniers@google.com>, linux@armlinux.org.uk,
+ linux-kernel@vger.kernel.org, broonie@kernel.org,
+ Nathan Chancellor <natechancellor@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2019-02-21 at 23:48 -0800, Stephen Boyd wrote:
-> Quoting Matthias Brugger (2019-02-21 00:36:24)
-> > 
-> > 
-> > On 20/02/2019 20:18, Stephen Boyd wrote:
-> > > 
-> > > What's the merge plan here? Do you want me to apply these patches to clk
-> > > tree? Will someone be sending me a pull request for mediatek clk changes
-> > > this cycle? It's getting pretty late for much of anything making this
-> > > upcoming merge window.
-> > > 
-> > 
-> > As far as I can see, the clock patches are independent, so I think it is OK to
-> > take them. SCPSYS patches will go through my tree once they are in shape.
-> 
-> Ok great. When patches for clks are interspersed throughout the patch
-> series it makes me think that something later in the series depends on
-> something that isn't a clk patch so then I can't apply it.
-> 
+Clang warns: vector initializers are not compatible with NEON intrinsics
+in big endian mode [-Wnonportable-vector-initialization]
 
-Hi Stephen,
+While this is usually the case, it's not an issue for this case since
+we're initializing the uint8x16_t (16x uint8_t's) with the same value.
 
-Sorry for making such complex dependencies between the clk patches and
-others in this series. And just like Matthias mentioned, the clock
-patches are independent from others. I could resend a clock-only series
-right away if each clock patch in v4 is qualified to merge into
-clk-next.
-If there still some provide need to be fixed, please let me know. I'll
-fix them and send v5 only for clock.
+Instead, use vdupq_n_u8 which both compilers lower into a single movi
+instruction: https://godbolt.org/z/vBrgzt
 
-> > 
-> > Do you prefer to get pull requests for clock patches? I wasn't aware of that.
-> > But if you prefer that, we can find someone who prepares every merge window a
-> > pull request.
-> > 
-> 
-> I don't really care one way or the other about pull requests vs.
-> manually applying patches. It helps if someone wants to pick the patches
-> up and send them along when there are complex dependencies between the
-> clk patches and dts bits or something like that. It also helps if
-> there's someone else with knowledge of the particular SoC saying "these
-> are good, please pull these patches". Subsystem maintainers obviously
-> aren't experts in all SoCs and their various quirks, plus datasheets
-> aren't always so widely available, so sharing the load with SoC
-> maintainers who are familiar with the hardware usually makes a lot of
-> sense.
-> 
-> Otherwise, if you just want to put your "Reviewed-by" tag on any patches
-> that look good and are sane then I'll quickly understand that these
-> patches are good and that I should pick them up into the clk tree from
-> the list. Just please communicate one way or the other about patches
-> that you care about because it helps to know if they've gotten attention
-> or not.
-> 
+This avoids the static storage for a constant value.
 
+Link: https://github.com/ClangBuiltLinux/linux/issues/214
+Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
+Signed-off-by: Nick Desaulniers <ndesaulniers@google.com>
+---
+ lib/raid6/neon.uc            | 5 ++---
+ lib/raid6/recov_neon_inner.c | 7 ++-----
+ 2 files changed, 4 insertions(+), 8 deletions(-)
+
+diff --git a/lib/raid6/neon.uc b/lib/raid6/neon.uc
+index d5242f544551..b7c68030da4f 100644
+--- a/lib/raid6/neon.uc
++++ b/lib/raid6/neon.uc
+@@ -28,7 +28,6 @@
+ 
+ typedef uint8x16_t unative_t;
+ 
+-#define NBYTES(x) ((unative_t){x,x,x,x, x,x,x,x, x,x,x,x, x,x,x,x})
+ #define NSIZE	sizeof(unative_t)
+ 
+ /*
+@@ -61,7 +60,7 @@ void raid6_neon$#_gen_syndrome_real(int disks, unsigned long bytes, void **ptrs)
+ 	int d, z, z0;
+ 
+ 	register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
+-	const unative_t x1d = NBYTES(0x1d);
++	const unative_t x1d = vdupq_n_u8(0x1d);
+ 
+ 	z0 = disks - 3;		/* Highest data disk */
+ 	p = dptr[z0+1];		/* XOR parity */
+@@ -92,7 +91,7 @@ void raid6_neon$#_xor_syndrome_real(int disks, int start, int stop,
+ 	int d, z, z0;
+ 
+ 	register unative_t wd$$, wq$$, wp$$, w1$$, w2$$;
+-	const unative_t x1d = NBYTES(0x1d);
++	const unative_t x1d = vdupq_n_u8(0x1d);
+ 
+ 	z0 = stop;		/* P/Q right side optimization */
+ 	p = dptr[disks-2];	/* XOR parity */
+diff --git a/lib/raid6/recov_neon_inner.c b/lib/raid6/recov_neon_inner.c
+index 8cd20c9f834a..7d00c31a6547 100644
+--- a/lib/raid6/recov_neon_inner.c
++++ b/lib/raid6/recov_neon_inner.c
+@@ -10,11 +10,6 @@
+ 
+ #include <arm_neon.h>
+ 
+-static const uint8x16_t x0f = {
+-	0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f,
+-	0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f, 0x0f,
+-};
+-
+ #ifdef CONFIG_ARM
+ /*
+  * AArch32 does not provide this intrinsic natively because it does not
+@@ -41,6 +36,7 @@ void __raid6_2data_recov_neon(int bytes, uint8_t *p, uint8_t *q, uint8_t *dp,
+ 	uint8x16_t pm1 = vld1q_u8(pbmul + 16);
+ 	uint8x16_t qm0 = vld1q_u8(qmul);
+ 	uint8x16_t qm1 = vld1q_u8(qmul + 16);
++	uint8x16_t x0f = vdupq_n_u8(0x0f);
+ 
+ 	/*
+ 	 * while ( bytes-- ) {
+@@ -87,6 +83,7 @@ void __raid6_datap_recov_neon(int bytes, uint8_t *p, uint8_t *q, uint8_t *dq,
+ {
+ 	uint8x16_t qm0 = vld1q_u8(qmul);
+ 	uint8x16_t qm1 = vld1q_u8(qmul + 16);
++	uint8x16_t x0f = vdupq_n_u8(0x0f);
+ 
+ 	/*
+ 	 * while (bytes--) {
+-- 
+2.21.0.rc2.261.ga7da99ff1b-goog
 
 
 _______________________________________________
