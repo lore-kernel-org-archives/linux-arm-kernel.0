@@ -2,64 +2,64 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A5AC3C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:11:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E6296C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 736E0217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:11:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B20412173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rbKZ1Dxs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 736E0217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="se+YhYTY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20412173C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Y2quFo9RkPCfVXujyDJbX4u1lMwIme53A6e4ugWtCGo=; b=rbKZ1DxsoYW40d
-	mv2M0SYXLrzuFYgA4nEiFWdvG95EfkE85oWu7hzFyRlCod5WHV5/kpHqI2Pwx6wLqW3LAULNn6jjW
-	B9HTyWNI1PqyLJHiZ8t/82qHn0hKpXSgYl/QuIuTaO+XefaYEydNKUcGSQDLkmt2fRhlsiKCaiYp8
-	7z99iRyOzKBDc/LlDGGTvQ3nHJVwi/xm35vfso8fzWyncG9mkv04YFbFjMbP9hp5DRFmYCMjTzL5s
-	lL7j4r/N48SvTl3CYobVSN3Wk0LQvQhWhk5UnzP3UFxLUnTNxXPa8dB8oax3oLchtoJNUHwSVoGGE
-	twJT+Hc77vXVHafzQmRw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=7M5OIjd4HWk5bY6dZZfWUMokmDH6Is520Oi7yMrE6+Y=; b=se+YhYTYg16LN2
+	39y61AsgpMWioWac/Dhyf3awyysvhhBf/zD+eaVgRWD9wTsVXxbRqZE+CzWCX9FQfXd5DS3p6+D+S
+	75Xc/KfDCJjZsHHC9aIVImmO0Omeh9faNoay/f7vq0kmDzKN9nLUZl/Jw1FxhG309LF9WDWRA8LCl
+	qRszqQiT/9QNzZPoL4l52yQ1wvXBiEdLoWKycUyl1Yc+/ENCD22WXx+Vy6/w5l60Wh+TOyAFkaKaR
+	JVLWZEyO3EMwcnZ26CtTfdM6RyblyVeIZM6KZWc8DBB4CmIX+NmuCyHNsBMrFpsuISbCMtXkFveIH
+	uXCiGpNXQ6Pd3qhvtU5w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybaV-0006Nu-DS; Tue, 26 Feb 2019 12:11:55 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gybbS-0006sF-SN; Tue, 26 Feb 2019 12:12:54 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybZB-0005pG-7N
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:10:53 +0000
+ id 1gybbP-0006og-Ti
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:12:53 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id EED9F80D;
- Tue, 26 Feb 2019 04:10:32 -0800 (PST)
-Received: from [10.1.196.72] (e119884-lin.cambridge.arm.com [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6F9C33F71D;
- Tue, 26 Feb 2019 04:10:30 -0800 (PST)
-Subject: Re: [PATCH v5 08/23] arm64: compat: Add KUSER_HELPERS config option
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6767880D;
+ Tue, 26 Feb 2019 04:12:51 -0800 (PST)
+Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 99BA13F5C1;
+ Tue, 26 Feb 2019 04:12:49 -0800 (PST)
+Date: Tue, 26 Feb 2019 12:12:47 +0000
+From: Dave Martin <Dave.Martin@arm.com>
 To: Mark Rutland <mark.rutland@arm.com>
-References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
- <20190222122430.21180-9-vincenzo.frascino@arm.com>
- <20190222140427.GI42419@lakrids.cambridge.arm.com>
-From: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Message-ID: <9a74d54f-5500-3276-64fa-c838f85bc69c@arm.com>
-Date: Tue, 26 Feb 2019 12:10:28 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+Subject: Re: [PATCH v5 12/26] KVM: arm64: Support runtime sysreg visibility
+ filtering
+Message-ID: <20190226121247.GO3567@e103592.cambridge.arm.com>
+References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
+ <1550519559-15915-13-git-send-email-Dave.Martin@arm.com>
+ <20190220153726.GF4763@lakrids.cambridge.arm.com>
 MIME-Version: 1.0
-In-Reply-To: <20190222140427.GI42419@lakrids.cambridge.arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20190220153726.GF4763@lakrids.cambridge.arm.com>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_041033_880799_9BA3EDB0 
-X-CRM114-Status: GOOD (  36.59  )
+X-CRM114-CacheID: sfid-20190226_041251_975054_FAEB91BA 
+X-CRM114-Status: GOOD (  25.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,137 +71,102 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Shuah Khan <shuah@kernel.org>,
- Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Dmitry Safonov <0x7f454c46@gmail.com>,
- Rasmus Villemoes <linux@rasmusvillemoes.dk>,
- Thomas Gleixner <tglx@linutronix.de>, Peter Collingbourne <pcc@google.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
+ Christoffer Dall <cdall@kernel.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
+ kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mark,
+On Wed, Feb 20, 2019 at 03:37:26PM +0000, Mark Rutland wrote:
+> On Mon, Feb 18, 2019 at 07:52:25PM +0000, Dave Martin wrote:
+> > Some optional features of the Arm architecture add new system
+> > registers that are not present in the base architecture.
+> > 
+> > Where these features are optional for the guest, the visibility of
+> > these registers may need to depend on some runtime configuration,
+> > such as a flag passed to KVM_ARM_VCPU_INIT.
+> > 
+> > For example, ZCR_EL1 and ID_AA64ZFR0_EL1 need to be hidden if SVE
+> > is not enabled for the guest, even though these registers may be
+> > present in the hardware and visible to the host at EL2.
+> > 
+> > Adding special-case checks all over the place for individual
+> > registers is going to get messy as the number of conditionally-
+> > visible registers grows.
+> > 
+> > In order to help solve this problem, this patch adds a new sysreg
+> > method restrictions() that can be used to hook in any needed
+> > runtime visibility checks.  This method can currently return
+> > REG_NO_USER to inhibit enumeration and ioctl access to the register
+> > for userspace, and REG_NO_GUEST to inhibit runtime access by the
+> > guest using MSR/MRS.
+> > 
+> > This allows a conditionally modified view of individual system
+> > registers such as the CPU ID registers, in addition to completely
+> > hiding register where appropriate.
+> > 
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > 
+> > ---
+> > 
+> > Changes since v4:
+> > 
+> >  * Move from a boolean sysreg property that just suppresses register
+> >    enumeration via KVM_GET_REG_LIST, to a multi-flag property that
+> >    allows independent runtime control of MRS/MSR and user ioctl access.
+> > 
+> >    This allows registers to be either hidden completely, or to have
+> >    hybrid behaviours (such as the not-enumerated, RAZ, WAZ behaviour of
+> >    "non-present" CPU ID regs).
+> 
+> Sorry for bikeshedding...
+> 
+> > +	/* Check for regs disabled by runtime config */
+> > +	if (restrictions(vcpu, r) & REG_NO_GUEST) {
+> 
+> Maybe it's worth wrapping this as something like
+> 
+> 	reg_runtime_hidden_from_guest(vcpu, r)
+> 
+> ... and avoid exposing the raw flags to all the places we have to check?
+> 
+> [...]
+> 
+> > +#define REG_NO_USER	(1 << 0) /* hidden from userspace ioctl interface */
+> > +#define REG_NO_GUEST	(1 << 1) /* hidden from guest */
+> 
+> Perhaps REG_USER_HIDDEN and REG_GUEST_HIDDEN?
 
-thank you for your review.
+I'm not attached to any particular naming, so I'm not opposed to making
+changes similar to those you suggest.
 
-On 22/02/2019 14:04, Mark Rutland wrote:
-> On Fri, Feb 22, 2019 at 12:24:15PM +0000, Vincenzo Frascino wrote:
->> When kuser helpers are enabled the kernel maps the relative code at
->> a fixed address (0xffff0000). Making configurable the option to disable
->> them means that the kernel can remove this mapping and any access to
->> this memory area results in a sigfault.
->>
->> Add a KUSER_HELPERS config option that can be used to disable the
->> mapping when it is turned off.
->>
->> This option can be turned off if and only if the applications are
->> designed specifically for the platform and they do not make use of the
->> kuser helpers code.
->>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
-> 
-> IIUC, the KUSER bits aren't striclty dependent on the rest of the vDSO
-> changes.
-> 
-> I think the KUSER bits should be split into a preparatory series, so that they
-> can be merged soon, rather than tying them artificially to the rest of the vDSO
-> bits (which I expect will require significantly more review).
-> 
+There are some anomalies right now:
 
-This is a good point. I will extract them and post as a separate patch set.
-In doing so I will update the config description below.
+1) Currently, we can express REG_NO_GUEST by itself, which is a of an
+odd thing to have.  I'm not sure whether that's a problem or not.
+Keeping the flags as-is at least keeps the code simple.
 
--- 
-Regards,
-Vincenzo
+2) These flags do not quite have the obvious semantics: these are
+overrides rather than determining precisely when a reg is/isn't
+accessible.
 
->> ---
->>  arch/arm64/Kconfig          | 21 +++++++++++++++++++++
->>  arch/arm64/kernel/Makefile  |  3 ++-
->>  arch/arm64/kernel/kuser32.S |  7 +++----
->>  arch/arm64/kernel/vdso.c    | 15 +++++++++++++++
->>  4 files changed, 41 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index d898da2e20f5..ed3290494f1c 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -1465,6 +1465,27 @@ config COMPAT
->>  
->>  	  If you want to execute 32-bit userspace applications, say Y.
->>  
->> +config KUSER_HELPERS
->> +	bool "Enable kuser helpers page for compatibility with 32 bit applications."
->> +	depends on COMPAT
->> +	default y
->> +	help
->> +	  Enables kuser helpers to be mapped in a special purpose page at a fixed
->> +	  address to maintain independence from the type of CPU present in the SoC.
->> +	  This feature is provided for compatibility reasons in fact allows 32 bit
->> +	  applications compliant with ARMv4 up to ARMv8 to run without any
->> +	  modification.
->> +
->> +	  Warning: Being always mapped at a fixed address makes it easier to create
->> +	  exploits based on ROP type of attacks.
->> +
->> +	  As a consequence of this, this feature is made configurable but be aware that
->> +	  it can be turned off if and only if the binaries and the libraries running on
->> +	  a specific platform are designed to do not make use of these helpers, otherwise
->> +	  should be left on.
->> +
->> +	  See Documentation/arm/kernel_user_helpers.txt for details.
-> 
-> This is quite divergent from the text for the 32-bit arm KUSER_HELPERS.
-> 
-> Could we please reuse that existing text as far as possible, with minimal
-> changes?
-> 
-> e.g.
-> 
-> config KUSER_HELPERS
-> 	bool "Enable kuser helpers for compat tasks"
-> 	depends on COMPAT
-> 	default y
-> 	help
-> 	  Warning: disabling this option may break user programs.
-> 
-> 	  Provide kuser helpers to compat tasks. The kernel provides
-> 	  helper code to userspace in read only form at a fixed location
-> 	  to allow userspace to be independent of the CPU type fitted to
-> 	  the system. This permits binaries to be run on ARMv4 through
-> 	  to ARMv8 without modification.
-> 
-> 	  See Documentation/arm/kernel_user_helpers.txt for details.
-> 
-> 	  However, the fixed address nature of these helpers can be used
-> 	  by ROP (return orientated programming) authors when creating
-> 	  exploits.
-> 
-> 	  If all of the binaries and libraries which run on your platform
-> 	  are built specifically for your platform, and make no use of
-> 	  these helpers, then you can turn this option off to hinder
-> 	  such exploits. However, in that case, if a binary or library
-> 	  relying on those helpers is run, it will not function correctly.
-> 
-> 	  Say N here only if you are absolutely certain that you do not
-> 	  need these helpers; otherwise, the safe option is to say Y.
-> 
-> I believe that Will wanted to default the kuser helpers off, as applications
-> using them need the instruction emulation which is also disabled by default.
-> 
-> I'm also not sure which binaries we expect to work on arm64, so I'm not sure if
-> the ARMv4 reference is correct.
-> 
-> Thanks,
-> Mark.
-> 
+So, REG_NO_USER means "don't even call this reg's get/set_user(): forbid
+user access unconditionally", whereas lack of this flag means "call the
+appropriate get/set_user() function to find out what to do, which may
+or may not result in forbidding the access".
+
+Maybe this subtlety is just a question of clear commenting.  I can't
+think of obviously-correct names that won't be stupidly verbose...
+
+Thoughts?
+
+Cheers
+---Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
