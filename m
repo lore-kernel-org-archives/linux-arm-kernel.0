@@ -2,68 +2,70 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CC9CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:12:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 10FDEC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:12:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1C89321848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:12:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D3854217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:12:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rdvmazsm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1C89321848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qn6eJuhp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D3854217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=U01IHJuGXESKEyN2jDtrOnd3lrIR7fCbHNzPWxccFv8=; b=rdvmazsmMfrbk7
-	lUMXIvvBIE1lVOPi/rz3YgiThj3EhkfsBWaDabXZglP6+5VD1woH0wDGy28hYMT5G13zvnv7pB/O6
-	ulgc6TguJvt686teROE26x3YsLFHshVc/Mm6t5po7ddYK9qEwSki91eegpiLUihW+HGbqrf0Yi2JL
-	ugExCo1LUBJX/nsqZv6Lb3mOQku1Ory6tIVGhsuSwxbR0R/YbiKJHZU2JTiW91KZcGvzI9cFcxuUr
-	IPjhP/bR9OB+HUYXQYNmGIecawFF008N8Vb9YYIRJLGUMIIG8hArIwJTecDzkNEv3hlNmeyQMzQpG
-	TgHLbhZVU0SzM7RQ7iyw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=A/wP2D3qW4eHxPApZZm2axWl6mMDLKUcLfIkg8vemU8=; b=Qn6eJuhpbg8EF5
+	i7yA50E52qf59gaMLwdTcUbm8k3r2I0XK0cTdh0BlGMsuVW02wyjxJOq/kTxd1DRc2upezhH5RcUL
+	kn44LuN+gfW6km28vITiEpWhiyFZdgsJj6h6E0GLrSVJ0L0aJgVnliGvAt91gCkTF+YowvNS98jw8
+	tGvR4r0m9UYQRObD7uhiIpnmIReoFUcZx4+GYVTk5muXOhCSVXvewoDdJxGrryYoNZnvOwnKwxTya
+	RhGmzFpYKfnO3+Y9hY/zjtMJ4chRsLsrsRZ8Rd+7yPlPN5XjBsx2RSw7udmQAKUXyjQI5madB9KWA
+	C5wFP1pHepwto1OGyHEg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gycXG-0004nr-JV; Tue, 26 Feb 2019 13:12:38 +0000
+	id 1gycXO-0004wS-2K; Tue, 26 Feb 2019 13:12:46 +0000
 Received: from mailgw01.mediatek.com ([216.200.240.184])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gycWx-0004S2-Hw; Tue, 26 Feb 2019 13:12:22 +0000
-X-UUID: fd81cc9d78714f2892d14687ad2f960c-20190226
-X-UUID: fd81cc9d78714f2892d14687ad2f960c-20190226
+ id 1gycWx-0004TT-Hw; Tue, 26 Feb 2019 13:12:22 +0000
+X-UUID: 8b0e8b41648b45da81794bb48396a782-20190226
+X-UUID: 8b0e8b41648b45da81794bb48396a782-20190226
 Received: from mtkcas68.mediatek.inc [(172.29.94.19)] by mailgw01.mediatek.com
  (envelope-from <qii.wang@mediatek.com>)
  (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 963534724; Tue, 26 Feb 2019 05:11:38 -0800
+ with ESMTP id 1309062783; Tue, 26 Feb 2019 05:11:38 -0800
 Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
  MTKMBS62DR.mediatek.inc (172.29.94.18) with Microsoft SMTP Server (TLS) id
  15.0.1395.4; Tue, 26 Feb 2019 05:11:37 -0800
 Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
  mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 26 Feb 2019 21:11:28 +0800
+ 15.0.1395.4; Tue, 26 Feb 2019 21:11:30 +0800
 Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
  (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Tue, 26 Feb 2019 21:11:28 +0800
+ Transport; Tue, 26 Feb 2019 21:11:29 +0800
 From: Qii Wang <qii.wang@mediatek.com>
 To: <wsa@the-dreams.de>
-Subject: [PATCH v5 0/5] add i2c support for mt8183
-Date: Tue, 26 Feb 2019 21:10:55 +0800
-Message-ID: <1551186660-16902-1-git-send-email-qii.wang@mediatek.com>
+Subject: [PATCH v5 2/5] dt-bindings: i2c: Add Mediatek MT8183 i2c binding
+Date: Tue, 26 Feb 2019 21:10:57 +0800
+Message-ID: <1551186660-16902-3-git-send-email-qii.wang@mediatek.com>
 X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1551186660-16902-1-git-send-email-qii.wang@mediatek.com>
+References: <1551186660-16902-1-git-send-email-qii.wang@mediatek.com>
 MIME-Version: 1.0
-X-TM-SNTS-SMTP: 4595AA4059D5953ADD7EA443CC5FE4EC174A697B85D113DB26D7187A30A7C2712000:8
+X-TM-SNTS-SMTP: 3F95D220E3CB02AE74685FD57517FE12CE04DFC7CD9FFFC50BB9CEC5234B766B2000:8
 X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_051219_943069_7E205907 
-X-CRM114-Status: UNSURE (   7.55  )
+X-CRM114-CacheID: sfid-20190226_051219_873129_CD5BCD7F 
+X-CRM114-Status: UNSURE (   9.09  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -86,39 +88,38 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This series are based on 5.0-rc1 and provide five patches to support
-mt8183 IC.
+Add MT8183 i2c binding to binding file. Compare to MT2712 i2c
+controller, MT8183 has different registers, offsets, and clock.
 
-Main changes compared to v4:
---modify the commit of arb clock dt-binding
---split a patch(3/3) into three(3/5 4/5 5/5)
+Signed-off-by: Qii Wang <qii.wang@mediatek.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-mtk.txt |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Main changes compared to v3:
---remove the patches which have been applied to for-next
---remove i2c fallback for i3c controller 
-
-Main changes compared to v2:
---update commit message
---add Reviewed-by from Rob Herring, Nicolas and Sean
-
-Main changes compared to v1:
---remove useless dt-binding for mt7629
---split a patch into two(2/6 3/6)
---muti-user feature was dropped
-
-Qii Wang (5):
-  i2c: mediatek: Add offsets array for new i2c registers
-  dt-bindings: i2c: Add Mediatek MT8183 i2c binding
-  i2c: mediatek: Add arb clock in i2c driver
-  i2c: mediatek: Add i2c and apdma sync in i2c driver
-  i2c: mediatek: Add i2c support for MediaTek MT8183
-
- Documentation/devicetree/bindings/i2c/i2c-mtk.txt |   4 +-
- drivers/i2c/busses/i2c-mt65xx.c                   | 246 ++++++++++++++++------
- 2 files changed, 188 insertions(+), 62 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+index ee4c324..b052f29 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mtk.txt
+@@ -12,13 +12,15 @@ Required properties:
+       "mediatek,mt7623-i2c", "mediatek,mt6577-i2c": for MediaTek MT7623
+       "mediatek,mt7629-i2c", "mediatek,mt2712-i2c": for MediaTek MT7629
+       "mediatek,mt8173-i2c": for MediaTek MT8173
++      "mediatek,mt8183-i2c": for MediaTek MT8183
+   - reg: physical base address of the controller and dma base, length of memory
+     mapped region.
+   - interrupts: interrupt number to the cpu.
+   - clock-div: the fixed value for frequency divider of clock source in i2c
+     module. Each IC may be different.
+   - clocks: clock name from clock manager
+-  - clock-names: Must include "main" and "dma", if enable have-pmic need include
++  - clock-names: Must include "main" and "dma", "arb" is for multi-master that
++    one bus has more than two i2c controllers, if enable have-pmic need include
+     "pmic" extra.
+ 
+ Optional properties:
 -- 
-1.9.1
+1.7.9.5
+
 
 _______________________________________________
 linux-arm-kernel mailing list
