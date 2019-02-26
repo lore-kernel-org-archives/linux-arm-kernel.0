@@ -2,93 +2,58 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BEC43C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:57:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 92E3CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:01:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8C21B213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 08:57:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5F1282173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 09:01:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D5yd7G4J";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="kg7jp8Er"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C21B213A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dGxReJO2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5F1282173C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=holtmann.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=83xsZ8SoHjV3jh5HEz1pXNCGE+gS1ryq60W/AYVSXys=; b=D5yd7G4JkbnzuTnzVzoS3P7nF
-	/LryWXQx2Ud3MDezrSjlNIeDLuvPoz+ARiOhbTcQtSgp0o9seZOwV/E4xJcCFaxuAYsU3jm3mA782
-	x/fXp/lgtb7s43FlzVsjKVrHT5lii7CmGyDkIUeZa9zTsDZXjXL/Iu2U0L8SLoCHyqo1fElEUoPqa
-	QRY/L93W5g3QuffpVlFmiO3DxRCD2fcFELZEyMF+T3WyU7jfi9RcUviVDEdjGnk5I9tZiSaM3zxPs
-	ZgZ7T8ctbQACSVrk2cxdl51TiQb6VvBTQeDFvJa+EqoY7KSAJFv2n5q6FTFcSg+mJl3CDxgaaNESI
-	WTMs18GQA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:References:Message-Id:Date:
+	In-Reply-To:From:Subject:Mime-Version:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=WzttW+zNdr51mNBMRurlrlLO/auJv7etR1rJpF4BYXU=; b=dGxReJO29005CT
+	TPt+4tX/iqkm8JLZlqdxPC9HDAq39tksqPqMs13QAT/2iCQ1dTMfyL0OFhq4jUeSa7WUYUqHg3CoG
+	mmQuN2+Qtja1mwQjY+MUY4vIS6SKPMBv6EYTTQ7r0k8Um4ymtBBatSqwOluTKUuPdLsoTsFBL+U4Q
+	7cVr1JcYNvsDdkoRtJ9PGHIpNXV9vJPfoQ9YJhAQujNgm7N1chPu4aHY3ih91X6En2l/PJ2LyXP0f
+	KTbnt6t4Z1akkGkLZd0X49nq5517CtjAGTCkvkMe0KekXR18uAf9QoGvV40kNIFLfxMpriFDIsLU3
+	JwD3FAFOFIwpIsrlyLXg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyYYC-0004as-NS; Tue, 26 Feb 2019 08:57:20 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyYY9-0004aI-Pd
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 08:57:19 +0000
-Received: by mail-wr1-x443.google.com with SMTP id l5so12972981wrw.6
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 00:57:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=S35F2dY0IkDH0zCO63ymoahlalUNx6qu+5BTWvJk4YY=;
- b=kg7jp8ErPi0+a4M8kmC7FTAF0Iqpdx6JVd7nYWSvF33J9NLSGVS4cEd5DTk5LAJClk
- 29Wj+1D0nBLyKzsLeOFJ9/vxSErsJbSCjpFrSztPmF72HsinYILN6R4Sx69bO0Jvc0wH
- 0BjGq+D8iBAth0bvTiy/zExN2YZ6RDcKnJXZ7yqKxu/nFlCtruGcE7Svrg7Eje9tNbBb
- DZXxTTHQyM3EZHDiQDglInXGdc+7eYGlHYSMjHy0YZX6wFT8Q2A5csbGL1UGKF4JMFI8
- bBz5oUcg5eOB9Hpm5SWEBOV21RbJCQq/398lm7kynIRv7/1aVgbN722rhcQ6fuN5/PqF
- LFuw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=S35F2dY0IkDH0zCO63ymoahlalUNx6qu+5BTWvJk4YY=;
- b=LkW/iHeAKtfXryJ9h4Xz+0p4gYIroZbE5nAmE7vCRfG9V8Oo9RQEJnJscz4sPZdmBJ
- A6iLQH35+Nd1H0eVVQyDCPfiP19S12XNpUh6GOcwBm23cN0ei/TR98Czan9r7eL4+fD9
- FniwoaDJsPY07J9Gu4yTmAA0hLm9XjCcTd7qGj153XKkg6M4s48PdGIrSzFeJ7AmIk4v
- bvDvPqHOnG0iVAd1ZN/fDhyanbOsPaVcyaBaFTL3H8ZglXZIASvgUkemPIBsCSbCyYqP
- GZDxv3Ow1RHM8XQnfpXhDqlTmiyRNed/DF88gHMCsAFwpqo/GibTj8qcRGQkNxN3nlhK
- 8x9Q==
-X-Gm-Message-State: AHQUAuasCnW/DWDBkM/MaVMFAcjRvSq0LfZe+oT0qCGQXn+vo6lBnPs5
- UAV/pIV8E99iX6VQgE06RYGP/UwsqGY=
-X-Google-Smtp-Source: AHgI3IZ9PoLfc3RjKZel4JxK3z+35ibPGYc3fMNqw6rmynZ6+dVMmpyRgmCzccbLcAAEaQVkXJ4TkQ==
-X-Received: by 2002:adf:f792:: with SMTP id q18mr11275310wrp.324.1551171435329; 
- Tue, 26 Feb 2019 00:57:15 -0800 (PST)
-Received: from ?IPv6:2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6?
- ([2a00:23c4:f7a1:ce00:5105:4b7b:c922:7c6])
- by smtp.gmail.com with ESMTPSA id o30sm12666362wro.57.2019.02.26.00.57.14
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 00:57:14 -0800 (PST)
-Subject: Re: [PATCH v2 0/2] Add and document the i.MX8MQ OTP controller
-To: Abel Vesa <abel.vesa@nxp.com>
-References: <20190202150638.13672-1-ccaione@baylibre.com>
- <20190225151127.elg2iuaxa4otdb46@fsr-ub1664-175>
-From: Carlo Caione <ccaione@baylibre.com>
-Message-ID: <e0af9818-86cf-c341-61a4-0a1406b07880@baylibre.com>
-Date: Tue, 26 Feb 2019 08:57:13 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-MIME-Version: 1.0
-In-Reply-To: <20190225151127.elg2iuaxa4otdb46@fsr-ub1664-175>
-Content-Language: en-US
+	id 1gyYcU-0006UI-Jf; Tue, 26 Feb 2019 09:01:46 +0000
+Received: from coyote.holtmann.net ([212.227.132.17] helo=mail.holtmann.org)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyYcR-0006TM-Go; Tue, 26 Feb 2019 09:01:45 +0000
+Received: from marcel-macpro.fritz.box (p4FF9F361.dip0.t-ipconnect.de
+ [79.249.243.97])
+ by mail.holtmann.org (Postfix) with ESMTPSA id AEDF4CF2A3;
+ Tue, 26 Feb 2019 10:09:29 +0100 (CET)
+Mime-Version: 1.0 (Mac OS X Mail 12.2 \(3445.102.3\))
+Subject: Re: [PATCH v2 1/3] Bluetooth: btusb: add QCA6174A compatible
+ properties
+From: Marcel Holtmann <marcel@holtmann.org>
+In-Reply-To: <20190222225345.69084-1-briannorris@chromium.org>
+Date: Tue, 26 Feb 2019 10:01:34 +0100
+Message-Id: <49653AC5-5800-4319-B3C0-0CCA6A920E2C@holtmann.org>
+References: <20190222225345.69084-1-briannorris@chromium.org>
+To: Brian Norris <briannorris@chromium.org>
+X-Mailer: Apple Mail (2.3445.102.3)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_005717_889954_1770D20F 
-X-CRM114-Status: GOOD (  17.26  )
+X-CRM114-CacheID: sfid-20190226_010143_706677_3A5A544D 
+X-CRM114-Status: GOOD (  11.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,46 +65,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "festevam@gmail.com" <festevam@gmail.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: devicetree <devicetree@vger.kernel.org>, Heiko Stuebner <heiko@sntech.de>,
+ "open list:BLUETOOTH DRIVERS" <linux-bluetooth@vger.kernel.org>,
+ Douglas Anderson <dianders@chromium.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-rockchip@lists.infradead.org, Rob Herring <robh+dt@kernel.org>,
+ Enric Balletbo i Serra <enric.balletbo@collabora.com>,
+ Rajat Jain <rajatja@google.com>, Robin Murphy <robin.murphy@arm.com>,
+ Matthias Kaehlcke <mka@chromium.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Johan Hedberg <johan.hedberg@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 25/02/2019 15:11, Abel Vesa wrote:
-> On 19-02-02 15:06:36, Carlo Caione wrote:
->> Add a new node to enable the On-Chip OTP controller and add the new
->> binding in the documentation.
->>
->> Carlo Caione (2):
->>    arm64: dts: imx8mq: Add on-chip OTP controller node
->>    dt-bindings: imx-ocotp: Add i.MX8MQ compatible
->>
->>   Documentation/devicetree/bindings/nvmem/imx-ocotp.txt | 1 +
->>   arch/arm64/boot/dts/freescale/imx8mq.dtsi             | 8 ++++++++
->>   2 files changed, 9 insertions(+)
->>
->> -- 
->> 2.19.1
->>
-> 
-> What's the status of this patchseries ?
-> 
-> It would help a lot if we would manage to get this in.
+Hi Brian,
 
-Uh, for some reason I thought Lucas was going to take care of this.
-I'll submit a v2 now.
+> We may need to specify a GPIO wake pin for this device, so add a
+> compatible property for it.
+> 
+> There are at least to USB PID/VID variations of this chip: one with a
+> Lite-On ID and one with an Atheros ID.
+> 
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> ---
+> v2:
+> * drop leading zeroes from VID, per documented binding
+> ---
+> drivers/bluetooth/btusb.c | 2 ++
+> 1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/bluetooth/btusb.c b/drivers/bluetooth/btusb.c
+> index 470ee68555d9..54cb5f583b1d 100644
+> --- a/drivers/bluetooth/btusb.c
+> +++ b/drivers/bluetooth/btusb.c
+> @@ -2862,6 +2862,8 @@ static irqreturn_t btusb_oob_wake_handler(int irq, void *priv)
+> 
+> static const struct of_device_id btusb_match_table[] = {
+> 	{ .compatible = "usb1286,204e" },
+> +	{ .compatible = "usbcf3,e300" }, /* QCA6174A */
+> +	{ .compatible = "usb4ca,301a" }, /* QCA6174A (Lite-On) */
 
---
-Carlo Caione
+are these really proper .compatible USB VID?PID strings. I think they are one letter short.
+
+Regards
+
+Marcel
 
 
 _______________________________________________
