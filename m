@@ -2,92 +2,72 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 89C7CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 00:29:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6499FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 02:08:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5827B2184E
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 00:29:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D2CF20684
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 02:08:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cnQ2hEku";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="GF6Ex+WP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5827B2184E
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oInSizAz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D2CF20684
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.panasonic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sRZPu0DKpVVIg0rar5WQuo3kvrR0HWuZdcS9SS0isE8=; b=cnQ2hEkuYXN5TA
-	Omp5jCyvv3AlNzqaR6MiK24pw7obNYXNO8TPfKCs/vQNWpj9nqawI+CzCnWj2ZuWt9wJ96S0b91E7
-	F/db3JWLXJA0yCOteIioWLoua+TGLTrVaENjFevjhTx27ee/GAt6xSUabGwLHr/LcE2TCWZeVmsuM
-	YDMh9be8ztoMUdWYVBukoLro6YT4q4MpZ3yBO56ud6bxLe/stRIT+N17wSXO76dx7S0AlyqkNTjuF
-	Z55li5OpPQdXwYnW5v+n3spqvM4njt9S4AGawrrwd6AwQjM6uquiVwKmIKqdy/uDLUcJ4FAkq6NIY
-	THVcJ+ZKC15nv6hEjiPA==;
+	List-Owner; bh=J0D5fosK4T/S/NwTWIzt507ee8xjpU014tCfBT910mk=; b=oInSizAz9ZzlPF
+	tttfhLLN0OWeu+tXj3ZuHsjKGpw69ZW8SgRkhshAymkThylTItt+z1JvQuO/uj1dPJTKR48d2M7o/
+	+Vx+/82I5cjG3vft6myAgkuy3V8YLgPhl6i+xsSg26J4icfZVf2JlJA1pXqoqEJVCqUKJI4KKdjFO
+	Ta+FWd/nn1UYTfC4pVFiQbLr+np61EcjvkPXc13gj6vguESNPVNDoJnXykOtXNPSeVOQQVOjQuo7Z
+	xnnHTUTrEuL3pfMuJcsPJaxRB6lcvPklK+OU6txd2b1fcJYVkpml9hA/pMKtDPxVwfRwDnVXTr/Gw
+	NRonhkaXENJOJw/XyPwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyQcp-0005Av-RS; Tue, 26 Feb 2019 00:29:35 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyQcn-0005Ac-D9
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 00:29:34 +0000
-Received: by mail-lj1-x244.google.com with SMTP id z7so8966756lji.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 16:29:32 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8tZwR/zt5ZZMcpwi9xVzbwgZJ4rn4m7mYsGQrzVWldc=;
- b=GF6Ex+WPJgKPYaYMyiIbId6RIukmmSazsTWtV9xn9LdGcTAJYMpyGGB9FFXsFydzv2
- LkaUPFAXn/15yW0zr5q1QGGvuChK26PFnALGnpGwE9KrHm3rsA8CP6x8Xyii+g8Yn+L1
- Ke7i+KyQTxyMDH7waWKg44lZOM1ffsHMVAzRI=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=8tZwR/zt5ZZMcpwi9xVzbwgZJ4rn4m7mYsGQrzVWldc=;
- b=fJGHDScwzmlZp87P4AF4iTJ/p8TXz9DqnqolQ/5Zm3iIRWzLA9VhJ1YqAKS6lMznaL
- N1+w/cuVnyps/2N6sHsLsCyD7T2nL5K51QX/DKjbE95v8pmA6Mv3pXfOKq5XfCiunJ5Q
- AZR0WyJRBeD9hEv36pb0wCkR9GbQmA76giR3vRyL3dlbpWUB/0dnQJk0ciPZKmI5r4yZ
- Mr3qol4+TInE0nFTDNFnizlnIEXRP25vKWqWYNwCdjDO89McIf0ZCskMkjlepXSWHBCd
- la6hoKVatUC2EtuLonzKAqBwLcGhcqEV8xlzgnmAmWL1dn1/eX0obgc1sSeX6zloaTof
- L9Eg==
-X-Gm-Message-State: AHQUAuYuM9GPG0w2ljHH12ZFPIJ0Lak2N5WELR79tjyYg7Qa/UXfAxyO
- 89gricjuN4s1E8xL/EfXPyJdyUqoZDo=
-X-Google-Smtp-Source: AHgI3IYWSwPGopQE63UnOp9lGo9b8K7Q9MxjVBwKgwgd9iqeN1MOTS7/UeHFToGwN/uCbiD2a7S8xA==
-X-Received: by 2002:a2e:9001:: with SMTP id h1mr11669157ljg.5.1551140971073;
- Mon, 25 Feb 2019 16:29:31 -0800 (PST)
-Received: from mail-lf1-f53.google.com (mail-lf1-f53.google.com.
- [209.85.167.53])
- by smtp.gmail.com with ESMTPSA id c86sm2578687ljf.28.2019.02.25.16.29.30
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 25 Feb 2019 16:29:30 -0800 (PST)
-Received: by mail-lf1-f53.google.com with SMTP id n15so8306958lfe.5
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 16:29:30 -0800 (PST)
-X-Received: by 2002:a19:ed0a:: with SMTP id y10mr11846459lfy.154.1551139034938; 
- Mon, 25 Feb 2019 15:57:14 -0800 (PST)
+	id 1gySA8-0007pI-51; Tue, 26 Feb 2019 02:08:04 +0000
+Received: from smtp.mei.co.jp ([133.183.100.20])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gySA5-0007ov-3W
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 02:08:02 +0000
+Received: from mail-gw.jp.panasonic.com ([157.8.1.157])
+ by smtp.mei.co.jp (8.14.4/8.14.4/lvzy14) with ESMTP id x1Q27u0l013560;
+ Tue, 26 Feb 2019 11:07:56 +0900
+Received: from epochmail.jp.panasonic.com ([157.8.1.130])
+ by mail.jp.panasonic.com (8.11.6p2/3.7W/kc-maili12) with ESMTP id x1Q27tt01478;
+ Tue, 26 Feb 2019 11:07:55 +0900
+Received: by epochmail.jp.panasonic.com (8.12.11.20060308/3.7W/pml-send1) id
+ x1Q27tWU025003; Tue, 26 Feb 2019 11:07:55 +0900
+Received: from jpa000secmn21.palet.jp.panasonic.com [10.74.216.56] 
+ by JPA000SGWMN01.palet.jp.panasonic.com with ESMTP id MAA41642;
+ Tue, 26 Feb 2019 11:07:55 +0900
+Received: from localhost.localdomain (10.74.216.123) by
+ JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56) with Microsoft SMTP
+ Server (TLS) id 15.0.1076.9; Tue, 26 Feb 2019 11:07:54 +0900
+From: Kohji Okuno <okuno.kohji@jp.panasonic.com>
+To: <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH v2] ARM: imx6q: cpuidle: fix bug that CPU might not wake up at
+ expected time
+Date: Tue, 26 Feb 2019 11:06:23 +0900
+Message-ID: <20190226020623.18324-1-okuno.kohji@jp.panasonic.com>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20190222.174953.431124434951497467.okuno.kohji@jp.panasonic.com>
+References: <20190222.174953.431124434951497467.okuno.kohji@jp.panasonic.com>
 MIME-Version: 1.0
-References: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
- <1546318276-18993-13-git-send-email-yong.wu@mediatek.com>
-In-Reply-To: <1546318276-18993-13-git-send-email-yong.wu@mediatek.com>
-From: Evan Green <evgreen@chromium.org>
-Date: Mon, 25 Feb 2019 15:56:38 -0800
-X-Gmail-Original-Message-ID: <CAE=gft5KJf=mx1zmzVPxGw7roL6N9Z4QvDSyTekOCeBzaTDQVg@mail.gmail.com>
-Message-ID: <CAE=gft5KJf=mx1zmzVPxGw7roL6N9Z4QvDSyTekOCeBzaTDQVg@mail.gmail.com>
-Subject: Re: [PATCH 12/13] arm: dts: mediatek: Get rid of mediatek,
- larb for MM nodes
-To: Yong Wu <yong.wu@mediatek.com>
+X-Originating-IP: [10.74.216.123]
+X-ClientProxiedBy: JPA000SECMN19.palet.jp.panasonic.com (10.74.216.54) To
+ JPA000SECMN21.palet.jp.panasonic.com (10.74.216.56)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_162933_440499_BD464234 
-X-CRM114-Status: GOOD (  10.72  )
+X-CRM114-CacheID: sfid-20190225_180801_416824_F229840C 
+X-CRM114-Status: GOOD (  12.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,31 +79,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com,
- "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
- <devicetree@vger.kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
- Arnd Bergmann <arnd@arndb.de>, srv_heupstream@mediatek.com,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Joerg Roedel <joro@8bytes.org>, Will Deacon <will.deacon@arm.com>,
- LKML <linux-kernel@vger.kernel.org>, Tomasz Figa <tfiga@google.com>,
- iommu@lists.linux-foundation.org, Rob Herring <robh+dt@kernel.org>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- yingjoe.chen@mediatek.com, Robin Murphy <robin.murphy@arm.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Sascha Hauer <s.hauer@pengutronix.de>,
+ Kohji Okuno <okuno.kohji@jp.panasonic.com>, NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 31, 2018 at 8:53 PM Yong Wu <yong.wu@mediatek.com> wrote:
->
-> After adding device_link between the IOMMU consumer and smi,
-> the mediatek,larb is unnecessary now.
->
-> CC: Matthias Brugger <matthias.bgg@gmail.com>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+ In the current cpuidle implementation for i.MX6q, the CPU that sets
+'WAIT_UNCLOCKED' and the CPU that returns to 'WAIT_CLOCKED' are always
+the same. While the CPU that sets 'WAIT_UNCLOCKED' is in IDLE state of
+"WAIT", if the other CPU wakes up and enters IDLE state of "WFI"
+istead of "WAIT", this CPU can not wake up at expired time.
+ Because, in the case of "WFI", the CPU must be waked up by the local
+timer interrupt. But, while 'WAIT_UNCLOCKED' is set, the local timer
+is stopped, when all CPUs execute "wfi" instruction. As a result, the
+local timer interrupt is not fired.
+ In this situation, this CPU will wake up by IRQ different from local
+timer. (e.g. broacast tiemr)
 
-Reviewed-by: Evan Green <evgreen@chromium.org>
+ So, this fix changes CPU to return to 'WAIT_CLOCKED'.
+
+Signed-off-by: Kohji Okuno <okuno.kohji@jp.panasonic.com>
+---
+
+Changes for v2:
+ - change "master" variable name.
+
+
+ arch/arm/mach-imx/cpuidle-imx6q.c | 27 +++++++++++----------------
+ 1 file changed, 11 insertions(+), 16 deletions(-)
+
+diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
+index bfeb25aaf9a2..9d005b589498 100644
+--- a/arch/arm/mach-imx/cpuidle-imx6q.c
++++ b/arch/arm/mach-imx/cpuidle-imx6q.c
+@@ -16,30 +16,25 @@
+ #include "cpuidle.h"
+ #include "hardware.h"
+ 
+-static atomic_t master = ATOMIC_INIT(0);
+-static DEFINE_SPINLOCK(master_lock);
++static int num_idle_cpus = 0;
++static DEFINE_SPINLOCK(cpuidle_lock);
+ 
+ static int imx6q_enter_wait(struct cpuidle_device *dev,
+ 			    struct cpuidle_driver *drv, int index)
+ {
+-	if (atomic_inc_return(&master) == num_online_cpus()) {
+-		/*
+-		 * With this lock, we prevent other cpu to exit and enter
+-		 * this function again and become the master.
+-		 */
+-		if (!spin_trylock(&master_lock))
+-			goto idle;
++	spin_lock(&cpuidle_lock);
++	if (++num_idle_cpus == num_online_cpus()) {
+ 		imx6_set_lpm(WAIT_UNCLOCKED);
+-		cpu_do_idle();
+-		imx6_set_lpm(WAIT_CLOCKED);
+-		spin_unlock(&master_lock);
+-		goto done;
+ 	}
++	spin_unlock(&cpuidle_lock);
+ 
+-idle:
+ 	cpu_do_idle();
+-done:
+-	atomic_dec(&master);
++
++	spin_lock(&cpuidle_lock);
++	if (num_idle_cpus-- == num_online_cpus()) {
++		imx6_set_lpm(WAIT_CLOCKED);
++	}
++	spin_unlock(&cpuidle_lock);
+ 
+ 	return index;
+ }
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
