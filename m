@@ -2,118 +2,74 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 818C1C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:30:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8AD2FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:31:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4CCC8217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:30:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5B72A217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:31:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KAVzrGC7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="fGB9qN5C"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4CCC8217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hc+vDufa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B72A217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8T1yF13zFzyNfRcQZSHy/Nx/cOK0OF96OjE6gsd/x+U=; b=KAVzrGC7IorGzQ
-	jyN7mHMsKEOv71XeKtfw6aZ/IDrPySatr7uMXX1vISFx6Lr0rr7LTdTvS7DHjfkQXjJ4MHm9xxHWz
-	OSIUOTYZnW8SEX9MkHO7/Tc1scZ3+XlQg2mRU4CU4rbVQiG6oO5IWCcx5d09bxJus8Ki+PHCRMKY1
-	Qjqv29dMSn4oXqoWUxVEg3sxZx7X/W6TZN2M9Ir0Jz1PyJ1w8TmDi5VBpaN4b6S8i+s2j8Lc0ff9i
-	qKV4appU8zfb8m0rfdZT4I48XUv7CIm9kc+fUj09ecEagu7RDvgoOCX+lQOSk3jbEIa1fT+SQn4fw
-	4X7/+O3H4VYqIuKIVFOQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=zm1eDy2SbzPXbHJEfnLVzgFzA29Nd6EUsgo/OZaCUWg=; b=Hc+vDufaKCzoh7q+9xkKYxcN3
+	BrsxRWf0AVTpDB55K1iMhoL7ZWNaR2vNuoRoFhx0mFHl6vIDDRnAu/FFrCAzBzh0KfM9KRkfcsr6+
+	p9eqvdZeJ9nIBVoIaPE5XG3MkNH1Ks076jORZYQzMFWxUuiob6ABh51PrOvazQenrJL2kvgDReGQE
+	i7j3aIcgK1SYchTVy+ahQAm2t4e2x5wy/SIH10uHfzCPXGvIhBSHjcJbnD0w3JrI67ys2HbYMFWxV
+	moIlxDx75jYoSoOeP4P6O2DE31ebeBtJ4GE5tDH+iixFijLQCVknag+cTOlaQTDUbGpMv9S7/W+/m
+	3cGlEeEbw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gygZ3-0003fQ-Ak; Tue, 26 Feb 2019 17:30:45 +0000
-Received: from mail-eopbgr60072.outbound.protection.outlook.com ([40.107.6.72]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gygYx-0003eg-QL
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 17:30:42 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=PSWSXpFYDO+2OduOKbzhHAwuOLzPXSbzF6h6HsZRPDA=;
- b=fGB9qN5CJ1UAPj9CxOICLHPfJL6dXP8eJqfUSDSa+jiiu+RZd0WPCbFTisPNSn0cSbK2ORGAMs+7dunZkKXOcfPVQXKDhq0Kunqmx4dVaUzZRE+1y0HULkBBRrGu7sWTuSl51g/a+lB4ePKkaIwdPKswPyCHZna4YOQ2LQUucIc=
-Received: from DB8PR08MB4105.eurprd08.prod.outlook.com (20.179.12.12) by
- DB8PR08MB5098.eurprd08.prod.outlook.com (10.255.18.154) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.14; Tue, 26 Feb 2019 17:30:21 +0000
-Received: from DB8PR08MB4105.eurprd08.prod.outlook.com
- ([fe80::c84c:c3bf:a13e:423a]) by DB8PR08MB4105.eurprd08.prod.outlook.com
- ([fe80::c84c:c3bf:a13e:423a%4]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
- 17:30:21 +0000
-From: Steve Capper <Steve.Capper@arm.com>
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Subject: Re: [PATCH 0/9] 52-bit kernel + user VAs
-Thread-Topic: [PATCH 0/9] 52-bit kernel + user VAs
-Thread-Index: AQHUx6w1oMh6myss70WSkOxz9gCxzKXnCbYAgAAJv4CAAAD2gIAAArwAgAAD2wCAAAuFAIAAJ5MAgAsUZgA=
-Date: Tue, 26 Feb 2019 17:30:20 +0000
-Message-ID: <20190226173007.GA1553@capper-debian.cambridge.arm.com>
-References: <20190218170245.14915-1-steve.capper@arm.com>
- <CAKv+Gu_xOFXLwKsrFo-rBXdgk4O6zm6xPHB+tv1XjDjzyrjhEA@mail.gmail.com>
- <20190219124825.GH8501@fuggles.cambridge.arm.com>
- <CAKv+Gu-xp06XTvQfwNpCMNej4MLmPZ-borA6oq60+A9XXV6k_g@mail.gmail.com>
- <20190219130138.GI8501@fuggles.cambridge.arm.com>
- <CAKv+Gu9qLiGDfT+yC2-pLhzepYNOfvJ4Squjgmy6u-t3HCJrAw@mail.gmail.com>
- <20190219135640.GA15458@capper-debian.cambridge.arm.com>
- <CAKv+Gu82_vmeztgCe_y5+pXR27CRUzWBszk+ZEmxXZw9zpRNtA@mail.gmail.com>
-In-Reply-To: <CAKv+Gu82_vmeztgCe_y5+pXR27CRUzWBszk+ZEmxXZw9zpRNtA@mail.gmail.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.10.1 (2018-07-13)
-x-originating-ip: [217.140.96.140]
-x-clientproxiedby: DM5PR18CA0054.namprd18.prod.outlook.com
- (2603:10b6:3:22::16) To DB8PR08MB4105.eurprd08.prod.outlook.com
- (2603:10a6:10:b0::12)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Steve.Capper@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: adcac37b-6aee-4fda-e142-08d69c101473
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB8PR08MB5098; 
-x-ms-traffictypediagnostic: DB8PR08MB5098:
-x-ms-exchange-purlcount: 1
-nodisclaimer: True
-x-microsoft-exchange-diagnostics: 1; DB8PR08MB5098;
- 20:kcbIhsvTdbKvRNidwgtOB38/s/+GFk0VCUQJC65EqBIggDIJQgk24zUdm/QuwFOGRVy4UsCPzR511rtJFkIPYvKOta3zwI0/494F7WRuxIsvp8L9OvxCID3jWotNd4waGAvuckGclZpzWYPpLkhQIv/UBiLl0cnnugIW16OAWf8=
-x-microsoft-antispam-prvs: <DB8PR08MB50985819E6AA6E231678E04C817B0@DB8PR08MB5098.eurprd08.prod.outlook.com>
-x-forefront-prvs: 096029FF66
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(376002)(366004)(136003)(346002)(396003)(39860400002)(189003)(199004)(6246003)(53936002)(486006)(3846002)(6306002)(106356001)(4326008)(14454004)(5660300002)(6116002)(44832011)(86362001)(71190400001)(71200400001)(186003)(478600001)(105586002)(14444005)(68736007)(256004)(6512007)(8676002)(54906003)(6486002)(966005)(316002)(93886005)(2906002)(26005)(229853002)(58126008)(76176011)(102836004)(1076003)(6436002)(386003)(81166006)(476003)(81156014)(6506007)(446003)(72206003)(6916009)(305945005)(99286004)(25786009)(11346002)(97736004)(8936002)(33656002)(52116002)(7736002)(66066001)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB8PR08MB5098;
- H:DB8PR08MB4105.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: +Pmme7eZ2oIqlzDXCZGHlAabpKh/JgJIltkp0FbP3+FEGWgVIps+2O4/oTLTkhs8uyVFLLMIaP3e7YrMnKw7851Fmov3pPoKC+2sn4g+FT4iK5nHpfsEqUIqE5vXHbWDqvm03JW2MFC77cLezdRX6E0QsQPBG5bwZLxwXxFvMBHDa70VxPYopkMWkCU7g0/jtbRfTvY4yMyvZ7qGwpRiZWQA06ZubeTyuRNCPVW4jbGHBDITUSIx5KxWjSbL6cedP4C4sAf1gxOpN0W/uEFvnBZgC2ArWiDKAKwpQKHHFeV3fB/5ldkNHYACM+VD96Bubx+3EcqIB269tcHQvCO1JVsRmGrd/8gi8FJH1HFya89HMz4dUuqSuXeszW+IVuhXrWGSvZwcExWJC0goAJmbaGEbHTEcSqXO43xtoGQUuLs=
-Content-ID: <5FB56575E5C8B84B949A770FBD9BE3F0@eurprd08.prod.outlook.com>
+	id 1gygZO-0003uy-CM; Tue, 26 Feb 2019 17:31:06 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gygZL-0003u7-Fp
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 17:31:05 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8278B80D;
+ Tue, 26 Feb 2019 09:31:01 -0800 (PST)
+Received: from [10.1.199.35] (e107154-lin.cambridge.arm.com [10.1.199.35])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6D92C3F738;
+ Tue, 26 Feb 2019 09:30:56 -0800 (PST)
+Subject: Re: [RFC][PATCH 0/3] arm64 relaxed ABI
+To: Szabolcs Nagy <Szabolcs.Nagy@arm.com>,
+ Catalin Marinas <Catalin.Marinas@arm.com>
+References: <20181210143044.12714-1-vincenzo.frascino@arm.com>
+ <CAAeHK+xPZ-Z9YUAq=3+hbjj4uyJk32qVaxZkhcSAHYC4mHAkvQ@mail.gmail.com>
+ <20181212150230.GH65138@arrakis.emea.arm.com>
+ <CAAeHK+zxYJDJ7DJuDAOuOMgGvckFwMAoVUTDJzb6MX3WsXhRTQ@mail.gmail.com>
+ <20181218175938.GD20197@arrakis.emea.arm.com>
+ <20181219125249.GB22067@e103592.cambridge.arm.com>
+ <9bbacb1b-6237-f0bb-9bec-b4cf8d42bfc5@arm.com>
+ <CAFKCwrhH5R3e5ntX0t-gxcE6zzbCNm06pzeFfYEN2K13c5WLTg@mail.gmail.com>
+ <20190212180223.GD199333@arrakis.emea.arm.com>
+ <ac8f4e3b-84b8-6067-6a7a-fac7dc48daea@arm.com>
+ <20190225165720.GA79300@arrakis.emea.arm.com>
+ <7afa18b8-f135-036d-943c-b6216e7da481@arm.com>
+From: Kevin Brodsky <kevin.brodsky@arm.com>
+Message-ID: <4a301222-e6bd-dda8-ebef-da724bb15028@arm.com>
+Date: Tue, 26 Feb 2019 17:30:54 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: adcac37b-6aee-4fda-e142-08d69c101473
-X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 17:30:17.4526 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB8PR08MB5098
+In-Reply-To: <7afa18b8-f135-036d-943c-b6216e7da481@arm.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_093039_994779_F0745A0D 
-X-CRM114-Status: GOOD (  44.39  )
+X-CRM114-CacheID: sfid-20190226_093103_540807_B3FE0BEB 
+X-CRM114-Status: GOOD (  29.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,216 +81,148 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "crecklin@redhat.com" <crecklin@redhat.com>,
- Marc Zyngier <Marc.Zyngier@arm.com>, Catalin Marinas <Catalin.Marinas@arm.com>,
- Will Deacon <Will.Deacon@arm.com>, nd <nd@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <Mark.Rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Will Deacon <Will.Deacon@arm.com>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Vincenzo Frascino <Vincenzo.Frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Dave P Martin <Dave.Martin@arm.com>, Evgenii Stepanov <eugenis@google.com>,
+ Kees Cook <keescook@chromium.org>, Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Andrey Konovalov <andreyknvl@google.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Alexander Viro <viro@zeniv.linux.org.uk>, nd <nd@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Kostya Serebryany <kcc@google.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
+ Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
+ Robin Murphy <Robin.Murphy@arm.com>,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 19, 2019 at 05:18:18PM +0100, Ard Biesheuvel wrote:
-> On Tue, 19 Feb 2019 at 14:56, Steve Capper <Steve.Capper@arm.com> wrote:
-> >
-> > On Tue, Feb 19, 2019 at 02:15:26PM +0100, Ard Biesheuvel wrote:
-> > > On Tue, 19 Feb 2019 at 14:01, Will Deacon <will.deacon@arm.com> wrote:
-> > > >
-> > > > On Tue, Feb 19, 2019 at 01:51:51PM +0100, Ard Biesheuvel wrote:
-> > > > > On Tue, 19 Feb 2019 at 13:48, Will Deacon <will.deacon@arm.com> wrote:
-> > > > > >
-> > > > > > On Tue, Feb 19, 2019 at 01:13:32PM +0100, Ard Biesheuvel wrote:
-> > > > > > > On Mon, 18 Feb 2019 at 18:05, Steve Capper <steve.capper@arm.com> wrote:
-> > > > > > > >
-> > > > > > > > This patch series adds support for 52-bit kernel VAs using some of the
-> > > > > > > > machinery already introduced by the 52-bit userspace VA code in 5.0.
-> > > > > > > >
-> > > > > > > > As 52-bit virtual address support is an optional hardware feature,
-> > > > > > > > software support for 52-bit kernel VAs needs to be deduced at early boot
-> > > > > > > > time. If HW support is not available, the kernel falls back to 48-bit.
-> > > > > > > >
-> > > > > > > > A significant proportion of this series focuses on "de-constifying"
-> > > > > > > > VA_BITS related constants.
-> > > > > > > >
-> > > > > > > > In order to allow for a KASAN shadow that changes size at boot time, one
-> > > > > > > > must fix the KASAN_SHADOW_END for both 48 & 52-bit VAs and "grow" the
-> > > > > > > > start address. Also, it is highly desirable to maintain the same
-> > > > > > > > function addresses in the kernel .text between VA sizes. Both of these
-> > > > > > > > requirements necessitate us to flip the kernel address space halves s.t.
-> > > > > > > > the direct linear map occupies the lower addresses.
-> > > > > > > >
-> > > > > > > > One obvious omission is 52-bit kernel VA + 48-bit userspace VA which I
-> > > > > > > > can add with some more #ifdef'ery if needed.
-> > > > > > > >
-> > > > > > >
-> > > > > > > Hi Steve,
-> > > > > > >
-> > > > > > > Apologies if I am bringing up things that have been addressed
-> > > > > > > internally already. We discussed the 52-bit kernel VA work at
-> > > > > > > plumber's at some point, and IIUC, KASAN is the complicating factor
-> > > > > > > when it comes to having compile time constants for VA_BITS_MIN,
-> > > > > > > VA_BITS_MAX and PAGE_OFFSET, right?
-> > > > > > >
-> > > > > > > To clarify what I mean, please refer to the diagram below, which
-> > > > > > > describes a hybrid 48/52 kernel VA arrangement that does not rely on
-> > > > > > > runtime variable quantities. (VA_BITS_MIN == 48, VA_BITS_MAX == 52)
-> > > > > > >
-> > > > > > > +------------------- (~0) -------------------------+
-> > > > > > > |                                                |
-> > > > > > > |            PCI IO / fixmap spaces              |
-> > > > > > > |                                                |
-> > > > > > > +------------------------------------------------+
-> > > > > > > |                                                |
-> > > > > > > |             kernel/vmalloc space               |
-> > > > > > > |                                                |
-> > > > > > > +------------------------------------------------+
-> > > > > > > |                                                |
-> > > > > > > |                module space                    |
-> > > > > > > |                                                |
-> > > > > > > +------------------------------------------------+
-> > > > > > > |                                                |
-> > > > > > > |                BPF space                       |
-> > > > > > > |                                                |
-> > > > > > > +------------------------------------------------+
-> > > > > > > |                                                |
-> > > > > > > |                                                |
-> > > > > > > |   vmemmap space (size based on VA_BITS_MAX)    |
-> > > > > > > |                                                |
-> > > > > > > |                                                |
-> > > > > > > +-- linear/vmalloc split based on VA_BITS_MIN -- +
-> > > > > > > |                                                |
-> > > > > > > |    linear mapping (48 bit addressable region)  |
-> > > > > > > |                                                |
-> > > > > > > +------------------------------------------------+
-> > > > > > > |                                                |
-> > > > > > > |    linear mapping (52 bit addressable region)  |
-> > > > > > > |                                                |
-> > > > > > > +------ PAGE_OFFSET based on VA_BITS_MAX --------+
-> > > > > > >
-> > > > > > > Since KASAN is what is preventing this, would it be acceptable for
-> > > > > > > KASAN to only be supported when you use a true 48 bit or a true 52 bit
-> > > > > > > configuration, and disable it for the 48/52 hybrid configuration?
-> > > > > > >
-> > > > > > > Just thinking out loud (and in ASCII art :-))
-> > > > > >
-> > > > > > TBH, if we end up having support for 52-bit kernel VA, I'd be inclined to
-> > > > > > drop the 48/52 configuration altogether. But Catalin's on holiday at the
-> > > > > > moment, and may have a different opinion ;)
-> > > > > >
-> > > > >
-> > > > > But that implies that you cannot have an image that supports 52-bit
-> > > > > kernel VAs but can still boot on hardware that does not implement
-> > > > > support for it. If that is acceptable, then none of this hoop jumping
-> > > > > that Steve is doing in these patches is necessary to begin with,
-> > > > > right?
-> > > >
-> > > > Sorry, I misunderstood what you meant by a "48/52 hybrid configuration". I
-> > > > thought you were referring to the configuration where userspace is 52-bit
-> > > > and the kernel is 48-bit, which is something I think we can drop if we gain
-> > > > support for 52-bit kernel.
-> > > >
-> > > > Now that I understand what you mean, I think disabling KASAN would be fine
-> > > > as long as it's a runtime thing and the kernel continues to work in every
-> > > > other respect.
-> > > >
-> > >
-> > > No, it would be a limitation of the 52-bit config which also supports
-> > > 48-bit-VA-only-h/w that the address space is laid out in such a way
-> > > that there is simply no room for the KASAN shadow region, since it
-> > > would have to live in the 48-bit addressable area, but be big enough
-> > > to cover 52 bits of VA, which is impossible.
-> > >
-> > > For the vmemmap space, we could live with sizing it statically to
-> > > cover a 52-bit VA linear region, but the KASAN shadow region is simply
-> > > too big.
-> > >
-> > > So if KASAN support in that configuration is a requirement, then I
-> > > agree with Steve's approach, but it does imply that quite a number of
-> > > formerly compile-time constants now get turned into runtime variables.
-> > >
-> > > Steve, do you have any idea what the impact of that is?
-> >
-> > Hi Guys,
-> >
-> > The KASAN region only really necessitates two things: 1) that we think
-> > about the end address of the region (which is invariant) rather than the
-> > start address; and that 2) we flip the kernel VA space. IIUC both these
-> > changes have a neglible perf impact.
-> >
-> > As for VA_BITS_ACTUAL, we need this in a few places: KVM mapping
-> > support, and the big one phys_to/from_virt. For phys_to/from_virt the
-> > logic is changed s.t. we use a variable lookup for translation but this
-> > is folded into a new variable physvirt_offset (before the patch we used
-> > a single variable read too).
-> >
-> > Again IIUC there should be a minimal perf impact (unless one tries to do
-> > cat /sys/kernel/debug/kernel_page_tables with KASAN enabled - but that
-> > can be optimised later).
-> >
-> > I didn't have the patience for ASCII art ;-), but I have a picture of
-> > what I think it looks like here:
-> > https://s3.amazonaws.com/connect.linaro.org/yvr18/presentations/yvr18-119.pdf
-> > What I've tried to do is have most parts of the kernel VA space
-> > invariant between 48/52 bits. If it's helpful I can type this up into a
-> > document/commit log message?
-> >
-> > For this series I have tried to introduce VA_BITS_MIN in its own patch
-> > and also VA_BITS_ACTUAL into its own patch to make it easier to follow.
-> >
+On 25/02/2019 18:02, Szabolcs Nagy wrote:
+> On 25/02/2019 16:57, Catalin Marinas wrote:
+>> On Tue, Feb 19, 2019 at 06:38:31PM +0000, Szabolcs Nagy wrote:
+>>> i think these rules work for the cases i care about, a more
+>>> tricky question is when/how to check for the new syscall abi
+>>> and when/how the TCR_EL1.TBI0 setting may be turned off.
+>> I don't think turning TBI0 off is critical (it's handy for PAC with
+>> 52-bit VA but then it's short-lived if you want more security features
+>> like MTE).
+> yes, i made a mistake assuming TBI0 off is
+> required for (or at least compatible with) MTE.
+>
+> if TBI0 needs to be on for MTE then some of my
+> analysis is wrong, and i expect TBI0 to be on
+> in the foreseeable future.
+>
+>>> consider the following cases (tb == top byte):
+>>>
+>>> binary 1: user tb = any, syscall tb = 0
+>>>    tbi is on, "legacy binary"
+>>>
+>>> binary 2: user tb = any, syscall tb = any
+>>>    tbi is on, "new binary using tb"
+>>>    for backward compat it needs to check for new syscall abi.
+>>>
+>>> binary 3: user tb = 0, syscall tb = 0
+>>>    tbi can be off, "new binary",
+>>>    binary is marked to indicate unused tb,
+>>>    kernel may turn tbi off: additional pac bits.
+>>>
+>>> binary 4: user tb = mte, syscall tb = mte
+>>>    like binary 3, but with mte, "new binary using mte"
+> so this should be "like binary 2, but with mte".
+>
+>>>    does it have to check for new syscall abi?
+>>>    or MTE HWCAP would imply it?
+>>>    (is it possible to use mte without new syscall abi?)
+>> I think MTE HWCAP should imply it.
+>>
+>>> in userspace we want most binaries to be like binary 3 and 4
+>>> eventually, i.e. marked as not-relying-on-tbi, if a dso is
+>>> loaded that is unmarked (legacy or new tb user), then either
+>>> the load fails (e.g. if mte is already used? or can we turn
+>>> mte off at runtime?) or tbi has to be enabled (prctl? does
+>>> this work with pac? or multi-threads?).
+>> We could enable it via prctl. That's the plan for MTE as well (in
+>> addition maybe to some ELF flag).
+>>
+>>> as for checking the new syscall abi: i don't see much semantic
+>>> difference between AT_HWCAP and AT_FLAGS (either way, the user
+>>> has to check a feature flag before using the feature of the
+>>> underlying system and it does not matter much if it's a syscall
+>>> abi feature or cpu feature), but i don't see anything wrong
+>>> with AT_FLAGS if the kernel prefers that.
+>> The AT_FLAGS is aimed at capturing binary 2 case above, i.e. the
+>> relaxation of the syscall ABI to accept tb = any. The MTE support will
+>> have its own AT_HWCAP, likely in addition to AT_FLAGS. Arguably,
+>> AT_FLAGS is either redundant here if MTE implies it (and no harm in
+>> keeping it around) or the meaning is different: a tb != 0 may be checked
+>> by the kernel against the allocation tag (i.e. get_user() could fail,
+>> the tag is not entirely ignored).
+>>
+>>> the discussion here was mostly about binary 2,
+>> That's because passing tb != 0 into the syscall ABI is the main blocker
+>> here that needs clearing out before merging the MTE support. There is,
+>> of course, a variation of binary 1 for MTE:
+>>
+>> binary 5: user tb = mte, syscall tb = 0
+>>
+>> but this requires a lot of C lib changes to support properly.
+> yes, i don't think we want to do that.
+>
+> but it's ok to have both syscall tbi AT_FLAGS and MTE HWCAP.
+>
+>>> but for
+>>> me the open question is if we can make binary 3/4 work.
+>>> (which requires some elf binary marking, that is recognised
+>>> by the kernel and dynamic loader, and efficient handling of
+>>> the TBI0 bit, ..if it's not possible, then i don't see how
+>>> mte will be deployed).
+>> If we ignore binary 3, we can keep TBI0 = 1 permanently, whether we have
+>> MTE or not.
+>>
+>>> and i guess on the kernel side the open question is if the
+>>> rules 1/2/3/4 can be made to work in corner cases e.g. when
+>>> pointers embedded into structs are passed down in ioctl.
+>> We've been trying to track these down since last summer and we came to
+>> the conclusion that it should be (mostly) fine for the non-weird memory
+>> described above.
+> i think an interesting case is when userspace passes
+> a pointer to the kernel and later gets it back,
+> which is why i proposed rule 4 (kernel has to keep
+> the tag then).
+>
+> but i wonder what's the right thing to do for sp
+> (user can malloc thread/sigalt/makecontext stack
+> which will be mte tagged in practice with mte on)
+> does tagged sp work? should userspace untag the
+> stack memory before setting it up as a stack?
+> (but then user pointers to that allocation may get
+> broken..)
 
-Hi Ard,
+Tagged SP does work, and it is actually a good idea (it avoids using the default tag 
+for the stack). It would be quite easy for the kernel to tag the initial SP and the 
+stack on execve(). For other stacks, it is up to userspace, as you say, and would be 
+made easier by making it possible to choose how a mapping should be tagged by the 
+kernel via a new mmap() flag. Some software that makes too many assumptions on the 
+address of stack variables will be disturbed by a tagged SP, but this should be 
+fairly rare.
 
-Apologies for my late reply, I had been staring at this for a while.
+In any case, I don't think this impacts this ABI proposal (beyond the fact that 
+passing tagged pointers to the stack needs to be allowed).
 
-> 
-> OK, perhaps I am just rephrasing what you essentially implemented
-> already, but let me try to explain a bit better what I mean:
-> 
-> - we flip the VA space in the way you suggest
-> - we limit the size of the top half of the address space to 47 bits
-> - KASAN region growns downwards from (~0) << 47
-> - we define PAGE_OFFSET as (~0) << 52, regardless of whether the h/w
-> supports LVA or not
-> - however, we tweak the phys/virt translation so that memory appears
-> in the 48-bit addressable part of the linear region on non-LVA
-> hardware
-> 
-> The latter basically means that the KASAN shadow region will intersect
-> the linear region, but whether we map memory or shadow pages there
-> depends on the h/w config at runtime.
-> 
-> The heart of the matter is probably the different placement of the
-> memory inside the linear region, depending on whether the h/w is LVA
-> capable or not, which is also reflected in your physvirt_offset. I am
-> just trying to figure out why we need VA_BITS_ACTUAL to be a runtime
-> variable.
-
-Currently the direct linear map between configurations does not overlap,
-we have:
-
-FFF00000_00000000 - Direct linear map start (52-bit)
-FFF80000_00000000 - Direct linear map end (52-bit)
-FFFF0000_00000000 - Direct linear map start (48-bit)
-FFFF8000_00000000 - Direct linear map end (48-bit)
-
-We *can* make PAGE_OFFSET a constant for both 48/52 bit VA_BITS, if we
-offset it. vmemmap can then be adjusted on early boot to ensure that
-everything points to the right place. However we will get overlap for
-52-bit configurations between KASAN and the direct linear map.
-
-The question is: are we okay with quite a large overlap?
-
-The KASAN region begins on 0xFFFDA000_00000000 for 52-bit. If we wish to
-employ a "full" 47-bit direct linear map on 48-bit systems we need a
-PAGE_OFFSET of 0xFFF78000_00000000 in order to make the direct linear
-map end addresses "match up" between 48/52 bit configurations.
-
-This doesn't leave us with a lot of room for 52-bit configurations
-though, if KASAN is enabled.
-
-Cheers,
--- 
-Steve
+Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
