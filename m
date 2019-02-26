@@ -2,90 +2,69 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 07954C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:51:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C3E22C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:53:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CB415217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:51:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 93BE9217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 11:53:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PCKQzLOr";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="m2LTN/z+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CB415217F9
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J2/hBCWU";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="AszxAvyB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 93BE9217F9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=koUXg3/6cBoB0NSEvm3IWp/a3lT85vuL7lZRtOeB2nY=; b=PCKQzLOrceoq/o7zjoYE0QVNbk
-	iQksGydlX8JwAT79W8Owc2qY0ok3sRZPbqa4BuAHK3wM6+YMIONrg9lS9a37Zrek8gfbZzjUWAGjq
-	oKPOzld5+B2j1rNR3Ky/Un7+iGKsCFiaXDfVi0ysfrJGOAflXqUHV8qZ+/C36feHQ4eCC7OvUnsvi
-	cT3a8iqcgPUuoCruV0dJwpawIK3VLyEWnp7/oIbzlVCuwc3dzlevwlM05cvf/m2flkUA+hXRVsVJR
-	W9OY0lnzcl0dbPg5m0kf0AWMp20PzIwaGZTwEUHz7GJoEQR8srgtkMpLuuVmOApvm6ShVUPGoIGvs
-	2KrUITwA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UxBeYh+OZyevgV4RKGj92GFcgtxVUNmFS8fC/DN+66o=; b=J2/hBCWUHMagJp
+	/ovCN378yMDXRmYXeO93PHY+YqUNSBDRcbkoC2yPIBVPwP4y0evSRbMRfPqPBLDwhQ4osEFcAmgZ7
+	PCvv4aaXlg6/E5pBlMsEZNc2t7cW7pTRKX2+tEx4arx6PetV1jzoKTwkGIrRt4XVSKLWXien1pB0J
+	/ri4WsVnJcY2oQUSe57xkcfRmyx5bRQa1KMrHzYu3oUTWCGYqGCk3cFVcokj7YIJmTQyVQ0/HDLHw
+	yg5DVIDpq0bjSihP7FBlFPvXDi3fRb9u9DADTOaJHN8e511Mx51OtRwSj+OyrOxTh82UpXZAXFC+B
+	Bght1l3KV2B8WWVJ6jPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybGD-00081z-H1; Tue, 26 Feb 2019 11:50:57 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gybIU-0008Ob-F5; Tue, 26 Feb 2019 11:53:18 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybFz-0007mQ-GF
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 11:50:46 +0000
-Received: by mail-pl1-x642.google.com with SMTP id m10so6119824plt.10
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 03:50:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=BsfNKWEJ3ROKzrbnju2laN7hNuk0psHdh/467dEUXhg=;
- b=m2LTN/z+Y8P/b7k/tzaH2Fb2S6ZLbwIQa6E/jV+c6QEzqT7shkF9+4ad6YOwcUY1Cc
- 87ACyxPTjwUFzjkcEBjHsxQvmRXiM1aVFwHifDc1wGQ32/qdOpMXRlBL/MFHQrrkQ0Y6
- xs1aCYZpSYAAHBOup58iqqdqgUl9UwmXF0252FETY3QFiren60GC3xrrMz8IoxJQzx/i
- 3q1k3TsAfJBtu7CScsmMkCNSqV9jHL3rye59pJK7pWQ/cyFVRVLH1YxLPpmgBGp9DcYu
- IfPeB1gIIbFWCfnfXyJeDpl8a97N9F2Lhr00LuMoHCpsHoMZHv88nm4haHn+e6BsNMSO
- 2X6A==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=BsfNKWEJ3ROKzrbnju2laN7hNuk0psHdh/467dEUXhg=;
- b=EFTbg4wYiS3RQwO8G2E0j2FlJU3o4sXmlE7vDwmnuMmKbaZd1HrVFffEZkRWZsLKdW
- YNlztQXt/M3zRYeAkVLjYl6bo4yWRmE7OO/KZl9k1rw13xFMZZNiyVTHzsfDCElXPain
- cJ4RCPqIizgbFfrBkWeuKxf1PlcBY3zcEzS9ST3pvqgk6TGhZU7e2rBn5tIMsb9FLSJY
- MbC1aBlnKvFbxA5dTS5lHNjwIyjIMyimZzAjZtkSWqmXeg6X7cd7ZFMY5OrMtPV1SjBt
- tTDQjFU9eiFd4aY7TnUjfgy6CN+/fSVOi9bv+xX3fslTWfBNyw9HwIZqtFJdF8/A9HOf
- OUcg==
-X-Gm-Message-State: AHQUAuYLHqS7N+82lDH6ywaNoTKrDqqO94+5Zqny+52naJTWmNXu4r/i
- rqhQWQH+DkNtsM/F+BDU+8zwF7Qk2g==
-X-Google-Smtp-Source: AHgI3IbYtzO47PzqP/GcwC77ytxzSt9Q3QS6j+WcIewtyOwCwjSjrirAYwRqkHnWa7cZrUp7bySXTQ==
-X-Received: by 2002:a17:902:2aa8:: with SMTP id
- j37mr24836963plb.226.1551181842548; 
- Tue, 26 Feb 2019 03:50:42 -0800 (PST)
-Received: from localhost.localdomain ([2405:204:7288:2b3b:d5bf:2058:5f56:d25e])
- by smtp.gmail.com with ESMTPSA id t10sm31639245pfa.151.2019.02.26.03.50.38
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 03:50:41 -0800 (PST)
-From: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-To: linux-arm-kernel@lists.infradead.org,
-	linus.walleij@linaro.org
-Subject: [PATCH 2/2] arm64: dts: bitmain: Add GPIO Line names for Sophon Edge
- board
-Date: Tue, 26 Feb 2019 17:20:22 +0530
-Message-Id: <20190226115022.19022-2-manivannan.sadhasivam@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190226115022.19022-1-manivannan.sadhasivam@linaro.org>
-References: <20190226115022.19022-1-manivannan.sadhasivam@linaro.org>
+ id 1gybIQ-0008OB-Rp
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 11:53:16 +0000
+Received: from localhost (5356596B.cm-6-7b.dynamic.ziggo.nl [83.86.89.107])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 27183217F9;
+ Tue, 26 Feb 2019 11:53:13 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1551181993;
+ bh=Q3PMcPZyYk7lXpXVRSw73aPhfioMF5rJZy36t6w1tjs=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=AszxAvyBBEg6OQWICDLthuF/+OmY14lAe+oil6tPiYJsDHyMXRwLNOnGYXiRpGupi
+ p8IFppdfGT8N/CHAZ//mc+UQsPwFvow7s+UCb66lsKqutV8x8vDJTXnxIXBlx0WvGt
+ g6XCnSfSBnM/BKS7i/93ifj5/fC6K33PuuAYnRUY=
+Date: Tue, 26 Feb 2019 12:53:11 +0100
+From: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+To: Hyun Kwon <hyun.kwon@xilinx.com>
+Subject: Re: [PATCH RFC 1/1] uio: Add dma-buf import ioctls
+Message-ID: <20190226115311.GA4094@kroah.com>
+References: <1550953697-7288-1-git-send-email-hyun.kwon@xilinx.com>
+ <1550953697-7288-2-git-send-email-hyun.kwon@xilinx.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1550953697-7288-2-git-send-email-hyun.kwon@xilinx.com>
+User-Agent: Mutt/1.11.3 (2019-02-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_035043_862275_471158B3 
-X-CRM114-Status: GOOD (  15.06  )
+X-CRM114-CacheID: sfid-20190226_035314_935935_09390760 
+X-CRM114-Status: GOOD (  19.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,160 +76,129 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- amit.kucheria@linaro.org, darren.tsao@bitmain.com, linux-gpio@vger.kernel.org,
- Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- haitao.suo@bitmain.com
-MIME-Version: 1.0
+Cc: Stefano Stabellini <stefanos@xilinx.com>, Sonal Santan <sonals@xilinx.com>,
+ Cyril Chemparathy <cyrilc@xilinx.com>, Jiaying Liang <jliang@xilinx.com>,
+ dri-devel@lists.freedesktop.org, linux-kernel@vger.kernel.org,
+ linaro-mm-sig@lists.linaro.org, Sumit Semwal <sumit.semwal@linaro.org>,
+ Michal Simek <michal.simek@xilinx.com>, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add GPIO line names for Sophon Edge board based on BM1880 SoC from
-Bitmain. Line names are based on the board schematics as well as the
-96Boards Consumer Edition specification v1.0.
+On Sat, Feb 23, 2019 at 12:28:17PM -0800, Hyun Kwon wrote:
+> Add the dmabuf map / unmap interfaces. This allows the user driver
+> to be able to import the external dmabuf and use it from user space.
+> 
+> Signed-off-by: Hyun Kwon <hyun.kwon@xilinx.com>
+> ---
+>  drivers/uio/Makefile         |   2 +-
+>  drivers/uio/uio.c            |  43 +++++++++
+>  drivers/uio/uio_dmabuf.c     | 210 +++++++++++++++++++++++++++++++++++++++++++
+>  drivers/uio/uio_dmabuf.h     |  26 ++++++
+>  include/uapi/linux/uio/uio.h |  33 +++++++
+>  5 files changed, 313 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/uio/uio_dmabuf.c
+>  create mode 100644 drivers/uio/uio_dmabuf.h
+>  create mode 100644 include/uapi/linux/uio/uio.h
+> 
+> diff --git a/drivers/uio/Makefile b/drivers/uio/Makefile
+> index c285dd2..5da16c7 100644
+> --- a/drivers/uio/Makefile
+> +++ b/drivers/uio/Makefile
+> @@ -1,5 +1,5 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> -obj-$(CONFIG_UIO)	+= uio.o
+> +obj-$(CONFIG_UIO)	+= uio.o uio_dmabuf.o
+>  obj-$(CONFIG_UIO_CIF)	+= uio_cif.o
+>  obj-$(CONFIG_UIO_PDRV_GENIRQ)	+= uio_pdrv_genirq.o
+>  obj-$(CONFIG_UIO_DMEM_GENIRQ)	+= uio_dmem_genirq.o
+> diff --git a/drivers/uio/uio.c b/drivers/uio/uio.c
+> index 1313422..6841f98 100644
+> --- a/drivers/uio/uio.c
+> +++ b/drivers/uio/uio.c
+> @@ -24,6 +24,12 @@
+>  #include <linux/kobject.h>
+>  #include <linux/cdev.h>
+>  #include <linux/uio_driver.h>
+> +#include <linux/list.h>
+> +#include <linux/mutex.h>
+> +
+> +#include <uapi/linux/uio/uio.h>
+> +
+> +#include "uio_dmabuf.h"
+>  
+>  #define UIO_MAX_DEVICES		(1U << MINORBITS)
+>  
+> @@ -454,6 +460,8 @@ static irqreturn_t uio_interrupt(int irq, void *dev_id)
+>  struct uio_listener {
+>  	struct uio_device *dev;
+>  	s32 event_count;
+> +	struct list_head dbufs;
+> +	struct mutex dbufs_lock; /* protect @dbufs */
+>  };
+>  
+>  static int uio_open(struct inode *inode, struct file *filep)
+> @@ -500,6 +508,9 @@ static int uio_open(struct inode *inode, struct file *filep)
+>  	if (ret)
+>  		goto err_infoopen;
+>  
+> +	INIT_LIST_HEAD(&listener->dbufs);
+> +	mutex_init(&listener->dbufs_lock);
+> +
+>  	return 0;
+>  
+>  err_infoopen:
+> @@ -529,6 +540,10 @@ static int uio_release(struct inode *inode, struct file *filep)
+>  	struct uio_listener *listener = filep->private_data;
+>  	struct uio_device *idev = listener->dev;
+>  
+> +	ret = uio_dmabuf_cleanup(idev, &listener->dbufs, &listener->dbufs_lock);
+> +	if (ret)
+> +		dev_err(&idev->dev, "failed to clean up the dma bufs\n");
+> +
+>  	mutex_lock(&idev->info_lock);
+>  	if (idev->info && idev->info->release)
+>  		ret = idev->info->release(idev->info, inode);
+> @@ -652,6 +667,33 @@ static ssize_t uio_write(struct file *filep, const char __user *buf,
+>  	return retval ? retval : sizeof(s32);
+>  }
+>  
+> +static long uio_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- .../boot/dts/bitmain/bm1880-sophon-edge.dts   | 114 ++++++++++++++++++
- 1 file changed, 114 insertions(+)
+We have resisted adding a uio ioctl for a long time, can't you do this
+through sysfs somehow?
 
-diff --git a/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts b/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
-index 6a3255597138..6bdf4c101c61 100644
---- a/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
-+++ b/arch/arm64/boot/dts/bitmain/bm1880-sophon-edge.dts
-@@ -8,6 +8,28 @@
- 
- #include "bm1880.dtsi"
- 
-+/*
-+ * GPIO name legend: proper name = the GPIO line is used as GPIO
-+ *         NC = not connected (pin out but not routed from the chip to
-+ *              anything the board)
-+ *         "[PER]" = pin is muxed for [peripheral] (not GPIO)
-+ *         LSEC = Low Speed External Connector
-+ *         HSEC = High Speed External Connector
-+ *
-+ * Line names are taken from the schematic "sophon-edge-schematics"
-+ * version, 1.0210.
-+ *
-+ * For the lines routed to the external connectors the
-+ * lines are named after the 96Boards CE Specification 1.0,
-+ * Appendix "Expansion Connector Signal Description".
-+ *
-+ * When the 96Board naming of a line and the schematic name of
-+ * the same line are in conflict, the 96Board specification
-+ * takes precedence. This is only for the informational
-+ * lines i.e. "[FOO]", the GPIO named lines "GPIO-A" thru "GPIO-L"
-+ * are the only ones actually used for GPIO.
-+ */
-+
- / {
- 	compatible = "bitmain,sophon-edge", "bitmain,bm1880";
- 	model = "Sophon Edge";
-@@ -32,6 +54,98 @@
- 		clock-frequency = <500000000>;
- 		#clock-cells = <0>;
- 	};
-+
-+	soc {
-+		gpio0: gpio@50027000 {
-+			porta: gpio-controller@0 {
-+				gpio-line-names =
-+					"GPIO-A", /* GPIO0, LSEC pin 23 */
-+					"GPIO-C", /* GPIO1, LSEC pin 25 */
-+					"[GPIO2_PHY0_RST]", /* GPIO2 */
-+					"GPIO-E", /* GPIO3, LSEC pin 27 */
-+					"[USB_DET]", /* GPIO4 */
-+					"[EN_P5V]", /* GPIO5 */
-+					"[VDDIO_MS1_SEL]", /* GPIO6 */
-+					"GPIO-G", /* GPIO7, LSEC pin 29 */
-+					"[BM_TUSB_RST_L]", /* GPIO8 */
-+					"[EN_P5V_USBHUB]", /* GPIO9 */
-+					"NC",
-+					"LED_WIFI", /* GPIO11 */
-+					"LED_BT", /* GPIO12 */
-+					"[BM_BLM8221_EN_L]", /* GPIO13 */
-+					"NC", /* GPIO14 */
-+					"NC", /* GPIO15 */
-+					"NC", /* GPIO16 */
-+					"NC", /* GPIO17 */
-+					"NC", /* GPIO18 */
-+					"NC", /* GPIO19 */
-+					"NC", /* GPIO20 */
-+					"NC", /* GPIO21 */
-+					"NC", /* GPIO22 */
-+					"NC", /* GPIO23 */
-+					"NC", /* GPIO24 */
-+					"NC", /* GPIO25 */
-+					"NC", /* GPIO26 */
-+					"NC", /* GPIO27 */
-+					"NC", /* GPIO28 */
-+					"NC", /* GPIO29 */
-+					"NC", /* GPIO30 */
-+					"NC"; /* GPIO31 */
-+			};
-+		};
-+
-+		gpio1: gpio@50027400 {
-+			portb: gpio-controller@0 {
-+				gpio-line-names =
-+					"NC", /* GPIO32 */
-+					"NC", /* GPIO33 */
-+					"[I2C0_SDA]", /* GPIO34, LSEC pin 17 */
-+					"[I2C0_SCL]", /* GPIO35, LSEC pin 15 */
-+					"[JTAG0_TDO]", /* GPIO36 */
-+					"[JTAG0_TCK]", /* GPIO37 */
-+					"[JTAG0_TDI]", /* GPIO38 */
-+					"[JTAG0_TMS]", /* GPIO39 */
-+					"[JTAG0_TRST_X]", /* GPIO40 */
-+					"[JTAG1_TDO]", /* GPIO41 */
-+					"[JTAG1_TCK]", /* GPIO42 */
-+					"[JTAG1_TDI]", /* GPIO43 */
-+					"[CPU_TX]", /* GPIO44 */
-+					"[CPU_RX]", /* GPIO45 */
-+					"[UART1_TXD]", /* GPIO46 */
-+					"[UART1_RXD]", /* GPIO47 */
-+					"[UART0_TXD]", /* GPIO48 */
-+					"[UART0_RXD]", /* GPIO49 */
-+					"GPIO-I", /* GPIO50, LSEC pin 31 */
-+					"GPIO-K", /* GPIO51, LSEC pin 33 */
-+					"USER_LED2", /* GPIO52 */
-+					"USER_LED1", /* GPIO53 */
-+					"[UART0_RTS]", /* GPIO54 */
-+					"[UART0_CTS]", /* GPIO55 */
-+					"USER_LED4", /* GPIO56, JTAG1_TRST_X */
-+					"USER_LED3", /* GPIO57, JTAG1_TMS */
-+					"[I2S0_SCLK]", /* GPIO58 */
-+					"[I2S0_FS]", /* GPIO59 */
-+					"[I2S0_SDI]", /* GPIO60 */
-+					"[I2S0_SDO]", /* GPIO61 */
-+					"GPIO-B", /* GPIO62, LSEC pin 24 */
-+					"GPIO-F"; /* GPIO63, I2S1_SCLK, LSEC pin 28 */
-+			};
-+		};
-+
-+		gpio2: gpio@50027800 {
-+			portc: gpio-controller@0 {
-+				gpio-line-names =
-+					"GPIO-D", /* GPIO64, I2S1_FS, LSEC pin 26 */
-+					"GPIO-J", /* GPIO65, I2S1_SDI, LSEC pin 32 */
-+					"GPIO-H", /* GPIO66, I2S1_SDO, LSEC pin 30 */
-+					"GPIO-L", /* GPIO67, LSEC pin 34 */
-+					"[SPI0_CS]", /* GPIO68, SPI1_CS, LSEC pin 12 */
-+					"[SPI0_DIN]", /* GPIO69, SPI1_SDI, LSEC pin 10 */
-+					"[SPI0_DOUT]", /* GPIO70, SPI1_SDO, LSEC pin 14 */
-+					"[SPI0_SCLK]"; /* GPIO71, SPI1_SCK, LSEC pin 8 */
-+			};
-+		};
-+	};
- };
- 
- &uart0 {
--- 
-2.17.1
+A meta-comment about your ioctl structure:
 
+> +#define UIO_DMABUF_DIR_BIDIR	1
+> +#define UIO_DMABUF_DIR_TO_DEV	2
+> +#define UIO_DMABUF_DIR_FROM_DEV	3
+> +#define UIO_DMABUF_DIR_NONE	4
+
+enumerated type?
+
+> +
+> +struct uio_dmabuf_args {
+> +	__s32	dbuf_fd;
+> +	__u64	dma_addr;
+> +	__u64	size;
+> +	__u32	dir;
+
+Why the odd alignment?  Are you sure this is the best packing for such a
+structure?
+
+Why is dbuf_fd __s32?  dir can be __u8, right?
+
+I don't know that dma layer very well, it would be good to get some
+review from others to see if this really is even a viable thing to do.
+The fd handling seems a bit "odd" here, but maybe I just do not
+understand it.
+
+thanks,
+
+greg k-h
 
 _______________________________________________
 linux-arm-kernel mailing list
