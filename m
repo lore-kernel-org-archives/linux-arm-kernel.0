@@ -2,64 +2,139 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-7.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 36CAAC4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 31CA9C10F0B
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0B35321852
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0331F217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:07:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="M/IC6Pfu"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0B35321852
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LojRGiwR";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="JChRC81H"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0331F217F9
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=q84jMpRZCxSi0mCn6KwLtcNvRKSYLZrQno1noo/XKdA=; b=M/IC6Pfujni94q
-	hf2yKuZARgRmuNUu7rwXTz35QSCGBueOFwRH6+0Erd3kXhABiwCVa219gv1PSQ/kxzMgf9/b0B+pX
-	SmN5wjGKcI68JC0A8hecBPsOxMnuDei1kGf+rHUxnv5OTMTMh4/FxAM37VYSaXlFiUonI6cTOvlZk
-	OhulV+a732Hk4E7oYdaFq41d2Iny/kzCgr4x6u7WB/FyIVBx6T4yoqHIdHFpE/1xiILJ/vngPTV4b
-	uLm+5QI6ccS5cF6DstBdYcrp70zeFptDRg/qXxMrewawSQur+g2MQUDLkpsDkvfVdxBQLy1G95n5S
-	rG81K/tTdIhF0JOHE94g==;
+	List-Owner; bh=zSO0fypFzj+kHtExCuOdemN2ZnsYkzydysfrFlbDOu4=; b=LojRGiwR+r0V3p
+	fQCDOYofBWRJaw354+vZ6CkZWOb935M9wRmpHFPPuPV8qC40E2jjcC05nLWbk0InlkgXgt2gdlPzJ
+	nipwMUm8M7/5cI2bTRJf4//oWwNstTC32bxoxkKNWEKYnUMijCbrSqgPn+kN6StDlYri6Z4am4p89
+	u/f3MvTxRKUL4Ejg1UA0IjNfsYbvYlDReK+LNNtiuHHhG+VTuEda0pmmZITcPLgJGdyGiiP+7E0nq
+	rEkzgzLNUVpT2XxiOx7BTWl03flfufXeDRJLxtSAMysDilH7SDP4i/P65SydboJRVbo6MadqF79qK
+	+NArZqpZ7ohWTDL+JHGA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybVv-0000rO-ST; Tue, 26 Feb 2019 12:07:11 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybVL-0000I5-Bh
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:42 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ADE5480D;
- Tue, 26 Feb 2019 04:06:34 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E12303F71D;
- Tue, 26 Feb 2019 04:06:32 -0800 (PST)
-Date: Tue, 26 Feb 2019 12:06:30 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v5 06/26] arm64/sve: Check SVE virtualisability
-Message-ID: <20190226120630.GH3567@e103592.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-7-git-send-email-Dave.Martin@arm.com>
- <64764e35-c243-e642-a868-5b9e221813c7@arm.com>
+	id 1gybW3-00011G-6u; Tue, 26 Feb 2019 12:07:19 +0000
+Received: from mail-eopbgr00069.outbound.protection.outlook.com ([40.107.0.69]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gybVM-0000HW-AT
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:06:50 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=zc8Ql06AobFqiMbgo1afOGRQem95XHCnz7ED1GNv6Eg=;
+ b=JChRC81HyG1FNKE1Vkw8GEr4gxbd171DK/eSVtJVriaqc5W/lQLMv/eBty3rg5e9k3t5UvPBo8p0SKaxokq82Z5SGuetA1tTEamejhx90JKjLEj3lL5kx1QzBI+Z5qcbvhqSLOJc5qkJ+8/QrXRf3S+4bU4m522AbUOud9BEoEs=
+Received: from VI1PR04MB4222.eurprd04.prod.outlook.com (52.134.31.21) by
+ VI1PR04MB4991.eurprd04.prod.outlook.com (20.177.49.220) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.16; Tue, 26 Feb 2019 12:06:31 +0000
+Received: from VI1PR04MB4222.eurprd04.prod.outlook.com
+ ([fe80::b1cb:82a5:aacb:238d]) by VI1PR04MB4222.eurprd04.prod.outlook.com
+ ([fe80::b1cb:82a5:aacb:238d%6]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
+ 12:06:31 +0000
+From: Aisheng Dong <aisheng.dong@nxp.com>
+To: Anson Huang <anson.huang@nxp.com>, "robh+dt@kernel.org"
+ <robh+dt@kernel.org>, "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "festevam@gmail.com" <festevam@gmail.com>, "ulf.hansson@linaro.org"
+ <ulf.hansson@linaro.org>, "devicetree@vger.kernel.org"
+ <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH V4 1/2] dt-bindings: imx: remove unused resources from scu
+ resource table
+Thread-Topic: [PATCH V4 1/2] dt-bindings: imx: remove unused resources from
+ scu resource table
+Thread-Index: AQHUyyabNa6yXj+Xik+em+PrjLHzmaXx/6bAgAABHVA=
+Date: Tue, 26 Feb 2019 12:06:31 +0000
+Message-ID: <VI1PR04MB422268F2EB954DA0DCF15442807B0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+References: <1550891655-29043-1-git-send-email-Anson.Huang@nxp.com>
+ <VI1PR04MB42224740E322E5792426DAAB807B0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+In-Reply-To: <VI1PR04MB42224740E322E5792426DAAB807B0@VI1PR04MB4222.eurprd04.prod.outlook.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: b685a3d6-b2be-45c0-242b-08d69be2d894
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR04MB4991; 
+x-ms-traffictypediagnostic: VI1PR04MB4991:
+x-microsoft-exchange-diagnostics: =?us-ascii?Q?1; VI1PR04MB4991;
+ 23:rmb+6R3v675t6fxFjfK6/ala1aXg2UxCaEd4dbjua?=
+ =?us-ascii?Q?O8/LTwRKrJa6B+67LS5pKQsOTBWxzuy/BCrSHO9X+HOl5zd1H9EwmNH9xGh6?=
+ =?us-ascii?Q?yAQeuoChEIBKtrwFHge84Qqzb4Pwsddl9oNHUelDFIC2UNZACpgJw9M2YXJ5?=
+ =?us-ascii?Q?Yg5K2pNqpXUStJE4S2N5vjJNfmugemKt/bbFRz58E13ELusQiEcv2tHRB1wC?=
+ =?us-ascii?Q?AINEoPqIy9y3Ppi2dvxNW+K+fj1gF3kmiqMniZ6noIfloQspX3k6lWPE4IPn?=
+ =?us-ascii?Q?2M37pSj8qHn6+QjgwOUjrO7ds3oP1Nb+9/LXliStfjU64jVvg79OLUgxVZIE?=
+ =?us-ascii?Q?IJUIqVF70gEP/IL9eKRZI7UWo1bCbFzZgimHtIJa5vmnRCbz/sn/r7ww314W?=
+ =?us-ascii?Q?3K9RPElRL9ZVEHemhCaDvkPN7oANrJI+FsSIO9H4a0CcbbbdtBnrnX1LRj83?=
+ =?us-ascii?Q?U2Z43XEtEwfZjjsZ/EgZPlnojC8w5zG9zbTlHQ00kuAtNbZk/9fw1VqZhFO7?=
+ =?us-ascii?Q?pfP7dYSUihyYlCktJJFFj1UglqKaIqKa+7X6n0BtxTr49RdHiKshAP1t6niI?=
+ =?us-ascii?Q?uyTC+rryRZl+WTjPngHaLmmN6cAkNXUga0bFklKR/PSyi0T/fUHuE8gtLYbm?=
+ =?us-ascii?Q?QkEm0VnVD0eI4LrAacLtFdZtSQZhULTOlNGIsQQ7oEfCiC6YiUDB9NWQfqtf?=
+ =?us-ascii?Q?/PUoMF8LdPeemOMvnhKRdbmW6qKiHSQzFn1f6jm8MB9qSx5QgrjN2/WyxWrW?=
+ =?us-ascii?Q?P8S+UYrpCOZ2BRWOC5S62MO+R3Bpxl0+VQoOvorOHJ0eNhTnCBmUWHXnx8Hh?=
+ =?us-ascii?Q?AnMongFv4+dULldw/+FhFZ3k+k3ReRkcQU3HD1ne3OzI1FfNMRQtHKHYVcdU?=
+ =?us-ascii?Q?sJmhCEjsUJBODpPf58ji2tQVCtq7OF2rUywLdbvrAfM6U0eS5Oq6/ZUAQPsf?=
+ =?us-ascii?Q?+KDPTfxBxiqc2xCvPBVIdA+QoUVYtc10oIUx2Jt/HcV6vPj4HOyXKrKjG8n/?=
+ =?us-ascii?Q?ynlb+0wvXNEL3SR95pJMjsU0sySQ3zjy2tQRGKEl7k5o5OjpDz/QUeH1F0zo?=
+ =?us-ascii?Q?EfbTYrWW/Wt7QMO+R7s9vcDHsVZ48/zVilWz8neQLjx5xUNhOILCl5uMOjbd?=
+ =?us-ascii?Q?ZXLMuLP2mv6iV13w/ejvi6r9oULvMgf2WtUh7pgt7yBZRi53RjAxTFIfhO8B?=
+ =?us-ascii?Q?YTjll8nGbHVv69XjBYMjuy/IeE6mRtIhuu3kCBLkluzlRzxkTed0W6oIc1wE?=
+ =?us-ascii?Q?c1KQhr0SEhYZWz56s5itYDV/Qgl324d5aGzij9jVNIZLDL34ck77U4/7yzpW?=
+ =?us-ascii?Q?BHJfO3tjCdAJnxjS2AA7WuGMr34kiGUPXD87g46+l53UQLH4VfScAnCte4yg?=
+ =?us-ascii?Q?DOUUGGzGZyQP6p67PQ9YiwC5uWR6oL6Pfe0Oyb5UzBgjwBskY31sTYH3AqVI?=
+ =?us-ascii?Q?m577zGqnTP3W6aFSC/MNakCvINyZ2ZNgVe9BMGvS5E/iOWMgwXw9sUhvtLSd?=
+ =?us-ascii?Q?ImsVDqTG8b7/g=3D=3D?=
+x-microsoft-antispam-prvs: <VI1PR04MB4991EB718421AA637EBA0979807B0@VI1PR04MB4991.eurprd04.prod.outlook.com>
+x-forefront-prvs: 096029FF66
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(979002)(396003)(366004)(136003)(39860400002)(346002)(376002)(189003)(199004)(97736004)(55016002)(2501003)(9686003)(14444005)(5660300002)(71200400001)(71190400001)(6246003)(74316002)(6436002)(106356001)(105586002)(4326008)(7416002)(186003)(14454004)(478600001)(53936002)(8936002)(25786009)(26005)(6116002)(3846002)(99286004)(7696005)(81156014)(81166006)(2906002)(8676002)(68736007)(256004)(102836004)(6506007)(6346003)(229853002)(93156006)(446003)(7736002)(33656002)(52536013)(2940100002)(305945005)(110136005)(86362001)(2201001)(44832011)(11346002)(76176011)(66066001)(476003)(486006)(316002)(921003)(1121003)(969003)(989001)(999001)(1009001)(1019001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4991;
+ H:VI1PR04MB4222.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: TjdQXtwWFCk+pieovjlYrC7C39NPSmE19nakG4SFqAAb1jvTT+rT1BGl1pt71NcqCO2CF1NQ+UV7zG9PiaxoNLxfNGlFwnNlP2uZtprkV6dZq27utKOO7UbGu9kynLe5BP9s4XGbn7Zv6iAd69kMeB9MzUmpeHy2FIfMWNWPePnyz7HfiqMKY31S8QymgZV8GRWKcyDEFF5UIfvX4pkIaEIEKVSX16d1BiQwDsHTiM25e3JJ4lvUpXNzmfd34mXHuFthqFd8BkQCbleJwvwBUndRf1cqwGHz3WzhDCgzOeoTU/aZ4jdONxyFWP6/7TLpDfSVGZ5tGexr66CkoD5Sz6yHk5eShY0irfKe4dtyeADejYNSZBT29/SkUpWveFN1vMqITYhlmb1c8W4DLhnQnGwG/CYQQ21OBMiZXjKJ7Y0=
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <64764e35-c243-e642-a868-5b9e221813c7@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b685a3d6-b2be-45c0-242b-08d69be2d894
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 12:06:31.6734 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4991
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_040635_580961_62033E6F 
-X-CRM114-Status: GOOD (  31.95  )
+X-CRM114-CacheID: sfid-20190226_040636_618167_81912E85 
+X-CRM114-Status: GOOD (  12.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,219 +146,119 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, Zhang Lei <zhang.lei@jp.fujitsu.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: dl-linux-imx <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 11:12:49AM +0000, Julien Thierry wrote:
-> Hi Dave,
+> > Subject: [PATCH V4 1/2] dt-bindings: imx: remove unused resources from
+> > scu resource table
+> >
+> > Removes below resources which were defined during pre-silicon phase
+> > and the real silicons do NOT have them, they have never been used,
+> > latest system controller firmware also removed them:
+> >
+> > 	IMX_SC_R_DC_0_CAPTURE0
+> > 	IMX_SC_R_DC_0_CAPTURE1
+> > 	IMX_SC_R_DC_0_INTEGRAL0
+> > 	IMX_SC_R_DC_0_INTEGRAL1
+> > 	IMX_SC_R_DC_0_FRAC1
+> > 	IMX_SC_R_DC_1_CAPTURE0
+> > 	IMX_SC_R_DC_1_CAPTURE1
+> > 	IMX_SC_R_DC_1_INTEGRAL0
+> > 	IMX_SC_R_DC_1_INTEGRAL1
+> > 	IMX_SC_R_DC_1_FRAC1
+> > 	IMX_SC_R_GPU_3_PID0
+> > 	IMX_SC_R_M4_0_SIM
+> > 	IMX_SC_R_M4_0_WDOG
+> > 	IMX_SC_R_M4_1_SIM
+> > 	IMX_SC_R_M4_1_WDOG
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > 
-> On 18/02/2019 19:52, Dave Martin wrote:
-> > Due to the way the effective SVE vector length is controlled and
-> > trapped at different exception levels, certain mismatches in the
-> > sets of vector lengths supported by different physical CPUs in the
-> > system may prevent straightforward virtualisation of SVE at parity
-> > with the host.
-> > 
-> > This patch analyses the extent to which SVE can be virtualised
-> > safely without interfering with migration of vcpus between physical
-> > CPUs, and rejects late secondary CPUs that would erode the
-> > situation further.
-> > 
-> > It is left up to KVM to decide what to do with this information.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> There're gaps left after removing, but I can't see it's actually a problem.
+> So:
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+> 
+
+Sorry, missed to comment that please update the patch title:
+dt-bindings: firmware: imx-scu: xxxx
+
+Regards
+Dong Aisheng
+
+> Regards
+> Dong Aisheng
+> 
 > > ---
-> >  arch/arm64/include/asm/fpsimd.h |  1 +
-> >  arch/arm64/kernel/cpufeature.c  |  2 +-
-> >  arch/arm64/kernel/fpsimd.c      | 86 ++++++++++++++++++++++++++++++++++-------
-> >  3 files changed, 73 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> > index dd1ad39..964adc9 100644
-> > --- a/arch/arm64/include/asm/fpsimd.h
-> > +++ b/arch/arm64/include/asm/fpsimd.h
-> > @@ -87,6 +87,7 @@ extern void sve_kernel_enable(const struct arm64_cpu_capabilities *__unused);
-> >  extern u64 read_zcr_features(void);
-> >  
-> >  extern int __ro_after_init sve_max_vl;
-> > +extern int __ro_after_init sve_max_virtualisable_vl;
-> >  
-> >  #ifdef CONFIG_ARM64_SVE
-> >  
-> > diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> > index f6d84e2..5eaacb4 100644
-> > --- a/arch/arm64/kernel/cpufeature.c
-> > +++ b/arch/arm64/kernel/cpufeature.c
-> > @@ -1825,7 +1825,7 @@ static void verify_sve_features(void)
-> >  	unsigned int len = zcr & ZCR_ELx_LEN_MASK;
-> >  
-> >  	if (len < safe_len || sve_verify_vq_map()) {
-> > -		pr_crit("CPU%d: SVE: required vector length(s) missing\n",
-> > +		pr_crit("CPU%d: SVE: vector length support mismatch\n",
-> >  			smp_processor_id());
-> >  		cpu_die_early();
-> >  	}
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index 62c37f0..64729e2 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -18,6 +18,7 @@
-> >   */
-> >  
-> >  #include <linux/bitmap.h>
-> > +#include <linux/bitops.h>
-> >  #include <linux/bottom_half.h>
-> >  #include <linux/bug.h>
-> >  #include <linux/cache.h>
-> > @@ -48,6 +49,7 @@
-> >  #include <asm/sigcontext.h>
-> >  #include <asm/sysreg.h>
-> >  #include <asm/traps.h>
-> > +#include <asm/virt.h>
-> >  
-> >  #define FPEXC_IOF	(1 << 0)
-> >  #define FPEXC_DZF	(1 << 1)
-> > @@ -130,14 +132,18 @@ static int sve_default_vl = -1;
-> >  
-> >  /* Maximum supported vector length across all CPUs (initially poisoned) */
-> >  int __ro_after_init sve_max_vl = SVE_VL_MIN;
-> > +int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
-> >  /* Set of available vector lengths, as vq_to_bit(vq): */
-> >  static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> > +/* Set of vector lengths present on at least one cpu: */
-> > +static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
-> >  static void __percpu *efi_sve_state;
-> >  
-> >  #else /* ! CONFIG_ARM64_SVE */
-> >  
-> >  /* Dummy declaration for code that will be optimised out: */
-> >  extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> > +extern __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
-> >  extern void __percpu *efi_sve_state;
-> >  
-> >  #endif /* ! CONFIG_ARM64_SVE */
-> > @@ -623,12 +629,6 @@ int sve_get_current_vl(void)
-> >  	return sve_prctl_status(0);
-> >  }
-> >  
-> > -/*
-> > - * Bitmap for temporary storage of the per-CPU set of supported vector lengths
-> > - * during secondary boot.
-> > - */
-> > -static DECLARE_BITMAP(sve_secondary_vq_map, SVE_VQ_MAX);
-> > -
-> >  static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
-> >  {
-> >  	unsigned int vq, vl;
-> > @@ -650,6 +650,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
-> >  void __init sve_init_vq_map(void)
-> >  {
-> >  	sve_probe_vqs(sve_vq_map);
-> > +	bitmap_copy(sve_vq_partial_map, sve_vq_map, SVE_VQ_MAX);
-> >  }
-> >  
-> >  /*
-> > @@ -658,25 +659,58 @@ void __init sve_init_vq_map(void)
-> >   */
-> >  void sve_update_vq_map(void)
-> >  {
-> > -	sve_probe_vqs(sve_secondary_vq_map);
-> > -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
-> > +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-> > +
-> > +	sve_probe_vqs(tmp_map);
-> > +	bitmap_and(sve_vq_map, sve_vq_map, tmp_map, SVE_VQ_MAX);
-> > +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, tmp_map, SVE_VQ_MAX);
-> >  }
-> >  
-> >  /* Check whether the current CPU supports all VQs in the committed set */
-> >  int sve_verify_vq_map(void)
-> >  {
-> > -	int ret = 0;
-> > +	DECLARE_BITMAP(tmp_map, SVE_VQ_MAX);
-> > +	unsigned long b;
-> >  
-> > -	sve_probe_vqs(sve_secondary_vq_map);
-> > -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
-> > -		      SVE_VQ_MAX);
-> > -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
-> > +	sve_probe_vqs(tmp_map);
-> > +
-> > +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-> > +	if (bitmap_intersects(tmp_map, sve_vq_map, SVE_VQ_MAX)) {
-> >  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
-> >  			smp_processor_id());
-> > -		ret = -EINVAL;
-> > +		return -EINVAL;
-> >  	}
-> >  
-> > -	return ret;
-> > +	if (!IS_ENABLED(CONFIG_KVM) || !is_hyp_mode_available())
-> > +		return 0;
-> > +
-> > +	/*
-> > +	 * For KVM, it is necessary to ensure that this CPU doesn't
-> > +	 * support any vector length that guests may have probed as
-> > +	 * unsupported.
-> > +	 */
-> > +
-> > +	/* Recover the set of supported VQs: */
-> > +	bitmap_complement(tmp_map, tmp_map, SVE_VQ_MAX);
-> > +	/* Find VQs supported that are not globally supported: */
-> > +	bitmap_andnot(tmp_map, tmp_map, sve_vq_map, SVE_VQ_MAX);
-> > +
-> > +	/* Find the lowest such VQ, if any: */
-> > +	b = find_last_bit(tmp_map, SVE_VQ_MAX);
-> > +	if (b >= SVE_VQ_MAX)
-> > +		return 0; /* no mismatches */
-> > +
-> > +	/*
-> > +	 * Mismatches above sve_max_virtualisable_vl are fine, since
-> > +	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
-> > +	 */
-> > +	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
-> > +		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
-> 
-> Nit: might be good to specify that the vector length is unsupported for
-> virtualisation.
-> 
-> Also, since KVM is the one deciding what to do with the information,
-> should we have a warning here? But I can understand that knowing which
-> CPUs are introducing unsupported vector length, maybe using pr_devel()
-> instead of pr_warn()
+> > Changes since V3:
+> > 	- just remove those unused resource and no need to define UNUSED
+> > resource.
+> > --
+> >  include/dt-bindings/firmware/imx/rsrc.h | 15 ---------------
+> >  1 file changed, 15 deletions(-)
+> >
+> > diff --git a/include/dt-bindings/firmware/imx/rsrc.h
+> > b/include/dt-bindings/firmware/imx/rsrc.h
+> > index 4481f2d..d69f934 100644
+> > --- a/include/dt-bindings/firmware/imx/rsrc.h
+> > +++ b/include/dt-bindings/firmware/imx/rsrc.h
+> > @@ -36,15 +36,10 @@
+> >  #define IMX_SC_R_DC_0_BLIT1		20
+> >  #define IMX_SC_R_DC_0_BLIT2		21
+> >  #define IMX_SC_R_DC_0_BLIT_OUT		22
+> > -#define IMX_SC_R_DC_0_CAPTURE0		23
+> > -#define IMX_SC_R_DC_0_CAPTURE1		24
+> >  #define IMX_SC_R_DC_0_WARP		25
+> > -#define IMX_SC_R_DC_0_INTEGRAL0		26
+> > -#define IMX_SC_R_DC_0_INTEGRAL1		27
+> >  #define IMX_SC_R_DC_0_VIDEO0		28
+> >  #define IMX_SC_R_DC_0_VIDEO1		29
+> >  #define IMX_SC_R_DC_0_FRAC0		30
+> > -#define IMX_SC_R_DC_0_FRAC1		31
+> >  #define IMX_SC_R_DC_0			32
+> >  #define IMX_SC_R_GPU_2_PID0		33
+> >  #define IMX_SC_R_DC_0_PLL_0		34
+> > @@ -53,17 +48,11 @@
+> >  #define IMX_SC_R_DC_1_BLIT1		37
+> >  #define IMX_SC_R_DC_1_BLIT2		38
+> >  #define IMX_SC_R_DC_1_BLIT_OUT		39
+> > -#define IMX_SC_R_DC_1_CAPTURE0		40
+> > -#define IMX_SC_R_DC_1_CAPTURE1		41
+> >  #define IMX_SC_R_DC_1_WARP		42
+> > -#define IMX_SC_R_DC_1_INTEGRAL0		43
+> > -#define IMX_SC_R_DC_1_INTEGRAL1		44
+> >  #define IMX_SC_R_DC_1_VIDEO0		45
+> >  #define IMX_SC_R_DC_1_VIDEO1		46
+> >  #define IMX_SC_R_DC_1_FRAC0		47
+> > -#define IMX_SC_R_DC_1_FRAC1		48
+> >  #define IMX_SC_R_DC_1			49
+> > -#define IMX_SC_R_GPU_3_PID0		50
+> >  #define IMX_SC_R_DC_1_PLL_0		51
+> >  #define IMX_SC_R_DC_1_PLL_1		52
+> >  #define IMX_SC_R_SPI_0			53
+> > @@ -303,8 +292,6 @@
+> >  #define IMX_SC_R_M4_0_UART		287
+> >  #define IMX_SC_R_M4_0_I2C		288
+> >  #define IMX_SC_R_M4_0_INTMUX		289
+> > -#define IMX_SC_R_M4_0_SIM		290
+> > -#define IMX_SC_R_M4_0_WDOG		291
+> >  #define IMX_SC_R_M4_0_MU_0B		292
+> >  #define IMX_SC_R_M4_0_MU_0A0		293
+> >  #define IMX_SC_R_M4_0_MU_0A1		294
+> > @@ -323,8 +310,6 @@
+> >  #define IMX_SC_R_M4_1_UART		307
+> >  #define IMX_SC_R_M4_1_I2C		308
+> >  #define IMX_SC_R_M4_1_INTMUX		309
+> > -#define IMX_SC_R_M4_1_SIM		310
+> > -#define IMX_SC_R_M4_1_WDOG		311
+> >  #define IMX_SC_R_M4_1_MU_0B		312
+> >  #define IMX_SC_R_M4_1_MU_0A0		313
+> >  #define IMX_SC_R_M4_1_MU_0A1		314
+> > --
+> > 2.7.4
 
-These warnings are really for consumption by SoC vendors, not users:
-my aim is to flag up systems that we consider broken (or at least,
-unsuitable for running KVM).
-
-So I prefer to make this noisy and limit the amount of "useful"
-information people might be tempted to programmatically scrape from
-dmesg.
-
-cpufeatures uses pr_warn("SANITY CHECK: [...]") here.  Maybe I should
-stick "SANITY CHECK" in here too?  I will also try to make the commit
-message more explicit and/or add comments to make the intent of the code
-clearer.
-
-It may also make sense to make this noise even if KVM isn't enabled
-(which is a rare case anyhow).
-
-Thoughts?
-
-> In any case, the logic looks good to me:
-> 
-> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
-
-Thanks
----Dave
 
 _______________________________________________
 linux-arm-kernel mailing list
