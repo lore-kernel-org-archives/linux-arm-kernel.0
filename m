@@ -2,92 +2,86 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 96A36C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:10:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CED2C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:11:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 65584217F9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:10:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DB979217F9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:11:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XDmpsSvh";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="gY1xvfRw"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 65584217F9
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O6TJAjxq";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=bgdev-pl.20150623.gappssmtp.com header.i=@bgdev-pl.20150623.gappssmtp.com header.b="uytcb79l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DB979217F9
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bgdev.pl
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cudmq0JFGSfsFf3Q8LVUr99RnSaIlSzfFmXmZEmzM24=; b=XDmpsSvhxZyc2J
-	N6LcbUkg2BNFfQVJPO+fdAurliO3BroT8D/lEFlerzPASgYuQR+6n+MyZWnFzkqgY0FTopessQpji
-	f9v2w5sklB8R9bWPcu/2VipW4eh6CLid3JfcdGhJqMxJ8nP5ka4IwJqowJf+lcrFUUDU50OQhW9n0
-	+O3ZW0Ddv284PF2kIbVbv6NPSWKNnpbgsTzF92ToLcWncO3oAyQOtQb0sr34PFdip5ShuFyI1xVs3
-	gqgOTkcZPj1s3m8s0kVF89BnyLYVpC5JDs2StCqvCcNu/NwkTfGlEH/F+oLBv/HCBZ3MWBS6Vb2Vp
-	akSgYzp3/M+ltd/IN0GQ==;
+	List-Owner; bh=ITB8PbdT3bkImw8xMt3U8TyyIAD7lThPsNSWjGchDAU=; b=O6TJAjxqEULqwb
+	nNFBjN0gzDhHdp5EsUxuUS07tyaPknH4pU5xK2qaja9Dz20wZRMZeypIMGYjwhDjYbDgZUnr3dqQL
+	RxsjZxesi5cQHTzLQkkFPke7jHElyrPhmYVcVty4KD5vxHpUcWa7qbYDnBmcqa3pQhvkHia4h5wa2
+	9MvqP4EQfxnrDAS+TFb46TUzfyGSNVdDGd3JJ01d9JCqIwzKBzoGNKeMIPwQo73fQGWDSy3Ixsdmk
+	L2IPxkDLfv6eGb0kwXIlqMJ/BZATteM9LECll4elhUyazeTVMz3DDkcoBkSlTZX0OVNcI9l7lBJWX
+	40v82OzhJfWHYUP1rGFw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybZ3-0005cr-3j; Tue, 26 Feb 2019 12:10:25 +0000
-Received: from mail-wm1-f65.google.com ([209.85.128.65])
+	id 1gybaO-0006Es-DI; Tue, 26 Feb 2019 12:11:48 +0000
+Received: from mail-io1-f68.google.com ([209.85.166.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybWS-0001eH-9O
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:08:13 +0000
-Received: by mail-wm1-f65.google.com with SMTP id q187so2141200wme.5
+ id 1gybYI-0003Yx-HA
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:10:34 +0000
+Received: by mail-io1-f68.google.com with SMTP id r136so10286284iod.3
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 04:07:43 -0800 (PST)
+ Tue, 26 Feb 2019 04:09:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=bgdev-pl.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=r3KP+rIw+f33h04TS2sogBibwgW1Uf1B9wKJUk0AkUo=;
- b=gY1xvfRwCDtTJJPgaFVZKL6QXSpLCZTvti6w6zoFVCNEjD2QU8a6uqMnjlmq2/Hnc0
- RCXIvMxbjb8njnRf2EL/9NUZX8vc0FfgsSuDmJ+QRxJFqCeiLj+ZEc1Z24KjTD4FGlaG
- oxsiBy3r//dukxRhNVPmIH+8XtThUZ2pDqPcsgpIfb0/lSA1TnCtI7fpSg7Fh00/2n8C
- tDMpkzxHmKHtAhqVVzRa6pCzwH6DXxjXI+xWswkPgmLAUj7hsYzPBS4ujukAlpk7cwfG
- 0oNXTzoQYsoPo1itrjFc3Eq0BqZMBRkZtLUTrPTJyuIvz8jpIHCuYUX6b1HBM8a5r9BA
- 1zaA==
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=jFGSDSqsinybQJOsU/D36ElOP7a9yW2c6i9xoNwf52I=;
+ b=uytcb79l5j3EcEj+DPAaQ+RSlHdaGaSy8RizIyzQocwB3bD640rLf+3nHmBtYlGbvu
+ VUK9wHJAlZYg8szu5He/bcyCF9sGdXTh25dZIX78DYd/z1SmHKrnmA66Bmj/Cb0hpaDg
+ CjaHLhDFEFtg3NbwFQML+Tv1JaYBLV+lTF6wA6CGYC3vQYpTlDDr2g2gMBdpBrmFy8L9
+ +1hXe76F3uuGM5u99xmkbWfwlN5yIW6P80MuNzskfupz288bWD8tNA+Ja96jTqIXcWYs
+ d9ZAuuqw7R8qSA5HwscMXuU8tG+RyBiNG4uu8lse3Dhg9I6F7CkTDu9lRFRGXioFNelX
+ n4jg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=r3KP+rIw+f33h04TS2sogBibwgW1Uf1B9wKJUk0AkUo=;
- b=oXDwWytqidVzw3SbvutNvIcAtRJYo1P7G6VZzmdhjPjuF/F9eR3USRI5PKYp1zJ30o
- 3b/tE6MBRarmmD3pr21qC3HhF0G8PtFcyc/04S2Jbf1d4k1UQLNRgjvxTU34d4Fw5hEP
- KfOidZI0yQrFYdBCsCtqT3mKFUugJ3WzmWeAnq2j8lSSXQwqbbiphqbqGdtIyRRrpCfx
- HHxLak8CyuXZ4a67Sy0UsF8gKCIOrq4+Whh+JWNNk+odMxQFfY0Bcc0LvPR++ObfzV0d
- jveMRygfccDhpN7hcO4dfEmCAZwEAV0rnHBfAz53TJ2/T7MBNnchn7Ip9/8bUV0bDOzX
- 1Y9g==
-X-Gm-Message-State: AHQUAubfNQDP8wTnCc2ms5IF0JoQlLoaKP0vNE423R7WBERTk12PAgez
- 0nCnn628dlV65IAg7f4zDjE5bA==
-X-Google-Smtp-Source: AHgI3Ib4G6cQlEeSrlfHOBAAuNqCZFuCdO0W+0gFn11G04G480ZW5k/bXaV9DF6jXBZ89MaNTquGTQ==
-X-Received: by 2002:a1c:5546:: with SMTP id j67mr2299669wmb.95.1551182861432; 
- Tue, 26 Feb 2019 04:07:41 -0800 (PST)
-Received: from debian-brgl.home ([2a01:cb1d:af:5b00:6d6c:8493:1ab5:dad7])
- by smtp.gmail.com with ESMTPSA id a8sm12642158wmh.26.2019.02.26.04.07.40
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 26 Feb 2019 04:07:40 -0800 (PST)
-From: Bartosz Golaszewski <brgl@bgdev.pl>
-To: Sekhar Nori <nsekhar@ti.com>, Kevin Hilman <khilman@kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Thomas Gleixner <tglx@linutronix.de>, David Lechner <david@lechnology.com>
-Subject: [PATCH v3 09/11] ARM: davinci: dm644x: switch to using the
- clocksource driver
-Date: Tue, 26 Feb 2019 13:06:31 +0100
-Message-Id: <20190226120633.18200-10-brgl@bgdev.pl>
-X-Mailer: git-send-email 2.20.1
-In-Reply-To: <20190226120633.18200-1-brgl@bgdev.pl>
-References: <20190226120633.18200-1-brgl@bgdev.pl>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=jFGSDSqsinybQJOsU/D36ElOP7a9yW2c6i9xoNwf52I=;
+ b=l4N/5E3JkoHbgqxIFPaNDekcrgcvntCoHhnhHB4R7SuGg/XifyiBxevlrhDg9cZrdt
+ U7jXl47OGOJL3/2G9WJo1lKbujct5dsqS51Br8RxjV5H6mhbd9+yCZ8vRgrh4Pl+47g1
+ bwtpMkxNyRioYpVdZ6bgTLHcZG7wA14WpY7Ndf/fCV7/gD5O16HwRGCHp2Sf+Zn/Nc55
+ 4xJuqQxtL+m3LStlWK9IdmL/kTnw7Px1P491Doi8cxhd4XO45JWhOLPY0m7oK01tSINs
+ ucebwtTK1TLWpdTi2VB2+mI4qmrf3gaJnTPj6XubQ1TvpbwncokQibf0H2xOOUoMw96a
+ uCHQ==
+X-Gm-Message-State: AHQUAuZ/Ui13jH86/cId3ZDMrVTcKshFtU8SqBkwo9k/NetyxWf4t9h3
+ sLnQutSQSu23mkP1kHS6NadSKQNzULGO9RXKH6jCJA==
+X-Google-Smtp-Source: AHgI3IYcdQn8f0YErB1c+1z8veB6DoMZZkGSIotAr8GE0WsLAUrb/RQBbhPycEaVpHCnvImGiUbJGqo/y+jgN8J3778=
+X-Received: by 2002:a5e:de05:: with SMTP id e5mr13247886iok.111.1551182977250; 
+ Tue, 26 Feb 2019 04:09:37 -0800 (PST)
 MIME-Version: 1.0
+References: <20190204171757.32073-1-brgl@bgdev.pl>
+ <20190204171757.32073-9-brgl@bgdev.pl>
+ <bb0bc61a-8c2b-affa-c58a-1e7c14f9390d@ti.com>
+In-Reply-To: <bb0bc61a-8c2b-affa-c58a-1e7c14f9390d@ti.com>
+From: Bartosz Golaszewski <brgl@bgdev.pl>
+Date: Tue, 26 Feb 2019 13:09:26 +0100
+Message-ID: <CAMRc=Mf8wGNaPOxNx8xmvw5cRpA1fnRQ1-sc7iyMihcZ=Fb6dw@mail.gmail.com>
+Subject: Re: [PATCH v2 08/12] ARM: davinci: dm355: switch to using the
+ clocksource driver
+To: Sekhar Nori <nsekhar@ti.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_040745_023387_A8798A8A 
-X-CRM114-Status: GOOD (  15.20  )
+X-CRM114-CacheID: sfid-20190226_040939_370058_5199985B 
+X-CRM114-Status: GOOD (  12.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,92 +93,39 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org,
- Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>, Kevin Hilman <khilman@kernel.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Bartosz Golaszewski <bgolaszewski@baylibre.com>,
+ Rob Herring <robh+dt@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-We now have a proper clocksource driver for davinci. Switch the dm644x
-platform to using it.
-
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/dm644x.c | 24 +++++++++++-------------
- 1 file changed, 11 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index 2b0e921aa755..f5f40a2a5110 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -26,7 +26,8 @@
- #include <mach/cputype.h>
- #include <mach/mux.h>
- #include <mach/serial.h>
--#include <mach/time.h>
-+
-+#include <clocksource/timer-davinci.h>
- 
- #include "asp.h"
- #include "davinci.h"
-@@ -559,16 +560,12 @@ static struct davinci_id dm644x_ids[] = {
- 	},
- };
- 
--/*
-- * T0_BOT: Timer 0, bottom:  clockevent source for hrtimers
-- * T0_TOP: Timer 0, top   :  clocksource for generic timekeeping
-- * T1_BOT: Timer 1, bottom:  (used by DSP in TI DSPLink code)
-- * T1_TOP: Timer 1, top   :  <unused>
-- */
--static struct davinci_timer_info dm644x_timer_info = {
--	.timers		= davinci_timer_instance,
--	.clockevent_id	= T0_BOT,
--	.clocksource_id	= T0_TOP,
-+static const struct davinci_timer_cfg dm644x_timer_cfg = {
-+	.reg = DEFINE_RES_IO(DAVINCI_TIMER0_BASE, SZ_4K),
-+	.irq = {
-+		DEFINE_RES_IRQ(DAVINCI_INTC_IRQ(IRQ_TINT0_TINT12)),
-+		DEFINE_RES_IRQ(DAVINCI_INTC_IRQ(IRQ_TINT0_TINT34)),
-+	},
- };
- 
- static struct plat_serial8250_port dm644x_serial0_platform_data[] = {
-@@ -646,7 +643,6 @@ static const struct davinci_soc_info davinci_soc_info_dm644x = {
- 	.pinmux_base		= DAVINCI_SYSTEM_MODULE_BASE,
- 	.pinmux_pins		= dm644x_pins,
- 	.pinmux_pins_num	= ARRAY_SIZE(dm644x_pins),
--	.timer_info		= &dm644x_timer_info,
- 	.emac_pdata		= &dm644x_emac_pdata,
- 	.sram_dma		= 0x00008000,
- 	.sram_len		= SZ_16K,
-@@ -668,6 +664,7 @@ void __init dm644x_init_time(void)
- {
- 	void __iomem *pll1, *psc;
- 	struct clk *clk;
-+	int rv;
- 
- 	clk_register_fixed_rate(NULL, "ref_clk", NULL, 0, DM644X_REF_FREQ);
- 
-@@ -683,7 +680,8 @@ void __init dm644x_init_time(void)
- 		return;
- 	}
- 
--	davinci_timer_init(clk);
-+	rv = davinci_timer_register(clk, &dm644x_timer_cfg);
-+	WARN(rv, "Unable to register the timer: %d\n", rv);
- }
- 
- static struct resource dm644x_pll2_resources[] = {
--- 
-2.20.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+cHQuLCA4IGx1dCAyMDE5IG8gMTM6MzQgU2VraGFyIE5vcmkgPG5zZWtoYXJAdGkuY29tPiBuYXBp
+c2HFgihhKToKPgo+IE9uIDA0LzAyLzE5IDEwOjQ3IFBNLCBCYXJ0b3N6IEdvbGFzemV3c2tpIHdy
+b3RlOgo+ID4gLS8qCj4gPiAtICogVDBfQk9UOiBUaW1lciAwLCBib3R0b206ICBjbG9ja2V2ZW50
+IHNvdXJjZSBmb3IgaHJ0aW1lcnMKPiA+IC0gKiBUMF9UT1A6IFRpbWVyIDAsIHRvcCAgIDogIGNs
+b2Nrc291cmNlIGZvciBnZW5lcmljIHRpbWVrZWVwaW5nCj4gPiAtICogVDFfQk9UOiBUaW1lciAx
+LCBib3R0b206ICAodXNlZCBieSBEU1AgaW4gVEkgRFNQTGluayBjb2RlKQo+ID4gLSAqIFQxX1RP
+UDogVGltZXIgMSwgdG9wICAgOiAgPHVudXNlZD4KPgo+IERvY3VtZW50aW5nIHRoaXMgdGltZXIg
+ZGl2aXNpb24gaXMgaW1wb3J0YW50IGJlY2F1c2UgRFNQIHVzYWdlIGFuZAo+IHVudXNlZCB0aW1l
+cnMgYXJlIG5vdCBpbW1lZGlhdGVseSBjbGVhciBmcm9tIGtlcm5lbCBjb2RlIGFsb25lLiBDYW4g
+eW91Cj4gcmV0YWluIHRoZXNlIGNvbW1lbnRzIGluIGFsbCBwYXRjaGVzIG9mIHRoaXMgc2VyaWVz
+IChJIGd1ZXNzIFQwX0JPVCBldGMuCj4gdGVybWlub2xvZ3kgaXMgY2hhbmdlZCwgc28gZmVlbCBm
+cmVlIHRvIGFkanVzdCB0aGUgY29tbWVudCB0ZXh0KS4KPgo+ID4gLSAqLwo+ID4gLXN0YXRpYyBz
+dHJ1Y3QgZGF2aW5jaV90aW1lcl9pbmZvIGRtMzU1X3RpbWVyX2luZm8gPSB7Cj4gPiAtICAgICAu
+dGltZXJzICAgICAgICAgPSBkYXZpbmNpX3RpbWVyX2luc3RhbmNlLAo+ID4gLSAgICAgLmNsb2Nr
+ZXZlbnRfaWQgID0gVDBfQk9ULAo+ID4gLSAgICAgLmNsb2Nrc291cmNlX2lkID0gVDBfVE9QLAo+
+ID4gK3N0YXRpYyBjb25zdCBzdHJ1Y3QgZGF2aW5jaV90aW1lcl9jZmcgZG0zNTVfdGltZXJfY2Zn
+ID0gewo+ID4gKyAgICAgLnJlZyA9IHsKPiA+ICsgICAgICAgICAgICAgLnN0YXJ0ICAgICAgICAg
+ID0gREFWSU5DSV9USU1FUjBfQkFTRSwKPiA+ICsgICAgICAgICAgICAgLmVuZCAgICAgICAgICAg
+ID0gREFWSU5DSV9USU1FUjBfQkFTRSArIFNaXzRLLAo+Cj4gSGVyZSBhbmQgb3RoZXIgcGxhY2Vz
+IHRvbywgU1pfNEsgLSAxCj4KPiBUaGFua3MsCj4gU2VraGFyCgpJIHVzZWQgYXBwcm9wcmlhdGUg
+REVGSU5FX1JFU194KCkgbWFjcm9zIGluc3RlYWQuCgpCYXJ0CgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
