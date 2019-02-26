@@ -2,21 +2,21 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68477C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:51:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 07293C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:53:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3D1D22173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:51:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D1FDB2186A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 17:53:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KMMijRwx";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="eU7Tu+U4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3D1D22173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PFDtkAhW";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="d0UjWaAt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D1FDB2186A
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,44 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:In-Reply-To:From:Subject:
 	Message-ID:References:To:MIME-Version:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rXw/EFovOWPkaEanJnj/xTs65qv7OaamwikstjwWpOc=; b=KMMijRwx2lDVoV
-	PL/d+rBhfayf3spE3Ugng0Cm3g0A6RTlDu8m0sYqO11YxcRdfucMdm9oi7Uy1+YPfq52Gv7vVQ5o+
-	plpqSl/BqTj0Ut6TCzqGOy/nWmc/jqc4rREXq6BPF4Zb97+OCnVXe3Spo3F7SRI4wIPn3qGKNe+0A
-	Rfdg+KThemJd4MqPnH3ba2SW6GIqOSNSwHRoCk79h2H6Ul6dhismhZZHbp2H+N/jIzHCfEm22DJs9
-	awhPBZGILFrKHOoxUinytMszgqYSuJHABNJNCBQEE9pAJ9VLDBCIDQ9kv6r6hSVxIThw1a8qezPye
-	OU3DpyJJ4Y9Bdw1anJXw==;
+	List-Owner; bh=fFbUoTqLjiaIelBCqLEggRkiaRXLclr3XrWjNDFXolw=; b=PFDtkAhW0siXkw
+	YBCKdpTpEUFj/h13r/p/ceB4BkV/yDklePsiiT8dnzF8YqK3eXEBoTHKX26OIdTrG02sdwffm/HAn
+	NU5xEE6zDF+hJPHmvrvIVHlPZtiJIH0L1ja7oHfzViJhmltGD7FakfTqmBRZnTxE1LhBu3VPXyKyF
+	IQo8HJOacP49tJgb2q97cC2asDb/H2rKZA3LSX81vFGQB0nucOYPc4pPzSUvaLK3xqmqWPpTYbstB
+	9QzvQnTe8qs+Uv0KiDCoRnVHopz+oeEEWNHG24dU7cwqOWWpqDGwvfBwstBlwyHUTPi3FptwdYyDw
+	PM+d/eH8ZyAkHZktdKoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gygsg-0003TI-OE; Tue, 26 Feb 2019 17:51:02 +0000
+	id 1gygun-0003tV-I0; Tue, 26 Feb 2019 17:53:13 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gygsd-0003Rz-Al; Tue, 26 Feb 2019 17:51:00 +0000
+ id 1gyguk-0003t5-8g; Tue, 26 Feb 2019 17:53:11 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id EB8352173C;
- Tue, 26 Feb 2019 17:50:58 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id D959A2173C;
+ Tue, 26 Feb 2019 17:53:09 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1551203459;
- bh=3nANAhLFyGRirluaGDEeKEuf9286NQe83pDNkn3J9cs=;
+ s=default; t=1551203590;
+ bh=VjJneA/s4eX6456hCNL9/imBB29/UyDasE0Hx0zHNCI=;
  h=To:References:Cc:Subject:From:In-Reply-To:Date:From;
- b=eU7Tu+U4qF5KIUncNyhZSeY/wqfVC2NtvtPhW8Vgp61WDzK1OOnj9df3Ved0morI9
- ADal/JolADUMjFEeDzhztiednhGKX0AR/CaewISTFaZKW4bjvHJcp2P2OmYr500781
- WowW3sDEvrvrRrYeMJAfU6hPJlFn9gmF/CsycrKk=
+ b=d0UjWaAtvIVdH8EDkUxHLXUl2OzRAgrXAPVzsawVpPVJV9G8p2x0qwYeAkuDjOagp
+ Oeq+qB6V+E2r9FxCo1lF5aIN+ptBdXgQeVnxUK/kesFdDF+Wnm+tAdFex0KQ66R+j+
+ 3SVwVZQtAqQXR75kbZMHO5zyhmxd7vZoR5J1ZdhE=
 MIME-Version: 1.0
-To: Matthias Brugger <matthias.bgg@gmail.com>,
- Nicolas Boichat <drinkcat@chromium.org>, Rob Herring <robh@kernel.org>,
- Stephen Boyd <sboyd@codeaurora.org>, Weiyi Lu <weiyi.lu@mediatek.com>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-10-weiyi.lu@mediatek.com>
-Message-ID: <155120345816.260864.13433355004684800350@swboyd.mtv.corp.google.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>, kevin-cw.chen@mediatek.com,
+ mars.cheng@mediatek.com, matthias.bgg@kernel.org, mturquette@baylibre.com
+References: <20190214163026.26073-1-matthias.bgg@kernel.org>
+ <f7ed0750-665a-76bc-df1a-95af39fef8ec@gmail.com>
+Message-ID: <155120358914.260864.17734674975447226263@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.8
-Subject: Re: [PATCH v4 08/12] clk: mediatek: Add MT8183 clock support
+Subject: Re: [PATCH v4 0/3] Mark clocks as critical for MT6797
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20190201083016.25856-10-weiyi.lu@mediatek.com>
-Date: Tue, 26 Feb 2019 09:50:58 -0800
+In-Reply-To: <f7ed0750-665a-76bc-df1a-95af39fef8ec@gmail.com>
+Date: Tue, 26 Feb 2019 09:53:09 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_095059_419632_B0F72F95 
-X-CRM114-Status: GOOD (  10.60  )
+X-CRM114-CacheID: sfid-20190226_095310_324552_FC6FE39F 
+X-CRM114-Status: GOOD (  13.15  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,115 +74,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: James Liao <jamesjj.liao@mediatek.com>, Weiyi Lu <weiyi.lu@mediatek.com>,
- srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, linux-clk@vger.kernel.org,
+Cc: Matthias Brugger <mbrugger@suse.com>, sean.wang@mediatek.com,
+ linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
+ jasu@njomotys.info, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Weiyi Lu (2019-02-01 00:30:12)
-> diff --git a/drivers/clk/mediatek/clk-mt8183.c b/drivers/clk/mediatek/clk-mt8183.c
-> new file mode 100644
-> index 000000000000..e9de9fe774ca
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-mt8183.c
-> @@ -0,0 +1,1285 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +//
-> +// Copyright (c) 2018 MediaTek Inc.
-> +// Author: Weiyi Lu <weiyi.lu@mediatek.com>
-> +
-> +#include <linux/delay.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +
-[....]
-> +
-> +static int clk_mt8183_top_probe(struct platform_device *pdev)
-> +{
-> +       struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       void __iomem *base;
-> +       struct clk_onecell_data *clk_data;
-> +       struct device_node *node = pdev->dev.of_node;
-> +
-> +       base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(base)) {
-> +               pr_err("%s(): ioremap failed\n", __func__);
+Quoting Matthias Brugger (2019-02-26 04:59:44)
+> 
+> 
+> On 14/02/2019 17:30, matthias.bgg@kernel.org wrote:
+> > From: Matthias Brugger <mbrugger@suse.com>
+> > 
+> > Jasper send this series some month ago. As there was no reaction from
+> > his side, I'll do a friendly take-over.
+> > I tested the patches on my Helios X20 boards and they fix the issue.
+> > I didn't add a Tested-by tag as I added my Signed-off-by.
+> > 
+> > Changes since v3:
+> > - add comments explaining why the clock muxer and gates are marked
+> >   as critical
+> > 
+> > Changes since v2 (https://patchwork.kernel.org/patch/10686759/):
+> > - axi_sel is not needed, drop CLK_IS_CRITICAL for it.
+> > - update commit message
+> > - add Acked-by from Mars
+> > 
+> > Changes since v1:
+> > - add a fixes tag.
+> > 
+> 
+> Steven, Mike any comments on this?
+> 
 
-This API already prints an error so please remove this duplicate error
-message
+I got patch #1 and #2 in my queue and they're not threaded properly as
+replies to each other. I'll have to go dig out the last patch somehow,
+but probably I can apply them now.
 
-> +               return PTR_ERR(base);
-> +       }
-> +
-> +       clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
-> +
-> +       mtk_clk_register_fixed_clks(top_fixed_clks, ARRAY_SIZE(top_fixed_clks),
-> +               clk_data);
-> +
-> +       mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
-> +
-> +       mtk_clk_register_muxes(top_muxes, ARRAY_SIZE(top_muxes),
-> +               node, &mt8183_clk_lock, clk_data);
-> +
-> +       mtk_clk_register_composites(top_aud_muxes, ARRAY_SIZE(top_aud_muxes),
-> +               base, &mt8183_clk_lock, clk_data);
-> +
-> +       mtk_clk_register_composites(top_aud_divs, ARRAY_SIZE(top_aud_divs),
-> +               base, &mt8183_clk_lock, clk_data);
-> +
-> +       mtk_clk_register_gates(node, top_clks, ARRAY_SIZE(top_clks),
-> +               clk_data);
-> +
-> +       return of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> +}
-> +
-> +static int clk_mt8183_infra_probe(struct platform_device *pdev)
-> +{
-> +       struct clk_onecell_data *clk_data;
-> +       struct device_node *node = pdev->dev.of_node;
-> +
-> +       clk_data = mtk_alloc_clk_data(CLK_INFRA_NR_CLK);
-> +
-> +       mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
-> +               clk_data);
-> +
-> +       return of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> +}
-> +
-> +static int clk_mt8183_mcu_probe(struct platform_device *pdev)
-> +{
-> +       struct clk_onecell_data *clk_data;
-> +       struct device_node *node = pdev->dev.of_node;
-> +       void __iomem *base;
-> +       struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +
-> +       base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(base)) {
-> +               pr_err("%s(): ioremap failed\n", __func__);
-> +               return PTR_ERR(base);
-> +       }
-> +
-> +       clk_data = mtk_alloc_clk_data(CLK_MCU_NR_CLK);
-
-Can this fail? It doesn't seem to be checked for failure so I guess we
-don't care?
-
-> +
-> +       mtk_clk_register_composites(mcu_muxes, ARRAY_SIZE(mcu_muxes), base,
-> +                       &mt8183_clk_lock, clk_data);
-> +
-> +       return of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> +}
-> +
 
 _______________________________________________
 linux-arm-kernel mailing list
