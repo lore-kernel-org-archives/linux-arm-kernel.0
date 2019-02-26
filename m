@@ -2,63 +2,68 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 667A4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:43:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 87E41C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:43:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 369EC20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:43:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 56D7220863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 13:43:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lWiXTSD+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 369EC20863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MefmZ/3W"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56D7220863
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=TzUwmWmDl6+fKqHFUig/NxxHg+Xpd3dW45OLkFjGH4o=; b=lWi
-	XTSD+uSRGhHQJJnWTjrguQquaAElrlvD9GcG3aOOsbENrK9Wux/5R9NUkHj2w4m41cJB0XE90HFmq
-	m3r5tZ4W/KVbnD1nwQfb9Dni6KfK8SVoG/tmF3BqiIcU1MAGQxZmX4dFeBEnYeA14NzCfyYch95Wn
-	9FcnSdxvFun65pOVYslupHRKm0kIWgHGkHvu+jRVyZl/tw5uGsj2hc5atRv036yPHW2eYuq5Hjr0h
-	Z4ygDXDW07BrestjHi8tz6pu5qMquBBdvvYQpNxyfjkP7sSxoqXieOS06Zdob1ZdKO2LPHB2DI2Yw
-	+pGfFpvY4c+eFd+XvkEdv4CyjxLUECQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=BGkDSOL7SEfh9Pr4RFZe0L01Cf9hY/pTeDZ0yT3D6Us=; b=MefmZ/3WAdb8yHYSG4JwWKn8jM
+	JWMWXzDtOqirNNi5gRRBV0OmxMyCJ+qGjlTpxCfvP3P68blQesBufE/GX1Kr4sqT0IRng4MHoebps
+	rBd+P74CTPr5q+tecutD7cHVWeC7Y6SMX/xaDa3Z5XZESxQS9zU/cgr867ZcYCWfxAEHhv9s+d5Ty
+	FM332DHiOy/NO6te5/8cG676LGbQ1C6pLQYJm/85S2vv/WbVyB0NgJpWtml38ypC8uaVQ6L2PnIqi
+	v3thU/eZ8hwYdYA7AUb+aofmm8ZfVkCO6izwmZ6cq2lJJaJak3XvmZpOPKMkVDqzys6qMaOE7uXh/
+	ibn2m1qw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyd0f-0001JJ-Hh; Tue, 26 Feb 2019 13:43:01 +0000
-Received: from inva021.nxp.com ([92.121.34.21])
+	id 1gyd0p-0001V1-Rt; Tue, 26 Feb 2019 13:43:11 +0000
+Received: from inva020.nxp.com ([92.121.34.13])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyd08-0000bZ-RI
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 13:42:30 +0000
-Received: from inva021.nxp.com (localhost [127.0.0.1])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 71A35200309;
- Tue, 26 Feb 2019 14:42:24 +0100 (CET)
+ id 1gyd0B-0000dM-Pc
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 13:42:34 +0000
+Received: from inva020.nxp.com (localhost [127.0.0.1])
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 841D21A0188;
+ Tue, 26 Feb 2019 14:42:25 +0100 (CET)
 Received: from inva024.eu-rdc02.nxp.com (inva024.eu-rdc02.nxp.com
  [134.27.226.22])
- by inva021.eu-rdc02.nxp.com (Postfix) with ESMTP id 64CD42001F0;
- Tue, 26 Feb 2019 14:42:24 +0100 (CET)
+ by inva020.eu-rdc02.nxp.com (Postfix) with ESMTP id 750681A0171;
+ Tue, 26 Feb 2019 14:42:25 +0100 (CET)
 Received: from fsr-ub1664-016.ea.freescale.net
  (fsr-ub1664-016.ea.freescale.net [10.171.71.216])
- by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id E209D205EB;
- Tue, 26 Feb 2019 14:42:23 +0100 (CET)
+ by inva024.eu-rdc02.nxp.com (Postfix) with ESMTP id F31D6205EB;
+ Tue, 26 Feb 2019 14:42:24 +0100 (CET)
 From: Claudiu Manoil <claudiu.manoil@nxp.com>
 To: Rob Herring <robh+dt@kernel.org>, Shawn Guo <shawnguo@kernel.org>,
  Li Yang <leoyang.li@nxp.com>, "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH net-next v4 0/4] enetc: Add mdio support and device tree nodes
-Date: Tue, 26 Feb 2019 15:42:19 +0200
-Message-Id: <1551188543-28867-1-git-send-email-claudiu.manoil@nxp.com>
+Subject: [PATCH net-next v4 2/4] arm64: dts: fsl: ls1028a-rdb: Add ENETC
+ external eth ports for the LS1028A RDB board
+Date: Tue, 26 Feb 2019 15:42:21 +0200
+Message-Id: <1551188543-28867-3-git-send-email-claudiu.manoil@nxp.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1551188543-28867-1-git-send-email-claudiu.manoil@nxp.com>
+References: <1551188543-28867-1-git-send-email-claudiu.manoil@nxp.com>
 X-Virus-Scanned: ClamAV using ClamSMTP
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_054229_021870_48B99CBD 
-X-CRM114-Status: UNSURE (   8.46  )
+X-CRM114-CacheID: sfid-20190226_054232_310266_46A2E4DE 
+X-CRM114-Status: UNSURE (   7.66  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -80,33 +85,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is the missing part to enable PCI probing of the ENETC ethernet
-ports on the LS1028A SoC and external traffic on the LS1028A RDB board.
-It's one of the first items on the TODO list for the recently merged
-ENETC ethernet driver.
+The LS1028A RDB board features an Atheros PHY connected over
+SGMII to the ENETC PF0 (or Port0).  ENETC Port1 (PF1) has no
+external connection on this board, so it can be disabled for now.
 
-v3: Add DT bindings doc for ENETC connections
-v4: none
+Signed-off-by: Alex Marginean <alexandru.marginean@nxp.com>
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+---
+v2 - added a mdio node as parent for the phy node
+v3 - none
+v4 - none
 
-Claudiu Manoil (4):
-  arm64: dts: fsl: ls1028a: Add PCI IERC node and ENETC endpoints
-  arm64: dts: fsl: ls1028a-rdb: Add ENETC external eth ports for the
-    LS1028A RDB board
-  enetc: Add ENETC PF level external MDIO support
-  dt-bindings: net: freescale: enetc: Add connection bindings for ENETC
-    ethernet nodes
+ arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
- .../devicetree/bindings/net/fsl-enetc.txt          |  69 +++++++
- arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts  |  17 ++
- arch/arm64/boot/dts/freescale/fsl-ls1028a.dtsi     |  35 ++++
- drivers/net/ethernet/freescale/enetc/Makefile      |   3 +-
- drivers/net/ethernet/freescale/enetc/enetc_mdio.c  | 199 +++++++++++++++++++++
- drivers/net/ethernet/freescale/enetc/enetc_pf.c    |  12 ++
- drivers/net/ethernet/freescale/enetc/enetc_pf.h    |   6 +
- 7 files changed, 340 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/net/fsl-enetc.txt
- create mode 100644 drivers/net/ethernet/freescale/enetc/enetc_mdio.c
-
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
+index fdeb417..f86b054 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1028a-rdb.dts
+@@ -71,3 +71,20 @@
+ &duart1 {
+ 	status = "okay";
+ };
++
++&enetc_port0 {
++	phy-handle = <&sgmii_phy0>;
++	phy-connection-type = "sgmii";
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		sgmii_phy0: ethernet-phy@2 {
++			reg = <0x2>;
++		};
++	};
++};
++
++&enetc_port1 {
++	status = "disabled";
++};
 -- 
 2.7.4
 
