@@ -2,80 +2,86 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 885C7C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:35:37 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5ECA9C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:36:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 576D320C01
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:35:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2E73420C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:36:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Af+ukmFl";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="p6cnLN/P"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 576D320C01
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eUX+peFt";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="XRKcLkoJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E73420C01
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GpINbXdQ3KW1PeU1hTPnqLkmxdjfMF8KtHFMCeyambc=; b=Af+ukmFl9WJOmr
-	hvrKo7qq4anpB597/tBc9N2A13mkx/6MebNRQUwysZrH7SynRtgveqbKUohH+yWbuWriW+8kJSv8B
-	oMXTfauC/W3uu8ddY/Jbs9lyMb+7XjWFuoqaavEbLHvHRq/fL5IeGvUl95PZJfv5pYxHJ0vEa1TTQ
-	kVOkPPQsWPBsCyP7jxGLGH3I1LFLmQPadFM/7C3xgr/n+RaGyI4C7l5PBVqe8r2qBE9KnbHiWqJ5R
-	fTl/ptOGOpmkVmc7qZxDvGYSRhPadwpC87OQFw0dHpvxBQZ4d4c5gSyW0/uUpP0QqjB37lf9tAPkX
-	YoRgiWzuiT23u+T/2UdQ==;
+	List-Owner; bh=J2UHpB/qarLxksD49IQt+pkpVvLITtYiI/pxNSZepR0=; b=eUX+peFtYTA6EE
+	SnLrQwoEbSuIoAS4hKAHXJaeQAA77gg9IOLjN3k/P+uBx3Zy7t/MRJO6jUMMEaGtSAsG0IJdlu3kf
+	PmpOiB+bO44h34tcZf9xYFLvujWk5lWs/6JP8eySjpkzWZjI/M2pMOmDk7EmKB/rnZ68ETci19Q6J
+	a7Fgj0htyM2tXaSYx9Z6jfKqHS8r6wcu/WPt7iivChEmf9A8d6cQpTmBIeoT73lEDBiNRw9F9cmBU
+	0POKjxdE5CrhxKd0abQh5dnmcNKWSDzmg+BrMrqby8K6+FFl9f0dsVkDxBKhhE10N3/mr0RH5ETY9
+	xcb2Mwhx7ZWA7i072K6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gydpU-0007Ze-Jb; Tue, 26 Feb 2019 14:35:32 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gydpv-0007r1-89; Tue, 26 Feb 2019 14:35:59 +0000
+Received: from mail-pf1-x443.google.com ([2607:f8b0:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gydpS-0007ZY-EF
- for linux-arm-kernel@bombadil.infradead.org; Tue, 26 Feb 2019 14:35:30 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- Content-Type:References:In-Reply-To:Date:Cc:To:From:Subject:Message-ID:Sender
- :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=6P9ZgwMWx1A8g4tiZNvrCOkeQvGFViJZzJmfBxznhDA=; b=p6cnLN/PgrIc53IXjLPIJYl9pw
- I/UcCOq7vlGuxczRdX31L/vhXgzwtbhvGL2Jv4WVo1cHV718a2Htw9FnFWlLd0w+HMEchgwr83oCl
- /rCovuwqlaWN7NxzgJa3LdtmM1XniSB6DFTD4fcj0nNzx4vBjNGOlmwxu/f/z6W4K/9hFW+VqVS2n
- lRrbQdpMeTdhtbITEOxR9ryE9Ae2VJCoFnH8wK79M6TxPNzzMYHr4kbM176WqoQ/I91ywaZP54bvI
- 3E8cyrMt1gmo4tlGVo1rlD2Qln/uh+4FyGmiSTZNMY2HBL5z2dA+j4jv0Yk844CLJusVVDXiFGjgx
- pSycF4rg==;
-Received: from relay4-d.mail.gandi.net ([217.70.183.196])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gydpK-0003r9-8I
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:35:28 +0000
-X-Originating-IP: 90.88.147.150
-Received: from aptenodytes (aaubervilliers-681-1-27-150.w90-88.abo.wanadoo.fr
- [90.88.147.150])
- (Authenticated sender: paul.kocialkowski@bootlin.com)
- by relay4-d.mail.gandi.net (Postfix) with ESMTPSA id CA608E0006;
- Tue, 26 Feb 2019 14:34:39 +0000 (UTC)
-Message-ID: <8d93f76de896a1a6e516adbf5cfeff8b68b6181d.camel@bootlin.com>
-Subject: Re: [PATCH v4 2/3] dt-bindings: panel: Add YAML schemas for the
- Ronbo RB070D30 panel
-From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-To: Maxime Ripard <maxime.ripard@bootlin.com>, Maarten Lankhorst
- <maarten.lankhorst@linux.intel.com>, Sean Paul <seanpaul@chromium.org>
-Date: Tue, 26 Feb 2019 15:34:39 +0100
-In-Reply-To: <c05b961302ec4a2af32ea6c215ec0749b1a9cff7.1550650810.git-series.maxime.ripard@bootlin.com>
-References: <cover.5ac8e6ed5381ceb14a2e5d64671228f665a08d43.1550650810.git-series.maxime.ripard@bootlin.com>
- <c05b961302ec4a2af32ea6c215ec0749b1a9cff7.1550650810.git-series.maxime.ripard@bootlin.com>
-Organization: Bootlin
-User-Agent: Evolution 3.30.5 
+ id 1gydps-0007ps-GF
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:35:57 +0000
+Received: by mail-pf1-x443.google.com with SMTP id g6so6319062pfh.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 26 Feb 2019 06:35:52 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=AUt4iAfRYbk6BwjoCKxvIK1Q45AuJd2RFSG+AdGqGGc=;
+ b=XRKcLkoJARsdGGCLNMsEu1Vu8sk3uYCwX73ehOf3+cVLv75cO4w/3UTqMluqhaIGyh
+ cCy4xvROzeQSaFXI2Iu8ow09wzrfeUVrM4ZBHYRiwLLWx0shcllKfcDdFKilrD1Kr8Mf
+ pLE8gRxiLBO8WSSp7OrsZFKA+euo20XGdvScqo95ZZCUwpBjOnXMacjezDCcsLkt/Mth
+ pHEFCvychKIJQf6QLymBizZy5Tzkwkra5iyXKKlgGp2QSjfkxadk85kayKTWgP4jHqma
+ lYOKPh4aOy50Vdd3ysijeaTRxrjd48CuRB+UX9PdLo8hQkWNFjb25zGeU7TCq+mn7l5N
+ FWRw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=AUt4iAfRYbk6BwjoCKxvIK1Q45AuJd2RFSG+AdGqGGc=;
+ b=DTLR7KvS2ma4h1aoYE9xRDuH2jKXeJnkDyUnq62Ramr+/d1SnsfVdY96vo4kHeMobQ
+ w26wR3f3yMvhTuoZIUXnw6anC4Bct+/jB/NnmK05xvJwHPkUg7nppBrO/lXKIFayJPmt
+ +VEyizCR9zrXN3qjniYAvCJ56bbIkqRQI3hfLwABOaOkZlu16OPLVEv+cS+HXFZT7IG/
+ z2O3tcX4ZUvKgdHddK9N/NfBHPNMCCIgN0jLa9FaCi5wVr4IC6PWZ7KE3Fgc+VDINhff
+ QYX4FsSNZQZYI3PmrZd8+xmFG5jhTFngbZwYCoM9rysLIfx1mVFfEiVX//l08iWPporh
+ OxVA==
+X-Gm-Message-State: AHQUAuYf6kLlTezgpBw6/ErA04ZEiNHjiOYCa0QdgTpNc5i2cCIzldVk
+ Lr9txztTmF+Mx0m6X67PJPvKwQNykwQv51S0FfvdJg==
+X-Google-Smtp-Source: AHgI3IbiQNlPq53/tUpD5IAq8EfXkU5pkBI8V4LoDzop7lQaXJ2OSriJDpc1tkZELm721YxkXsfJtn4Ts8mziEe1cTs=
+X-Received: by 2002:a62:6383:: with SMTP id
+ x125mr25941741pfb.239.1551191751796; 
+ Tue, 26 Feb 2019 06:35:51 -0800 (PST)
 MIME-Version: 1.0
+References: <cover.1550839937.git.andreyknvl@google.com>
+ <a958e202cdbe6e1bac8a37b7f3d9881d1b22993d.1550839937.git.andreyknvl@google.com>
+ <a38275b0-f6cd-20e1-3c48-544846586a16@intel.com>
+In-Reply-To: <a38275b0-f6cd-20e1-3c48-544846586a16@intel.com>
+From: Andrey Konovalov <andreyknvl@google.com>
+Date: Tue, 26 Feb 2019 15:35:40 +0100
+Message-ID: <CAAeHK+wLm7zSUC8dJv3LgdyvpkBN8u_24ene6b91PgM570VWbQ@mail.gmail.com>
+Subject: Re: [PATCH v10 06/12] fs,
+ arm64: untag user pointers in copy_mount_options
+To: Dave Hansen <dave.hansen@intel.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_143522_445244_474557DD 
-X-CRM114-Status: GOOD (  14.75  )
+X-CRM114-CacheID: sfid-20190226_063556_562634_CA74AAE1 
+X-CRM114-Status: GOOD (  16.11  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,95 +93,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org, Chen-Yu Tsai <wens@csie.org>,
- dri-devel@lists.freedesktop.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, bbrezillon@kernel.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Szabolcs Nagy <Szabolcs.Nagy@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ Kostya Serebryany <kcc@google.com>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>,
+ Vincenzo Frascino <vincenzo.frascino@arm.com>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Dave Martin <Dave.Martin@arm.com>, Evgeniy Stepanov <eugenis@google.com>,
+ Kevin Brodsky <kevin.brodsky@arm.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
+ Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Sat, Feb 23, 2019 at 12:03 AM Dave Hansen <dave.hansen@intel.com> wrote:
+>
+> On 2/22/19 4:53 AM, Andrey Konovalov wrote:
+> > --- a/fs/namespace.c
+> > +++ b/fs/namespace.c
+> > @@ -2730,7 +2730,7 @@ void *copy_mount_options(const void __user * data)
+> >        * the remainder of the page.
+> >        */
+> >       /* copy_from_user cannot cross TASK_SIZE ! */
+> > -     size = TASK_SIZE - (unsigned long)data;
+> > +     size = TASK_SIZE - (unsigned long)untagged_addr(data);
+> >       if (size > PAGE_SIZE)
+> >               size = PAGE_SIZE;
+>
+> I would have thought that copy_from_user() *is* entirely capable of
+> detecting and returning an error in the case that its arguments cross
+> TASK_SIZE.  It will fail and return an error, but that's what it's
+> supposed to do.
+>
+> I'd question why this code needs to be doing its own checking in the
+> first place.  Is there something subtle going on?
 
-On Wed, 2019-02-20 at 09:21 +0100, Maxime Ripard wrote:
-> The Ronbo RB070D30 panel is a 1024x600 MIPI-DSI panel.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+The comment above exact_copy_from_user() states:
 
-Reviewed-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-
-Cheers,
-
-Paul
-
-> ---
->  Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.yaml | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.yaml
-> 
-> diff --git a/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.yaml b/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.yaml
-> new file mode 100644
-> index 000000000000..a0e6fa1559cf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/panel/ronbo,rb070d30.yaml
-> @@ -0,0 +1,52 @@
-> +# SPDX-License-Identifier: (GPL-2.0+ OR X11)
-> +%YAML 1.2
-> +---
-> +$id: http://devicetree.org/schemas/display/panel/ronbo,rb070d30.yaml#
-> +$schema: http://devicetree.org/meta-schemas/core.yaml#
-> +
-> +title: Ronbo RB070D30 DSI Display Panel
-> +
-> +maintainers:
-> +  - Maxime Ripard <maxime.ripard@bootlin.com>
-> +
-> +properties:
-> +  compatible:
-> +    const: ronbo,rb070d30
-> +
-> +  reg:
-> +    description: MIPI-DSI virtual channel
-> +
-> +  power-gpios:
-> +    description: GPIO used for the power pin
-> +    maxItems: 1
-> +
-> +  reset-gpios:
-> +    description: GPIO used for the reset pin
-> +    maxItems: 1
-> +
-> +  shlr-gpios:
-> +    description: GPIO used for the shlr pin (horizontal flip)
-> +    maxItems: 1
-> +
-> +  updn-gpios:
-> +    description: GPIO used for the updn pin (vertical flip)
-> +    maxItems: 1
-> +
-> +  vcc-lcd-supply:
-> +    description: Power regulator
-> +
-> +  backlight:
-> +    description: Backlight used by the panel
-> +    $ref: "/schemas/types.yaml#/definitions/phandle"
-> +
-> +required:
-> +  - compatible
-> +  - power-gpios
-> +  - reg
-> +  - reset-gpios
-> +  - shlr-gpios
-> +  - updn-gpios
-> +  - vcc-lcd-supply
-> +
-> +additionalProperties: false
-> +  
--- 
-Paul Kocialkowski, Bootlin
-Embedded Linux and kernel engineering
-https://bootlin.com
-
+Some copy_from_user() implementations do not return the exact number of
+bytes remaining to copy on a fault.  But copy_mount_options() requires that.
+Note that this function differs from copy_from_user() in that it will oops
+on bad values of `to', rather than returning a short copy.
 
 _______________________________________________
 linux-arm-kernel mailing list
