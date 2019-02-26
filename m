@@ -2,86 +2,129 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E926BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:49:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D814FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:08:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B753220684
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 06:49:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A73662173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 07:08:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fau2Mqbl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="EycbhnqV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B753220684
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CyoD0CiJ";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="lUOHoTvl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A73662173C
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=GyIBHxo7+jPIIED4G12LGTFkT6tt3aCcGN8T7L3ivXs=; b=fau2MqblZ+xn76
-	q0Xof2OUj9VSSDdWbyyNjOmj1Ssg3DqB0mE72UVIxHmNzJz/opBYCpanPrDZ1zmGYVqR6L1yIL+uF
-	rIWh8KvTsCWb/6akeSV47JXSAwoz2siYkTAI0nW8IVbsGshm5VS4y/62uJKOULLgZVEulaF1QEIaO
-	h0lTldh2PYzkhVOA6rzKZawDdHOzeDDV8uGxJ/KOag7IY3+wEIqt6Lj2Ryuto3txuHoxp43o57ePC
-	1i2XeMnZ8ofuVFjF2DHW9wfxpQ6K+qakqZjc+brdQMj96QtqupzbakyiZC8tkDhyW8yPTSpcWKPpM
-	7VVt7uh9PQKM3ing1z2g==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=J0ndrrpvkvsoX3beCwlmS9wCO3tzcFZ8NQUWW0SkrlQ=; b=CyoD0CiJzDa4Cf
+	L4x1FSksDx3ZUyuHbjwtO6g+u/d+QvsspRW4ePxQm6XE/1y8HoYe85f0cH7QZe9RV8s/6VuIV+bNv
+	LQhQpMRAzazuXfwiVhRZc8G8Vv1o4Ud22PSGKNOmkKa90VamyLwZdM+5I8JFtHFUVKKvxgD4aiuUg
+	mOVz+oqWzDh/I8K6uM9QSOssYQ4xl8kH6EPc8Z8FY3YbFWLye5+6s3hP6MTQ4kEkED75yVg38+ath
+	HTh0MUdOUiV9dkREiTXRcIWo2rG96pYnln3u89TQOdQzsHoDo9uF7mTH0RNtvVXcgNXeVQpq4T8q4
+	aIF0NZEP/XRUPp3zeiRA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyWYB-0001Ob-O1; Tue, 26 Feb 2019 06:49:11 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gyWqj-0007My-2v; Tue, 26 Feb 2019 07:08:21 +0000
+Received: from mail-eopbgr40080.outbound.protection.outlook.com ([40.107.4.80]
+ helo=EUR03-DB5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyWY7-0001OF-A6
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 06:49:10 +0000
-Received: by mail-io1-xd42.google.com with SMTP id y13so9644401iop.11
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 25 Feb 2019 22:49:06 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=sVHAZ/egTlBNh7OvJT0sp5IVENLITBgL0jas/C8BVGc=;
- b=EycbhnqVN8yc4JLjdWjegehW8f72UaiMHMQOlzuSurKHQs9vfFnOWACrBhVRsXf0hO
- fSz1fWM2/3yTVWrGYqh0C4WdFsHIANHXImpJV3rpSmWTsKvxOAQqIjlj/AdjHKuX0fe1
- 1ZoTR1exsHETMprR4IpBA4Ho4cL+fBc9jo3yc=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=sVHAZ/egTlBNh7OvJT0sp5IVENLITBgL0jas/C8BVGc=;
- b=E33HywYWWsNdKmH5+4Cq1VJAMVLZGI/wrc20wXSxlUrvuTnNZ9dwK0Tkny6cP+7NGL
- 6Y3HHOAt2VLbf3f65qXsrMxxNi53DObzlDenwA9Atzk5lQjCPb5lZ0K/Zy3vQdRU4j82
- zfO8nY+pd83JIiJRL6NiUs1ET8/5VwfmlcGoxH9pzV7zlXUf/DaDbFZZlXusze1ioNTn
- TcgLAnDKZvlWBoi9AdHxK8th0w4BSZnVTxY56VilnqdWXBUev/lqqIs7L9HMzVG7S4sY
- 3PpLN+7AO5QvyOgru6PrgFQmn9j5Cupz7Rp03DVAHeAnLexMHbnksd18cassx+zS8yrF
- tbgg==
-X-Gm-Message-State: AHQUAuYrhrHXskW9G7J6t3eD0uwIjJSm/aqbmCQNqLXLZ2ia6BDTmD71
- 7fALX6XfymfcSRpZQjrENZ6K/6R4fYbCwfsEIQ2FvA==
-X-Google-Smtp-Source: AHgI3IZF6OgObDxAT9aZVWY2ulYriUr6wXkau0e4mtGJqjMyaR0782poxfPLGCq/1o9KDhm1rLsyKC3g6Khz4e3cA7o=
-X-Received: by 2002:a5d:97c8:: with SMTP id k8mr12225187ios.267.1551163745890; 
- Mon, 25 Feb 2019 22:49:05 -0800 (PST)
+ id 1gyWqf-0007Lv-5L
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 07:08:19 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=5ruERQqTuOXuHFDgyQM4iBb5WWNMfL9mvlnlwamFQ0Q=;
+ b=lUOHoTvlSTlS2A2UW3lBn3HXimOgDZhS+4qTa3zcxmew0B4pUZ/4N0nLFMpWJijh+U1cLA42tb7udsdwsgfmuqUpmIxdUNWo8gOojNhOLETpfLxtNjH/pzM3L0MvCOOUZMC38BcvLzFOfmDjoW3n+5jPd1i7SlrbWUiaJzxCRBw=
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
+ VI1PR0402MB3741.eurprd04.prod.outlook.com (52.134.15.147) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.16; Tue, 26 Feb 2019 07:08:11 +0000
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced%2]) with mapi id 15.20.1643.019; Tue, 26 Feb 2019
+ 07:08:11 +0000
+From: Daniel Baluta <daniel.baluta@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>
+Subject: [PATCH v3 0/5] Enable wm8524 on i.MX8MQ
+Thread-Topic: [PATCH v3 0/5] Enable wm8524 on i.MX8MQ
+Thread-Index: AQHUzaIIT88cE3xLDkC5V2BVcwNH0g==
+Date: Tue, 26 Feb 2019 07:08:11 +0000
+Message-ID: <20190226070742.30551-1-daniel.baluta@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: VI1PR04CA0102.eurprd04.prod.outlook.com
+ (2603:10a6:803:64::37) To VI1PR0402MB3357.eurprd04.prod.outlook.com
+ (2603:10a6:803:2::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=daniel.baluta@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 06a5ca2f-5890-4548-0506-08d69bb92abd
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3741; 
+x-ms-traffictypediagnostic: VI1PR0402MB3741:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR0402MB3741;
+ 23:oxjEWml1F3De+AUtQMK4A4mu90X1kqf36H2F4?=
+ =?iso-8859-1?Q?esjmnKyE7aodq5zF7YbJzF4fVZOye3jw74tulNLhjMs0otSEJ60wPa4qgz?=
+ =?iso-8859-1?Q?V2qmmEUmrUoPG15AZH5glmi6gwz88MF4XLJNKREfOta+MBBFVuob+/djnB?=
+ =?iso-8859-1?Q?gluu3OlSneg6vpQV41biqp486Tm2LoXHsw2pJ0m15QvBF91PIIlvnubP/J?=
+ =?iso-8859-1?Q?CuLISf33bAzdDReK/BPWC2Hu8YzL85cXMggKHCFbPDnNAy3D1bncK+1QyI?=
+ =?iso-8859-1?Q?idwvue2nZEfq3OddTlr9tp0BOO/Sk1uoxO608ofQSV53SEshQ3nWwIukmC?=
+ =?iso-8859-1?Q?hEuat54p5ocXiC812RrWAyHx0e2R7MGbtdoR8nCzc4lPo3+KD/6JT7khdF?=
+ =?iso-8859-1?Q?K30BiBAryafnh+AtsdtZE3e1ryjqXEi95yEC6O4U5w3Rz+jKwAS4Gmnoga?=
+ =?iso-8859-1?Q?BVlCDpeRBeA9PehzEh9L892W1w36SbL7vOi+XGnXvS8ZHl6RxROn/eJgTU?=
+ =?iso-8859-1?Q?kqoOstYfYwRqHi+XnoKiCjwO6IcmW6jfzz7F5+TNl8XZuVu/XdCDVpIND6?=
+ =?iso-8859-1?Q?UfleHVcUoxrshyjT7jedOov57hWypazuJa+PQgqI1hDXviz5cRt6WzVij5?=
+ =?iso-8859-1?Q?j8IbBu4fjeI42aci2OnA7xYMq0FIgW4Vml/P35fxtyeIubeioH/GqGiBl6?=
+ =?iso-8859-1?Q?TyX21qtz3BEgtORrHERApWQ0rTR+6r5oYS5NmiWExUf4ducCiKjyn9w6IT?=
+ =?iso-8859-1?Q?hxnbDn2TLnSvLQZW33wnzjapxLTnylo0VKAIRfX9Y4LPUOEuqal9Y6pigz?=
+ =?iso-8859-1?Q?ZCmmphpwa3saH40iia03mhDWI5D2ip428dmzEptuUVJECqa15qGqd9ykDt?=
+ =?iso-8859-1?Q?RvJwMc4Cg70IexMNvoISJO2c4C+X7uLlH/WOEHHM9kGutKImz6KS7cf19u?=
+ =?iso-8859-1?Q?PRW7wgCgF/hNIqzJT8Zz0WRd2hRHBsOSPumXCS6Wo5sHIINT9clIfvwfqJ?=
+ =?iso-8859-1?Q?RkRfbLYPDdWoaTN3VhaBDNvhSkjlp5+qjAGunC7f6dDIVYHoVB/Ls81ZnU?=
+ =?iso-8859-1?Q?u1T44dbJklqwAcOeBzcTMcziPIL31d1XUrbcI9MXA1g9bBr5DO63U3RxIh?=
+ =?iso-8859-1?Q?n4sRv0jXizOAoFIkLVOaLTQ8LX2ec8xz2k5WCxGRq9Yb641okaBOVPXjyZ?=
+ =?iso-8859-1?Q?+TrJankjkglesVcK/r9SdLMAXGJO7/s4IkwHtkjERbe96PPVqWOJ/aRdpR?=
+ =?iso-8859-1?Q?AXq49gmy297KyyiJt48Y1lKAvzHZp9FxJkThLp3Rwmp1rPuChMvqnFmkc6?=
+ =?iso-8859-1?Q?JxOtCAFAFdsr0hbI+81E+B61ztwXeQ4ue2RNWQ9enUMViFrGTDbPcJo1W8?=
+ =?iso-8859-1?Q?4m2TbnOkxQ=3D?=
+x-microsoft-antispam-prvs: <VI1PR0402MB37413F8262EC96E5305A2D5BF97B0@VI1PR0402MB3741.eurprd04.prod.outlook.com>
+x-forefront-prvs: 096029FF66
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(366004)(376002)(396003)(136003)(346002)(189003)(199004)(4744005)(3846002)(6116002)(305945005)(7736002)(6486002)(6436002)(1076003)(2906002)(71200400001)(71190400001)(54906003)(8676002)(1730700003)(50226002)(316002)(8936002)(81156014)(81166006)(6512007)(53936002)(5640700003)(66066001)(478600001)(486006)(7416002)(14444005)(68736007)(6916009)(6506007)(5660300002)(2616005)(386003)(476003)(2501003)(2351001)(97736004)(36756003)(86362001)(99286004)(4326008)(186003)(106356001)(44832011)(105586002)(26005)(256004)(14454004)(25786009)(52116002)(102836004);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3741;
+ H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: 4Ji0rAwYB1jZkFD7y7vyFEk1LclyR127cricxpy8UJvXdI0doubYsVVHttUNx3e8Mky27UaTNto7Bk/gl82cVc4WpEs7vDqps6nfvJ4BZ54F6YPRVVCBByeR3PgJCrHD+HOusAUHhVi3i/jf/Kr9ejqnr4Hqpi4m9AxGsdFAExqi1GxcWGxZFcsAImGn9ZhUsE0pRXx+LRyUFXUkVP+rboa+4qlJ4sWMBruWXZW5HrDLzAF/B08hEOipfpaJcbfSVej/Np868CU3ykZNWKfjWGQQm7a9+TFYQigdt/xsOCSZuqk3LJR0yZkVVzsy84jeAN5OVkXZ/ygwE6h5fQDI6rWkPmNo3zqtSzp+C07dNkAMLtUasLdxKNWXHZivs5Phc7131zydNGGEf5BrnF+urcTQHdwD02REe49tG2mvuWc=
 MIME-Version: 1.0
-References: <cover.f28d9994585553a089a519392616b0d26ed54af1.1549896081.git-series.maxime.ripard@bootlin.com>
- <20190215141244.5jrrqkykna6enbtp@flea>
- <CAMty3ZAA90-fHPADJSE3ht9CiYWA3yBoyEy7wVv9=6C5JiaTVw@mail.gmail.com>
- <c46cd50a-3695-ebc8-0cd4-4ddc27fc353b@openedev.com>
- <8d64d043333e3d43c36d60788d6c5b0997bc4e69.camel@bootlin.com>
- <CAMty3ZDK4Zw4XnSQFmT9C68Kf1LTshnVfMJOEM3ZbXa0AvJT4A@mail.gmail.com>
- <20190220163533.cehatadivjolo7sk@flea>
-In-Reply-To: <20190220163533.cehatadivjolo7sk@flea>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Tue, 26 Feb 2019 12:18:54 +0530
-Message-ID: <CAMty3ZDoQNnLAP9fBfEsdUb2ZPyfrATaw-2-FDUgyUO=Rdt_CA@mail.gmail.com>
-Subject: Re: [PATCH v3 0/8] drm/sun4i: dsi: Add burst mode support
-To: Maxime Ripard <maxime.ripard@bootlin.com>
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 06a5ca2f-5890-4548-0506-08d69bb92abd
+X-MS-Exchange-CrossTenant-originalarrivaltime: 26 Feb 2019 07:08:09.9984 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3741
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190225_224907_821907_30CAD1B8 
-X-CRM114-Status: GOOD (  40.91  )
+X-CRM114-CacheID: sfid-20190225_230817_206974_F02F0908 
+X-CRM114-Status: UNSURE (   8.98  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,221 +136,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: bbrezillon@kernel.org, dri-devel <dri-devel@lists.freedesktop.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Sean Paul <seanpaul@chromium.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Jagan Teki <jagan@openedev.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "baruch@tkos.co.il" <baruch@tkos.co.il>, Abel Vesa <abel.vesa@nxp.com>,
+ "kuninori.morimoto.gx@renesas.com" <kuninori.morimoto.gx@renesas.com>,
+ "ccaione@baylibre.com" <ccaione@baylibre.com>,
+ Daniel Baluta <daniel.baluta@nxp.com>, "S.j. Wang" <shengjiu.wang@nxp.com>,
+ "angus@akkea.ca" <angus@akkea.ca>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Aisheng Dong <aisheng.dong@nxp.com>, "agx@sigxcpu.org" <agx@sigxcpu.org>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 10:05 PM Maxime Ripard
-<maxime.ripard@bootlin.com> wrote:
->
-> Hi,
->
-> On Mon, Feb 18, 2019 at 04:01:09PM +0530, Jagan Teki wrote:
-> > On Mon, Feb 18, 2019 at 1:56 PM Paul Kocialkowski
-> > <paul.kocialkowski@bootlin.com> wrote:
-> > > On Fri, 2019-02-15 at 22:37 +0530, Jagan Teki wrote:
-> > > > On 15/02/19 8:10 PM, Jagan Teki wrote:
-> > > > >
-> > > > > On Fri, 15 Feb, 2019, 7:43 PM Maxime Ripard, <maxime.ripard@bootlin.com
-> > > > > <mailto:maxime.ripard@bootlin.com>> wrote:
-> > > > >
-> > > > >     On Mon, Feb 11, 2019 at 03:41:21PM +0100, Maxime Ripard wrote:
-> > > > >      > Hi,
-> > > > >      >
-> > > > >      > Here is a series implementing the burst mode support for DSI.
-> > > > >      >
-> > > > >      > It's been tested on an A33 board with the panel supported on the last
-> > > > >      > patch, which should remove all quirks due to a different SoC from the
-> > > > >      > equation.
-> > > > >
-> > > > >     I should have sent that mail yesterday, but patches 1-4 and 6-7 were
-> > > > >     merged. Patch 5 was discarded since it was not consistent with the
-> > > > >     rest of the driver, and 8 had some comments.
-> > > > >
-> > > > >
-> > > > > Are the applied patches from this series or from my v7 series?
-> > > > >
-> > > > >   Would you please point me the branch.
-> > > > >
-> > > >
-> > > > Unfortunately my last mail didn't reach arm mailing list.
-> > > >
-> > > > Just wanted to know are the applied patches from this series or from my
-> > > > v7 series? Would you please point me the repo, I couldn't find it on
-> > > > git://git.kernel.org/pub/scm/linux/kernel/git/sunxi/linux.git
-> > >
-> > > This series is the one that was applied upstream. You can find the
-> > > commits merged at: https://cgit.freedesktop.org/drm/drm-misc/log/
-> >
-> > Thanks for sharing the link Paul.
-> >
-> > This is really really discouraging.
-> >
-> > Don't know whom to ask directly about this, but I am really upset
-> > about this move.
->
-> I appreciate and understand that, and I feel sorry it ended up like
-> this.
->
-> > Most of the changes from applied series have similar patches that are
-> > been part of my series of patches. I've been sending this since last
-> > September (which was sent way prior than this series).
->
-> Note that only the burst part has been merged, and the first time you
-> sent it was in November.
+On i.MX8MQ we can start the party using the wm8524 codec
+which gets it's data through the SAI2 interface.
 
-at least those were prior to the applied series.
+In order to make it work this patch series enables the SDMA nodes,
+sets the correct pinctrl configuration and uses the simple card
+machine driver to put everything together.
 
->
-> > How come the same series is recreated and applied with minor changes
-> > while the original series was still in discussion. At least Maxime
-> > should have informed me or he should have rejected my work from
-> > patchwork or atleast NAK in ML?
->
-> I did, both in private and public. And I've told you on numerous
-> occasions what was wrong with your series and the way you were pushing
-> things. But let's break it down:
->
-> v8:
->   - Chen-Yu and I spent a lot of time (almost two full work days in my
->     case, Chen-Yu at least a full evening from what I know) trying to
->     make sense of the Allwinner BSP code, and report what was being
->     done. This was made public on the mailing lists, and you were in
->     cc [1][2]. It happened the week before your submission, yet you
+Changes since v2:
+	- s/QM/MQ after Chris comments
 
-I really missed this, since I don't have any information from you
-about sending my burst changes on behalf of other series. This is
-something that I couldn't aware in community project where someone
-sent the existing changes w/o informing the real author.
+Changes since v1:
+	- added cover letter
+	- remove "fsl,imx8mq-sdma" compatible for sdma.
 
->     ignored most of those changes, and I told you so [3], mentionning
->     a bunch of other recurring comments I had that were not really
->     addressed.
+Daniel Baluta (5):
+  arm64: dts: imx8mq: Add SDMA nodes
+  arm64: dts: imx8mq: Add SAI2 node
+  arm64: dts: imx8mq: Add SAI pinctrl configuration
+  arm64: dts: imx8mq: Enable SAI2 for wm8524 codec
+  arm64: dts: imx8mq: Enable wm8524 codec
 
-On the other hand, I replied about the real reason why I sent this on
-[3.1], these changes were generic and doesn't related to clock. You
-have been mentioned about the clock but ie not the reason for holding
-the generic changes I suppose.
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts | 48 ++++++++++++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi    | 38 ++++++++++++++++
+ 2 files changed, 86 insertions(+)
 
-At one point, I felt myself I'm making confusion with big changes, so
-I realized and sent the v7 [1] [2] which would eventually break the
-changes into sets those are placed generic burst and A64 support. I
-don't know I couldn't see any comments.
+-- 
+2.17.1
 
->   - This series and the other also had some obvious flaw that had 0
->     chance to work properly (which you eventually noticed[4])
->
-> v7:
->   - Chen-Yu and I were already discussing and pointing out some
->     issues, that were not addressed[5]
->
-> v6:
->   - Reviewing a PLL issue, already mentionned in the v5 and v2 [6]
->
-> v5:
->   - I mention that the display I have is broken, just like in your v4 [6].
->     Just like in the v4, I'm asking for a panel datasheet so
->     that I can help you debug this further. This is ignored.
->   - I asked for clarifications on that PLL min_rate, just like in the
->     previous versions [7]
->
-> v4
->  - I mention that the only other DSI display there is is broken
->    [8]. I'm again asking for datasheet and better commit logs.
->
-> v3
->   - Some more ignored comments [9]
->
-> A64 DSI v2
->   - Asking details on the PLL min_rate, comments ignored [10]
->   - Untested code [11]
->
-> Burst v2
->   - More details asked, obvious flaws [12]
->
-> v1
->   - Me asking for better commit logs and some justifications [13][14][15]
->
->
-> TL; DR: there's not been any single iteration of those patches where
-> you wouldn't have ignored some comments made on a previous iteration,
-> despite for some patches numerous questions around the same points,
-> and with very significant time invested in this by numerous people
-> (Chen-Yu, myself and Paul to a lesser extent).
->
-> This is what was completely stalling your series, and I'm sure
-> frustrating both sides. You even acknowledged that in that mail:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/632060.html
->
-> Yet, you submitted your v8 versions without taking our comments into
-> account.
->
-> > All these burst changes and random fixes are reviewed in couple of
-> > versions, now the versioning moved to v8[1] [2]. For each and every
-> > versioning I'm trying to fix the previous version comments, code
-> > improvements, commit messages. In fact for each rotation I'm trying to
-> > validate 4 different panels which eventually consume all my 16 hours
-> > in day.
-> >
-> > Please let me know to how could we better collaborate?
->
-> By listening and addressing the reviews we are making. If you feel
-> like you're missing something and / or not understanding everything in
-> a review (which honestly would be pretty understandable with that
-> sub-par DSI block documentation), then please ask, but ignoring those
-> comments will just be a waste of time for everyone involved, and will
-> frustrate everybody (especially when the time spent is this important).
-
-I did address all your comments as per as generic burst changes, which
-were supposed to fixed in initial versions. here are the changelog for
-your information.
-
-Changes for v8:
-- rebase on master
-- rework on commit messages
-- include drq changes from previous version
-Changes for v7:
-- rebase on master
-- collect Merlijn Wajer Tested-by credits.
-Changes for v6:
-- fixed all burst mode patches as per previous version comments
-- rebase on master
-- update proper commit message
-- dropped unneeded comments
-- order the patches that make review easy
-Changes for v5, v4, v3, v2:
-- use proper return value for tcon0 probe
-- add logic to get tcon0 divider values
-- simplify timings code to support burst mode
-- fix drq computation return values
-- update proper commit messages
-- rebase on master
-
->
-> Like I was saying before, I haven't merged any A64 or panel patches,
-> so this will be a pretty good occasion to test this.
-
-Honestly I didn't frustrate about this work, and  I couldn't see any
-proper reason for your response on why you send similar burst changes
-w/o informing or NAK my changes. I assume you may feel confused or
-frustrated about my series (which I didn't intentionally do that
-sorry), so you mark the changes from your side and applied.
-
-Anyway, thanks for your support, I will re-spin my changes on top
-these applied changes.
-
-[3.1] http://lists.infradead.org/pipermail/linux-arm-kernel/2019-February/632060.html
-[2] https://patchwork.kernel.org/cover/10813623//
-[1] https://patchwork.kernel.org/cover/10792981/
-
-Jagan.
 
 _______________________________________________
 linux-arm-kernel mailing list
