@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,
 	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46A9DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:39:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A8BB7C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:41:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1493C2173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:39:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 720622173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 14:41:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="n9H4xcyO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="qrniw8KQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1493C2173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jkcIucic";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="Jk4s/BkF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 720622173C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,61 +25,61 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3OnMEmrp/r9NA9N724VPFSm/yc2QoXBzDSDYpojqiwQ=; b=n9H4xcyORmtIY0
-	h8lw6Ex+xYyj2fajRguS6IFg/NvDThUHVdKtBOZJw3AdJZDaP7HRFYm2nbA2GdYj3gasfr8QYPiLo
-	rPA/IAM2vtqbmETYc2+zsCNhAqezdq5bbC9FgXGw4kCBxQZKQ5A8NIqPQUfF5fhM9UOUGr2+9+tgI
-	tZBXwK/SiqUCdQytol+ZwJIIoh3wzMBm458cPTNoO320bpAuR3nzPrC8ISNbD/zN5mTI9d/3WTb+u
-	5GOJfrmBRCf3p076ZvGgH1d1eevReceokJHx2v4yoKaXELiZPc5sZSOGXExAWL6VAylCULQNDaETR
-	89aZ8uKQ22jhlI7oOsRw==;
+	List-Owner; bh=f0ktNjaB0mTyF9ycjKbY/gcXv5aJuSPANBkUVclOefY=; b=jkcIucicpsPHXO
+	RTPhmg6TgEmGofV+PCg73rOMDhPsDlg+6CW7HKPVIy9k283PfzCEpF5cd7teHKV9S/sT5FUrF/3Lv
+	hu3rNZVHjUK0ojJrLV1ljY3AVGwySJY+S5A9wX4Eihqx2Rt7glCN0dZ/99jVsXkpioMQDpBMzC4NO
+	Q7K2Xwc1w75WKv6M1PvZSjZSdFy1SjCGPsgw5nTEwrZVrSqEPRPC7PZr2IOfcp99Zvur2dWiLoFvw
+	75tqSr5FCHIWmTV1Dp5Vby+xRxc1J2tMcvv6+yiVPEimv2kzqnKj5aEHUmW/43VMXCaKd4Z05VUpt
+	LjiQmc3LH1PEBOQ/Wc4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gydtD-0008CA-0n; Tue, 26 Feb 2019 14:39:23 +0000
-Received: from mail-pg1-x544.google.com ([2607:f8b0:4864:20::544])
+	id 1gydvR-0001iH-TY; Tue, 26 Feb 2019 14:41:41 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gydt9-0008Bi-P0
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:39:21 +0000
-Received: by mail-pg1-x544.google.com with SMTP id m2so6314995pgl.5
+ id 1gydvO-0001hZ-Oi
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 14:41:40 +0000
+Received: by mail-pf1-x441.google.com with SMTP id u9so6352677pfn.1
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 06:39:19 -0800 (PST)
+ Tue, 26 Feb 2019 06:41:38 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=dfiBLpo8ppzHN31Df3pK9Pue7IUmmemEwHEq/+qIHW8=;
- b=qrniw8KQBsnVcBdkLwXYTHP1tzALWjLL3wqY47zLDB86u7VpyXqsBCFNMPUvx2rcQ5
- tleEIn43VcQEIxdaz5Lq3qoXKxfo59ovHYPtXDa7JwcKInE8AMfYDGNxNizwMWMWQjde
- EhSO6jW2VXILtMDY8JQSd+bipZZVCQ+CR0EOZ2zJgqQHGK2gbFfefcVUCOF/9F/FdN4j
- khe0Gzu8tDmq3gffWUNVCHAG7gYifd/AMvfrRv8bNWrE6v7GDGV6bjcxEvsAriDj0zwX
- 9ukzSjG/hOjO6EfG3Aixqm8fiGMNQyIAiftpSDpkdyIWPy343s9BUOUiQ9YAblVGHraC
- nJQA==
+ :cc; bh=ORID1v1ozYXyKv1mw/ofFm5kiuOuJ/TBoHbnGpDrQY0=;
+ b=Jk4s/BkFrIcxrk4e9Mx5smnm1MMtapGUCpafH868xdIWYkLK7M78NPFfkO1hXlBR3s
+ fHSFCSGQY90XYaDQqb63dSKPREtSbEi2GwRgT00jYvnEy0yQetugEzlFqBmtB3qipsAd
+ q/rhOJ6CKsqxpXxBDrJDcb0ls8JRx8hPmbNL5pXQCFMY5+3weHhsnBcu5hbxiUG4WqQl
+ pBEq1Wji+wh6z+8emU3AosXH6snGNQBpu8akU3FP96jjwWcneLVMTgn776abphESvY54
+ iMhXTsCqkSEIu1VQDJchEorqdn4d1RpFfWm51ZaV3ypfOUhUpwNhpwhi50tHIgnGBRqu
+ SjeQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=dfiBLpo8ppzHN31Df3pK9Pue7IUmmemEwHEq/+qIHW8=;
- b=SIuseA6MAkN98sFwiXUwGZKKmXWC4Dc70bGjOixn9Qjy+2at0Il0S/l0ekL0I1QK7H
- Y/rHs1tW43XGQJmr6+ZpdWjqwVySPGih3obe3o/LMnSz7okB+/0MCSToQrclGGekwvba
- 2GFgJIPDpfcec3NbO7Vsz62BEFfxJTtJFJN9yl1IwXI0rZDxJYN4YVjTN/h+ukN41db6
- GBSHi3le+svqnTy4x/eQAukrfT2ds3G7lFXpoRlcnN3Qcu9h9n+zHgAlfctVPO0pFJoh
- WkX+7WtyiOtezY1m4r4AwNc+QkZuW0U+u/bUBM5NC1SVo8xYUJBHqjRZGWJ5q9uPTk/M
- zgJA==
-X-Gm-Message-State: AHQUAuY+jWr0pI/lFfsV27rZJ2/1byT1ML9Hf14wjL4lhMzuTq7RrfQQ
- B5KM6Z9UdiRxHZDvhFv5RMpauHFpwo+lmvaUd8olwg==
-X-Google-Smtp-Source: AHgI3IbzQ3IeJ3DdtureLg8xHbfzWl4k26RcwSMIdPdFZQbQ2oXfH0JWdLJfU9vlDhlDrZoE5TP5lbkNIdumuA65DBY=
-X-Received: by 2002:a65:6651:: with SMTP id z17mr23465185pgv.95.1551191958932; 
- Tue, 26 Feb 2019 06:39:18 -0800 (PST)
+ bh=ORID1v1ozYXyKv1mw/ofFm5kiuOuJ/TBoHbnGpDrQY0=;
+ b=lrR1sGFgR965BX1Ab0bcNDCebFgM0uZOojTNUTCVKrXVIUfvlbA/pCNZ6W6xhAylmB
+ FFCmRk8dvu/PCjmosDY/76WtobKFFCNST06GRHqpSwbeUc8zAFc5QbNM573oOY3NmV0i
+ TcIWtHA2+czgtSWbYrQdmOLzVISaYh07crIa7dU7Aq4g6PatoRkwqs7NxfGkawENu+p5
+ 61V/bZZ65UaB4kC9JmlwxqfseQ8maKGKCNWqCwOshGx49Ea45VaqJeO/gxVG08Lgj4P8
+ ej0omXfbPX/EjycMkuyDa+vjT12C62ZDdkMNBG/wobTMxHM0vUgtcnXePwHVi/LbvIan
+ 7wcg==
+X-Gm-Message-State: AHQUAuZ/ptaMjZtB6eJI4uKUGu0j5e8IyjAUO17s9g6aBC/9KSNOL9Px
+ eylSZnCv9O6Pant3Lm/qINDXeUMc7QkkuXAEAzCvFw==
+X-Google-Smtp-Source: AHgI3IZRaeChYbi2J79TLZ2OQNrL+zd2lHSInwkIpfXgbjWxpzJly0F0LoxycLTV6qaHuDyyWxELKtQh0Gjyn9jKmaE=
+X-Received: by 2002:a62:4299:: with SMTP id h25mr26113838pfd.165.1551192097850; 
+ Tue, 26 Feb 2019 06:41:37 -0800 (PST)
 MIME-Version: 1.0
 References: <cover.1550839937.git.andreyknvl@google.com>
- <8343cd77ca301df15839796f3b446b75ce5ffbbf.1550839937.git.andreyknvl@google.com>
- <73f2f3fe-9a66-22a1-5aae-c282779a75f5@intel.com>
-In-Reply-To: <73f2f3fe-9a66-22a1-5aae-c282779a75f5@intel.com>
+ <3875fa863b755d8cb43afa7bb0fe543e5fd05a5d.1550839937.git.andreyknvl@google.com>
+ <81ea4e77-90a4-4fd9-2bc8-135e0da30044@intel.com>
+In-Reply-To: <81ea4e77-90a4-4fd9-2bc8-135e0da30044@intel.com>
 From: Andrey Konovalov <andreyknvl@google.com>
-Date: Tue, 26 Feb 2019 15:39:08 +0100
-Message-ID: <CAAeHK+yQU8khtOoyDKqmHterCa16P7oWe9AMiPnrxE+Gyb_7aw@mail.gmail.com>
-Subject: Re: [PATCH v10 07/12] fs,
- arm64: untag user pointers in fs/userfaultfd.c
+Date: Tue, 26 Feb 2019 15:41:26 +0100
+Message-ID: <CAAeHK+z2qw__Kpeih2mEyhVJ-gbor1vYsOZddT5E71JDiSg7pg@mail.gmail.com>
+Subject: Re: [PATCH v10 04/12] mm,
+ arm64: untag user pointers passed to memory syscalls
 To: Dave Hansen <dave.hansen@intel.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_063919_832808_E4C777D6 
-X-CRM114-Status: GOOD (  12.75  )
+X-CRM114-CacheID: sfid-20190226_064138_837861_CAC17491 
+X-CRM114-Status: GOOD (  14.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -120,20 +119,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Feb 23, 2019 at 12:06 AM Dave Hansen <dave.hansen@intel.com> wrote:
+On Sat, Feb 23, 2019 at 12:07 AM Dave Hansen <dave.hansen@intel.com> wrote:
 >
 > On 2/22/19 4:53 AM, Andrey Konovalov wrote:
-> > userfaultfd_register() and userfaultfd_unregister() use provided user
-> > pointers for vma lookups, which can only by done with untagged pointers.
+> > --- a/mm/mprotect.c
+> > +++ b/mm/mprotect.c
+> > @@ -578,6 +578,7 @@ static int do_mprotect_pkey(unsigned long start, size_t len,
+> >  SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
+> >               unsigned long, prot)
+> >  {
+> > +     start = untagged_addr(start);
+> >       return do_mprotect_pkey(start, len, prot, -1);
+> >  }
+> >
+> > @@ -586,6 +587,7 @@ SYSCALL_DEFINE3(mprotect, unsigned long, start, size_t, len,
+> >  SYSCALL_DEFINE4(pkey_mprotect, unsigned long, start, size_t, len,
+> >               unsigned long, prot, int, pkey)
+> >  {
+> > +     start = untagged_addr(start);
+> >       return do_mprotect_pkey(start, len, prot, pkey);
+> >  }
 >
-> So, we have to patch all these sites before the tagged values get to the
-> point of hitting the vma lookup functions.  Dumb question: Why don't we
-> just patch the vma lookup functions themselves instead of all of these
-> callers?
+> This seems to have taken the approach of going as close as possible to
+> the syscall boundary and untagging the pointer there.  I guess that's
+> OK, but it does lead to more churn than necessary.  For instance, why
+> not just do the untagging in do_mprotect_pkey()?
 
-That might be a working approach as well. We'll still need to fix up
-places where the vma fields are accessed directly. Catalin, what do
-you think?
+I think that makes more sense, will do in the next version, thanks!
+
+>
+> I think that's an overall design question.  I kinda asked the same thing
+> about patching call sites vs. VMA lookup functions.
+
+Replied in the other thread.
 
 _______________________________________________
 linux-arm-kernel mailing list
