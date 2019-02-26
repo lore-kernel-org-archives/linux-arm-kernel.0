@@ -2,20 +2,20 @@ Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E6296C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B3E55C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B20412173C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7DEE32173C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 12:13:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="se+YhYTY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B20412173C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NW2BMd5Q"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7DEE32173C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,42 +24,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7M5OIjd4HWk5bY6dZZfWUMokmDH6Is520Oi7yMrE6+Y=; b=se+YhYTYg16LN2
-	39y61AsgpMWioWac/Dhyf3awyysvhhBf/zD+eaVgRWD9wTsVXxbRqZE+CzWCX9FQfXd5DS3p6+D+S
-	75Xc/KfDCJjZsHHC9aIVImmO0Omeh9faNoay/f7vq0kmDzKN9nLUZl/Jw1FxhG309LF9WDWRA8LCl
-	qRszqQiT/9QNzZPoL4l52yQ1wvXBiEdLoWKycUyl1Yc+/ENCD22WXx+Vy6/w5l60Wh+TOyAFkaKaR
-	JVLWZEyO3EMwcnZ26CtTfdM6RyblyVeIZM6KZWc8DBB4CmIX+NmuCyHNsBMrFpsuISbCMtXkFveIH
-	uXCiGpNXQ6Pd3qhvtU5w==;
+	List-Owner; bh=fP5SBtxsdOBww6uvKO/qFuadKwRcR1+EBA0R6O9bcZY=; b=NW2BMd5QFQg8Y8
+	B6Li6Ro9vjVfXxPBtlUFVA2lB1VD9mJGZKyLBd3fnrXd5ueOpjXPdPXteYs3nnsnDu6GxlAQKVedy
+	Yf49hJSsa5/iLuCeshp/FgdZX9jkTRA1h5euZa+npoYsajvaeFnAYTRKg8IK69/coNn9aEFrMdV3N
+	Mo1UfyjGmNPymFREuxmUMLrs2NE7wUyodTKNbByn5SDYGlQy3Vb8RkfzEr3dTzZXRMEqUrPf7W8Kx
+	iQNWbM4F6CWa1qMoWELDLNGNgTCYG3UA9bvzice4nYENxzU2r0/hb3g5dLhqqb24ZY/2LNom22STE
+	LC+wOe0umdLpplH8Srew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gybbS-0006sF-SN; Tue, 26 Feb 2019 12:12:54 +0000
+	id 1gybbs-0007AE-9w; Tue, 26 Feb 2019 12:13:20 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gybbP-0006og-Ti
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:12:53 +0000
+ id 1gybbp-00079k-6M
+ for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 12:13:18 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6767880D;
- Tue, 26 Feb 2019 04:12:51 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D3D2680D;
+ Tue, 26 Feb 2019 04:13:16 -0800 (PST)
 Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
  [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 99BA13F5C1;
- Tue, 26 Feb 2019 04:12:49 -0800 (PST)
-Date: Tue, 26 Feb 2019 12:12:47 +0000
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 12C963F5C1;
+ Tue, 26 Feb 2019 04:13:14 -0800 (PST)
+Date: Tue, 26 Feb 2019 12:13:12 +0000
 From: Dave Martin <Dave.Martin@arm.com>
 To: Mark Rutland <mark.rutland@arm.com>
-Subject: Re: [PATCH v5 12/26] KVM: arm64: Support runtime sysreg visibility
- filtering
-Message-ID: <20190226121247.GO3567@e103592.cambridge.arm.com>
+Subject: Re: [PATCH v5 14/26] KVM: arm64/sve: Context switch the SVE registers
+Message-ID: <20190226121312.GP3567@e103592.cambridge.arm.com>
 References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-13-git-send-email-Dave.Martin@arm.com>
- <20190220153726.GF4763@lakrids.cambridge.arm.com>
+ <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
+ <20190220161917.GG4763@lakrids.cambridge.arm.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20190220153726.GF4763@lakrids.cambridge.arm.com>
+In-Reply-To: <20190220161917.GG4763@lakrids.cambridge.arm.com>
 User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_041251_975054_FAEB91BA 
-X-CRM114-Status: GOOD (  25.64  )
+X-CRM114-CacheID: sfid-20190226_041317_234856_3F69B7EC 
+X-CRM114-Status: GOOD (  18.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,90 +81,73 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Feb 20, 2019 at 03:37:26PM +0000, Mark Rutland wrote:
-> On Mon, Feb 18, 2019 at 07:52:25PM +0000, Dave Martin wrote:
-> > Some optional features of the Arm architecture add new system
-> > registers that are not present in the base architecture.
-> > 
-> > Where these features are optional for the guest, the visibility of
-> > these registers may need to depend on some runtime configuration,
-> > such as a flag passed to KVM_ARM_VCPU_INIT.
-> > 
-> > For example, ZCR_EL1 and ID_AA64ZFR0_EL1 need to be hidden if SVE
-> > is not enabled for the guest, even though these registers may be
-> > present in the hardware and visible to the host at EL2.
-> > 
-> > Adding special-case checks all over the place for individual
-> > registers is going to get messy as the number of conditionally-
-> > visible registers grows.
-> > 
-> > In order to help solve this problem, this patch adds a new sysreg
-> > method restrictions() that can be used to hook in any needed
-> > runtime visibility checks.  This method can currently return
-> > REG_NO_USER to inhibit enumeration and ioctl access to the register
-> > for userspace, and REG_NO_GUEST to inhibit runtime access by the
-> > guest using MSR/MRS.
-> > 
-> > This allows a conditionally modified view of individual system
-> > registers such as the CPU ID registers, in addition to completely
-> > hiding register where appropriate.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > 
-> > ---
-> > 
-> > Changes since v4:
-> > 
-> >  * Move from a boolean sysreg property that just suppresses register
-> >    enumeration via KVM_GET_REG_LIST, to a multi-flag property that
-> >    allows independent runtime control of MRS/MSR and user ioctl access.
-> > 
-> >    This allows registers to be either hidden completely, or to have
-> >    hybrid behaviours (such as the not-enumerated, RAZ, WAZ behaviour of
-> >    "non-present" CPU ID regs).
+On Wed, Feb 20, 2019 at 04:19:18PM +0000, Mark Rutland wrote:
+> On Mon, Feb 18, 2019 at 07:52:27PM +0000, Dave Martin wrote:
+> > -static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> > +/* Check for an FPSIMD/SVE trap and handle as appropriate */
+> > +static bool __hyp_text __hyp_handle_fpsimd(struct kvm_vcpu *vcpu)
+> >  {
+> > -	struct user_fpsimd_state *host_fpsimd = vcpu->arch.host_fpsimd_state;
+> > +	bool vhe, sve_guest, sve_host;
+> > +	u8 trap_class;
 > 
-> Sorry for bikeshedding...
+> Nit: elsewhere in kvm, this gets called hsr_ec. Can we use the same name
+> here?
+
+Done.
+
+(This name is not used in hyp/switch.c yet, and I was sort of trying to
+conform to the naming of kvm_vcpu_trap_get_class().  But hsr_ec is used
+elsewhere, and more self-describing, so it makes sense.)
+
 > 
-> > +	/* Check for regs disabled by runtime config */
-> > +	if (restrictions(vcpu, r) & REG_NO_GUEST) {
+> >  
+> > -	if (has_vhe())
+> > -		write_sysreg(read_sysreg(cpacr_el1) | CPACR_EL1_FPEN,
+> > -			     cpacr_el1);
+> > -	else
+> > +	if (!system_supports_fpsimd())
+> > +		return false;
+> > +
+> > +	if (system_supports_sve()) {
+> > +		sve_guest = vcpu_has_sve(vcpu);
+> > +		sve_host = vcpu->arch.flags & KVM_ARM64_HOST_SVE_IN_USE;
+> > +		vhe = true;
+> > +	} else {
+> > +		sve_guest = false;
+> > +		sve_host = false;
+> > +		vhe = has_vhe();
+> > +	}
+> > +
+> > +	trap_class = kvm_vcpu_trap_get_class(vcpu);
+> > +	if (trap_class != ESR_ELx_EC_FP_ASIMD &&
+> > +	    (!sve_guest || trap_class != ESR_ELx_EC_SVE))
+> > +		return false;
 > 
-> Maybe it's worth wrapping this as something like
+> This is somewhat painful to decipher, but I couldn't come up with
+> something that was both succint and legible.
 > 
-> 	reg_runtime_hidden_from_guest(vcpu, r)
+> Maybe it's worth duplicating the SVE check, i.e.
 > 
-> ... and avoid exposing the raw flags to all the places we have to check?
+> 	if (hsr_ec != ESR_ELx_EC_FP_ASIMD &&
+> 	    hsr_ec != ESR_ELx_EC_SVE)
+> 		return false;
 > 
-> [...]
+> 	if (!sve_guest && hsr_ec == ESR_ELx_EC_SVE)
+> 		return false;
 > 
-> > +#define REG_NO_USER	(1 << 0) /* hidden from userspace ioctl interface */
-> > +#define REG_NO_GUEST	(1 << 1) /* hidden from guest */
-> 
-> Perhaps REG_USER_HIDDEN and REG_GUEST_HIDDEN?
+> ... ?
 
-I'm not attached to any particular naming, so I'm not opposed to making
-changes similar to those you suggest.
+There were previously some static_key checks in here that I didn't want
+to duplicate, which is part of the reason for trying to merge related
+if-conditions together explicitly.
 
-There are some anomalies right now:
+This is no longer relevant now that the static_key checks have been
+hoisted out explicitly.  Something along the lines of your version
+would definitely be clearer.  gcc also seems to merge the conditions
+competently, so I'll pick up your suggestion for now.
 
-1) Currently, we can express REG_NO_GUEST by itself, which is a of an
-odd thing to have.  I'm not sure whether that's a problem or not.
-Keeping the flags as-is at least keeps the code simple.
-
-2) These flags do not quite have the obvious semantics: these are
-overrides rather than determining precisely when a reg is/isn't
-accessible.
-
-So, REG_NO_USER means "don't even call this reg's get/set_user(): forbid
-user access unconditionally", whereas lack of this flag means "call the
-appropriate get/set_user() function to find out what to do, which may
-or may not result in forbidding the access".
-
-Maybe this subtlety is just a question of clear commenting.  I can't
-think of obviously-correct names that won't be stupidly verbose...
-
-Thoughts?
-
-Cheers
+Thanks
 ---Dave
 
 _______________________________________________
