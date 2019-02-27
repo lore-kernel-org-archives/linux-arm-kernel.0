@@ -2,84 +2,68 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	HK_RANDOM_FROM,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D63EC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5DD10C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 02:26:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 71BB7218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1FA9A218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 02:26:47 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CfxgjKdd";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bXDYrYGl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71BB7218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GtlJedrA";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=163.com header.i=@163.com header.b="lUqUQLBZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1FA9A218CD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=163.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LeqlkkbGTubgEiXh7sMDdpIj417297KPF9IO3XrBC88=; b=CfxgjKddu2TQzg
-	iFHSkIrY1E8aFBXzW0H5/3cA5wSbTauSGkpqqg4oP0FqeivifOdHedlX5h6gsUloOqSQJ32GQhoKl
-	ZQC0j4mafO6lj7Ta1308F5hftRjqPsXUp6A8f0w8DedV648XIcS6786mHmTFeMsDvYrdhuPNPSYSJ
-	rebxrs9NHEWd06C5ivo49j+ZWCueEya7QjLOXEmXaCy6tkAScEVVeIvLHd55L+8Q994KLosKD6TL/
-	GA4T90buVpnHn4Fm0ezzaoUS3MY0g/6MKPA8VIBP7LAporZ12cSmKJwxMwYpe1SuHOk7oJtqAmppw
-	tVp+1je69bERtNldH+hQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=b+bXlUf55IH7uefW0/cknSo8dklc+YW2YH/p5Gy8+DE=; b=Gtl
+	JedrAsd8apeByl9ACi6AAPtScY8F7yVbHQrTdRvM4OJ14F3TYmn5DuBDYwXRuI5bgk0nEzAvwvY+A
+	yR4R/UuVjn0/HNBl6DLmu2xU9q1EWrNbJklegDYPVTUdhyxPVgrimOaAo7UnYp8yNGlgiUE3+dPnr
+	LJ9BlRkaXIwpas6FYgL/QUP+OReRCaMU2BoIUDfWBmrmg3danE62BGjAt6ZLjeeQdMaOy52P0w2ZT
+	sfA96jIFn7fZDprj5jkLZU28ZUzEx3P7QQnuapG0rTwwAsEfLTT9iycwtcX1qJh9b7bz5+EWZUzcZ
+	gCpwf3P1l+Ltfe1TRhzEh6rXhD9CBHg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyoFg-0006AB-BN; Wed, 27 Feb 2019 01:43:16 +0000
-Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyoFc-0005zI-IS
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 01:43:14 +0000
-Received: by mail-ot1-x343.google.com with SMTP id t7so12948488otk.8
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 17:43:12 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=+ePahqNB+NAIQktminfToWaR6W6q1o8dl+pknU+Oug8=;
- b=bXDYrYGlVlnwVA0Uw3rnfWSp/TCkYI5Y6IfmAJ0TdyhbyuVco2uOy64+IYGufqSEXy
- nuIXA/vM8bmleJpQao/cvOAPx+t29A8n7SmNGukKSs22u1zuUeJ4d9idJBWI4nDpk2sY
- +zQjhGoCRmLcT9Rwm3HdB6WHMeA735PEBgdtSZd2yZv+9GALI8nWWCaK0MrdXA5C13e/
- /dwnqZtvJa4cWXyXUz5lt0SyJroMc3FDvAHTMzrSfjsDwUN+HC3LdDMVAes0eLEiBa6v
- Rc/D1OnbhPIkCpB8of1Sx1sxVeM2W3q13gFUpxcq8NRA0t4GHDZhM3aZAXTZsavRFbhk
- r6eQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=+ePahqNB+NAIQktminfToWaR6W6q1o8dl+pknU+Oug8=;
- b=iQZg4kVGMc7x8wAqAQn6yZJaytFQYpkf6JjB9FiSGVOq/b2K4VxfoEGupR185ymggz
- BclX5sJU39T72+v+ez28lrq6EvPTg7ZJw7fml4SK6e9wcrBX7VIDCFd6ueJxW1hD69cl
- Dj+ZYDrBRlcaiQXSzCHAo2LJAjs09zyU84Qld1JgfMfiXSiKx7FQSH/lWvSIKYCt+h8E
- 3tNdwDFCt4gGhZmZK8qru9s57iPi/8dTbHIieEuRL7no8pu17L4N5+ZUOlSYUBlQwRan
- Te0o8fnR7GDhKWLtY9m5R/KTD9IlhfIxpZDlw/QDVaTSNckNDVEzhHAzy3ryfvffip/6
- N8xQ==
-X-Gm-Message-State: AHQUAuY67lXDMr2pnNqdBFeltZo+7XGCKlPg0axF1vdCCUnFv2rMm0uw
- x42SNjrMlMwFCxaFuNgF4MmjJFd+CxEx24uBlQQ=
-X-Google-Smtp-Source: APXvYqzKVLSr+oXMH1RsvLJ9BPOZZxFkxDhAmIsLK0hM34vcBg/7oAWVWWnmOQ7nHhyuOx4L1aeCTFXw01ZhwC8TN/4=
-X-Received: by 2002:a9d:7d02:: with SMTP id v2mr615500otn.203.1551231791522;
- Tue, 26 Feb 2019 17:43:11 -0800 (PST)
-MIME-Version: 1.0
-References: <1551230622-30660-1-git-send-email-Anson.Huang@nxp.com>
- <1551230622-30660-2-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1551230622-30660-2-git-send-email-Anson.Huang@nxp.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Tue, 26 Feb 2019 22:42:59 -0300
-Message-ID: <CAOMZO5AddhSfB0Efuy-Z5GjvpXMwyBGHB8H6YTWcztXzCOWVyA@mail.gmail.com>
-Subject: Re: [PATCH RESEND V2 2/2] arm64: dts: freescale: imx8mq: add clock
- for GPIO node
-To: Anson Huang <anson.huang@nxp.com>
+	id 1gyovk-0003P5-RP; Wed, 27 Feb 2019 02:26:44 +0000
+Received: from m12-17.163.com ([220.181.12.17])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyovg-0003Oi-3l
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 02:26:42 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=163.com;
+ s=s110527; h=From:Subject:Date:Message-Id; bh=btUcs3+/xyWYxVRVE5
+ 2HFznfCYpsm3BUMuXFtIGU9Qw=; b=lUqUQLBZznXZsTROYcOsm7SzLMS5p4lN5V
+ cfJ9eb8QboGKMdsqnwSbvCDPLsOvILKr8mx1+faC5IUkKYQ+dNN4d3MYROGqk+yX
+ 2qDsztZxbMwRxogVlSAcQlJHFq8VGyxip2RoGH/kD0Aqo91IKVSwvZYLjZRnA3/h
+ b3Jw9GhXg=
+Received: from localhost.localdomain (unknown [182.151.187.141])
+ by smtp13 (Coremail) with SMTP id EcCowABnNtdJ9XVcr0WqHg--.29349S2;
+ Wed, 27 Feb 2019 10:26:18 +0800 (CST)
+From: WangBo <wdjjwb@163.com>
+To: linux-kernel@vger.kernel.org
+Subject: [PATCH] ARM: dmabounce: NULL check before some freeing functions is 
+Date: Wed, 27 Feb 2019 10:26:15 +0800
+Message-Id: <1551234375-6223-1-git-send-email-wdjjwb@163.com>
+X-Mailer: git-send-email 2.7.4
+X-CM-TRANSID: EcCowABnNtdJ9XVcr0WqHg--.29349S2
+X-Coremail-Antispam: 1Uf129KBjvdXoWrur15GF1fCryUCr1rCw4DJwb_yoWfAFg_Ar
+ yxt3ykur95ZF4kWF4ayr1rur1fA3yrXFWFvF18Jrs7GanYqr9xArnrZ3yfK3W2gayjvr9x
+ XrWUZryjyr12kjkaLaAFLSUrUUUUUb8apTn2vfkv8UJUUUU8Yxn0WfASr-VFAUDa7-sFnT
+ 9fnUUvcSsGvfC2KfnxnUUI43ZEXa7IUnjsjUUUUUU==
+X-Originating-IP: [182.151.187.141]
+X-CM-SenderInfo: xzgmy4re6rljoofrz/xtbBEApoGVUMK+Nl1wAAsI
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_174312_708283_536B7975 
-X-CRM114-Status: UNSURE (   8.44  )
+X-CRM114-CacheID: sfid-20190226_182640_690919_6244B6FF 
+X-CRM114-Status: UNSURE (   8.82  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -92,33 +76,43 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "agx@sigxcpu.org" <agx@sigxcpu.org>, Abel Vesa <abel.vesa@nxp.com>,
- "sboyd@kernel.org" <sboyd@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "mturquette@baylibre.com" <mturquette@baylibre.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Cc: rmk+kernel@armlinux.org.uk, wang.bo116@zte.com.cn,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 26, 2019 at 10:29 PM Anson Huang <anson.huang@nxp.com> wrote:
->
-> i.MX8MQ has clock gate for each GPIO bank, add clock info
-> to GPIO node for clock management.
->
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+The function dma_pool_destroy(NULL) is safe, so removes NULL check before 
+freeing the mem. This patch also fix the ifnullfree.cocci warnings.
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Signed-off-by: WangBo <wang.bo116@zte.com.cn>
+---
+ arch/arm/common/dmabounce.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 5ba4622..dd520a3 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -563,10 +563,8 @@ void dmabounce_unregister_dev(struct device *dev)
+ 		BUG();
+ 	}
+ 
+-	if (device_info->small.pool)
+-		dma_pool_destroy(device_info->small.pool);
+-	if (device_info->large.pool)
+-		dma_pool_destroy(device_info->large.pool);
++	dma_pool_destroy(device_info->small.pool);
++	dma_pool_destroy(device_info->large.pool);
+ 
+ #ifdef STATS
+ 	if (device_info->attr_res == 0)
+-- 
+2.7.4
+
+
 
 _______________________________________________
 linux-arm-kernel mailing list
