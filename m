@@ -2,106 +2,79 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 46923C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D444CC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 16694205F4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A3144205F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:54 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PFS6etmH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16694205F4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hpYcFDfB";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="u2xD6uPM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3144205F4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+rT74oYh1hyRUTem/W3kzHfF7ywSsKDejvNwyO2WLtA=; b=PFS6etmHg6TUm9
-	3uTWRduH8NR81w4usuWg1bIqbnVu/8Z4aKYZlVwRwR8zwvfZqHB1j6bFeuyWhwH/LKYWPL1X66397
-	U/LuLlPfVYr9/nZX8zxh0uqHHazs/nmhxXPuKAt3SxnbNKd0TGmB2+yAOL+BqBn6jf3CJMF3mNyXK
-	y2athsv7EMHUQ+AMh5w2YIXhKKDIElQ+K5oUokHuXhEqbuG8SBPLcuA7LnuoiCqzmjcUe4AFrh3Rd
-	G4/VRC6hvNUG7pYIQDfWX40rdgltk5ACLTdFMGGABQeqwd91PkspOIKDieVEre0y+E7wlgd3TBtDP
-	LobfoExdf1x7P+N4+yRQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=pqj4+nIY4USpG60/8P7zTnwf5ctSv4BIGINkS0JqWv8=; b=hpYcFDfB7a25GC/kx0U6f8tEK
+	TXIUTyp3/RQgC1uKA5ljHcfU1nx1lzTyhb/nOAs9wADS7xVe/p0HCvwBS7pfbsTI8xKuNTdoWDUaE
+	sz+Prkw5U3Q7DI6sd3LP6Kd7oBmpSpp9g2x1b35MZHJ7j8/9ZM+rR6kqv8KXiBBSRtgMyCDz6VkhR
+	nT9+M5JT4BzNGIbKPfLo3KSzO1ZNvuhwkU3BujvA43hY06KO5ve8y89LSegzLxJNoYPMh8dH55Tjm
+	VMwm0Om5VodShEH/gpfQF8W7KcKKb4vCg51o90jdwW/FfQherBqsDOO7Xi3/Lalgi7+DzOy70h0DR
+	iIGnmbFSg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyw2l-0000ea-AG; Wed, 27 Feb 2019 10:02:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyw2h-0000ah-Jq; Wed, 27 Feb 2019 10:02:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E1C421596;
- Wed, 27 Feb 2019 02:02:22 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 3C4133F575; Wed, 27 Feb 2019 02:02:18 -0800 (PST)
-Subject: Re: [PATCH 0/4] mwifiex PCI/wake-up interrupt fixes
-To: Brian Norris <briannorris@chromium.org>
-References: <20190224140426.3267-1-marc.zyngier@arm.com>
- <20190226232822.GA174696@google.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- mQINBE6Jf0UBEADLCxpix34Ch3kQKA9SNlVQroj9aHAEzzl0+V8jrvT9a9GkK+FjBOIQz4KE
- g+3p+lqgJH4NfwPm9H5I5e3wa+Scz9wAqWLTT772Rqb6hf6kx0kKd0P2jGv79qXSmwru28vJ
- t9NNsmIhEYwS5eTfCbsZZDCnR31J6qxozsDHpCGLHlYym/VbC199Uq/pN5gH+5JHZyhyZiNW
- ozUCjMqC4eNW42nYVKZQfbj/k4W9xFfudFaFEhAf/Vb1r6F05eBP1uopuzNkAN7vqS8XcgQH
- qXI357YC4ToCbmqLue4HK9+2mtf7MTdHZYGZ939OfTlOGuxFW+bhtPQzsHiW7eNe0ew0+LaL
- 3wdNzT5abPBscqXWVGsZWCAzBmrZato+Pd2bSCDPLInZV0j+rjt7MWiSxEAEowue3IcZA++7
- ifTDIscQdpeKT8hcL+9eHLgoSDH62SlubO/y8bB1hV8JjLW/jQpLnae0oz25h39ij4ijcp8N
- t5slf5DNRi1NLz5+iaaLg4gaM3ywVK2VEKdBTg+JTg3dfrb3DH7ctTQquyKun9IVY8AsxMc6
- lxl4HxrpLX7HgF10685GG5fFla7R1RUnW5svgQhz6YVU33yJjk5lIIrrxKI/wLlhn066mtu1
- DoD9TEAjwOmpa6ofV6rHeBPehUwMZEsLqlKfLsl0PpsJwov8TQARAQABtCNNYXJjIFp5bmdp
- ZXIgPG1hcmMuenluZ2llckBhcm0uY29tPokCOwQTAQIAJQIbAwYLCQgHAwIGFQgCCQoLBBYC
- AwECHgECF4AFAk6NvYYCGQEACgkQI9DQutE9ekObww/+NcUATWXOcnoPflpYG43GZ0XjQLng
- LQFjBZL+CJV5+1XMDfz4ATH37cR+8gMO1UwmWPv5tOMKLHhw6uLxGG4upPAm0qxjRA/SE3LC
- 22kBjWiSMrkQgv5FDcwdhAcj8A+gKgcXBeyXsGBXLjo5UQOGvPTQXcqNXB9A3ZZN9vS6QUYN
- TXFjnUnzCJd+PVI/4jORz9EUVw1q/+kZgmA8/GhfPH3xNetTGLyJCJcQ86acom2liLZZX4+1
- 6Hda2x3hxpoQo7pTu+XA2YC4XyUstNDYIsE4F4NVHGi88a3N8yWE+Z7cBI2HjGvpfNxZnmKX
- 6bws6RQ4LHDPhy0yzWFowJXGTqM/e79c1UeqOVxKGFF3VhJJu1nMlh+5hnW4glXOoy/WmDEM
- UMbl9KbJUfo+GgIQGMp8mwgW0vK4HrSmevlDeMcrLdfbbFbcZLNeFFBn6KqxFZaTd+LpylIH
- bOPN6fy1Dxf7UZscogYw5Pt0JscgpciuO3DAZo3eXz6ffj2NrWchnbj+SpPBiH4srfFmHY+Y
- LBemIIOmSqIsjoSRjNEZeEObkshDVG5NncJzbAQY+V3Q3yo9og/8ZiaulVWDbcpKyUpzt7pv
- cdnY3baDE8ate/cymFP5jGJK++QCeA6u6JzBp7HnKbngqWa6g8qDSjPXBPCLmmRWbc5j0lvA
- 6ilrF8m5Ag0ETol/RQEQAM/2pdLYCWmf3rtIiP8Wj5NwyjSL6/UrChXtoX9wlY8a4h3EX6E3
- 64snIJVMLbyr4bwdmPKULlny7T/R8dx/mCOWu/DztrVNQiXWOTKJnd/2iQblBT+W5W8ep/nS
- w3qUIckKwKdplQtzSKeE+PJ+GMS+DoNDDkcrVjUnsoCEr0aK3cO6g5hLGu8IBbC1CJYSpple
- VVb/sADnWF3SfUvJ/l4K8Uk4B4+X90KpA7U9MhvDTCy5mJGaTsFqDLpnqp/yqaT2P7kyMG2E
- w+eqtVIqwwweZA0S+tuqput5xdNAcsj2PugVx9tlw/LJo39nh8NrMxAhv5aQ+JJ2I8UTiHLX
- QvoC0Yc/jZX/JRB5r4x4IhK34Mv5TiH/gFfZbwxd287Y1jOaD9lhnke1SX5MXF7eCT3cgyB+
- hgSu42w+2xYl3+rzIhQqxXhaP232t/b3ilJO00ZZ19d4KICGcakeiL6ZBtD8TrtkRiewI3v0
- o8rUBWtjcDRgg3tWx/PcJvZnw1twbmRdaNvsvnlapD2Y9Js3woRLIjSAGOijwzFXSJyC2HU1
- AAuR9uo4/QkeIrQVHIxP7TJZdJ9sGEWdeGPzzPlKLHwIX2HzfbdtPejPSXm5LJ026qdtJHgz
- BAb3NygZG6BH6EC1NPDQ6O53EXorXS1tsSAgp5ZDSFEBklpRVT3E0NrDABEBAAGJAh8EGAEC
- AAkFAk6Jf0UCGwwACgkQI9DQutE9ekMLBQ//U+Mt9DtFpzMCIHFPE9nNlsCm75j22lNiw6mX
- mx3cUA3pl+uRGQr/zQC5inQNtjFUmwGkHqrAw+SmG5gsgnM4pSdYvraWaCWOZCQCx1lpaCOl
- MotrNcwMJTJLQGc4BjJyOeSH59HQDitKfKMu/yjRhzT8CXhys6R0kYMrEN0tbe1cFOJkxSbV
- 0GgRTDF4PKyLT+RncoKxQe8lGxuk5614aRpBQa0LPafkirwqkUtxsPnarkPUEfkBlnIhAR8L
- kmneYLu0AvbWjfJCUH7qfpyS/FRrQCoBq9QIEcf2v1f0AIpA27f9KCEv5MZSHXGCdNcbjKw1
- 39YxYZhmXaHFKDSZIC29YhQJeXWlfDEDq6nIhvurZy3mSh2OMQgaIoFexPCsBBOclH8QUtMk
- a3jW/qYyrV+qUq9Wf3SKPrXf7B3xB332jFCETbyZQXqmowV+2b3rJFRWn5hK5B+xwvuxKyGq
- qDOGjof2dKl2zBIxbFgOclV7wqCVkhxSJi/QaOj2zBqSNPXga5DWtX3ekRnJLa1+ijXxmdjz
- hApihi08gwvP5G9fNGKQyRETePEtEAWt0b7dOqMzYBYGRVr7uS4uT6WP7fzOwAJC4lU7ZYWZ
- yVshCa0IvTtp1085RtT3qhh9mobkcZ+7cQOY+Tx2RGXS9WeOh2jZjdoWUv6CevXNQyOUXMM=
-Organization: ARM Ltd
-Message-ID: <d67512fe-42b4-513f-d27a-fed85c19e9c2@arm.com>
-Date: Wed, 27 Feb 2019 10:02:16 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.5.0
+	id 1gyw34-00018Q-UO; Wed, 27 Feb 2019 10:02:46 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyw2k-0000bC-Ow
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 27 Feb 2019 10:02:26 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=jHrecR2XkHtdX/WYDEvpbbxZHKYE6FFjnQuYeqYbIoU=; b=u2xD6uPMgdyn/phaWIkfBnB9j
+ lOupDtExEmmOdTxndzGBWo2dkw/sMAidy+RHgJCbqs8NbeeApe3u0KCOd8zz6hOwpXwM3akggQXyB
+ i/xZGmRErKJ//qoS8pw3Rwh9yu1QU11yfarfJpPTBRO7/pebf6o6xgQo17JCLLm2RDgR66H5shJL5
+ caW5OrB65na5E1nX42XgV/2YgBzEITIJmp6ANRPx/aIFb9gVyOfbCDJ+ch1j7IvJa0rJP5aMj2+/2
+ Iw85tRMlkvnBmPJs54cDC8mRUJXWgilIfcv+rawoAsRWBI0zyK7Czpbq032RbN/JTXuE/n1lBBd9/
+ JBSxYXrrg==;
+Received: from relay9-d.mail.gandi.net ([217.70.183.199])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyw2g-0007af-4P
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 10:02:24 +0000
+X-Originating-IP: 90.88.147.150
+Received: from localhost (aaubervilliers-681-1-27-150.w90-88.abo.wanadoo.fr
+ [90.88.147.150]) (Authenticated sender: maxime.ripard@bootlin.com)
+ by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 23E01FF80A;
+ Wed, 27 Feb 2019 10:01:46 +0000 (UTC)
+Date: Wed, 27 Feb 2019 11:01:46 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Ezequiel Garcia <ezequiel@collabora.com>
+Subject: Re: [PATCH v4 1/2] media: uapi: Add H264 low-level decoder API
+ compound controls.
+Message-ID: <20190227100146.beakovktekqcaei3@flea>
+References: <cover.1862a43851950ddee041d53669f8979aba863c38.1550672228.git-series.maxime.ripard@bootlin.com>
+ <9817c9875638ed2484d61e6e128e2551cf3bda4c.1550672228.git-series.maxime.ripard@bootlin.com>
+ <CAAFQd5D3CVQQDkP3uKM6dYkmfsLohXcdjG0wMMLukFf-D=TCsw@mail.gmail.com>
+ <5d95629590e6ca2abbec898e8e9ee478f7a3a6cc.camel@collabora.com>
 MIME-Version: 1.0
-In-Reply-To: <20190226232822.GA174696@google.com>
-Content-Language: en-US
+In-Reply-To: <5d95629590e6ca2abbec898e8e9ee478f7a3a6cc.camel@collabora.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_020223_666039_76425D63 
-X-CRM114-Status: GOOD (  29.76  )
+X-CRM114-CacheID: sfid-20190227_050222_338796_34EFF2BE 
+X-CRM114-Status: GOOD (  16.04  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -113,148 +86,99 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ganapathi Bhat <gbhat@marvell.com>, Jeffy Chen <jeffy.chen@rock-chips.com>,
- Heiko Stuebner <heiko@sntech.de>, devicetree@vger.kernel.org,
- Xinming Hu <huxinming820@gmail.com>, netdev@vger.kernel.org,
- linux-pm@vger.kernel.org, linux-wireless@vger.kernel.org,
- linux-kernel@vger.kernel.org, Amitkumar Karwar <amitkarwar@gmail.com>,
- linux-rockchip@lists.infradead.org, Nishant Sarmukadam <nishants@marvell.com>,
- Rob Herring <robh+dt@kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
- linux-arm-kernel@lists.infradead.org,
- Enric Balletbo i Serra <enric.balletbo@collabora.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- "David S. Miller" <davem@davemloft.net>, Kalle Valo <kvalo@codeaurora.org>,
- Tony Lindgren <tony@atomide.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
+ Joerg   Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Alexandre Courbot <acourbot@chromium.org>, Jonas Karlman <jonas@kwiboo.se>,
+ jenskuske@gmail.com, linux-sunxi@googlegroups.com,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Jernej Skrabec <jernej.skrabec@gmail.com>, Tomasz Figa <tfiga@chromium.org>,
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hans.verkuil@cisco.com>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Guenter Roeck <groeck@chromium.org>,
+ Nicolas Dufresne <nicolas.dufresne@collabora.com>,
+ Pawel Osciak <posciak@chromium.org>,
+ Linux Media Mailing List <linux-media@vger.kernel.org>
+Content-Type: multipart/mixed; boundary="===============2940115272048006596=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-+ Lorenzo
 
-Hi Brian,
+--===============2940115272048006596==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="2vn33557bkmisyhi"
+Content-Disposition: inline
 
-On 26/02/2019 23:28, Brian Norris wrote:
-> + others
-> 
-> Hi Marc,
-> 
-> Thanks for the series. I have a few bits of history to add to this, and
-> some comments.
-> 
-> On Sun, Feb 24, 2019 at 02:04:22PM +0000, Marc Zyngier wrote:
->> For quite some time, I wondered why the PCI mwifiex device built in my
->> Chromebook was unable to use the good old legacy interrupts. But as MSIs
->> were working fine, I never really bothered investigating. I finally had a
->> look, and the result isn't very pretty.
->>
->> On this machine (rk3399-based kevin), the wake-up interrupt is described as
->> such:
->>
->> &pci_rootport {
->> 	mvl_wifi: wifi@0,0 {
->> 		compatible = "pci1b4b,2b42";
->> 		reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
->> 		       0x83010000 0x0 0x00100000 0x0 0x00100000>;
->> 		interrupt-parent = <&gpio0>;
->> 		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
->> 		pinctrl-names = "default";
->> 		pinctrl-0 = <&wlan_host_wake_l>;
->> 		wakeup-source;
->> 	};
->> };
->>
->> Note how the interrupt is part of the properties directly attached to the
->> PCI node. And yet, this interrupt has nothing to do with a PCI legacy
->> interrupt, as it is attached to the wake-up widget that bypasses the PCIe RC
->> altogether (Yay for the broken design!). This is in total violation of the
->> IEEE Std 1275-1994 spec[1], which clearly documents that such interrupt
->> specifiers describe the PCI device interrupts, and must obey the
->> INT-{A,B,C,D} mapping. Oops!
-> 
-> You're not the first person to notice this. All the motivations are not
-> necessarily painted clearly in their cover letter, but here are some
-> previous attempts at solving this problem:
-> 
-> [RFC PATCH v11 0/5] PCI: rockchip: Move PCIe WAKE# handling into pci core
-> https://lkml.kernel.org/lkml/20171225114742.18920-1-jeffy.chen@rock-chips.com/
-> http://lkml.kernel.org/lkml/20171226023646.17722-1-jeffy.chen@rock-chips.com/
-> 
-> As you can see by the 12th iteration, it wasn't left unsolved for lack
-> of trying...
 
-I wasn't aware of this. That's definitely a better approach than my
-hack, and I would really like this to be revived.
+--2vn33557bkmisyhi
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-> 
-> Frankly, if a proper DT replacement to the admittedly bad binding isn't
-> agreed upon quickly, I'd be very happy to just have WAKE# support
-> removed from the DTS for now, and the existing mwifiex binding should
-> just be removed. (Wake-on-WiFi was never properly vetted on these
-> platforms anyway.) It mostly serves to just cause problems like you've
-> noticed.
+Hi Ezequiel,
 
-Agreed. If there is no actual use for this, and that we can build a case
-for a better solution, let's remove the wakeup support from the Gru DT
-(it is invalid anyway), and bring it back if and when we get the right
-level of support.
+On Fri, Feb 22, 2019 at 01:59:33PM -0300, Ezequiel Garcia wrote:
+> On Fri, 2019-02-22 at 16:46 +0900, Tomasz Figa wrote:
+> > > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/vide=
+odev2.h
+> > > index 9a920f071ff9..6443ae53597f 100644
+> > > --- a/include/uapi/linux/videodev2.h
+> > > +++ b/include/uapi/linux/videodev2.h
+> > > @@ -653,6 +653,7 @@ struct v4l2_pix_format {
+> > >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H26=
+4 with start codes */
+> > >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H=
+264 without start codes */
+> > >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H26=
+4 MVC */
+> > > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H=
+264 parsed slices */
+> >=20
+> > Are we okay with adding here already, without going through staging fir=
+st?
+>=20
+> Also regarding the pixel formats. I still think we should have two
+> pixel formats: V4L2_PIX_FMT_H264_SLICE_RAW and
+> V4L2_PIX_FMT_H264_SLICE_ANNEX_B, to properly represent "raw" NALUs
+> and "annex B" formatted NALUs.
 
-[...]
+I agree with that, but I was under the impression that it would be
+part of your series, since you would be the prime user (at first at
+least).
 
-> One problem Rockchip authors were also trying to resolve here is that
-> PCIe WAKE# handling should not really be something the PCI device driver
-> has to handle directly. Despite your complaints about not using in-band
-> TLP wakeup, a separate WAKE# pin is in fact a documented part of the
-> PCIe standard, and it so happens that the Rockchip RC does not support
-> handling TLPs in S3, if you want to have decent power consumption. (Your
-> "bad hardware" complaints could justifiably fall here, I suppose.)
-> 
-> Additionally, I've had pushback from PCI driver authors/maintainers on
-> adding more special handling for this sort of interrupt property (not
-> the binding specifically, but just the concept of handling WAKE# in the
-> driver), as they claim this should be handled by the system firmware,
-> when they set the appropriate wakeup flags, which filter down to
-> __pci_enable_wake() -> platform_pci_set_wakeup(). That's how x86 systems
-> do it (note: I know for a fact that many have a very similar
-> architecture -- WAKE# is not routed to the RC, because, why does it need
-> to? and they *don't* use TLP wakeup either -- they just hide it in
-> firmware better), and it Just Works.
+Maxime
 
-Even on an arm64 platform, there is no reason why a wakeup interrupt
-couldn't be handled by FW rather than the OS. It just need to be wired
-to the right spot (so that it generates a secure interrupt that can be
-handled by FW).
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
-> So, we basically concluded that we should standardize on a way to
-> describe WAKE# interrupts such that PCI drivers don't have to deal with
-> it at all, and the PCI core can do it for us. 12 revisions later
-> and...we still never agreed on a good device tree binding for this.
+--2vn33557bkmisyhi
+Content-Type: application/pgp-signature; name="signature.asc"
 
-Is the DT binding the only problem? Do we have an agreement for the core
-code?
+-----BEGIN PGP SIGNATURE-----
 
-> IOW, maybe your wake-up sub-node is the best way to side-step the
-> problems of conflicting with the OF PCI spec. But I'd still really like
-> to avoid parsing it in mwifiex, if at all possible.
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXHZgCgAKCRDj7w1vZxhR
+xVMpAQClntThLgxNJNe4H3R8i5KBo2Ht7X3qerXfB/OlFlGwqAD9GqKo9iEGBIfX
+jBn6Bhq9EJ2B6yNhRFTAUIDwz1an0g4=
+=Dp57
+-----END PGP SIGNATURE-----
 
-Honestly, my solution is just a terrible hack. I wasn't aware that this
-was a more general problem, and I'd love it to be addressed in the core
-PCI code.
+--2vn33557bkmisyhi--
 
-> (We'd still be left with the marvell,wakeup-pin propery to parse
-> specifically in mwifiex, which sadly has to exist because....well,
-> Samsung decided to do chip-on-board, and then they failed to use the
-> correct pin on Marvell's side when wiring up WAKE#. Sigh.)
 
-Oh well...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--===============2940115272048006596==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============2940115272048006596==--
+
