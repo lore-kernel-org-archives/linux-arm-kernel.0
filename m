@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7C9FFC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:13:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 828E5C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:23:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4B77F2084D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:13:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5263D20643
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:23:58 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aYjf0j6y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4B77F2084D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AlqwUmSe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="rOdTOU/g"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5263D20643
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +26,54 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=o0PxnFFH4Af/XBO+9pj0n7pf78n/c6JqtVBCYcUa5/Q=; b=aYjf0j6yBNr4di
-	MJvGbCputcYRLyd0mK8y7XrCsqSIe5MBdy+jm1kTCTFcVrfjLO5/SJpRiE7DbwfiB5OacKAQdmF+T
-	NZOEYfttyRhxTINSsLA69A8xz44OCGHCV0Zqkk82BS0ayiTyJC7zm9F4oTGjVzoUgIIhl/dplHkvZ
-	Q5lBhJfUo+mHKgehpxe10GQdf/jERL5lv0rZ7bxPdThU1Ktawq4Kk4H3Kp4BNrMos7c1x5/D35tEp
-	Zwbla4dy9BfwYxkFGiBKI5YS5zZwOTDXKa3kNA82GjFue1S3d8X4S3AzWHtk+ZZKamhPMNqeXpesv
-	FgTP5NNY3hvQICQSyIUg==;
+	List-Owner; bh=V09WEHCPnRFv7n7bUMG9HXcNRQog9bCk+gn868a0Btc=; b=AlqwUmSesLlTZK
+	3suLRgga1EDcXab3WDSuHCcH/XZcv/03J6ZchJ5uoDvHKOj6qhJRBYWItN02O9Y33VwSXx5Q+iumh
+	s+CiRWwtnHPVrNltSadXp+c7p/QKTp2LYPBM0FZw7bO7vwcogH2E7phqHMq0jAj2XtzS2IE1nL60f
+	L9fkshq+RnQjblvW2nApEuJNIAzD8zBqyffqEn8Y3ZoeCDzSzx+kOf5u5CCdNtPd2FehRGUiwT+MR
+	hF2awW5Xx5lCD9EvvMM5R9ZPnwAhXQpp+yth91qcC95LxJ3xL42ZrKrZcHvZp3eOHydIL76qeppxy
+	z9jf/1hshDqR/2kxGtBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz2mB-0007IL-UF; Wed, 27 Feb 2019 17:13:47 +0000
+	id 1gz2vw-00037R-Br; Wed, 27 Feb 2019 17:23:52 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gz2vs-0002gA-Ps
+ for linux-arm-kernel@bombadil.infradead.org; Wed, 27 Feb 2019 17:23:48 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=N4WRLTZt28lkUemP8bmvX63q6AU2uYVq26PdhSIkK84=; b=rOdTOU/gGeSgViWbYQIaN0JgHA
+ 2cxA7a6xcYiGQjSYMoZVPB+mGekNOMo5DhMIv/l3xgIXdsT7MQbdLEGH7ZJYXFv1YyfJDGnedkARS
+ V2a9bc9AiHU4/izbKxu8gFgboXOaC0+rHZTfhGHE4KKnwqyNJiAryB7naM+Bmhr1QpeUkMbapFqR7
+ ORw15YYzAlkDJSpUFrvsOKrvzRCAJmd3yXL3WSOFny2igj5C3ojRRyLRuPzW1QOddFbxoE2PUOQQ0
+ sgzeG1ApIGvqPWj1ClgPX29wT+MlMKh9oSVbc4XWW4kuMdOU+edWX9xRhPrVOStXGX8JWqW5NxAfb
+ attFxyTQ==;
 Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz2h9-00017C-Qp
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 17:08:57 +0000
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gz2gI-0000Vh-1l
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 17:07:46 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id BF11A1715;
- Wed, 27 Feb 2019 09:08:35 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9E822174E;
+ Wed, 27 Feb 2019 09:07:41 -0800 (PST)
 Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
  [10.1.196.69])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 838A53F738;
- Wed, 27 Feb 2019 09:08:32 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id ED5CD3F738;
+ Wed, 27 Feb 2019 09:07:37 -0800 (PST)
 From: Steven Price <steven.price@arm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v3 34/34] x86: mm: Convert dump_pagetables to use
- walk_page_range
-Date: Wed, 27 Feb 2019 17:06:08 +0000
-Message-Id: <20190227170608.27963-35-steven.price@arm.com>
+Subject: [PATCH v3 19/34] sh: mm: Add p?d_large() definitions
+Date: Wed, 27 Feb 2019 17:05:53 +0000
+Message-Id: <20190227170608.27963-20-steven.price@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190227170608.27963-1-steven.price@arm.com>
 References: <20190227170608.27963-1-steven.price@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_090836_243413_682A6C2D 
-X-CRM114-Status: GOOD (  17.69  )
+X-CRM114-CacheID: sfid-20190227_170742_570870_2C3A8693 
+X-CRM114-Status: GOOD (  12.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,375 +85,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
- Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>,
+Cc: Mark Rutland <Mark.Rutland@arm.com>, Rich Felker <dalias@libc.org>,
+ linux-sh@vger.kernel.org, Peter Zijlstra <peterz@infradead.org>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Steven Price <steven.price@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, "Liang, Kan" <kan.liang@linux.intel.com>,
+ Yoshinori Sato <ysato@users.sourceforge.jp>, x86@kernel.org,
+ Steven Price <steven.price@arm.com>, Ingo Molnar <mingo@redhat.com>,
+ Arnd Bergmann <arnd@arndb.de>,
  =?UTF-8?q?J=C3=A9r=C3=B4me=20Glisse?= <jglisse@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
+ Borislav Petkov <bp@alien8.de>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>, linux-kernel@vger.kernel.org,
+ James Morse <james.morse@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Make use of the new functionality in walk_page_range to remove the
-arch page walking code and use the generic code to walk the page tables.
+walk_page_range() is going to be allowed to walk page tables other than
+those of user space. For this it needs to know when it has reached a
+'leaf' entry in the page tables. This information is provided by the
+p?d_large() functions/macros.
 
-The effective permissions are passed down the chain using new fields
-in struct pg_state.
+For sh, we don't support large pages, so add stubs returning 0.
 
-The KASAN optimisation is implemented by including test_p?d callbacks
-which can decide to skip an entire tree of entries
-
+CC: Yoshinori Sato <ysato@users.sourceforge.jp>
+CC: Rich Felker <dalias@libc.org>
+CC: linux-sh@vger.kernel.org
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/x86/mm/dump_pagetables.c | 279 ++++++++++++++++++----------------
- 1 file changed, 146 insertions(+), 133 deletions(-)
+ arch/sh/include/asm/pgtable-3level.h | 1 +
+ arch/sh/include/asm/pgtable_32.h     | 1 +
+ arch/sh/include/asm/pgtable_64.h     | 1 +
+ 3 files changed, 3 insertions(+)
 
-diff --git a/arch/x86/mm/dump_pagetables.c b/arch/x86/mm/dump_pagetables.c
-index 40a8b0da2170..64d1619493a4 100644
---- a/arch/x86/mm/dump_pagetables.c
-+++ b/arch/x86/mm/dump_pagetables.c
-@@ -33,6 +33,10 @@ struct pg_state {
- 	int level;
- 	pgprot_t current_prot;
- 	pgprotval_t effective_prot;
-+	pgprotval_t effective_prot_pgd;
-+	pgprotval_t effective_prot_p4d;
-+	pgprotval_t effective_prot_pud;
-+	pgprotval_t effective_prot_pmd;
- 	unsigned long start_address;
- 	unsigned long current_address;
- 	const struct addr_marker *marker;
-@@ -355,22 +359,21 @@ static inline pgprotval_t effective_prot(pgprotval_t prot1, pgprotval_t prot2)
- 	       ((prot1 | prot2) & _PAGE_NX);
- }
- 
--static void walk_pte_level(struct pg_state *st, pmd_t addr, pgprotval_t eff_in,
--			   unsigned long P)
-+static int ptdump_pte_entry(pte_t *pte, unsigned long addr,
-+			    unsigned long next, struct mm_walk *walk)
- {
--	int i;
--	pte_t *pte;
--	pgprotval_t prot, eff;
--
--	for (i = 0; i < PTRS_PER_PTE; i++) {
--		st->current_address = normalize_addr(P + i * PTE_LEVEL_MULT);
--		pte = pte_offset_map(&addr, st->current_address);
--		prot = pte_flags(*pte);
--		eff = effective_prot(eff_in, prot);
--		note_page(st, __pgprot(prot), eff, 5);
--		pte_unmap(pte);
--	}
-+	struct pg_state *st = walk->private;
-+	pgprotval_t eff, prot;
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	prot = pte_flags(*pte);
-+	eff = effective_prot(st->effective_prot_pmd, prot);
-+	note_page(st, __pgprot(prot), eff, 5);
-+
-+	return 0;
- }
-+
- #ifdef CONFIG_KASAN
+diff --git a/arch/sh/include/asm/pgtable-3level.h b/arch/sh/include/asm/pgtable-3level.h
+index 7d8587eb65ff..9d8b2b002582 100644
+--- a/arch/sh/include/asm/pgtable-3level.h
++++ b/arch/sh/include/asm/pgtable-3level.h
+@@ -48,6 +48,7 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long address)
+ #define pud_present(x)	(pud_val(x))
+ #define pud_clear(xp)	do { set_pud(xp, __pud(0)); } while (0)
+ #define	pud_bad(x)	(pud_val(x) & ~PAGE_MASK)
++#define pud_large(x)	(0)
  
  /*
-@@ -399,130 +402,152 @@ static inline bool kasan_page_table(struct pg_state *st, void *pt)
- }
- #endif
+  * (puds are folded into pgds so this doesn't get actually called,
+diff --git a/arch/sh/include/asm/pgtable_32.h b/arch/sh/include/asm/pgtable_32.h
+index 29274f0e428e..61186aa11021 100644
+--- a/arch/sh/include/asm/pgtable_32.h
++++ b/arch/sh/include/asm/pgtable_32.h
+@@ -329,6 +329,7 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
+ #define pmd_present(x)	(pmd_val(x))
+ #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
+ #define	pmd_bad(x)	(pmd_val(x) & ~PAGE_MASK)
++#define pmd_large(x)	(0)
  
--#if PTRS_PER_PMD > 1
--
--static void walk_pmd_level(struct pg_state *st, pud_t addr,
--			   pgprotval_t eff_in, unsigned long P)
-+static int ptdump_test_pmd(unsigned long addr, unsigned long next,
-+			   pmd_t *pmd, struct mm_walk *walk)
- {
--	int i;
--	pmd_t *start, *pmd_start;
--	pgprotval_t prot, eff;
--
--	pmd_start = start = (pmd_t *)pud_page_vaddr(addr);
--	for (i = 0; i < PTRS_PER_PMD; i++) {
--		st->current_address = normalize_addr(P + i * PMD_LEVEL_MULT);
--		if (!pmd_none(*start)) {
--			prot = pmd_flags(*start);
--			eff = effective_prot(eff_in, prot);
--			if (pmd_large(*start) || !pmd_present(*start)) {
--				note_page(st, __pgprot(prot), eff, 4);
--			} else if (!kasan_page_table(st, pmd_start)) {
--				walk_pte_level(st, *start, eff,
--					       P + i * PMD_LEVEL_MULT);
--			}
--		} else
--			note_page(st, __pgprot(0), 0, 4);
--		start++;
--	}
-+	struct pg_state *st = walk->private;
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	if (kasan_page_table(st, pmd))
-+		return 1;
-+	return 0;
- }
+ #define pages_to_mb(x)	((x) >> (20-PAGE_SHIFT))
+ #define pte_page(x)	pfn_to_page(pte_pfn(x))
+diff --git a/arch/sh/include/asm/pgtable_64.h b/arch/sh/include/asm/pgtable_64.h
+index 1778bc5971e7..80fe9264babf 100644
+--- a/arch/sh/include/asm/pgtable_64.h
++++ b/arch/sh/include/asm/pgtable_64.h
+@@ -64,6 +64,7 @@ static __inline__ void set_pte(pte_t *pteptr, pte_t pteval)
+ #define pmd_clear(pmd_entry_p)	(set_pmd((pmd_entry_p), __pmd(_PMD_EMPTY)))
+ #define pmd_none(pmd_entry)	(pmd_val((pmd_entry)) == _PMD_EMPTY)
+ #define pmd_bad(pmd_entry)	((pmd_val(pmd_entry) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
++#define pmd_large(pmd_entry)	(0)
  
--#else
--#define walk_pmd_level(s,a,e,p) walk_pte_level(s,__pmd(pud_val(a)),e,p)
--#define pud_large(a) pmd_large(__pmd(pud_val(a)))
--#define pud_none(a)  pmd_none(__pmd(pud_val(a)))
--#endif
-+static int ptdump_pmd_entry(pmd_t *pmd, unsigned long addr,
-+			    unsigned long next, struct mm_walk *walk)
-+{
-+	struct pg_state *st = walk->private;
-+	pgprotval_t eff, prot;
-+
-+	prot = pmd_flags(*pmd);
-+	eff = effective_prot(st->effective_prot_pud, prot);
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	if (pmd_large(*pmd))
-+		note_page(st, __pgprot(prot), eff, 4);
- 
--#if PTRS_PER_PUD > 1
-+	st->effective_prot_pmd = eff;
- 
--static void walk_pud_level(struct pg_state *st, p4d_t addr, pgprotval_t eff_in,
--			   unsigned long P)
-+	return 0;
-+}
-+
-+static int ptdump_test_pud(unsigned long addr, unsigned long next,
-+			   pud_t *pud, struct mm_walk *walk)
- {
--	int i;
--	pud_t *start, *pud_start;
--	pgprotval_t prot, eff;
--	pud_t *prev_pud = NULL;
--
--	pud_start = start = (pud_t *)p4d_page_vaddr(addr);
--
--	for (i = 0; i < PTRS_PER_PUD; i++) {
--		st->current_address = normalize_addr(P + i * PUD_LEVEL_MULT);
--		if (!pud_none(*start)) {
--			prot = pud_flags(*start);
--			eff = effective_prot(eff_in, prot);
--			if (pud_large(*start) || !pud_present(*start)) {
--				note_page(st, __pgprot(prot), eff, 3);
--			} else if (!kasan_page_table(st, pud_start)) {
--				walk_pmd_level(st, *start, eff,
--					       P + i * PUD_LEVEL_MULT);
--			}
--		} else
--			note_page(st, __pgprot(0), 0, 3);
-+	struct pg_state *st = walk->private;
- 
--		prev_pud = start;
--		start++;
--	}
-+	st->current_address = normalize_addr(addr);
-+
-+	if (kasan_page_table(st, pud))
-+		return 1;
-+	return 0;
- }
- 
--#else
--#define walk_pud_level(s,a,e,p) walk_pmd_level(s,__pud(p4d_val(a)),e,p)
--#define p4d_large(a) pud_large(__pud(p4d_val(a)))
--#define p4d_none(a)  pud_none(__pud(p4d_val(a)))
--#endif
-+static int ptdump_pud_entry(pud_t *pud, unsigned long addr,
-+			    unsigned long next, struct mm_walk *walk)
-+{
-+	struct pg_state *st = walk->private;
-+	pgprotval_t eff, prot;
-+
-+	prot = pud_flags(*pud);
-+	eff = effective_prot(st->effective_prot_p4d, prot);
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	if (pud_large(*pud))
-+		note_page(st, __pgprot(prot), eff, 3);
-+
-+	st->effective_prot_pud = eff;
- 
--static void walk_p4d_level(struct pg_state *st, pgd_t addr, pgprotval_t eff_in,
--			   unsigned long P)
-+	return 0;
-+}
-+
-+static int ptdump_test_p4d(unsigned long addr, unsigned long next,
-+			   p4d_t *p4d, struct mm_walk *walk)
- {
--	int i;
--	p4d_t *start, *p4d_start;
--	pgprotval_t prot, eff;
--
--	if (PTRS_PER_P4D == 1)
--		return walk_pud_level(st, __p4d(pgd_val(addr)), eff_in, P);
--
--	p4d_start = start = (p4d_t *)pgd_page_vaddr(addr);
--
--	for (i = 0; i < PTRS_PER_P4D; i++) {
--		st->current_address = normalize_addr(P + i * P4D_LEVEL_MULT);
--		if (!p4d_none(*start)) {
--			prot = p4d_flags(*start);
--			eff = effective_prot(eff_in, prot);
--			if (p4d_large(*start) || !p4d_present(*start)) {
--				note_page(st, __pgprot(prot), eff, 2);
--			} else if (!kasan_page_table(st, p4d_start)) {
--				walk_pud_level(st, *start, eff,
--					       P + i * P4D_LEVEL_MULT);
--			}
--		} else
--			note_page(st, __pgprot(0), 0, 2);
-+	struct pg_state *st = walk->private;
- 
--		start++;
--	}
-+	st->current_address = normalize_addr(addr);
-+
-+	if (kasan_page_table(st, p4d))
-+		return 1;
-+	return 0;
- }
- 
--#define pgd_large(a) (pgtable_l5_enabled() ? pgd_large(a) : p4d_large(__p4d(pgd_val(a))))
--#define pgd_none(a)  (pgtable_l5_enabled() ? pgd_none(a) : p4d_none(__p4d(pgd_val(a))))
-+static int ptdump_p4d_entry(p4d_t *p4d, unsigned long addr,
-+			    unsigned long next, struct mm_walk *walk)
-+{
-+	struct pg_state *st = walk->private;
-+	pgprotval_t eff, prot;
-+
-+	prot = p4d_flags(*p4d);
-+	eff = effective_prot(st->effective_prot_pgd, prot);
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	if (p4d_large(*p4d))
-+		note_page(st, __pgprot(prot), eff, 2);
-+
-+	st->effective_prot_p4d = eff;
-+
-+	return 0;
-+}
- 
--static inline bool is_hypervisor_range(int idx)
-+static int ptdump_pgd_entry(pgd_t *pgd, unsigned long addr,
-+			    unsigned long next, struct mm_walk *walk)
- {
--#ifdef CONFIG_X86_64
--	/*
--	 * A hole in the beginning of kernel address space reserved
--	 * for a hypervisor.
--	 */
--	return	(idx >= pgd_index(GUARD_HOLE_BASE_ADDR)) &&
--		(idx <  pgd_index(GUARD_HOLE_END_ADDR));
-+	struct pg_state *st = walk->private;
-+	pgprotval_t eff, prot;
-+
-+	prot = pgd_flags(*pgd);
-+
-+#ifdef CONFIG_X86_PAE
-+	eff = _PAGE_USER | _PAGE_RW;
- #else
--	return false;
-+	eff = prot;
- #endif
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	if (pgd_large(*pgd))
-+		note_page(st, __pgprot(prot), eff, 1);
-+
-+	st->effective_prot_pgd = eff;
-+
-+	return 0;
-+}
-+
-+static int ptdump_hole(unsigned long addr, unsigned long next, int depth,
-+		       struct mm_walk *walk)
-+{
-+	struct pg_state *st = walk->private;
-+
-+	st->current_address = normalize_addr(addr);
-+
-+	note_page(st, __pgprot(0), 0, depth + 1);
-+
-+	return 0;
- }
- 
- static void ptdump_walk_pgd_level_core(struct seq_file *m, struct mm_struct *mm,
- 				       bool checkwx, bool dmesg)
- {
--	pgd_t *start = mm->pgd;
--	pgprotval_t prot, eff;
--	int i;
- 	struct pg_state st = {};
-+	struct mm_walk walk = {
-+		.mm		= mm,
-+		.pgd_entry	= ptdump_pgd_entry,
-+		.p4d_entry	= ptdump_p4d_entry,
-+		.pud_entry	= ptdump_pud_entry,
-+		.pmd_entry	= ptdump_pmd_entry,
-+		.pte_entry	= ptdump_pte_entry,
-+		.test_p4d	= ptdump_test_p4d,
-+		.test_pud	= ptdump_test_pud,
-+		.test_pmd	= ptdump_test_pmd,
-+		.pte_hole	= ptdump_hole,
-+		.private	= &st
-+	};
- 
- 	st.to_dmesg = dmesg;
- 	st.check_wx = checkwx;
-@@ -530,27 +555,15 @@ static void ptdump_walk_pgd_level_core(struct seq_file *m, struct mm_struct *mm,
- 	if (checkwx)
- 		st.wx_pages = 0;
- 
--	for (i = 0; i < PTRS_PER_PGD; i++) {
--		st.current_address = normalize_addr(i * PGD_LEVEL_MULT);
--		if (!pgd_none(*start) && !is_hypervisor_range(i)) {
--			prot = pgd_flags(*start);
--#ifdef CONFIG_X86_PAE
--			eff = _PAGE_USER | _PAGE_RW;
-+	down_read(&mm->mmap_sem);
-+#ifdef CONFIG_X86_64
-+	walk_page_range(0, PTRS_PER_PGD*PGD_LEVEL_MULT/2, &walk);
-+	walk_page_range(normalize_addr(PTRS_PER_PGD*PGD_LEVEL_MULT/2), ~0,
-+			&walk);
- #else
--			eff = prot;
-+	walk_page_range(0, ~0, &walk);
- #endif
--			if (pgd_large(*start) || !pgd_present(*start)) {
--				note_page(&st, __pgprot(prot), eff, 1);
--			} else {
--				walk_p4d_level(&st, *start, eff,
--					       i * PGD_LEVEL_MULT);
--			}
--		} else
--			note_page(&st, __pgprot(0), 0, 1);
--
--		cond_resched();
--		start++;
--	}
-+	up_read(&mm->mmap_sem);
- 
- 	/* Flush out the last page */
- 	st.current_address = normalize_addr(PTRS_PER_PGD*PGD_LEVEL_MULT);
+ #define pmd_page_vaddr(pmd_entry) \
+ 	((unsigned long) __va(pmd_val(pmd_entry) & PAGE_MASK))
 -- 
 2.20.1
 
