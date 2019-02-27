@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AEE50C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:08:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9B84FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:08:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76B3D20842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:08:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 60DB420842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 17:08:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jjRNxoOj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76B3D20842
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SzqyFixp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 60DB420842
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NPQdITwY+znopPGTFRxXvr82PspNYXkqRQ3TghLJW1Q=; b=jjRNxoOjFZmZpr
-	mj0w0sAiRqThRR0HwPBbcLJRHIrsrcIaocIOPBply2i/jljmENc0slPIYcKoCPycLxSe1qpJrtxoM
-	ZxwyOfVDhiEm+dbeCwF3wqRbGR5CAGTR9K1AluJzNnPbvqt/vOE3uqhW4XexjC/IQXq8niphbvu8x
-	o8Scjw7vewLdfooFnx90kuToq1SlugUZeXSjo6D8lZtRGB8aWnV7P9Hpd8VPKbKdyNIJb/XdfInc7
-	K/apPbPnROxvwvLi0tJHpOVL7nCXanjOlEHKkVSJgkRp/60SPuZmfdE/HMDyYzzqL8PuZVHpOrn70
-	HYw6rZKZpX7Cnhy7qWgA==;
+	List-Owner; bh=FDax9kOIabB27+gb6056RqHLA+S/XbbonnU45X3O5qI=; b=SzqyFixpxwJ8Nf
+	MmZp7fhd4G+FCWUWMs5gDzZ0ZZPgM95QzV1tPu78yUdsTaG2/MT0JWKbXpbB/fy37J9XJRTwrNh58
+	nQbLdOppFIcwOEJdFYYt/vzqt3Vx4O5z/g5KgnwWeQRB8V0lOOEmjdNF1UgRyNv+E7varJoHRUpo0
+	J/iWZnOahsQi7eKqWm6TjoZAVbqQ1FzP63cV2Nlw1Ra5yr+dhhAL5W2RVGf2QjB5ZgybYm9c+kdge
+	f/UEoHiiHaHJxzYXui40TO2e/xFl2c7jGtyAMJzyyXI8PnzuJHZLnHEWlmASYQLu+ibuEXZX4Pv94
+	eOI7Gy3qXR97kyh2j8KA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz2h0-00011x-3T; Wed, 27 Feb 2019 17:08:26 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gz2hA-0001HC-OM; Wed, 27 Feb 2019 17:08:36 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz2fW-0007ws-VQ
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 17:06:58 +0000
+ id 1gz2fa-00081w-I7
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 17:07:09 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 7B91D1684;
- Wed, 27 Feb 2019 09:06:54 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6C7F3A78;
+ Wed, 27 Feb 2019 09:06:58 -0800 (PST)
 Received: from e112269-lin.arm.com (e112269-lin.cambridge.arm.com
  [10.1.196.69])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EE5103F738;
- Wed, 27 Feb 2019 09:06:50 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id BB5463F738;
+ Wed, 27 Feb 2019 09:06:54 -0800 (PST)
 From: Steven Price <steven.price@arm.com>
 To: linux-mm@kvack.org
-Subject: [PATCH v3 07/34] hexagon: mm: Add p?d_large() definitions
-Date: Wed, 27 Feb 2019 17:05:41 +0000
-Message-Id: <20190227170608.27963-8-steven.price@arm.com>
+Subject: [PATCH v3 08/34] ia64: mm: Add p?d_large() definitions
+Date: Wed, 27 Feb 2019 17:05:42 +0000
+Message-Id: <20190227170608.27963-9-steven.price@arm.com>
 X-Mailer: git-send-email 2.20.1
 In-Reply-To: <20190227170608.27963-1-steven.price@arm.com>
 References: <20190227170608.27963-1-steven.price@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_090655_301247_7161DB04 
-X-CRM114-Status: GOOD (  13.35  )
+X-CRM114-CacheID: sfid-20190227_090659_193610_1B77A306 
+X-CRM114-Status: GOOD (  11.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,18 +68,19 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
- Arnd Bergmann <arnd@arndb.de>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+Cc: Mark Rutland <Mark.Rutland@arm.com>, linux-ia64@vger.kernel.org,
  Peter Zijlstra <peterz@infradead.org>,
  Catalin Marinas <catalin.marinas@arm.com>,
  Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Steven Price <steven.price@arm.com>,
+ "H. Peter Anvin" <hpa@zytor.com>, "Liang, Kan" <kan.liang@linux.intel.com>,
+ x86@kernel.org, Steven Price <steven.price@arm.com>,
+ Ingo Molnar <mingo@redhat.com>, Fenghua Yu <fenghua.yu@intel.com>,
+ Arnd Bergmann <arnd@arndb.de>,
  =?UTF-8?q?J=C3=A9r=C3=B4me=20Glisse?= <jglisse@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
- Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- Richard Kuo <rkuo@codeaurora.org>, linux-hexagon@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
+ Borislav Petkov <bp@alien8.de>, Andy Lutomirski <luto@kernel.org>,
+ Thomas Gleixner <tglx@linutronix.de>, linux-arm-kernel@lists.infradead.org,
+ Tony Luck <tony.luck@intel.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ linux-kernel@vger.kernel.org, James Morse <james.morse@arm.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -91,31 +91,45 @@ those of user space. For this it needs to know when it has reached a
 'leaf' entry in the page tables. This information is provided by the
 p?d_large() functions/macros.
 
-For hexagon, we don't support large pages, so add a stub returning 0.
+For ia64 leaf entries are always at the lowest level, so implement
+stubs returning 0.
 
-CC: Richard Kuo <rkuo@codeaurora.org>
-CC: linux-hexagon@vger.kernel.org
+CC: Tony Luck <tony.luck@intel.com>
+CC: Fenghua Yu <fenghua.yu@intel.com>
+CC: linux-ia64@vger.kernel.org
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/hexagon/include/asm/pgtable.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/ia64/include/asm/pgtable.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/hexagon/include/asm/pgtable.h b/arch/hexagon/include/asm/pgtable.h
-index 65125d0b02dd..422e6aa2a6ef 100644
---- a/arch/hexagon/include/asm/pgtable.h
-+++ b/arch/hexagon/include/asm/pgtable.h
-@@ -281,6 +281,11 @@ static inline int pmd_bad(pmd_t pmd)
- 	return 0;
- }
- 
-+static inline int pmd_large(pmd_t pmd)
-+{
-+	return 0;
-+}
-+
- /*
-  * pmd_page - converts a PMD entry to a page pointer
-  */
+diff --git a/arch/ia64/include/asm/pgtable.h b/arch/ia64/include/asm/pgtable.h
+index b1e7468eb65a..84dda295391b 100644
+--- a/arch/ia64/include/asm/pgtable.h
++++ b/arch/ia64/include/asm/pgtable.h
+@@ -271,6 +271,7 @@ extern unsigned long VMALLOC_END;
+ #define pmd_none(pmd)			(!pmd_val(pmd))
+ #define pmd_bad(pmd)			(!ia64_phys_addr_valid(pmd_val(pmd)))
+ #define pmd_present(pmd)		(pmd_val(pmd) != 0UL)
++#define pmd_large(pmd)			(0)
+ #define pmd_clear(pmdp)			(pmd_val(*(pmdp)) = 0UL)
+ #define pmd_page_vaddr(pmd)		((unsigned long) __va(pmd_val(pmd) & _PFN_MASK))
+ #define pmd_page(pmd)			virt_to_page((pmd_val(pmd) + PAGE_OFFSET))
+@@ -278,6 +279,7 @@ extern unsigned long VMALLOC_END;
+ #define pud_none(pud)			(!pud_val(pud))
+ #define pud_bad(pud)			(!ia64_phys_addr_valid(pud_val(pud)))
+ #define pud_present(pud)		(pud_val(pud) != 0UL)
++#define pud_large(pud)			(0)
+ #define pud_clear(pudp)			(pud_val(*(pudp)) = 0UL)
+ #define pud_page_vaddr(pud)		((unsigned long) __va(pud_val(pud) & _PFN_MASK))
+ #define pud_page(pud)			virt_to_page((pud_val(pud) + PAGE_OFFSET))
+@@ -286,6 +288,7 @@ extern unsigned long VMALLOC_END;
+ #define pgd_none(pgd)			(!pgd_val(pgd))
+ #define pgd_bad(pgd)			(!ia64_phys_addr_valid(pgd_val(pgd)))
+ #define pgd_present(pgd)		(pgd_val(pgd) != 0UL)
++#define pgd_large(pgd)			(0)
+ #define pgd_clear(pgdp)			(pgd_val(*(pgdp)) = 0UL)
+ #define pgd_page_vaddr(pgd)		((unsigned long) __va(pgd_val(pgd) & _PFN_MASK))
+ #define pgd_page(pgd)			virt_to_page((pgd_val(pgd) + PAGE_OFFSET))
 -- 
 2.20.1
 
