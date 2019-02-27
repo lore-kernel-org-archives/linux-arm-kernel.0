@@ -2,66 +2,64 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 11263C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 13:38:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16C2FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 13:47:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CC2A12133D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 13:38:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D845C20C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 13:47:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kdE/Yo+r"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CC2A12133D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uBoYGVfg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D845C20C01
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sUJ6ftV+TDyYV23+srSbXX3ivI4B1NST3ms2x1qCL6g=; b=kdE/Yo+rtCmkUl
-	75ApecZTKLvLkwW/YnA1UXAFTK8DvbF2jgmXf36bfKmWzDOuw+AWNId+KvVuzVr/srXIDrjZXsHrX
-	PeBGJGKnK7RWgg9mWevtJeyVEUjEhBbBLJmBRgQC+8KiJBcd3kVngP8eOA2Xytrwcm1H9tKGBqsoP
-	fNIFHKDF4l31vp2Ue2RQRj2dIQBVgSvCmr3GNwgKACL4HN2U4rWnPO8xWIeHidnQKB8rr/6GE1cxU
-	W8Z6c6M4a7Knh7/FWox6uIeCRUt1KogTxPYywax5WbeidW0r0dPADJH4R3JyJ+E4H/ZmQ5NSqiR/w
-	VrbxETuQ7S+t3V/MiM4w==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Tc1upTYNQ32YknfeMoLLbHCP5m5cV8dtlLPfgMhee6k=; b=uBoYGVfgQJOWK5
+	Sq8PWUnmaaMr0dQNI4957pzj5Hlo6L4hFge3ei/qGFW/9L18ag2pRNckogUOZFJ3gnJos2T2h5J7k
+	l7VlUaGpAIo2+HNlN5yNpa3m1aaKXkfGVJ+2DHgzBxsR1FIsCjCuhJUvbC5tFMwCSEBJIh5J0mBvF
+	muB7mu1fbKGnfuLvwBxFNqnFUoGPOlvWCvwXo8YLN2p/t3czd4W6IxVAciKtTRjVVURu46K7kRxNj
+	Uhji2OCaIB85zuEbmaVtrPrWGZU3P7FSx2HQIL35nnvMBvgPCv/YxDi2OIAgA08mNJV48nOz9nbOz
+	pN71KauGrZwDYmL6Ieew==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyzPR-0001dA-6q; Wed, 27 Feb 2019 13:38:05 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gyzYj-00056Y-Dj; Wed, 27 Feb 2019 13:47:41 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyzPN-0001ca-Gu
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 13:38:02 +0000
+ id 1gyzYg-000568-7I
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 13:47:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 24710374;
- Wed, 27 Feb 2019 05:37:57 -0800 (PST)
-Received: from e103592.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 33B0F3F5C1;
- Wed, 27 Feb 2019 05:37:55 -0800 (PST)
-Date: Wed, 27 Feb 2019 13:37:52 +0000
-From: Dave Martin <Dave.Martin@arm.com>
-To: Julien Grall <julien.grall@arm.com>
-Subject: Re: [PATCH v5 14/26] KVM: arm64/sve: Context switch the SVE registers
-Message-ID: <20190227133751.GD3567@e103592.cambridge.arm.com>
-References: <1550519559-15915-1-git-send-email-Dave.Martin@arm.com>
- <1550519559-15915-15-git-send-email-Dave.Martin@arm.com>
- <83fa5587-24a0-5bbb-c113-cddc74571ea2@arm.com>
- <20190226121321.GQ3567@e103592.cambridge.arm.com>
- <82b7b947-7e92-15df-5c71-6d562141264e@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id AA96B374;
+ Wed, 27 Feb 2019 05:47:35 -0800 (PST)
+Received: from [10.1.196.72] (e119884-lin.cambridge.arm.com [10.1.196.72])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4B7323F5C1;
+ Wed, 27 Feb 2019 05:47:33 -0800 (PST)
+Subject: Re: [PATCH v5 02/23] kernel: Define gettimeofday vdso common code
+To: Thomas Gleixner <tglx@linutronix.de>
+References: <20190222122430.21180-1-vincenzo.frascino@arm.com>
+ <20190222122430.21180-3-vincenzo.frascino@arm.com>
+ <alpine.DEB.2.21.1902231751510.1666@nanos.tec.linutronix.de>
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Message-ID: <9c1da773-7fae-69ad-484b-224f3e76ea09@arm.com>
+Date: Wed, 27 Feb 2019 13:47:31 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.4.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <82b7b947-7e92-15df-5c71-6d562141264e@arm.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <alpine.DEB.2.21.1902231751510.1666@nanos.tec.linutronix.de>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_053801_567903_D8A554D9 
-X-CRM114-Status: GOOD (  16.20  )
+X-CRM114-CacheID: sfid-20190227_054738_276204_46E8C3B4 
+X-CRM114-Status: GOOD (  19.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,42 +71,246 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Okamoto Takayuki <tokamoto@jp.fujitsu.com>,
- Christoffer Dall <cdall@kernel.org>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Marc Zyngier <marc.zyngier@arm.com>, Catalin Marinas <catalin.marinas@arm.com>,
- Julien Thierry <julien.thierry@arm.com>, Will Deacon <will.deacon@arm.com>,
- Zhang Lei <zhang.lei@jp.fujitsu.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-arch@vger.kernel.org, Shuah Khan <shuah@kernel.org>,
+ Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Dmitry Safonov <0x7f454c46@gmail.com>,
+ Rasmus Villemoes <linux@rasmusvillemoes.dk>,
+ Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 26, 2019 at 04:56:36PM +0000, Julien Grall wrote:
-> Hi Dave,
+Hi Thomas,
+
+On 23/02/2019 17:31, Thomas Gleixner wrote:
+> On Fri, 22 Feb 2019, Vincenzo Frascino wrote:
+>> +static notrace int do_hres(const struct vdso_data *vd,
+>> +			   clockid_t clk,
+>> +			   struct __vdso_timespec *ts)
+>> +{
+>> +	const struct vdso_timestamp *vdso_ts = &vd->basetime[clk];
+>> +	u64 cycles, last, sec, ns;
+>> +	u32 seq, cs_index = CLOCKSOURCE_MONO;
+>> +
+>> +	if (clk == CLOCK_MONOTONIC_RAW)
+>> +		cs_index = CLOCKSOURCE_RAW;
 > 
-> On 26/02/2019 12:13, Dave Martin wrote:
-> >On Wed, Feb 20, 2019 at 04:46:57PM +0000, Julien Thierry wrote:
-> >>
-> >>
-> >>On 18/02/2019 19:52, Dave Martin wrote:
-> >>>In order to give each vcpu its own view of the SVE registers, this
-> >>>patch adds context storage via a new sve_state pointer in struct
-> >>>vcpu_arch.  An additional member sve_max_vl is also added for each
-> >>>vcpu, to determine the maximum vector length visible to the guest
-> >>>and thus the value to be configured in ZCR_EL2.LEN while the is
-> >>
-> >>"While the <guest> is active"?
-> >
-> >Hmmm, yes.  Thanks for deciphering that.  Done.
-> I think it would be more consistent if you use "vcpu" over "guest". After
-> all ZCR_EL2.LEN is per vCPU.
+> Uuurgh. So you create an array with 16 members and then use two. This code
+> is really optimized and now you add not only the pointless array, you also
+> need the extra index plus another conditional. Not to talk about the cache
+> impact which makes things even worse. In the x86 implementation we have:
+> 
+>        u32 		seq;			 +  0
+>        int		mode;			 +  4
+>        u64		mask;			 +  8
+>        u32		mult;			 + 16
+>        u32		shift;			 + 20
+>        struct vgtod_ts	basetimer[VGTOD_BASES];  + 24
+> 
+> Each basetime array member occupies 16 bytes. So
+> 
+> 	CLOCK_REALTIME		+ 24
+> 	CLOCK_MONOTONIC		+ 40
+> 	..
+> 		cacheline boundary		
+> 	..
+> 	CLOCK_REALTIME_COARSE	+ 104
+> 	CLOCK_MONOTONIC_COARSE	+ 120   <- cacheline boundary
+> 	CLOCK_BOOTTIME		+ 136
+> 	CLOCK_REALTIME_ALARM	+ 152
+> 	CLOCK_BOOTTIME_ALARM	+ 168
+>        
+> So the most used clocks REALTIME/MONO are in the first cacheline.
+> 
+> So with your scheme the thing becomes
+> 
+>        u32 		seq;			 +   0
+>        int		mode;			 +   4
+>        struct cs	cs[16]			 +   8
+>        struct vgtod_ts	basetimer[VGTOD_BASES];  + 264
+> 
+> and 
+> 
+> 	CLOCK_REALTIME		+ 264
+> 	CLOCK_MONOTONIC		+ 280
+>
 
-Yes, that makes sense.  Done.
+The clocksource array has two elements (CLOCKSOURCE_RAW, CLOCKSOURCE_MONO) and
+the situation with my scheme should be the following:
+	u32		seq:			+    0
+	s32		clock_mode;		+    4
+	u64		cycle_last;		+    8
+	struct vdso_cs	cs[2];			+    16
+	struct vdso_ts	basetime[VDSO_BASES];	+    48
 
-Cheers
----Dave
+which I agree makes still things a bit worse.
+
+Assuming L1_CACHE_SHIFT == 6:
+
+	CLOCK_REALTIME			+    48
+	...
+	cache boundary
+	...
+	CLOCK_MONOTONIC			+    64
+	CLOCK_PROCESS_CPUTIME_ID	+    80
+	CLOCK_THREAD_CPUTIME_ID		+    96
+	CLOCK_MONOTONIC_RAW		+    112
+	...
+	cache boundary
+	...
+	CLOCK_REALTIME_COARSE		+    128
+	CLOCK_MONOTONIC_COARSE		+    144
+	CLOCK_BOOTTIME			+    160
+	CLOCK_REALTIME_ALARM 		+    172
+	CLOCK_BOOTTIME_ALARM		+    188
+	...
+
+> IOW, the most important clocks touch TWO cachelines now which are not even
+> adjacent. No, they are 256 bytes apart, which really sucks for prefetching.
+> 
+> We're surely not going to sacrify the performance which we carefully tuned
+> in that code just to support MONO_RAW. The solution I showed you in the
+> other reply does not have these problems at all.
+> 
+> It's easy enough to benchmark these implementations and without trying I'm
+> pretty sure that you can see the performance drop nicely. Please do so next
+> time and provide the numbers in the changelogs.
+> 
+
+I did run some benchmarks this morning to quantify the performance impact and
+seems that using vdsotest[1] the difference in between a stock linux kernel
+5.0.0-rc7 and one that has unified vDSO, running on my x86 machine (Xeon Gold
+5120T), is below 1%. Please find the results below, I will add them as well to
+the next changelog.
+
+[1] https://github.com/nathanlynch/vdsotest
+
+> Thanks,
+> 
+> 	tglx
+> 
+
+-- 
+Regards,
+Vincenzo
+
+8<-----------------
+
+Unified vDSO:
+=============
+
+clock-gettime-monotonic: syscall: 351 nsec/call
+clock-gettime-monotonic:    libc: 37 nsec/call
+clock-gettime-monotonic:    vdso: 31 nsec/call
+clock-getres-monotonic: syscall: 271 nsec/call
+clock-getres-monotonic:    libc: 269 nsec/call
+clock-getres-monotonic:    vdso: 9 nsec/call
+clock-gettime-monotonic-coarse: syscall: 280 nsec/call
+clock-gettime-monotonic-coarse:    libc: 22 nsec/call
+clock-gettime-monotonic-coarse:    vdso: 11 nsec/call
+clock-getres-monotonic-coarse: syscall: 274 nsec/call
+clock-getres-monotonic-coarse:    libc: 276 nsec/call
+clock-getres-monotonic-coarse:    vdso: 10 nsec/call
+clock-gettime-monotonic-raw: syscall: 337 nsec/call
+clock-gettime-monotonic-raw:    libc: 38 nsec/call
+clock-gettime-monotonic-raw:    vdso: 32 nsec/call
+clock-getres-monotonic-raw: syscall: 284 nsec/call
+clock-getres-monotonic-raw:    libc: 271 nsec/call
+clock-getres-monotonic-raw:    vdso: 9 nsec/call
+clock-gettime-tai: syscall: 332 nsec/call
+clock-gettime-tai:    libc: 37 nsec/call
+clock-gettime-tai:    vdso: 31 nsec/call
+clock-getres-tai: syscall: 273 nsec/call
+clock-getres-tai:    libc: 281 nsec/call
+clock-getres-tai:    vdso: 10 nsec/call
+clock-gettime-boottime: syscall: 338 nsec/call
+clock-gettime-boottime:    libc: 37 nsec/call
+clock-gettime-boottime:    vdso: 32 nsec/call
+clock-getres-boottime: syscall: 283 nsec/call
+clock-getres-boottime:    libc: 278 nsec/call
+clock-getres-boottime:    vdso: 9 nsec/call
+clock-gettime-realtime: syscall: 338 nsec/call
+clock-gettime-realtime:    libc: 39 nsec/call
+clock-gettime-realtime:    vdso: 32 nsec/call
+clock-getres-realtime: syscall: 281 nsec/call
+clock-getres-realtime:    libc: 277 nsec/call
+clock-getres-realtime:    vdso: 10 nsec/call
+clock-gettime-realtime-coarse: syscall: 286 nsec/call
+clock-gettime-realtime-coarse:    libc: 21 nsec/call
+clock-gettime-realtime-coarse:    vdso: 12 nsec/call
+clock-getres-realtime-coarse: syscall: 285 nsec/call
+clock-getres-realtime-coarse:    libc: 283 nsec/call
+clock-getres-realtime-coarse:    vdso: 11 nsec/call
+getcpu: syscall: 234 nsec/call
+getcpu:    libc: 31 nsec/call
+getcpu:    vdso: 20 nsec/call
+gettimeofday: syscall: 293 nsec/call
+gettimeofday:    libc: 32 nsec/call
+gettimeofday:    vdso: 31 nsec/call
+
+Stock Kernel:
+=============
+
+clock-gettime-monotonic: syscall: 349 nsec/call
+clock-gettime-monotonic:    libc: 37 nsec/call
+clock-gettime-monotonic:    vdso: 28 nsec/call
+clock-getres-monotonic: syscall: 296 nsec/call
+clock-getres-monotonic:    libc: 295 nsec/call
+clock-getres-monotonic:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-monotonic-coarse: syscall: 296 nsec/call
+clock-gettime-monotonic-coarse:    libc: 21 nsec/call
+clock-gettime-monotonic-coarse:    vdso: 11 nsec/call
+clock-getres-monotonic-coarse: syscall: 287 nsec/call
+clock-getres-monotonic-coarse:    libc: 288 nsec/call
+clock-getres-monotonic-coarse:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-monotonic-raw: syscall: 353 nsec/call
+clock-gettime-monotonic-raw:    libc: 360 nsec/call
+clock-gettime-monotonic-raw:    vdso: 352 nsec/call
+clock-getres-monotonic-raw: syscall: 282 nsec/call
+clock-getres-monotonic-raw:    libc: 286 nsec/call
+clock-getres-monotonic-raw:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-tai: syscall: 351 nsec/call
+clock-gettime-tai:    libc: 364 nsec/call
+clock-gettime-tai:    vdso: 365 nsec/call
+clock-getres-tai: syscall: 287 nsec/call
+clock-getres-tai:    libc: 287 nsec/call
+clock-getres-tai:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-boottime: syscall: 347 nsec/call
+clock-gettime-boottime:    libc: 364 nsec/call
+clock-gettime-boottime:    vdso: 355 nsec/call
+clock-getres-boottime: syscall: 287 nsec/call
+clock-getres-boottime:    libc: 287 nsec/call
+clock-getres-boottime:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-realtime: syscall: 346 nsec/call
+clock-gettime-realtime:    libc: 36 nsec/call
+clock-gettime-realtime:    vdso: 29 nsec/call
+clock-getres-realtime: syscall: 285 nsec/call
+clock-getres-realtime:    libc: 287 nsec/call
+clock-getres-realtime:    vdso: not tested
+Note: vDSO version of clock_getres not found
+clock-gettime-realtime-coarse: syscall: 296 nsec/call
+clock-gettime-realtime-coarse:    libc: 20 nsec/call
+clock-gettime-realtime-coarse:    vdso: 11 nsec/call
+clock-getres-realtime-coarse: syscall: 301 nsec/call
+clock-getres-realtime-coarse:    libc: 297 nsec/call
+clock-getres-realtime-coarse:    vdso: not tested
+Note: vDSO version of clock_getres not found
+getcpu: syscall: 255 nsec/call
+getcpu:    libc: 32 nsec/call
+getcpu:    vdso: 21 nsec/call
+gettimeofday: syscall: 339 nsec/call
+gettimeofday:    libc: 31 nsec/call
+gettimeofday:    vdso: 30 nsec/call
+
 
 _______________________________________________
 linux-arm-kernel mailing list
