@@ -2,79 +2,135 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D444CC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A0901C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:09:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A3144205F4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6F29D2084D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:09:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hpYcFDfB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="u2xD6uPM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A3144205F4
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VIikNVXV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="IesKaECy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6F29D2084D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=pqj4+nIY4USpG60/8P7zTnwf5ctSv4BIGINkS0JqWv8=; b=hpYcFDfB7a25GC/kx0U6f8tEK
-	TXIUTyp3/RQgC1uKA5ljHcfU1nx1lzTyhb/nOAs9wADS7xVe/p0HCvwBS7pfbsTI8xKuNTdoWDUaE
-	sz+Prkw5U3Q7DI6sd3LP6Kd7oBmpSpp9g2x1b35MZHJ7j8/9ZM+rR6kqv8KXiBBSRtgMyCDz6VkhR
-	nT9+M5JT4BzNGIbKPfLo3KSzO1ZNvuhwkU3BujvA43hY06KO5ve8y89LSegzLxJNoYPMh8dH55Tjm
-	VMwm0Om5VodShEH/gpfQF8W7KcKKb4vCg51o90jdwW/FfQherBqsDOO7Xi3/Lalgi7+DzOy70h0DR
-	iIGnmbFSg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=MmCz7nxGlaBXOSCtXHNNCsuMA25UTpocjLHwFucij4g=; b=VIikNVXVFsjoMp
+	JtJhcy/KruNxIeKPLasjYEuJ1+Rh13LawmBQo6ytDxVprjJQQI3oBIGy9ccd/kwj39Z5m6YYURB6p
+	pzPcphusmczsc9FvG9lp4UEyTbjDnPFyv7r9ZOYPNdHZTCtuRAomf4zNc/K9GRO3TK1bj+/inLOFn
+	oLwDgHDGGMTPJh2fEuAlYVSfKO6i1ejUE9Sk8JeXIADdZKq7oqKedkzo13wKI409JSobGqg/yr1Wh
+	dq3mqgEGIOlwb5e0SGo20yF6wVpesFtDszsAL0SG+Fy5a5fXNfBjt45nPo2yXKBK9y/LzHY/ApGj/
+	Y7vNYokqouQ/jGVn/q9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyw34-00018Q-UO; Wed, 27 Feb 2019 10:02:46 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gyw92-00039o-UH; Wed, 27 Feb 2019 10:08:56 +0000
+Received: from mail-he1eur01on0602.outbound.protection.outlook.com
+ ([2a01:111:f400:fe1e::602]
+ helo=EUR01-HE1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyw2k-0000bC-Ow
- for linux-arm-kernel@bombadil.infradead.org; Wed, 27 Feb 2019 10:02:26 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=jHrecR2XkHtdX/WYDEvpbbxZHKYE6FFjnQuYeqYbIoU=; b=u2xD6uPMgdyn/phaWIkfBnB9j
- lOupDtExEmmOdTxndzGBWo2dkw/sMAidy+RHgJCbqs8NbeeApe3u0KCOd8zz6hOwpXwM3akggQXyB
- i/xZGmRErKJ//qoS8pw3Rwh9yu1QU11yfarfJpPTBRO7/pebf6o6xgQo17JCLLm2RDgR66H5shJL5
- caW5OrB65na5E1nX42XgV/2YgBzEITIJmp6ANRPx/aIFb9gVyOfbCDJ+ch1j7IvJa0rJP5aMj2+/2
- Iw85tRMlkvnBmPJs54cDC8mRUJXWgilIfcv+rawoAsRWBI0zyK7Czpbq032RbN/JTXuE/n1lBBd9/
- JBSxYXrrg==;
-Received: from relay9-d.mail.gandi.net ([217.70.183.199])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyw2g-0007af-4P
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 10:02:24 +0000
-X-Originating-IP: 90.88.147.150
-Received: from localhost (aaubervilliers-681-1-27-150.w90-88.abo.wanadoo.fr
- [90.88.147.150]) (Authenticated sender: maxime.ripard@bootlin.com)
- by relay9-d.mail.gandi.net (Postfix) with ESMTPSA id 23E01FF80A;
- Wed, 27 Feb 2019 10:01:46 +0000 (UTC)
-Date: Wed, 27 Feb 2019 11:01:46 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Ezequiel Garcia <ezequiel@collabora.com>
-Subject: Re: [PATCH v4 1/2] media: uapi: Add H264 low-level decoder API
- compound controls.
-Message-ID: <20190227100146.beakovktekqcaei3@flea>
-References: <cover.1862a43851950ddee041d53669f8979aba863c38.1550672228.git-series.maxime.ripard@bootlin.com>
- <9817c9875638ed2484d61e6e128e2551cf3bda4c.1550672228.git-series.maxime.ripard@bootlin.com>
- <CAAFQd5D3CVQQDkP3uKM6dYkmfsLohXcdjG0wMMLukFf-D=TCsw@mail.gmail.com>
- <5d95629590e6ca2abbec898e8e9ee478f7a3a6cc.camel@collabora.com>
+ id 1gyw8y-00038Z-Jg
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 10:08:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=jMAm9NOsAK64vZKydJsc+kvokW6a3GVgNTdHp7zYV1I=;
+ b=IesKaECyE5iYgSmZywepSyTeZRRI0Zm2ZLQrk5Kbj+JOHjKkbVUzOzRosdPvOJi/0/mxtGReeNkwPpWw+50FWBdPHjJX31VuX3aNEv9Gxkg1PFSntH9NqiapjoYuKUvo2bQ0jbiUAI0KTNRN02jI9sZXAWr8D6ya7TagMzEeJJo=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3708.eurprd04.prod.outlook.com (52.134.70.139) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.20; Wed, 27 Feb 2019 10:08:47 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::1cb4:3e1c:fc85:7ed7]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::1cb4:3e1c:fc85:7ed7%2]) with mapi id 15.20.1643.019; Wed, 27 Feb 2019
+ 10:08:47 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
+ <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Subject: [PATCH 1/2] dt-bindings: memory-controllers: freescale: add MMDC
+ binding doc
+Thread-Topic: [PATCH 1/2] dt-bindings: memory-controllers: freescale: add MMDC
+ binding doc
+Thread-Index: AQHUzoRtPPOcU3pFxU6ikSfd3nqjew==
+Date: Wed, 27 Feb 2019 10:08:47 +0000
+Message-ID: <1551261844-23983-1-git-send-email-Anson.Huang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.7.4
+x-clientproxiedby: HK2PR02CA0215.apcprd02.prod.outlook.com
+ (2603:1096:201:20::27) To DB3PR0402MB3916.eurprd04.prod.outlook.com
+ (2603:10a6:8:10::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 84f1b329-54e0-43d3-2c82-08d69c9b8ffe
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3708; 
+x-ms-traffictypediagnostic: DB3PR0402MB3708:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3708;
+ 23:CVIUSZoSfnCh1StZHmQQoIGRJKznLzg3ztk9J?=
+ =?iso-8859-1?Q?rG5Yg8u4yIcbqb47XPtR+mbx1+CQ4Op21Ic3+XDWWABbmJWcjwMO6kkT5W?=
+ =?iso-8859-1?Q?QDbU2BlYEUIA+96Q9Vga1E0RlIi5INYz4qlBSmCnFO/dbS3TivQZvxOXm/?=
+ =?iso-8859-1?Q?/9fVtNxUX0ke9kZF1XkQzOmNDiElJ4uRe34mrq4xxmcopdBNL5Sn0FpGZP?=
+ =?iso-8859-1?Q?NQDZ3w4/vaGHkTnTWwr0cbVtKvKyigF8Ds8rRorBXhaY+EBS7vET/FaVhq?=
+ =?iso-8859-1?Q?dJN5g9XDMsPEm1kcFo89O0CmBtK8oxNsAF6AouaggiDkN849fu0Tv9CSzV?=
+ =?iso-8859-1?Q?7E3QOtsP5hCFKT32PmxknV0R0WQJB4LJBIjxJGK7gRWooTMu/9jc27SncU?=
+ =?iso-8859-1?Q?YCszSlTmws2vKS6jpUxOMH7F8is9Qi3TT+UMZupqf5i8v/HU1ppACZ0tZm?=
+ =?iso-8859-1?Q?RabYkTFCKhb8ylgx2iixYyZZ8k7d67tPjk5Jx1dC2n0bA30m3jXmZjkAne?=
+ =?iso-8859-1?Q?eLYdiQbZIe1t8zqm9EqngLY1A8UOSf5T1iZBzZWDFcCr41gVlbse9BpM9D?=
+ =?iso-8859-1?Q?Urd8zR/Zy6raQ5l/z4hWNZKRrWRDJA1XqDGnGcGbNdpS4/nPHBHVzpYtZl?=
+ =?iso-8859-1?Q?baezpp1O7FVSBBHfGp1Gl3XAVACvfRljKVA7c6AO8htxZnFRQcDm3iAt2s?=
+ =?iso-8859-1?Q?79B/eTmAAo8g1kxYtdhNI1J/0ugsxEtAVnMqhc+SQs5p1HGkGa9b1Apeuk?=
+ =?iso-8859-1?Q?Vko9WoJyUEaoVEzDXFb7dpJPuN6JXUplBYTnFbf/iVJFM5G9TjZ7VMh7Bb?=
+ =?iso-8859-1?Q?2DUK4jcqBNZbkKhhuFhrfON1GhULfPpb+ttcnx7rhoAt98gGgSqPWmPv6u?=
+ =?iso-8859-1?Q?mGkm80ti+wuqd+ReKRd75aupkzriMOZGTmnTLammCLKksMmgpGer0Tqr2N?=
+ =?iso-8859-1?Q?aLWkdf2xeUbEqa4dNfgTpCTz7wtQfs/gwNb927XiAloeVRZrQvW5MU4R3t?=
+ =?iso-8859-1?Q?vaaI4d+8D/yX1ON8SFwFXQdk3mPyBW21lv25iH3T0PL4lkQWLUtSEQnAdn?=
+ =?iso-8859-1?Q?umctUhyRGJeLrBc2bQxyLPKmf3OMuuf1lQxcTryPlvq/tw9fCFw+Ir55/D?=
+ =?iso-8859-1?Q?kLby6Fr72zSbsMS+ymQ1N6mlXgxPQKoxzf6Qox/NWFRnYWMfYhjiCeaqiF?=
+ =?iso-8859-1?Q?yUBHyyY2NFLP8viGHn3stPicyjDMrSHAJJw=3D=3D?=
+x-microsoft-antispam-prvs: <DB3PR0402MB3708D60983B644DEB2999D2CF5740@DB3PR0402MB3708.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0961DF5286
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(376002)(346002)(366004)(39860400002)(396003)(136003)(189003)(199004)(6512007)(71200400001)(71190400001)(53936002)(8676002)(6436002)(68736007)(316002)(186003)(52116002)(486006)(50226002)(2201001)(105586002)(5660300002)(81166006)(81156014)(8936002)(4326008)(106356001)(6486002)(25786009)(86362001)(97736004)(14454004)(305945005)(3846002)(6116002)(7736002)(14444005)(6506007)(110136005)(386003)(478600001)(26005)(2906002)(102836004)(2501003)(99286004)(2616005)(256004)(66066001)(36756003)(476003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3708;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: YgZdfuSjsYIsTeu4c3CBYaWvofLJDRgTpqD1yznf5T/4zdS1yi/DMcrcHvPKEEcod8VqmFzFa7YArgyOEyJIjNOY/cUCBJVTfxFi0lmHh85DKKzHAZlyvf6RsleFBYn0qO2Xx8PyXG+PZxD9EJB/+VMYCnL8mEC2jGe1ac8OSPLnTWzhRwdi/ZIXIlcK+bZktFWRVfeSGmQJbN5l7VoIklndOg3Pscu8ZQslbPD7rYDfL7Tdrw0flY7hfh8UnjomoVhxJv1x58O4VV2MmhhMJUWflCrKo85gped38prY9UHVHmtSr1Kc7Tx9g7AL391JcsQowfNdPIAFP7qKbapU51ndVbdo6uyjSAS6IVeRHqqhoJQ/EnK+g8PB6xqj7ordscnpIBK/hdhz2wQJgOs8qpRkNRGNKDxsRHwWJf5WfX4=
 MIME-Version: 1.0
-In-Reply-To: <5d95629590e6ca2abbec898e8e9ee478f7a3a6cc.camel@collabora.com>
-User-Agent: NeoMutt/20180716
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 84f1b329-54e0-43d3-2c82-08d69c9b8ffe
+X-MS-Exchange-CrossTenant-originalarrivaltime: 27 Feb 2019 10:08:43.3341 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3708
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_050222_338796_34EFF2BE 
-X-CRM114-Status: GOOD (  16.04  )
+X-CRM114-CacheID: sfid-20190227_020852_853570_7081C97D 
+X-CRM114-Status: GOOD (  11.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,99 +142,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "list@263.net:IOMMU DRIVERS <iommu@lists.linux-foundation.org>,
- Joerg   Roedel <joro@8bytes.org>, " <linux-arm-kernel@lists.infradead.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Alexandre Courbot <acourbot@chromium.org>, Jonas Karlman <jonas@kwiboo.se>,
- jenskuske@gmail.com, linux-sunxi@googlegroups.com,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Jernej Skrabec <jernej.skrabec@gmail.com>, Tomasz Figa <tfiga@chromium.org>,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- Chen-Yu Tsai <wens@csie.org>, Hans Verkuil <hans.verkuil@cisco.com>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Guenter Roeck <groeck@chromium.org>,
- Nicolas Dufresne <nicolas.dufresne@collabora.com>,
- Pawel Osciak <posciak@chromium.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
-Content-Type: multipart/mixed; boundary="===============2940115272048006596=="
+Cc: dl-linux-imx <linux-imx@nxp.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Freescale MMDC (Multi Mode DDR Controller) driver is supported
+since i.MX6Q, but not yet documented, this patch adds binding
+doc for MMDC module driver.
 
---===============2940115272048006596==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="2vn33557bkmisyhi"
-Content-Disposition: inline
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ .../bindings/memory-controllers/fsl/mmdc.txt       | 27 ++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/fsl/mmdc.txt
 
+diff --git a/Documentation/devicetree/bindings/memory-controllers/fsl/mmdc.txt b/Documentation/devicetree/bindings/memory-controllers/fsl/mmdc.txt
+new file mode 100644
+index 0000000..5b5a224
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/fsl/mmdc.txt
+@@ -0,0 +1,27 @@
++Freescale Multi Mode DDR controller (MMDC)
++
++Required properties :
++- compatible : should be one of following:
++	for i.MX6Q/i.MX6DL:
++	- "fsl,imx6q-mmdc";
++	for i.MX6SL:
++	- "fsl,imx6sl-mmdc", "fsl,imx6q-mmdc";
++	for i.MX6SLL:
++	- "fsl,imx6sll-mmdc", "fsl,imx6q-mmdc";
++	for i.MX6SX:
++	- "fsl,imx6sx-mmdc", "fsl,imx6q-mmdc";
++	for i.MX6UL/i.MX6ULL/i.MX6ULZ:
++	- "fsl,imx6ul-mmdc", "fsl,imx6q-mmdc";
++	for i.MX7ULP:
++	- "fsl,imx7ulp-mmdc", "fsl,imx6q-mmdc";
++- reg : address and size of MMDC DDR controller registers
++
++Optional properties :
++- clocks : the clock provided by the SoC to access the MMDC registers
++
++Example :
++	mmdc0: mmdc@21b0000 { /* MMDC0 */
++		compatible = "fsl,imx6q-mmdc";
++		reg = <0x021b0000 0x4000>;
++		clocks = <&clks IMX6QDL_CLK_MMDC_P0_IPG>;
++	};
+-- 
+2.7.4
 
---2vn33557bkmisyhi
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-Hi Ezequiel,
-
-On Fri, Feb 22, 2019 at 01:59:33PM -0300, Ezequiel Garcia wrote:
-> On Fri, 2019-02-22 at 16:46 +0900, Tomasz Figa wrote:
-> > > diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/vide=
-odev2.h
-> > > index 9a920f071ff9..6443ae53597f 100644
-> > > --- a/include/uapi/linux/videodev2.h
-> > > +++ b/include/uapi/linux/videodev2.h
-> > > @@ -653,6 +653,7 @@ struct v4l2_pix_format {
-> > >  #define V4L2_PIX_FMT_H264     v4l2_fourcc('H', '2', '6', '4') /* H26=
-4 with start codes */
-> > >  #define V4L2_PIX_FMT_H264_NO_SC v4l2_fourcc('A', 'V', 'C', '1') /* H=
-264 without start codes */
-> > >  #define V4L2_PIX_FMT_H264_MVC v4l2_fourcc('M', '2', '6', '4') /* H26=
-4 MVC */
-> > > +#define V4L2_PIX_FMT_H264_SLICE v4l2_fourcc('S', '2', '6', '4') /* H=
-264 parsed slices */
-> >=20
-> > Are we okay with adding here already, without going through staging fir=
-st?
->=20
-> Also regarding the pixel formats. I still think we should have two
-> pixel formats: V4L2_PIX_FMT_H264_SLICE_RAW and
-> V4L2_PIX_FMT_H264_SLICE_ANNEX_B, to properly represent "raw" NALUs
-> and "annex B" formatted NALUs.
-
-I agree with that, but I was under the impression that it would be
-part of your series, since you would be the prime user (at first at
-least).
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---2vn33557bkmisyhi
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXHZgCgAKCRDj7w1vZxhR
-xVMpAQClntThLgxNJNe4H3R8i5KBo2Ht7X3qerXfB/OlFlGwqAD9GqKo9iEGBIfX
-jBn6Bhq9EJ2B6yNhRFTAUIDwz1an0g4=
-=Dp57
------END PGP SIGNATURE-----
-
---2vn33557bkmisyhi--
-
-
---===============2940115272048006596==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============2940115272048006596==--
-
