@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D3CCC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9D63EC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4F624218E2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:00 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 71BB7218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 01:43:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XBGcoGez";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="jdFleDy/"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F624218E2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CfxgjKdd";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="bXDYrYGl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 71BB7218D3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+EYU7VDQnj7oOtn6QlSfLrAkkUPBnQWjoS8WjZWXk6A=; b=XBGcoGezt3/fWH
-	5ZdUq8RZwv1uXBq5jKdpPIH88UwZ765c5gas4+q6Q4yx47a9ODcERpGRBfdHHdgL0g6exKdGRQXOU
-	/MDocVvdYi1KDT7f9kiPJao+E+iBOyD/pHbAuVPfsE8wxsIvbX2etsduTh3U6xr8NMq4NTYHBcXfY
-	ckJY5pV5G0tLIofVuFMFx1tldlZe317Ok94JYOdpHgNB9F/PzucCUizC6EvtjKutvWz91DMiRPotZ
-	vH7c8HaAJA1m7CW9eJ3HXjKdBbb+ExdN+Dhl7tiQbB05cnWO+TRxa97KrLjiv3rSoM85LFtN5WQnD
-	C7xlXbprCloDU0x0Drrg==;
+	List-Owner; bh=LeqlkkbGTubgEiXh7sMDdpIj417297KPF9IO3XrBC88=; b=CfxgjKddu2TQzg
+	iFHSkIrY1E8aFBXzW0H5/3cA5wSbTauSGkpqqg4oP0FqeivifOdHedlX5h6gsUloOqSQJ32GQhoKl
+	ZQC0j4mafO6lj7Ta1308F5hftRjqPsXUp6A8f0w8DedV648XIcS6786mHmTFeMsDvYrdhuPNPSYSJ
+	rebxrs9NHEWd06C5ivo49j+ZWCueEya7QjLOXEmXaCy6tkAScEVVeIvLHd55L+8Q994KLosKD6TL/
+	GA4T90buVpnHn4Fm0ezzaoUS3MY0g/6MKPA8VIBP7LAporZ12cSmKJwxMwYpe1SuHOk7oJtqAmppw
+	tVp+1je69bERtNldH+hQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyoFN-0005KI-Tw; Wed, 27 Feb 2019 01:42:57 +0000
-Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+	id 1gyoFg-0006AB-BN; Wed, 27 Feb 2019 01:43:16 +0000
+Received: from mail-ot1-x343.google.com ([2607:f8b0:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyoFK-0005Bu-Ce
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 01:42:56 +0000
-Received: by mail-oi1-x242.google.com with SMTP id a81so12090405oii.11
+ id 1gyoFc-0005zI-IS
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 01:43:14 +0000
+Received: by mail-ot1-x343.google.com with SMTP id t7so12948488otk.8
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 17:42:53 -0800 (PST)
+ Tue, 26 Feb 2019 17:43:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8vCW/Wa8dcY8A4VZhcPLzXb5kVuJM8/rxF5r1eLFf1A=;
- b=jdFleDy/K/OpFEYG/BEAQsV3ZlQxOap9nG3Vs0jqfwT+wH0G6CRXDEMQML49Kydxbs
- 5Q+qpxQy2ITIPdnNc5OjGPxqACsCupf7TgbQDhDc0/B9du96L3N0aRr6EiqgxyvNEyCO
- GaxNtuNzkUivMtBM9aZE/0bCfQMqK+dJLibpD4d0RBUovPQNQGUuWsIzndegVnavgI4s
- sIIs/sePzRJ0uR1ApKzGsx1rpnehjruAWHBF3lOdBMA8riJqalwirHCJWG3xcqmy8Lbf
- eme3ONiwNFqWmgRxy1aKgtGiBx/Cu0D0QufnkpwqjNfLqRMyomWMGc1OJpwlqmgbLjFG
- AZ5g==
+ :cc; bh=+ePahqNB+NAIQktminfToWaR6W6q1o8dl+pknU+Oug8=;
+ b=bXDYrYGlVlnwVA0Uw3rnfWSp/TCkYI5Y6IfmAJ0TdyhbyuVco2uOy64+IYGufqSEXy
+ nuIXA/vM8bmleJpQao/cvOAPx+t29A8n7SmNGukKSs22u1zuUeJ4d9idJBWI4nDpk2sY
+ +zQjhGoCRmLcT9Rwm3HdB6WHMeA735PEBgdtSZd2yZv+9GALI8nWWCaK0MrdXA5C13e/
+ /dwnqZtvJa4cWXyXUz5lt0SyJroMc3FDvAHTMzrSfjsDwUN+HC3LdDMVAes0eLEiBa6v
+ Rc/D1OnbhPIkCpB8of1Sx1sxVeM2W3q13gFUpxcq8NRA0t4GHDZhM3aZAXTZsavRFbhk
+ r6eQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=8vCW/Wa8dcY8A4VZhcPLzXb5kVuJM8/rxF5r1eLFf1A=;
- b=nwhZPGkohaFjguFS1xb6CrMVz5JS3Ktkahf/azTav9Z1CVzBwtV54Vjjtg0oUMHinj
- bFdG7FxGP5EZsCFz7UE0hCUFX/Tv4ctnlJ0mM90VGNcmWdWoBB+dapibWdCDKAAdvT6b
- 5iKLrljHVJavbFSCIkRbeu8LgqWKO+f1kOhndubV4QY70pb1/mRn5BvZH4OuGeN38ixw
- 7WPQo/+fdCmAhGBqB2cTfGlatEbf9I9PTPkRTuwUA0xr9dPxk+91DxXodHyhfIXnRzqn
- Ep9KnaRwEnTSIzFl5cVs5h4YMM54adZteR6JCiOjCGtQT7tvH0B7EoK84hXfnjmOnlhi
- oykQ==
-X-Gm-Message-State: AHQUAuZErTcMBFDkcIeDBk6nTWa0bi2X9x+yJaSKHhtjtnaXMsrQ/Te3
- wtKq9UspYcjd9Q9BgHYSNfWr51QdoyNM4rs6NGM=
-X-Google-Smtp-Source: AHgI3Iag3I8rQGTloFiQlFwATou16YcDdDgnFdkS8hL1JGgcEQ6A86xFgCYWPkFmURaRoWeyWOONA5OokS6e7zkXaXE=
-X-Received: by 2002:aca:b5c1:: with SMTP id e184mr4358645oif.75.1551231772955; 
- Tue, 26 Feb 2019 17:42:52 -0800 (PST)
+ bh=+ePahqNB+NAIQktminfToWaR6W6q1o8dl+pknU+Oug8=;
+ b=iQZg4kVGMc7x8wAqAQn6yZJaytFQYpkf6JjB9FiSGVOq/b2K4VxfoEGupR185ymggz
+ BclX5sJU39T72+v+ez28lrq6EvPTg7ZJw7fml4SK6e9wcrBX7VIDCFd6ueJxW1hD69cl
+ Dj+ZYDrBRlcaiQXSzCHAo2LJAjs09zyU84Qld1JgfMfiXSiKx7FQSH/lWvSIKYCt+h8E
+ 3tNdwDFCt4gGhZmZK8qru9s57iPi/8dTbHIieEuRL7no8pu17L4N5+ZUOlSYUBlQwRan
+ Te0o8fnR7GDhKWLtY9m5R/KTD9IlhfIxpZDlw/QDVaTSNckNDVEzhHAzy3ryfvffip/6
+ N8xQ==
+X-Gm-Message-State: AHQUAuY67lXDMr2pnNqdBFeltZo+7XGCKlPg0axF1vdCCUnFv2rMm0uw
+ x42SNjrMlMwFCxaFuNgF4MmjJFd+CxEx24uBlQQ=
+X-Google-Smtp-Source: APXvYqzKVLSr+oXMH1RsvLJ9BPOZZxFkxDhAmIsLK0hM34vcBg/7oAWVWWnmOQ7nHhyuOx4L1aeCTFXw01ZhwC8TN/4=
+X-Received: by 2002:a9d:7d02:: with SMTP id v2mr615500otn.203.1551231791522;
+ Tue, 26 Feb 2019 17:43:11 -0800 (PST)
 MIME-Version: 1.0
 References: <1551230622-30660-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1551230622-30660-1-git-send-email-Anson.Huang@nxp.com>
+ <1551230622-30660-2-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1551230622-30660-2-git-send-email-Anson.Huang@nxp.com>
 From: Fabio Estevam <festevam@gmail.com>
-Date: Tue, 26 Feb 2019 22:42:41 -0300
-Message-ID: <CAOMZO5ADvmVO51fbrGjtGsDaN_AQcJs=+mBBQoPzRwhWasJLrw@mail.gmail.com>
-Subject: Re: [PATCH RESEND V2 1/2] clk: imx8mq: add GPIO clocks to clock tree
+Date: Tue, 26 Feb 2019 22:42:59 -0300
+Message-ID: <CAOMZO5AddhSfB0Efuy-Z5GjvpXMwyBGHB8H6YTWcztXzCOWVyA@mail.gmail.com>
+Subject: Re: [PATCH RESEND V2 2/2] arm64: dts: freescale: imx8mq: add clock
+ for GPIO node
 To: Anson Huang <anson.huang@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_174254_981875_9A6A5409 
-X-CRM114-Status: UNSURE (   7.91  )
+X-CRM114-CacheID: sfid-20190226_174312_708283_536B7975 
+X-CRM114-Status: UNSURE (   8.44  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -109,10 +111,10 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Feb 26, 2019 at 10:28 PM Anson Huang <anson.huang@nxp.com> wrote:
+On Tue, Feb 26, 2019 at 10:29 PM Anson Huang <anson.huang@nxp.com> wrote:
 >
-> i.MX8MQ has clock gate for each GPIO bank, add them
-> into clock tree for GPIO driver to manage.
+> i.MX8MQ has clock gate for each GPIO bank, add clock info
+> to GPIO node for clock management.
 >
 > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
