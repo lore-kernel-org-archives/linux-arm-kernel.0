@@ -2,68 +2,73 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B1FBBC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 03:26:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 26918C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 03:51:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7F9F5218D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 03:26:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EBE6220C01
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 03:51:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lL0IYVOr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7F9F5218D0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XTQbZhjn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EBE6220C01
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Cc:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=MgGK2mU+ocmBZZYIb9AUqqTjxoMfjow298xwljSw5kc=; b=lL0IYVOrPwM5bczxD8qxKBRmEx
-	oOTiSD83s9Sx48qMaud5kKZIF7/1f0+lNqNotuUVtF/0kQqsWpp82/L+nSmhTr5AGXtzGWvzizkBk
-	oQetxHRi+6HamjZDyo14xDJ0tHxHhNPB8CyZiIkrI39G42k3N1cr8n2A6qzASVNBH3fr3cg2kb+jg
-	rUdjUxxaIMQN52n2Mpixr/ODeGo7jKPUbCrQsJC/6pcVZKvlzwhmHV4jrB5dLp6arkWpiPUPzcozf
-	CqP2DDyQWnotIVZAtJnTRRr8IgUT0ojKnGqFDBx86mdW7vugihDv+K1M2iJycVyhSWmBARCeEkURs
-	zoNiUaUA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=FsH4Itmeef/Hwc16e8tobimvFMuHJaU75Gwc25AA/9Y=; b=XTQbZhjnk18zid
+	R3PNo8By+quqdn0Bb5Xt41UObar1TAVNffKiNAsl84k3l1JLYUDTHlRfQR9ct0u3K6YZec6X1F4hS
+	rWtm2nebmqJ7qtROuYUtjjpIktA9WnHAMBWgu6qk8XToZ4qVFWK5FICxVprPag7hpkR2ix4/OqPI2
+	bxus84uDgx4rkC6z80XDhXiQgaeL6TYS6zlRMiuG0A0L6huoliG3o2dHLM7c1Kms/GV1oIZe4D6PP
+	yRvmVD8JDVsU8V793pvho/oBZUqGXkGW5CGHjRZMQeHugKvyEJAiGNVLs2cLGRvXRN4jHhZPiK+vt
+	8UXi02p8n3PNXdYT6Sig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyprC-0006iU-5U; Wed, 27 Feb 2019 03:26:06 +0000
-Received: from szxga06-in.huawei.com ([45.249.212.32] helo=huawei.com)
+	id 1gyqFV-000683-Hd; Wed, 27 Feb 2019 03:51:13 +0000
+Received: from mailgw02.mediatek.com ([216.200.240.185])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gypr9-0006hQ-IK
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 03:26:05 +0000
-Received: from DGGEMS413-HUB.china.huawei.com (unknown [172.30.72.60])
- by Forcepoint Email with ESMTP id A38B7C429708B956B1C0;
- Wed, 27 Feb 2019 11:25:51 +0800 (CST)
-Received: from [127.0.0.1] (10.177.23.164) by DGGEMS413-HUB.china.huawei.com
- (10.3.19.213) with Microsoft SMTP Server id 14.3.408.0; Wed, 27 Feb 2019
- 11:25:45 +0800
-Subject: Re: [PATCH 0/5] iommu/arm-smmu-v3: make smmu can be enabled in kdump
- kernel
-To: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>, Robin Murphy
- <robin.murphy@arm.com>, Will Deacon <will.deacon@arm.com>, Joerg Roedel
- <joro@8bytes.org>, linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- iommu <iommu@lists.linux-foundation.org>, linux-kernel
- <linux-kernel@vger.kernel.org>
-References: <20190219075443.17732-1-thunder.leizhen@huawei.com>
-From: "Leizhen (ThunderTown)" <thunder.leizhen@huawei.com>
-Message-ID: <5C760337.2070504@huawei.com>
-Date: Wed, 27 Feb 2019 11:25:43 +0800
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:38.0) Gecko/20100101
- Thunderbird/38.5.1
+ id 1gyqFQ-00067e-Qn; Wed, 27 Feb 2019 03:51:10 +0000
+X-UUID: 4ee931ae7f7440c2be94679e8a6c3082-20190226
+X-UUID: 4ee931ae7f7440c2be94679e8a6c3082-20190226
+Received: from mtkcas67.mediatek.inc [(172.29.193.45)] by mailgw02.mediatek.com
+ (envelope-from <weiyi.lu@mediatek.com>)
+ (musrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 599025955; Tue, 26 Feb 2019 19:51:05 -0800
+Received: from mtkmbs03n2.mediatek.inc (172.21.101.182) by
+ MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Tue, 26 Feb 2019 19:51:04 -0800
+Received: from mtkcas08.mediatek.inc (172.21.101.126) by
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Wed, 27 Feb 2019 11:51:02 +0800
+Received: from [172.21.77.4] (172.21.77.4) by mtkcas08.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Wed, 27 Feb 2019 11:51:02 +0800
+Message-ID: <1551239460.1047.30.camel@mtksdaap41>
+Subject: Re: [PATCH v4 01/12] clk: mediatek: Disable tuner_en before change
+ PLL rate
+From: Weiyi Lu <weiyi.lu@mediatek.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>
+Date: Wed, 27 Feb 2019 11:51:00 +0800
+In-Reply-To: <41aed6f5-8794-ddf5-d5c2-17ee82e33db3@gmail.com>
+References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
+ <20190201083016.25856-3-weiyi.lu@mediatek.com>
+ <41aed6f5-8794-ddf5-d5c2-17ee82e33db3@gmail.com>
+X-Mailer: Evolution 3.10.4-0ubuntu2 
 MIME-Version: 1.0
-In-Reply-To: <20190219075443.17732-1-thunder.leizhen@huawei.com>
-X-Originating-IP: [10.177.23.164]
-X-CFilter-Loop: Reflected
+X-TM-SNTS-SMTP: 8AA3E19B124612539407FF0DB6EB0CEF394A2D080949110F5D66794B339111752000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_192603_778575_23F47F42 
-X-CRM114-Status: GOOD (  12.34  )
+X-CRM114-CacheID: sfid-20190226_195108_877123_7794E314 
+X-CRM114-Status: GOOD (  24.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,38 +80,132 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
+Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
+ srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
+ Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
+ stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
+ linux-mediatek@lists.infradead.org, Owen Chen <owen.chen@mediatek.com>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Will, Robin:
-   Do you have time to review these patches? Hope you can give me some opinions.
+On Tue, 2019-02-26 at 16:59 +0100, Matthias Brugger wrote:
+> 
+> On 01/02/2019 09:30, Weiyi Lu wrote:
+> > From: Owen Chen <owen.chen@mediatek.com>
+> > 
+> > PLLs with tuner_en bit, such as APLL1, need to disable
+> > tuner_en before apply new frequency settings, or the new frequency
+> > settings (pcw) will not be applied.
+> > The tuner_en bit will be disabled during changing PLL rate
+> > and be restored after new settings applied.
+> > Another minor change is to correct the macro name of pcw change bit
+> > to CON1_PCW_CHG because PCW_CHG(BIT31) is on CON1.
+> > 
+> > Fixes: e2f744a82d725 (clk: mediatek: Add MT2712 clock support)
+> > Cc: <stable@vger.kernel.org>
+> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> > ---
+> >  drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
+> >  1 file changed, 31 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> > index f54e4015b0b1..f0ff5f535c7e 100644
+> > --- a/drivers/clk/mediatek/clk-pll.c
+> > +++ b/drivers/clk/mediatek/clk-pll.c
+> > @@ -27,7 +27,7 @@
+> >  #define CON0_BASE_EN		BIT(0)
+> >  #define CON0_PWR_ON		BIT(0)
+> >  #define CON0_ISO_EN		BIT(1)
+> > -#define CON0_PCW_CHG		BIT(31)
+> > +#define CON1_PCW_CHG		BIT(31)
+> >  
+> >  #define AUDPLL_TUNER_EN		BIT(31)
+> >  
+> > @@ -93,9 +93,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> >  {
+> >  	u32 con1, val;
+> >  	int pll_en;
+> > +	u32 tuner_en = 0;
+> > +	u32 tuner_en_mask;
+> > +	void __iomem *tuner_en_addr = NULL;
+> >  
+> >  	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+> >  
+> > +	/* disable tuner */
+> > +	if (pll->tuner_en_addr) {
+> > +		tuner_en_addr = pll->tuner_en_addr;
+> > +		tuner_en_mask = BIT(pll->data->tuner_en_bit);
+> > +	} else if (pll->tuner_addr) {
+> > +		tuner_en_addr = pll->tuner_addr;
+> > +		tuner_en_mask = AUDPLL_TUNER_EN;
+> > +	}
+> > +
+> > +	if (tuner_en_addr) {
+> > +		val = readl(tuner_en_addr);
+> > +		tuner_en = val & tuner_en_mask;
+> > +
+> > +		if (tuner_en) {
+> > +			val &= ~tuner_en_mask;
+> > +			writel(val, tuner_en_addr);
+> > +		}
+> > +	}
+> > +
+> 
+> Why don't we use a flag here, it would make the code easier to understand.
+> I think it would also help if you put this code in a separate function.
+> 
+> Regards,
+> Matthias
+> 
+
+Hi Matthias,
+
+I guess you suggest to add a flag (e.g. CLK_TUNER_SUPPORT) and declare
+the PLL clock with this flag. And inside this mtk_pll_set_rate_regs()
+function, we could modify it as below. Am I right?
+
+if (pll->data->flags & CLK_TUNER_SUPPORT)
+    disable_tuner();
+[...]
+if (pll->data->flags & CLK_TUNER_SUPPORT)
+    enable_tuner();
 
 
-On 2019/2/19 15:54, Zhen Lei wrote:
-> This patch series include two parts:
-> 1. Patch1-2 use dummy STE tables with "ste abort" hardware feature to abort unexpected
->    devices accessing. For more details, see the description in patch 2.
-> 2. If the "ste abort" feature is not support, force the unexpected devices in the
->    secondary kernel to use the memory maps which it used in the first kernel. For more
->    details, see patch 5.
-> 
-> 
-> Zhen Lei (5):
->   iommu/arm-smmu-v3: make sure the stale caching of L1STD are invalid
->   iommu/arm-smmu-v3: make smmu can be enabled in kdump kernel
->   iommu/arm-smmu-v3: add macro xxx_SIZE to replace xxx_DWORDS shift
->   iommu/arm-smmu-v3: move arm_smmu_get_step_for_sid() a little ahead
->   iommu/arm-smmu-v3: workaround for STE abort in kdump kernel
-> 
->  drivers/iommu/arm-smmu-v3.c | 243 +++++++++++++++++++++++++++++++++++---------
->  1 file changed, 194 insertions(+), 49 deletions(-)
-> 
+But I thought this flag might be a customized flags and can only be put
+in clk-mtk.h not clk-provider.h so far. And it might cause 
+potential problem of clock flag re-definition. May I have more
+suggestion?
 
--- 
-Thanks!
-BestRegards
+> 
+> >  	/* set postdiv */
+> >  	val = readl(pll->pd_addr);
+> >  	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
+> > @@ -116,12 +138,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> >  	con1 = readl(pll->base_addr + REG_CON1);
+> >  
+> >  	if (pll_en)
+> > -		con1 |= CON0_PCW_CHG;
+> > +		con1 |= CON1_PCW_CHG;
+> >  
+> >  	writel(con1, pll->base_addr + REG_CON1);
+> >  	if (pll->tuner_addr)
+> >  		writel(con1 + 1, pll->tuner_addr);
+> >  
+> > +	/* restore tuner_en */
+> > +	if (tuner_en_addr && tuner_en) {
+> > +		val = readl(tuner_en_addr);
+> > +		val |= tuner_en_mask;
+> > +		writel(val, tuner_en_addr);
+> > +	}
+> > +
+> >  	if (pll_en)
+> >  		udelay(20);
+> >  }
+> > 
+
 
 
 _______________________________________________
