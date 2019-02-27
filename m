@@ -2,84 +2,129 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
+	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80592C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 06:20:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E32FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 06:38:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 45852218D9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 06:20:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A417218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 06:38:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fXpQEbAJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45852218D9
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=jp.fujitsu.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VvWgPdEp";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="nlnNcysb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A417218D0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=amDaAAOl7XT7RDbUeKQP0V7F4QXH3d3mY6ANNujkSac=; b=fXpQEbAJjb2J3M
-	LYsFfxNjHgnLMeoDEE6QPxWIzmqFdZOQo0wa5qT2zd4LE2NqwBHR/D3PUTDl4RTT4N3hevYeanwAb
-	Xxg4yMgUNlWFMWPd2cwlfCQc0LrEcz9Oc302i1yds6gIprSo+ogKokILynNxdlpPe/1E0T1r0g7NB
-	N7VrC6JlxC2/o6UTraTO8S8cQoVO6cnAg71ZK9uexawmYCZalPk9dmfqrBwp4USckzcW4mtPYI2tM
-	X+99h4FlWXPMW9Rz1cGlcMzb+BKzTSt9bxG10JEkRsfBvM4p5S2MXp0fbYXHMpDT+k87j7sPTRR67
-	rO/QTZN+/4UgPJ4H8f1Q==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=Q7xt88Dyo2/715tmFEsOWPl8mbeMAohJ/D/vvrdd4Do=; b=VvWgPdEpsXWnoS
+	LRVu6tQQtfcYdRfuwaTpl7dZFBXk39IULA36XymlW162eM1o3nTnQ7Xx6ddTgX5t+T5QiD5aZqgoP
+	cHG5Ns48IZ1p9nYHpu3usJ15spr5sY+SOilQI6kbrj4bPjt7zl898YhxbD/CjhngE/ELKYcXsBs3U
+	vWdU9Tacd3QmqHkds7j4vJX5VKVYdW8lnoZilZiIEj/e2vllpR3dkX4OhJHWszVkxkzcXct+k5jc2
+	PyifCepz+Xxm5YPD2WtNGl93ggbGwwRAiPaHkk8AnFim1q6PNTn00f8yik1QRIh8KlSmaoslpuPCT
+	4kvHfeO3ixOALrMFwF/Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gysZo-0004RE-BQ; Wed, 27 Feb 2019 06:20:20 +0000
-Received: from mgwym02.jp.fujitsu.com ([211.128.242.41])
+	id 1gysrF-00011e-4G; Wed, 27 Feb 2019 06:38:21 +0000
+Received: from mail-eopbgr30068.outbound.protection.outlook.com ([40.107.3.68]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gysZk-0004QV-SF
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 06:20:18 +0000
-Received: from yto-m4.gw.nic.fujitsu.com (unknown [192.168.229.97]) by
- mgwym02.jp.fujitsu.com with smtp
- id 4a63_d201_feccf6ff_fea9_43f6_915f_439f4fedfc30;
- Wed, 27 Feb 2019 15:20:08 +0900
-Received: from g01jpfmpwkw03.exch.g01.fujitsu.local
- (g01jpfmpwkw03.exch.g01.fujitsu.local [10.0.193.57])
- by yto-m4.gw.nic.fujitsu.com (Postfix) with ESMTP id 96F0940A9BC2
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 27 Feb 2019 15:20:06 +0900 (JST)
-Received: from G01JPEXCHKW16.g01.fujitsu.local
- (G01JPEXCHKW16.g01.fujitsu.local [10.0.194.55])
- by g01jpfmpwkw03.exch.g01.fujitsu.local (Postfix) with ESMTP id 077F2BD66DF;
- Wed, 27 Feb 2019 15:20:05 +0900 (JST)
-Received: from G01JPEXMBKW03.g01.fujitsu.local ([10.0.194.67]) by
- g01jpexchkw16 ([10.0.194.55]) with mapi id 14.03.0415.000; Wed, 27 Feb 2019
- 15:20:05 +0900
-From: "Zhang, Lei" <zhang.lei@jp.fujitsu.com>
-To: 'James Morse' <james.morse@arm.com>
-Subject: RE: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
-Thread-Topic: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum 010001
-Thread-Index: AdTENhuVebuKtHOoRzCPb6sZ5vznO///+H8AgAAo/wD//jk2sP/v2FHAgCMpHID//QDzQA==
-Date: Wed, 27 Feb 2019 06:20:04 +0000
-Message-ID: <8898674D84E3B24BA3A2D289B872026A6A3336C8@G01JPEXMBKW03>
-References: <8898674D84E3B24BA3A2D289B872026A6A311EAE@G01JPEXMBKW03>
- <20190214155605.GC27547@lakrids.cambridge.arm.com>
- <90347cf4-4d7b-d553-d4db-1bacd000ff75@arm.com>
- <8898674D84E3B24BA3A2D289B872026A6A313313@G01JPEXMBKW03>
- <8898674D84E3B24BA3A2D289B872026A6A319D26@G01JPEXMBKW03>
- <d391d125-86a9-82e3-5add-10a15e578dd7@arm.com>
-In-Reply-To: <d391d125-86a9-82e3-5add-10a15e578dd7@arm.com>
-Accept-Language: ja-JP, en-US
-Content-Language: ja-JP
+ id 1gysrA-00010h-Et
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 06:38:18 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=UJf8ZFnjY2PSGK0g2KWiF2gXwSc+8hhDJCQRava8+Xs=;
+ b=nlnNcysbqgkbPWZEoLdBRz6g46fA+OVpHZVWV1Mf9hYUeYB/r9qnrKCxiVRCZMa6IhmqIImeKyR7jtR3gKuEH/R1LTg7juKCO4xZtzkWiUwA3jM8UJq6umMJ/hH+3AhKMXmRvYJCwF7v8LWjRnv98eEPh/+3DWXYYr1BhPiqbaQ=
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com (52.134.1.18) by
+ VI1PR0402MB3615.eurprd04.prod.outlook.com (52.134.7.18) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Wed, 27 Feb 2019 06:38:08 +0000
+Received: from VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced]) by VI1PR0402MB3357.eurprd04.prod.outlook.com
+ ([fe80::f80e:d03f:57bc:aced%2]) with mapi id 15.20.1643.019; Wed, 27 Feb 2019
+ 06:38:08 +0000
+From: Daniel Baluta <daniel.baluta@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>
+Subject: [PATCH v4 0/5] Enable wm8524 on i.MX8MQ-EVK
+Thread-Topic: [PATCH v4 0/5] Enable wm8524 on i.MX8MQ-EVK
+Thread-Index: AQHUzmcAW34J9B4cPUiudYtARhaiwA==
+Date: Wed, 27 Feb 2019 06:38:08 +0000
+Message-ID: <20190227063737.24445-1-daniel.baluta@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
 X-MS-Has-Attach: 
 X-MS-TNEF-Correlator: 
-x-securitypolicycheck: OK by SHieldMailChecker v2.2.3
-x-shieldmailcheckerpolicyversion: FJ-ISEC-20140219
-x-originating-ip: [10.18.70.198]
+x-clientproxiedby: VI1PR07CA0152.eurprd07.prod.outlook.com
+ (2603:10a6:802:16::39) To VI1PR0402MB3357.eurprd04.prod.outlook.com
+ (2603:10a6:803:2::18)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=daniel.baluta@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-mailer: git-send-email 2.17.1
+x-originating-ip: [95.76.156.53]
+x-ms-publictraffictype: Email
+x-ms-office365-filtering-correlation-id: 9a61236c-cb90-4a87-738b-08d69c7e22e0
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:VI1PR0402MB3615; 
+x-ms-traffictypediagnostic: VI1PR0402MB3615:
+x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; VI1PR0402MB3615;
+ 23:CqlPSv700h+hrl4TE3itfeibekWmqpsBeG7sV?=
+ =?iso-8859-1?Q?GFqsB2mvN67QtXSp7MSn171ipqtd01462Xpe9srWUAHSfZY3l2tfufh209?=
+ =?iso-8859-1?Q?q0QkWvpINOVOJnW5z4YloaoLHjP6ptAYxwtChhnU4TDCKI/jkYCVEzbDA6?=
+ =?iso-8859-1?Q?zdB7xd26S+dBdZQlN/tjHzlPGEEYWk1w5O8FAZ3vI0TcqiIIX0EH9wkSNY?=
+ =?iso-8859-1?Q?dsH5WRRqa49psgNf1xZvFY1jIEuF5jkoKPjpTcTorN3NRq0osNgRr2k/Wq?=
+ =?iso-8859-1?Q?ztKo/ZX6bhkXsbUbHlQTlKTBunepDCfOHnG54PfqgWlCD6gO8pcB/8HbAB?=
+ =?iso-8859-1?Q?FUpxvFMG4WB6KGKZkvdKoz2yuFJitobviqUgRcA63i4+b25rLjb15X4+Qs?=
+ =?iso-8859-1?Q?Thg8AAqI2/uvR33sYlKP3vxHPxBgTEPUGpXE+2KWpQTCyEdCV5ZuKOb629?=
+ =?iso-8859-1?Q?zmSgqV31eN+kl5XLnwITYM7AsmkYgHojXa79I7dLystOvupkQM5FTNsSDW?=
+ =?iso-8859-1?Q?KcLZc4Rnii+iGLTH/tY9KhNC/NbL5oH8srkiIgfzSu1iJuMIkO6FYkuB8N?=
+ =?iso-8859-1?Q?mcRfVIS2RakCnuo+7yErHsOVTw7pd2NIeLxMtB1f9AEAABVc/fA/un/Sjk?=
+ =?iso-8859-1?Q?0Rw+L2ouBXtg7W7f4SzRetOlk6OICVy39yR9anomd7eYJ9706JwbD2DyiB?=
+ =?iso-8859-1?Q?U5j37wIXeFLvCHcGfYsP4ABcB29nTPaexau3iFwNqp49dcpAPlMOBhdELg?=
+ =?iso-8859-1?Q?UtLuQrHc1dLdIw1zmIHQN/5oLQvRCL8hbMdAahMk6651Ql5ysWTSOMzgsP?=
+ =?iso-8859-1?Q?WgpTshnQCns6Up2ykIxymouquysUONXYQgPexMXl3dj/YCqEdPMLHotXaC?=
+ =?iso-8859-1?Q?5vE+s6cCw0MzQp31eacfgWRCEqKRkCFosMbTnTWyVIycIWmVw9Ct28oaFJ?=
+ =?iso-8859-1?Q?XtX3oK4hpLSr0U4f86+UeLfqZm9wC8ODnf+WlENYdNROYerJRZoGbQHvlg?=
+ =?iso-8859-1?Q?zYwAad2MMXUtpto9EjYM0bvpNIjFzikn2+jFWzMXXzwswuRwfJ5Lp6G+rn?=
+ =?iso-8859-1?Q?1Q23SYSAFm7wpwAF823FU9qenPwfU4uaNKrxhOzwDJQbi8l38MFG/cMPeD?=
+ =?iso-8859-1?Q?7M0jPiGGuSfRyJCC4SEg4WEjXziYbWQrShurNdO1rQt/viMTEkE2vbMZAi?=
+ =?iso-8859-1?Q?QMgMHxaN8ALCAtK1eVpaOktXmRqdIyeYcZXn2/r9vjzfyQYS4GoAKZMlhK?=
+ =?iso-8859-1?Q?q1t7dfVdD9iBikNqxBbsEJlY8Gtc9uqUKRrvVuPiRzv8ZW48ni+3cI2K66?=
+ =?iso-8859-1?Q?qsmiAjbJVLaE5SuKeF+dCC+K9xfRqW0lt5u5ycA8ZifOy9A=3D=3D?=
+x-microsoft-antispam-prvs: <VI1PR0402MB3615EDCB86DFE9B477E3083FF9740@VI1PR0402MB3615.eurprd04.prod.outlook.com>
+x-forefront-prvs: 0961DF5286
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(39860400002)(136003)(346002)(376002)(396003)(366004)(189003)(199004)(2616005)(71190400001)(7736002)(97736004)(71200400001)(305945005)(66066001)(81166006)(81156014)(44832011)(7416002)(5660300002)(26005)(105586002)(486006)(68736007)(106356001)(6486002)(476003)(86362001)(1730700003)(8676002)(2351001)(1076003)(52116002)(8936002)(3846002)(2906002)(36756003)(99286004)(316002)(6116002)(25786009)(478600001)(53936002)(5640700003)(102836004)(6916009)(54906003)(186003)(6436002)(256004)(14444005)(6512007)(14454004)(50226002)(4326008)(6506007)(386003)(2501003);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR0402MB3615;
+ H:VI1PR0402MB3357.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-ms-exchange-senderadcheck: 1
+x-microsoft-antispam-message-info: yAxYf/llN0tIBDsq6bXWDdH5Kc/AqkAMpgNc19r0H5HR7fbo8gj/T44Mpu7H/9YXzBuHCG16VwJ3wQ3V47WOTh2j7+1R7Hj5Mh+zGb4XByCyybOwauC29+TTdmb3MJbvW/DIR9Dt5oMm3Iy7Esg3cgEDu5zsdogTVmupiIqCISx7wP9zQ5tG2dRjcBhaCdNLQn3CK3ZCPJLb3SQo3kGgXO+u432FuzS7HYEKTIGA59nOvlN7J1yiuSG5GjqXIVVyfICYVtP6LPA+VZpyCy1hUh9W+9/SwYAhabIopdJntORg1tJWljcBkpSdbMcPIjaugqljxy4FIgLQ1Uw0PjqNnEDiIuluOsvPPzv+M2ouD3GWn/GW0Nj+rqSm6N3Xn3e2bJsGkxEdXZnvHaZ39N2jJKsXp3gOaa6oSn+JFXQNoW0=
 MIME-Version: 1.0
-X-SecurityPolicyCheck-GC: OK by FENCE-Mail
-X-TM-AS-GCONF: 00
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 9a61236c-cb90-4a87-738b-08d69c7e22e0
+X-MS-Exchange-CrossTenant-originalarrivaltime: 27 Feb 2019 06:38:07.6305 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR0402MB3615
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_222017_156446_B97744BD 
-X-CRM114-Status: GOOD (  23.87  )
+X-CRM114-CacheID: sfid-20190226_223816_626868_63980D79 
+X-CRM114-Status: UNSURE (   9.80  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,104 +136,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- 'Catalin Marinas' <catalin.marinas@arm.com>,
- 'Will Deacon' <will.deacon@arm.com>,
- "'linux-kernel@vger.kernel.org'" <linux-kernel@vger.kernel.org>,
- "'linux-arm-kernel@lists.infradead.org'"
- <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-2022-jp"
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "baruch@tkos.co.il" <baruch@tkos.co.il>, Abel Vesa <abel.vesa@nxp.com>,
+ "kuninori.morimoto.gx@renesas.com" <kuninori.morimoto.gx@renesas.com>,
+ "ccaione@baylibre.com" <ccaione@baylibre.com>,
+ "spencercw@gmail.com" <spencercw@gmail.com>,
+ "S.j. Wang" <shengjiu.wang@nxp.com>, "angus@akkea.ca" <angus@akkea.ca>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Daniel Baluta <daniel.baluta@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Aisheng Dong <aisheng.dong@nxp.com>, "agx@sigxcpu.org" <agx@sigxcpu.org>,
+ "festevam@gmail.com" <festevam@gmail.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "l.stach@pengutronix.de" <l.stach@pengutronix.de>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi James,
+On i.MX8MQ-EVK we can start the party using the wm8524 codec
+which gets it's data through the SAI2 interface.
 
-> -----Original Message-----
-> From: linux-arm-kernel <linux-arm-kernel-bounces@lists.infradead.org> On
-> Behalf Of James Morse
-> Sent: Tuesday, February 26, 2019 2:29 AM
-> To: Zhang, Lei/張 雷 <zhang.lei@jp.fujitsu.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>; 'Catalin Marinas'
-> <catalin.marinas@arm.com>; 'Will Deacon' <will.deacon@arm.com>;
-> 'linux-kernel@vger.kernel.org' <linux-kernel@vger.kernel.org>;
-> 'linux-arm-kernel@lists.infradead.org' <linux-arm-kernel@lists.infradead.org>
-> Subject: Re: [PATCH v4] arm64: Add workaround for Fujitsu A64FX erratum
-> 010001
-> 
-> Hi Zhang,
-> 
-> On 23/02/2019 13:06, Zhang, Lei wrote:
-> > Zhang, Lei wrote:
-> >> I think you mean it may be a problem to modify the KPTI trampoline
-> >> because some patches about KPTI will be merged to mainline in the near
-> future.
-> >> I understood that.
-> >> I should discuss with my colleagues whether we can set NFDx=0 all of
-> >> time on A64FX.
-> >
-> > The result of our investigation also supports your suggestion.
-> > We surely agree with you that your proposed method (never set NFDx=1
-> > on A64FX) is the best to resolve this erratum.
-> >
-> > For this erratum, James's patch should be merged to mainline instead
-> > of my previous patches (v1 to v4).
-> > Since KPTI fully covers the effect of NFD1 for A64FX, KPTI is
-> > recommended to be used in conjunction with James’s patch.
-> 
-> >> And thanks for your patch.
-> >> If we can set NFDx=0 all of time, I will review, test and report the result.
-> >
-> > I have already tested James's patch on A64FX, and the result is no problem at
-> all.
-> >
-> > Tested-by:zhang.lei<zhang.lei@jp.fujitsu.com>
-> 
-> Thanks, I'll post it properly with this tag.
-[>] 
-I saw v5 patch you posted. Thanks a lot.
+In order to make it work this patch series enables the SDMA nodes,
+sets the correct pinctrl configuration and uses the simple card
+machine driver to put everything together.
 
-> 
-> 
-> >> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
-> >> a4168d366127..b0b7f1c4e816 100644
-> >> --- a/arch/arm64/Kconfig
-> >> +++ b/arch/arm64/Kconfig
-> >> @@ -643,6 +643,25 @@ config QCOM_FALKOR_ERRATUM_E1041
-> >>
-> >>  	  If unsure, say Y.
-> >>
-> >> +config FUJITSU_ERRATUM_010001
-> >> +	bool "Fujitsu-A64FX erratum E#010001: Undefined fault may occur
-> wrongly"
-> >> +	default y
-> >> +	help
-> >> +	  This option adds workaround for Fujitsu-A64FX erratum E#010001.
-> >> +	  On some variants of the Fujitsu-A64FX cores version (1.0, 1.1),
-> memory
-> >> +	  accesses may cause undefined fault (Data abort, DFSC=0b111111).
-> >> +	  This fault occurs under a specific hardware condition when a
-> >> +	  load/store instruction performs an address translation using:
-> >> +	  case-1  TTBR0_EL1 with TCR_EL1.NFD0 == 1.
-> >> +	  case-2  TTBR0_EL2 with TCR_EL2.NFD0 == 1.
-> >> +	  case-3  TTBR1_EL1 with TCR_EL1.NFD1 == 1.
-> >> +	  case-4  TTBR1_EL2 with TCR_EL2.NFD1 == 1.
-> >> +
-> >> +	  The workaround is to ensure these bits are clear in TCR_ELx.
-> >> +	  The workaround only affect the Fujitsu-A64FX.
-> >
-> > I think it is better to add a notice here as follows:
-> >
-> >   Recommend to enable KPTI (UNMAP_KERNEL_AT_EL0 = y).
-> 
-> That unmap option is on by default, you can't turn it off without
-> CONFIG_EXPERT. While I agree, I don't think we need to spell this out.
-[>] 
-I agree with you (that there is no need to mention here). 
-Thank you for your suggestion.
- 
-Best Regards,
-Zhang Lei
+Changes since v3:
+	- use "arm64: dts: imx8mq-evk" prefix for patches specific to 8MQ-EVK
+	- squash together patches for setting up SAI (previous 3/5 and 4/5)
+	- add back and document "fsl, imx8mq-sdma" compatbile string
+
+Changes since v2:
+        - s/QM/MQ after Chris comments
+
+Changes since v1:
+        - added cover letter
+        - remove "fsl,imx8mq-sdma" compatible for sdma.
+
+Daniel Baluta (5):
+  arm64: dts: imx8mq: Add SDMA nodes
+  bindings: fsl-imx-sdma: Document fsl,imx8mq-sdma compatbile string
+  arm64: dts: imx8mq: Add SAI2 node
+  arm64: dts: imx8mq-evk: Enable SAI2 node
+  arm64: dts: imx8mq-evk: Enable wm8524 codec
+
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt  |  1 +
+ arch/arm64/boot/dts/freescale/imx8mq-evk.dts  | 48 +++++++++++++++++++
+ arch/arm64/boot/dts/freescale/imx8mq.dtsi     | 38 +++++++++++++++
+ 3 files changed, 87 insertions(+)
+
+-- 
+2.17.1
 
 
 _______________________________________________
