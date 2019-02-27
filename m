@@ -2,64 +2,105 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 019B4C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 18:38:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 29B67C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 18:55:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C5A6720449
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 18:38:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EF0D02184A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 18:55:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dQ90iw/m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C5A6720449
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=davemloft.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XVYfYi8s"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF0D02184A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	From:Subject:To:Message-Id:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RYf7ezjeyzJ0Za9bTaKeP+zyX6hGQNqhprM5XW9atyk=; b=dQ90iw/mg3W0cQ
-	leEk7erfVslIHlG1u3VMwOE89IdM+UIU+c+GrCH/83xuU/L5Zeg5JtooTJMJb8YYXnX4dAtuxxVc8
-	tNED2etyUKep3yw6v1D5p4f0R8B2FjhCPO+u1L6vTGBknRDbn5+RIfFa/Uqjg3OjEz5EEcaIcKN6R
-	IadYWaf7KbfMz+zBlrqTgU+lW56oemBOYYn/abCh2b71hxzE5iCwS4yYf4J2fzK/1HHw5SF0l4Lve
-	YNzRzP8meVNo3P/5LU5mmw2D7vt1PmxMZSXYW28Tg6w9FZp6DTB3h1aCl2eKajFxy5Xd1dWdEHwiv
-	a5LEV7ZlZXKeWYYGTbPg==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=qmC1aDUeR7Jx1k7NUTXyTPX27jcS1diawAvQsfbdmp0=; b=XVYfYi8sETCGGn
+	nMiyT6IPOhtJ7PeLwnIpfbgpFJIbsJVCiFGm9Oed6R/Wqmwe2kq7olkmMpVxtAjq9GEkmGiTCC4Ma
+	FtimrdyZRqSohALQmgUbpOqlGvkMUmNbaiqiY0xJXYk/oMPhm9BURllzg2/YwGQHLBQuw6UTDjlcG
+	dYPVXkmMEM0eVTdnvX/7B5m9VggMyTDeEW28QwTbfeV9c0llCdchIl80GAJYb9AUQrWc+jrIfIbtR
+	SuMVGwvo418ImcoK/9gv7cmYQ03U1oFi485LiyDnVqkuVqTkFUfjvKjlP6PY6m24XmJFiIcAj+Lil
+	1KQyHs3F9MFK7nX8kRIw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz46R-0006OU-2q; Wed, 27 Feb 2019 18:38:47 +0000
-Received: from shards.monkeyblade.net ([2620:137:e000::1:9])
+	id 1gz4MF-0004R0-Pc; Wed, 27 Feb 2019 18:55:07 +0000
+Received: from mout.gmx.net ([212.227.17.20])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz46O-0006OD-Du
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 18:38:46 +0000
-Received: from localhost (unknown [IPv6:2601:601:9f80:35cd::bf5])
- (using TLSv1 with cipher AES256-SHA (256/256 bits))
- (Client did not present a certificate)
- (Authenticated sender: davem-davemloft)
- by shards.monkeyblade.net (Postfix) with ESMTPSA id 157C214010634;
- Wed, 27 Feb 2019 10:38:38 -0800 (PST)
-Date: Wed, 27 Feb 2019 10:38:37 -0800 (PST)
-Message-Id: <20190227.103837.668255833945043179.davem@davemloft.net>
-To: steven.price@arm.com
-Subject: Re: [PATCH v3 20/34] sparc: mm: Add p?d_large() definitions
-From: David Miller <davem@davemloft.net>
-In-Reply-To: <20190227170608.27963-21-steven.price@arm.com>
+ id 1gz4MB-0003cx-K5
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 18:55:05 +0000
+Received: from [192.168.20.60] ([92.116.177.218]) by mail.gmx.com (mrgmx103
+ [212.227.17.168]) with ESMTPSA (Nemesis) id 0MPlMc-1gu6XT2w54-0054hD; Wed, 27
+ Feb 2019 19:54:25 +0100
+Subject: Re: [PATCH v3 15/34] parisc: mm: Add p?d_large() definitions
+To: Steven Price <steven.price@arm.com>, linux-mm@kvack.org
 References: <20190227170608.27963-1-steven.price@arm.com>
- <20190227170608.27963-21-steven.price@arm.com>
-X-Mailer: Mew version 6.8 on Emacs 26.1
-Mime-Version: 1.0
-X-Greylist: Sender succeeded SMTP AUTH, not delayed by milter-greylist-4.5.12
- (shards.monkeyblade.net [149.20.54.216]);
- Wed, 27 Feb 2019 10:38:38 -0800 (PST)
+ <20190227170608.27963-16-steven.price@arm.com>
+From: Helge Deller <deller@gmx.de>
+Openpgp: preference=signencrypt
+Autocrypt: addr=deller@gmx.de; keydata=
+ xsBNBFDPIPYBCAC6PdtagIE06GASPWQJtfXiIzvpBaaNbAGgmd3Iv7x+3g039EV7/zJ1do/a
+ y9jNEDn29j0/jyd0A9zMzWEmNO4JRwkMd5Z0h6APvlm2D8XhI94r/8stwroXOQ8yBpBcP0yX
+ +sqRm2UXgoYWL0KEGbL4XwzpDCCapt+kmarND12oFj30M1xhTjuFe0hkhyNHkLe8g6MC0xNg
+ KW3x7B74Rk829TTAtj03KP7oA+dqsp5hPlt/hZO0Lr0kSAxf3kxtaNA7+Z0LLiBqZ1nUerBh
+ OdiCasCF82vQ4/y8rUaKotXqdhGwD76YZry9AQ9p6ccqKaYEzWis078Wsj7p0UtHoYDbABEB
+ AAHNHEhlbGdlIERlbGxlciA8ZGVsbGVyQGdteC5kZT7CwJIEEwECADwCGwMGCwkIBwMCBhUI
+ AgkKCwQWAgMBAh4BAheAFiEE9M/0wAvkPPtRU6Boh8nBUbUeOGQFAlrHzIICGQEACgkQh8nB
+ UbUeOGT1GAgAt+EeoHB4DbAx+pZoGbBYp6ZY8L6211n8fSi7wiwgM5VppucJ+C+wILoPkqiU
+ +ZHKlcWRbttER2oBUvKOt0+yDfAGcoZwHS0P+iO3HtxR81h3bosOCwek+TofDXl+TH/WSQJa
+ iaitof6iiPZLygzUmmW+aLSSeIAHBunpBetRpFiep1e5zujCglKagsW78Pq0DnzbWugGe26A
+ 288JcK2W939bT1lZc22D9NhXXRHfX2QdDdrCQY7UsI6g/dAm1d2ldeFlGleqPMdaaQMcv5+E
+ vDOur20qjTlenjnR/TFm9tA1zV+K7ePh+JfwKc6BSbELK4EHv8J8WQJjfTphakYLVM7ATQRQ
+ zyD2AQgA2SJJapaLvCKdz83MHiTMbyk8yj2AHsuuXdmB30LzEQXjT3JEqj1mpvcEjXrX1B3h
+ +0nLUHPI2Q4XWRazrzsseNMGYqfVIhLsK6zT3URPkEAp7R1JxoSiLoh4qOBdJH6AJHex4CWu
+ UaSXX5HLqxKl1sq1tO8rq2+hFxY63zbWINvgT0FUEME27Uik9A5t8l9/dmF0CdxKdmrOvGMw
+ T770cTt76xUryzM3fAyjtOEVEglkFtVQNM/BN/dnq4jDE5fikLLs8eaJwsWG9k9wQUMtmLpL
+ gRXeFPRRK+IT48xuG8rK0g2NOD8aW5ThTkF4apznZe74M7OWr/VbuZbYW443QQARAQABwsBf
+ BBgBAgAJBQJQzyD2AhsMAAoJEIfJwVG1HjhkNTgH/idWz2WjLE8DvTi7LvfybzvnXyx6rWUs
+ 91tXUdCzLuOtjqWVsqBtSaZynfhAjlbqRlrFZQ8i8jRyJY1IwqgvHP6PO9s+rIxKlfFQtqhl
+ kR1KUdhNGtiI90sTpi4aeXVsOyG3572KV3dKeFe47ALU6xE5ZL5U2LGhgQkbjr44I3EhPWc/
+ lJ/MgLOPkfIUgjRXt0ZcZEN6pAMPU95+u1N52hmqAOQZvyoyUOJFH1siBMAFRbhgWyv+YE2Y
+ ZkAyVDL2WxAedQgD/YCCJ+16yXlGYGNAKlvp07SimS6vBEIXk/3h5Vq4Hwgg0Z8+FRGtYZyD
+ KrhlU0uMP9QTB5WAUvxvGy8=
+Message-ID: <fa3072ba-f02b-fee5-dc16-d575a5308d4b@gmx.de>
+Date: Wed, 27 Feb 2019 19:54:22 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
+MIME-Version: 1.0
+In-Reply-To: <20190227170608.27963-16-steven.price@arm.com>
+Content-Language: en-US
+X-Provags-ID: V03:K1:GVERcQi2HwefwpmfHh/gl3DFsRldSfy2pf2hJBcZTGIy3DVEKKP
+ iI0xMty44p8fvwZbS6tsPODCGUwOfyenBilXMM44uOd9qK46YCPdIsjllMaR1EK2XX2ukac
+ VLlKFN3HVFeyP3BpD3oHrWIH9wBGPA9L46C+g2TckhBhGxaGg47rYbM+w4wT1jfG47lx+08
+ 4XbF3H3dqbUxhLoEsZxrA==
+X-UI-Out-Filterresults: notjunk:1;V03:K0:I17FZP7GeCA=:20s2XPNDi2rIeeD4TKdf7S
+ XStYTqQmB7W1BoMbCZlSLPjFn/L5Exg6hSBbQ9RJ2c6Nr9Db9gE1YVMLZpA9xiQtfFxGWI6FV
+ izt+wCTUCCEzacex+ajK4zhL8YOJ939t6aKYewciyDLqQfmqIwhReescv5kPVbAfpTv7xoLSW
+ nFJ/w8glvICJ0WP8covqOiSRCdx07jbXQmCxO1hlZm+BiAraLoUhvrPtZGvIkKaM+mzNODeig
+ aS5Fssved6V57ePHgJ9WYik+AOcf8P80swmdBNuYmI1a139q28uvjidJC7demxm6SbKFWfcN1
+ DPKTk+JckiyRsHJhtQl1y8jX1uEZ3LqJ4HjS3e6yVMr9a6oXfnmyGjAD8v2ZHulAH4zhs3TJG
+ xcESTTxmnUDIhvhx86WoPY6f7igNgcIOosc8ju/2q6eBI4mIVGNusIRwB895HZf0yNTd+mKX1
+ zZe4uPNT+Q2Lb1PnJAfjyV4BKlOckIndJmRm1xy68itf5dcbGiQoze6YtzQtyt7xLsErQBoa0
+ hO4w4RYnSFAkmEznz834741Sr/5LNoxO7BpV+R29GeCjXvReG1WaRVOZejW5vrERbBeg5Ujxj
+ JrcED3jhQt53+rApp3I5Rh8qyfWW0Vh4gugEhqbuIbDJbKG/tCptd5sVGepF3vUnNh0Y4xe+k
+ YMY947PEN2DV7bf+JnMxPYUAtlSqTxr/GP4liACn+ji3Hv5ceEsNAzbvrFvKrlR7yOpjocCWi
+ TkweZT2GLZMAly1wEEY0OyrH6lnntkPyVl+8iuGqG7rFxXJ9sJlREisA5TSuK1gOgS/S6WXXR
+ NFQ1C7N3wKSvA2bt5GaF5gzelNESKWEr5TsSkf6fGNrUiZwFcE6JKQ0XbyILdlGdHGViywYUL
+ UF+vUg/wlOCW9cxuNPqMH4Sf/jnS121HU6celPN1nrEZbqELTQj2BkQ6crLCDIMkkYaS5NbKQ
+ s+3KzNAA1L0Tq5PaFHKgoItIiSa3FAMe6ha3HpGg54SXHk1GmZdifGx+5J0wn1lWEfWYimbI1
+ 38SV8Us5P9BcIJZCo2HOG0E=
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_103844_466271_E85190AA 
-X-CRM114-Status: UNSURE (   8.44  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20190227_105503_968334_4C745176 
+X-CRM114-Status: GOOD (  16.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,37 +112,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark.Rutland@arm.com, x86@kernel.org, arnd@arndb.de,
- ard.biesheuvel@linaro.org, peterz@infradead.org, catalin.marinas@arm.com,
- dave.hansen@linux.intel.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- linux-mm@kvack.org, jglisse@redhat.com, mingo@redhat.com, bp@alien8.de,
- luto@kernel.org, hpa@zytor.com, sparclinux@vger.kernel.org,
- james.morse@arm.com, tglx@linutronix.de, linux-arm-kernel@lists.infradead.org,
- kan.liang@linux.intel.com
+Cc: Mark Rutland <Mark.Rutland@arm.com>, x86@kernel.org,
+ linux-parisc@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, "James E.J. Bottomley" <jejb@parisc-linux.org>,
+ =?UTF-8?B?SsOpcsO0bWUgR2xpc3Nl?= <jglisse@redhat.com>,
+ Ingo Molnar <mingo@redhat.com>, Borislav Petkov <bp@alien8.de>,
+ Andy Lutomirski <luto@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
+ James Morse <james.morse@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
+ linux-arm-kernel@lists.infradead.org, "Liang, Kan" <kan.liang@linux.intel.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Steven Price <steven.price@arm.com>
-Date: Wed, 27 Feb 2019 17:05:54 +0000
-
+On 27.02.19 18:05, Steven Price wrote:
 > walk_page_range() is going to be allowed to walk page tables other than
 > those of user space. For this it needs to know when it has reached a
 > 'leaf' entry in the page tables. This information is provided by the
 > p?d_large() functions/macros.
 > 
-> For sparc, we don't support large pages, so add stubs returning 0.
-> 
-> CC: "David S. Miller" <davem@davemloft.net>
-> CC: sparclinux@vger.kernel.org
+> For parisc, we don't support large pages, so add stubs returning 0.
+
+We do support huge pages on parisc, but not yet on those levels.
+So, you may add
+
+Acked-by: Helge Deller <deller@gmx.de> # parisc
+ 
+Helge
+
+> CC: "James E.J. Bottomley" <jejb@parisc-linux.org>
+> CC: Helge Deller <deller@gmx.de>
+> CC: linux-parisc@vger.kernel.org
 > Signed-off-by: Steven Price <steven.price@arm.com>
+> ---
+>  arch/parisc/include/asm/pgtable.h | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/parisc/include/asm/pgtable.h b/arch/parisc/include/asm/pgtable.h
+> index c7bb74e22436..1f38c85a9530 100644
+> --- a/arch/parisc/include/asm/pgtable.h
+> +++ b/arch/parisc/include/asm/pgtable.h
+> @@ -302,6 +302,7 @@ extern unsigned long *empty_zero_page;
+>  #endif
+>  #define pmd_bad(x)	(!(pmd_flag(x) & PxD_FLAG_VALID))
+>  #define pmd_present(x)	(pmd_flag(x) & PxD_FLAG_PRESENT)
+> +#define pmd_large(x)	(0)
+>  static inline void pmd_clear(pmd_t *pmd) {
+>  #if CONFIG_PGTABLE_LEVELS == 3
+>  	if (pmd_flag(*pmd) & PxD_FLAG_ATTACHED)
+> @@ -324,6 +325,7 @@ static inline void pmd_clear(pmd_t *pmd) {
+>  #define pgd_none(x)     (!pgd_val(x))
+>  #define pgd_bad(x)      (!(pgd_flag(x) & PxD_FLAG_VALID))
+>  #define pgd_present(x)  (pgd_flag(x) & PxD_FLAG_PRESENT)
+> +#define pgd_large(x)	(0)
+>  static inline void pgd_clear(pgd_t *pgd) {
+>  #if CONFIG_PGTABLE_LEVELS == 3
+>  	if(pgd_flag(*pgd) & PxD_FLAG_ATTACHED)
+> @@ -342,6 +344,7 @@ static inline void pgd_clear(pgd_t *pgd) {
+>  static inline int pgd_none(pgd_t pgd)		{ return 0; }
+>  static inline int pgd_bad(pgd_t pgd)		{ return 0; }
+>  static inline int pgd_present(pgd_t pgd)	{ return 1; }
+> +static inline int pgd_large(pgd_t pgd)		{ return 0; }
+>  static inline void pgd_clear(pgd_t * pgdp)	{ }
+>  #endif
+>  
+> 
 
-Sparc does support large pages on 64-bit, just not at this level.  It
-would be nice if the commit message was made more accurate.  Other than
-that:
-
-Acked-by: David S. Miller <davem@davemloft.net>
 
 _______________________________________________
 linux-arm-kernel mailing list
