@@ -2,73 +2,67 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13C4BC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 04:39:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E7B97C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 04:40:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D8480218E0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 04:39:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B70F5218D0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 04:40:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iuR2mWIj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8480218E0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="s8qQl/vT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B70F5218D0
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zte.com.cn
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9jq+R1Z5/uSdD2nOWX3Wt6jHHSi1kMQhFHbKMCQzaqQ=; b=iuR2mWIjlvpZaJ
-	MMtFPPlncJibRcPOxofUU7fttcttJLyZBdIDXzHZhl9x+Ea3+LDRJzDWW8LR4x6UX4heD5JWx7Q//
-	U/jZzP/g47X3aTfTPoLLsaZj1YzfQNl5hHjkXkOm1p/1YeWkSGvO8BCI0tl5Bj/efnK0P4rDsEC1+
-	UuAGo4egLp5uUgDyBaWnfpBGTlFLRF16QWLcBzh9O+sZ6JZherG++ki+RSrW2mtYrlMBJY0BrIF19
-	M9gPHAxs2BTW9SwXQzvw423W+LV18fHglbL2eykUaYeP3r9vagSinQ8CRrLWePFt4+lWwZxg/XaGa
-	SyBvv89uE+Ms6b9JcGQg==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=8tgLu5aPvRZoN6CxmATlRtEuR+V6ZfTAjZE2s3hBRfs=; b=s8q
+	Ql/vTjDKPH3q/ywaPA+F7kcXOZ7Bn7wqqg4ecR+KVYGkas6Ijm0CmKujOw8wSkOmGG+68/T5vQval
+	8b2muj31pAFayBU2dAH4ZKoMm0cK2vp2mMqlbNZTruEBWK2ZFQsb6xIj9rYAuZf7+U0AwAhhMgwNL
+	0avqnzatZOi7PDtH/f88xR3Rw6fvTCN/k+dO0VRzCm8xzpdedKEJYCK/pcckJh6AjKPLYJASqQJxs
+	+kvqwtz/DtF1wjbTDdHJEWISLrKN3tzr8do0N+I7r5xOPWeM3YpveSKWVJsM5o5NR/xt+ARGTaoNZ
+	ePRXnMTgTD8QbwY4vgQ+n1rClA9Te7A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyr0U-00037O-Om; Wed, 27 Feb 2019 04:39:46 +0000
-Received: from mailgw01.mediatek.com ([216.200.240.184])
+	id 1gyr1a-0004np-BF; Wed, 27 Feb 2019 04:40:54 +0000
+Received: from mxhk.zte.com.cn ([63.217.80.70])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyr0P-000370-Lo; Wed, 27 Feb 2019 04:39:44 +0000
-X-UUID: 1dd9d77990ee42c297ee4a4df6634aa3-20190226
-X-UUID: 1dd9d77990ee42c297ee4a4df6634aa3-20190226
-Received: from mtkcas66.mediatek.inc [(172.29.193.44)] by mailgw01.mediatek.com
- (envelope-from <weiyi.lu@mediatek.com>)
- (musrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1720278583; Tue, 26 Feb 2019 20:39:17 -0800
-Received: from mtkmbs03n1.mediatek.inc (172.21.101.181) by
- MTKMBS62N2.mediatek.inc (172.29.193.42) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 26 Feb 2019 20:39:16 -0800
-Received: from mtkcas08.mediatek.inc (172.21.101.126) by
- mtkmbs03n1.mediatek.inc (172.21.101.181) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Wed, 27 Feb 2019 12:39:14 +0800
-Received: from [172.21.77.4] (172.21.77.4) by mtkcas08.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Wed, 27 Feb 2019 12:39:14 +0800
-Message-ID: <1551242354.1047.37.camel@mtksdaap41>
-Subject: Re: [PATCH v4 01/12] clk: mediatek: Disable tuner_en before change
- PLL rate
-From: Weiyi Lu <weiyi.lu@mediatek.com>
-To: Matthias Brugger <matthias.bgg@gmail.com>
-Date: Wed, 27 Feb 2019 12:39:14 +0800
-In-Reply-To: <1551239460.1047.30.camel@mtksdaap41>
-References: <20190201083016.25856-1-weiyi.lu@mediatek.com>
- <20190201083016.25856-3-weiyi.lu@mediatek.com>
- <41aed6f5-8794-ddf5-d5c2-17ee82e33db3@gmail.com>
- <1551239460.1047.30.camel@mtksdaap41>
-X-Mailer: Evolution 3.10.4-0ubuntu2 
-MIME-Version: 1.0
-X-MTK: N
+ id 1gyr1W-0004lL-TK; Wed, 27 Feb 2019 04:40:52 +0000
+Received: from mse01.zte.com.cn (unknown [10.30.3.20])
+ by Forcepoint Email with ESMTPS id CEF291E758D9ADE3065E;
+ Wed, 27 Feb 2019 12:40:38 +0800 (CST)
+Received: from notes_smtp.zte.com.cn ([10.30.1.239])
+ by mse01.zte.com.cn with ESMTP id x1R4eWI3003595;
+ Wed, 27 Feb 2019 12:40:32 +0800 (GMT-8)
+ (envelope-from wen.yang99@zte.com.cn)
+Received: from fox-host8.localdomain ([10.74.120.8])
+ by szsmtp06.zte.com.cn (Lotus Domino Release 8.5.3FP6)
+ with ESMTP id 2019022712405358-2029105 ;
+ Wed, 27 Feb 2019 12:40:53 +0800 
+From: Wen Yang <wen.yang99@zte.com.cn>
+To: benh@kernel.crashing.org
+Subject: [PATCH 1/8] PCI: dwc: pci-dra7xx: fix a leaked reference by adding
+ missing of_node_put
+Date: Wed, 27 Feb 2019 12:40:36 +0800
+Message-Id: <1551242443-27300-1-git-send-email-wen.yang99@zte.com.cn>
+X-Mailer: git-send-email 1.8.3.1
+X-MIMETrack: Itemize by SMTP Server on SZSMTP06/server/zte_ltd(Release
+ 8.5.3FP6|November 21, 2013) at 2019-02-27 12:40:53,
+ Serialize by Router on notes_smtp/zte_ltd(Release 9.0.1FP7|August  17, 2016) at
+ 2019-02-27 12:40:25, Serialize complete at 2019-02-27 12:40:25
+X-MAIL: mse01.zte.com.cn x1R4eWI3003595
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_203941_721388_8D11EB46 
-X-CRM114-Status: GOOD (  27.95  )
+X-CRM114-CacheID: sfid-20190226_204051_103111_12271120 
+X-CRM114-Status: GOOD (  10.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,141 +74,58 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Nicolas Boichat <drinkcat@chromium.org>,
- srv_heupstream@mediatek.com, James Liao <jamesjj.liao@mediatek.com>,
- Stephen Boyd <sboyd@codeaurora.org>, linux-kernel@vger.kernel.org,
- stable@vger.kernel.org, Fan Chen <fan.chen@mediatek.com>,
- linux-mediatek@lists.infradead.org, Owen Chen <owen.chen@mediatek.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: heiko@sntech.de, hayashi.kunihiko@socionext.com, linux-pci@vger.kernel.org,
+ shawn.lin@rock-chips.com, minghuan.Lian@nxp.com, paulus@samba.org,
+ thomas.petazzoni@bootlin.com, Wen Yang <wen.yang99@zte.com.cn>,
+ ryder.lee@mediatek.com, mpe@ellerman.id.au, kishon@ti.com,
+ linux-rockchip@lists.infradead.org, bcm-kernel-feedback-list@broadcom.com,
+ linux-arm-kernel@lists.infradead.org, wang.yi59@zte.com.cn, rjui@broadcom.com,
+ lorenzo.pieralisi@arm.com, linux-mediatek@lists.infradead.org,
+ tyreld@linux.vnet.ibm.com, matthias.bgg@gmail.com, linux-omap@vger.kernel.org,
+ mingkai.hu@nxp.com, roy.zang@nxp.com, sbranden@broadcom.com,
+ yamada.masahiro@socionext.com, linuxppc-dev@lists.ozlabs.org,
+ linux-kernel@vger.kernel.org, bhelgaas@google.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 2019-02-27 at 11:51 +0800, Weiyi Lu wrote:
-> On Tue, 2019-02-26 at 16:59 +0100, Matthias Brugger wrote:
-> > 
-> > On 01/02/2019 09:30, Weiyi Lu wrote:
-> > > From: Owen Chen <owen.chen@mediatek.com>
-> > > 
-> > > PLLs with tuner_en bit, such as APLL1, need to disable
-> > > tuner_en before apply new frequency settings, or the new frequency
-> > > settings (pcw) will not be applied.
-> > > The tuner_en bit will be disabled during changing PLL rate
-> > > and be restored after new settings applied.
-> > > Another minor change is to correct the macro name of pcw change bit
-> > > to CON1_PCW_CHG because PCW_CHG(BIT31) is on CON1.
-> > > 
-> > > Fixes: e2f744a82d725 (clk: mediatek: Add MT2712 clock support)
-> > > Cc: <stable@vger.kernel.org>
-> > > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
-> > > ---
-> > >  drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
-> > >  1 file changed, 31 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> > > index f54e4015b0b1..f0ff5f535c7e 100644
-> > > --- a/drivers/clk/mediatek/clk-pll.c
-> > > +++ b/drivers/clk/mediatek/clk-pll.c
-> > > @@ -27,7 +27,7 @@
-> > >  #define CON0_BASE_EN		BIT(0)
-> > >  #define CON0_PWR_ON		BIT(0)
-> > >  #define CON0_ISO_EN		BIT(1)
-> > > -#define CON0_PCW_CHG		BIT(31)
-> > > +#define CON1_PCW_CHG		BIT(31)
-> > >  
-> > >  #define AUDPLL_TUNER_EN		BIT(31)
-> > >  
-> > > @@ -93,9 +93,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> > >  {
-> > >  	u32 con1, val;
-> > >  	int pll_en;
-> > > +	u32 tuner_en = 0;
-> > > +	u32 tuner_en_mask;
-> > > +	void __iomem *tuner_en_addr = NULL;
-> > >  
-> > >  	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
-> > >  
-> > > +	/* disable tuner */
-> > > +	if (pll->tuner_en_addr) {
-> > > +		tuner_en_addr = pll->tuner_en_addr;
-> > > +		tuner_en_mask = BIT(pll->data->tuner_en_bit);
-> > > +	} else if (pll->tuner_addr) {
-> > > +		tuner_en_addr = pll->tuner_addr;
-> > > +		tuner_en_mask = AUDPLL_TUNER_EN;
-> > > +	}
-> > > +
-> > > +	if (tuner_en_addr) {
-> > > +		val = readl(tuner_en_addr);
-> > > +		tuner_en = val & tuner_en_mask;
-> > > +
-> > > +		if (tuner_en) {
-> > > +			val &= ~tuner_en_mask;
-> > > +			writel(val, tuner_en_addr);
-> > > +		}
-> > > +	}
-> > > +
-> > 
-> > Why don't we use a flag here, it would make the code easier to understand.
-> > I think it would also help if you put this code in a separate function.
-> > 
-> > Regards,
-> > Matthias
-> > 
-> 
-> Hi Matthias,
-> 
-> I guess you suggest to add a flag (e.g. CLK_TUNER_SUPPORT) and declare
-> the PLL clock with this flag. And inside this mtk_pll_set_rate_regs()
-> function, we could modify it as below. Am I right?
-> 
-> if (pll->data->flags & CLK_TUNER_SUPPORT)
->     disable_tuner();
-> [...]
-> if (pll->data->flags & CLK_TUNER_SUPPORT)
->     enable_tuner();
-> 
-> 
-> But I thought this flag might be a customized flags and can only be put
-> in clk-mtk.h not clk-provider.h so far. And it might cause 
-> potential problem of clock flag re-definition. May I have more
-> suggestion?
-> 
+The call to of_get_next_child returns a node pointer with refcount
+incremented thus it must be explicitly decremented after the last
+usage.
+irq_domain_add_linear also calls of_node_get to increase refcount,
+so irq_domain will not be affected when it is released.
 
-Please ignore the potential problem I mentioned, I just checked it
-carefully and that redefinition problem won't happen in current flow.
-Sorry for having you confused.
-But I still need to confirm with you if the method in previous mail is
-correct? Thanks.
+Detected by coccinelle with the following warnings:
+./drivers/pci/controller/dwc/pci-dra7xx.c:252:2-8: ERROR: missing of_node_put; acquired a node pointer with refcount incremented on line 241, but without a corresponding object release within this function.
+./drivers/pci/controller/dwc/pci-dra7xx.c:255:1-7: ERROR: missing of_node_put; acquired a node pointer with refcount incremented on line 241, but without a corresponding object release within this function.
 
-> > 
-> > >  	/* set postdiv */
-> > >  	val = readl(pll->pd_addr);
-> > >  	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-> > > @@ -116,12 +138,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> > >  	con1 = readl(pll->base_addr + REG_CON1);
-> > >  
-> > >  	if (pll_en)
-> > > -		con1 |= CON0_PCW_CHG;
-> > > +		con1 |= CON1_PCW_CHG;
-> > >  
-> > >  	writel(con1, pll->base_addr + REG_CON1);
-> > >  	if (pll->tuner_addr)
-> > >  		writel(con1 + 1, pll->tuner_addr);
-> > >  
-> > > +	/* restore tuner_en */
-> > > +	if (tuner_en_addr && tuner_en) {
-> > > +		val = readl(tuner_en_addr);
-> > > +		val |= tuner_en_mask;
-> > > +		writel(val, tuner_en_addr);
-> > > +	}
-> > > +
-> > >  	if (pll_en)
-> > >  		udelay(20);
-> > >  }
-> > > 
-> 
+Signed-off-by: Wen Yang <wen.yang99@zte.com.cn>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: linux-omap@vger.kernel.org
+Cc: linux-pci@vger.kernel.org
+Cc: linux-kernel@vger.kernel.org
+---
+ drivers/pci/controller/dwc/pci-dra7xx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/pci/controller/dwc/pci-dra7xx.c b/drivers/pci/controller/dwc/pci-dra7xx.c
+index ae84a69..627c91d 100644
+--- a/drivers/pci/controller/dwc/pci-dra7xx.c
++++ b/drivers/pci/controller/dwc/pci-dra7xx.c
+@@ -247,6 +247,7 @@ static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
+ 
+ 	dra7xx->irq_domain = irq_domain_add_linear(pcie_intc_node, PCI_NUM_INTX,
+ 						   &intx_domain_ops, pp);
++	of_node_put(pcie_intc_node);
+ 	if (!dra7xx->irq_domain) {
+ 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+ 		return -ENODEV;
+-- 
+2.9.5
 
 
 _______________________________________________
