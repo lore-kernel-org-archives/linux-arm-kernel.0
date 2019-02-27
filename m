@@ -1,90 +1,84 @@
-Return-Path: <SRS0=3RVO=RB=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
-X-Spam-Level: *
-X-Spam-Status: No, score=1.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FSL_HELO_FAKE,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=no autolearn_force=no version=3.4.0
+X-Spam-Level: 
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 77D51C4360F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 23:44:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16556C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:01:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4928B218CD
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue, 26 Feb 2019 23:44:35 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D86CE218CD
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:01:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l34j6PA8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="UZvFI2Gj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4928B218CD
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QTPIuUQD";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="qFIzSfN+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D86CE218CD
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0ikQpE23KHDaniL0QhDy+XpVIY8CnKdkMybj1DQg7mU=; b=l34j6PA86js0CM
-	+UmsjxBMOUxvsTmfM/1m1vEnhA+hEpCSvfEwIwo4qGkBZMqUkmjnR9QSw1ASLoHOAW6z6pUG6zhIC
-	qf335DjZ2+l4HHAEyxzx7kG0CmJR42pAF/eD5Fq7jMAXCllwTrtvgHqdeO+th1NFkpYO/8oqAYswN
-	p5UmWXKWpr+yVkIxi3b8m7cH1syarDvjysN2oYSqQsU7qavuO7uMSaAWDOeAujd185I5d9UEgVYhw
-	fM+p5ml2AK/H/ws4rS+4QSTjjrILZIWWMXqh/bhtTefos0S3VQVq4Dth7AkRkKk+rXg+SVQ0pdTa7
-	ujuSGsuyVd2oOfA5/RLQ==;
+	List-Owner; bh=dOCSwoZSlZj0pAeFZVpsUVV5aiIth7u7n76Hi7ZGiHs=; b=QTPIuUQDTxjMK3
+	0BdVnfiwjt6pbH0dsc0G+Ih2OjUCTX+rrlUrAm83z+rz5XsaxHTJdGrKyemEYCr83XXd2p21/K7du
+	7uwxB1M1pc03GDKG44wDNN1WKryvRCXipE2LZAGbMbQq7tVOVRAYlftUt6gzMLbeEY5GHjZQ9YZDY
+	kVb6iIT1uGvZDxt/vNDOCzcqCQ1HU/PAlkIuGWbeR3m8sfx5rSITi0S2geB6Ujg/KSjlGMAU3rK83
+	4+orOGlSnptsc/QvprybAgz4s/E+1iUrhwoN+tbkKcMmHhUm+0RZi1tP4YlBZ9/3Zkb9UFvyRMrJz
+	6hly5+YMhVioYEMfHkzw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gymOm-0003HX-Eb; Tue, 26 Feb 2019 23:44:32 +0000
-Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
+	id 1gymey-0000x0-Uo; Wed, 27 Feb 2019 00:01:16 +0000
+Received: from mail-ua1-x942.google.com ([2607:f8b0:4864:20::942])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gymOh-0003GN-JS
- for linux-arm-kernel@lists.infradead.org; Tue, 26 Feb 2019 23:44:29 +0000
-Received: by mail-pf1-x444.google.com with SMTP id s22so7028211pfh.4
+ id 1gymeu-0000wX-Fx
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 00:01:14 +0000
+Received: by mail-ua1-x942.google.com with SMTP id c5so13672193uaq.7
  for <linux-arm-kernel@lists.infradead.org>;
- Tue, 26 Feb 2019 15:44:27 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=OFnLT5XdPjqDxL6/K91hoXuMuyo4KTpfIXDgQ+N2d3Y=;
- b=UZvFI2GjkVuuFoyBvh4bJSdn7ATJZRWjS30gFEmLU37mK1BBfLrV/tvmc9PnixBT8M
- So+FliEBPa/oBXiYdELL9iDYVDLDZxCO9RFLp2EA+64bpeYbFQDVdw4oHDBQkGSYTdkG
- cVFtuhjbYqBrxuCAhUOUjCSKls1M7GaSlU5S0=
+ Tue, 26 Feb 2019 16:01:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Tg+2XcH32wEHA5nyAjtq91plGODU29mwHB2Ur6ovBSc=;
+ b=qFIzSfN+Wr2+wigymye4+ET2M6J5vNgQFsd4AzlmTISWgvbtXbGluPFZnpvRCqrp0E
+ 6jvz+/WfLutzg0ZvNAlf7BBrEgiIFic47Qt1SGZ1PQDcFcNy5DwQn1OFd+MeX1S3HnQ7
+ WiaFaLSEZE0JHnki8mSizY74dORsopaV4/2r+u16DnSTn3v7FjK7/Mry3b4uXdtqeRY3
+ H5I8IDu289cug3+6y0aEP1FijINmYWJZPrzPLiF4yYSKWZUq0N2hdpvN9C+gyelA9+uA
+ 8Gyk1Gi4qwd/8nwX0mMXQJKlhWS5KKunGDUagbBb9e2pr8vUQXYE0fpW5h4mwTWtDbM7
+ 7nbQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=OFnLT5XdPjqDxL6/K91hoXuMuyo4KTpfIXDgQ+N2d3Y=;
- b=K2n/tKH2Uy/Qs/nPB15OOxzs2EI6R6x4jiGfTzLSZjH10UvAl7RvcZSj9QWLRqv1fN
- V8cO+VSYXV7Ge0VFeqjJd4Vx0t7QGT+aaWWmT8fBq/jB997oWmKGXQojxw6GVx8r8elz
- OaVqLPtUp5wh4t92eZoE5p25js9t/4Pmzsaj+c8r9k9U/9siCzjfHY+ENpTCkPOJVaVo
- 33fRZH9CsolMwM79XiIPfZoZ2qBw7MqMrOmZNTpnBaWxmLWTH5Bls54n4KYBPVoBySpZ
- aEv+3tilRHKI1ZN2Ftuw2t0IVj38rNioRI1F7irHVRPr8IPpKnS1zpJ8lOASTHniefKW
- Sh7g==
-X-Gm-Message-State: AHQUAuYXVCKonhIGDZEbl0D94wZvZm/WGE8qR1xSfWVQ4FQjQ13iRaTL
- YRb59swHzhpoBHuE1Q8av2UJ/g==
-X-Google-Smtp-Source: AHgI3IZ3b25RdTEFdcJ4w+m0hBHnIhGkp5dN+7k66Ly/vLQ284p0Gvn7FT9oPhFP4BcM72QTK1hXgA==
-X-Received: by 2002:a65:4147:: with SMTP id x7mr22593pgp.54.1551224666997;
- Tue, 26 Feb 2019 15:44:26 -0800 (PST)
-Received: from google.com ([2620:15c:202:1:534:b7c0:a63c:460c])
- by smtp.gmail.com with ESMTPSA id q62sm24471018pfi.183.2019.02.26.15.44.25
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Tue, 26 Feb 2019 15:44:25 -0800 (PST)
-Date: Tue, 26 Feb 2019 15:44:23 -0800
-From: Brian Norris <briannorris@chromium.org>
-To: Marc Zyngier <marc.zyngier@arm.com>
-Subject: Re: [PATCH 0/4] mwifiex PCI/wake-up interrupt fixes
-Message-ID: <20190226234422.GD174696@google.com>
-References: <20190224140426.3267-1-marc.zyngier@arm.com>
- <CAKv+Gu9OOzOxx0rTAZqM8r4q_hRmOp3b=KP7fwgNeiu67FCApA@mail.gmail.com>
- <5310b73b-4821-6dff-b9c0-34c59fb7fd72@arm.com>
- <CAKv+Gu_=bQyVZqgUnJm9moCcaCcpDrag6NWGEpaR65=pMiTFJQ@mail.gmail.com>
- <0c433a70-27f6-76ad-c46c-6015de1ffaa4@arm.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Tg+2XcH32wEHA5nyAjtq91plGODU29mwHB2Ur6ovBSc=;
+ b=h+OpeR/YMT0BOh6byveObxmmdKR3vXzZ0NnMTEZxXtX7AsYBV0VSY3HWusTPYB6bDV
+ avC8zubOd5UmNjpA2OG5nedyxYMOT3x80gAQcaLjHPnevc3DVmxdx2kdfunBGJlMUVlG
+ wpooNm1XHpjJrQLb6Tl7gZzoCU+RQPrgJ4db4VU8c9nRmAA5w1DYPxMEH0uH5DpoiaAr
+ BDot0/Phfb/fVMbIAbArYBQkOAR1EIb3juLEho+fvMD0xBvGKKrFRMH8Utcu60oSRnzK
+ Hnb54JYPygL4yLvdCJJcAuC7Lh89K/SQoWz4JY+/r25GpPOOB3V3LjHm7ZH96Agy5owx
+ d8/w==
+X-Gm-Message-State: AHQUAuZ6l6ncVDyzge/pDTyzPuENILbq5CWIG2bDntTvdxu6h+owdBU5
+ hoi7z7w9Mpu2CbwpoDwSyTsJ2QcVDvmuUb9hH4wCAg==
+X-Google-Smtp-Source: AHgI3IYXqeQaGpfh2cEnyPTpm3PwkVsKLV/W3e6ePPoJRmtxDZxuZth5f+L5c7k8JSrYfew1DPNHL0y0lrRBLr+Oh7A=
+X-Received: by 2002:a67:8055:: with SMTP id b82mr256830vsd.200.1551225671305; 
+ Tue, 26 Feb 2019 16:01:11 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <0c433a70-27f6-76ad-c46c-6015de1ffaa4@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+References: <1477347668-41901-1-git-send-email-lina.iyer@linaro.org>
+ <1477347668-41901-9-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdVDtP=Y=FWfy56d+azW4bJ=3ihmmwdVkzEX-K3W6Wc9zA@mail.gmail.com>
+In-Reply-To: <CAMuHMdVDtP=Y=FWfy56d+azW4bJ=3ihmmwdVkzEX-K3W6Wc9zA@mail.gmail.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Wed, 27 Feb 2019 01:00:35 +0100
+Message-ID: <CAPDyKFq1xma+vi_T0qyPo0FNUEUOSiog2WGhEkgZLN4j-0z6aQ@mail.gmail.com>
+Subject: Re: [PATCH v4 8/9] PM / Domains: Support IRQ safe PM domains
+To: Geert Uytterhoeven <geert@linux-m68k.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_154428_033774_58638DEC 
-X-CRM114-Status: GOOD (  25.16  )
+X-CRM114-CacheID: sfid-20190226_160112_538662_CA66DA63 
+X-CRM114-Status: GOOD (  33.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,78 +90,142 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ganapathi Bhat <gbhat@marvell.com>,
- Devicetree List <devicetree@vger.kernel.org>,
- Jeffy Chen <jeffy.chen@rock-chips.com>, Heiko Stuebner <heiko@sntech.de>,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Xinming Hu <huxinming820@gmail.com>,
- "<netdev@vger.kernel.org>" <netdev@vger.kernel.org>, linux-pm@vger.kernel.org,
- "<linux-wireless@vger.kernel.org>" <linux-wireless@vger.kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Amitkumar Karwar <amitkarwar@gmail.com>, linux-rockchip@lists.infradead.org,
- Nishant Sarmukadam <nishants@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-pci@vger.kernel.org,
- Enric Balletbo i Serra <enric.balletbo@collabora.com>,
- "David S. Miller" <davem@davemloft.net>, Kalle Valo <kvalo@codeaurora.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
+ Juri Lelli <Juri.Lelli@arm.com>, Linux PM list <linux-pm@vger.kernel.org>,
+ Stephen Boyd <sboyd@codeaurora.org>, Kevin Hilman <khilman@kernel.org>,
+ "Rafael J. Wysocki" <rjw@rjwysocki.net>, Sudeep Holla <sudeep.holla@arm.com>,
+ Brendan Jackman <brendan.jackman@arm.com>, Lina Iyer <lina.iyer@linaro.org>,
+ linux-arm-msm <linux-arm-msm@vger.kernel.org>,
+ Andy Gross <andy.gross@linaro.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi,
+On Tue, 26 Feb 2019 at 16:52, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>
+> Hi Lina,
+>
+> Yes, this is a reply to an old patch.
+> But it seems there are no upstream users of GENPD_FLAG_IRQ_SAFE yet...
 
-On Tue, Feb 26, 2019 at 05:14:00PM +0000, Marc Zyngier wrote:
-> On 26/02/2019 16:21, Ard Biesheuvel wrote:
-> > On Mon, 25 Feb 2019 at 15:53, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> It outlines one thing: If you have to interpret per-device PCI
-> >> properties from DT, you're in for serious trouble. I should get some
-> >> better HW.
-> >>
-> > 
-> > Yeah, it obviously makes no sense at all for the interrupt parent of a
-> > PCI device to deviate from the host bridge's interrupt parent, and
-> > it's quite unfortunate that we can't simply ban it now that the cat is
-> > out of the bag already.
-> > 
-> > Arguably, the wake up widget is not part of the PCI device, but I have
-> > no opinion as to whether it is better modeling it as a sub device as
-> > you are proposing or as an entirely separate device referenced via a
-> > phandle.
-> 
-> It is not that clear. The widget seems to be an integral part of the
-> device, as it is the same basic IP that is used for SDIO and USB.
+Correct. But I are working on adding the first ones, as you probably know.
 
-It's not really a widget specific to this IP. It's just a GPIO. It so
-happens that both SDIO and PCIe designs have wanted to use a GPIO for
-wakeup, as many other devices do. (Note: it's not just cheap ARM
-devices; pulling up some Intel Chromebook designs, I see the exact same
-WAKE# GPIO on their PCIe WiFi as well.)
+>
+> On Tue, Oct 25, 2016 at 12:21 AM Lina Iyer <lina.iyer@linaro.org> wrote:
+> > Generic Power Domains currently support turning on/off only in process
+> > context. This prevents the usage of PM domains for domains that could be
+> > powered on/off in a context where IRQs are disabled. Many such domains
+> > exist today and do not get powered off, when the IRQ safe devices in
+> > that domain are powered off, because of this limitation.
+> >
+> > However, not all domains can operate in IRQ safe contexts. Genpd
+> > therefore, has to support both cases where the domain may or may not
+> > operate in IRQ safe contexts. Configuring genpd to use an appropriate
+> > lock for that domain, would allow domains that have IRQ safe devices to
+> > runtime suspend and resume, in atomic context.
+> >
+> > To achieve domain specific locking, set the domain's ->flag to
+> > GENPD_FLAG_IRQ_SAFE while defining the domain. This indicates that genpd
+> > should use a spinlock instead of a mutex for locking the domain. Locking
+> > is abstracted through genpd_lock() and genpd_unlock() functions that use
+> > the flag to determine the appropriate lock to be used for that domain.
+> >
+> > Domains that have lower latency to suspend and resume and can operate
+> > with IRQs disabled may now be able to save power, when the component
+> > devices and sub-domains are idle at runtime.
+> >
+> > The restriction this imposes on the domain hierarchy is that non-IRQ
+> > safe domains may not have IRQ-safe subdomains, but IRQ safe domains may
+> > have IRQ safe and non-IRQ safe subdomains and devices.
+> >
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Cc: Kevin Hilman <khilman@kernel.org>
+> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+> > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > ---
+> >  drivers/base/power/domain.c | 111 ++++++++++++++++++++++++++++++++++++++++----
+> >  include/linux/pm_domain.h   |  10 +++-
+> >  2 files changed, 110 insertions(+), 11 deletions(-)
+> >
+> > diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> > index 1ad42f2..07ed835 100644
+> > --- a/drivers/base/power/domain.c
+> > +++ b/drivers/base/power/domain.c
+> > @@ -74,11 +74,70 @@ static const struct genpd_lock_ops genpd_mtx_ops = {
+> >         .unlock = genpd_unlock_mtx,
+> >  };
+> >
+> > +static void genpd_lock_spin(struct generic_pm_domain *genpd)
+> > +       __acquires(&genpd->slock)
+> > +{
+> > +       unsigned long flags;
+> > +
+> > +       spin_lock_irqsave(&genpd->slock, flags);
+> > +       genpd->lock_flags = flags;
+> > +}
+> > +
+> > +static void genpd_lock_nested_spin(struct generic_pm_domain *genpd,
+> > +                                       int depth)
+> > +       __acquires(&genpd->slock)
+> > +{
+> > +       unsigned long flags;
+> > +
+> > +       spin_lock_irqsave_nested(&genpd->slock, flags, depth);
+> > +       genpd->lock_flags = flags;
+>
+> I don't think this is correct: during the second or any subsequent call,
+> the old genpd->lock_flags will be overwritten by the new one.
+> As interrupts are already disabled when doing a second call, the new
+> flags will reflect this, and calling genpd_unlock_spin() below will
+> never re-enable interrupts again.
 
-> It looks like the good old pre-PCI-2.2 days, where you had to have a
-> separate cable between your network card and the base-board for the
-> wake-up interrupt to be delivered. Starting with PCI-2.2, the bus can
-> carry the signal just fine. With PCIe, it should just be an interrupt
-> TLP sent to the RC, but that's obviously not within the capabilities of
-> the HW.
+That seems like a correct observation, at least as far as I can tell.
+Thanks for looking into this!
 
-You should search the PCI Express specification for WAKE#. There is a
-clearly-documented "side-band wake" feature that is part of the
-standard, as an alternative to in-band TLP wakeup. While you claim this
-is an ancient thing, it in fact still in use on many systems -- it's
-just usually abstracted better by ACPI firmware, whereas the dirty
-laundry is aired a bit more on a Device Tree system. And we got it
-wrong.
+>
+> Note that changing the above to
+>
+>     if (!depth)
+>             genpd->lock_flags = flags;
+>
+> won't help, as that means the first call to genpd_unlock_spin() will
+> re-enable interrupts, which is too early.
+>
+> Using a single genpd->lock_flags can work only in case interrupts were
+> already disabled before the first call.  But perhaps that's guaranteed?
 
-> Anyway, it'd be good if the Marvell people could chime in and let us
-> know how they'd prefer to handle this.
+So far, the only user case I have been playing with, is for CPUs. In
+that case, this code in executed in the cpuidle path and thus IRQs are
+disabled, so yes then it works.
 
-I'm not sure this is really a Marvell-specific problem. (Well, except
-for the marvell,wakeup-pin silliness, which is somewhat orthogonal.) In
-fact, if we cared a little more about Wake-on-WiFi, we'd be trying to
-support the same (out-of-band WAKE#) with other WiFi drivers.
+>
+> Apart from that, given depth is used as a lockdep subclass, and the
+> following comment in include/linux/lockdep.h:
+>
+>     /*
+>      * For trivial one-depth nesting of a lock-class, the following
+>      * global define can be used. (Subsystems with multiple levels
+>      * of nesting should define their own lock-nesting subclasses.)
+>      */
+>     #define SINGLE_DEPTH_NESTING                 1
+>
+> I'm wondering if depth > 1 actually works as expected.
+>
+> Am I missing something?
 
-Brian
+I don't think so, we need to fix this problem, in one way or the other.
+
+Clearly this code hasn't been executed enough, probably only by me and
+Lina and for CPUs. Ideally, we should try to make it work for the
+generic case, as I think there are more potential users of it.
+
+[...]
+
+Kind regards
+Uffe
 
 _______________________________________________
 linux-arm-kernel mailing list
