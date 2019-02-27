@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 98B98C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:35:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BFB80C4360F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:36:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 68E3820842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:35:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8053F20842
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:36:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iReDc/hl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68E3820842
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gmda3Wjp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8053F20842
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,46 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=uljjb8Dh5zXllHG2c8gSYa+hYWxAKZkRFHRVTdPJpyo=; b=iReDc/hlxf7S21
-	UJ+81QDEvl9L5XGqkB6zbpCdcEFzCs0KKvkj+SwmLi+IkNvhcCoj9VA1EdmsNoxyKjK6Y7lXl4LdA
-	cH3mvwjAY4ndwjLTeOI87rHETgI6pkuMB+uWR6+yQUD9nHQZHgbwMLgoSc6QNVLFRfLEcJVCnsxsk
-	BNcEp7Rw6+L11ON8+pN4D4MQmGWaDyF/KduegyLh5i0a/om9OzhmDtrkXAx1P++wBvrSjMoV0MTOb
-	6/z09ICyuKAMPto0kJJKQQt+oXbB5p+U2Eiq3nNObbc+SsY5ZFWMJg0v5A5GJT/cB6y+xUYe7lL3q
-	xB5iktkQ/S+eQkSwP74w==;
+	List-Owner; bh=jBcre/ys9vW4TMbcYN4oqTlrHAS7jYOrZbxb8W+mpRg=; b=Gmda3WjpHhTIwj
+	6TShdOB9u8MzCacp0COXghdncljco4JsAzGkBX5E0eYlqDmZVH+lRGW1blkV5NyfW8xc5CIdh9YVX
+	5rpHkpn8F12r8jWK8T/6h6dNaDcHiNB6EnFY5M3y+YBA3vp5rNYO7JxWbOOLwdBt0JGqekolmy4Np
+	ldm5BL6DlpvamdsEjP2559Jd+S0FHJkTZ+LZSpzS9PhVQhPpJTkmWCINWu1CIcXR4SzKNOeGM3y+0
+	WtKgSbJPlHz28iE6gJaPAJRnflKgkJ1fsRAyn38GGVgDqMSVRHt/fS7EjogilmDHQETo1UP+Eu+3o
+	+4R2/mN069dv2y8vsm2w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyvd3-00046h-D1; Wed, 27 Feb 2019 09:35:53 +0000
+	id 1gyvdB-0004GD-Ht; Wed, 27 Feb 2019 09:36:01 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyvcW-0003Xz-Oz
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 09:35:24 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
+ id 1gyvcX-0003YL-2Y
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 09:35:26 +0000
+Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1R9Vniq007922; Wed, 27 Feb 2019 10:35:15 +0100
+ x1R9WB0D030965; Wed, 27 Feb 2019 10:35:15 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qtvtx5e1y-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qtvh3njhd-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
  Wed, 27 Feb 2019 10:35:15 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9CBB23D;
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 0583E43;
+ Wed, 27 Feb 2019 09:35:15 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas21.st.com [10.75.90.44])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B692D2BEF;
  Wed, 27 Feb 2019 09:35:14 +0000 (GMT)
-Received: from Webmail-eu.st.com (Safex1hubcas23.st.com [10.75.90.46])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id B86E62A67;
- Wed, 27 Feb 2019 09:35:13 +0000 (GMT)
-Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS23.st.com
- (10.75.90.46) with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb
- 2019 10:35:13 +0100
+Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by SAFEX1HUBCAS21.st.com
+ (10.75.90.44) with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb
+ 2019 10:35:14 +0100
 Received: from localhost (10.201.20.5) by webmail-ga.st.com (10.75.90.48) with
  Microsoft SMTP Server (TLS) id 14.3.361.1;
- Wed, 27 Feb 2019 10:35:13 +0100
+ Wed, 27 Feb 2019 10:35:14 +0100
 From: Amelie Delaunay <amelie.delaunay@st.com>
 To: Lee Jones <lee.jones@linaro.org>, Linus Walleij <linus.walleij@linaro.org>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
  Alexandre Torgue <alexandre.torgue@st.com>, "Maxime
  Coquelin" <mcoquelin.stm32@gmail.com>
-Subject: [PATCH v4 5/9] ARM: dts: stm32: add STMFX support on stm32746g-eval
-Date: Wed, 27 Feb 2019 10:34:50 +0100
-Message-ID: <1551260094-32570-6-git-send-email-amelie.delaunay@st.com>
+Subject: [PATCH v4 6/9] ARM: dts: stm32: add joystick support on stm32746g-eval
+Date: Wed, 27 Feb 2019 10:34:51 +0100
+Message-ID: <1551260094-32570-7-git-send-email-amelie.delaunay@st.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1551260094-32570-1-git-send-email-amelie.delaunay@st.com>
 References: <1551260094-32570-1-git-send-email-amelie.delaunay@st.com>
@@ -73,8 +73,8 @@ X-Originating-IP: [10.201.20.5]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-27_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_013521_319846_13C8E2CC 
-X-CRM114-Status: GOOD (  12.08  )
+X-CRM114-CacheID: sfid-20190227_013521_719230_467B3FEB 
+X-CRM114-Status: GOOD (  11.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,50 +94,77 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch adds support for STMicroelectronics Multi-Function eXpander
-(STMFX) on stm32746g-eval. It is connected on i2c1.
+The joystick (B3) on stm32746g-eval uses gpios on STMFX gpio expander.
+These gpios need a pin configuration (push-pull and bias-pull-up),
+described under stmfx_pinctrl node.
 
 Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/stm32746g-eval.dts | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/stm32746g-eval.dts | 43 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
-index 8c081ea..203faf0 100644
+index 203faf0..b86ad83 100644
 --- a/arch/arm/boot/dts/stm32746g-eval.dts
 +++ b/arch/arm/boot/dts/stm32746g-eval.dts
-@@ -44,6 +44,7 @@
- #include "stm32f746.dtsi"
- #include "stm32f746-pinctrl.dtsi"
- #include <dt-bindings/input/input.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
+@@ -86,6 +86,43 @@
+ 		};
+ 	};
  
- / {
- 	model = "STMicroelectronics STM32746g-EVAL board";
-@@ -114,6 +115,22 @@
- 	i2c-scl-rising-time-ns = <185>;
- 	i2c-scl-falling-time-ns = <20>;
- 	status = "okay";
-+
-+	stmfx: stmfx@42 {
-+		compatible = "st,stmfx-0300";
-+		reg = <0x42>;
-+		interrupts = <8 IRQ_TYPE_EDGE_RISING>;
-+		interrupt-parent = <&gpioi>;
-+
-+		stmfx_pinctrl: stmfx-pin-controller {
-+			compatible = "st,stmfx-0300-pinctrl";
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			gpio-ranges = <&stmfx_pinctrl 0 0 24>;
++	joystick {
++		compatible = "gpio-keys";
++		#size-cells = <0>;
++		pinctrl-0 = <&joystick_pins>;
++		pinctrl-names = "default";
++		button-0 {
++			label = "JoySel";
++			linux,code = <KEY_ENTER>;
++			interrupt-parent = <&stmfx_pinctrl>;
++			interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++		};
++		button-1 {
++			label = "JoyDown";
++			linux,code = <KEY_DOWN>;
++			interrupt-parent = <&stmfx_pinctrl>;
++			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++		};
++		button-2 {
++			label = "JoyLeft";
++			linux,code = <KEY_LEFT>;
++			interrupt-parent = <&stmfx_pinctrl>;
++			interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++		};
++		button-3 {
++			label = "JoyRight";
++			linux,code = <KEY_RIGHT>;
++			interrupt-parent = <&stmfx_pinctrl>;
++			interrupts = <3 IRQ_TYPE_EDGE_FALLING>;
++		};
++		button-4 {
++			label = "JoyUp";
++			linux,code = <KEY_UP>;
++			interrupt-parent = <&stmfx_pinctrl>;
++			interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
 +		};
 +	};
++
+ 	usbotg_hs_phy: usb-phy {
+ 		#phy-cells = <0>;
+ 		compatible = "usb-nop-xceiv";
+@@ -129,6 +166,12 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <2>;
+ 			gpio-ranges = <&stmfx_pinctrl 0 0 24>;
++
++			joystick_pins: joystick {
++				pins = "gpio0", "gpio1", "gpio2", "gpio3", "gpio4";
++				drive-push-pull;
++				bias-pull-up;
++			};
+ 		};
+ 	};
  };
- 
- &rtc {
 -- 
 2.7.4
 
