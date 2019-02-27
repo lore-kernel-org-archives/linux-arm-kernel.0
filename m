@@ -2,68 +2,106 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BF985C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:59:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46923C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8FC5720842
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:59:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 16694205F4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 10:02:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qDnQPA2P";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="h4lPA1II"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FC5720842
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PFS6etmH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 16694205F4
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=wKqlEb5UwxpCS9CKLOiu5v1iDk2Zpk4OXVMRwtYK7eE=; b=qDnQPA2PQRSHgk
-	Ibvw/tVSQbejl5d3PFGrnDNYNL0L06lfTQmFliMqHb5BS56ICENLwBoLM0LzGyQCdWIMR4SP7YBhE
-	SnTngh8Tm3ObmeiYeu5RkxDd317X7IwzCbbbacYQLm5yBdJnk2qhP5eIGKkjS1Tlb3Pd3jwVXsxFy
-	AJ1/l7lJAF1fi4SzTVyDBxRmvPfuGgDO6CC587MoXyT3YNSXBruILrJ+nKzG2VNBuFcyOR/5T0ABi
-	uLfqWJo7leZ2lXiHQT/x2eRMbHEUr9x5HrGHFmKFG3GHEME0Z11aUb5MCr6uqw5GRQbOf2KM/tZZ9
-	ICp69ikJpDuWx9s4ASHw==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=+rT74oYh1hyRUTem/W3kzHfF7ywSsKDejvNwyO2WLtA=; b=PFS6etmHg6TUm9
+	3uTWRduH8NR81w4usuWg1bIqbnVu/8Z4aKYZlVwRwR8zwvfZqHB1j6bFeuyWhwH/LKYWPL1X66397
+	U/LuLlPfVYr9/nZX8zxh0uqHHazs/nmhxXPuKAt3SxnbNKd0TGmB2+yAOL+BqBn6jf3CJMF3mNyXK
+	y2athsv7EMHUQ+AMh5w2YIXhKKDIElQ+K5oUokHuXhEqbuG8SBPLcuA7LnuoiCqzmjcUe4AFrh3Rd
+	G4/VRC6hvNUG7pYIQDfWX40rdgltk5ACLTdFMGGABQeqwd91PkspOIKDieVEre0y+E7wlgd3TBtDP
+	LobfoExdf1x7P+N4+yRQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyw0D-0007BE-8E; Wed, 27 Feb 2019 09:59:49 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyw09-0007Aj-EU; Wed, 27 Feb 2019 09:59:47 +0000
-Received: from localhost (91-160-177-164.subs.proxad.net [91.160.177.164])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 06022205F4;
- Wed, 27 Feb 2019 09:59:41 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1551261584;
- bh=SEGeeNAdiIiL1sHrk9uRoWVuV4aOBMHFvHuTGNX/sEw=;
- h=Date:From:To:Cc:Subject:In-Reply-To:References:From;
- b=h4lPA1IIGrroPggndXXI023fBc0MTaJSZ4YTw+5nXBFhJ8usA/nOvX/kx+bPjjFaz
- x64Xy9WLAK1T3jBE0zds5yb5GmM5hp3tulBRsknv3nUawdAFI4fMlxht8UlbGbSCRo
- GX0+8t71jwHHmyKXE5kGLfAcuQ29Ok8R0sVqIbs8=
-Date: Wed, 27 Feb 2019 10:59:37 +0100
-From: Boris Brezillon <bbrezillon@kernel.org>
-To: Vignesh Raghavendra <vigneshr@ti.com>
-Subject: Re: [RFC PATCH 3/5] mtd: Add support for Hyperbus memory devices
-Message-ID: <20190227105937.527c6573@kernel.org>
-In-Reply-To: <3952b327-3aff-a32e-4280-6ab24c32cfd9@ti.com>
-References: <20190219063607.29949-1-vigneshr@ti.com>
- <20190219063607.29949-4-vigneshr@ti.com>
- <7e79fff7-2565-28f7-7b2b-bb3098f1a928@cogentembedded.com>
- <3952b327-3aff-a32e-4280-6ab24c32cfd9@ti.com>
-X-Mailer: Claws Mail 3.17.3 (GTK+ 2.24.32; x86_64-redhat-linux-gnu)
+	id 1gyw2l-0000ea-AG; Wed, 27 Feb 2019 10:02:27 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gyw2h-0000ah-Jq; Wed, 27 Feb 2019 10:02:25 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E1C421596;
+ Wed, 27 Feb 2019 02:02:22 -0800 (PST)
+Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 3C4133F575; Wed, 27 Feb 2019 02:02:18 -0800 (PST)
+Subject: Re: [PATCH 0/4] mwifiex PCI/wake-up interrupt fixes
+To: Brian Norris <briannorris@chromium.org>
+References: <20190224140426.3267-1-marc.zyngier@arm.com>
+ <20190226232822.GA174696@google.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
+Openpgp: preference=signencrypt
+Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
+ 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
+Organization: ARM Ltd
+Message-ID: <d67512fe-42b4-513f-d27a-fed85c19e9c2@arm.com>
+Date: Wed, 27 Feb 2019 10:02:16 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.0
 MIME-Version: 1.0
+In-Reply-To: <20190226232822.GA174696@google.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_015945_524912_0D0FCD48 
-X-CRM114-Status: GOOD (  30.27  )
+X-CRM114-CacheID: sfid-20190227_020223_666039_76425D63 
+X-CRM114-Status: GOOD (  29.76  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,179 +113,146 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Arnd Bergmann <arnd@arndb.de>,
- Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>,
- "tudor.ambarus@microchip.com" <tudor.ambarus@microchip.com>,
- Richard Weinberger <richard@nod.at>, Miquel Raynal <miquel.raynal@bootlin.com>,
- "Nori, Sekhar" <nsekhar@ti.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Marek Vasut <marek.vasut@gmail.com>, Rob Herring <robh+dt@kernel.org>,
- "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Brian Norris <computersforpeace@gmail.com>,
- David Woodhouse <dwmw2@infradead.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: Ganapathi Bhat <gbhat@marvell.com>, Jeffy Chen <jeffy.chen@rock-chips.com>,
+ Heiko Stuebner <heiko@sntech.de>, devicetree@vger.kernel.org,
+ Xinming Hu <huxinming820@gmail.com>, netdev@vger.kernel.org,
+ linux-pm@vger.kernel.org, linux-wireless@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Amitkumar Karwar <amitkarwar@gmail.com>,
+ linux-rockchip@lists.infradead.org, Nishant Sarmukadam <nishants@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>, "Rafael J. Wysocki" <rjw@rjwysocki.net>,
+ linux-arm-kernel@lists.infradead.org,
+ Enric Balletbo i Serra <enric.balletbo@collabora.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ "David S. Miller" <davem@davemloft.net>, Kalle Valo <kvalo@codeaurora.org>,
+ Tony Lindgren <tony@atomide.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, 27 Feb 2019 15:22:19 +0530
-Vignesh Raghavendra <vigneshr@ti.com> wrote:
++ Lorenzo
 
-> On 26/02/19 11:46 PM, Sergei Shtylyov wrote:
-> > On 02/19/2019 09:36 AM, Vignesh R (by way of Boris Brezillon <bbrezillon@kernel.org>) wrote:
-> >   
-> >> Cypress HyperBus is Low Signal Count, High Performance Double Data Rate Bus
-> >> interface between a host system master and one or more slave interfaces.
-> >> HyperBus is used to connect microprocessor, microcontroller, or ASIC
-> >> devices with random access NOR flash memory(called HyperFlash) or
-> >> self refresh DRAM(called HyperRAM).
-> >>
-> >> Its a 8-bit data bus (DQ[7:0]) with  Read-Write Data Strobe (RWDS)
-> >> signal and either Single-ended clock(3.0V parts) or Differential clock
-> >> (1.8V parts). It uses ChipSelect lines to select b/w multiple slaves.
-> >> At bus level, it follows a separate protocol described in HyperBus
-> >> specification[1].
-> >>
-> >> HyperFlash follows CFI AMD/Fujitsu Extended Command Set (0x0002) similar
-> >> to that of existing parallel NORs. Since Hyperbus is x8 DDR bus,
-> >> its equivalent to x16 parallel NOR flash wrt bits per clk. But Hyperbus
-> >> operates at >166MHz frequencies.
-> >> HyperRAM provides direct random read/write access to flash memory
-> >> array.
-> >>
-> >> But, Hyperbus memory controllers seem to abstract implementation details
-> >> and expose a simple MMIO interface to access connected flash.
-> >>
-> >> Add support for registering HyperFlash devices with MTD framework. MTD
-> >> maps framework along with CFI chip support framework are used to support
-> >> communicate with flash.
-> >>
-> >> Framework is modelled along the lines of spi-nor framework. HyperBus
-> >> memory controller(HBMC) drivers call hb_register_device() to register a
-> >> single HyperFlash device. HyperFlash core parses MMIO access
-> >> information from DT, sets up the map_info struct, probes CFI flash and
-> >> registers it with MTD framework.
-> >>
-> >> Some HBMC masters need calibration/training sequence[3] to be carried
-> >> out, in order for DLL inside the controller to lock, by reading a known
-> >> string/pattern. This is done by repeatedly reading CFI Query
-> >> Identification String. Calibration needs to be done before try to detect
-> >> flash as part of CFI flash probe.
-> >>
-> >> HyperRAM is not supported atm.
-> >>
-> >> HyperBus specification can be found at[1]
-> >> HyperFlash datasheet can be found at[2]
-> >>
-> >> [1] https://www.cypress.com/file/213356/download
-> >> [2] https://www.cypress.com/file/213346/download
-> >> [3] http://www.ti.com/lit/ug/spruid7b/spruid7b.pdf
-> >>     Table 12-5741. HyperFlash Access Sequence
-> >>
-> >> Signed-off-by: Vignesh R <vigneshr@ti.com>  
-> > [...]  
-> >> diff --git a/include/linux/mtd/hyperbus.h b/include/linux/mtd/hyperbus.h
-> >> new file mode 100644
-> >> index 000000000000..0aa11458c424
-> >> --- /dev/null
-> >> +++ b/include/linux/mtd/hyperbus.h
-> >> @@ -0,0 +1,73 @@
-> >> +/* SPDX-License-Identifier: GPL-2.0
-> >> + *
-> >> + * Copyright (C) 2019 Texas Instruments Incorporated - http://www.ti.com/
-> >> + */
-> >> +
-> >> +#ifndef __LINUX_MTD_HYPERBUS_H__
-> >> +#define __LINUX_MTD_HYPERBUS_H__
-> >> +
-> >> +#include <linux/mtd/map.h>
-> >> +
-> >> +enum hb_memtype {
-> >> +	HYPERFLASH,
-> >> +	HYPERRAM,
-> >> +};
-> >> +
-> >> +/**
-> >> + * struct hb_device - struct representing Hyperbus slave device
-> >> + * @map: map_info struct for accessing MMIO Hyperbus flash memory
-> >> + * @dev: device pointer of Hyperbus Controller  
-> > 
-> >    I think we need a separate structure for the HyperBus controller, not just
-> > for the slave devices...
-> >   
-> >> + * @np:	pointer to Hyperbus slave device node
-> >> + * @mtd: pointer to MTD struct
-> >> + * @ops: pointer to custom Hyperbus ops
-> >> + * @memtype: type of memory device: Hyperflash or HyperRAM
-> >> + * @needs_calib: flag to indicate whether calibration sequence is needed
-> >> + * @registered: flag to indicate whether device is registered with MTD core
-> >> + */
-> >> +
-> >> +struct hb_device {
-> >> +	struct map_info map;
-> >> +	struct device *dev;
-> >> +	struct device_node *np;
-> >> +	struct mtd_info *mtd;
-> >> +	struct hb_ops *ops;
-> >> +	enum hb_memtype memtype;
-> >> +	bool needs_calib;
-> >> +	bool registered;
-> >> +};
-> >> +
-> >> +/**
-> >> + * struct hb_ops - struct representing custom Hyperbus operations
-> >> + * @read16: read 16 bit of data, usually from register/ID-CFI space
-> >> + * @write16: write 16 bit of data, usually to register/ID-CFI space
-> >> + * copy_from: copy data from flash memory
-> >> + * copy_to: copy data to flash_memory
-> >> + */
-> >> +
-> >> +struct hb_ops {
-> >> +	u16 (*read16)(struct hb_device *hbdev, unsigned long addr);
-> >> +	void (*write16)(struct hb_device *hbdev, unsigned long addr, u16 val);
-> >> +
-> >> +	void (*copy_from)(struct hb_device *hbdev, void *to,
-> >> +			  unsigned long from, ssize_t len);
-> >> +	void (*copy_to)(struct hb_device *dev, unsigned long to,
-> >> +			const void *from, ssize_t len);  
-> > 
-> >    ... else these methods won't fly if you need to "massage" the controller
-> > registers inside them...
-> >   
-> 
-> If accessing controller register is the only need, wouldn't a private
-> data pointer within struct hb_device be sufficient to hold pointer to
-> controller specific struct?
-> 
-> struct hb_device {
-> 	...
-> 	void *priv; /* points to controller's private data */
-> };
-> 
-> 
-> Or do you see a need for separate structure for the HyperBus controller?
+Hi Brian,
 
-Sorry to chime in. Just want to share my experience here: properly
-splitting the controller/device representation is always a good thing.
-When it's not done from the beginning and people start to add their own
-controller drivers as if it was a flash device driver it becomes messy
-pretty quickly and people add hacks to support that (look at the raw
-NAND framework if you need a proof). So, I'd recommend having this
-separation now, even if the onle controllers we support have a 1:1
-relationship between HB controller and HB device.
+On 26/02/2019 23:28, Brian Norris wrote:
+> + others
+> 
+> Hi Marc,
+> 
+> Thanks for the series. I have a few bits of history to add to this, and
+> some comments.
+> 
+> On Sun, Feb 24, 2019 at 02:04:22PM +0000, Marc Zyngier wrote:
+>> For quite some time, I wondered why the PCI mwifiex device built in my
+>> Chromebook was unable to use the good old legacy interrupts. But as MSIs
+>> were working fine, I never really bothered investigating. I finally had a
+>> look, and the result isn't very pretty.
+>>
+>> On this machine (rk3399-based kevin), the wake-up interrupt is described as
+>> such:
+>>
+>> &pci_rootport {
+>> 	mvl_wifi: wifi@0,0 {
+>> 		compatible = "pci1b4b,2b42";
+>> 		reg = <0x83010000 0x0 0x00000000 0x0 0x00100000
+>> 		       0x83010000 0x0 0x00100000 0x0 0x00100000>;
+>> 		interrupt-parent = <&gpio0>;
+>> 		interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
+>> 		pinctrl-names = "default";
+>> 		pinctrl-0 = <&wlan_host_wake_l>;
+>> 		wakeup-source;
+>> 	};
+>> };
+>>
+>> Note how the interrupt is part of the properties directly attached to the
+>> PCI node. And yet, this interrupt has nothing to do with a PCI legacy
+>> interrupt, as it is attached to the wake-up widget that bypasses the PCIe RC
+>> altogether (Yay for the broken design!). This is in total violation of the
+>> IEEE Std 1275-1994 spec[1], which clearly documents that such interrupt
+>> specifiers describe the PCI device interrupts, and must obey the
+>> INT-{A,B,C,D} mapping. Oops!
+> 
+> You're not the first person to notice this. All the motivations are not
+> necessarily painted clearly in their cover letter, but here are some
+> previous attempts at solving this problem:
+> 
+> [RFC PATCH v11 0/5] PCI: rockchip: Move PCIe WAKE# handling into pci core
+> https://lkml.kernel.org/lkml/20171225114742.18920-1-jeffy.chen@rock-chips.com/
+> http://lkml.kernel.org/lkml/20171226023646.17722-1-jeffy.chen@rock-chips.com/
+> 
+> As you can see by the 12th iteration, it wasn't left unsolved for lack
+> of trying...
+
+I wasn't aware of this. That's definitely a better approach than my
+hack, and I would really like this to be revived.
 
 > 
-> 
-> >> +};  
-> > [...]
-> > 
-> > MBR, Sergei
-> >   
-> 
+> Frankly, if a proper DT replacement to the admittedly bad binding isn't
+> agreed upon quickly, I'd be very happy to just have WAKE# support
+> removed from the DTS for now, and the existing mwifiex binding should
+> just be removed. (Wake-on-WiFi was never properly vetted on these
+> platforms anyway.) It mostly serves to just cause problems like you've
+> noticed.
 
+Agreed. If there is no actual use for this, and that we can build a case
+for a better solution, let's remove the wakeup support from the Gru DT
+(it is invalid anyway), and bring it back if and when we get the right
+level of support.
+
+[...]
+
+> One problem Rockchip authors were also trying to resolve here is that
+> PCIe WAKE# handling should not really be something the PCI device driver
+> has to handle directly. Despite your complaints about not using in-band
+> TLP wakeup, a separate WAKE# pin is in fact a documented part of the
+> PCIe standard, and it so happens that the Rockchip RC does not support
+> handling TLPs in S3, if you want to have decent power consumption. (Your
+> "bad hardware" complaints could justifiably fall here, I suppose.)
+> 
+> Additionally, I've had pushback from PCI driver authors/maintainers on
+> adding more special handling for this sort of interrupt property (not
+> the binding specifically, but just the concept of handling WAKE# in the
+> driver), as they claim this should be handled by the system firmware,
+> when they set the appropriate wakeup flags, which filter down to
+> __pci_enable_wake() -> platform_pci_set_wakeup(). That's how x86 systems
+> do it (note: I know for a fact that many have a very similar
+> architecture -- WAKE# is not routed to the RC, because, why does it need
+> to? and they *don't* use TLP wakeup either -- they just hide it in
+> firmware better), and it Just Works.
+
+Even on an arm64 platform, there is no reason why a wakeup interrupt
+couldn't be handled by FW rather than the OS. It just need to be wired
+to the right spot (so that it generates a secure interrupt that can be
+handled by FW).
+
+> So, we basically concluded that we should standardize on a way to
+> describe WAKE# interrupts such that PCI drivers don't have to deal with
+> it at all, and the PCI core can do it for us. 12 revisions later
+> and...we still never agreed on a good device tree binding for this.
+
+Is the DT binding the only problem? Do we have an agreement for the core
+code?
+
+> IOW, maybe your wake-up sub-node is the best way to side-step the
+> problems of conflicting with the OF PCI spec. But I'd still really like
+> to avoid parsing it in mwifiex, if at all possible.
+
+Honestly, my solution is just a terrible hack. I wasn't aware that this
+was a more general problem, and I'd love it to be addressed in the core
+PCI code.
+
+> (We'd still be left with the marvell,wakeup-pin propery to parse
+> specifically in mwifiex, which sadly has to exist because....well,
+> Samsung decided to do chip-on-board, and then they failed to use the
+> correct pin on Marvell's side when wiring up WAKE#. Sigh.)
+
+Oh well...
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
