@@ -2,89 +2,88 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6702FC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:59:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4022FC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:06:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2DECA21850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:59:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0CD5021850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:06:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LNISf0Qq";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="fs9VQPmQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2DECA21850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GJemVCk7";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=alliedtelesis.co.nz header.i=@alliedtelesis.co.nz header.b="sO56rmKn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0CD5021850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=alliedtelesis.co.nz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=og16RzZoLQ71kZj3D3VvPRcGc4dOyWlCqOAakHeBtpk=; b=LNISf0QqBWIXOSaV8r4wva+KfQ
-	0uH+02ATTV2mZDxdsnWK0CSuMh9ieffwkzyEWbkM/uPB2IwkKBdRVgWoydMr4xOepgOLxZou19lOx
-	AfqgBqItAhzJ5NSobmdnhNfcZPMM9Xr2GrQn9MMkr5XBwIixJBfbvQDvXCori7HEfmIYJ7udmInPu
-	y7PBNhsKBc7LZvOT0OXuehUrQJB/W9b1n4/PcR1IpQ1LQ9MWst6qv8XchpArtoY6F0gRFwKBpQ9hH
-	JpPHF043Xold1oL3nQ0rtS/WPsDFLko4PoYmizJgTTcPhcvBFGLjuBkdOGUEXMyEkmDdiOiI7GyMZ
-	gMvL52FA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:Date
+	:Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	List-Owner; bh=2DIdzuPoEA+SPHWG6CQ42h2y5PvM5IbWKbtlYo2aynQ=; b=GJemVCk78aSJil
+	BJ3xOdVyDeq/AXDXuhSjTBEdKUsdUnTgcFLYWe4qlasAy1PR7TUHRXOsmO7pzzi6MISoL2JyZIhpN
+	3JGb4LSv5m9sODJYG+tTdXTrWqHndvRt4U2QuwYEKlFScSu6nbRAv19kuSRQDmfs9ARHauRsZnVwA
+	74Xnk9GH+r0nNU9pIJ0+elRMMg4MXEvK2ZP0QsW0vu8ToVBP1KWLTxhVfFcxwo8D8Kr/PAhD4tJsl
+	H6kjlpJ19WYviUXFonNx+SlJm9FQChgHDw6XnBUdxxUe+lO0NRdq4ijAuTd9ElmpIKextVZI/f/ye
+	QKYb+hHmwNQBDtkhWihw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz5Mq-0008CJ-U2; Wed, 27 Feb 2019 19:59:48 +0000
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
+	id 1gz5T9-0003Gh-GH; Wed, 27 Feb 2019 20:06:19 +0000
+Received: from gate2.alliedtelesis.co.nz ([2001:df5:b000:5::4])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz5Lu-00079X-6r
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 19:58:55 +0000
-Received: by mail-lj1-x241.google.com with SMTP id d14so14975750ljl.9
- for <linux-arm-kernel@lists.infradead.org>;
- Wed, 27 Feb 2019 11:58:50 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=0UE75rMIQ1/9Jb6g/TX5/C4pyxCKvxuMKoZQJmTsETs=;
- b=fs9VQPmQRj1jiGfHFNe+tJQzJI/tPaF4zmdsl+FEfGNRZTQirJtSKBWKu0nP6x9p0P
- MX0Hbv/cwTvGR2e61LKylfYtHNgmn/DmeP8G+mBoDwMTa/1krseYVY1yHowfF6DtZZyG
- NvWrUlGUdS3p0z34XIAdAmqWDhOv9yUvmNyxAO1Js0VvKRfEOmphrUyuYAHMDesJrnZe
- HSSzhaYavELPrv+OHmP5NeS1Xmddt1qkqXM56BGOkN3vk6QbPckGwmHYf6VMkMwyh+td
- 0+KksbCPy+IGogdMyDlbvZHrwOfRgEJkDZx4VOYUZzPK8rxhrzuZfF+qgYO4vlF9+hSl
- aOIw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=0UE75rMIQ1/9Jb6g/TX5/C4pyxCKvxuMKoZQJmTsETs=;
- b=LJMFTL1wTpsuKWw7SxS/Kk+nRFT3HmIGnd8sHOwGnK5ePsRzWwuSRO7ZnsB0n7SJva
- X4Qc2OHm8EreVXJs8S/4f5pYvnq57VoeSs/KF06RV9q9ceOY1LGbU+gM0yCbOoZGxCTQ
- ObAZRd6V9GTs5mzvpUsD+lBAV1QOIfQsutZP8mQFM/bYwh/eHjpMbSjQopvVJHv1eOZc
- RGnWl1Qjr8idk8SwnY87xHAhat9np3MjN8eLCt2VtXRsiC5Xp/k9xvwcFn4oGsOxnnkh
- s4rOkfRvCuH7lYIl2xCCtIORayA1sEKrbNLoi/aXBxLppDF87gRjhmZDLX5js6aTEWvW
- TmLA==
-X-Gm-Message-State: APjAAAX9sgbKR98m/nh6BJ0XunjvZMyXqanGLFe4W/EXHmQojscoHh5O
- SS75Mfxf7gO89m2zFGitHEjnXQ==
-X-Google-Smtp-Source: APXvYqzgcYN6BOjXkQsZhyiVuASKF6e74OjwL//SPfBfIgNC+i7ZJXtxi2TwaSAwvDwqowOVbiFCqA==
-X-Received: by 2002:a2e:680e:: with SMTP id c14mr2469128lja.51.1551297528417; 
- Wed, 27 Feb 2019 11:58:48 -0800 (PST)
-Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
- [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id z128sm723802lfa.60.2019.02.27.11.58.46
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Wed, 27 Feb 2019 11:58:47 -0800 (PST)
-From: Ulf Hansson <ulf.hansson@linaro.org>
-To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
-	linux-pm@vger.kernel.org
-Subject: [PATCH v12 4/4] PM / Domains: Add genpd governor for CPUs
-Date: Wed, 27 Feb 2019 20:58:36 +0100
-Message-Id: <20190227195836.24739-5-ulf.hansson@linaro.org>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20190227195836.24739-1-ulf.hansson@linaro.org>
-References: <20190227195836.24739-1-ulf.hansson@linaro.org>
+ id 1gz5T1-0003Ft-QN
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 20:06:14 +0000
+Received: from mmarshal3.atlnz.lc (mmarshal3.atlnz.lc [10.32.18.43])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (Client did not present a certificate)
+ by gate2.alliedtelesis.co.nz (Postfix) with ESMTPS id C40FD886B5;
+ Thu, 28 Feb 2019 09:05:47 +1300 (NZDT)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=alliedtelesis.co.nz;
+ s=mail181024; t=1551297947;
+ bh=TfUt8A0AmIxelot3jQBm+iyNxD2sBSKFwYo3HAPsdAE=;
+ h=From:To:CC:Subject:Date:References;
+ b=sO56rmKnPjy3Pc5Gcy2iLylafenCXvSqKCEF8RAWsHohbbiR+N/khmQr+lfgkfItw
+ gVmuHNloyg0oz5GjXL1aH7AJfOAUGR0c8i7Cz1jNq62S6siBf4z51OwfFVGa8C7lHI
+ 167lVw09jIWfd/KG+Nf/0Ux7QxSwW+qjz6GHdnWci8jwTrieDjQkIEZf5wunZXXU2W
+ fNs3+9oGxwFasp3bWbCLeJlEfxoN8BHZjj6TO69XYNn5Ux1COiTKIZXgwcTu4fY0/V
+ owK/CWV+b0iGkjVR19S5Jt99HBv1fsNQLhgnXZipQYsQ+O5VM5GOaRXR0i66qvCaW1
+ v9ze1k0ljkCTw==
+Received: from svr-chch-ex1.atlnz.lc (Not Verified[10.32.16.77]) by
+ mmarshal3.atlnz.lc with Trustwave SEG (v7, 5, 8, 10121)
+ id <B5c76ed9b0000>; Thu, 28 Feb 2019 09:05:48 +1300
+Received: from svr-chch-ex1.atlnz.lc (2001:df5:b000:bc8::77) by
+ svr-chch-ex1.atlnz.lc (2001:df5:b000:bc8::77) with Microsoft SMTP Server
+ (TLS) id 15.0.1156.6; Thu, 28 Feb 2019 09:05:46 +1300
+Received: from svr-chch-ex1.atlnz.lc ([fe80::409d:36f5:8899:92e8]) by
+ svr-chch-ex1.atlnz.lc ([fe80::409d:36f5:8899:92e8%12]) with mapi id
+ 15.00.1156.000; Thu, 28 Feb 2019 09:05:46 +1300
+From: Chris Packham <Chris.Packham@alliedtelesis.co.nz>
+To: "linux@armlinux.org.uk" <linux@armlinux.org.uk>, "bp@alien8.de"
+ <bp@alien8.de>, "arnd@arndb.de" <arnd@arndb.de>, "jlu@pengutronix.de"
+ <jlu@pengutronix.de>, "gregory.clement@bootlin.com"
+ <gregory.clement@bootlin.com>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>
+Subject: Re: [PATCH v7 0/9] EDAC drivers for Armada XP L2 and DDR
+Thread-Topic: [PATCH v7 0/9] EDAC drivers for Armada XP L2 and DDR
+Thread-Index: AQHUgfgBrJjSADzRCEun9Iucv3y9fg==
+Date: Wed, 27 Feb 2019 20:05:45 +0000
+Message-ID: <ddd4d4738bf2484e8d13e6bc59cec6d8@svr-chch-ex1.atlnz.lc>
+References: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
+Accept-Language: en-NZ, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-ms-exchange-transport-fromentityheader: Hosted
+x-originating-ip: [2001:df5:b000:22:3a2c:4aff:fe70:2b02]
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_115850_639388_4D521893 
-X-CRM114-Status: GOOD (  23.03  )
+X-CRM114-CacheID: sfid-20190227_120612_240764_EE80D437 
+X-CRM114-Status: GOOD (  18.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,188 +95,98 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Ulf Hansson <ulf.hansson@linaro.org>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Frederic Weisbecker <fweisbec@gmail.com>, linux-arm-msm@vger.kernel.org,
- Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
- Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- Viresh Kumar <viresh.kumar@linaro.org>, Sudeep Holla <sudeep.holla@arm.com>,
- Thomas Gleixner <tglx@linutronix.de>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-edac@vger.kernel.org" <linux-edac@vger.kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-As it's now perfectly possible that a PM domain managed by genpd contains
-devices belonging to CPUs, we should start to take into account the
-residency values for the idle states during the state selection process.
-The residency value specifies the minimum duration of time, the CPU or a
-group of CPUs, needs to spend in an idle state to not waste energy entering
-it.
+Hi Borislav, Russell,
 
-To deal with this, let's add a new genpd governor, pm_domain_cpu_gov, that
-may be used for a PM domain that have CPU devices attached or if the CPUs
-are attached through subdomains.
+This seems to have fallen off the radar. Is there anything stopping this 
+series from being merged?
 
-The new governor computes the minimum expected idle duration time for the
-online CPUs being attached to the PM domain and its subdomains. Then in the
-state selection process, trying the deepest state first, it verifies that
-the idle duration time satisfies the state's residency value.
-
-It should be noted that, when computing the minimum expected idle duration
-time, we use the information about the next timer/tick that is stored in
-the per CPU variable, cpuidle_devices, for the related CPUs. Future wise,
-this deserves to be improved, as there are obviously more reasons to why a
-CPU may be woken up from idle.
-
-Cc: Lina Iyer <ilina@codeaurora.org>
-Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-
-Changes in v12:
-	- Rebased.
-
----
- drivers/base/power/domain_governor.c | 62 +++++++++++++++++++++++++++-
- include/linux/pm_domain.h            |  3 ++
- 2 files changed, 64 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-index 99896fbf18e4..fb8fd21e69a7 100644
---- a/drivers/base/power/domain_governor.c
-+++ b/drivers/base/power/domain_governor.c
-@@ -10,6 +10,9 @@
- #include <linux/pm_domain.h>
- #include <linux/pm_qos.h>
- #include <linux/hrtimer.h>
-+#include <linux/cpuidle.h>
-+#include <linux/cpumask.h>
-+#include <linux/ktime.h>
- 
- static int dev_update_qos_constraint(struct device *dev, void *data)
- {
-@@ -211,8 +214,10 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
- 	struct gpd_link *link;
- 
--	if (!genpd->max_off_time_changed)
-+	if (!genpd->max_off_time_changed) {
-+		genpd->state_idx = genpd->cached_power_down_state_idx;
- 		return genpd->cached_power_down_ok;
-+	}
- 
- 	/*
- 	 * We have to invalidate the cached results for the masters, so
-@@ -237,6 +242,7 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 		genpd->state_idx--;
- 	}
- 
-+	genpd->cached_power_down_state_idx = genpd->state_idx;
- 	return genpd->cached_power_down_ok;
- }
- 
-@@ -245,6 +251,55 @@ static bool always_on_power_down_ok(struct dev_pm_domain *domain)
- 	return false;
- }
- 
-+static bool cpu_power_down_ok(struct dev_pm_domain *pd)
-+{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	struct cpuidle_device *dev;
-+	ktime_t domain_wakeup;
-+	s64 idle_duration_ns;
-+	int cpu, i;
-+
-+	/* Validate dev PM QoS constraints. */
-+	if (!default_power_down_ok(pd))
-+		return false;
-+
-+	if (!(genpd->flags & GENPD_FLAG_CPU_DOMAIN))
-+		return true;
-+
-+	/*
-+	 * Find the next wakeup for any of the online CPUs within the PM domain
-+	 * and its subdomains. Note, we only need the genpd->cpus, as it already
-+	 * contains a mask of all CPUs from subdomains.
-+	 */
-+	domain_wakeup = ktime_set(KTIME_SEC_MAX, 0);
-+	for_each_cpu_and(cpu, genpd->cpus, cpu_online_mask) {
-+		dev = per_cpu(cpuidle_devices, cpu);
-+		if (dev && ktime_before(dev->next_hrtimer, domain_wakeup))
-+			domain_wakeup = dev->next_hrtimer;
-+	}
-+
-+	/* The minimum idle duration is from now - until the next wakeup. */
-+	idle_duration_ns = ktime_to_ns(ktime_sub(domain_wakeup, ktime_get()));
-+	if (idle_duration_ns <= 0)
-+		return false;
-+
-+	/*
-+	 * Find the deepest idle state that has its residency value satisfied
-+	 * and by also taking into account the power off latency for the state.
-+	 * Start at the state picked by the dev PM QoS constraint validation.
-+	 */
-+	i = genpd->state_idx;
-+	do {
-+		if (idle_duration_ns >= (genpd->states[i].residency_ns +
-+		    genpd->states[i].power_off_latency_ns)) {
-+			genpd->state_idx = i;
-+			return true;
-+		}
-+	} while (--i >= 0);
-+
-+	return false;
-+}
-+
- struct dev_power_governor simple_qos_governor = {
- 	.suspend_ok = default_suspend_ok,
- 	.power_down_ok = default_power_down_ok,
-@@ -257,3 +312,8 @@ struct dev_power_governor pm_domain_always_on_gov = {
- 	.power_down_ok = always_on_power_down_ok,
- 	.suspend_ok = default_suspend_ok,
- };
-+
-+struct dev_power_governor pm_domain_cpu_gov = {
-+	.suspend_ok = default_suspend_ok,
-+	.power_down_ok = cpu_power_down_ok,
-+};
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index a6e251fe9deb..ae7061556a26 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -118,6 +118,7 @@ struct generic_pm_domain {
- 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
- 	bool max_off_time_changed;
- 	bool cached_power_down_ok;
-+	bool cached_power_down_state_idx;
- 	int (*attach_dev)(struct generic_pm_domain *domain,
- 			  struct device *dev);
- 	void (*detach_dev)(struct generic_pm_domain *domain,
-@@ -202,6 +203,7 @@ int dev_pm_genpd_set_performance_state(struct device *dev, unsigned int state);
- 
- extern struct dev_power_governor simple_qos_governor;
- extern struct dev_power_governor pm_domain_always_on_gov;
-+extern struct dev_power_governor pm_domain_cpu_gov;
- #else
- 
- static inline struct generic_pm_domain_data *dev_gpd_data(struct device *dev)
-@@ -245,6 +247,7 @@ static inline int dev_pm_genpd_set_performance_state(struct device *dev,
- 
- #define simple_qos_governor		(*(struct dev_power_governor *)(NULL))
- #define pm_domain_always_on_gov		(*(struct dev_power_governor *)(NULL))
-+#define pm_domain_cpu_gov		(*(struct dev_power_governor *)(NULL))
- #endif
- 
- #ifdef CONFIG_PM_GENERIC_DOMAINS_SLEEP
--- 
-2.17.1
+On 22/11/18 1:12 PM, Chris Packham wrote:
+> The current plan is for these to go in via the ARM tree once appropriate
+> Reviews/Acks have been given
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-August/525561.html
+> 
+> This series adds drivers for the L2 cache and DDR RAM ECC functionality as
+> found on the MV78230/MV78x60 SoCs. Jan has tested these changes with the
+> MV78460 (on a custom board with a DDR3 ECC DIMM), Chris has tested these
+> changes with 88F6820 and 98dx3236 (both a custom boards with fixed DDR3 + ECC).
+> 
+> Also contained in this series is an additional debugfs wrapper.
+> 
+> Compared to the previous v6 series I've dropped the marvell,ecc-disable
+> property.
+> 
+> Compared to the previous v5 series I've split the dt-binding documentation into
+> its own patch and updated armada_xp_edac.c to use a SPDX license.
+> 
+> Compared to the previous v4 series I've added my s-o-b to some of Jan's
+> patches and rebased against v4.19.0.
+> 
+> Compared to the previous v3 series, the following changes have been made:
+> - Use shorter names for the AURORA ECC and parity registers
+> - Numerous formatting changes to edac/armada_xp.c (as requested by Boris)
+> - Added support for Armada-38x and 98dx3236 SoCs
+> 
+> Compared to the previous v2 series, the following changes have been made:
+> - Allocate EDAC structures later during probing and drop devres support
+>    patches (requested by Boris)
+> - Make drvdata->width usage consistent according to the comment (suggested by
+>    Chris)
+> 
+> Compared to the previous v1 series, the following changes have been made:
+> - Add the aurora-l2 register defines earlier in the series (suggested by
+>    Russell King and Gregory CLEMENT )
+> - Changed the DT vendor prefix from "arm" to "marvell" for the ecc-enable/disable
+>    properties on the aurora-l2 (suggested by Russell King)
+> - Fix some warnings reported by checkpatch
+> 
+> Compared to the original RFC series, the following changes have been made:
+> - Integrated Chris' patches for parity and ECC configuration via DT
+> - Merged the DDR RAM and L2 cache drivers (as requested by Boris, analogous
+>    to fsl_ddr_edac.c and mpc85xx_edac.c)
+> - Added myself to MAINTAINERS (requested by Boris)
+> - L2 cache: Track the msg size and use snprintf (review comment by Chris)
+> - L2 cache: Split error injection from the check function (review comment by
+>    Chris)
+> - DDR RAM: Allow 16 bit width in addition to 32 and 64 bit (review comment by
+>    Chris)
+> - Use of_match_ptr() (review comments by Chris)
+> - Minor checkpatch cleanups
+> 
+> Chris Packham (4):
+>    ARM: l2x0: support parity-enable/disable on aurora
+>    dt-bindings: ARM: document marvell,ecc-enable binding
+>    ARM: l2x0: add marvell,ecc-enable property for aurora
+>    EDAC: armada_xp: Add support for more SoCs
+> 
+> Jan Luebbe (5):
+>    ARM: l2c: move cache-aurora-l2.h to asm/hardware
+>    ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+>    ARM: aurora-l2: add defines for parity and ECC registers
+>    EDAC: Add missing debugfs_create_x32 wrapper
+>    EDAC: Add driver for the Marvell Armada XP SDRAM and L2 cache ECC
+> 
+>   .../devicetree/bindings/arm/l2c2x0.txt        |   1 +
+>   MAINTAINERS                                   |   6 +
+>   .../asm/hardware}/cache-aurora-l2.h           |  50 +-
+>   arch/arm/mm/cache-l2x0.c                      |  18 +-
+>   drivers/edac/Kconfig                          |   7 +
+>   drivers/edac/Makefile                         |   1 +
+>   drivers/edac/armada_xp_edac.c                 | 635 ++++++++++++++++++
+>   drivers/edac/debugfs.c                        |  11 +
+>   drivers/edac/edac_module.h                    |   5 +
+>   9 files changed, 730 insertions(+), 4 deletions(-)
+>   rename arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h (50%)
+>   create mode 100644 drivers/edac/armada_xp_edac.c
+> 
 
 
 _______________________________________________
