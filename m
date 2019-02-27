@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
 	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT
 	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 70FA3C00319
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:51:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8EA80C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:52:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3B0C42186A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:51:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55E5A217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 20:52:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dn57RSof";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="0xPrcwTi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B0C42186A
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tgiFoUiO";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=xilinx.onmicrosoft.com header.i=@xilinx.onmicrosoft.com header.b="PtNgERtb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55E5A217F5
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=xilinx.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,63 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vGQrhIs4YwXg4Z8RHCPQjzQGDFGFHQ2fE6TeAK9cze0=; b=dn57RSofPahMoU
-	TB5VUYDqlbrEUlV1yP3nu7ONhYFkwrMqTYI3jaCcXvp5VyIHcJG4hQkUqe4nPj+erVH3GivqbVSb7
-	plV+PuA4K9X2TjF2yp05WaPXlZlMG0AC6xO+y+nRhJSMLC5eY/T5x9sgJzQyBFmE3Idixt+xgmbgI
-	DN2jPmPXhxaHSpnkwaFR9twQOkrtpW5qmpV6cG1JMQOKyNZdQERNPgKjcrH/33osEqy20soV1VBTV
-	EvrsHdGINOjlpXDpSFDpWytV0J/g0vmuKVhgXY2g46YZ+SO3TlbZCQ/JVeYS/se2IgHZgb3wk4pm7
-	396xC/NP0h5xiK+HuKJQ==;
+	List-Owner; bh=JhxP4s95qM21DEOmXlyJfhqnmxhhcfVUZb0DPFdvXaA=; b=tgiFoUiOpsTqhT
+	1Wcz04clNlEJ+Dy+/oWkiScfgXypMmcsWqDq028mK/V7ikedgq+tRXqs3XKEZr1FNNkhU2fsC5iyR
+	DkADhTB6bTAAH+X46uhtm5AY+R6S+V/CgmFWTZaJ/ehoMJ0gLOXdHSnaM9ORD7PZyDzZGcf4dtBA7
+	JOP1PRbZy5rTDAdsfHsF89kH9K38L67XCPcbNPMoNR6fdeOMPaydMweKbvbuFpkpZm/Fv/nWmjfgy
+	3RVh97uE4s5zeHKM4UZKwzahlw/G8ceigI/AkmYLaIM4pzrQecvthaLKZN5oYq3DmgdkbRAAM3vEf
+	r/1xFgmQSpXvQi5pjPPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz6B6-0000o6-PS; Wed, 27 Feb 2019 20:51:44 +0000
-Received: from mail-bl2nam02on060a.outbound.protection.outlook.com
- ([2a01:111:f400:fe46::60a]
- helo=NAM02-BL2-obe.outbound.protection.outlook.com)
+	id 1gz6BV-0001DN-Oh; Wed, 27 Feb 2019 20:52:09 +0000
+Received: from mail-co1nam03on062e.outbound.protection.outlook.com
+ ([2a01:111:f400:fe48::62e]
+ helo=NAM03-CO1-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz6Aw-0000gA-FO
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 20:51:36 +0000
+ id 1gz6Az-0000gg-NB
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 20:51:40 +0000
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=xilinx.onmicrosoft.com; s=selector1-xilinx-com;
  h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=2eNNWge4FNeF/gb2t2+RayD722X0oILwPTV4+dw2DK0=;
- b=0xPrcwTieaxHdiaOFBBvYB/jZrDPZzWRVJjiVPOpwoH5fmpMg9TBkONB5k8QCsqP9wAL9I2rFEk3bAwHpi5yBYTYtL+FGzpvpIGjcUX9gauOLCN/FC32PODoS3iCoivJuMrUwjl55XAK2ekZsBOPk2S8L0CetSF6qszkNMwM5ew=
-Received: from DM6PR02CA0060.namprd02.prod.outlook.com (2603:10b6:5:177::37)
- by SN6PR02MB4526.namprd02.prod.outlook.com (2603:10b6:805:af::32) with
- Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.1643.15; Wed, 27 Feb
- 2019 20:51:29 +0000
-Received: from CY1NAM02FT052.eop-nam02.prod.protection.outlook.com
- (2a01:111:f400:7e45::207) by DM6PR02CA0060.outlook.office365.com
- (2603:10b6:5:177::37) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1622.16 via Frontend
+ bh=K6B4XBmAvzGNtVg1EtOboI7I+MWDbNRvMEphG1E90jI=;
+ b=PtNgERtb2DUq6ZGs9d0lf+FHT+acBbtYq22U5j6kJtFBiZY15qmKDog0AXvj6G82hxQmNt9rErVyEk+VeEcgjMxRnMT8HwrKXWOwtV3kfWVXELWOkP0txAXMQQOp0AYH1pip0WK7bfM23i85R5XoFO+g4qnXvx2sYZLvojk07ds=
+Received: from DM6PR02CA0008.namprd02.prod.outlook.com (2603:10b6:5:1c::21) by
+ CY4PR02MB2261.namprd02.prod.outlook.com (2603:10b6:903:14::15) with
+ Microsoft
+ SMTP Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1643.14; Wed, 27 Feb 2019 20:51:29 +0000
+Received: from SN1NAM02FT028.eop-nam02.prod.protection.outlook.com
+ (2a01:111:f400:7e44::203) by DM6PR02CA0008.outlook.office365.com
+ (2603:10b6:5:1c::21) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA384) id 15.20.1665.15 via Frontend
  Transport; Wed, 27 Feb 2019 20:51:29 +0000
+Authentication-Results: spf=pass (sender IP is 149.199.60.83)
+ smtp.mailfrom=xilinx.com; vger.kernel.org; dkim=none (message not signed)
+ header.d=none;vger.kernel.org; dmarc=bestguesspass action=none
+ header.from=xilinx.com;
 Received-SPF: Pass (protection.outlook.com: domain of xilinx.com designates
  149.199.60.83 as permitted sender) receiver=protection.outlook.com;
  client-ip=149.199.60.83; helo=xsj-pvapsmtpgw01;
 Received: from xsj-pvapsmtpgw01 (149.199.60.83) by
- CY1NAM02FT052.mail.protection.outlook.com (10.152.74.123) with Microsoft SMTP
+ SN1NAM02FT028.mail.protection.outlook.com (10.152.72.105) with Microsoft SMTP
  Server (version=TLS1_0, cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.20.1643.11
  via Frontend Transport; Wed, 27 Feb 2019 20:51:29 +0000
 Received: from unknown-38-66.xilinx.com ([149.199.38.66] helo=xsj-pvapsmtp01)
  by xsj-pvapsmtpgw01 with esmtp (Exim 4.63)
  (envelope-from <jolly.shah@xilinx.com>)
- id 1gz6Aq-0007dS-PH; Wed, 27 Feb 2019 12:51:28 -0800
+ id 1gz6Aq-0007dR-O1; Wed, 27 Feb 2019 12:51:28 -0800
 Received: from [127.0.0.1] (helo=localhost)
  by xsj-pvapsmtp01 with smtp (Exim 4.63)
  (envelope-from <jolly.shah@xilinx.com>)
- id 1gz6Al-0002WZ-Lo; Wed, 27 Feb 2019 12:51:23 -0800
+ id 1gz6Al-0002WZ-K7; Wed, 27 Feb 2019 12:51:23 -0800
 Received: from xsj-pvapsmtp01 (xsj-pvapsmtp01.xilinx.com [149.199.38.66])
- by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1RKpKIq021081; 
+ by xsj-smtp-dlp2.xlnx.xilinx.com (8.13.8/8.13.1) with ESMTP id x1RKpKZS021083; 
  Wed, 27 Feb 2019 12:51:20 -0800
 Received: from [172.19.2.91] (helo=xsjjollys50.xilinx.com)
  by xsj-pvapsmtp01 with esmtp (Exim 4.63)
  (envelope-from <jollys@xilinx.com>)
- id 1gz6Ai-0002Vn-15; Wed, 27 Feb 2019 12:51:20 -0800
+ id 1gz6Ai-0002Vn-3G; Wed, 27 Feb 2019 12:51:20 -0800
 From: Jolly Shah <jolly.shah@xilinx.com>
 To: <robh+dt@kernel.org>
-Subject: [PATCH 1/2] include: dt-binding: clock: Rename zynqmp header file
-Date: Wed, 27 Feb 2019 12:51:09 -0800
-Message-ID: <1551300670-6949-2-git-send-email-jollys@xilinx.com>
+Subject: [PATCH 2/2] dt-bindings: xilinx: Separate clock binding from firmware
+ doc
+Date: Wed, 27 Feb 2019 12:51:10 -0800
+Message-ID: <1551300670-6949-3-git-send-email-jollys@xilinx.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1551300670-6949-1-git-send-email-jollys@xilinx.com>
 References: <1551300670-6949-1-git-send-email-jollys@xilinx.com>
@@ -93,55 +98,55 @@ X-EOPAttributedMessage: 0
 X-MS-Office365-Filtering-HT: Tenant
 X-Forefront-Antispam-Report: CIP:149.199.60.83; IPV:NLI; CTRY:US; EFV:NLI;
  SFV:NSPM;
- SFS:(10009020)(376002)(136003)(396003)(39860400002)(346002)(2980300002)(199004)(189003)(76176011)(51416003)(7696005)(446003)(106466001)(426003)(6346003)(2351001)(6666004)(336012)(486006)(2906002)(50226002)(16586007)(47776003)(8676002)(5660300002)(316002)(305945005)(26005)(8936002)(48376002)(81166006)(54906003)(81156014)(50466002)(14444005)(72206003)(478600001)(36756003)(9786002)(77096007)(186003)(63266004)(356004)(107886003)(36386004)(106002)(2616005)(44832011)(476003)(126002)(4326008)(11346002)(107986001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:SN6PR02MB4526; H:xsj-pvapsmtpgw01; FPR:;
+ SFS:(10009020)(136003)(39860400002)(396003)(376002)(346002)(2980300002)(199004)(189003)(426003)(36756003)(26005)(186003)(77096007)(50226002)(126002)(446003)(11346002)(2616005)(336012)(476003)(2351001)(5660300002)(63266004)(106466001)(9786002)(36386004)(305945005)(316002)(2906002)(8936002)(81156014)(72206003)(107886003)(14444005)(81166006)(4326008)(54906003)(106002)(6666004)(356004)(7696005)(51416003)(486006)(47776003)(16586007)(50466002)(48376002)(76176011)(8676002)(478600001)(44832011)(107986001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:CY4PR02MB2261; H:xsj-pvapsmtpgw01; FPR:;
  SPF:Pass; LANG:en; PTR:unknown-60-83.xilinx.com; A:1; MX:1; 
 MIME-Version: 1.0
 X-MS-PublicTrafficType: Email
-X-MS-Office365-Filtering-Correlation-Id: 1812a6c2-1aee-4bd0-0d6f-08d69cf5591f
+X-MS-Office365-Filtering-Correlation-Id: e033fdc4-8a7f-4185-e086-08d69cf55904
 X-Microsoft-Antispam: BCL:0; PCL:0;
  RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4608103)(4709054)(2017052603328)(7153060);
- SRVR:SN6PR02MB4526; 
-X-MS-TrafficTypeDiagnostic: SN6PR02MB4526:
+ SRVR:CY4PR02MB2261; 
+X-MS-TrafficTypeDiagnostic: CY4PR02MB2261:
 X-Auto-Response-Suppress: DR, RN, NRN, OOF, AutoReply
-X-Microsoft-Exchange-Diagnostics: 1; SN6PR02MB4526;
- 20:QVa8YRUjXMEJrw2Bng+hNeu8hH9GcmpKL1esCW4gVK4x2nE+gqGpKuJt4n2GzKdTLEEBzYwdqhkAdnfDyWNxucW0GoqN3BRDXvk/LK7A8Ser4EApMEksWZie4bRfar8fKDIGbmZfDFJVWT/ABeayid9yuMGYb2fM0gzeJZr3cpszIdaiJfQzktByKxDKqncJOJ+zBtEfsdo/+qG0l0daqrggBXWiCt+ukQzbnow45fEVRtu/eK8jMdttZB4pt4kvl63tNi8aMj1RQtyJ1T+4jxcZgJnFN36QnwbD9vJMOIKM2mM4j5XBaIO0g46sfWWb9WNW0ATA8gWGDnFwGE3phK6UgXCu4xbNQLa3C4xApHt95nEr2C3uLbrJbyjw+c4eWBZCfJC3jG3RnVbiMDc+djAicm/xF9E1/JmUm04etXUjBLl1VOJJNSh3hQ96tuDnmA2rk0Df8TguMPX+7B1usi5wL+XbzRUhMVGemoCLMRCp1fNK8jY9psL6pIlD2kBO
-X-Microsoft-Antispam-PRVS: <SN6PR02MB45264A8AE3045A07BFDFEADCB8740@SN6PR02MB4526.namprd02.prod.outlook.com>
+X-Microsoft-Exchange-Diagnostics: 1; CY4PR02MB2261;
+ 20:H2n9sS9qkX6/sYXLgPzK18qlZeVSDzlp+1VIRdc0wS4Jop4ixQKNZyN00MpTPtfM0enfMS0W5RvwHhw3spXWHVibvs6o5+H3sOgww3I2thqFtBD5OObZCJembhCypb5CAHU4wEsUWpCkUA85tBACpt9yZsOOBD34siysaQjM6dMLVbohzoElG67tojNcecDzyyBLNw5Z4wglJFAvqteHTu4dJg92OciDgLQESBgZp7Nmy2SFi3X0AoagF8hosjkQCeYr0vEJ1wLwWq3NBDMVfLBxK4/6hYjz+SU6glhx8jg1c1FcvEsnp6lOLMyMLVT04qVxsJdmeOhuKi8ttcYjMb8XCsw4Q3x4NPxAxWAAZAY0moGDt7xhDCdK7daOT5+l7PM3PJ/uxI7UydjwRlUvvGaZbT5I6mhIUhc3NVVcZcUAbrORkk5mPi1UWXq2ajTpog+KjYS0l1z3HCngNQtZDKM3IvlqqEzZbXUEbt5xihp1ZJt8J8/vnpcHtbbHDEmf
+X-Microsoft-Antispam-PRVS: <CY4PR02MB2261AE0C00EC0B884B76FA90B8740@CY4PR02MB2261.namprd02.prod.outlook.com>
 X-Forefront-PRVS: 0961DF5286
-X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; SN6PR02MB4526;
- 23:/s1fAyNRzijW/TgvVf6P8gntZOqvQ8b3WUA3fNnUA?=
- =?us-ascii?Q?gJvlEN4lcTol8bfFr5ZuREBLKGl92GrBpQuSjyDUtq37JxTG8vgrtPYOgGDz?=
- =?us-ascii?Q?wvv18cBsize8Ljq6+bzAT90jsDe0kTXCVzukmmnwj2x/G25uaYru0VwOzhmB?=
- =?us-ascii?Q?FMmUiDRAzNN7FcOMu8EM9VlCw4+6WdKeBuPDFL88Tfc7y3vNo4XWlQmA7xJz?=
- =?us-ascii?Q?wirdxvYN42FremV6aJUKZAAhm4L1AGjugZChwaiYiheY187YO4k+rlgURvAv?=
- =?us-ascii?Q?Sq6Ux3I5quVeVTPD9lnhJMjjzpvtKthy8AER6rnb+EU4NTvRRDl/Y7ajoHha?=
- =?us-ascii?Q?bj5qrKSQhzMtAwSPYWo7IAJSpCF+xyVLH/fuKGYRAYMdjBYX2TCT1rnm6G80?=
- =?us-ascii?Q?xOwumR65bartNnkF13mtaVaTdC8MWYMaXr0CL3LrRv+QtRYh3k6p3lmwvqyB?=
- =?us-ascii?Q?iTeiCQNDuWPdI/XfX26f0tRL+5Csj/TiKrQt0z4K4AR+rJVMn8XZ/WKF1NGZ?=
- =?us-ascii?Q?3kuez6NzSaW/9oKAwwaq0cW4TWf9vPiXWa++CKw8TDGFSqeA3EubXmjGDsso?=
- =?us-ascii?Q?S37cNe3UhlNtfutjtgL/UazusH8ZvoVyFuZCyHUZ3OR9qjQ4Y58rjFpA+NzL?=
- =?us-ascii?Q?BsTDuAeggYxEe3rtrB0MR3bshSTri8YVsnXiDhzthUi26xuU8oRkrlwesVWI?=
- =?us-ascii?Q?f9d3XfpUgVhwLH2xoBdSjoCUt5cq99MMiQX2w77abacNFPd7HZGqcdizCWnw?=
- =?us-ascii?Q?3KlPjO6I6jqsOAYQZChmnvGpGXtRs2V0PEhsbLZ4sr2Grw1kr7yr6Xyue75n?=
- =?us-ascii?Q?wyjLrOHo1PjhtB6Y6sj6ZM04BS5q7HEnes5eMCijPfKXkfkZ2IFOClivZawf?=
- =?us-ascii?Q?Wz3uvHOWLImA/gsLKXVwua6ymHIB8YLno8NapGQPQp0F53AQbyu4V4J2CWrK?=
- =?us-ascii?Q?zElKCXqRYXy3B0qv7B6SOswGoQYVcD4ZuzrIn4je9P4XTGBgRlgDKjE1g5oD?=
- =?us-ascii?Q?cvQncFLF0UOdniWiEyYyTK8ootZnz+aDWmaN/GcKtux9PzK5wwvtfkf+dFoe?=
- =?us-ascii?Q?xhq6nzi2CHR1wOrhFEj5/MCdCGT0EUbhbjQSUPZ8NQj5BGGkFz7Wunmz9LF+?=
- =?us-ascii?Q?ByKJ5PC8Rk46hDaCNLwJOBi1d42oh/ZioTmRYCs2UgYhX1c5chOyw=3D=3D?=
+X-Microsoft-Exchange-Diagnostics: =?us-ascii?Q?1; CY4PR02MB2261;
+ 23:8hMEWafw7TyrJQyF43VCH7fNKlmkxApRn7SJRtShT?=
+ =?us-ascii?Q?IiP8PJAVW1vEvyQ2JtqicsrR5N1JgDJU8PcFYBx1I56EyVPJOANLEa0T39Bf?=
+ =?us-ascii?Q?m4Umaua9+FaOZ+scNsiAC96LxxmQfgj5CEApDxtTbRm6BskFxO8CPpPTpBIe?=
+ =?us-ascii?Q?67SvPJ39OFnr6nn8z3cbvMbznV8OaTomlm6JI2nrFvt6tgQefeeJ3MrdBPe4?=
+ =?us-ascii?Q?QidDFnvtGTi5ekkdvdoatSxx0yciZOBn2k4ggz7pqAQkLF67nAg5KsNntgNS?=
+ =?us-ascii?Q?dtZdvo0YknqvTqfLTl3VnqvDlQEEIEA0S/4qKbFzIvMNctgx3t0LxPU9AbyZ?=
+ =?us-ascii?Q?q1hXKpY0N5KoSP+0Rm0LhEhdoz4NeQZHhBEpy6/3IuxGQDWhBsd3QVEfBNi6?=
+ =?us-ascii?Q?elio6d9N1N92qQh+yhK1sCjVOisfmAdupEWwIiQqbz7guMGpop4gE1NktoEK?=
+ =?us-ascii?Q?5pO4E92bSeE3VL4AaiTemHJyAwa0YjTg5LuHX3rTcQ8aqO0EYhnKzK2lPbDq?=
+ =?us-ascii?Q?nieBHpX1TmiEQxtAcIDyav0CRqFhAfI6gVsyvLKy/+8VtYB36FE3ftomZ6Yv?=
+ =?us-ascii?Q?GcYVFkNlYLS42+5QjSmzJUGQ4PKAHv4+3UKHLdpBvQB9QeDnYO4hWlEwdgR3?=
+ =?us-ascii?Q?ie7LLz+6RBUJg638dnYk7+ION4u169PzXrirTcgJ4mFUvhZG52OTYIVzh0Z4?=
+ =?us-ascii?Q?xCXbd6n6hd6LoTGolGvEK/n+BXBK5sxSUlEtlf7u2aywdrw3Dgc/rUdoNlBi?=
+ =?us-ascii?Q?5ZJIVdbzGqIXVRGl5cXO4Kg/s8tjdPgd+LfFBC0AEXLArFDdX8ZSQR1GR+Ic?=
+ =?us-ascii?Q?ZxMHTeE8dvhi9xMrRUl3opP8jzT4ns5QZcs0/iOmu4RnVhoGk4ivHX81MTrS?=
+ =?us-ascii?Q?JDWwNfZORs2mBwEvIDZrHLWtlh3QNHQwE7qMpvhNqbUXOyUaXUu2JdJqxbmu?=
+ =?us-ascii?Q?7DpVTHvqDaE+jh8eWS/6UWiK0efOgC9rfbu/mbwezR0al6j16SD9D7atffq4?=
+ =?us-ascii?Q?xadk0wGbAnNnHUdEGX6TnC/KsrgRq3i0FVuaAv/1PXcAWUI6cNsSHztacLRR?=
+ =?us-ascii?Q?c7buQQ4zhp6mh13270ZrmGQl5uB9+aX3EWRnUMKPgnzAEiPRspIaZatybZG6?=
+ =?us-ascii?Q?1OyxpjEbOFvjnMSuU/jWnWA497pDvig?=
 X-MS-Exchange-SenderADCheck: 1
-X-Microsoft-Antispam-Message-Info: r9iFccaUk9HodWPX9/47OIBtVJdGNHD1ug6ybSDMRoriX3c+wx6+8TUKbTRA4mjeqdTo+vb+KdjV1nCaz8Om0AnXQmbEwSdyMdo2aVZf4tvCef/Y8Fr0QDwKOmskc2tKOyy91Pz6Hi/BmHbe5iDPrqVJ52pHZoQhJdbU1tmHmk5ZLteyICmTODPAhnXNF+/Ltcg0uUFMzElTaYb6GI1C6MLOsi9ZC5bEyx+RThNXVn5uXQGCQMad/KlXe3TSREl/y8WEjAyLuFpdqfeWALtKmcPxaOoJzYGReJRi7SSn/Cb802z51yiMWfZXNdC5zz9UkrttaR14lxLX4L7MNNCl/cw0jTllqCsD9C/c7Whip08+UYdEDm7i3tz+FTHGOzT4mnGaapAkMpFh4bVqTB++QScXdszPzWIK/OMcIqG34xg=
+X-Microsoft-Antispam-Message-Info: eFuQ+0ncctY+1TNJ+w6c3oXZjn8Xbh1Ec4XDAZXML2q6Y1fqHdR1J3lyMttw0T+eUIh+T/1hohOY9UH6geS1HR6kHxaOm6C5G8a+HNULDAF6+ieKLvKE67sKxWW4yf6GiDTDFzdJvBi/9622MfgdeJxOSaKpt0sU3yTJ3scCytFoaxibJmrWHCmNBD8CpYB7Vx++jJK7tpqqBXl6tnmIXePjxZwe9fOAo3IyQS2gSlFJkSQ1ff/lsvE4IDiksUO22W7bKcIX0dG8fFAeuzyE7o6Fum5ZXOP4+H67uBIukYninlCjKCC3+jMT2eByJrC8fak5XzmNC793HmqOp3kenQUQgXwoEWb7qHvXqOdQIXt8a/BDlzJvgQAzXs61Hs6cbcWPB0SHcglSrB/EALezAXzIH8n3/z6E3hAB5HrF4Kk=
 X-OriginatorOrg: xilinx.com
-X-MS-Exchange-CrossTenant-OriginalArrivalTime: 27 Feb 2019 20:51:29.2273 (UTC)
-X-MS-Exchange-CrossTenant-Network-Message-Id: 1812a6c2-1aee-4bd0-0d6f-08d69cf5591f
+X-MS-Exchange-CrossTenant-OriginalArrivalTime: 27 Feb 2019 20:51:29.1494 (UTC)
+X-MS-Exchange-CrossTenant-Network-Message-Id: e033fdc4-8a7f-4185-e086-08d69cf55904
 X-MS-Exchange-CrossTenant-Id: 657af505-d5df-48d0-8300-c31994686c5c
 X-MS-Exchange-CrossTenant-OriginalAttributedTenantConnectingIp: TenantId=657af505-d5df-48d0-8300-c31994686c5c; Ip=[149.199.60.83];
  Helo=[xsj-pvapsmtpgw01]
 X-MS-Exchange-CrossTenant-FromEntityHeader: HybridOnPrem
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: SN6PR02MB4526
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: CY4PR02MB2261
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_125135_011021_28B40EC8 
-X-CRM114-Status: GOOD (  11.78  )
+X-CRM114-CacheID: sfid-20190227_125137_901731_A51BD037 
+X-CRM114-Status: GOOD (  12.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -162,286 +167,159 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rename file name of ZynqMP clk dt-bindings to align with
-file name of reset and power dt-bindings.
+From: Rajan Vaja <rajan.vaja@xilinx.com>
+
+Clock description is part of firmware doc. Move clock description
+in separate doc.
 
 Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- .../firmware/xilinx/xlnx,zynqmp-firmware.txt       |   2 +-
- include/dt-bindings/clock/xlnx,zynqmp-clk.h        | 116 -------------------
- include/dt-bindings/clock/xlnx-zynqmp-clk.h        | 126 +++++++++++++++++++++
- 3 files changed, 127 insertions(+), 117 deletions(-)
- delete mode 100644 include/dt-bindings/clock/xlnx,zynqmp-clk.h
- create mode 100644 include/dt-bindings/clock/xlnx-zynqmp-clk.h
+ .../devicetree/bindings/clock/xlnx,zynqmp-clk.txt  | 63 ++++++++++++++++++++++
+ .../firmware/xilinx/xlnx,zynqmp-firmware.txt       | 54 +------------------
+ 2 files changed, 64 insertions(+), 53 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/xlnx,zynqmp-clk.txt
 
+diff --git a/Documentation/devicetree/bindings/clock/xlnx,zynqmp-clk.txt b/Documentation/devicetree/bindings/clock/xlnx,zynqmp-clk.txt
+new file mode 100644
+index 0000000..391ee1a6
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/xlnx,zynqmp-clk.txt
+@@ -0,0 +1,63 @@
++--------------------------------------------------------------------------
++Device Tree Clock bindings for the Zynq Ultrascale+ MPSoC controlled using
++Zynq MPSoC firmware interface
++--------------------------------------------------------------------------
++The clock controller is a h/w block of Zynq Ultrascale+ MPSoC clock
++tree. It reads required input clock frequencies from the devicetree and acts
++as clock provider for all clock consumers of PS clocks.
++
++See clock_bindings.txt for more information on the generic clock bindings.
++
++Required properties:
++ - #clock-cells:	Must be 1
++ - compatible:		Must contain:	"xlnx,zynqmp-clk"
++ - clocks:		List of clock specifiers which are external input
++			clocks to the given clock controller. Please refer
++			the next section to find the input clocks for a
++			given controller.
++ - clock-names:		List of clock names which are exteral input clocks
++			to the given clock controller. Please refer to the
++			clock bindings for more details.
++
++Input clocks for zynqmp Ultrascale+ clock controller:
++
++The Zynq UltraScale+ MPSoC has one primary and four alternative reference clock
++inputs. These required clock inputs are:
++ - pss_ref_clk (PS reference clock)
++ - video_clk (reference clock for video system )
++ - pss_alt_ref_clk (alternative PS reference clock)
++ - aux_ref_clk
++ - gt_crx_ref_clk (transceiver reference clock)
++
++The following strings are optional parameters to the 'clock-names' property in
++order to provide an optional (E)MIO clock source:
++ - swdt0_ext_clk
++ - swdt1_ext_clk
++ - gem0_emio_clk
++ - gem1_emio_clk
++ - gem2_emio_clk
++ - gem3_emio_clk
++ - mio_clk_XX		# with XX = 00..77
++ - mio_clk_50_or_51	#for the mux clock to gem tsu from 50 or 51
++
++
++Output clocks are registered based on clock information received
++from firmware. Output clocks indexes are mentioned in
++include/dt-bindings/clock/xlnx-zynqmp-clk.h.
++
++-------
++Example
++-------
++
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
++		zynqmp_clk: clock-controller {
++			#clock-cells = <1>;
++			compatible = "xlnx,zynqmp-clk";
++			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
++			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
++		};
++	};
++};
 diff --git a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-index 614bac5..45d259c 100644
+index 45d259c..a4fe136 100644
 --- a/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
 +++ b/Documentation/devicetree/bindings/firmware/xilinx/xlnx,zynqmp-firmware.txt
-@@ -62,7 +62,7 @@ order to provide an optional (E)MIO clock source:
+@@ -17,53 +17,6 @@ Required properties:
+ 		  - "smc" : SMC #0, following the SMCCC
+ 		  - "hvc" : HVC #0, following the SMCCC
  
- Output clocks are registered based on clock information received
- from firmware. Output clocks indexes are mentioned in
--include/dt-bindings/clock/xlnx,zynqmp-clk.h.
-+include/dt-bindings/clock/xlnx-zynqmp-clk.h.
- 
+---------------------------------------------------------------------------
+-Device Tree Clock bindings for the Zynq Ultrascale+ MPSoC controlled using
+-Zynq MPSoC firmware interface
+---------------------------------------------------------------------------
+-The clock controller is a h/w block of Zynq Ultrascale+ MPSoC clock
+-tree. It reads required input clock frequencies from the devicetree and acts
+-as clock provider for all clock consumers of PS clocks.
+-
+-See clock_bindings.txt for more information on the generic clock bindings.
+-
+-Required properties:
+- - #clock-cells:	Must be 1
+- - compatible:		Must contain:	"xlnx,zynqmp-clk"
+- - clocks:		List of clock specifiers which are external input
+-			clocks to the given clock controller. Please refer
+-			the next section to find the input clocks for a
+-			given controller.
+- - clock-names:		List of clock names which are exteral input clocks
+-			to the given clock controller. Please refer to the
+-			clock bindings for more details.
+-
+-Input clocks for zynqmp Ultrascale+ clock controller:
+-
+-The Zynq UltraScale+ MPSoC has one primary and four alternative reference clock
+-inputs. These required clock inputs are:
+- - pss_ref_clk (PS reference clock)
+- - video_clk (reference clock for video system )
+- - pss_alt_ref_clk (alternative PS reference clock)
+- - aux_ref_clk
+- - gt_crx_ref_clk (transceiver reference clock)
+-
+-The following strings are optional parameters to the 'clock-names' property in
+-order to provide an optional (E)MIO clock source:
+- - swdt0_ext_clk
+- - swdt1_ext_clk
+- - gem0_emio_clk
+- - gem1_emio_clk
+- - gem2_emio_clk
+- - gem3_emio_clk
+- - mio_clk_XX		# with XX = 00..77
+- - mio_clk_50_or_51	#for the mux clock to gem tsu from 50 or 51
+-
+-
+-Output clocks are registered based on clock information received
+-from firmware. Output clocks indexes are mentioned in
+-include/dt-bindings/clock/xlnx-zynqmp-clk.h.
+-
  -------
  Example
-diff --git a/include/dt-bindings/clock/xlnx,zynqmp-clk.h b/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-deleted file mode 100644
-index 4aebe6e..0000000
---- a/include/dt-bindings/clock/xlnx,zynqmp-clk.h
-+++ /dev/null
-@@ -1,116 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--/*
-- * Xilinx Zynq MPSoC Firmware layer
-- *
-- *  Copyright (C) 2014-2018 Xilinx, Inc.
-- *
-- */
--
--#ifndef _DT_BINDINGS_CLK_ZYNQMP_H
--#define _DT_BINDINGS_CLK_ZYNQMP_H
--
--#define IOPLL			0
--#define RPLL			1
--#define APLL			2
--#define DPLL			3
--#define VPLL			4
--#define IOPLL_TO_FPD		5
--#define RPLL_TO_FPD		6
--#define APLL_TO_LPD		7
--#define DPLL_TO_LPD		8
--#define VPLL_TO_LPD		9
--#define ACPU			10
--#define ACPU_HALF		11
--#define DBF_FPD			12
--#define DBF_LPD			13
--#define DBG_TRACE		14
--#define DBG_TSTMP		15
--#define DP_VIDEO_REF		16
--#define DP_AUDIO_REF		17
--#define DP_STC_REF		18
--#define GDMA_REF		19
--#define DPDMA_REF		20
--#define DDR_REF			21
--#define SATA_REF		22
--#define PCIE_REF		23
--#define GPU_REF			24
--#define GPU_PP0_REF		25
--#define GPU_PP1_REF		26
--#define TOPSW_MAIN		27
--#define TOPSW_LSBUS		28
--#define GTGREF0_REF		29
--#define LPD_SWITCH		30
--#define LPD_LSBUS		31
--#define USB0_BUS_REF		32
--#define USB1_BUS_REF		33
--#define USB3_DUAL_REF		34
--#define USB0			35
--#define USB1			36
--#define CPU_R5			37
--#define CPU_R5_CORE		38
--#define CSU_SPB			39
--#define CSU_PLL			40
--#define PCAP			41
--#define IOU_SWITCH		42
--#define GEM_TSU_REF		43
--#define GEM_TSU			44
--#define GEM0_REF		45
--#define GEM1_REF		46
--#define GEM2_REF		47
--#define GEM3_REF		48
--#define GEM0_TX			49
--#define GEM1_TX			50
--#define GEM2_TX			51
--#define GEM3_TX			52
--#define QSPI_REF		53
--#define SDIO0_REF		54
--#define SDIO1_REF		55
--#define UART0_REF		56
--#define UART1_REF		57
--#define SPI0_REF		58
--#define SPI1_REF		59
--#define NAND_REF		60
--#define I2C0_REF		61
--#define I2C1_REF		62
--#define CAN0_REF		63
--#define CAN1_REF		64
--#define CAN0			65
--#define CAN1			66
--#define DLL_REF			67
--#define ADMA_REF		68
--#define TIMESTAMP_REF		69
--#define AMS_REF			70
--#define PL0_REF			71
--#define PL1_REF			72
--#define PL2_REF			73
--#define PL3_REF			74
--#define WDT			75
--#define IOPLL_INT		76
--#define IOPLL_PRE_SRC		77
--#define IOPLL_HALF		78
--#define IOPLL_INT_MUX		79
--#define IOPLL_POST_SRC		80
--#define RPLL_INT		81
--#define RPLL_PRE_SRC		82
--#define RPLL_HALF		83
--#define RPLL_INT_MUX		84
--#define RPLL_POST_SRC		85
--#define APLL_INT		86
--#define APLL_PRE_SRC		87
--#define APLL_HALF		88
--#define APLL_INT_MUX		89
--#define APLL_POST_SRC		90
--#define DPLL_INT		91
--#define DPLL_PRE_SRC		92
--#define DPLL_HALF		93
--#define DPLL_INT_MUX		94
--#define DPLL_POST_SRC		95
--#define VPLL_INT		96
--#define VPLL_PRE_SRC		97
--#define VPLL_HALF		98
--#define VPLL_INT_MUX		99
--#define VPLL_POST_SRC		100
--#define CAN0_MIO		101
--#define CAN1_MIO		102
--
--#endif
-diff --git a/include/dt-bindings/clock/xlnx-zynqmp-clk.h b/include/dt-bindings/clock/xlnx-zynqmp-clk.h
-new file mode 100644
-index 0000000..cdc4c0b
---- /dev/null
-+++ b/include/dt-bindings/clock/xlnx-zynqmp-clk.h
-@@ -0,0 +1,126 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Xilinx Zynq MPSoC Firmware layer
-+ *
-+ *  Copyright (C) 2014-2018 Xilinx, Inc.
-+ *
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_ZYNQMP_H
-+#define _DT_BINDINGS_CLK_ZYNQMP_H
-+
-+#define IOPLL			0
-+#define RPLL			1
-+#define APLL			2
-+#define DPLL			3
-+#define VPLL			4
-+#define IOPLL_TO_FPD		5
-+#define RPLL_TO_FPD		6
-+#define APLL_TO_LPD		7
-+#define DPLL_TO_LPD		8
-+#define VPLL_TO_LPD		9
-+#define ACPU			10
-+#define ACPU_HALF		11
-+#define DBF_FPD			12
-+#define DBF_LPD			13
-+#define DBG_TRACE		14
-+#define DBG_TSTMP		15
-+#define DP_VIDEO_REF		16
-+#define DP_AUDIO_REF		17
-+#define DP_STC_REF		18
-+#define GDMA_REF		19
-+#define DPDMA_REF		20
-+#define DDR_REF			21
-+#define SATA_REF		22
-+#define PCIE_REF		23
-+#define GPU_REF			24
-+#define GPU_PP0_REF		25
-+#define GPU_PP1_REF		26
-+#define TOPSW_MAIN		27
-+#define TOPSW_LSBUS		28
-+#define GTGREF0_REF		29
-+#define LPD_SWITCH		30
-+#define LPD_LSBUS		31
-+#define USB0_BUS_REF		32
-+#define USB1_BUS_REF		33
-+#define USB3_DUAL_REF		34
-+#define USB0			35
-+#define USB1			36
-+#define CPU_R5			37
-+#define CPU_R5_CORE		38
-+#define CSU_SPB			39
-+#define CSU_PLL			40
-+#define PCAP			41
-+#define IOU_SWITCH		42
-+#define GEM_TSU_REF		43
-+#define GEM_TSU			44
-+#define GEM0_TX			45
-+#define GEM1_TX			46
-+#define GEM2_TX			47
-+#define GEM3_TX			48
-+#define GEM0_RX			49
-+#define GEM1_RX			50
-+#define GEM2_RX			51
-+#define GEM3_RX			52
-+#define QSPI_REF		53
-+#define SDIO0_REF		54
-+#define SDIO1_REF		55
-+#define UART0_REF		56
-+#define UART1_REF		57
-+#define SPI0_REF		58
-+#define SPI1_REF		59
-+#define NAND_REF		60
-+#define I2C0_REF		61
-+#define I2C1_REF		62
-+#define CAN0_REF		63
-+#define CAN1_REF		64
-+#define CAN0			65
-+#define CAN1			66
-+#define DLL_REF			67
-+#define ADMA_REF		68
-+#define TIMESTAMP_REF		69
-+#define AMS_REF			70
-+#define PL0_REF			71
-+#define PL1_REF			72
-+#define PL2_REF			73
-+#define PL3_REF			74
-+#define WDT			75
-+#define IOPLL_INT		76
-+#define IOPLL_PRE_SRC		77
-+#define IOPLL_HALF		78
-+#define IOPLL_INT_MUX		79
-+#define IOPLL_POST_SRC		80
-+#define RPLL_INT		81
-+#define RPLL_PRE_SRC		82
-+#define RPLL_HALF		83
-+#define RPLL_INT_MUX		84
-+#define RPLL_POST_SRC		85
-+#define APLL_INT		86
-+#define APLL_PRE_SRC		87
-+#define APLL_HALF		88
-+#define APLL_INT_MUX		89
-+#define APLL_POST_SRC		90
-+#define DPLL_INT		91
-+#define DPLL_PRE_SRC		92
-+#define DPLL_HALF		93
-+#define DPLL_INT_MUX		94
-+#define DPLL_POST_SRC		95
-+#define VPLL_INT		96
-+#define VPLL_PRE_SRC		97
-+#define VPLL_HALF		98
-+#define VPLL_INT_MUX		99
-+#define VPLL_POST_SRC		100
-+#define CAN0_MIO		101
-+#define CAN1_MIO		102
-+#define ACPU_FULL		103
-+#define GEM0_REF		104
-+#define GEM1_REF		105
-+#define GEM2_REF		106
-+#define GEM3_REF		107
-+#define GEM0_REF_UNG		108
-+#define GEM1_REF_UNG		109
-+#define GEM2_REF_UNG		110
-+#define GEM3_REF_UNG		111
-+#define LPD_WDT			112
-+
-+#endif
+ -------
+@@ -72,11 +25,6 @@ firmware {
+ 	zynqmp_firmware: zynqmp-firmware {
+ 		compatible = "xlnx,zynqmp-firmware";
+ 		method = "smc";
+-		zynqmp_clk: clock-controller {
+-			#clock-cells = <1>;
+-			compatible = "xlnx,zynqmp-clk";
+-			clocks = <&pss_ref_clk>, <&video_clk>, <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
+-			clock-names = "pss_ref_clk", "video_clk", "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
+-		};
++		...
+ 	};
+ };
 -- 
 2.7.4
 
