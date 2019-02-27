@@ -2,65 +2,84 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5D9B6C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:30:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 65A32C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:48:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E5332133D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:30:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 31B54217F5
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 19:48:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DaVEnjFF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E5332133D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l8b9pSG8";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ldC+wThu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 31B54217F5
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=k+/telzqeM2rGXe+rm8O9aEEIIy5Czt8IWs3eL/COXM=; b=DaVEnjFFgsOVZgqzuELeoA6PH
-	U0UgJHuFOx08brzJ57776WL8+RHdM6k+QYbmiMAYtXG7JpzWCeAxbpnSiuHRUI6md3bJBzaiwQxY1
-	WijIja80XuPWoWLWAacFn431ihYRsPOFqZORgvOkVQBI9JIdEAx8RFJq1mJiVOmrFv1dZIl3hcg67
-	ejsXsXsDgWQK/gzO42WvsLPBHzlr5uRU3U32LFemIIRQnaheVTtcn7NERhWbvDIFlauYOfI04Rbfw
-	Nk0P1HdNmN9gR4iHnyaAfZgOvBRR4co3xNkCR5aXtQUhU16Vj81/LQkLzPS0ks5OtBn4ihM8RwRSc
-	zRG8e0JsA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=3SvQI/V036aPSYure/L4+Z+TdVZJ51ojtPYXUs5LhZI=; b=l8b9pSG8AkASsE
+	Js4YBG+wotgKx+XzWsidJ3lsSZgfMJFE1W8HAlUW2yPlTz/DYx/sKZNyugl4LI+faGTKIppVaBpCx
+	IKEvEPhl4C+PVjEs+bMomO3uVqqk7gsdPzwqyJ8UB22rk3+/YSFuDoCPhcq5B1tmOcvuhLAC+YFY/
+	sfEkRDvclC3ZFMxMZ8VxTcYVuOsdxCyHURR76bxfL1URDNhq9qpQrrikk/zOpPHqeV8X935ecwDYz
+	DCJAgk1vGV4KcglMR6jBRFy1eUE+Nnoa3tiLe2kopViiPqwcFbCRPsVr582uXRa9MQ6ynuOYiNL4x
+	PIA1N6odAqchiyApcvDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gz4uK-0007jm-0E; Wed, 27 Feb 2019 19:30:20 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gz4uF-0007iw-Ud; Wed, 27 Feb 2019 19:30:18 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 78898A78;
- Wed, 27 Feb 2019 11:30:14 -0800 (PST)
-Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id AD5F43F703;
- Wed, 27 Feb 2019 11:30:11 -0800 (PST)
-Subject: Re: [PATCH 04/13] iommu/mediatek: Add device_link between the
- consumer and the larb devices
-To: Yong Wu <yong.wu@mediatek.com>, Joerg Roedel <joro@8bytes.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Matthias Brugger <matthias.bgg@gmail.com>, Rob Herring <robh+dt@kernel.org>
-References: <1546318276-18993-1-git-send-email-yong.wu@mediatek.com>
- <1546318276-18993-5-git-send-email-yong.wu@mediatek.com>
-From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <709d7d66-9610-eeb3-128e-e2156bcfb616@arm.com>
-Date: Wed, 27 Feb 2019 19:30:10 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
+	id 1gz5BZ-0003sp-1e; Wed, 27 Feb 2019 19:48:09 +0000
+Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gz5BV-0003sL-Jb
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 19:48:06 +0000
+Received: by mail-oi1-x244.google.com with SMTP id j135so14486840oib.13
+ for <linux-arm-kernel@lists.infradead.org>;
+ Wed, 27 Feb 2019 11:48:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=fldtQHOifDanDhFlYrzElnvY/w/FO+3Si64v4s151xI=;
+ b=ldC+wThusiems77n2S/eNCFK8H5GVsKpTGNDt7XyAeVAlIlxGTxPZJynmbm++33TtM
+ q+JemssC1yZ0ojiKPp3TkkH1Gxme5R4gyw8NqeEVoruyd6Y7RtdOG/dFDbZ9RRjIvDUL
+ UGKIzFTFLaMD4U9qnFttQM9zjtOq4+KCPLUWbnM2jv01H3il9tdeb5Sh5cnW2G8oALxO
+ 78y057ZZBZ7xwtqrn4DF1a6+ntIFYJP1Y7hrhteTRplWkO9ICR8XtQ6ImvGlAz+8xE4A
+ LWE5o+lJnqt3bSxYk4Oz83y2JtegNgPP8iwk4icYcf6gX68KUtBPPg5B4iNFjsEqp0FT
+ ekCQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=fldtQHOifDanDhFlYrzElnvY/w/FO+3Si64v4s151xI=;
+ b=Nq0l10KtLNXg0m7BBsnbTezsj97769pDUe9eXFJwAXiXUm9ZzEvQP4xcVTx6jqo42B
+ YDDkIb1zQurKEh8pkEtkfZk/P9+9LH7rRn8bikltNumN7r119aKWkdt1mfBRLhnNZFxi
+ JI+OpfaIX3atiU1YBieZQ3NnM1gsRO6uM1yseowW0V7wqNKimEzUesv/OwHHekBSG1xe
+ PHXhypC+3ZV1/hS3E8sVQ7qjQF/IzpMkZorczuLLkfenx8YRfKLSyAH/09UzH8h93nck
+ 1LMkH1RyB/R32Os71nm/BcUeYRe5ZGnEtSONQTSrd6SshI9slRblwK0dlcKwWUWcgNiq
+ 9Tzw==
+X-Gm-Message-State: APjAAAWqCsct34AH+O7uBr8Kw7r2IpYwqyVEChyfxSLjIcd9g7Tixkh0
+ TNXeO1vg4ighwUHrilZrhi2Q4DNITV+1aGT6DXc=
+X-Google-Smtp-Source: AHgI3IbIQ3i6Q1ipP8ZXVvoVzdH+2F5CKoAo+HBuHc1SUwBvUoh8y9K/ZvDBhlPm19e1rykUom63V1ggknt+WcjZw1E=
+X-Received: by 2002:aca:aac7:: with SMTP id t190mr594721oie.43.1551296883878; 
+ Wed, 27 Feb 2019 11:48:03 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <1546318276-18993-5-git-send-email-yong.wu@mediatek.com>
-Content-Language: en-US
+References: <1551261844-23983-1-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1551261844-23983-1-git-send-email-Anson.Huang@nxp.com>
+From: Fabio Estevam <festevam@gmail.com>
+Date: Wed, 27 Feb 2019 16:47:52 -0300
+Message-ID: <CAOMZO5BtjCDw4Vd2DpJdw7iamK694EpvGxsVZ7Me_guesoqqaw@mail.gmail.com>
+Subject: Re: [PATCH 1/2] dt-bindings: memory-controllers: freescale: add MMDC
+ binding doc
+To: Anson Huang <anson.huang@nxp.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_113016_001695_A1EC675D 
-X-CRM114-Status: GOOD (  25.49  )
+X-CRM114-CacheID: sfid-20190227_114805_648701_56AA4061 
+X-CRM114-Status: UNSURE (   7.65  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,129 +91,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
- Nicolas Boichat <drinkcat@chromium.org>, arnd@arndb.de,
- srv_heupstream@mediatek.com, Will Deacon <will.deacon@arm.com>,
- linux-kernel@vger.kernel.org, Tomasz Figa <tfiga@google.com>,
- iommu@lists.linux-foundation.org, linux-mediatek@lists.infradead.org,
- yingjoe.chen@mediatek.com, linux-arm-kernel@lists.infradead.org
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 01/01/2019 04:51, Yong Wu wrote:
-> MediaTek IOMMU don't have its power-domain. all the consumer connect
-> with smi-larb, then connect with smi-common.
-> 
->          M4U
->           |
->      smi-common
->           |
->    -------------
->    |         |    ...
->    |         |
-> larb1     larb2
->    |         |
-> vdec       venc
-> 
-> When the consumer works, it should enable the smi-larb's power which
-> also need enable the smi-common's power firstly.
-> 
-> Thus, First of all, use the device link connect the consumer and the
-> smi-larbs. then add device link between the smi-larb and smi-common.
-> 
-> This patch adds device_link between the consumer and the larbs.
-> 
-> Suggested-by: Tomasz Figa <tfiga@chromium.org>
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->   drivers/iommu/mtk_iommu.c    | 15 +++++++++++++--
->   drivers/iommu/mtk_iommu_v1.c | 14 ++++++++++++--
->   2 files changed, 25 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index 202e41b..735ae8d 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -247,6 +247,7 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
->   	struct mtk_smi_larb_iommu    *larb_mmu;
->   	unsigned int                 larbid, portid;
->   	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
-> +	struct device_link *link;
->   	int i;
->   
->   	for (i = 0; i < fwspec->num_ids; ++i) {
-> @@ -257,10 +258,20 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
->   		dev_dbg(dev, "%s iommu port: %d\n",
->   			enable ? "enable" : "disable", portid);
->   
-> -		if (enable)
-> +		if (enable) {
->   			larb_mmu->mmu |= MTK_SMI_MMU_EN(portid);
-> -		else
-> +			/* Link the consumer with the larb device(supplier) */
-> +			link = device_link_add(dev, larb_mmu->dev,
-> +					       DL_FLAG_PM_RUNTIME |
-> +					       DL_FLAG_AUTOREMOVE_CONSUMER);
+Hi Anson,
 
-This looks technically wrong, since we get here from 
-mtk_iommu_attach_device(), and in theory a device could get attached to 
-any number of domains over its lifetime, so adding a link at this point 
-when there's no corresponding cleanup on detach is definitely 
-unbalanced. If you want this layer to manage the link on behalf of the 
-consumer, it would probably be better to do it at the point of 
-mtk_iommu_add_device(), and either track it for manual cleanup in 
-mtk_iommu_remove_device() or rely on AUTOREMOVE_SUPPLIER.
+On Wed, Feb 27, 2019 at 7:08 AM Anson Huang <anson.huang@nxp.com> wrote:
 
-Robin.
+> +Example :
+> +       mmdc0: mmdc@21b0000 { /* MMDC0 */
 
-> +			if (!link) {
-> +				dev_err(dev, "Unable to link %s\n",
-> +					dev_name(larb_mmu->dev));
-> +				return;
-> +			}
-> +		} else {
->   			larb_mmu->mmu &= ~MTK_SMI_MMU_EN(portid);
-> +		}
->   	}
->   }
->   
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index 9386aee..022bad9 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -201,6 +201,7 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
->   	struct mtk_smi_larb_iommu    *larb_mmu;
->   	unsigned int                 larbid, portid;
->   	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
-> +	struct device_link *link;
->   	int i;
->   
->   	for (i = 0; i < fwspec->num_ids; ++i) {
-> @@ -211,10 +212,19 @@ static void mtk_iommu_config(struct mtk_iommu_data *data,
->   		dev_dbg(dev, "%s iommu port: %d\n",
->   			enable ? "enable" : "disable", portid);
->   
-> -		if (enable)
-> +		if (enable) {
->   			larb_mmu->mmu |= MTK_SMI_MMU_EN(portid);
-> -		else
-> +			link = device_link_add(dev, larb_mmu->dev,
-> +					       DL_FLAG_PM_RUNTIME |
-> +					       DL_FLAG_AUTOREMOVE_CONSUMER);
-> +			if (!link) {
-> +				dev_err(dev, "Unable to link %s\n",
-> +					dev_name(larb_mmu->dev));
-> +				return;
-> +			}
-> +		} else {
->   			larb_mmu->mmu &= ~MTK_SMI_MMU_EN(portid);
-> +		}
->   	}
->   }
->   
-> 
+Node names should be generic, so:
+
+memory-controller@21b0000
 
 _______________________________________________
 linux-arm-kernel mailing list
