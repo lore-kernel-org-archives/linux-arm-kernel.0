@@ -2,141 +2,63 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.0 required=3.0 tests=BAD_ENC_HEADER,DKIMWL_WL_HIGH,
-	DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1056DC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:53:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 88133C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:54:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D394A218D3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:53:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 570FE218D3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 00:54:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MrGpUYAM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="mHNd27kk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D394A218D3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ijOBapWj"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 570FE218D3
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SDbvAGgnO0kCjNsGKRhwcGM0/hpGltvciaUVmLkdTGc=; b=MrGpUYAMyJlgqn
-	zOX66wwrdanJn+7SSLQVZpNzon1Aft0Zx9MlbuCyDsXc8b2jmp55wpgchDqqclJIhDCIDCVB7FaMe
-	L5TMktY+1F9ujTYrXr6ABAtlnf081dFk1euF/v91cSCBtsIxecqnhsxNyah4wi/pNxAJZnAb12Z2W
-	ep8t1mpmJxObUNURhaLuMjccf0R96fD1/CjZmCqQwnKKdQuKZQ1O5inMLleA8Qe5Ba9ZsUoWfWWfa
-	ENXS+x6WBd3LzTnnXMKOs7cTTybuOVSbyL0O6GiPvwbxKfL23j3VadzSXbh34s6AmhAfDio1rL5/U
-	XJ7FeD80F0sLToJTtlcw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=H7v6vp6yHqzscZuI8OdgK9PtYr64ent/CfIiJKe+86o=; b=ijOBapWjuXZG+jsqBE7T39PQX
+	MvRQhSclFkFf0R3dINehB872F36RiFVhNKa35WoQ91B+9UwZT6iUuP0LdMqxtkm6jrY31wb2oEgLE
+	CWVt9PVKVivAtfWTnFWlFkhmdpJZNQ3IxMqNyxoowIjR7uBmdxNAA+tNt+QEt1T/U48T4cKf++2V8
+	9FPjPVhO+SM8lDBqrLdfIwS/M7gLSdpjOedkeUS1mT0FENnzVIrE/QZ+OwrU1TUdJKt8bAFSK5/b8
+	8u278wtAIdUy5TetrVLi+db18cKXMS0+WQ47oywHf5H9AAC7ycTx23qr1GWvF7V3uCXd9pcV71IRx
+	cgFpuMLcQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gynTS-0000oe-Uj; Wed, 27 Feb 2019 00:53:26 +0000
-Received: from mail-ve1eur03on0611.outbound.protection.outlook.com
- ([2a01:111:f400:fe09::611]
- helo=EUR03-VE1-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gynTF-0000Zm-37
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 00:53:14 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=U242PBJRu26IEaVsclNbKDVbbV57a/JS8wvF5l1Z90c=;
- b=mHNd27kkhFEHJsTSuoo/L4d2oSsfqN2hjlX0x+q5uPU/qNVeSCXBa0GyT7Tyf1FnkMR2+yTb/PEDbXwj0++71Rl40oTFrxyg9EFGsVAKidReYTlA39HCdDA0+QBVM3lB71WkPZCv5SiX83IkWjvHhDUk5JLrsrMarFV/HNRdvG8=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3771.eurprd04.prod.outlook.com (52.134.67.30) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1643.20; Wed, 27 Feb 2019 00:53:09 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::1cb4:3e1c:fc85:7ed7]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::1cb4:3e1c:fc85:7ed7%2]) with mapi id 15.20.1643.019; Wed, 27 Feb 2019
- 00:53:09 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, "kernel@pengutronix.de"
- <kernel@pengutronix.de>, "festevam@gmail.com" <festevam@gmail.com>, Aisheng
- Dong <aisheng.dong@nxp.com>, "ulf.hansson@linaro.org"
- <ulf.hansson@linaro.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH RESEND V4 2/2] dt-bindings: firmware: imx-scu: add new
- resources to scu resource table
-Thread-Topic: [PATCH RESEND V4 2/2] dt-bindings: firmware: imx-scu: add new
- resources to scu resource table
-Thread-Index: AQHUzjbO6COAVhuAiESQl/ro/17JnA==
-Date: Wed, 27 Feb 2019 00:53:09 +0000
-Message-ID: <1551228502-1535-2-git-send-email-Anson.Huang@nxp.com>
-References: <1551228502-1535-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1551228502-1535-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0183.apcprd02.prod.outlook.com
- (2603:1096:201:21::19) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-ms-office365-filtering-correlation-id: 8b978bca-2c47-4be6-382b-08d69c4df108
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390118)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600127)(711020)(4605104)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3771; 
-x-ms-traffictypediagnostic: DB3PR0402MB3771:
-x-microsoft-exchange-diagnostics: =?iso-8859-1?Q?1; DB3PR0402MB3771;
- 23:N3S0+ZuwC3F2Tvh0M4A9x8jjqeJqYb3hoSBNs?=
- =?iso-8859-1?Q?CDKtydlxNL/GQkvhXuFWtlu/sF4HUNmOMGXJMaiZ8/GmCtFC2nYNIG4fdZ?=
- =?iso-8859-1?Q?+923K/lk5wev9lcW4TTkEuwNrsRfoYYI3t6Wy/3dJPw374TgoCUK/2RtFq?=
- =?iso-8859-1?Q?OTjJYvxAq8E1ZYqvb4R+BYEkQ4/HHuIMby7O0WeggTcEDEFViewM8FSJB0?=
- =?iso-8859-1?Q?r7PN9EW/vCU6+saNOHu5NuD53I+9F/hoC4aeQxIbloSLu40nfd6ZjeGK2I?=
- =?iso-8859-1?Q?SLtKbwEbRqL7qmArUcDuWnVAzp41bMJJfVAOMLXrVH2VxhH1WVrEtFSFb9?=
- =?iso-8859-1?Q?p3FvGQ2bl9N9rzkhDqhEbNhaHWQzTu+tcJnriFpDWeBWBCFMRx0ZmQaeMV?=
- =?iso-8859-1?Q?LbL7WnpIzOR1wC0DlX1373v4C8AwIxrTKH6JxFoD0km99VOjG+EC1lCYeM?=
- =?iso-8859-1?Q?yF0uvHcR4774ebZIxFw8oARqrUfe1pcsLWGG6HQcTjg5/Cm60iBDPVpchj?=
- =?iso-8859-1?Q?ZEdIQWhMsvV9+StYWai5HlJZHcPiqllb4Wk1J/n7bIB3a/K0gdioiTO3Zm?=
- =?iso-8859-1?Q?d5QtnZ0R4LHOy/DQVABVDpensOTdxt+jttvTHi87BCP9e+SZUk+99i/Ji+?=
- =?iso-8859-1?Q?dw/HkHfq0gVlbjhDjsqTFlcccH0hAo7CvvNbDky0SIfVJNAQhItuexCPjw?=
- =?iso-8859-1?Q?ZqhOyJS6AnYVBlXRJ6a5IgYfxlBqaeceJHGMwX/XbJixBZ+0PjfXIciQhv?=
- =?iso-8859-1?Q?NfB0jFO2CvbYbisLv4Xa4/HJteLBT2OMCnEhxlO2bbZPfj1+8uS53VFMGQ?=
- =?iso-8859-1?Q?AkVMrTte/JpEmbxmVwcvJRciF2+4MFC/NuvrxaY2p0bH0+jpMVnlLk/Yxu?=
- =?iso-8859-1?Q?1y+jl/JrV4xlE51pXyppCrn4+kSyiWbQeqHrhA31z2sVwwLEe3oG6OVWkg?=
- =?iso-8859-1?Q?CFulMZkEs+4cNnWNwP5SqUCEuFnb+2ms3ddJdEbR/pjwWXI23AarotI2/g?=
- =?iso-8859-1?Q?fMkg6+R7RSlaSpoJKVJ29UGmH1+Fgv4tUeqlsR+cIFiIggztMqF4GAwPEQ?=
- =?iso-8859-1?Q?ypHV4/Ovo0mnYecS/CdpTtpGkLiwkMYZAjIsMkLhlOp7c5Bl2YDdF+9YcQ?=
- =?iso-8859-1?Q?PwVlWc+shIVmh9ipO6o3G0lBZJIGs9ZAuusZD1Rz0+eHaIqBVDJBAwOQVB?=
- =?iso-8859-1?Q?kYwZ2n1UQL1nKO/hbU8u1xIFUeoDxiQjyVKUFURAYzbrmnq/WeKYluxhi7?=
- =?iso-8859-1?Q?kyloPu0OayoZvcNv/V/CcfMxBGFgvxLBDCv792FHRfz76sQTgI9/p+25UN?=
- =?iso-8859-1?Q?dxx0=3D?=
-x-microsoft-antispam-prvs: <DB3PR0402MB37717BFDC1D846BA7C5AE90DF5740@DB3PR0402MB3771.eurprd04.prod.outlook.com>
-x-forefront-prvs: 0961DF5286
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(396003)(39860400002)(376002)(136003)(346002)(189003)(199004)(102836004)(316002)(110136005)(71200400001)(71190400001)(68736007)(386003)(478600001)(256004)(6506007)(6116002)(3846002)(99286004)(6436002)(6486002)(76176011)(66066001)(6512007)(52116002)(2906002)(105586002)(106356001)(97736004)(7416002)(186003)(2501003)(11346002)(446003)(25786009)(476003)(26005)(2616005)(486006)(53936002)(4326008)(36756003)(14454004)(5660300002)(8936002)(86362001)(305945005)(2201001)(50226002)(7736002)(81156014)(81166006)(8676002)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3771;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-ms-exchange-senderadcheck: 1
-x-microsoft-antispam-message-info: QIx8O/EZUTsGWyZF3QweA+Wp5N0jsu/g4oK61OxvL+15NvTIenbLfgPDooRdC+WZgC9sa6mbw0Qbl02O2SW7JdeTXinsNjumYR5KVTkIkQdYivgF4bbn8CeBPZr5oAXf+x+EHQZF1RnIQxmkh7Rcb0VcD+TG6QW848Q8IhcrAEbOYfYHVy9MxZlzytg7FEZ8YX/Y0eRg8xxr8xfXGRzQ85MtFsN5+B3gZ2vrt1yto+bwoq/WT2BdE8wDXxYoGL12o/Y0gU1XlAbZDlSjGCS102Qt8xe/FTQdcOcAQVZkV4Pyn+W1Dx6zPzn22qa7sAxGki46fYJ1hMQ5IgwuwPeAIYQbafaWxAYj8plPetBrXhsSx69mN3fZwciR0xagUiesGfEIZ+h9FXM/jr5rpl1Vw5ezT8lw45kH37Oqm7wKWGM=
+	id 1gynUP-00017M-UP; Wed, 27 Feb 2019 00:54:25 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gynUM-00016v-Bk
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 00:54:24 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id ADAF480D;
+ Tue, 26 Feb 2019 16:54:20 -0800 (PST)
+Received: from [192.168.1.123] (usa-sjc-mx-foss1.foss.arm.com [217.140.101.70])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 828B83F5C1;
+ Tue, 26 Feb 2019 16:54:19 -0800 (PST)
+Subject: Re: [PATCH] iommu: Add a quirk for ARM Mali midgard MMU
+To: Rob Herring <robh@kernel.org>
+References: <20190226181716.14556-1-robh@kernel.org>
+ <efd64b34-a05e-1d34-c974-280e0da4807b@arm.com>
+ <CAL_JsqJ857qSQTQ9WFCrPQxNsZ=6uB-PPwCY7cXmkcsP2NA=YQ@mail.gmail.com>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <0bcd215e-e013-6891-ecd4-da4c91bb4eb9@arm.com>
+Date: Wed, 27 Feb 2019 00:54:19 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; rv:60.0) Gecko/20100101
+ Thunderbird/60.5.1
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 8b978bca-2c47-4be6-382b-08d69c4df108
-X-MS-Exchange-CrossTenant-originalarrivaltime: 27 Feb 2019 00:53:04.9347 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-mailboxtype: HOSTED
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3771
+In-Reply-To: <CAL_JsqJ857qSQTQ9WFCrPQxNsZ=6uB-PPwCY7cXmkcsP2NA=YQ@mail.gmail.com>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_165313_132294_E8C8D193 
-X-CRM114-Status: GOOD (  10.29  )
+X-CRM114-CacheID: sfid-20190226_165422_409927_0C487934 
+X-CRM114-Status: GOOD (  17.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -148,67 +70,68 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Joerg Roedel <joro@8bytes.org>,
+ Linux IOMMU <iommu@lists.linux-foundation.org>,
+ Will Deacon <will.deacon@arm.com>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Tomeu Vizoso <tomeu.vizoso@collabora.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add new resources as below according to latest system
-controller firmware for new features:
+On 2019-02-26 8:05 pm, Rob Herring wrote:
+> On Tue, Feb 26, 2019 at 1:25 PM Robin Murphy <robin.murphy@arm.com> wrote:
+>>
+>> Hi Rob,
+>>
+>> On 26/02/2019 18:17, Rob Herring wrote:
+>>> ARM Mali midgard GPUs have a few differences from standard 64-bit
+>>> stage 1 page tables.
+>>>
+>>> The 3rd level page entry bits are 0x1 instead of 0x3 for page entries.
+>>>
+>>> The access flags are not read-only and unprivileged, but read and write.
+>>> This is similar to stage 2 entries, but the memory attributes field matches
+>>> stage 1 being an index.
+>>>
+>>> The nG bit is also not set by the vendor driver, but that one doesn't
+>>> seem to matter.
+>>>
+>>> Add a quirk to handle all of these differences.
+>>
+>>   From the look of these changes, this isn't a quirk but a distinct
+>> format. AFAICS from the mali_kbase driver, this must be "LPAE mode"
+>> rather than "AArch64 mode", so it seems unlikely that it really supports
+>> the full VMSAv8 gamut of granules, address sizes, and page sizes that
+>> this patch will happily let through.
+> 
+> Right, but the page size bitmap and the in and out address sizes in
+> the config struct should be enough to restrict those.
+> 
+> What do you propose? Add another init function which hardcodes all
+> those or add some checks of allowed settings?
 
-	IMX_SC_R_PERF
-	IMX_SC_R_OCRAM
-	IMX_SC_R_DMA_5_CH0
-	IMX_SC_R_DMA_5_CH1
-	IMX_SC_R_DMA_5_CH2
-	IMX_SC_R_DMA_5_CH3
-	IMX_SC_R_ATTESTATION
+Or rather somewhere in between, i.e. add a new io_pgtable_fmt with an 
+init function which sanity checks/constrains the request appropriately 
+(like the existing ones do), and which could at least help make 
+arm_lpae_pte_to_prot() less of a mess.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- include/dt-bindings/firmware/imx/rsrc.h | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+We don't treat v7 LPAE as a quirk of v8 AArch64, even though we 
+implement it as a strict subset, and neither do we treat stage 2 as a 
+quirk of stage 1 (or vice versa). This Midgard "LPAE" format appears 
+more different from any of the VMSA long-descriptor formats than they 
+are from each other - it certainly doesn't seem like a case of someone 
+aiming to implement AArch64 stage 1 but getting one or two details 
+slightly wrong.
 
-diff --git a/include/dt-bindings/firmware/imx/rsrc.h b/include/dt-bindings/firmware/imx/rsrc.h
-index d69f934..4e61f64 100644
---- a/include/dt-bindings/firmware/imx/rsrc.h
-+++ b/include/dt-bindings/firmware/imx/rsrc.h
-@@ -36,6 +36,7 @@
- #define IMX_SC_R_DC_0_BLIT1		20
- #define IMX_SC_R_DC_0_BLIT2		21
- #define IMX_SC_R_DC_0_BLIT_OUT		22
-+#define IMX_SC_R_PERF			23
- #define IMX_SC_R_DC_0_WARP		25
- #define IMX_SC_R_DC_0_VIDEO0		28
- #define IMX_SC_R_DC_0_VIDEO1		29
-@@ -322,7 +323,7 @@
- #define IMX_SC_R_IRQSTR_SCU2		321
- #define IMX_SC_R_IRQSTR_DSP		322
- #define IMX_SC_R_ELCDIF_PLL		323
--#define IMX_SC_R_UNUSED6		324
-+#define IMX_SC_R_OCRAM			324
- #define IMX_SC_R_AUDIO_PLL_0		325
- #define IMX_SC_R_PI_0			326
- #define IMX_SC_R_PI_0_PWM_0		327
-@@ -539,6 +540,11 @@
- #define IMX_SC_R_VPU_MU_3		538
- #define IMX_SC_R_VPU_ENC_1		539
- #define IMX_SC_R_VPU			540
--#define IMX_SC_R_LAST			541
-+#define IMX_SC_R_DMA_5_CH0		541
-+#define IMX_SC_R_DMA_5_CH1		542
-+#define IMX_SC_R_DMA_5_CH2		543
-+#define IMX_SC_R_DMA_5_CH3		544
-+#define IMX_SC_R_ATTESTATION		545
-+#define IMX_SC_R_LAST			546
- 
- #endif /* __DT_BINDINGS_RSCRC_IMX_H */
--- 
-2.7.4
+(I know I implemented Mediatek's Frankein-short-descriptor as a set of 
+quirks rather than introducing multiple v7s formats, but that's largely 
+because it's the only real user of that code, and most of them are 
+generic enough that they could well be common to other formats in future)
 
+Robin.
 
 _______________________________________________
 linux-arm-kernel mailing list
