@@ -2,74 +2,77 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 18308C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 12:13:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C270BC43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 12:14:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC2CE2087C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 12:13:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8F0B52087C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 12:14:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cA8bYsne"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC2CE2087C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oz1yaFmk"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8F0B52087C
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=8j5f2tsYlZZJVXbIQyIfgSi5mRP87EZrkWLQxQGrfXA=; b=cA8bYsnetp2MLU
-	iGLBViMJ3jJIJzSSxTYSsLdfs7F1FYWr8rtmrZu7K7FI45ThPBXd7NjmfEX1Dnqb6fU/Xf3wiOr+H
-	1E798YUBECu27zMLi0Xu4HwmEDYlVhOIwFkHU4KB/CZBh72N3KNVMz8po3axE5U6P66+7qK5XaMS8
-	b6xzO6FYdxpeRhq6JqcxjVMB+XDOcyKmnTqSYaSyc7TEbYAIWwaAnKMDlhezPAG8NeJYZ6KOPLEED
-	ioT7znwyABCz8e1u6U+sD8wS/dxPIb3jMDK7Grw/dQSyDgyvfouBhpHUVdxswm+jzUPgSv05oxvg7
-	2IUhc+5Or7VZ8Rc/2wOA==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=Op8ZoVx900cbB+3YEIlV8S5XedoZTqF00rlD0VALhhY=; b=oz1yaFmkwzO/Yj
+	0/kT3Gm3OBw6jqjT/t4yWIqj6EUBOayshlB42OdcOy/IzabftVhMjAVaoYUJT+WT0T9ftMIwqhYs+
+	HrvNJprTeUWX8iFq8nzaqOA/pEshqIAAxj77SSFrIcyYCbPL0sps3hVBteRV8XytMd3DcST9BoXRu
+	8uCS/3UYeguuYIi1FRvVjuBNP5odbwbWzg71faOld0xh8aRUcZyV3K2ic4jyrXEvJPlvcGC4mlleQ
+	2YGgA3Ms8LmsbX+zxzsQMog4eWf3S/Um95vQ6UW8/tUT/Uud5QDKxIm0BqAMc0hiJ5fpMhB3m/vjM
+	MyQ6kJ8sjCmRLVOigxlg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyy5o-00076i-86; Wed, 27 Feb 2019 12:13:44 +0000
+	id 1gyy5y-0007KZ-GK; Wed, 27 Feb 2019 12:13:54 +0000
 Received: from mx07-00178001.pphosted.com ([62.209.51.94])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyy50-00067j-9e
+ id 1gyy50-00067l-8O
  for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 12:12:58 +0000
 Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
  by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1RC64sh028656; Wed, 27 Feb 2019 13:12:44 +0100
+ x1RC65nZ028665; Wed, 27 Feb 2019 13:12:46 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qtvtx68gh-1
+ by mx07-00178001.pphosted.com with ESMTP id 2qtvtx68gw-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 27 Feb 2019 13:12:44 +0100
+ Wed, 27 Feb 2019 13:12:46 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 78A6634;
- Wed, 27 Feb 2019 12:12:43 +0000 (GMT)
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id CA07531;
+ Wed, 27 Feb 2019 12:12:45 +0000 (GMT)
 Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 2BDBE5266;
- Wed, 27 Feb 2019 12:12:43 +0000 (GMT)
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 9C96C5266;
+ Wed, 27 Feb 2019 12:12:45 +0000 (GMT)
 Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by Safex1hubcas22.st.com
  (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb
- 2019 13:12:43 +0100
+ 2019 13:12:45 +0100
 Received: from localhost (10.201.20.122) by webmail-ga.st.com (10.75.90.48)
- with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb 2019 13:12:42
+ with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb 2019 13:12:45
  +0100
 From: Benjamin Gaignard <benjamin.gaignard@st.com>
 To: <broonie@kernel.org>, <robh@kernel.org>, <arnd@arndb.de>,
  <shawnguo@kernel.org>, <s.hauer@pengutronix.de>, <fabio.estevam@nxp.com>
-Subject: [PATCH 0/7] Introduce bus domains controller framework
-Date: Wed, 27 Feb 2019 13:12:25 +0100
-Message-ID: <20190227121232.24873-1-benjamin.gaignard@st.com>
+Subject: [PATCH 2/7] domainsctrl: Introduce domains controller framework
+Date: Wed, 27 Feb 2019 13:12:27 +0100
+Message-ID: <20190227121232.24873-3-benjamin.gaignard@st.com>
 X-Mailer: git-send-email 2.15.0
+In-Reply-To: <20190227121232.24873-1-benjamin.gaignard@st.com>
+References: <20190227121232.24873-1-benjamin.gaignard@st.com>
 MIME-Version: 1.0
 X-Originating-IP: [10.201.20.122]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-27_07:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_041254_657231_5B36A8A9 
-X-CRM114-Status: GOOD (  11.29  )
+X-CRM114-CacheID: sfid-20190227_041254_622281_5A163996 
+X-CRM114-Status: GOOD (  23.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,67 +93,423 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Bus domains controllers allow to divided system on chip into multiple domains
-that can be used to select by who hardware blocks could be accessed.
-A domain could be a cluster of CPUs (or coprocessors), a range of addresses or
-a group of hardware blocks.
+The goal of this framework is to offer an interface for the
+hardware blocks controlling bus accesses rights.
 
-Framework architecture is inspirated by pinctrl framework:
-- a default configuration could be applied before bind the driver
-- configurations could be apllied dynamically by drivers
-- device node provides the bus domains configurations
+Bus domains controllers are typically used to control if a
+hardware block can perform read or write operations on bus.
 
-An example of bus domains controller is STM32 ETZPC hardware block
-which got 3 domains:
-- secure: hardware blocks are only accessible by software running on trust
-  zone.
-- non-secure: hardware blocks are accessible by non-secure software (i.e.
-  linux kernel).
-- coprocessor: hardware blocks are only accessible by the corpocessor.
-Up to 94 hardware blocks of the soc could be managed by ETZPC and 
-assigned to one of the three domains.
+Smarter domains controllers could be able to define accesses
+rights per hardware blocks to control where they can read
+or write.
 
-At least two other hardware blocks can take benefits of this:
-- ARM TZC-400: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.d...
-  which is able to manage up to 8 regions in address space.
-- IMX Ressource Domain Controller (RDC): supports four domains and up to eight regions 
+Domains controller configurations are provided in device node,
+parsed by the framework and send to the driver to apply them.
+Each controller may need different number and type of inputs
+to configure a domain so device-tree properties size have to
+be define by using "#domainctrl-cells".
+Domains configurations properties have to be named "domainsctrl-X"
+on device node.
+"domainsctrl-names" keyword can also be used to give a name to
+a specific configuration.
 
-This version has been rebased on top of v5.0-rc8.
+Example of device-tree:
+ctrl0: domainsctrl@0 {
+	#domainctrl-cells = <2>;
+      };
 
-Benjamin
+foo: foo@0 {
+	domainsctrl-names = "default", "setting1";
+	domainsctrl-0 = <&ctrl0 1 2>;
+	domainsctrl-1 = <&ctrl0 3 4>;
+};
 
-Benjamin Gaignard (7):
-  devicetree: bindings: Document domains controller bindings
-  domainsctrl: Introduce domains controller framework
-  base: Add calls to domains controller
-  devicetree: bindings: domainsctrl: Add STM32 ETZPC bindings
-  bus: domainsctrl: Add driver for STM32 ETZPC controller
-  ARM: dts: stm32: Add domainsctrl node for stm32mp157 SoC
-  ARM: dts: stm32: enable domains controller node on stm32mp157c-ed1
+Configurations could be applied with functions like
+domainsctrl_set_config_by_index() or domainsctrl_set_config_by_name().
 
- .../bindings/bus/domains/domainsctrl.txt           |  55 +++++
- .../bindings/bus/domains/st,stm32-etzpc.txt        |  14 ++
- arch/arm/boot/dts/stm32mp157c-ev1.dts              |   2 +
- arch/arm/boot/dts/stm32mp157c.dtsi                 |   7 +
- drivers/base/dd.c                                  |   9 +
- drivers/bus/Kconfig                                |   2 +
- drivers/bus/Makefile                               |   2 +
- drivers/bus/domains/Kconfig                        |  14 ++
- drivers/bus/domains/Makefile                       |   2 +
- drivers/bus/domains/domainsctrl.c                  | 234 +++++++++++++++++++++
- drivers/bus/domains/stm32-etzpc.c                  | 140 ++++++++++++
- include/dt-bindings/bus/domains/stm32-etzpc.h      |  25 +++
- include/linux/domainsctrl.h                        |  70 ++++++
- 13 files changed, 576 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/bus/domains/domainsctrl.txt
- create mode 100644 Documentation/devicetree/bindings/bus/domains/st,stm32-etzpc.txt
+domainsctrl_set_default_config() function will apply the
+configuration named "default" (if existing) or the configuration
+with index 0 (i.e. domainsctrl-0).
+
+Drivers could register/unregister themselves be calling
+domainsctrl_register/domainsctrl_unregister functions.
+
+When a configuration has to be applied the driver callback,
+provided in the ops at registration time, set_config is called
+by the framework.
+
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Reviewed-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/bus/Kconfig               |   2 +
+ drivers/bus/Makefile              |   2 +
+ drivers/bus/domains/Kconfig       |   7 ++
+ drivers/bus/domains/Makefile      |   1 +
+ drivers/bus/domains/domainsctrl.c | 234 ++++++++++++++++++++++++++++++++++++++
+ include/linux/domainsctrl.h       |  70 ++++++++++++
+ 6 files changed, 316 insertions(+)
  create mode 100644 drivers/bus/domains/Kconfig
  create mode 100644 drivers/bus/domains/Makefile
  create mode 100644 drivers/bus/domains/domainsctrl.c
- create mode 100644 drivers/bus/domains/stm32-etzpc.c
- create mode 100644 include/dt-bindings/bus/domains/stm32-etzpc.h
  create mode 100644 include/linux/domainsctrl.h
 
+diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+index 1851112ccc29..a0f7a67c1296 100644
+--- a/drivers/bus/Kconfig
++++ b/drivers/bus/Kconfig
+@@ -183,4 +183,6 @@ config DA8XX_MSTPRI
+ 
+ source "drivers/bus/fsl-mc/Kconfig"
+ 
++source "drivers/bus/domains/Kconfig"
++
+ endmenu
+diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+index ca300b1914ce..d7e95edba33d 100644
+--- a/drivers/bus/Makefile
++++ b/drivers/bus/Makefile
+@@ -32,3 +32,5 @@ obj-$(CONFIG_UNIPHIER_SYSTEM_BUS)	+= uniphier-system-bus.o
+ obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o
+ 
+ obj-$(CONFIG_DA8XX_MSTPRI)	+= da8xx-mstpri.o
++
++obj-$(CONFIG_DOMAINS_CONTROLLERS) 	+= domains/
+diff --git a/drivers/bus/domains/Kconfig b/drivers/bus/domains/Kconfig
+new file mode 100644
+index 000000000000..5ba15f750bee
+--- /dev/null
++++ b/drivers/bus/domains/Kconfig
+@@ -0,0 +1,7 @@
++menu "Bus Domains Controllers"
++
++config DOMAINS_CONTROLLERS
++	bool "Support of bus domains controllers"
++	depends on OF
++
++endmenu
+diff --git a/drivers/bus/domains/Makefile b/drivers/bus/domains/Makefile
+new file mode 100644
+index 000000000000..262338b7cad5
+--- /dev/null
++++ b/drivers/bus/domains/Makefile
+@@ -0,0 +1 @@
++obj-$(CONFIG_DOMAINS_CONTROLLERS) += domainsctrl.o
+diff --git a/drivers/bus/domains/domainsctrl.c b/drivers/bus/domains/domainsctrl.c
+new file mode 100644
+index 000000000000..bbadf8165bc8
+--- /dev/null
++++ b/drivers/bus/domains/domainsctrl.c
+@@ -0,0 +1,234 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
++ */
++
++#include <linux/device.h>
++#include <linux/domainsctrl.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/list.h>
++#include <linux/of.h>
++#include <linux/slab.h>
++
++/* Mutex taken to protect domainctrl_list */
++static DEFINE_MUTEX(domainctrl_list_mutex);
++
++/* Global list of domain control devices (struct domains_ctrl) */
++static LIST_HEAD(domainctrl_list);
++
++struct domains_ctrl {
++	struct list_head node;
++	struct device *dev;
++	struct domains_ctrl_ops *ops;
++};
++
++static struct domains_ctrl *get_domainctrl_from_node(struct device_node *np)
++{
++	struct domains_ctrl *ctrl;
++
++	mutex_lock(&domainctrl_list_mutex);
++
++	list_for_each_entry(ctrl, &domainctrl_list, node) {
++		if (ctrl->dev->of_node == np) {
++			mutex_unlock(&domainctrl_list_mutex);
++			return ctrl;
++		}
++	}
++
++	mutex_unlock(&domainctrl_list_mutex);
++
++	return NULL;
++}
++
++/**
++ * domainsctrl_set_config_by_index
++ *
++ * Set a domains controller configuration based on given index.
++ *
++ * @dev: device with domain configuration to apply.
++ * @index: the index of the configuration in device node.
++ *
++ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
++ * registered or negative value on other errors.
++ */
++int domainsctrl_set_config_by_index(struct device *dev, int index)
++{
++	struct device_node *np = dev->of_node;
++	char *propname;
++	int configs, i, err = 0;
++
++	if (!np)
++		return 0;
++
++	propname = kasprintf(GFP_KERNEL, "domainctrl-%d", index);
++	configs = of_count_phandle_with_args(np, propname, "#domainctrl-cells");
++	if (configs < 0) {
++		err = -EINVAL;
++		goto error;
++	}
++
++	for (i = 0; i < configs; i++) {
++		struct domains_ctrl *ctrl;
++		struct of_phandle_args args;
++
++		err = of_parse_phandle_with_args(np, propname,
++						 "#domainctrl-cells",
++						 i, &args);
++		if (err)
++			goto error;
++
++		/* Test if the controller is (or will be) available */
++		if (!of_device_is_available(args.np)) {
++			of_node_put(args.np);
++			continue;
++		}
++
++		ctrl = get_domainctrl_from_node(args.np);
++		of_node_put(args.np);
++
++		/* Controller is not yet registered */
++		if (!ctrl) {
++			err = -EPROBE_DEFER;
++			goto error;
++		}
++
++		err = ctrl->ops->set_config(ctrl->dev, &args);
++		if (err)
++			goto error;
++	}
++
++error:
++	kfree(propname);
++	return err;
++}
++EXPORT_SYMBOL_GPL(domainsctrl_set_config_by_index);
++
++/**
++ * domainsctrl_set_config_by_name
++ *
++ * Set a domains controller configuration based on given name.
++ *
++ * @dev: device with domain configuration to apply.
++ * @name: the name of the configuration in device node.
++ *
++ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
++ * registered or negative value on other errors.
++ */
++int domainsctrl_set_config_by_name(struct device *dev, char *name)
++{
++	const char *configname;
++	int count, i;
++
++	count = of_property_count_strings(dev->of_node, "domainctrl-names");
++	for (i = 0; i < count; i++) {
++		int err;
++
++		err = of_property_read_string_index(dev->of_node,
++						    "domainctrl-names",
++						    i, &configname);
++		if (err)
++			return err;
++
++		if (strcmp(name, configname))
++			continue;
++
++		return domainsctrl_set_config_by_index(dev, i);
++	}
++
++	return -EINVAL;
++}
++EXPORT_SYMBOL_GPL(domainsctrl_set_config_by_name);
++
++/**
++ * domainsctrl_set_default_config
++ *
++ * Set the default configuration for device.
++ * First try to apply configuration named "default", if it fails
++ * or doesn't exist, try to apply domainsctrl-0 configuration.
++ *
++ * @dev: device with domain configuration to apply.
++ *
++ * Returns 0 if OK, -EPROBE_DEFER if waiting for domains controller to be
++ * registered or negative value on other errors.
++ */
++int domainsctrl_set_default_config(struct device *dev)
++{
++	int ret;
++
++	ret = domainsctrl_set_config_by_name(dev, "default");
++	if (!ret || (ret == -EPROBE_DEFER))
++		return ret;
++
++	return domainsctrl_set_config_by_index(dev, 0);
++}
++EXPORT_SYMBOL_GPL(domainsctrl_set_default_config);
++
++/**
++ * domainsctrl_register
++ *
++ * Register a domains controller device.
++ *
++ * @dev: device implementing domains controller.
++ * @ops: domains controller operations.
++ *
++ * Returns 0 if OK or negative value on error.
++ */
++int domainsctrl_register(struct device *dev,
++			 struct domains_ctrl_ops *ops)
++{
++	struct domains_ctrl *ctrl;
++
++	if (!dev || !ops || !ops->set_config)
++		return -EINVAL;
++
++	ctrl = kzalloc(sizeof(*ctrl), GFP_KERNEL);
++	if (!ctrl)
++		return -ENOMEM;
++
++	INIT_LIST_HEAD(&ctrl->node);
++
++	ctrl->dev = dev;
++	ctrl->ops = ops;
++
++	mutex_lock(&domainctrl_list_mutex);
++	list_add_tail(&ctrl->node, &domainctrl_list);
++	mutex_unlock(&domainctrl_list_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(domainsctrl_register);
++
++/**
++ * domainsctrl_unregister
++ *
++ * Unregister a domains controller device.
++ *
++ * @dev: device implementing domains controller.
++ */
++void domainsctrl_unregister(struct device *dev)
++{
++	struct domains_ctrl *ctrl;
++
++	ctrl = get_domainctrl_from_node(dev->of_node);
++	if (!ctrl)
++		return;
++
++	mutex_lock(&domainctrl_list_mutex);
++	list_del(&ctrl->node);
++	mutex_unlock(&domainctrl_list_mutex);
++
++	kfree(ctrl);
++}
++EXPORT_SYMBOL_GPL(domainsctrl_unregister);
++
++static int __init domainsctrl_init(void)
++{
++	pr_info("initialized bus domain controller subsystem\n");
++	return 0;
++}
++
++/* Init early since drivers really need to configure domains early */
++core_initcall(domainsctrl_init);
+diff --git a/include/linux/domainsctrl.h b/include/linux/domainsctrl.h
+new file mode 100644
+index 000000000000..1d1960175342
+--- /dev/null
++++ b/include/linux/domainsctrl.h
+@@ -0,0 +1,70 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) STMicroelectronics 2018 - All Rights Reserved
++ * Author: Benjamin Gaignard <benjamin.gaignard@st.com> for STMicroelectronics.
++ */
++
++#ifndef _DOMAINSCTRL_H_
++#define _DOMAINSCTRL_H_
++
++#include <linux/device.h>
++#include <linux/of.h>
++
++/**
++ * struct domains_ctrl_ops
++ *
++ * Domains controller operations structure to be filled by drivers.
++ */
++struct domains_ctrl_ops {
++	/**
++	 * @set_config:
++	 *
++	 * Driver callback to set a domain configuration on a domain controller.
++	 * Configuration arguments are provided in out_args parameter.
++	 *
++	 * Returns 0 on success, a negative error code on failure.
++	 */
++	int (*set_config)(struct device *dev, struct of_phandle_args *out_args);
++};
++
++#ifdef CONFIG_DOMAINS_CONTROLLERS
++
++int domainsctrl_set_config_by_index(struct device *dev, int index);
++int domainsctrl_set_config_by_name(struct device *dev, char *name);
++int domainsctrl_set_default_config(struct device *dev);
++
++int domainsctrl_register(struct device *dev, struct domains_ctrl_ops *ops);
++
++void domainsctrl_unregister(struct device *dev);
++
++#else
++
++static inline int domainsctrl_set_config_by_index(struct device *dev, int index)
++{
++	return 0;
++}
++
++static inline int domainsctrl_set_config_by_name(struct device *dev, char *name)
++{
++	return 0;
++}
++
++static inline int domainsctrl_set_default_config(struct device *dev)
++{
++	return 0;
++}
++
++static inline int domainsctrl_register(struct device *dev,
++				       struct domains_ctrl_ops *ops)
++{
++	return 0;
++}
++
++static inline void domainsctrl_unregister(struct device *dev)
++{
++	/* Empty */
++}
++
++#endif
++
++#endif /* _DOMAINSCTRL_H_ */
 -- 
 2.15.0
 
