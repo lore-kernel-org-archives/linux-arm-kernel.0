@@ -2,64 +2,84 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-1.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-13.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2B89AC43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 05:17:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A6AE4C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 05:38:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF6F9218D0
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 05:17:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 72E77218E0
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 05:38:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OVS0B0G8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF6F9218D0
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=tkos.co.il
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bK7KB4rK";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=linaro.org header.i=@linaro.org header.b="f2jV0OBa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 72E77218E0
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:
-	In-reply-to:Subject:To:From:References:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=ttCg/NhSa0dh9+7wyeDccqdCJquFU2MNi+k00IG8eSA=; b=OVS0B0G8QeI4wpiPFWnvjU5Enx
-	SmqO6p/gN0hKtvAK6oB6pdWYuUZztMgHO8V2ER02V7K2zUhIMNHFaQ1HtBYP3WPI5KP9ziUiUf5Aq
-	Mzb4gtB+0IKetdpchWekG7pUtjP08vkIa5A589ycoFeAwCPStqiJyEkchA/+guO9W4mDGzrZv4Yfe
-	nW2sXhNq992e6JrreYoMj8UyRKNJ9gyrLOKW0JnKU8DLxzW1xeStkl2ixYPj+mPSaCIvy75zYz3EV
-	R1ebpwfmC7DiQ9Qe6M/uRmv9umcLBcPIf7qhpIHj5btprgNxj/LLwNohIXyAFs8qwJZGcjYZL7tB3
-	5CUoBCdw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=4HXHrKIf3ZVnq07eAfk4I9u8ZSbxgm9QU28NZ01iWlw=; b=bK7
+	KB4rKtggUy1upQRAqIvRaJfQIxyB+mMg6QmlFDNlIU4J182f560yyMy4OpGLGoHsNAclWRjhiSKqB
+	aQLdGnVsM1TtFLM5Io7yVF283PQNH5gy3vWbPPM+bI7ndhwdHKb81LjihQ3CVHQTXWhjxyHGn8iQo
+	M+yS2RC/Op2Vayyu4vq/EiD9N6qP7Z//OJnyKOkodLMm/pO9WpKFi5pM22JKrsIVz82GDjGq4kLXg
+	Mp1bwKWAaw4QmYTihbJsfpvPet0S4k9MPpJXHzNnm6/ZqZUwOPOSA0MhKI2nWeWIa6zDWqod/VAHr
+	LTYDswPa7kEghRbgcPKv+6QH4XyLUKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyrae-0004G6-St; Wed, 27 Feb 2019 05:17:08 +0000
-Received: from guitar.tcltek.co.il ([192.115.133.116] helo=mx.tkos.co.il)
+	id 1gyrvA-0002Fm-2k; Wed, 27 Feb 2019 05:38:20 +0000
+Received: from mail-ot1-x341.google.com ([2607:f8b0:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyraZ-0004Ex-Aq
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 05:17:06 +0000
-Received: from tarshish (unknown [10.0.8.3])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mx.tkos.co.il (Postfix) with ESMTPS id BD73D4403CA;
- Wed, 27 Feb 2019 07:16:54 +0200 (IST)
-References: <20190222145356.23072-1-miquel.raynal@bootlin.com>
- <20190222145356.23072-5-miquel.raynal@bootlin.com> <87tvgt7o0q.fsf@tarshish>
- <20190225115826.5bc17f6d@xps13>
- <20190225121519.2quhgqcf24rutqn4@sapphire.tkos.co.il>
- <20190225130502.om6y5q7cbe35fbyw@shell.armlinux.org.uk>
-User-agent: mu4e 1.0; emacs 26.1
-From: Baruch Siach <baruch@tkos.co.il>
-To: Russell King - ARM Linux admin <linux@armlinux.org.uk>
-Subject: Re: [PATCH 4/5] arm64: dts: marvell: armada-8040-clearfog: Drop
- non-existent SATA port
-In-reply-to: <20190225130502.om6y5q7cbe35fbyw@shell.armlinux.org.uk>
-Date: Wed, 27 Feb 2019 07:16:54 +0200
-Message-ID: <87woll6cah.fsf@tarshish>
-MIME-Version: 1.0
+ id 1gyrv6-0002FQ-FC
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 05:38:17 +0000
+Received: by mail-ot1-x341.google.com with SMTP id t7so13312944otk.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 26 Feb 2019 21:38:15 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=xQq8ancmwZOdWsnLfrZLoOxW+Ve5gITnToEpTX3vkAY=;
+ b=f2jV0OBaEcUFsUDN+EvYbWi0GCVsZPlvmcx1YP6oINMndBO/ePNv9RrG7bqUJFJmGD
+ s03TZm2ZesuBXd+Kda+AQpX180aGv+UnsZmzJbkBKH5gWZfWtErHzfFLK1JmwJwmLBg0
+ bP24Vgem4UVEK3smMi6W5ZCMz+vfJnWIS0+08TaIxDGEM4P15MxY22GusjCl5+B7fej2
+ D6dQVUBJJRY8HPdawd1TiFPh0RVfAXiyk0EGbvjdBgQxUFna7D5p3JRW9FfuG6u2mYGZ
+ XVPV9vB+lue5IiCnSptINKTs7F9hMgQkKaHhq6DXa3pQFPJOkT3lIjk0xb2fsQDp3NeY
+ tCeQ==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=xQq8ancmwZOdWsnLfrZLoOxW+Ve5gITnToEpTX3vkAY=;
+ b=UTHZcXGjwJgFNDcDSPHyN8b/RSaaOeZdLTu4U1yuujROuCckMsqtMGdONjtljT6tKu
+ t4cXaOpzOfihYf4QKmsufAquWyDNlNdQR5SR4RSh8a90ej6mqYDtgjCuOXRiw0JIDOvs
+ S54M0Uo23pLEmjaGTXrSrTWgUOBgGdtTRwPc2eGzdwqpk3N2/ExwWsv8BRU8U0QxLNKw
+ TrCXj9xs7OPI0Qi3I/AqxQK0i1dhyeKnLrXdLRwFHBYaYizo/1TQ/1GN7+E7M5ptsbv4
+ k6N7P0Oj8copbnyr6G9PeGFjtP1ZHw86dEAOZ4SO4F6UWnOSo1nuxRyeYHLWufaKEuno
+ LuOg==
+X-Gm-Message-State: AHQUAuaNMKaQzPgLpDU5DxGzSgArn9oCTWeEpSK6gC0p4nMRLNliihH/
+ wu4HqTTCh06li2qRrlsi6q5m+A==
+X-Google-Smtp-Source: AHgI3IYmWeMWxYSDc2N3lN2vhwmXNQHfBXkMdLF60rslfYkTW4517S4OGHGSpRSuxQ7lXOdl7kI2yA==
+X-Received: by 2002:a9d:6012:: with SMTP id h18mr999584otj.341.1551245894373; 
+ Tue, 26 Feb 2019 21:38:14 -0800 (PST)
+Received: from localhost (107-207-74-175.lightspeed.austtx.sbcglobal.net.
+ [107.207.74.175])
+ by smtp.gmail.com with ESMTPSA id z6sm6082837otq.68.2019.02.26.21.38.13
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Tue, 26 Feb 2019 21:38:13 -0800 (PST)
+From: Andy Gross <andy.gross@linaro.org>
+To: arm@kernel.org
+Subject: [GIT PULL] Qualcomm ARM64 DT Fixes for 5.0-rc8
+Date: Tue, 26 Feb 2019 23:38:09 -0600
+Message-Id: <1551245889-15219-1-git-send-email-andy.gross@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190226_211703_875139_F80CE3BF 
-X-CRM114-Status: GOOD (  23.87  )
+X-CRM114-CacheID: sfid-20190226_213816_517534_17CADCE6 
+X-CRM114-Status: GOOD (  12.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,89 +91,50 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Marc Zyngier <marc.zyngier@arm.com>,
- Gregory Clement <gregory.clement@bootlin.com>,
- Jon Nettleton <jon@solid-run.com>, Rabeeh Khoury <rabeeh@solid-run.com>,
- Nadav Haklai <nadavh@marvell.com>, Hans de Goede <hdegoede@redhat.com>,
- Rob Herring <robh+dt@kernel.org>, Antoine Tenart <antoine.tenart@bootlin.com>,
- Jens Axboe <axboe@kernel.dk>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>, linux-ide@vger.kernel.org,
- Thomas Gleixner <tglx@linutronix.de>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Arnd Bergmann <arnd@arndb.de>, Kevin Hilman <khilman@baylibre.com>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>, linux-arm-msm@vger.kernel.org,
+ Olof Johansson <olof@lixom.net>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Russell,
+Arnd/Olof/Kevin,
 
-On Mon, Feb 25 2019, Russell King wrote:
-> On Mon, Feb 25, 2019 at 02:15:19PM +0200, Baruch Siach wrote:
->> On Mon, Feb 25, 2019 at 11:58:26AM +0100, Miquel Raynal wrote:
->> > Baruch Siach <baruch@tkos.co.il> wrote on Sun, 24 Feb 2019 07:29:09
->> > +0200:
->> >
->> > > On Fri, Feb 22 2019, Miquel Raynal wrote:
->> > > > There is no CP110 SATA port available on the 8040 Clearfog A8k, SATA
->> > > > may be used thanks to a mPCIe -> SATA extension board only. Hence, the
->> > > > cp1_sata0 node must be removed from the device tree.
->> > >
->> > > Not true. You can use the mini PCIe serdes as SATA directly if you
->> > > configure it as such. You only need to invert the serdes Rx pair
->> > > polarity. This is the default configuration for the Clearfog GT-8K CON3
->> > > mini-PCIe slot (CP1, lane #0) in current mainline U-Boot. I verified
->> > > that this setup works on Clearfog GT-8K.
->> > >
->> > > This patch would break mini PCIe direct SATA.
->> >
->> > Thanks for explaining, I am a little bit surprised that it actually
->> > uses the SATA host IP on CP110 but fine. So can you tell me which SATA
->> > port is used in this case? Because I will have to update the DT
->> > representation along with the CP110 changes.
->>
->> According to the cp110_comphy_phy_mux_data[] array in U-Boot
->> drivers/phy/marvell/comphy_cp110.c, serdes 0 of CP110 can only be SATA1 (i.e.
->> the second port; first is SATA0).
->
-> Adding folk from SolidRun...
->
-> Why are the mPCIe connectors configured by default for mSATA cards?
+I know this is late, but can you apply this single patch to fix boot issues on
+MSM8998 platforms?
 
-This is sort of capability demonstration.
+Thanks,
 
-> This sounds like it's going to cause confusion.  The published
-> specification for the board at:
->
-> https://developer.solid-run.com/products/clearfog-gt-8k/
->
-> states that the board has "3 x mPCIe (USB 2.0 + PCIe)" and makes no
-> mention of mSATA.
->
-> mSATA is not compatible with mPCIe - mSATA cards expect the serdes
-> lanes to be connected to a SATA interface, mPCIe cards expect a PCIe
-> controller at the other end of the serdes lanes.
->
-> Given that there is a lot of confusion about mSATA vs mPCIe out there,
-> (caused by both being the same physical form factor and fitting into
-> the same socket, yet being electrically different) I think it's
-> important to have a coherent story on these connectors everywhere.
->
-> Maybe we need a way to have these connectors configurable by the end
-> user?
+Andy
 
-The user can set the PCIe/SATA serdes configuration in U-Boot CP110
-comphy nodes.
+The following changes since commit 2a81efb0de0e33f2d2c83154af0bd3ce389b3269:
 
-baruch
+  arm64: dts: add msm8996 compatible to gicv3 (2019-01-24 21:16:16 -0600)
 
---
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch@tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-5.0-rc8
+
+for you to fetch changes up to 6e53330909672bd9a8c9f826e989a5945d9d9fdf:
+
+  arm64: dts: qcom: msm8998: Extend TZ reserved memory area (2019-02-26 23:32:11 -0600)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Fixes for 5.0-rc8
+
+* Fix TZ memory area size to avoid crashes during boot
+
+----------------------------------------------------------------
+Andy Gross (1):
+      Merge tag 'qcom-fixes-for-5.0-rc3' into fixes-for-5.0-rc8
+
+Marc Gonzalez (1):
+      arm64: dts: qcom: msm8998: Extend TZ reserved memory area
+
+ arch/arm64/boot/dts/qcom/msm8998.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
