@@ -2,90 +2,77 @@ Return-Path: <SRS0=CF3g=RC=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-3.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C17D8C43381
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:32:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DFD74C43381
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:35:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8FCB42147C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:32:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1430213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Wed, 27 Feb 2019 09:35:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dz21wseE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8FCB42147C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bui6xOc/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1430213A2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qPloiZyFbNt4r2IQ18i5e3ZU4pN7/k37lFITC4JJJFU=; b=dz21wseECU6nwZ
-	/lFLBTsqXLB1C0qe43fThXewxilUYHmFQnIm3aBatCe6Zf6eKljI6vrDOPkHtrk9MGcbIvrIR2Jqa
-	TaF/hLk+hbyfoYT55fmaCVIHOiFr2wrAqrcPW9uvUw1VCKR4zuRvPv4YX/GDc+VbtM8qhkuy5o1PT
-	PmiEbHJ0nSXII6k0XJLEpTDw/8PtiWWUHMwU6KIL3Cus+3XqxS5vvE+Hrl7+oLYxoWxslr8fG8J9/
-	hTNMohdTIC/qCQtUX3YbCuzES5wPMUZ/4Q4OI7B7KFCncU5ZZfb1JNeP+ksm1aLbCDR3GMkvMsZlY
-	hAZofXnL6a2G+jROfnkw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=scWiXQ38+kjaB4ewediEJU4LsRgHCpq+WDXgrs8ZF0c=; b=bui6xOc/LlpBep
+	w8xOzmX6aKMTnp0YnHX6/bISOtQdKt4oOqXdV37yZZ/OJHDY22kg4ds0Di2P6JxQ78o62FYH6LI6c
+	9eLJ6vYGSJovm2Ox9htL4LomaALn3YEBIAednzY968t6Sx8YrXI5kuVFGFnbPtQWrrWk/SXw4/7W9
+	purUh2kWSVKA7anCFIHxcsV7kU1bIv+qpup8Gl3ZSd1otR/6eqauEAtbvj728BzxkmOF515u6r6Cx
+	WRtRGYWWaC1u0nsfvGKCQLjwFfyMrTcLY3UGGE7WNGvSF2wHtaIVPP8+KyOh4c9sZqAJ3Qz6glTAY
+	hunvsLMZMcb/RFss0YjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gyvZn-0001pu-Is; Wed, 27 Feb 2019 09:32:31 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
+	id 1gyvcV-0003XD-9K; Wed, 27 Feb 2019 09:35:19 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gyvZj-0001or-4B
- for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 09:32:30 +0000
-Received: from pps.filterd (m0046037.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- x1R9Vni4007922; Wed, 27 Feb 2019 10:32:17 +0100
+ id 1gyvcS-0003WG-B1
+ for linux-arm-kernel@lists.infradead.org; Wed, 27 Feb 2019 09:35:17 +0000
+Received: from pps.filterd (m0046660.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ x1R9XfS2000430; Wed, 27 Feb 2019 10:35:09 +0100
 Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2qtvtx5dfp-1
+ by mx08-00178001.pphosted.com with ESMTP id 2qtv6cx2wu-1
  (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Wed, 27 Feb 2019 10:32:17 +0100
+ Wed, 27 Feb 2019 10:35:09 +0100
 Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 882F431;
- Wed, 27 Feb 2019 09:32:16 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 4029B2BA6;
- Wed, 27 Feb 2019 09:32:16 +0000 (GMT)
-Received: from SFHDAG3NODE2.st.com (10.75.127.8) by SFHDAG3NODE2.st.com
- (10.75.127.8) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Wed, 27 Feb
- 2019 10:32:16 +0100
-Received: from SFHDAG3NODE2.st.com ([fe80::b82f:1ce:8854:5b96]) by
- SFHDAG3NODE2.st.com ([fe80::b82f:1ce:8854:5b96%20]) with mapi id
- 15.00.1347.000; Wed, 27 Feb 2019 10:32:16 +0100
-From: Amelie DELAUNAY <amelie.delaunay@st.com>
-To: Lee Jones <lee.jones@linaro.org>
-Subject: Re: [PATCH v3 2/7] mfd: Add ST Multi-Function eXpander (STMFX) core
- driver
-Thread-Topic: [PATCH v3 2/7] mfd: Add ST Multi-Function eXpander (STMFX) core
- driver
-Thread-Index: AQHUVlbbMUibYria3kWHuz6PS2MFyqUWnhgAgN2jGwA=
-Date: Wed, 27 Feb 2019 09:32:16 +0000
-Message-ID: <5ad2b556-4a46-c4c3-271b-19782cbbb045@st.com>
-References: <1538048404-9041-1-git-send-email-amelie.delaunay@st.com>
- <1538048404-9041-3-git-send-email-amelie.delaunay@st.com>
- <20181009095504.GG4939@dell>
-In-Reply-To: <20181009095504.GG4939@dell>
-Accept-Language: fr-FR, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.4.0
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-exchange-transport-fromentityheader: Hosted
-x-originating-ip: [10.75.127.44]
-Content-ID: <A02F8478FD6E99479B33A8525D203E47@st.com>
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 8CFE434;
+ Wed, 27 Feb 2019 09:35:08 +0000 (GMT)
+Received: from Webmail-eu.st.com (Safex1hubcas22.st.com [10.75.90.92])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 31EE1275F;
+ Wed, 27 Feb 2019 09:35:07 +0000 (GMT)
+Received: from SAFEX1HUBCAS24.st.com (10.75.90.95) by Safex1hubcas22.st.com
+ (10.75.90.92) with Microsoft SMTP Server (TLS) id 14.3.361.1; Wed, 27 Feb
+ 2019 10:35:07 +0100
+Received: from localhost (10.201.20.5) by webmail-ga.st.com (10.75.90.48) with
+ Microsoft SMTP Server (TLS) id 14.3.361.1;
+ Wed, 27 Feb 2019 10:35:06 +0100
+From: Amelie Delaunay <amelie.delaunay@st.com>
+To: Lee Jones <lee.jones@linaro.org>, Linus Walleij <linus.walleij@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Alexandre Torgue <alexandre.torgue@st.com>, "Maxime
+ Coquelin" <mcoquelin.stm32@gmail.com>
+Subject: [PATCH v4 0/9] Introduce STMFX I2C Multi-Function eXpander
+Date: Wed, 27 Feb 2019 10:34:45 +0100
+Message-ID: <1551260094-32570-1-git-send-email-amelie.delaunay@st.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
+X-Originating-IP: [10.201.20.5]
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2019-02-27_06:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20190227_013227_618874_31C2E0CF 
-X-CRM114-Status: GOOD (  23.44  )
+X-CRM114-CacheID: sfid-20190227_013516_666619_320041CC 
+X-CRM114-Status: GOOD (  13.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,821 +84,78 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Alexandre TORGUE <alexandre.torgue@st.com>,
- Linus Walleij <linus.walleij@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "linux-gpio@vger.kernel.org" <linux-gpio@vger.kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- "linux-stm32@st-md-mailman.stormreply.com"
- <linux-stm32@st-md-mailman.stormreply.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, Amelie Delaunay <amelie.delaunay@st.com>,
+ linux-kernel@vger.kernel.org, linux-gpio@vger.kernel.org,
+ linux-stm32@st-md-mailman.stormreply.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 10/9/18 11:55 AM, Lee Jones wrote:
-> On Thu, 27 Sep 2018, Amelie Delaunay wrote:
-> 
->> STMicroelectronics Multi-Function eXpander (STMFX) is a slave controller
->> using I2C for communication with the main MCU. Main features are:
->> - 16 fast GPIOs individually configurable in input/output
->> - 8 alternate GPIOs individually configurable in input/output when other
->> STMFX functions are not used
->> - Main MCU IDD measurement
->> - Resistive touchscreen controller
->>
->> Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
->> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>   drivers/mfd/Kconfig       |  14 ++
->>   drivers/mfd/Makefile      |   2 +-
->>   drivers/mfd/stmfx.c       | 626 ++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/mfd/stmfx.h |  27 ++
->>   4 files changed, 668 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/mfd/stmfx.c
->>   create mode 100644 include/linux/mfd/stmfx.h
->>
->> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->> index f3a5f8d..8c41342 100644
->> --- a/drivers/mfd/Kconfig
->> +++ b/drivers/mfd/Kconfig
->> @@ -1862,6 +1862,20 @@ config MFD_STM32_TIMERS
->>   	  for PWM and IIO Timer. This driver allow to share the
->>   	  registers between the others drivers.
->>   
->> +config MFD_STMFX
->> +	tristate "Support for STMicroelectronics Multi-Function eXpander (STMFX)"
->> +	depends on I2C
->> +	depends on OF || COMPILE_TEST
->> +	select MFD_CORE
->> +	select REGMAP_I2C
->> +	help
->> +	  Support for the STMicroelectronics Multi-Function eXpander.
->> +
->> +	  This driver provides common support for accessing the device,
->> +	  additional drivers must be enabled in order to use the functionality
->> +	  of the device.
->> +
->> +
->>   menu "Multimedia Capabilities Port drivers"
->>   	depends on ARCH_SA1100
->>   
->> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
->> index 5856a94..282323b 100644
->> --- a/drivers/mfd/Makefile
->> +++ b/drivers/mfd/Makefile
->> @@ -240,4 +240,4 @@ obj-$(CONFIG_MFD_MXS_LRADC)     += mxs-lradc.o
->>   obj-$(CONFIG_MFD_SC27XX_PMIC)	+= sprd-sc27xx-spi.o
->>   obj-$(CONFIG_RAVE_SP_CORE)	+= rave-sp.o
->>   obj-$(CONFIG_MFD_ROHM_BD718XX)	+= rohm-bd718x7.o
->> -
->> +obj-$(CONFIG_MFD_STMFX) 	+= stmfx.o
->> diff --git a/drivers/mfd/stmfx.c b/drivers/mfd/stmfx.c
->> new file mode 100644
->> index 0000000..cfd4fca
->> --- /dev/null
->> +++ b/drivers/mfd/stmfx.c
->> @@ -0,0 +1,626 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Driver for STMicroelectronics Multi-Function eXpander (STMFX) core
->> + *
->> + * Copyright (C) 2018 STMicroelectronics
->> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com>.
->> + */
->> +#include <linux/bitfield.h>
->> +#include <linux/i2c.h>
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/mfd/core.h>
->> +#include <linux/mfd/stmfx.h>
->> +#include <linux/module.h>
->> +#include <linux/regulator/consumer.h>
->> +
->> +/* General */
->> +#define STMFX_REG_CHIP_ID		0x00 /* R */
->> +#define STMFX_REG_FW_VERSION_MSB	0x01 /* R */
->> +#define STMFX_REG_FW_VERSION_LSB	0x02 /* R */
->> +#define STMFX_REG_SYS_CTRL		0x40 /* RW */
->> +/* IRQ output management */
->> +#define STMFX_REG_IRQ_OUT_PIN		0x41 /* RW */
->> +#define STMFX_REG_IRQ_SRC_EN		0x42 /* RW */
->> +#define STMFX_REG_IRQ_PENDING		0x08 /* R */
->> +#define STMFX_REG_IRQ_ACK		0x44 /* RW */
->> +/* GPIO management */
->> +#define STMFX_REG_IRQ_GPI_PENDING1	0x0C /* R */
->> +#define STMFX_REG_IRQ_GPI_PENDING2	0x0D /* R */
->> +#define STMFX_REG_IRQ_GPI_PENDING3	0x0E /* R */
->> +#define STMFX_REG_GPIO_STATE1		0x10 /* R */
->> +#define STMFX_REG_GPIO_STATE2		0x11 /* R */
->> +#define STMFX_REG_GPIO_STATE3		0x12 /* R */
->> +#define STMFX_REG_IRQ_GPI_SRC1		0x48 /* RW */
->> +#define STMFX_REG_IRQ_GPI_SRC2		0x49 /* RW */
->> +#define STMFX_REG_IRQ_GPI_SRC3		0x4A /* RW */
->> +#define STMFX_REG_GPO_SET1		0x6C /* RW */
->> +#define STMFX_REG_GPO_SET2		0x6D /* RW */
->> +#define STMFX_REG_GPO_SET3		0x6E /* RW */
->> +#define STMFX_REG_GPO_CLR1		0x70 /* RW */
->> +#define STMFX_REG_GPO_CLR2		0x71 /* RW */
->> +#define STMFX_REG_GPO_CLR3		0x72 /* RW */
->> +
->> +#define STMFX_REG_MAX			0xB0
->> +
->> +/* MFX boot time is around 10ms, so after reset, we have to wait this delay */
->> +#define STMFX_BOOT_TIME_MS 10
->> +
->> +/* STMFX_REG_CHIP_ID bitfields */
->> +#define STMFX_REG_CHIP_ID_MASK		GENMASK(7, 0)
->> +
->> +/* STMFX_REG_SYS_CTRL bitfields */
->> +#define STMFX_REG_SYS_CTRL_GPIO_EN	BIT(0)
->> +#define STMFX_REG_SYS_CTRL_TS_EN	BIT(1)
->> +#define STMFX_REG_SYS_CTRL_IDD_EN	BIT(2)
->> +#define STMFX_REG_SYS_CTRL_ALTGPIO_EN	BIT(3)
->> +#define STMFX_REG_SYS_CTRL_SWRST	BIT(7)
->> +
->> +/* STMFX_REG_IRQ_OUT_PIN bitfields */
->> +#define STMFX_REG_IRQ_OUT_PIN_TYPE	BIT(0) /* 0-OD 1-PP */
->> +#define STMFX_REG_IRQ_OUT_PIN_POL	BIT(1) /* 0-active LOW 1-active HIGH */
->> +
->> +/* STMFX_REG_IRQ_(SRC_EN/PENDING/ACK) bit shift */
->> +enum stmfx_irqs {
->> +	STMFX_REG_IRQ_SRC_EN_GPIO = 0,
->> +	STMFX_REG_IRQ_SRC_EN_IDD,
->> +	STMFX_REG_IRQ_SRC_EN_ERROR,
->> +	STMFX_REG_IRQ_SRC_EN_TS_DET,
->> +	STMFX_REG_IRQ_SRC_EN_TS_NE,
->> +	STMFX_REG_IRQ_SRC_EN_TS_TH,
->> +	STMFX_REG_IRQ_SRC_EN_TS_FULL,
->> +	STMFX_REG_IRQ_SRC_EN_TS_OVF,
->> +	STMFX_REG_IRQ_SRC_MAX,
->> +};
-> 
-> I'd prefer from here up to the includes to be placed into the header.
-> 
+This series adds support for STMicroelectronics Multi-Function eXpander
+(STMFX), used on some STM32 discovery and evaluation boards.
 
-OK.
+STMFX is an STM32L152 slave controller whose firmware embeds the following
+features:
+- I/O expander (16 GPIOs + 8 extra if the other features are not enabled),
+- resistive touchscreen controller,
+- IDD measurement.
 
->> +/**
->> + * struct stmfx_ddata - STMFX MFD private structure
-> 
-> You can drop '_ddata' from here (read next comment).
-> 
->> + * @stmfx:		state holder with device for logs and register map
-> 
-> I don't understand why this requires an additional struct.
-> 
->> + * @vdd:		STMFX power supply
->> + * @irq_domain:		IRQ domain
->> + * @lock:		IRQ bus lock
->> + * @irq_src:		cache of IRQ_SRC_EN register for bus_lock
->> + * @bkp_sysctrl:	backup of SYS_CTRL register for suspend/resume
->> + * @bkp_irqoutpin:	backup of IRQ_OUT_PIN register for suspend/resume
->> + */
->> +struct stmfx_ddata {
->> +	struct stmfx *stmfx;
->> +	struct regulator *vdd;
->> +	struct irq_domain *irq_domain;
->> +	struct mutex lock; /* IRQ bus lock */
->> +	u8 irq_src;
->> +#ifdef CONFIG_PM
->> +	u8 bkp_sysctrl;
->> +	u8 bkp_irqoutpin;
->> +#endif
-> 
-> I haven't seen this before.
-> 
-> Why is this necessary for *this* device and no others?
-> 
+I2C stuff and chip initialization is based on an MFD parent driver, which
+registers STMFX features MFD children.
 
-Not necessary in fact. Private structure was here to reflect the mfd 
-core specific members because I thought it was useless for his children 
-to have access to these struct members.
+---
+Changes in v4:
+- mfd: move registers #define into the header
+- mfd: merge stmfx and stmfx_ddata structures into one stmfx structure
+- mfd: change stmfx_chip_init/exit and stmfx_irq_init/exit args: use
+  i2c_client struct and i2c_get_clientdata
+- mfd: fix typos
+- mfd: add MFD cells for IDD and TS features
+- pinctrl: rework registers #define
+- dts: add STMFX support on stm32mp157c-ev1
+Changes in v3:
+- fix MFD interrupt bindings
+- fix drivers/mfd/stmfx.c:103:8: warning: 'mask' may be used uninitialized
+  in this function
+Changes in v2:
+- move to MFD parent driver for i2c stuff and chip initialization
+- improve regmap configuration
+- take advantage of the use of gpio-ranges
 
->> +};
->> +
->> +static u8 stmfx_func_to_mask(u32 func)
->> +{
->> +	u8 mask = 0;
->> +
->> +	if (func & STMFX_FUNC_GPIO)
->> +		mask |= STMFX_REG_SYS_CTRL_GPIO_EN;
->> +
->> +	if ((func & STMFX_FUNC_ALTGPIO_LOW) || (func & STMFX_FUNC_ALTGPIO_HIGH))
->> +		mask |= STMFX_REG_SYS_CTRL_ALTGPIO_EN;
->> +
->> +	if (func & STMFX_FUNC_TS)
->> +		mask |= STMFX_REG_SYS_CTRL_TS_EN;
->> +
->> +	if (func & STMFX_FUNC_IDD)
->> +		mask |= STMFX_REG_SYS_CTRL_IDD_EN;
->> +
->> +	return mask;
->> +}
->> +
->> +int stmfx_function_enable(struct stmfx *stmfx, u32 func)
->> +{
->> +	u32 sys_ctrl;
->> +	u8 mask;
->> +	int ret;
->> +
->> +	ret = regmap_read(stmfx->map, STMFX_REG_SYS_CTRL, &sys_ctrl);
->> +	if (ret)
->> +		return ret;
->> +
->> +	/*
->> +	 * IDD and TS have priority in STMFX FW, so if IDD and TS are enabled,
->> +	 * ALTGPIO function is disabled by STMFX FW. If IDD or TS is enabled,
->> +	 * the number of aGPIO available decreases. To avoid GPIO management
->> +	 * disturbance, abort IDD or TS function enable in this case.
->> +	 */
->> +	if (((func & STMFX_FUNC_IDD) || (func & STMFX_FUNC_TS)) &&
->> +	    (sys_ctrl & STMFX_REG_SYS_CTRL_ALTGPIO_EN)) {
->> +		dev_err(stmfx->dev, "ALTGPIO function already enabled\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	/* If TS is enabled, aGPIO[3:0] cannot be used */
->> +	if ((func & STMFX_FUNC_ALTGPIO_LOW) &&
->> +	    (sys_ctrl & STMFX_REG_SYS_CTRL_TS_EN)) {
->> +		dev_err(stmfx->dev, "TS in use, aGPIO[3:0] unavailable\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	/* If IDD is enabled, aGPIO[7:4] cannot be used */
->> +	if ((func & STMFX_FUNC_ALTGPIO_HIGH) &&
->> +	    (sys_ctrl & STMFX_REG_SYS_CTRL_IDD_EN)) {
->> +		dev_err(stmfx->dev, "IDD in use, aGPIO[7:4] unavailable\n");
->> +		return -EBUSY;
->> +	}
->> +
->> +	mask = stmfx_func_to_mask(func);
->> +
->> +	return regmap_update_bits(stmfx->map, STMFX_REG_SYS_CTRL, mask, mask);
->> +}
->> +EXPORT_SYMBOL_GPL(stmfx_function_enable);
->> +
->> +int stmfx_function_disable(struct stmfx *stmfx, u32 func)
->> +{
->> +	u8 mask = stmfx_func_to_mask(func);
->> +
->> +	return regmap_update_bits(stmfx->map, STMFX_REG_SYS_CTRL, mask, 0);
->> +}
->> +EXPORT_SYMBOL_GPL(stmfx_function_disable);
->> +
->> +static void stmfx_irq_bus_lock(struct irq_data *data)
->> +{
->> +	struct stmfx_ddata *ddata = irq_data_get_irq_chip_data(data);
->> +
->> +	mutex_lock(&ddata->lock);
->> +}
->> +
->> +static void stmfx_irq_bus_sync_unlock(struct irq_data *data)
->> +{
->> +	struct stmfx_ddata *ddata = irq_data_get_irq_chip_data(data);
->> +
->> +	regmap_write(ddata->stmfx->map, STMFX_REG_IRQ_SRC_EN, ddata->irq_src);
->> +
->> +	mutex_unlock(&ddata->lock);
->> +}
->> +
->> +static void stmfx_irq_mask(struct irq_data *data)
->> +{
->> +	struct stmfx_ddata *ddata = irq_data_get_irq_chip_data(data);
->> +
->> +	ddata->irq_src &= ~BIT(data->hwirq % 8);
->> +}
->> +
->> +static void stmfx_irq_unmask(struct irq_data *data)
->> +{
->> +	struct stmfx_ddata *ddata = irq_data_get_irq_chip_data(data);
->> +
->> +	ddata->irq_src |= BIT(data->hwirq % 8);
->> +}
->> +
->> +static struct irq_chip stmfx_irq_chip = {
->> +	.name			= "stmfx-core",
->> +	.irq_bus_lock		= stmfx_irq_bus_lock,
->> +	.irq_bus_sync_unlock	= stmfx_irq_bus_sync_unlock,
->> +	.irq_mask		= stmfx_irq_mask,
->> +	.irq_unmask		= stmfx_irq_unmask,
->> +};
->> +
->> +static irqreturn_t stmfx_irq_handler(int irq, void *data)
->> +{
->> +	struct stmfx_ddata *ddata = data;
->> +	unsigned long n, pending;
->> +	u32 ack;
->> +	int ret;
->> +
->> +	ret = regmap_read(ddata->stmfx->map, STMFX_REG_IRQ_PENDING,
->> +			  (u32 *)&pending);
->> +	if (ret)
->> +		return IRQ_NONE;
->> +
->> +	/*
->> +	 * There is no ACK for GPIO, MFX_REG_IRQ_PENDING_GPIO is a logical OR
->> +	 * of MFX_REG_IRQ_GPI _PENDING1/_PENDING2/_PENDING3
->> +	 */
->> +	ack = pending & ~BIT(STMFX_REG_IRQ_SRC_EN_GPIO);
->> +	if (ack) {
->> +		ret = regmap_write(ddata->stmfx->map, STMFX_REG_IRQ_ACK, ack);
->> +		if (ret)
->> +			return IRQ_NONE;
->> +	}
->> +
->> +	for_each_set_bit(n, &pending, STMFX_REG_IRQ_SRC_MAX)
->> +		handle_nested_irq(irq_find_mapping(ddata->irq_domain, n));
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int stmfx_irq_map(struct irq_domain *d, unsigned int virq,
->> +			 irq_hw_number_t hwirq)
->> +{
->> +	irq_set_chip_data(virq, d->host_data);
->> +	irq_set_chip_and_handler(virq, &stmfx_irq_chip, handle_simple_irq);
->> +	irq_set_nested_thread(virq, 1);
->> +	irq_set_noprobe(virq);
->> +
->> +	return 0;
->> +}
->> +
->> +static void stmfx_irq_unmap(struct irq_domain *d, unsigned int virq)
->> +{
->> +	irq_set_chip_and_handler(virq, NULL, NULL);
->> +	irq_set_chip_data(virq, NULL);
->> +}
->> +
->> +static const struct irq_domain_ops stmfx_irq_ops = {
->> +	.map	= stmfx_irq_map,
->> +	.unmap	= stmfx_irq_unmap,
->> +};
->> +
->> +static void stmfx_irq_exit(struct stmfx_ddata *ddata)
->> +{
->> +	int hwirq;
->> +
->> +	for (hwirq = 0; hwirq < STMFX_REG_IRQ_SRC_MAX; hwirq++)
->> +		irq_dispose_mapping(irq_find_mapping(ddata->irq_domain, hwirq));
-> 
-> '\n' here please.
-> 
->> +	irq_domain_remove(ddata->irq_domain);
->> +}
->> +
->> +static int stmfx_irq_init(struct stmfx_ddata *ddata, int irq)
->> +{
->> +	struct device *dev = ddata->stmfx->dev;
-> 
-> Better to pass either 'dev' or 'pdev' around and extrapolate using the
-> dev_get_drvdata() helpers, rather than the other way around.
-> 
+Amelie Delaunay (9):
+  dt-bindings: mfd: Add ST Multi-Function eXpander (STMFX) core bindings
+  mfd: Add ST Multi-Function eXpander (STMFX) core driver
+  dt-bindings: pinctrl: document the STMFX pinctrl bindings
+  pinctrl: Add STMFX GPIO expander Pinctrl/GPIO driver
+  ARM: dts: stm32: add STMFX support on stm32746g-eval
+  ARM: dts: stm32: add joystick support on stm32746g-eval
+  ARM: dts: stm32: add orange and blue leds on stm32746g-eval
+  ARM: dts: stm32: add STMFX support on stm32mp157c-ev1
+  ARM: dts: stm32: add joystick support on stm32mp157c-ev1
 
-I agree. I can pass i2c client and extrapolate using the 
-i2c_get_clientdata helper, here and in _irq_exit, _chip_init, 
-_chip_exit, to homogenize.
+ Documentation/devicetree/bindings/mfd/stmfx.txt    |  28 +
+ .../devicetree/bindings/pinctrl/pinctrl-stmfx.txt  | 116 +++
+ arch/arm/boot/dts/stm32746g-eval.dts               |  66 ++
+ arch/arm/boot/dts/stm32mp157c-ev1.dts              |  60 ++
+ drivers/mfd/Kconfig                                |  13 +
+ drivers/mfd/Makefile                               |   2 +-
+ drivers/mfd/stmfx.c                                | 568 ++++++++++++++
+ drivers/pinctrl/Kconfig                            |  12 +
+ drivers/pinctrl/Makefile                           |   1 +
+ drivers/pinctrl/pinctrl-stmfx.c                    | 820 +++++++++++++++++++++
+ include/linux/mfd/stmfx.h                          | 123 ++++
+ 11 files changed, 1808 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/stmfx.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-stmfx.txt
+ create mode 100644 drivers/mfd/stmfx.c
+ create mode 100644 drivers/pinctrl/pinctrl-stmfx.c
+ create mode 100644 include/linux/mfd/stmfx.h
 
->> +	u32 irqoutpin = 0, irqtrigger;
->> +	int ret;
->> +
->> +	ddata->irq_domain = irq_domain_add_simple(dev->of_node,
->> +						  STMFX_REG_IRQ_SRC_MAX, 0,
->> +						  &stmfx_irq_ops, ddata);
->> +	if (!ddata->irq_domain) {
->> +		dev_err(dev, "failed to create irq domain\n");
-> 
-> s/irq/IRQ/
-> 
-> I also prefer capital letters to start sentences, but it's not
-> critical here.
-> 
+-- 
+2.7.4
 
-OK, I will fix all typos.
 
->> +		return -EINVAL;
->> +	}
->> +
->> +	if (!of_property_read_bool(dev->of_node, "drive-open-drain"))
->> +		irqoutpin |= STMFX_REG_IRQ_OUT_PIN_TYPE;
->> +
->> +	irqtrigger = irq_get_trigger_type(irq);
->> +	if ((irqtrigger & IRQ_TYPE_EDGE_RISING) ||
->> +	    (irqtrigger & IRQ_TYPE_LEVEL_HIGH))
->> +		irqoutpin |= STMFX_REG_IRQ_OUT_PIN_POL;
->> +
->> +	ret = regmap_write(ddata->stmfx->map, STMFX_REG_IRQ_OUT_PIN, irqoutpin);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = devm_request_threaded_irq(dev, irq, NULL, stmfx_irq_handler,
->> +					irqtrigger | IRQF_ONESHOT,
->> +					"stmfx", ddata);
->> +	if (ret)
->> +		stmfx_irq_exit(ddata);
->> +
->> +	return ret;
->> +}
->> +
->> +static int stmfx_chip_reset(struct stmfx_ddata *ddata)
->> +{
->> +	int ret;
->> +
->> +	ret = regmap_write(ddata->stmfx->map, STMFX_REG_SYS_CTRL,
->> +			   STMFX_REG_SYS_CTRL_SWRST);
->> +	if (ret)
->> +		return ret;
->> +
->> +	msleep(STMFX_BOOT_TIME_MS);
->> +
->> +	return ret;
->> +}
->> +
->> +static int stmfx_chip_init(struct stmfx_ddata *ddata, struct i2c_client *client)
-> 
-> No need to provide both ddata and client, you can extrapolate the
-> former from the latter.
-> 
->> +{
->> +	u32 id;
->> +	u8 version[2];
->> +	int ret;
->> +
->> +	ddata->vdd = devm_regulator_get_optional(&client->dev, "vdd");
->> +	if (IS_ERR(ddata->vdd)) {
->> +		ret = PTR_ERR(ddata->vdd);
->> +		if (ret != -ENODEV) {
->> +			if (ret != -EPROBE_DEFER)
->> +				dev_err(&client->dev,
->> +					"no vdd regulator found:%d\n", ret);
-> 
-> s/vdd/VDD/?
-> 
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	if (!IS_ERR(ddata->vdd)) {
-> 
-> Why not just 'else'?
-> 
->> +		ret = regulator_enable(ddata->vdd);
->> +		if (ret) {
->> +			dev_err(&client->dev, "vdd enable failed: %d\n", ret);
-> 
-> s/vdd/VDD/?
-> 
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	ret = regmap_read(ddata->stmfx->map, STMFX_REG_CHIP_ID, &id);
->> +	if (ret) {
->> +		dev_err(&client->dev, "error reading chip id: %d\n", ret);
-> 
-> s/id/ID/
-> 
->> +		goto err;
->> +	}
->> +
->> +	/*
->> +	 * Check that ID is the complement of the I2C address:
->> +	 * STMFX I2C address follows the 7-bit format (MSB), that's why
->> +	 * client->addr is shifted.
->> +	 *
->> +	 * STMFX_I2C_ADDR|       STMFX         |        Linux
->> +	 *   input pin   | I2C device address  | I2C device address
->> +	 *---------------------------------------------------------
->> +	 *       0       | b: 1000 010x h:0x84 |       0x42
->> +	 *       1       | b: 1000 011x h:0x86 |       0x43
->> +	 */
->> +	if (FIELD_GET(STMFX_REG_CHIP_ID_MASK, ~id) != (client->addr << 1)) {
->> +		dev_err(&client->dev, "unknown chip id: %#x\n", id);
->> +		ret = -EINVAL;
->> +		goto err;
->> +	}
->> +
->> +	ret = regmap_bulk_read(ddata->stmfx->map, STMFX_REG_FW_VERSION_MSB,
->> +			       version, ARRAY_SIZE(version));
->> +	if (ret) {
->> +		dev_err(&client->dev, "error reading fw version: %d\n", ret);
->> +		goto err;
->> +	}
->> +
->> +	dev_info(&client->dev, "STMFX id: %#x, fw version: %x.%02x\n",
->> +		 id, version[0], version[1]);
->> +
->> +	return stmfx_chip_reset(ddata);
->> +
->> +err:
->> +	if (!IS_ERR(ddata->vdd))
->> +		return regulator_disable(ddata->vdd);
->> +
->> +	return ret;
->> +}
->> +
->> +static int stmfx_chip_exit(struct stmfx_ddata *ddata)
->> +{
->> +	regmap_write(ddata->stmfx->map, STMFX_REG_IRQ_SRC_EN, 0);
->> +	regmap_write(ddata->stmfx->map, STMFX_REG_SYS_CTRL, 0);
->> +
->> +	if (!IS_ERR(ddata->vdd))
->> +		return regulator_disable(ddata->vdd);
->> +
->> +	return 0;
->> +}
->> +
->> +static const struct resource stmfx_pinctrl_resources[] = {
->> +	DEFINE_RES_IRQ(STMFX_REG_IRQ_SRC_EN_GPIO),
->> +};
->> +
->> +static struct mfd_cell stmfx_cells[] = {
->> +	{
->> +		.of_compatible = "st,stmfx-0300-pinctrl",
->> +		.name = "stmfx-pinctrl",
->> +		.resources = stmfx_pinctrl_resources,
->> +		.num_resources = ARRAY_SIZE(stmfx_pinctrl_resources),
->> +	}
->> +};
-> 
-> What other devices make up this MFD?
-> 
-
-I can add two other cells for TouchScreen feature with TouchScreen 
-interrupts, and IDD feature with IDD and Error interrupt (used by IDD 
-module to raise default/error encountered during IDD measurement).
-
->> +static bool stmfx_reg_volatile(struct device *dev, unsigned int reg)
->> +{
->> +	switch (reg) {
->> +	case STMFX_REG_SYS_CTRL:
->> +	case STMFX_REG_IRQ_SRC_EN:
->> +	case STMFX_REG_IRQ_PENDING:
->> +	case STMFX_REG_IRQ_GPI_PENDING1:
->> +	case STMFX_REG_IRQ_GPI_PENDING2:
->> +	case STMFX_REG_IRQ_GPI_PENDING3:
->> +	case STMFX_REG_GPIO_STATE1:
->> +	case STMFX_REG_GPIO_STATE2:
->> +	case STMFX_REG_GPIO_STATE3:
->> +	case STMFX_REG_IRQ_GPI_SRC1:
->> +	case STMFX_REG_IRQ_GPI_SRC2:
->> +	case STMFX_REG_IRQ_GPI_SRC3:
->> +	case STMFX_REG_GPO_SET1:
->> +	case STMFX_REG_GPO_SET2:
->> +	case STMFX_REG_GPO_SET3:
->> +	case STMFX_REG_GPO_CLR1:
->> +	case STMFX_REG_GPO_CLR2:
->> +	case STMFX_REG_GPO_CLR3:
->> +		return true;
->> +	default:
->> +		return false;
->> +	}
->> +}
->> +
->> +static bool stmfx_reg_writeable(struct device *dev, unsigned int reg)
->> +{
->> +	return (reg >= STMFX_REG_SYS_CTRL);
->> +}
->> +
->> +static const struct regmap_config stmfx_regmap_config = {
->> +	.reg_bits	= 8,
->> +	.reg_stride	= 1,
->> +	.val_bits	= 8,
->> +	.max_register	= STMFX_REG_MAX,
->> +	.volatile_reg	= stmfx_reg_volatile,
->> +	.writeable_reg	= stmfx_reg_writeable,
->> +	.cache_type	= REGCACHE_RBTREE,
->> +};
->> +
->> +static int stmfx_probe(struct i2c_client *client,
->> +		       const struct i2c_device_id *id)
->> +{
->> +	struct device *dev = &client->dev;
->> +	struct stmfx_ddata *ddata;
->> +	int i, ret;
->> +
->> +	ddata = devm_kzalloc(dev, sizeof(*ddata), GFP_KERNEL);
->> +	if (!ddata)
->> +		return -ENOMEM;
-> 
-> '\n' here please.
-> 
->> +	/* State holder */
->> +	ddata->stmfx = devm_kzalloc(dev, sizeof(*ddata->stmfx), GFP_KERNEL);
->> +	if (!ddata->stmfx)
->> +		return -ENOMEM;
->> +
->> +	i2c_set_clientdata(client, ddata);
->> +
->> +	ddata->stmfx->dev = dev;
->> +
->> +	ddata->stmfx->map = devm_regmap_init_i2c(client, &stmfx_regmap_config);
-> 
-> Just put this straight into the parent struct and do away with the
-> extra complication.
-> 
->> +	if (IS_ERR(ddata->stmfx->map)) {
->> +		ret = PTR_ERR(ddata->stmfx->map);
->> +		dev_err(dev, "failed to allocate register map: %d\n", ret);
->> +		return ret;
->> +	}
->> +
->> +	mutex_init(&ddata->lock);
->> +
->> +	ret = stmfx_chip_init(ddata, client);
->> +	if (ret) {
->> +		if (ret == -ETIMEDOUT)
->> +			return -EPROBE_DEFER;
->> +		return ret;
->> +	}
->> +
->> +	if (client->irq < 0) {
->> +		dev_err(dev, "failed to get irq: %d\n", client->irq);
->> +		ret = client->irq;
->> +		goto err_chip_exit;
->> +	}
->> +
->> +	ret = stmfx_irq_init(ddata, client->irq);
->> +	if (ret)
->> +		goto err_chip_exit;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(stmfx_cells); i++) {
->> +		stmfx_cells[i].platform_data = ddata->stmfx;
->> +		stmfx_cells[i].pdata_size = sizeof(struct stmfx);
->> +	}
->> +
->> +	ret = devm_mfd_add_devices(dev, PLATFORM_DEVID_NONE,
->> +				   stmfx_cells, ARRAY_SIZE(stmfx_cells), NULL,
->> +				   0, ddata->irq_domain);
->> +	if (ret)
->> +		goto err_irq_exit;
->> +
->> +	return 0;
->> +
->> +err_irq_exit:
->> +	stmfx_irq_exit(ddata);
->> +err_chip_exit:
->> +	stmfx_chip_exit(ddata);
->> +
->> +	return ret;
->> +}
->> +
->> +static int stmfx_remove(struct i2c_client *client)
->> +{
->> +	struct stmfx_ddata *ddata = i2c_get_clientdata(client);
->> +
->> +	stmfx_irq_exit(ddata);
->> +
->> +	return stmfx_chip_exit(ddata);
->> +}
->> +
->> +#ifdef CONFIG_PM_SLEEP
->> +static int stmfx_backup_regs(struct stmfx_ddata *ddata)
->> +{
->> +	int ret;
->> +
->> +	ret = regmap_raw_read(ddata->stmfx->map, STMFX_REG_SYS_CTRL,
->> +			      &ddata->bkp_sysctrl, sizeof(ddata->bkp_sysctrl));
->> +	if (ret)
->> +		return ret;
->> +	ret = regmap_raw_read(ddata->stmfx->map, STMFX_REG_IRQ_OUT_PIN,
->> +			      &ddata->bkp_irqoutpin,
->> +			      sizeof(ddata->bkp_irqoutpin));
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
->> +}
->> +
->> +static int stmfx_restore_regs(struct stmfx_ddata *ddata)
->> +{
->> +	int ret;
->> +
->> +	ret = regmap_raw_write(ddata->stmfx->map, STMFX_REG_SYS_CTRL,
->> +			       &ddata->bkp_sysctrl, sizeof(ddata->bkp_sysctrl));
->> +	if (ret)
->> +		return ret;
->> +	ret = regmap_raw_write(ddata->stmfx->map, STMFX_REG_IRQ_OUT_PIN,
->> +			       &ddata->bkp_irqoutpin,
->> +			       sizeof(ddata->bkp_irqoutpin));
->> +	if (ret)
->> +		return ret;
->> +	ret = regmap_raw_write(ddata->stmfx->map, STMFX_REG_IRQ_SRC_EN,
->> +			       &ddata->irq_src, sizeof(ddata->irq_src));
->> +	if (ret)
->> +		return ret;
->> +
->> +	return 0;
->> +}
->> +
->> +static int stmfx_suspend(struct device *dev)
->> +{
->> +	struct stmfx_ddata *ddata = dev_get_drvdata(dev);
->> +	int ret;
->> +
->> +	ret = stmfx_backup_regs(ddata);
->> +	if (ret) {
->> +		dev_err(ddata->stmfx->dev, "registers backup failure\n");
->> +		return ret;
->> +	}
->> +
->> +	if (!IS_ERR(ddata->vdd)) {
->> +		ret = regulator_disable(ddata->vdd);
->> +		if (ret)
->> +			return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int stmfx_resume(struct device *dev)
->> +{
->> +	struct stmfx_ddata *ddata = dev_get_drvdata(dev);
->> +	int ret;
->> +
->> +	if (!IS_ERR(ddata->vdd)) {
->> +		ret = regulator_enable(ddata->vdd);
->> +		if (ret) {
->> +			dev_err(ddata->stmfx->dev,
->> +				"vdd enable failed: %d\n", ret);
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	ret = stmfx_restore_regs(ddata);
->> +	if (ret) {
->> +		dev_err(ddata->stmfx->dev, "registers restoration failure\n");
->> +		return ret;
->> +	}
->> +
->> +	return 0;
->> +}
->> +#endif
->> +
->> +static SIMPLE_DEV_PM_OPS(stmfx_dev_pm_ops, stmfx_suspend, stmfx_resume);
->> +
->> +static const struct of_device_id stmfx_of_match[] = {
->> +	{ .compatible = "st,stmfx-0300", },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, stmfx_of_match);
->> +
->> +static struct i2c_driver stmfx_driver = {
->> +	.driver = {
->> +		.name = "stmfx-core",
->> +		.of_match_table = of_match_ptr(stmfx_of_match),
->> +		.pm = &stmfx_dev_pm_ops,
->> +	},
->> +	.probe = stmfx_probe,
->> +	.remove = stmfx_remove,
->> +};
->> +module_i2c_driver(stmfx_driver);
->> +
->> +MODULE_DESCRIPTION("STMFX core driver");
->> +MODULE_AUTHOR("Amelie Delaunay <amelie.delaunay@st.com>");
->> +MODULE_LICENSE("GPL v2");
->> diff --git a/include/linux/mfd/stmfx.h b/include/linux/mfd/stmfx.h
->> new file mode 100644
->> index 0000000..35c3d42
->> --- /dev/null
->> +++ b/include/linux/mfd/stmfx.h
->> @@ -0,0 +1,27 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + * Copyright (C) 2018 STMicroelectronics
->> + * Author(s): Amelie Delaunay <amelie.delaunay@st.com>.
->> + */
->> +
->> +#ifndef MFD_STMFX_H
->> +#define MFX_STMFX_H
->> +
->> +#include <linux/regmap.h>
->> +
->> +enum stmfx_functions {
->> +	STMFX_FUNC_GPIO		= BIT(0), /* GPIO[15:0] */
->> +	STMFX_FUNC_ALTGPIO_LOW	= BIT(1), /* aGPIO[3:0] */
->> +	STMFX_FUNC_ALTGPIO_HIGH = BIT(2), /* aGPIO[7:4] */
->> +	STMFX_FUNC_TS		= BIT(3),
->> +	STMFX_FUNC_IDD		= BIT(4),
->> +};
->> +
->> +struct stmfx {
->> +	struct device *dev;
->> +	struct regmap *map;
->> +};
->> +
->> +int stmfx_function_enable(struct stmfx *stmfx, u32 func);
->> +int stmfx_function_disable(struct stmfx *stmfx, u32 func);
->> +#endif
-> 
-
-V4 is coming, based on your comments. Thanks for the review.
-
-Regards,
-Amelie
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
